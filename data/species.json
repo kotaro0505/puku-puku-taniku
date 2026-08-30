@@ -1,0 +1,5 @@
+{
+  "deprecated": true,
+  "source": "res://data/species-v2.json",
+  "note": "11品種の現行データはspecies-v2.jsonを使用します。"
+}
