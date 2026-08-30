@@ -28,15 +28,16 @@ var target_offset := Vector3.ZERO
 var rng := RandomNumberGenerator.new()
 var label: Label
 const GROWTH_CM_PER_SECOND := 1.365625
-const JELLY_RAMP_START_SECONDS := 4.0
-const JELLY_RAMP_END_SECONDS := 10.0
-const JELLY_CHANCE_BEFORE_RAMP := 0.005
-const JELLY_CHANCE_AT_END := 0.06
+const JELLY_SAFE_END_SECONDS := 2.0
+const JELLY_PROFILE_START_SECONDS := 4.0
+const JELLY_CHANCE_AT_BIRTH := 0.0001
+const JELLY_CHANCE_AT_PROFILE_START := 0.005
 
 var visual_scale := 0.18
 var plant_sprite: Sprite3D
 var contact_shadow: MeshInstance3D
 var is_special := false
+var jelly_profile := "standard"
 var jelly_checks_enabled := true
 var sway_phase := 0.0
 
@@ -45,6 +46,15 @@ func setup(species: Dictionary, seed_value: int, screen_label: Label, _danger: L
 	rng.seed = seed_value
 	sway_phase = rng.randf_range(0.0, TAU)
 	is_special = rng.randf() < 0.10
+	var jelly_profile_roll := rng.randf()
+	if jelly_profile_roll < 0.65:
+		jelly_profile = "standard"
+	elif jelly_profile_roll < 0.90:
+		jelly_profile = "sticky"
+	elif jelly_profile_roll < 0.98:
+		jelly_profile = "long_lived"
+	else:
+		jelly_profile = "monster"
 	label = screen_label
 	# Species rarity and the independent special roll never change growth speed.
 	growth_rate = 1.0
@@ -104,34 +114,56 @@ func simulate(delta: float) -> void:
 	visual_scale = .18 + (diameter_cm - 1.6) * .058
 	_update_visual(delta)
 	if jelly_checks_enabled:
-		var jelly_probability := jelly_probability_for_interval(age - delta, delta)
+		var jelly_probability := jelly_probability_for_interval(age - delta, delta, jelly_profile)
 		if rng.randf() < jelly_probability: jelly()
 
-static func jelly_probability_for_interval(start_age: float, delta: float) -> float:
+static func jelly_probability_for_interval(start_age: float, delta: float, profile := "standard") -> float:
 	# This is the single source of truth for jelly probability. Integrating the
 	# smoothly varying hazard over the whole frame makes the result FPS independent.
 	if delta <= 0.0: return 0.0
 	var end_age := start_age + delta
 	var integrated_hazard := 0.0
-	var initial_end := minf(end_age, JELLY_RAMP_START_SECONDS)
+	var initial_end := minf(end_age, JELLY_SAFE_END_SECONDS)
 	if initial_end > start_age:
-		integrated_hazard += -log(1.0 - JELLY_CHANCE_BEFORE_RAMP) * (initial_end - start_age)
-	integrated_hazard += _integrate_hazard_segment(start_age, end_age, JELLY_RAMP_START_SECONDS, JELLY_RAMP_END_SECONDS, JELLY_CHANCE_BEFORE_RAMP, JELLY_CHANCE_AT_END)
-	var constant_start := maxf(start_age, JELLY_RAMP_END_SECONDS)
+		integrated_hazard += -log(1.0 - JELLY_CHANCE_AT_BIRTH) * (initial_end - start_age)
+	integrated_hazard += _integrate_hazard_segment(start_age, end_age, JELLY_SAFE_END_SECONDS, JELLY_PROFILE_START_SECONDS, JELLY_CHANCE_AT_BIRTH, JELLY_CHANCE_AT_PROFILE_START)
+	var points := _profile_points(profile)
+	for index in range(points.size() - 1):
+		var from_point: Vector2 = points[index]
+		var to_point: Vector2 = points[index + 1]
+		integrated_hazard += _integrate_hazard_segment(start_age, end_age, from_point.x, to_point.x, from_point.y, to_point.y)
+	var final_point: Vector2 = points[-1]
+	var constant_start := maxf(start_age, final_point.x)
 	if end_age > constant_start:
-		integrated_hazard += -log(1.0 - JELLY_CHANCE_AT_END) * (end_age - constant_start)
+		integrated_hazard += -log(1.0 - final_point.y) * (end_age - constant_start)
 	return 1.0 - exp(-integrated_hazard)
 
-static func jelly_chance_per_second(at_age: float) -> float:
-	var hazard: float
-	if at_age <= JELLY_RAMP_START_SECONDS:
-		hazard = -log(1.0 - JELLY_CHANCE_BEFORE_RAMP)
-	elif at_age < JELLY_RAMP_END_SECONDS:
-		var t := (at_age - JELLY_RAMP_START_SECONDS) / (JELLY_RAMP_END_SECONDS - JELLY_RAMP_START_SECONDS)
-		hazard = lerpf(-log(1.0 - JELLY_CHANCE_BEFORE_RAMP), -log(1.0 - JELLY_CHANCE_AT_END), smoothstep(0.0, 1.0, t))
-	else:
-		hazard = -log(1.0 - JELLY_CHANCE_AT_END)
+static func jelly_chance_per_second(at_age: float, profile := "standard") -> float:
+	var hazard := -log(1.0 - JELLY_CHANCE_AT_BIRTH)
+	if at_age > JELLY_SAFE_END_SECONDS and at_age < JELLY_PROFILE_START_SECONDS:
+		hazard = _smooth_hazard(at_age, JELLY_SAFE_END_SECONDS, JELLY_PROFILE_START_SECONDS, JELLY_CHANCE_AT_BIRTH, JELLY_CHANCE_AT_PROFILE_START)
+	elif at_age >= JELLY_PROFILE_START_SECONDS:
+		var points := _profile_points(profile)
+		hazard = -log(1.0 - JELLY_CHANCE_AT_PROFILE_START)
+		for index in range(points.size() - 1):
+			var from_point: Vector2 = points[index]
+			var to_point: Vector2 = points[index + 1]
+			if at_age < to_point.x:
+				hazard = _smooth_hazard(at_age, from_point.x, to_point.x, from_point.y, to_point.y)
+				break
+			hazard = -log(1.0 - to_point.y)
 	return 1.0 - exp(-hazard)
+
+static func _profile_points(profile: String) -> Array[Vector2]:
+	match profile:
+		"sticky": return [Vector2(4.0, 0.005), Vector2(12.0, 0.04)]
+		"long_lived": return [Vector2(4.0, 0.005), Vector2(9.0, 0.055), Vector2(18.0, 0.025)]
+		"monster": return [Vector2(4.0, 0.005), Vector2(10.0, 0.065), Vector2(20.0, 0.0125)]
+		_: return [Vector2(4.0, 0.005), Vector2(10.0, 0.06)]
+
+static func _smooth_hazard(at_age: float, segment_start: float, segment_end: float, start_chance: float, end_chance: float) -> float:
+	var t := clampf((at_age - segment_start) / (segment_end - segment_start), 0.0, 1.0)
+	return lerpf(-log(1.0 - start_chance), -log(1.0 - end_chance), smoothstep(0.0, 1.0, t))
 
 static func _integrate_hazard_segment(start_age: float, end_age: float, segment_start: float, segment_end: float, start_chance: float, end_chance: float) -> float:
 	var clipped_start := maxf(start_age, segment_start)

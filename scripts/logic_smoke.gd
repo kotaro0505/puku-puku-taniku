@@ -51,17 +51,20 @@ func _ready()->void:
 
 func _verify_jelly_probability()->void:
 	var succulent_script = load("res://scripts/succulent.gd")
-	assert(is_equal_approx(succulent_script.jelly_chance_per_second(0.0), 0.005))
-	assert(is_equal_approx(succulent_script.jelly_chance_per_second(3.0), 0.005))
-	assert(is_equal_approx(succulent_script.jelly_chance_per_second(4.0), 0.005))
-	assert(succulent_script.jelly_chance_per_second(7.0) > 0.005)
-	assert(succulent_script.jelly_chance_per_second(7.0) < 0.06)
-	assert(is_equal_approx(succulent_script.jelly_chance_per_second(10.0), 0.06))
-	assert(is_equal_approx(succulent_script.jelly_chance_per_second(100.0), 0.06))
-	var reference_probability = succulent_script.jelly_probability_for_interval(0.0, 15.0)
-	for fps in [30,60,120]:
-		var delta := 1.0 / float(fps)
-		var survival := 1.0
-		for frame in range(15 * fps):
-			survival *= 1.0 - succulent_script.jelly_probability_for_interval(frame * delta, delta)
-		assert(is_equal_approx(1.0 - survival, reference_probability))
+	for profile in ["standard","sticky","long_lived","monster"]:
+		assert(is_equal_approx(succulent_script.jelly_chance_per_second(0.0, profile), 0.0001))
+		assert(is_equal_approx(succulent_script.jelly_chance_per_second(2.0, profile), 0.0001))
+		assert(is_equal_approx(succulent_script.jelly_chance_per_second(4.0, profile), 0.005))
+		var reference_probability = succulent_script.jelly_probability_for_interval(0.0, 25.0, profile)
+		for fps in [30,60,120]:
+			var delta := 1.0 / float(fps)
+			var survival := 1.0
+			for frame in range(25 * fps):
+				survival *= 1.0 - succulent_script.jelly_probability_for_interval(frame * delta, delta, profile)
+			assert(is_equal_approx(1.0 - survival, reference_probability))
+	assert(is_equal_approx(succulent_script.jelly_chance_per_second(10.0, "standard"), 0.06))
+	assert(is_equal_approx(succulent_script.jelly_chance_per_second(12.0, "sticky"), 0.04))
+	assert(is_equal_approx(succulent_script.jelly_chance_per_second(9.0, "long_lived"), 0.055))
+	assert(is_equal_approx(succulent_script.jelly_chance_per_second(18.0, "long_lived"), 0.025))
+	assert(is_equal_approx(succulent_script.jelly_chance_per_second(10.0, "monster"), 0.065))
+	assert(is_equal_approx(succulent_script.jelly_chance_per_second(20.0, "monster"), 0.0125))
