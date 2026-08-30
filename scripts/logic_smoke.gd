@@ -5,6 +5,7 @@ func _ready()->void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	assert(game.plants.size()==12)
+	assert(game.catalog_species.size()==11)
 	var species_ids:Array=[]
 	for entry in game.species:species_ids.append(str(entry.species_id))
 	for required in ["laui","golden_laui","colorata","affinis","lutea","shaviana","kannte"]:assert(required in species_ids)
@@ -50,6 +51,8 @@ func _ready()->void:
 	var species_id:String=harvest_target.data.species_id;harvest_target.diameter_cm=21.7;harvest_target.harvest()
 	await get_tree().create_timer(1.2).timeout
 	assert(float(game.bests.get(species_id,0.0))>=21.7)
+	assert(bool(game.discovered.get(species_id,false)))
+	game._open_encyclopedia();assert(game.encyclopedia_overlay.visible);assert(game.encyclopedia_grid.get_child_count()==game.catalog_species.size());game._close_encyclopedia()
 	assert(game.plants.size()==initial_count)
 	var replacement_position:Vector3=game.plants[-1].original_pos;assert(replacement_position.distance_to(rooted_position)>.1)
 	for plant in game.plants:plant.jelly_checks_enabled=false

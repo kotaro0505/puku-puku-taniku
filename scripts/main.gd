@@ -14,6 +14,7 @@ const UI_GOLD := Color("#e8aa35")
 
 var rng := RandomNumberGenerator.new()
 var species: Array = []
+var catalog_species: Array = []
 var opening_species: Array = []
 var plants: Array = []
 var recent_vacated_slots: Array[Vector3] = []
@@ -36,8 +37,13 @@ var best_label: Label
 var coin_label: Label
 var record_card: PanelContainer
 var record_text: Label
+var encyclopedia_overlay: Control
+var encyclopedia_list_page: Control
+var encyclopedia_detail_page: Control
+var encyclopedia_grid: GridContainer
 var coins := 12450
 var bests: Dictionary = {}
+var discovered: Dictionary = {}
 var spawn_queue := 0
 var spawn_timer := 0.0
 var forced_golden_done := false
@@ -64,6 +70,7 @@ func _ready() -> void:
 func _load_species() -> void:
 	var raw := FileAccess.get_file_as_string("res://data/species-v2.json")
 	var all_species: Array = JSON.parse_string(raw)
+	catalog_species=all_species.duplicate(true)
 	var enabled := ["colorata", "lutea", "shaviana", "affinis", "laui", "kannte", "golden_laui"]
 	for entry in all_species:
 		if str(entry.species_id) in enabled:
@@ -73,11 +80,14 @@ func _load_save() -> void:
 	if FileAccess.file_exists("user://records.json"):
 		var value = JSON.parse_string(FileAccess.get_file_as_string("user://records.json"))
 		if value is Dictionary:
-			bests = value.get("bests",{}); coins = int(value.get("coins",12450))
+			bests = value.get("bests",{}); coins = int(value.get("coins",12450)); discovered=value.get("discovered",{})
+			# Saves created before the encyclopedia already contain valid best sizes.
+			for species_id in bests:
+				if float(bests[species_id])>0.0:discovered[species_id]=true
 
 func _save() -> void:
 	var f := FileAccess.open("user://records.json",FileAccess.WRITE)
-	f.store_string(JSON.stringify({"bests":bests,"coins":coins}))
+	f.store_string(JSON.stringify({"bests":bests,"discovered":discovered,"coins":coins}))
 
 func _build_world() -> void:
 	greenhouse_layer=CanvasLayer.new();greenhouse_layer.layer=-10;add_child(greenhouse_layer)
@@ -139,6 +149,7 @@ func _build_ui() -> void:
 	coin_label=Label.new(); coin_label.text=" ●  %s  ＋" % _comma(coins); coin_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; coin_label.add_theme_font_size_override("font_size",20); coin_label.add_theme_color_override("font_color",Color("#ffd85b")); coin_panel.add_child(coin_label)
 	for entry in [{"x":421,"t":"図鑑"},{"x":495,"t":"設定"}]:
 		var b:=Button.new(); b.text=entry.t; b.position=Vector2(entry.x,116); b.size=Vector2(68,73); _skin_button(b,Color("#fff0cf"),17); hud.add_child(b)
+		if entry.t=="図鑑":b.mouse_filter=Control.MOUSE_FILTER_STOP;b.pressed.connect(_open_encyclopedia)
 	mode_button=Button.new();mode_button.text="原生地";mode_button.position=Vector2(465,202);mode_button.size=Vector2(98,45);_skin_button(mode_button,Color("#fff0cf"),15);mode_button.mouse_filter=Control.MOUSE_FILTER_STOP;mode_button.pressed.connect(_toggle_mode);hud.add_child(mode_button)
 	# lower gradient cards
 	var harvest:=Button.new(); harvest.text="タップで 収穫！"; harvest.position=Vector2(24,829); harvest.size=Vector2(360,121); _skin_button(harvest,Color("#caa538"),27); harvest.mouse_filter=Control.MOUSE_FILTER_IGNORE; hud.add_child(harvest)
@@ -147,7 +158,51 @@ func _build_ui() -> void:
 	var nav:=HBoxContainer.new(); nav.position=Vector2(23,957); nav.size=Vector2(530,80); nav.add_theme_constant_override("separation",4); hud.add_child(nav)
 	for item in ["図鑑","ホーム","マーケット"]:
 		var b:=Button.new(); b.text=item; b.custom_minimum_size=Vector2(174,76); _skin_button(b,Color("#6d472d") if item!="ホーム" else Color("#fff0cf"),18); nav.add_child(b)
+		if item=="図鑑":b.pressed.connect(_open_encyclopedia)
+	_build_encyclopedia(hud)
 	_update_best_ui()
+
+func _build_encyclopedia(hud:Control)->void:
+	encyclopedia_overlay=Control.new();encyclopedia_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);encyclopedia_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;encyclopedia_overlay.visible=false;hud.add_child(encyclopedia_overlay)
+	var background:=ColorRect.new();background.color=Color("#3d2419");background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);background.mouse_filter=Control.MOUSE_FILTER_STOP;encyclopedia_overlay.add_child(background)
+	encyclopedia_list_page=Control.new();encyclopedia_list_page.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);encyclopedia_overlay.add_child(encyclopedia_list_page)
+	var title:=Label.new();title.text="ぷくぷく図鑑";title.position=Vector2(28,28);title.size=Vector2(390,65);title.add_theme_font_size_override("font_size",31);title.add_theme_color_override("font_color",UI_CREAM);encyclopedia_list_page.add_child(title)
+	var close:=Button.new();close.text="もどる";close.position=Vector2(447,27);close.size=Vector2(105,55);_skin_button(close,Color("#fff0cf"),17);close.pressed.connect(_close_encyclopedia);encyclopedia_list_page.add_child(close)
+	var scroll:=ScrollContainer.new();scroll.position=Vector2(20,105);scroll.size=Vector2(536,890);scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;encyclopedia_list_page.add_child(scroll)
+	encyclopedia_grid=GridContainer.new();encyclopedia_grid.columns=2;encyclopedia_grid.custom_minimum_size=Vector2(516,0);encyclopedia_grid.add_theme_constant_override("h_separation",12);encyclopedia_grid.add_theme_constant_override("v_separation",14);scroll.add_child(encyclopedia_grid)
+	encyclopedia_detail_page=Control.new();encyclopedia_detail_page.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);encyclopedia_detail_page.visible=false;encyclopedia_overlay.add_child(encyclopedia_detail_page)
+
+func _open_encyclopedia()->void:
+	_refresh_encyclopedia_cards();encyclopedia_detail_page.visible=false;encyclopedia_list_page.visible=true;encyclopedia_overlay.visible=true
+
+func _close_encyclopedia()->void:
+	encyclopedia_overlay.visible=false
+
+func _refresh_encyclopedia_cards()->void:
+	for child in encyclopedia_grid.get_children():child.free()
+	for entry in catalog_species:
+		var species_id:=str(entry.get("species_id",""));var found:=bool(discovered.get(species_id,false))
+		var card:=Button.new();card.custom_minimum_size=Vector2(252,218);_skin_button(card,Color("#f6e7c5"),16);card.disabled=not found;encyclopedia_grid.add_child(card)
+		var content:=VBoxContainer.new();content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);content.offset_left=10;content.offset_top=8;content.offset_right=-10;content.offset_bottom=-8;content.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.alignment=BoxContainer.ALIGNMENT_CENTER;card.add_child(content)
+		var image:=TextureRect.new();image.custom_minimum_size=Vector2(210,137);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.texture=_species_texture(entry);image.mouse_filter=Control.MOUSE_FILTER_IGNORE
+		if not found:image.modulate=Color(0.12,0.09,0.08,0.82)
+		content.add_child(image)
+		var name_label:=Label.new();name_label.text=str(entry.get("name_ja","？？？")) if found else "？？？";name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name_label.add_theme_font_size_override("font_size",18);name_label.add_theme_color_override("font_color",UI_BROWN);content.add_child(name_label)
+		var best_label_card:=Label.new();best_label_card.text=("自己ベスト  %.1f cm"%float(bests.get(species_id,0.0))) if found else "未発見";best_label_card.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;best_label_card.add_theme_font_size_override("font_size",14);best_label_card.add_theme_color_override("font_color",Color("#79543a"));content.add_child(best_label_card)
+		if found:card.pressed.connect(_open_species_detail.bind(entry))
+
+func _species_texture(entry:Dictionary)->Texture2D:
+	var variant:=str(entry.get("visual_variant","laui"));var path:=str(SucculentClass.SPRITES.get(variant,SucculentClass.SPRITES.laui));return load(path) as Texture2D
+
+func _open_species_detail(entry:Dictionary)->void:
+	for child in encyclopedia_detail_page.get_children():child.free()
+	encyclopedia_list_page.visible=false;encyclopedia_detail_page.visible=true
+	var back:=Button.new();back.text="一覧へ";back.position=Vector2(24,28);back.size=Vector2(105,55);_skin_button(back,Color("#fff0cf"),17);back.pressed.connect(func():encyclopedia_detail_page.visible=false;encyclopedia_list_page.visible=true);encyclopedia_detail_page.add_child(back)
+	var panel:=PanelContainer.new();panel.position=Vector2(28,115);panel.size=Vector2(520,760);panel.add_theme_stylebox_override("panel",_box(Color("#f6e7c5"),Color("#d3a75f"),24,4));encyclopedia_detail_page.add_child(panel)
+	var content:=VBoxContainer.new();content.alignment=BoxContainer.ALIGNMENT_CENTER;content.add_theme_constant_override("separation",18);panel.add_child(content)
+	var image:=TextureRect.new();image.custom_minimum_size=Vector2(450,470);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.texture=_species_texture(entry);content.add_child(image)
+	var name_label:=Label.new();name_label.text=str(entry.get("name_ja",""));name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name_label.add_theme_font_size_override("font_size",31);name_label.add_theme_color_override("font_color",UI_BROWN);content.add_child(name_label)
+	var species_id:=str(entry.get("species_id",""));var best_detail:=Label.new();best_detail.text="自己ベスト  %.1f cm"%float(bests.get(species_id,0.0));best_detail.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;best_detail.add_theme_font_size_override("font_size",23);best_detail.add_theme_color_override("font_color",Color("#98602e"));content.add_child(best_detail)
 
 func _box(bg: Color, border: Color, radius: int, width: int) -> StyleBoxFlat:
 	var s:=StyleBoxFlat.new(); s.bg_color=bg; s.border_color=border
@@ -306,6 +361,7 @@ func _update_labels()->void:
 		p.label.position=r.position; p.label.text="%.1f cm"%p.diameter_cm; p.label.visible=p.state=="growing" and Rect2(Vector2.ZERO,get_viewport().get_visible_rect().size).grow(80).has_point(screen)
 
 func _input(event:InputEvent)->void:
+	if encyclopedia_overlay and encyclopedia_overlay.visible:return
 	if event is InputEventScreenTouch:
 		if event.pressed:
 			_begin_pointer(event.position)
@@ -367,6 +423,7 @@ func _try_harvest(screen_pos:Vector2)->void:
 
 func _on_harvested(p)->void:
 	var old:=float(bests.get(p.data.species_id,0.0));var is_record:bool=p.diameter_cm>old
+	discovered[p.data.species_id]=true
 	if is_record:bests[p.data.species_id]=p.diameter_cm
 	var reward:=int(p.diameter_cm*11.0)*(4 if str(p.data.rarity)=="スーパーレア" else 1);coins+=reward;_save();_update_best_ui();coin_label.text=" ●  %s  ＋"%_comma(coins)
 	_show_float(p,"GET!\n%s  %.1fcm"%[p.data.name_ja,p.diameter_cm],Color("#fff3a2"))
