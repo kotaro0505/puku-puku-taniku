@@ -66,7 +66,6 @@ var shop_overlay: Control
 var shop_wallet_label: Label
 var shop_bag_label: Label
 var shop_message: Label
-var panda_clerk_slot: TextureRect
 var result_overlay: Control
 var result_card: PanelContainer
 var result_total_label: Label
@@ -264,14 +263,8 @@ func _build_play_overlay(hud:Control)->void:
 
 func _build_shop(hud:Control)->void:
 	shop_overlay=Control.new();shop_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);shop_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;shop_overlay.visible=false;hud.add_child(shop_overlay)
-	var shop_texture:=load("res://assets/shop-background.jpg") as Texture2D
+	var shop_texture:=load("res://assets/shop-background-final.jpg") as Texture2D
 	var background:=TextureRect.new();background.texture=shop_texture;background.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;background.stretch_mode=TextureRect.STRETCH_SCALE;background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);background.mouse_filter=Control.MOUSE_FILTER_IGNORE;shop_overlay.add_child(background)
-	# Independent character layer: replace this texture or animate this node later.
-	panda_clerk_slot=TextureRect.new();panda_clerk_slot.name="PandaClerkSprite";panda_clerk_slot.texture=load("res://assets/panda-clerk.png");panda_clerk_slot.position=Vector2(145,255);panda_clerk_slot.size=Vector2(286,429);panda_clerk_slot.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;panda_clerk_slot.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;panda_clerk_slot.mouse_filter=Control.MOUSE_FILTER_IGNORE;shop_overlay.add_child(panda_clerk_slot)
-	# Reuse the exact counter area from the background as a foreground occluder.
-	# It hides the panda's lower body without baking the character into the scene.
-	var counter_crop:=AtlasTexture.new();counter_crop.atlas=shop_texture;counter_crop.region=Rect2(0,745,720,535)
-	var counter_foreground:=TextureRect.new();counter_foreground.name="CounterForegroundMask";counter_foreground.texture=counter_crop;counter_foreground.position=Vector2(0,596);counter_foreground.size=Vector2(576,428);counter_foreground.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;counter_foreground.stretch_mode=TextureRect.STRETCH_SCALE;counter_foreground.mouse_filter=Control.MOUSE_FILTER_IGNORE;shop_overlay.add_child(counter_foreground)
 	var title:=Label.new();title.text="種袋ショップ";title.position=Vector2(20,24);title.size=Vector2(210,52);title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;title.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;title.add_theme_font_size_override("font_size",22);title.add_theme_color_override("font_color",UI_CREAM);title.add_theme_stylebox_override("normal",_box(Color(0.24,0.13,0.07,.82),Color("#e0b977"),18,2));shop_overlay.add_child(title)
 	var close:=Button.new();close.text="もどる";close.position=Vector2(446,24);close.size=Vector2(106,55);_skin_button(close,Color("#fff0cf"),17);close.pressed.connect(_close_shop);shop_overlay.add_child(close)
 	var purchase_panel:=PanelContainer.new();purchase_panel.position=Vector2(28,704);purchase_panel.size=Vector2(520,296);purchase_panel.add_theme_stylebox_override("panel",_box(Color(0.22,0.12,0.07,.93),Color("#d7aa64"),22,3));shop_overlay.add_child(purchase_panel)
