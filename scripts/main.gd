@@ -15,6 +15,10 @@ var camera: Camera3D
 var world_root: Node3D
 var pot_root: Node3D
 var greenhouse_layer: CanvasLayer
+var greenhouse_backdrop: TextureRect
+var greenhouse_pan_x := 0.0
+var greenhouse_pan_limit := 0.0
+var greenhouse_world_pan_x := 0.0
 var habitat_env: WorldEnvironment
 var habitat_environment: Environment
 var mode_button: Button
@@ -68,7 +72,7 @@ func _save() -> void:
 
 func _build_world() -> void:
 	greenhouse_layer=CanvasLayer.new();greenhouse_layer.layer=-10;add_child(greenhouse_layer)
-	var greenhouse:=TextureRect.new();greenhouse.texture=load("res://assets/greenhouse-pot.jpg");greenhouse.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);greenhouse.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;greenhouse.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_COVERED;greenhouse.mouse_filter=Control.MOUSE_FILTER_IGNORE;greenhouse_layer.add_child(greenhouse)
+	greenhouse_backdrop=TextureRect.new();greenhouse_backdrop.texture=load("res://assets/greenhouse-main.jpg");greenhouse_backdrop.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;greenhouse_backdrop.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT;greenhouse_backdrop.mouse_filter=Control.MOUSE_FILTER_IGNORE;greenhouse_layer.add_child(greenhouse_backdrop)
 	world_root = Node3D.new(); add_child(world_root)
 	habitat_env=WorldEnvironment.new(); var env:=Environment.new()
 	var sky := Sky.new(); var panorama := PanoramaSkyMaterial.new()
@@ -144,7 +148,24 @@ func _skin_button(b:Button,bg:Color,font_size:int)->void:
 	b.add_theme_font_size_override("font_size",font_size); b.add_theme_color_override("font_color",UI_BROWN if bg.get_luminance()>.55 else Color.WHITE); b.add_theme_color_override("font_hover_color",UI_BROWN); b.add_theme_stylebox_override("normal",_box(bg,bg.lightened(.22),20,3)); b.add_theme_stylebox_override("hover",_box(bg.lightened(.08),Color.WHITE,20,3)); b.add_theme_stylebox_override("pressed",_box(bg.darkened(.08),bg.lightened(.2),20,3))
 
 func _layout() -> void:
-	pass
+	_update_greenhouse_pan()
+
+func _update_greenhouse_pan()->void:
+	if greenhouse_backdrop==null or greenhouse_backdrop.texture==null:return
+	var viewport_size:=get_viewport().get_visible_rect().size
+	var texture_size:=greenhouse_backdrop.texture.get_size()
+	var cover_scale:=maxf(viewport_size.x/texture_size.x,viewport_size.y/texture_size.y)
+	var display_size:=texture_size*cover_scale
+	greenhouse_pan_limit=maxf(0.0,(display_size.x-viewport_size.x)*.5)
+	greenhouse_pan_x=clampf(greenhouse_pan_x,-greenhouse_pan_limit,greenhouse_pan_limit)
+	greenhouse_backdrop.size=display_size
+	greenhouse_backdrop.position=Vector2((viewport_size.x-display_size.x)*.5+greenhouse_pan_x,(viewport_size.y-display_size.y)*.5)
+	greenhouse_world_pan_x=0.0
+	if camera:
+		var soil_center:=camera.unproject_position(Vector3(0,.12,0))
+		var soil_right:=camera.unproject_position(Vector3(1,.12,0))
+		var pixels_per_world:=soil_right.x-soil_center.x
+		if absf(pixels_per_world)>.001:greenhouse_world_pan_x=greenhouse_pan_x/pixels_per_world
 
 func spawn_plant(force_golden := false) -> void:
 	var chosen:Dictionary
@@ -218,6 +239,7 @@ func _apply_mode()->void:
 		if is_instance_valid(p):p.visible=greenhouse_mode;p.label.visible=false
 	if greenhouse_mode:
 		camera.position=Vector3(0,7.3,8.6);camera.look_at_from_position(camera.position,Vector3(0,1.05,0),Vector3.UP)
+		_update_greenhouse_pan()
 	else:
 		camera.position=Vector3.ZERO;_apply_view_rotation()
 	if mode_button:
@@ -229,7 +251,7 @@ func _resolve_crowding(_delta:float)->void:
 	for p in plants:
 		if is_instance_valid(p):
 			p.target_offset = Vector3.ZERO
-			p.position.x = p.original_pos.x
+			p.position.x = p.original_pos.x + (greenhouse_world_pan_x if current_mode=="greenhouse" else 0.0)
 			p.position.z = p.original_pos.z
 
 func _update_labels()->void:
@@ -272,6 +294,11 @@ func _begin_pointer(screen_pos:Vector2)->void:
 
 func _drag_pointer(screen_pos:Vector2,relative:Vector2)->void:
 	pointer_travel+=relative.length();pointer_last=screen_pos
+	if current_mode=="greenhouse":
+		greenhouse_pan_x=clampf(greenhouse_pan_x+relative.x,-greenhouse_pan_limit,greenhouse_pan_limit)
+		_update_greenhouse_pan()
+		_resolve_crowding(0.0)
+		return
 	if current_mode!="habitat":return
 	# Direct manipulation: the panorama follows the finger in both axes.
 	view_yaw=fmod(view_yaw+relative.x*.032,360.0)
