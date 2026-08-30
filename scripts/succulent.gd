@@ -28,7 +28,9 @@ var target_offset := Vector3.ZERO
 var rng := RandomNumberGenerator.new()
 var label: Label
 const GROWTH_CM_PER_SECOND := 1.1875
-const JELLY_CHANCE_PER_SECOND := 0.13
+const EARLY_JELLY_DURATION_SECONDS := 3.0
+const EARLY_JELLY_CHANCE_PER_SECOND := 0.035
+const LATE_JELLY_CHANCE_PER_SECOND := 0.08
 
 var visual_scale := 0.18
 var plant_sprite: Sprite3D
@@ -101,9 +103,16 @@ func simulate(delta: float) -> void:
 	visual_scale = .18 + (diameter_cm - 1.6) * .058
 	_update_visual(delta)
 	if jelly_checks_enabled:
-		# Give every plant the same 13% chance over any one-second interval.
-		# Derive the exact per-frame chance from delta so the result is FPS independent.
-		var jelly_probability := 1.0 - pow(1.0 - JELLY_CHANCE_PER_SECOND, delta)
+		# Split frames that cross the three-second boundary, then combine survival
+		# probabilities. Rates depend only on age band and remain FPS independent.
+		var previous_age := age - delta
+		var early_duration := clampf(EARLY_JELLY_DURATION_SECONDS - previous_age, 0.0, delta)
+		var late_duration := delta - early_duration
+		var survival_probability := (
+			pow(1.0 - EARLY_JELLY_CHANCE_PER_SECOND, early_duration)
+			* pow(1.0 - LATE_JELLY_CHANCE_PER_SECOND, late_duration)
+		)
+		var jelly_probability := 1.0 - survival_probability
 		if rng.randf() < jelly_probability: jelly()
 
 func _update_visual(delta: float) -> void:
