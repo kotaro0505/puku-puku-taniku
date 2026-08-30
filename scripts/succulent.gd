@@ -48,9 +48,9 @@ func setup(species: Dictionary, seed_value: int, screen_label: Label, _danger: L
 	sway_phase = rng.randf_range(0.0, TAU)
 	is_special = rng.randf() < 0.10
 	var ramp_roll := rng.randf()
-	if ramp_roll < 0.20:
+	if ramp_roll < 0.65:
 		jelly_ramp_end_seconds = rng.randf_range(7.0, 9.0)
-	elif ramp_roll < 0.80:
+	elif ramp_roll < 0.90:
 		jelly_ramp_end_seconds = rng.randf_range(9.0, 13.0)
 	elif ramp_roll < 0.98:
 		jelly_ramp_end_seconds = rng.randf_range(13.0, 20.0)
