@@ -2,6 +2,9 @@ extends Node
 
 const SucculentClass = preload("res://scripts/succulent.gd")
 const TARGET_COUNT := 12
+const SPAWN_SOIL_RADIUS_X := 3.55
+const SPAWN_SOIL_RADIUS_Z := 3.15
+const SPAWN_EDGE_MARGIN := 0.50
 const UI_CREAM := Color("#fff1d2")
 const UI_BROWN := Color("#4a2618")
 const UI_GOLD := Color("#e8aa35")
@@ -199,7 +202,8 @@ func _find_spawn_position()->Vector3:
 	for attempt in range(72):
 		var angle := rng.randf_range(0.0, TAU)
 		var radius := sqrt(rng.randf())
-		var candidate := Vector3(cos(angle)*3.55*radius,.12,sin(angle)*3.15*radius)
+		# Keep the whole initial rosette inside the soil, not just its center.
+		var candidate := Vector3(cos(angle)*(SPAWN_SOIL_RADIUS_X-SPAWN_EDGE_MARGIN)*radius,.12,sin(angle)*(SPAWN_SOIL_RADIUS_Z-SPAWN_EDGE_MARGIN)*radius)
 		var clearance := 99.0
 		for plant in plants:
 			if is_instance_valid(plant): clearance = minf(clearance, candidate.distance_to(plant.original_pos))
@@ -295,7 +299,7 @@ func _begin_pointer(screen_pos:Vector2)->void:
 func _drag_pointer(screen_pos:Vector2,relative:Vector2)->void:
 	pointer_travel+=relative.length();pointer_last=screen_pos
 	if current_mode=="greenhouse":
-		greenhouse_pan_x=clampf(greenhouse_pan_x+relative.x,-greenhouse_pan_limit,greenhouse_pan_limit)
+		greenhouse_pan_x=clampf(greenhouse_pan_x+relative.x*.45,-greenhouse_pan_limit,greenhouse_pan_limit)
 		_update_greenhouse_pan()
 		_resolve_crowding(0.0)
 		return
