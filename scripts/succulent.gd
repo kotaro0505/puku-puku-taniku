@@ -39,7 +39,6 @@ var plant_sprite: Sprite3D
 var contact_shadow: MeshInstance3D
 var is_special := false
 var jelly_ramp_end_seconds := 11.0
-var growth_start_delay := 0.0
 var jelly_checks_enabled := true
 var sway_phase := 0.0
 
@@ -57,7 +56,6 @@ func setup(species: Dictionary, seed_value: int, screen_label: Label, _danger: L
 		jelly_ramp_end_seconds = rng.randf_range(13.0, 20.0)
 	else:
 		jelly_ramp_end_seconds = rng.randf_range(20.0, 30.0)
-	growth_start_delay = rng.randf_range(0.0, 2.5)
 	label = screen_label
 	# Species rarity and the independent special roll never change growth speed.
 	growth_rate = 1.0
@@ -111,8 +109,7 @@ void fragment(){vec2 p=(UV-vec2(.5))*2.0;float a=smoothstep(1.0,.08,dot(p,p));AL
 func simulate(delta: float) -> void:
 	if state != "growing": return
 	age += delta
-	var growth_age := maxf(0.0, age - growth_start_delay)
-	diameter_cm = 1.6 + growth_age * GROWTH_CM_PER_SECOND * growth_rate
+	diameter_cm = 1.6 + age * GROWTH_CM_PER_SECOND * growth_rate
 	# One physical-looking scale mapping for all sizes, with no clamp or cap.
 	# 30cm is now a moderate plant; 60–70cm is when it dominates the view.
 	visual_scale = .18 + (diameter_cm - 1.6) * .058
