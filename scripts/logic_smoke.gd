@@ -43,7 +43,7 @@ func _ready()->void:
 	game.view_yaw=0.0;game.view_pitch=-3.0;var count_before_drag:int=game.plants.size();var yaw_before:float=game.view_yaw;var pitch_before:float=game.view_pitch;game._begin_pointer(Vector2(300,500));game._drag_pointer(Vector2(380,560),Vector2(80,60));game._end_pointer(Vector2(380,560));assert(game.plants.size()==count_before_drag);assert(game.view_yaw>yaw_before and game.view_pitch>pitch_before)
 	game._toggle_mode();assert(game.current_mode=="greenhouse")
 	var pan_target=game.plants[0];var pan_screen_before:Vector2=game.camera.unproject_position(pan_target.global_position);var backdrop_y:float=game.greenhouse_backdrop.position.y
-	game._begin_pointer(Vector2(280,500));game._drag_pointer(Vector2(380,500),Vector2(100,0));game._end_pointer(Vector2(380,500));var pan_screen_after:Vector2=game.camera.unproject_position(pan_target.global_position)
+	game._begin_pointer(Vector2(280,500));game._drag_pointer(Vector2(282,500),Vector2(2,0));assert(is_equal_approx(game.greenhouse_pan_target_x,game.greenhouse_pan_x));game._drag_pointer(Vector2(380,500),Vector2(98,0));assert(game.greenhouse_pan_target_x>game.greenhouse_pan_x);game._update_greenhouse_pan_follow(.5);game._resolve_crowding(0.0);game._end_pointer(Vector2(380,500));var pan_screen_after:Vector2=game.camera.unproject_position(pan_target.global_position)
 	assert(game.greenhouse_pan_x>0.0 and game.greenhouse_pan_x<=game.greenhouse_pan_limit);assert(game.greenhouse_pan_limit<80.0);assert(pan_screen_after.x>pan_screen_before.x);assert(is_equal_approx(game.greenhouse_backdrop.position.y,backdrop_y))
 	for plant in game.plants:assert(game._spawn_center_inside_soil(plant.original_pos))
 	game.greenhouse_pan_x=0.0;game._update_greenhouse_pan();game._resolve_crowding(0.0)

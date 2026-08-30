@@ -5,6 +5,9 @@ const TARGET_COUNT := 12
 const SOIL_SOURCE_CENTER := Vector2(426.5,700.0)
 const SOIL_SOURCE_RADII := Vector2(360.0,190.0)
 const SPAWN_SPRITE_MARGIN_SOURCE_PX := 40.0
+const GREENHOUSE_DRAG_SCALE := 0.30
+const GREENHOUSE_DRAG_DEAD_ZONE := 3.0
+const GREENHOUSE_PAN_FOLLOW_SECONDS := 0.075
 const UI_CREAM := Color("#fff1d2")
 const UI_BROWN := Color("#4a2618")
 const UI_GOLD := Color("#e8aa35")
@@ -20,6 +23,7 @@ var pot_root: Node3D
 var greenhouse_layer: CanvasLayer
 var greenhouse_backdrop: TextureRect
 var greenhouse_pan_x := 0.0
+var greenhouse_pan_target_x := 0.0
 var greenhouse_pan_limit := 0.0
 var greenhouse_world_pan_x := 0.0
 var habitat_env: WorldEnvironment
@@ -43,6 +47,8 @@ var pointer_down := false
 var pointer_start := Vector2.ZERO
 var pointer_last := Vector2.ZERO
 var pointer_travel := 0.0
+var greenhouse_drag_accumulator := 0.0
+var greenhouse_drag_started := false
 
 func _ready() -> void:
 	rng.randomize()
@@ -161,6 +167,7 @@ func _update_greenhouse_pan()->void:
 	var display_size:=texture_size*cover_scale
 	greenhouse_pan_limit=maxf(0.0,(display_size.x-viewport_size.x)*.5)
 	greenhouse_pan_x=clampf(greenhouse_pan_x,-greenhouse_pan_limit,greenhouse_pan_limit)
+	greenhouse_pan_target_x=clampf(greenhouse_pan_target_x,-greenhouse_pan_limit,greenhouse_pan_limit)
 	greenhouse_backdrop.size=display_size
 	greenhouse_backdrop.position=Vector2((viewport_size.x-display_size.x)*.5+greenhouse_pan_x,(viewport_size.y-display_size.y)*.5)
 	greenhouse_world_pan_x=0.0
@@ -232,6 +239,7 @@ func _plant_label()->Label:
 	var l:=Label.new(); l.text="1.6 cm"; l.size=Vector2(92,34); l.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; l.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; l.add_theme_font_size_override("font_size",17); l.add_theme_color_override("font_color",Color.WHITE); l.add_theme_stylebox_override("normal",_box(Color(0.14,0.08,0.05,.92),Color("#f4e1be"),11,2)); l.mouse_filter=Control.MOUSE_FILTER_IGNORE; return l
 
 func _process(delta:float)->void:
+	_update_greenhouse_pan_follow(delta)
 	for p in plants:
 		if is_instance_valid(p): p.simulate(delta)
 	_resolve_crowding(delta)
@@ -239,6 +247,13 @@ func _process(delta:float)->void:
 	if spawn_queue>0:
 		spawn_timer-=delta
 		if spawn_timer<=0: spawn_queue-=1; spawn_plant(); spawn_timer=rng.randf_range(.35,.9)
+
+func _update_greenhouse_pan_follow(delta:float)->void:
+	if current_mode!="greenhouse" or is_equal_approx(greenhouse_pan_x,greenhouse_pan_target_x):return
+	var follow:=1.0-exp(-delta/GREENHOUSE_PAN_FOLLOW_SECONDS)
+	greenhouse_pan_x=lerpf(greenhouse_pan_x,greenhouse_pan_target_x,follow)
+	if absf(greenhouse_pan_target_x-greenhouse_pan_x)<0.05:greenhouse_pan_x=greenhouse_pan_target_x
+	_update_greenhouse_pan()
 
 func _toggle_mode()->void:
 	current_mode="habitat" if current_mode=="greenhouse" else "greenhouse"
@@ -308,13 +323,19 @@ func _input(event:InputEvent)->void:
 
 func _begin_pointer(screen_pos:Vector2)->void:
 	pointer_down=true;pointer_start=screen_pos;pointer_last=screen_pos;pointer_travel=0.0
+	greenhouse_drag_accumulator=0.0;greenhouse_drag_started=false;greenhouse_pan_target_x=greenhouse_pan_x
 
 func _drag_pointer(screen_pos:Vector2,relative:Vector2)->void:
 	pointer_travel+=relative.length();pointer_last=screen_pos
 	if current_mode=="greenhouse":
-		greenhouse_pan_x=clampf(greenhouse_pan_x+relative.x*.45,-greenhouse_pan_limit,greenhouse_pan_limit)
-		_update_greenhouse_pan()
-		_resolve_crowding(0.0)
+		if not greenhouse_drag_started:
+			greenhouse_drag_accumulator+=relative.x
+			if absf(greenhouse_drag_accumulator)<=GREENHOUSE_DRAG_DEAD_ZONE:return
+			greenhouse_drag_started=true
+			var excess:=greenhouse_drag_accumulator-signf(greenhouse_drag_accumulator)*GREENHOUSE_DRAG_DEAD_ZONE
+			greenhouse_pan_target_x=clampf(greenhouse_pan_target_x+excess*GREENHOUSE_DRAG_SCALE,-greenhouse_pan_limit,greenhouse_pan_limit)
+		else:
+			greenhouse_pan_target_x=clampf(greenhouse_pan_target_x+relative.x*GREENHOUSE_DRAG_SCALE,-greenhouse_pan_limit,greenhouse_pan_limit)
 		return
 	if current_mode!="habitat":return
 	# Direct manipulation: the panorama follows the finger in both axes.
