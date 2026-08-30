@@ -13,6 +13,10 @@ func _ready()->void:
 	for required in ["laui","golden_laui","colorata","affinis","lutea","kannte"]:assert(required in opening_ids)
 	for plant in game.plants:
 		plant.jelly_checks_enabled=false
+		assert(plant.growth_start_delay >= 0.0 and plant.growth_start_delay <= 2.5)
+	var growth_delays:Dictionary={}
+	for plant in game.plants:growth_delays["%.3f"%plant.growth_start_delay]=true
+	assert(growth_delays.size()>=10)
 	var unique_positions:Dictionary={}
 	for plant in game.plants:unique_positions["%.2f,%.2f"%[plant.original_pos.x,plant.original_pos.z]]=true
 	assert(unique_positions.size()>=11)
