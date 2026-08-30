@@ -51,8 +51,11 @@ func _ready()->void:
 
 func _verify_jelly_probability()->void:
 	var succulent_script = load("res://scripts/succulent.gd")
-	assert(is_equal_approx(succulent_script.jelly_chance_per_second(0.0), 0.015))
-	assert(is_equal_approx(succulent_script.jelly_chance_per_second(3.0), 0.025))
+	assert(is_equal_approx(succulent_script.jelly_chance_per_second(0.0), 0.005))
+	assert(is_equal_approx(succulent_script.jelly_chance_per_second(3.0), 0.005))
+	assert(is_equal_approx(succulent_script.jelly_chance_per_second(4.0), 0.005))
+	assert(succulent_script.jelly_chance_per_second(7.0) > 0.005)
+	assert(succulent_script.jelly_chance_per_second(7.0) < 0.06)
 	assert(is_equal_approx(succulent_script.jelly_chance_per_second(10.0), 0.06))
 	assert(is_equal_approx(succulent_script.jelly_chance_per_second(100.0), 0.06))
 	var reference_probability = succulent_script.jelly_probability_for_interval(0.0, 15.0)

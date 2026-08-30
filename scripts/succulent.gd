@@ -28,10 +28,9 @@ var target_offset := Vector3.ZERO
 var rng := RandomNumberGenerator.new()
 var label: Label
 const GROWTH_CM_PER_SECOND := 1.1875
-const JELLY_RAMP_MIDDLE_SECONDS := 3.0
+const JELLY_RAMP_START_SECONDS := 4.0
 const JELLY_RAMP_END_SECONDS := 10.0
-const JELLY_CHANCE_AT_BIRTH := 0.015
-const JELLY_CHANCE_AT_MIDDLE := 0.025
+const JELLY_CHANCE_BEFORE_RAMP := 0.005
 const JELLY_CHANCE_AT_END := 0.06
 
 var visual_scale := 0.18
@@ -114,8 +113,10 @@ static func jelly_probability_for_interval(start_age: float, delta: float) -> fl
 	if delta <= 0.0: return 0.0
 	var end_age := start_age + delta
 	var integrated_hazard := 0.0
-	integrated_hazard += _integrate_hazard_segment(start_age, end_age, 0.0, JELLY_RAMP_MIDDLE_SECONDS, JELLY_CHANCE_AT_BIRTH, JELLY_CHANCE_AT_MIDDLE)
-	integrated_hazard += _integrate_hazard_segment(start_age, end_age, JELLY_RAMP_MIDDLE_SECONDS, JELLY_RAMP_END_SECONDS, JELLY_CHANCE_AT_MIDDLE, JELLY_CHANCE_AT_END)
+	var initial_end := minf(end_age, JELLY_RAMP_START_SECONDS)
+	if initial_end > start_age:
+		integrated_hazard += -log(1.0 - JELLY_CHANCE_BEFORE_RAMP) * (initial_end - start_age)
+	integrated_hazard += _integrate_hazard_segment(start_age, end_age, JELLY_RAMP_START_SECONDS, JELLY_RAMP_END_SECONDS, JELLY_CHANCE_BEFORE_RAMP, JELLY_CHANCE_AT_END)
 	var constant_start := maxf(start_age, JELLY_RAMP_END_SECONDS)
 	if end_age > constant_start:
 		integrated_hazard += -log(1.0 - JELLY_CHANCE_AT_END) * (end_age - constant_start)
@@ -123,12 +124,11 @@ static func jelly_probability_for_interval(start_age: float, delta: float) -> fl
 
 static func jelly_chance_per_second(at_age: float) -> float:
 	var hazard: float
-	if at_age <= JELLY_RAMP_MIDDLE_SECONDS:
-		var t := clampf(at_age / JELLY_RAMP_MIDDLE_SECONDS, 0.0, 1.0)
-		hazard = lerpf(-log(1.0 - JELLY_CHANCE_AT_BIRTH), -log(1.0 - JELLY_CHANCE_AT_MIDDLE), smoothstep(0.0, 1.0, t))
+	if at_age <= JELLY_RAMP_START_SECONDS:
+		hazard = -log(1.0 - JELLY_CHANCE_BEFORE_RAMP)
 	elif at_age < JELLY_RAMP_END_SECONDS:
-		var t := (at_age - JELLY_RAMP_MIDDLE_SECONDS) / (JELLY_RAMP_END_SECONDS - JELLY_RAMP_MIDDLE_SECONDS)
-		hazard = lerpf(-log(1.0 - JELLY_CHANCE_AT_MIDDLE), -log(1.0 - JELLY_CHANCE_AT_END), smoothstep(0.0, 1.0, t))
+		var t := (at_age - JELLY_RAMP_START_SECONDS) / (JELLY_RAMP_END_SECONDS - JELLY_RAMP_START_SECONDS)
+		hazard = lerpf(-log(1.0 - JELLY_CHANCE_BEFORE_RAMP), -log(1.0 - JELLY_CHANCE_AT_END), smoothstep(0.0, 1.0, t))
 	else:
 		hazard = -log(1.0 - JELLY_CHANCE_AT_END)
 	return 1.0 - exp(-hazard)
