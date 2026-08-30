@@ -20,6 +20,7 @@ const SPRITES := {
 
 var data: Dictionary
 var age := 0.0
+var growth_time := 0.0
 var diameter_cm := 1.6
 var growth_rate := 1.0
 var state := "growing"
@@ -33,12 +34,15 @@ const JELLY_RAMP_START_SECONDS := 4.0
 const JELLY_CHANCE_AT_BIRTH := 0.0001
 const JELLY_CHANCE_AT_RAMP_START := 0.005
 const JELLY_CHANCE_FINAL := 0.06
+const GROWTH_RHYTHM_AMPLITUDE := 0.10
 
 var visual_scale := 0.18
 var plant_sprite: Sprite3D
 var contact_shadow: MeshInstance3D
 var is_special := false
 var jelly_ramp_end_seconds := 11.0
+var growth_rhythm_period := 22.0
+var growth_rhythm_phase := 0.0
 var jelly_checks_enabled := true
 var sway_phase := 0.0
 
@@ -56,6 +60,8 @@ func setup(species: Dictionary, seed_value: int, screen_label: Label, _danger: L
 		jelly_ramp_end_seconds = rng.randf_range(13.0, 20.0)
 	else:
 		jelly_ramp_end_seconds = rng.randf_range(20.0, 30.0)
+	growth_rhythm_period = rng.randf_range(16.0, 28.0)
+	growth_rhythm_phase = rng.randf_range(0.0, TAU)
 	label = screen_label
 	# Species rarity and the independent special roll never change growth speed.
 	growth_rate = 1.0
@@ -108,8 +114,12 @@ void fragment(){vec2 p=(UV-vec2(.5))*2.0;float a=smoothstep(1.0,.08,dot(p,p));AL
 
 func simulate(delta: float) -> void:
 	if state != "growing": return
+	if growth_time == 0.0 and diameter_cm > 1.6:
+		growth_time = (diameter_cm - 1.6) / (GROWTH_CM_PER_SECOND * growth_rate)
+	var previous_age := age
 	age += delta
-	diameter_cm = 1.6 + age * GROWTH_CM_PER_SECOND * growth_rate
+	growth_time += _integrated_growth_multiplier(previous_age, age)
+	diameter_cm = 1.6 + growth_time * GROWTH_CM_PER_SECOND * growth_rate
 	# One physical-looking scale mapping for all sizes, with no clamp or cap.
 	# 30cm is now a moderate plant; 60–70cm is when it dominates the view.
 	visual_scale = .18 + (diameter_cm - 1.6) * .058
@@ -117,6 +127,15 @@ func simulate(delta: float) -> void:
 	if jelly_checks_enabled:
 		var jelly_probability := jelly_probability_for_interval(age - delta, delta, jelly_ramp_end_seconds)
 		if rng.randf() < jelly_probability: jelly()
+
+func _integrated_growth_multiplier(start_time: float, end_time: float) -> float:
+	# Integrate 1 + amplitude*sin(omega*t+phase) exactly. The multiplier stays
+	# between 90% and 110%, never stops, and averages to 100% over each cycle.
+	var omega := TAU / growth_rhythm_period
+	return (end_time - start_time) + GROWTH_RHYTHM_AMPLITUDE / omega * (
+		cos(omega * start_time + growth_rhythm_phase)
+		- cos(omega * end_time + growth_rhythm_phase)
+	)
 
 static func jelly_probability_for_interval(start_age: float, delta: float, ramp_end_seconds := 11.0) -> float:
 	# This is the single source of truth for jelly probability. Integrating the

@@ -13,6 +13,11 @@ func _ready()->void:
 	for required in ["laui","golden_laui","colorata","affinis","lutea","kannte"]:assert(required in opening_ids)
 	for plant in game.plants:
 		plant.jelly_checks_enabled=false
+		assert(plant.growth_rhythm_period >= 16.0 and plant.growth_rhythm_period <= 28.0)
+		assert(is_equal_approx(plant._integrated_growth_multiplier(0.0,plant.growth_rhythm_period),plant.growth_rhythm_period))
+		var diameter_before:float=plant.diameter_cm
+		plant.simulate(0.01)
+		assert(plant.diameter_cm>diameter_before)
 	var unique_positions:Dictionary={}
 	for plant in game.plants:unique_positions["%.2f,%.2f"%[plant.original_pos.x,plant.original_pos.z]]=true
 	assert(unique_positions.size()>=11)
