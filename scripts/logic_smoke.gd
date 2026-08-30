@@ -51,15 +51,14 @@ func _ready()->void:
 
 func _verify_jelly_probability()->void:
 	var succulent_script = load("res://scripts/succulent.gd")
+	assert(is_equal_approx(succulent_script.jelly_chance_per_second(0.0), 0.015))
+	assert(is_equal_approx(succulent_script.jelly_chance_per_second(3.0), 0.025))
+	assert(is_equal_approx(succulent_script.jelly_chance_per_second(10.0), 0.06))
+	assert(is_equal_approx(succulent_script.jelly_chance_per_second(100.0), 0.06))
+	var reference_probability = succulent_script.jelly_probability_for_interval(0.0, 15.0)
 	for fps in [30,60,120]:
 		var delta := 1.0 / float(fps)
-		var early_survival := 1.0
-		var late_survival := 1.0
-		for frame in range(fps):
-			early_survival *= 1.0 - succulent_script.jelly_probability_for_interval(frame * delta, delta)
-			late_survival *= 1.0 - succulent_script.jelly_probability_for_interval(4.0 + frame * delta, delta)
-		assert(is_equal_approx(1.0 - early_survival, 0.035))
-		assert(is_equal_approx(1.0 - late_survival, 0.08))
-	var crossing_probability = succulent_script.jelly_probability_for_interval(2.99, 0.02)
-	var crossing_expected := 1.0 - pow(0.965, 0.01) * pow(0.92, 0.01)
-	assert(is_equal_approx(crossing_probability, crossing_expected))
+		var survival := 1.0
+		for frame in range(15 * fps):
+			survival *= 1.0 - succulent_script.jelly_probability_for_interval(frame * delta, delta)
+		assert(is_equal_approx(1.0 - survival, reference_probability))

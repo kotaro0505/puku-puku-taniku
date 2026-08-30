@@ -28,9 +28,11 @@ var target_offset := Vector3.ZERO
 var rng := RandomNumberGenerator.new()
 var label: Label
 const GROWTH_CM_PER_SECOND := 1.1875
-const EARLY_JELLY_DURATION_SECONDS := 3.0
-const EARLY_JELLY_CHANCE_PER_SECOND := 0.035
-const LATE_JELLY_CHANCE_PER_SECOND := 0.08
+const JELLY_RAMP_MIDDLE_SECONDS := 3.0
+const JELLY_RAMP_END_SECONDS := 10.0
+const JELLY_CHANCE_AT_BIRTH := 0.015
+const JELLY_CHANCE_AT_MIDDLE := 0.025
+const JELLY_CHANCE_AT_END := 0.06
 
 var visual_scale := 0.18
 var plant_sprite: Sprite3D
@@ -107,13 +109,41 @@ func simulate(delta: float) -> void:
 		if rng.randf() < jelly_probability: jelly()
 
 static func jelly_probability_for_interval(start_age: float, delta: float) -> float:
-	# This is the single source of truth for jelly probability. Split frames that
-	# cross three seconds and convert each per-second chance using p = 1-(1-r)^dt.
-	var early_duration := clampf(EARLY_JELLY_DURATION_SECONDS - start_age, 0.0, delta)
-	var late_duration := delta - early_duration
-	var early_survival := pow(1.0 - EARLY_JELLY_CHANCE_PER_SECOND, early_duration)
-	var late_survival := pow(1.0 - LATE_JELLY_CHANCE_PER_SECOND, late_duration)
-	return 1.0 - early_survival * late_survival
+	# This is the single source of truth for jelly probability. Integrating the
+	# smoothly varying hazard over the whole frame makes the result FPS independent.
+	if delta <= 0.0: return 0.0
+	var end_age := start_age + delta
+	var integrated_hazard := 0.0
+	integrated_hazard += _integrate_hazard_segment(start_age, end_age, 0.0, JELLY_RAMP_MIDDLE_SECONDS, JELLY_CHANCE_AT_BIRTH, JELLY_CHANCE_AT_MIDDLE)
+	integrated_hazard += _integrate_hazard_segment(start_age, end_age, JELLY_RAMP_MIDDLE_SECONDS, JELLY_RAMP_END_SECONDS, JELLY_CHANCE_AT_MIDDLE, JELLY_CHANCE_AT_END)
+	var constant_start := maxf(start_age, JELLY_RAMP_END_SECONDS)
+	if end_age > constant_start:
+		integrated_hazard += -log(1.0 - JELLY_CHANCE_AT_END) * (end_age - constant_start)
+	return 1.0 - exp(-integrated_hazard)
+
+static func jelly_chance_per_second(at_age: float) -> float:
+	var hazard: float
+	if at_age <= JELLY_RAMP_MIDDLE_SECONDS:
+		var t := clampf(at_age / JELLY_RAMP_MIDDLE_SECONDS, 0.0, 1.0)
+		hazard = lerpf(-log(1.0 - JELLY_CHANCE_AT_BIRTH), -log(1.0 - JELLY_CHANCE_AT_MIDDLE), smoothstep(0.0, 1.0, t))
+	elif at_age < JELLY_RAMP_END_SECONDS:
+		var t := (at_age - JELLY_RAMP_MIDDLE_SECONDS) / (JELLY_RAMP_END_SECONDS - JELLY_RAMP_MIDDLE_SECONDS)
+		hazard = lerpf(-log(1.0 - JELLY_CHANCE_AT_MIDDLE), -log(1.0 - JELLY_CHANCE_AT_END), smoothstep(0.0, 1.0, t))
+	else:
+		hazard = -log(1.0 - JELLY_CHANCE_AT_END)
+	return 1.0 - exp(-hazard)
+
+static func _integrate_hazard_segment(start_age: float, end_age: float, segment_start: float, segment_end: float, start_chance: float, end_chance: float) -> float:
+	var clipped_start := maxf(start_age, segment_start)
+	var clipped_end := minf(end_age, segment_end)
+	if clipped_end <= clipped_start: return 0.0
+	var length := segment_end - segment_start
+	var t0 := (clipped_start - segment_start) / length
+	var t1 := (clipped_end - segment_start) / length
+	var smooth_integral := (pow(t1, 3.0) - 0.5 * pow(t1, 4.0)) - (pow(t0, 3.0) - 0.5 * pow(t0, 4.0))
+	var start_hazard := -log(1.0 - start_chance)
+	var end_hazard := -log(1.0 - end_chance)
+	return start_hazard * (clipped_end - clipped_start) + (end_hazard - start_hazard) * length * smooth_integral
 
 func _update_visual(delta: float) -> void:
 	if plant_sprite == null: return
