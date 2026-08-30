@@ -6,6 +6,7 @@ func _ready()->void:
 	await get_tree().process_frame
 	assert(game.plants.is_empty() and not game.play_active)
 	game.normal_seed_bags=maxi(3,game.normal_seed_bags);game.selected_seed_bag_count=3;game._update_play_ui();assert(game.play_selection_label.text=="使用：3袋 / プレイ時間：180秒");var bags_before:int=game.normal_seed_bags;game._start_greenhouse_play("normal");assert(game.play_active and game.normal_seed_bags==bags_before-3);assert(game.play_time_remaining==180.0)
+	for control in game.external_navigation_controls:assert(not control.visible)
 	assert(game.plants.size()==12)
 	assert(game.catalog_species.size()==11)
 	assert(game.harvest_reward_yen(9.9)==0 and game.harvest_reward_yen(10.0)==10 and game.harvest_reward_yen(99.9)==1000 and game.harvest_reward_yen(150.0)==4000)
@@ -64,6 +65,8 @@ func _ready()->void:
 	assert(jelly_target.state=="jelly")
 	await get_tree().create_timer(1.2).timeout
 	assert(game.plants.size()==initial_count)
+	game._finish_greenhouse_play();assert(game.plants.is_empty())
+	for control in game.external_navigation_controls:assert(control.visible)
 	print("SMOKE_OK panorama360 plants=",game.plants.size()," diameter=",grown_diameter," sprite_scale=",grown_scale," rooted=true species=",species_id)
 	get_tree().quit()
 

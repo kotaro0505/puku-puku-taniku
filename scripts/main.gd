@@ -66,6 +66,8 @@ var shop_wallet_label: Label
 var shop_bag_label: Label
 var shop_message: Label
 var panda_clerk_slot: TextureRect
+var encyclopedia_icon_button: Button
+var external_navigation_controls: Array[Control] = []
 var coins := 12450
 var bests: Dictionary = {}
 var discovered: Dictionary = {}
@@ -208,8 +210,10 @@ func _build_ui() -> void:
 	coin_label=Label.new(); coin_label.text=" ¥%s" % _comma(coins); coin_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; coin_label.add_theme_font_size_override("font_size",20); coin_label.add_theme_color_override("font_color",Color("#ffd85b")); coin_panel.add_child(coin_label)
 	for entry in [{"x":421,"t":"図鑑"},{"x":495,"t":"設定"}]:
 		var b:=Button.new(); b.text=entry.t; b.position=Vector2(entry.x,116); b.size=Vector2(68,73); _skin_button(b,Color("#fff0cf"),17); hud.add_child(b)
-		if entry.t=="図鑑":b.mouse_filter=Control.MOUSE_FILTER_STOP;b.pressed.connect(_open_encyclopedia)
+		external_navigation_controls.append(b)
+		if entry.t=="図鑑":encyclopedia_icon_button=b;b.mouse_filter=Control.MOUSE_FILTER_STOP;b.pressed.connect(_open_encyclopedia)
 	mode_button=Button.new();mode_button.text="原生地";mode_button.position=Vector2(465,202);mode_button.size=Vector2(98,45);_skin_button(mode_button,Color("#fff0cf"),15);mode_button.mouse_filter=Control.MOUSE_FILTER_STOP;mode_button.pressed.connect(_toggle_mode);hud.add_child(mode_button)
+	external_navigation_controls.append(mode_button)
 	habitat_status_label=Label.new();habitat_status_label.position=Vector2(163,42);habitat_status_label.size=Vector2(250,56);habitat_status_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;habitat_status_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;habitat_status_label.add_theme_font_size_override("font_size",18);habitat_status_label.add_theme_color_override("font_color",UI_CREAM);habitat_status_label.add_theme_stylebox_override("normal",_box(Color("#4b2d20"),Color("#d8ad68"),18,2));habitat_status_label.visible=false;hud.add_child(habitat_status_label)
 	play_timer_label=Label.new();play_timer_label.position=Vector2(190,135);play_timer_label.size=Vector2(196,58);play_timer_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;play_timer_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;play_timer_label.add_theme_font_size_override("font_size",24);play_timer_label.add_theme_color_override("font_color",Color.WHITE);play_timer_label.add_theme_stylebox_override("normal",_box(Color("#5b3321"),Color("#f3cb72"),19,3));play_timer_label.visible=false;hud.add_child(play_timer_label)
 	# lower gradient cards
@@ -217,6 +221,7 @@ func _build_ui() -> void:
 	record_card=PanelContainer.new(); record_card.position=Vector2(394,816); record_card.size=Vector2(164,134); record_card.add_theme_stylebox_override("panel",_box(Color("#674135"),Color("#f4d36e"),18,3)); record_card.visible=false; hud.add_child(record_card)
 	record_text=Label.new(); record_text.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; record_text.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; record_text.add_theme_font_size_override("font_size",19); record_text.add_theme_color_override("font_color",Color.WHITE); record_card.add_child(record_text)
 	var nav:=HBoxContainer.new(); nav.position=Vector2(23,957); nav.size=Vector2(530,80); nav.add_theme_constant_override("separation",4); hud.add_child(nav)
+	external_navigation_controls.append(nav)
 	for item in ["図鑑","ホーム","マーケット"]:
 		var b:=Button.new(); b.text=item; b.custom_minimum_size=Vector2(174,76); _skin_button(b,Color("#6d472d") if item!="ホーム" else Color("#fff0cf"),18); nav.add_child(b)
 		if item=="図鑑":b.pressed.connect(_open_encyclopedia)
@@ -282,6 +287,7 @@ func _update_play_ui()->void:
 	if not play_overlay:return
 	play_overlay.visible=current_mode=="greenhouse" and not play_active
 	play_timer_label.visible=current_mode=="greenhouse" and play_active
+	for control in external_navigation_controls:control.visible=not play_active
 	play_timer_label.text="残り %d秒"%ceili(play_time_remaining)
 	play_bag_summary.text="通常種 %d袋　 プレミアム種 %d袋"%[normal_seed_bags,premium_seed_bags]
 	var maximum_selectable:=maxi(1,maxi(normal_seed_bags,premium_seed_bags));selected_seed_bag_count=clampi(selected_seed_bag_count,1,maximum_selectable)
@@ -534,7 +540,7 @@ func _toggle_mode()->void:
 func _apply_mode()->void:
 	if camera==null:return
 	var greenhouse_mode:=current_mode=="greenhouse"
-	if not greenhouse_mode and habitat_seed_date!=Time.get_date_string_from_system():_build_habitat_items()
+	if not greenhouse_mode:_build_habitat_items()
 	greenhouse_layer.visible=greenhouse_mode
 	habitat_items_root.visible=not greenhouse_mode
 	if habitat_status_label:habitat_status_label.visible=not greenhouse_mode
@@ -653,20 +659,28 @@ func _try_habitat_pick(screen_pos:Vector2)->void:
 	var candidates:Array=[]
 	for item in habitat_pickups:
 		var node=item.get("node")
-		if not is_instance_valid(node) or str(item.get("kind",""))=="found_species" or camera.is_position_behind(node.global_position):continue
+		if not is_instance_valid(node) or camera.is_position_behind(node.global_position):continue
 		var projected:=camera.unproject_position(node.global_position);var distance:=projected.distance_to(screen_pos)
-		if distance<34.0:candidates.append({"item":item,"distance":distance})
+		if distance<42.0:candidates.append({"item":item,"distance":distance})
 	if candidates.is_empty():return
 	candidates.sort_custom(func(a,b):return a.distance<b.distance);var selected:Dictionary=candidates[0].item
 	if str(selected.kind)=="seed":_collect_habitat_seed(selected)
 	elif str(selected.kind)=="new_species":_collect_habitat_species(selected)
+	elif str(selected.kind)=="found_species":_squish_habitat_plant(selected)
 
 func _collect_habitat_seed(item:Dictionary)->void:
 	if habitat_seeds_collected>=10:return
 	habitat_seeds_collected+=1;habitat_pickups.erase(item);var node=item.node;_show_habitat_message(node.global_position,"謎の種 GET!",Color("#ffe4a0"));node.queue_free();_save();_update_habitat_ui()
 
 func _collect_habitat_species(item:Dictionary)->void:
-	var species_id:=str(item.species_id);unlocked_species[species_id]=true;discovered[species_id]=true;habitat_new_species_id="";item.kind="found_species"
+	var node:Sprite3D=item.node;habitat_pickups.erase(item);node.visible=false
+	var flying:=TextureRect.new();flying.texture=node.texture;flying.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;flying.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;flying.mouse_filter=Control.MOUSE_FILTER_IGNORE;flying.size=Vector2(112,112);flying.position=camera.unproject_position(node.global_position)-flying.size*.5;flying.pivot_offset=flying.size*.5;effects_layer.add_child(flying)
+	var target:=Vector2(500,150)
+	if encyclopedia_icon_button:target=encyclopedia_icon_button.global_position+encyclopedia_icon_button.size*.5
+	var tween:=create_tween().set_parallel();tween.tween_property(flying,"position",target-flying.size*.5,.62).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN);tween.tween_property(flying,"scale",Vector2(.08,.08),.62).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN);tween.tween_property(flying,"rotation",.18,.62);tween.chain().tween_callback(_complete_habitat_species_get.bind(item,flying))
+
+func _complete_habitat_species_get(item:Dictionary,flying:TextureRect)->void:
+	var species_id:=str(item.species_id);unlocked_species[species_id]=true;discovered[species_id]=true;habitat_new_species_id=""
 	for entry in catalog_species:
 		if str(entry.species_id)==species_id:
 			var already_present:=false
@@ -674,9 +688,12 @@ func _collect_habitat_species(item:Dictionary)->void:
 				if str(active_entry.species_id)==species_id:already_present=true;break
 			if not already_present:species.append(entry);opening_species.append(entry)
 			_show_habitat_message(item.node.global_position,"%s GET!"%str(entry.name_ja),Color("#fff18a"));break
-	for child in item.node.get_children():
-		if child is Label3D:child.queue_free()
-	item.node.modulate=Color.WHITE;_save();_update_habitat_ui()
+	if is_instance_valid(item.node):item.node.queue_free()
+	if is_instance_valid(flying):flying.queue_free()
+	_save();_update_habitat_ui()
+
+func _squish_habitat_plant(item:Dictionary)->void:
+	var node:Sprite3D=item.node;var original_scale:=node.scale;var tween:=create_tween();tween.tween_property(node,"scale",Vector3(original_scale.x*1.04,original_scale.y*.84,original_scale.z),.09).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT);tween.tween_property(node,"scale",original_scale,.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 func _show_habitat_message(world_position:Vector3,message:String,color:Color)->void:
 	var label:=Label.new();label.text=message;label.size=Vector2(300,80);label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.add_theme_font_size_override("font_size",25);label.add_theme_color_override("font_color",color);label.add_theme_color_override("font_outline_color",UI_BROWN);label.add_theme_constant_override("outline_size",8);label.position=camera.unproject_position(world_position)-Vector2(150,40);effects_layer.add_child(label)
@@ -687,7 +704,7 @@ func _on_harvested(p)->void:
 	discovered[p.data.species_id]=true
 	if is_record:bests[p.data.species_id]=p.diameter_cm
 	var reward:=harvest_reward_yen(p.diameter_cm);coins+=reward;_save();_update_best_ui();_update_currency_ui()
-	_show_float(p,"GET!\n%s  %.1fcm"%[p.data.name_ja,p.diameter_cm],Color("#fff3a2"));_show_yen_float(p.global_position,reward)
+	_show_harvest_result(p,reward)
 	if is_record:_show_record(p,reward)
 	var tween:=create_tween().set_parallel();tween.tween_property(p,"position:y",p.position.y+2.0,.42).set_trans(Tween.TRANS_BACK);tween.tween_property(p,"scale",p.scale*1.2,.22);tween.chain().tween_property(p,"scale",Vector3.ONE*0.01,.24)
 	_cleanup_later(p,.68)
@@ -709,9 +726,13 @@ func _show_float(p,text:String,color:Color)->void:
 	var l:=Label.new();l.text=text;l.size=Vector2(230,90);l.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;l.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;l.add_theme_font_size_override("font_size",24);l.add_theme_color_override("font_color",color);l.add_theme_color_override("font_outline_color",UI_BROWN);l.add_theme_constant_override("outline_size",7);l.position=camera.unproject_position(p.global_position)-Vector2(115,40);effects_layer.add_child(l)
 	var tw:=create_tween().set_parallel();tw.tween_property(l,"position:y",l.position.y-85,.62).set_trans(Tween.TRANS_BACK);tw.tween_property(l,"modulate:a",0.0,.62).set_delay(.18);tw.chain().tween_callback(l.queue_free)
 
-func _show_yen_float(world_position:Vector3,reward:int)->void:
-	var label:=Label.new();label.text="+¥%d"%reward;label.size=Vector2(130,42);label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.add_theme_font_size_override("font_size",18);label.add_theme_color_override("font_color",Color("#fff0a6"));label.add_theme_color_override("font_outline_color",UI_BROWN);label.add_theme_constant_override("outline_size",5);label.position=camera.unproject_position(world_position)-Vector2(65,4);effects_layer.add_child(label)
-	var tween:=create_tween().set_parallel();tween.tween_property(label,"position:y",label.position.y-42,.55).set_trans(Tween.TRANS_QUAD);tween.tween_property(label,"modulate:a",0.0,.42).set_delay(.18);tween.chain().tween_callback(label.queue_free)
+func _show_harvest_result(plant,reward:int)->void:
+	var panel:=PanelContainer.new();panel.size=Vector2(220,132);panel.position=camera.unproject_position(plant.global_position)-Vector2(110,82);panel.pivot_offset=panel.size*.5;panel.scale=Vector2(.78,.78);panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;panel.add_theme_stylebox_override("panel",_box(Color(0.22,0.12,0.07,.92),Color("#f0cc82"),17,2));effects_layer.add_child(panel)
+	var content:=VBoxContainer.new();content.alignment=BoxContainer.ALIGNMENT_CENTER;content.add_theme_constant_override("separation",0);content.mouse_filter=Control.MOUSE_FILTER_IGNORE;panel.add_child(content)
+	var name_label:=Label.new();name_label.text=str(plant.data.name_ja);name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name_label.add_theme_font_size_override("font_size",20);name_label.add_theme_color_override("font_color",Color.WHITE);content.add_child(name_label)
+	var size_label:=Label.new();size_label.text="%.1fcm"%plant.diameter_cm;size_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;size_label.add_theme_font_size_override("font_size",19);size_label.add_theme_color_override("font_color",UI_CREAM);content.add_child(size_label)
+	var yen_label:=Label.new();yen_label.text="＋¥%d"%reward;yen_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;yen_label.add_theme_font_size_override("font_size",27);yen_label.add_theme_color_override("font_color",Color("#ffe06f"));yen_label.add_theme_color_override("font_outline_color",Color("#6b3518"));yen_label.add_theme_constant_override("outline_size",4);content.add_child(yen_label)
+	var tween:=create_tween();tween.tween_property(panel,"scale",Vector2.ONE,.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT);tween.tween_interval(1.12);tween.set_parallel(true);tween.tween_property(panel,"position:y",panel.position.y-34,.5).set_trans(Tween.TRANS_QUAD);tween.tween_property(panel,"modulate:a",0.0,.5);tween.set_parallel(false);tween.tween_callback(panel.queue_free)
 
 func _show_record(p,reward:int)->void:
 	record_text.text="収穫記録更新！\nNEW RECORD\n%.1f cm\n+%d円"%[p.diameter_cm,reward];record_card.visible=true;record_card.scale=Vector2(.72,.72);record_card.pivot_offset=record_card.size/2
