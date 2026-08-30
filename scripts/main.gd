@@ -8,6 +8,10 @@ const SPAWN_SPRITE_MARGIN_SOURCE_PX := 40.0
 const GREENHOUSE_DRAG_SCALE := 0.30
 const GREENHOUSE_DRAG_DEAD_ZONE := 3.0
 const GREENHOUSE_PAN_FOLLOW_SECONDS := 0.075
+const HABITAT_DRAG_SCALE := 0.055
+const HABITAT_ITEM_RADIUS := 9.0
+const HABITAT_SAFE_PLANT_POINTS := [Vector2(70,400),Vector2(155,410),Vector2(245,400),Vector2(335,420),Vector2(430,405),Vector2(535,415),Vector2(705,430),Vector2(820,410),Vector2(920,395),Vector2(1025,420),Vector2(1130,400),Vector2(1220,415)]
+const HABITAT_SAFE_SEED_POINTS := [Vector2(45,430),Vector2(115,445),Vector2(190,430),Vector2(275,445),Vector2(360,440),Vector2(455,435),Vector2(545,445),Vector2(625,455),Vector2(715,450),Vector2(805,440),Vector2(895,430),Vector2(980,445),Vector2(1060,435),Vector2(1140,445),Vector2(1210,435),Vector2(1260,455)]
 const UI_CREAM := Color("#fff1d2")
 const UI_BROWN := Color("#4a2618")
 const UI_GOLD := Color("#e8aa35")
@@ -29,6 +33,9 @@ var greenhouse_pan_limit := 0.0
 var greenhouse_world_pan_x := 0.0
 var habitat_env: WorldEnvironment
 var habitat_environment: Environment
+var habitat_items_root: Node3D
+var habitat_pickups: Array = []
+var habitat_new_species_id := ""
 var mode_button: Button
 var current_mode := "greenhouse"
 var labels_layer: Control
@@ -41,14 +48,20 @@ var encyclopedia_overlay: Control
 var encyclopedia_list_page: Control
 var encyclopedia_detail_page: Control
 var encyclopedia_grid: GridContainer
+var habitat_status_label: Label
 var coins := 12450
 var bests: Dictionary = {}
 var discovered: Dictionary = {}
+var unlocked_species: Dictionary = {}
+var habitat_seed_date := ""
+var habitat_seeds_collected := 0
 var spawn_queue := 0
 var spawn_timer := 0.0
 var forced_golden_done := false
 var view_yaw := 0.0
 var view_pitch := -3.0
+var habitat_target_yaw := 0.0
+var habitat_target_pitch := -3.0
 var pointer_down := false
 var pointer_start := Vector2.ZERO
 var pointer_last := Vector2.ZERO
@@ -61,9 +74,11 @@ func _ready() -> void:
 	_load_species()
 	opening_species=species.duplicate();opening_species.shuffle()
 	_load_save()
+	_apply_saved_unlocks()
 	_build_world()
 	_build_ui()
 	for i in range(TARGET_COUNT):spawn_plant()
+	_build_habitat_items()
 	get_viewport().size_changed.connect(_layout)
 	_layout()
 
@@ -74,20 +89,31 @@ func _load_species() -> void:
 	var enabled := ["colorata", "lutea", "shaviana", "affinis", "laui", "kannte", "golden_laui"]
 	for entry in all_species:
 		if str(entry.species_id) in enabled:
-			species.append(entry)
+			species.append(entry);unlocked_species[str(entry.species_id)]=true
 
 func _load_save() -> void:
 	if FileAccess.file_exists("user://records.json"):
 		var value = JSON.parse_string(FileAccess.get_file_as_string("user://records.json"))
 		if value is Dictionary:
-			bests = value.get("bests",{}); coins = int(value.get("coins",12450)); discovered=value.get("discovered",{})
+			bests = value.get("bests",{}); coins = int(value.get("coins",12450)); discovered=value.get("discovered",{});habitat_seed_date=str(value.get("habitat_seed_date",""));habitat_seeds_collected=int(value.get("habitat_seeds_collected",0))
+			var saved_unlocks=value.get("unlocked_species",{})
+			if saved_unlocks is Dictionary:
+				for species_id in saved_unlocks:
+					if bool(saved_unlocks[species_id]):unlocked_species[species_id]=true
 			# Saves created before the encyclopedia already contain valid best sizes.
 			for species_id in bests:
 				if float(bests[species_id])>0.0:discovered[species_id]=true
 
 func _save() -> void:
 	var f := FileAccess.open("user://records.json",FileAccess.WRITE)
-	f.store_string(JSON.stringify({"bests":bests,"discovered":discovered,"coins":coins}))
+	f.store_string(JSON.stringify({"bests":bests,"discovered":discovered,"unlocked_species":unlocked_species,"habitat_seed_date":habitat_seed_date,"habitat_seeds_collected":habitat_seeds_collected,"coins":coins}))
+
+func _apply_saved_unlocks()->void:
+	var present:Dictionary={}
+	for entry in species:present[str(entry.species_id)]=true
+	for entry in catalog_species:
+		var species_id:=str(entry.species_id)
+		if bool(unlocked_species.get(species_id,false)) and not present.has(species_id):species.append(entry);present[species_id]=true
 
 func _build_world() -> void:
 	greenhouse_layer=CanvasLayer.new();greenhouse_layer.layer=-10;add_child(greenhouse_layer)
@@ -103,6 +129,7 @@ func _build_world() -> void:
 	env.background_mode=Environment.BG_SKY; env.sky=sky; env.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR; env.ambient_light_color=Color("#d6b98b"); env.ambient_light_energy=0.32
 	env.tonemap_mode=Environment.TONE_MAPPER_FILMIC
 	habitat_environment=env;habitat_env.environment=env; world_root.add_child(habitat_env)
+	habitat_items_root=Node3D.new();habitat_items_root.visible=false;world_root.add_child(habitat_items_root)
 	var sun:=DirectionalLight3D.new(); sun.rotation_degrees=Vector3(-18,72,0); sun.light_color=Color("#ffd9a0"); sun.light_energy=0.28; sun.shadow_enabled=false; world_root.add_child(sun)
 	camera=Camera3D.new(); camera.fov=54.0; camera.current=true; world_root.add_child(camera)
 	_build_greenhouse_pot()
@@ -151,6 +178,7 @@ func _build_ui() -> void:
 		var b:=Button.new(); b.text=entry.t; b.position=Vector2(entry.x,116); b.size=Vector2(68,73); _skin_button(b,Color("#fff0cf"),17); hud.add_child(b)
 		if entry.t=="図鑑":b.mouse_filter=Control.MOUSE_FILTER_STOP;b.pressed.connect(_open_encyclopedia)
 	mode_button=Button.new();mode_button.text="原生地";mode_button.position=Vector2(465,202);mode_button.size=Vector2(98,45);_skin_button(mode_button,Color("#fff0cf"),15);mode_button.mouse_filter=Control.MOUSE_FILTER_STOP;mode_button.pressed.connect(_toggle_mode);hud.add_child(mode_button)
+	habitat_status_label=Label.new();habitat_status_label.position=Vector2(163,42);habitat_status_label.size=Vector2(250,56);habitat_status_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;habitat_status_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;habitat_status_label.add_theme_font_size_override("font_size",18);habitat_status_label.add_theme_color_override("font_color",UI_CREAM);habitat_status_label.add_theme_stylebox_override("normal",_box(Color("#4b2d20"),Color("#d8ad68"),18,2));habitat_status_label.visible=false;hud.add_child(habitat_status_label)
 	# lower gradient cards
 	var harvest:=Button.new(); harvest.text="タップで 収穫！"; harvest.position=Vector2(24,829); harvest.size=Vector2(360,121); _skin_button(harvest,Color("#caa538"),27); harvest.mouse_filter=Control.MOUSE_FILTER_IGNORE; hud.add_child(harvest)
 	record_card=PanelContainer.new(); record_card.position=Vector2(394,816); record_card.size=Vector2(164,134); record_card.add_theme_stylebox_override("panel",_box(Color("#674135"),Color("#f4d36e"),18,3)); record_card.visible=false; hud.add_child(record_card)
@@ -193,6 +221,51 @@ func _refresh_encyclopedia_cards()->void:
 
 func _species_texture(entry:Dictionary)->Texture2D:
 	var variant:=str(entry.get("visual_variant","laui"));var path:=str(SucculentClass.SPRITES.get(variant,SucculentClass.SPRITES.laui));return load(path) as Texture2D
+
+func _build_habitat_items()->void:
+	for child in habitat_items_root.get_children():child.free()
+	habitat_pickups.clear();habitat_new_species_id=""
+	var plant_points:Array=HABITAT_SAFE_PLANT_POINTS.duplicate()
+	var point_index:=0
+	for entry in catalog_species:
+		var species_id:=str(entry.species_id)
+		if bool(discovered.get(species_id,false)) and point_index<plant_points.size():
+			_add_habitat_plant(entry,plant_points[point_index],false);point_index+=1
+	for entry in catalog_species:
+		var species_id:=str(entry.species_id)
+		if not bool(unlocked_species.get(species_id,false)):
+			habitat_new_species_id=species_id
+			_add_habitat_plant(entry,plant_points[min(point_index,plant_points.size()-1)],true)
+			break
+	_reset_daily_seeds_if_needed()
+	var seed_points:Array=HABITAT_SAFE_SEED_POINTS.duplicate();var daily_rng:=RandomNumberGenerator.new();daily_rng.seed=habitat_seed_date.hash()
+	for i in range(seed_points.size()-1,0,-1):
+		var swap_index:=daily_rng.randi_range(0,i);var held=seed_points[i];seed_points[i]=seed_points[swap_index];seed_points[swap_index]=held
+	for i in range(maxi(0,10-habitat_seeds_collected)):_add_habitat_seed(seed_points[i])
+	_update_habitat_ui()
+
+func _add_habitat_plant(entry:Dictionary,panorama_point:Vector2,is_new:bool)->void:
+	var sprite:=Sprite3D.new();sprite.texture=_species_texture(entry);sprite.billboard=BaseMaterial3D.BILLBOARD_ENABLED;sprite.no_depth_test=true;sprite.texture_filter=BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS;sprite.pixel_size=1.15/maxf(1.0,float(sprite.texture.get_width()));sprite.offset.y=-float(sprite.texture.get_height())*.18;sprite.position=_panorama_point_to_world(panorama_point,HABITAT_ITEM_RADIUS);habitat_items_root.add_child(sprite)
+	var item={"node":sprite,"kind":"new_species" if is_new else "found_species","species_id":str(entry.species_id)};habitat_pickups.append(item)
+	if is_new:
+		sprite.modulate=Color(1.18,1.12,.78,1.0)
+		var badge:=Label3D.new();badge.text="NEW!";badge.position.y=.72;badge.font_size=42;badge.outline_size=9;badge.modulate=Color("#ffe26f");sprite.add_child(badge)
+
+func _add_habitat_seed(panorama_point:Vector2)->void:
+	var seed:=MeshInstance3D.new();var mesh:=SphereMesh.new();mesh.radius=.105;mesh.height=.24;mesh.radial_segments=12;mesh.rings=6;seed.mesh=mesh
+	var material:=StandardMaterial3D.new();material.albedo_color=Color("#b87932");material.roughness=.72;material.emission_enabled=true;material.emission=Color("#5c3514");material.emission_energy_multiplier=.35;seed.material_override=material;seed.position=_panorama_point_to_world(panorama_point,HABITAT_ITEM_RADIUS);habitat_items_root.add_child(seed);habitat_pickups.append({"node":seed,"kind":"seed"})
+
+func _panorama_point_to_world(point:Vector2,radius:float)->Vector3:
+	var longitude:float=(point.x/1280.0-.5)*TAU;var latitude:float=(.5-point.y/640.0)*PI;var horizontal:=cos(latitude)
+	return Vector3(sin(longitude)*horizontal,sin(latitude),-cos(longitude)*horizontal)*radius
+
+func _reset_daily_seeds_if_needed()->void:
+	var today:=Time.get_date_string_from_system()
+	if habitat_seed_date!=today:habitat_seed_date=today;habitat_seeds_collected=0;_save()
+
+func _update_habitat_ui()->void:
+	if habitat_status_label:habitat_status_label.text="謎の種  %d / 10"%habitat_seeds_collected
+	if mode_button and current_mode=="greenhouse":mode_button.text="原生地！" if not habitat_new_species_id.is_empty() else "原生地"
 
 func _open_species_detail(entry:Dictionary)->void:
 	for child in encyclopedia_detail_page.get_children():child.free()
@@ -295,11 +368,13 @@ func _plant_label()->Label:
 
 func _process(delta:float)->void:
 	_update_greenhouse_pan_follow(delta)
-	for p in plants:
-		if is_instance_valid(p): p.simulate(delta)
+	_update_habitat_view_follow(delta)
+	if current_mode=="greenhouse":
+		for p in plants:
+			if is_instance_valid(p):p.simulate(delta)
 	_resolve_crowding(delta)
 	_update_labels()
-	if spawn_queue>0:
+	if current_mode=="greenhouse" and spawn_queue>0:
 		spawn_timer-=delta
 		if spawn_timer<=0: spawn_queue-=1; spawn_plant(); spawn_timer=rng.randf_range(.35,.9)
 
@@ -310,6 +385,14 @@ func _update_greenhouse_pan_follow(delta:float)->void:
 	if absf(greenhouse_pan_target_x-greenhouse_pan_x)<0.05:greenhouse_pan_x=greenhouse_pan_target_x
 	_update_greenhouse_pan()
 
+func _update_habitat_view_follow(delta:float)->void:
+	if current_mode!="habitat":return
+	var follow:=1.0-exp(-delta/GREENHOUSE_PAN_FOLLOW_SECONDS)
+	view_yaw=rad_to_deg(lerp_angle(deg_to_rad(view_yaw),deg_to_rad(habitat_target_yaw),follow));view_pitch=lerpf(view_pitch,habitat_target_pitch,follow)
+	if absf(wrapf(habitat_target_yaw-view_yaw,-180.0,180.0))<.02:view_yaw=habitat_target_yaw
+	if absf(habitat_target_pitch-view_pitch)<.02:view_pitch=habitat_target_pitch
+	_apply_view_rotation()
+
 func _toggle_mode()->void:
 	current_mode="habitat" if current_mode=="greenhouse" else "greenhouse"
 	_apply_mode()
@@ -317,7 +400,10 @@ func _toggle_mode()->void:
 func _apply_mode()->void:
 	if camera==null:return
 	var greenhouse_mode:=current_mode=="greenhouse"
+	if not greenhouse_mode and habitat_seed_date!=Time.get_date_string_from_system():_build_habitat_items()
 	greenhouse_layer.visible=greenhouse_mode
+	habitat_items_root.visible=not greenhouse_mode
+	if habitat_status_label:habitat_status_label.visible=not greenhouse_mode
 	# The official greenhouse artwork already contains the finished pot and soil.
 	# Keep the old geometry disabled so no duplicate rim covers the sprites.
 	pot_root.visible=false
@@ -328,9 +414,9 @@ func _apply_mode()->void:
 		camera.position=Vector3(0,7.3,8.6);camera.look_at_from_position(camera.position,Vector3(0,1.05,0),Vector3.UP)
 		_update_greenhouse_pan()
 	else:
-		camera.position=Vector3.ZERO;_apply_view_rotation()
+		camera.position=Vector3.ZERO;habitat_target_yaw=view_yaw;habitat_target_pitch=view_pitch;_apply_view_rotation()
 	if mode_button:
-		mode_button.text="原生地" if greenhouse_mode else "温室"
+		mode_button.text=("原生地！" if not habitat_new_species_id.is_empty() else "原生地") if greenhouse_mode else "温室"
 
 func _resolve_crowding(_delta:float)->void:
 	# Sprite plants remain rooted at their spawn point. Natural overlap is less
@@ -380,6 +466,7 @@ func _input(event:InputEvent)->void:
 func _begin_pointer(screen_pos:Vector2)->void:
 	pointer_down=true;pointer_start=screen_pos;pointer_last=screen_pos;pointer_travel=0.0
 	greenhouse_drag_accumulator=0.0;greenhouse_drag_started=false;greenhouse_pan_target_x=greenhouse_pan_x
+	habitat_target_yaw=view_yaw;habitat_target_pitch=view_pitch
 
 func _drag_pointer(screen_pos:Vector2,relative:Vector2)->void:
 	pointer_travel+=relative.length();pointer_last=screen_pos
@@ -394,16 +481,21 @@ func _drag_pointer(screen_pos:Vector2,relative:Vector2)->void:
 			greenhouse_pan_target_x=clampf(greenhouse_pan_target_x+relative.x*GREENHOUSE_DRAG_SCALE,-greenhouse_pan_limit,greenhouse_pan_limit)
 		return
 	if current_mode!="habitat":return
-	# Direct manipulation: the panorama follows the finger in both axes.
-	view_yaw=fmod(view_yaw+relative.x*.032,360.0)
-	view_pitch=clamp(view_pitch+relative.y*.024,-13.0,9.0)
-	_apply_view_rotation()
+	if not greenhouse_drag_started:
+		greenhouse_drag_accumulator+=relative.x
+		if absf(greenhouse_drag_accumulator)<=GREENHOUSE_DRAG_DEAD_ZONE:return
+		greenhouse_drag_started=true
+		var excess:=greenhouse_drag_accumulator-signf(greenhouse_drag_accumulator)*GREENHOUSE_DRAG_DEAD_ZONE
+		habitat_target_yaw=fmod(habitat_target_yaw+excess*HABITAT_DRAG_SCALE,360.0)
+	else:habitat_target_yaw=fmod(habitat_target_yaw+relative.x*HABITAT_DRAG_SCALE,360.0)
+	habitat_target_pitch=clampf(habitat_target_pitch+relative.y*.025,-13.0,9.0)
 
 func _end_pointer(screen_pos:Vector2)->void:
 	if not pointer_down:return
 	pointer_down=false
 	if pointer_travel<13.0 and pointer_start.distance_to(screen_pos)<16.0:
-		_try_harvest(screen_pos)
+		if current_mode=="greenhouse":_try_harvest(screen_pos)
+		elif current_mode=="habitat":_try_habitat_pick(screen_pos)
 
 func _apply_view_rotation()->void:
 	if camera:camera.rotation_degrees=Vector3(view_pitch,view_yaw,0.0)
@@ -420,6 +512,39 @@ func _try_harvest(screen_pos:Vector2)->void:
 		if dist<radius:candidates.append({"p":p,"score":dist/max(radius,1.0)+p.visual_scale*.08})
 	if candidates.size()>0:
 		candidates.sort_custom(func(a,b):return a.score<b.score);candidates[0].p.harvest()
+
+func _try_habitat_pick(screen_pos:Vector2)->void:
+	var candidates:Array=[]
+	for item in habitat_pickups:
+		var node=item.get("node")
+		if not is_instance_valid(node) or str(item.get("kind",""))=="found_species" or camera.is_position_behind(node.global_position):continue
+		var projected:=camera.unproject_position(node.global_position);var distance:=projected.distance_to(screen_pos)
+		if distance<34.0:candidates.append({"item":item,"distance":distance})
+	if candidates.is_empty():return
+	candidates.sort_custom(func(a,b):return a.distance<b.distance);var selected:Dictionary=candidates[0].item
+	if str(selected.kind)=="seed":_collect_habitat_seed(selected)
+	elif str(selected.kind)=="new_species":_collect_habitat_species(selected)
+
+func _collect_habitat_seed(item:Dictionary)->void:
+	if habitat_seeds_collected>=10:return
+	habitat_seeds_collected+=1;habitat_pickups.erase(item);var node=item.node;_show_habitat_message(node.global_position,"謎の種 GET!",Color("#ffe4a0"));node.queue_free();_save();_update_habitat_ui()
+
+func _collect_habitat_species(item:Dictionary)->void:
+	var species_id:=str(item.species_id);unlocked_species[species_id]=true;discovered[species_id]=true;habitat_new_species_id="";item.kind="found_species"
+	for entry in catalog_species:
+		if str(entry.species_id)==species_id:
+			var already_present:=false
+			for active_entry in species:
+				if str(active_entry.species_id)==species_id:already_present=true;break
+			if not already_present:species.append(entry);opening_species.append(entry)
+			_show_habitat_message(item.node.global_position,"%s GET!"%str(entry.name_ja),Color("#fff18a"));break
+	for child in item.node.get_children():
+		if child is Label3D:child.queue_free()
+	item.node.modulate=Color.WHITE;_save();_update_habitat_ui()
+
+func _show_habitat_message(world_position:Vector3,message:String,color:Color)->void:
+	var label:=Label.new();label.text=message;label.size=Vector2(300,80);label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.add_theme_font_size_override("font_size",25);label.add_theme_color_override("font_color",color);label.add_theme_color_override("font_outline_color",UI_BROWN);label.add_theme_constant_override("outline_size",8);label.position=camera.unproject_position(world_position)-Vector2(150,40);effects_layer.add_child(label)
+	var tween:=create_tween().set_parallel();tween.tween_property(label,"position:y",label.position.y-70,.7);tween.tween_property(label,"modulate:a",0.0,.7).set_delay(.25);tween.chain().tween_callback(label.queue_free)
 
 func _on_harvested(p)->void:
 	var old:=float(bests.get(p.data.species_id,0.0));var is_record:bool=p.diameter_cm>old
