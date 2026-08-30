@@ -28,7 +28,7 @@ var target_offset := Vector3.ZERO
 var rng := RandomNumberGenerator.new()
 var label: Label
 const GROWTH_CM_PER_SECOND := 1.1875
-const NORMAL_JELLY_CHANCE_PER_SECOND := .143
+const MEAN_JELLY_TIME_SECONDS := 7.0
 
 var visual_scale := 0.18
 var plant_sprite: Sprite3D
@@ -101,11 +101,9 @@ func simulate(delta: float) -> void:
 	visual_scale = .18 + (diameter_cm - 1.6) * .058
 	_update_visual(delta)
 	if jelly_checks_enabled:
-		# Convert the specified one-second chance to a continuous hazard, then back
-		# to this frame's chance. This is FPS independent and never preselects a
-		# lifetime or final size.
-		var rate := -log(1.0-NORMAL_JELLY_CHANCE_PER_SECOND)
-		if is_special:rate*=.85
+		# Every plant uses the same exponential lifetime with a seven-second mean.
+		# Convert the continuous hazard to this frame's chance so it is FPS independent.
+		var rate := 1.0 / MEAN_JELLY_TIME_SECONDS
 		var jelly_probability := 1.0-exp(-rate*delta)
 		if rng.randf() < jelly_probability: jelly()
 
