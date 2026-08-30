@@ -27,7 +27,7 @@ var original_pos := Vector3.ZERO
 var target_offset := Vector3.ZERO
 var rng := RandomNumberGenerator.new()
 var label: Label
-const GROWTH_CM_PER_SECOND := 1.1875
+const GROWTH_CM_PER_SECOND := 1.365625
 const JELLY_RAMP_START_SECONDS := 4.0
 const JELLY_RAMP_END_SECONDS := 10.0
 const JELLY_CHANCE_BEFORE_RAMP := 0.005
