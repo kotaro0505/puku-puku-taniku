@@ -51,7 +51,7 @@ func _ready() -> void:
 func _load_species() -> void:
 	var raw := FileAccess.get_file_as_string("res://data/species-v2.json")
 	var all_species: Array = JSON.parse_string(raw)
-	var enabled := ["colorata", "lutea", "affinis", "laui", "kannte", "golden_laui"]
+	var enabled := ["colorata", "lutea", "shaviana", "affinis", "laui", "kannte", "golden_laui"]
 	for entry in all_species:
 		if str(entry.species_id) in enabled:
 			species.append(entry)

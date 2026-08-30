@@ -7,10 +7,10 @@ func _ready()->void:
 	assert(game.plants.size()==12)
 	var species_ids:Array=[]
 	for entry in game.species:species_ids.append(str(entry.species_id))
-	for required in ["laui","golden_laui","colorata","affinis","lutea","kannte"]:assert(required in species_ids)
+	for required in ["laui","golden_laui","colorata","affinis","lutea","shaviana","kannte"]:assert(required in species_ids)
 	var opening_ids:Array=[]
 	for plant in game.plants:opening_ids.append(str(plant.data.species_id))
-	for required in ["laui","golden_laui","colorata","affinis","lutea","kannte"]:assert(required in opening_ids)
+	for required in ["laui","golden_laui","colorata","affinis","lutea","shaviana","kannte"]:assert(required in opening_ids)
 	for plant in game.plants:
 		plant.jelly_checks_enabled=false
 		assert(plant.growth_rhythm_period >= 16.0 and plant.growth_rhythm_period <= 28.0)

@@ -13,7 +13,7 @@ const SPRITES := {
 	"lutea": "res://assets/plants/sprite-lutea.png",
 	"juliana": "res://assets/plants/sprite-lutea.png",
 	"kannte": "res://assets/plants/sprite-kante.png",
-	"shaviana": "res://assets/plants/sprite-kante.png",
+	"shaviana": "res://assets/plants/sprite-shaviana.png",
 	"pinwheel": "res://assets/plants/sprite-kante.png",
 	"gold_kannte": "res://assets/plants/sprite-golden-laui.png"
 }
