@@ -4,14 +4,17 @@ func _ready()->void:
 	var scene:PackedScene=load("res://main.tscn");var game:Node=scene.instantiate();add_child(game)
 	await get_tree().process_frame
 	await get_tree().process_frame
+	assert(game.plants.is_empty() and not game.play_active)
+	game.normal_seed_bags=maxi(1,game.normal_seed_bags);var bags_before:int=game.normal_seed_bags;game._start_greenhouse_play("normal");assert(game.play_active and game.normal_seed_bags==bags_before-1);assert(game.play_time_remaining==60.0)
 	assert(game.plants.size()==12)
 	assert(game.catalog_species.size()==11)
+	assert(game.harvest_reward_yen(9.9)==0 and game.harvest_reward_yen(10.0)==10 and game.harvest_reward_yen(99.9)==1000 and game.harvest_reward_yen(150.0)==4000)
 	var species_ids:Array=[]
 	for entry in game.species:species_ids.append(str(entry.species_id))
 	for required in ["laui","golden_laui","colorata","affinis","lutea","shaviana","kannte"]:assert(required in species_ids)
 	var opening_ids:Array=[]
 	for plant in game.plants:opening_ids.append(str(plant.data.species_id))
-	for required in ["laui","golden_laui","colorata","affinis","lutea","shaviana","kannte"]:assert(required in opening_ids)
+	for spawned_id in opening_ids:assert(spawned_id in species_ids)
 	for plant in game.plants:
 		plant.jelly_checks_enabled=false
 		assert(plant.growth_rhythm_period >= 16.0 and plant.growth_rhythm_period <= 28.0)
