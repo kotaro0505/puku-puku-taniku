@@ -103,17 +103,17 @@ func simulate(delta: float) -> void:
 	visual_scale = .18 + (diameter_cm - 1.6) * .058
 	_update_visual(delta)
 	if jelly_checks_enabled:
-		# Split frames that cross the three-second boundary, then combine survival
-		# probabilities. Rates depend only on age band and remain FPS independent.
-		var previous_age := age - delta
-		var early_duration := clampf(EARLY_JELLY_DURATION_SECONDS - previous_age, 0.0, delta)
-		var late_duration := delta - early_duration
-		var survival_probability := (
-			pow(1.0 - EARLY_JELLY_CHANCE_PER_SECOND, early_duration)
-			* pow(1.0 - LATE_JELLY_CHANCE_PER_SECOND, late_duration)
-		)
-		var jelly_probability := 1.0 - survival_probability
+		var jelly_probability := jelly_probability_for_interval(age - delta, delta)
 		if rng.randf() < jelly_probability: jelly()
+
+static func jelly_probability_for_interval(start_age: float, delta: float) -> float:
+	# This is the single source of truth for jelly probability. Split frames that
+	# cross three seconds and convert each per-second chance using p = 1-(1-r)^dt.
+	var early_duration := clampf(EARLY_JELLY_DURATION_SECONDS - start_age, 0.0, delta)
+	var late_duration := delta - early_duration
+	var early_survival := pow(1.0 - EARLY_JELLY_CHANCE_PER_SECOND, early_duration)
+	var late_survival := pow(1.0 - LATE_JELLY_CHANCE_PER_SECOND, late_duration)
+	return 1.0 - early_survival * late_survival
 
 func _update_visual(delta: float) -> void:
 	if plant_sprite == null: return

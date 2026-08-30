@@ -1,5 +1,6 @@
 extends Node
 func _ready()->void:
+	_verify_jelly_probability()
 	var scene:PackedScene=load("res://main.tscn");var game:Node=scene.instantiate();add_child(game)
 	await get_tree().process_frame
 	await get_tree().process_frame
@@ -47,3 +48,18 @@ func _ready()->void:
 	assert(game.plants.size()==initial_count)
 	print("SMOKE_OK panorama360 plants=",game.plants.size()," diameter=",grown_diameter," sprite_scale=",grown_scale," rooted=true species=",species_id)
 	get_tree().quit()
+
+func _verify_jelly_probability()->void:
+	var succulent_script = load("res://scripts/succulent.gd")
+	for fps in [30,60,120]:
+		var delta := 1.0 / float(fps)
+		var early_survival := 1.0
+		var late_survival := 1.0
+		for frame in range(fps):
+			early_survival *= 1.0 - succulent_script.jelly_probability_for_interval(frame * delta, delta)
+			late_survival *= 1.0 - succulent_script.jelly_probability_for_interval(4.0 + frame * delta, delta)
+		assert(is_equal_approx(1.0 - early_survival, 0.035))
+		assert(is_equal_approx(1.0 - late_survival, 0.08))
+	var crossing_probability = succulent_script.jelly_probability_for_interval(2.99, 0.02)
+	var crossing_expected := 1.0 - pow(0.965, 0.01) * pow(0.92, 0.01)
+	assert(is_equal_approx(crossing_probability, crossing_expected))
