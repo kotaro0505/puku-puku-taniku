@@ -21,8 +21,7 @@ func _ready()->void:
 	var unique_positions:Dictionary={}
 	for plant in game.plants:
 		unique_positions["%.2f,%.2f"%[plant.original_pos.x,plant.original_pos.z]]=true
-		var soil_distance:float=pow(plant.original_pos.x/(game.SPAWN_SOIL_RADIUS_X-game.SPAWN_EDGE_MARGIN),2.0)+pow(plant.original_pos.z/(game.SPAWN_SOIL_RADIUS_Z-game.SPAWN_EDGE_MARGIN),2.0)
-		assert(soil_distance<=1.00001)
+		assert(game._spawn_center_inside_soil(plant.original_pos))
 	assert(unique_positions.size()>=11)
 	var initial_count:int=game.plants.size()
 	var harvest_target=game.plants[0]
@@ -46,6 +45,7 @@ func _ready()->void:
 	var pan_target=game.plants[0];var pan_screen_before:Vector2=game.camera.unproject_position(pan_target.global_position);var backdrop_y:float=game.greenhouse_backdrop.position.y
 	game._begin_pointer(Vector2(280,500));game._drag_pointer(Vector2(380,500),Vector2(100,0));game._end_pointer(Vector2(380,500));var pan_screen_after:Vector2=game.camera.unproject_position(pan_target.global_position)
 	assert(game.greenhouse_pan_x>0.0 and game.greenhouse_pan_x<=game.greenhouse_pan_limit);assert(game.greenhouse_pan_limit<80.0);assert(pan_screen_after.x>pan_screen_before.x);assert(is_equal_approx(game.greenhouse_backdrop.position.y,backdrop_y))
+	for plant in game.plants:assert(game._spawn_center_inside_soil(plant.original_pos))
 	game.greenhouse_pan_x=0.0;game._update_greenhouse_pan();game._resolve_crowding(0.0)
 	var species_id:String=harvest_target.data.species_id;harvest_target.diameter_cm=21.7;harvest_target.harvest()
 	await get_tree().create_timer(1.2).timeout
@@ -63,20 +63,13 @@ func _ready()->void:
 
 func _verify_jelly_probability()->void:
 	var succulent_script = load("res://scripts/succulent.gd")
-	assert(absf(succulent_script.jelly_chance_per_second(0.0)-0.0001)<0.000001)
-	assert(absf(succulent_script.jelly_chance_per_second(4.0)-0.005)<0.000001)
-	assert(absf(succulent_script.jelly_chance_per_second(7.0)-0.683)<0.000001)
-	assert(absf(succulent_script.jelly_chance_per_second(9.0)-0.06)<0.000001)
-	assert(absf(succulent_script.jelly_chance_per_second(100.0)-0.06)<0.000001)
-	var reference_probability = succulent_script.jelly_probability_for_interval(0.0, 35.0)
-	for fps in [30,60,120]:
-		var delta := 1.0 / float(fps)
-		var survival := 1.0
-		for frame in range(35 * fps):
-			survival *= 1.0 - succulent_script.jelly_probability_for_interval(frame * delta, delta)
-		assert(is_equal_approx(1.0 - survival, reference_probability))
-	var expected_lifetime:=0.0;var lifetime_survival:=1.0;var lifetime_delta:=0.01
-	for frame in range(12000):
-		expected_lifetime+=lifetime_survival*lifetime_delta
-		lifetime_survival*=1.0-succulent_script.jelly_probability_for_interval(frame*lifetime_delta,lifetime_delta)
-	assert(expected_lifetime>6.9 and expected_lifetime<7.1)
+	for ramp_end in [8.0,11.0,16.5,25.0]:
+		assert(absf(succulent_script.jelly_chance_per_second(0.0,ramp_end)-0.0001)<0.000001)
+		assert(absf(succulent_script.jelly_chance_per_second(4.0,ramp_end)-0.005)<0.000001)
+		assert(absf(succulent_script.jelly_chance_per_second(ramp_end,ramp_end)-0.06)<0.000001)
+		assert(absf(succulent_script.jelly_chance_per_second(100.0,ramp_end)-0.06)<0.000001)
+		var reference_probability = succulent_script.jelly_probability_for_interval(0.0,35.0,ramp_end)
+		for fps in [30,60,120]:
+			var delta := 1.0/float(fps);var survival:=1.0
+			for frame in range(35*fps):survival*=1.0-succulent_script.jelly_probability_for_interval(frame*delta,delta,ramp_end)
+			assert(is_equal_approx(1.0-survival,reference_probability))

@@ -31,18 +31,16 @@ var label: Label
 const GROWTH_CM_PER_SECOND := 1.365625
 const JELLY_SAFE_END_SECONDS := 2.0
 const JELLY_RAMP_START_SECONDS := 4.0
-const JELLY_DANGER_PEAK_SECONDS := 7.0
-const JELLY_DANGER_END_SECONDS := 9.0
 const JELLY_CHANCE_AT_BIRTH := 0.0001
 const JELLY_CHANCE_AT_RAMP_START := 0.005
 const JELLY_CHANCE_FINAL := 0.06
-const JELLY_CHANCE_AT_DANGER_PEAK := 0.683
 const GROWTH_RHYTHM_AMPLITUDE := 0.10
 
 var visual_scale := 0.18
 var plant_sprite: Sprite3D
 var contact_shadow: MeshInstance3D
 var is_special := false
+var jelly_ramp_end_seconds := 11.0
 var growth_rhythm_period := 22.0
 var growth_rhythm_phase := 0.0
 var jelly_checks_enabled := true
@@ -53,6 +51,15 @@ func setup(species: Dictionary, seed_value: int, screen_label: Label, _danger: L
 	rng.seed = seed_value
 	sway_phase = rng.randf_range(0.0, TAU)
 	is_special = rng.randf() < 0.10
+	var ramp_roll := rng.randf()
+	if ramp_roll < 0.65:
+		jelly_ramp_end_seconds = rng.randf_range(7.0, 9.0)
+	elif ramp_roll < 0.90:
+		jelly_ramp_end_seconds = rng.randf_range(9.0, 13.0)
+	elif ramp_roll < 0.98:
+		jelly_ramp_end_seconds = rng.randf_range(13.0, 20.0)
+	else:
+		jelly_ramp_end_seconds = rng.randf_range(20.0, 30.0)
 	growth_rhythm_period = rng.randf_range(16.0, 28.0)
 	growth_rhythm_phase = rng.randf_range(0.0, TAU)
 	label = screen_label
@@ -118,7 +125,7 @@ func simulate(delta: float) -> void:
 	visual_scale = .18 + (diameter_cm - 1.6) * .058
 	_update_visual(delta)
 	if jelly_checks_enabled:
-		var jelly_probability := jelly_probability_for_interval(age - delta, delta)
+		var jelly_probability := jelly_probability_for_interval(age - delta, delta, jelly_ramp_end_seconds)
 		if rng.randf() < jelly_probability: jelly()
 
 func _integrated_growth_multiplier(start_time: float, end_time: float) -> float:
@@ -130,7 +137,7 @@ func _integrated_growth_multiplier(start_time: float, end_time: float) -> float:
 		- cos(omega * end_time + growth_rhythm_phase)
 	)
 
-static func jelly_probability_for_interval(start_age: float, delta: float) -> float:
+static func jelly_probability_for_interval(start_age: float, delta: float, ramp_end_seconds := 11.0) -> float:
 	# This is the single source of truth for jelly probability. Integrating the
 	# smoothly varying hazard over the whole frame makes the result FPS independent.
 	if delta <= 0.0: return 0.0
@@ -140,23 +147,20 @@ static func jelly_probability_for_interval(start_age: float, delta: float) -> fl
 	if initial_end > start_age:
 		integrated_hazard += -log(1.0 - JELLY_CHANCE_AT_BIRTH) * (initial_end - start_age)
 	integrated_hazard += _integrate_hazard_segment(start_age, end_age, JELLY_SAFE_END_SECONDS, JELLY_RAMP_START_SECONDS, JELLY_CHANCE_AT_BIRTH, JELLY_CHANCE_AT_RAMP_START)
-	integrated_hazard += _integrate_hazard_segment(start_age, end_age, JELLY_RAMP_START_SECONDS, JELLY_DANGER_PEAK_SECONDS, JELLY_CHANCE_AT_RAMP_START, JELLY_CHANCE_AT_DANGER_PEAK)
-	integrated_hazard += _integrate_hazard_segment(start_age, end_age, JELLY_DANGER_PEAK_SECONDS, JELLY_DANGER_END_SECONDS, JELLY_CHANCE_AT_DANGER_PEAK, JELLY_CHANCE_FINAL)
-	var constant_start := maxf(start_age, JELLY_DANGER_END_SECONDS)
+	integrated_hazard += _integrate_hazard_segment(start_age, end_age, JELLY_RAMP_START_SECONDS, ramp_end_seconds, JELLY_CHANCE_AT_RAMP_START, JELLY_CHANCE_FINAL)
+	var constant_start := maxf(start_age, ramp_end_seconds)
 	if end_age > constant_start:
 		integrated_hazard += -log(1.0 - JELLY_CHANCE_FINAL) * (end_age - constant_start)
 	return 1.0 - exp(-integrated_hazard)
 
-static func jelly_chance_per_second(at_age: float) -> float:
+static func jelly_chance_per_second(at_age: float, ramp_end_seconds := 11.0) -> float:
 	var hazard := -log(1.0 - JELLY_CHANCE_AT_BIRTH)
 	if at_age <= JELLY_SAFE_END_SECONDS:
 		pass
 	elif at_age < JELLY_RAMP_START_SECONDS:
 		hazard = _smooth_hazard(at_age, JELLY_SAFE_END_SECONDS, JELLY_RAMP_START_SECONDS, JELLY_CHANCE_AT_BIRTH, JELLY_CHANCE_AT_RAMP_START)
-	elif at_age < JELLY_DANGER_PEAK_SECONDS:
-		hazard = _smooth_hazard(at_age, JELLY_RAMP_START_SECONDS, JELLY_DANGER_PEAK_SECONDS, JELLY_CHANCE_AT_RAMP_START, JELLY_CHANCE_AT_DANGER_PEAK)
-	elif at_age < JELLY_DANGER_END_SECONDS:
-		hazard = _smooth_hazard(at_age, JELLY_DANGER_PEAK_SECONDS, JELLY_DANGER_END_SECONDS, JELLY_CHANCE_AT_DANGER_PEAK, JELLY_CHANCE_FINAL)
+	elif at_age < ramp_end_seconds:
+		hazard = _smooth_hazard(at_age, JELLY_RAMP_START_SECONDS, ramp_end_seconds, JELLY_CHANCE_AT_RAMP_START, JELLY_CHANCE_FINAL)
 	else:
 		hazard = -log(1.0 - JELLY_CHANCE_FINAL)
 	return 1.0 - exp(-hazard)

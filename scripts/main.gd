@@ -2,9 +2,9 @@ extends Node
 
 const SucculentClass = preload("res://scripts/succulent.gd")
 const TARGET_COUNT := 12
-const SPAWN_SOIL_RADIUS_X := 3.55
-const SPAWN_SOIL_RADIUS_Z := 3.15
-const SPAWN_EDGE_MARGIN := 0.50
+const SOIL_SOURCE_CENTER := Vector2(426.5,700.0)
+const SOIL_SOURCE_RADII := Vector2(360.0,190.0)
+const SPAWN_SPRITE_MARGIN_SOURCE_PX := 40.0
 const UI_CREAM := Color("#fff1d2")
 const UI_BROWN := Color("#4a2618")
 const UI_GOLD := Color("#e8aa35")
@@ -196,14 +196,15 @@ func _weighted_species()->Dictionary:
 	return species[0]
 
 func _find_spawn_position()->Vector3:
-	# Uniformly sample the visible soil ellipse. No rows, slots, or equal spacing.
+	# Sample world positions, but accept them only after projecting into the
+	# scrolling background image's source-pixel coordinates.
 	var best := Vector3.ZERO
 	var best_clearance := -1.0
-	for attempt in range(72):
+	for attempt in range(192):
 		var angle := rng.randf_range(0.0, TAU)
 		var radius := sqrt(rng.randf())
-		# Keep the whole initial rosette inside the soil, not just its center.
-		var candidate := Vector3(cos(angle)*(SPAWN_SOIL_RADIUS_X-SPAWN_EDGE_MARGIN)*radius,.12,sin(angle)*(SPAWN_SOIL_RADIUS_Z-SPAWN_EDGE_MARGIN)*radius)
+		var candidate := Vector3(cos(angle)*3.55*radius,.12,sin(angle)*3.15*radius)
+		if not _spawn_center_inside_soil(candidate):continue
 		var clearance := 99.0
 		for plant in plants:
 			if is_instance_valid(plant): clearance = minf(clearance, candidate.distance_to(plant.original_pos))
@@ -214,6 +215,18 @@ func _find_spawn_position()->Vector3:
 			best_clearance = clearance
 		if clearance >= .82: return candidate
 	return best
+
+func _spawn_center_inside_soil(candidate:Vector3)->bool:
+	if camera==null or greenhouse_backdrop==null or greenhouse_backdrop.texture==null:return false
+	var displayed_world:=candidate+Vector3(greenhouse_world_pan_x,0,0)
+	if camera.is_position_behind(displayed_world):return false
+	var screen_point:=camera.unproject_position(displayed_world)
+	var texture_scale:=greenhouse_backdrop.size.x/greenhouse_backdrop.texture.get_width()
+	if texture_scale<=0.0:return false
+	var source_point:=(screen_point-greenhouse_backdrop.position)/texture_scale
+	var safe_radii:=SOIL_SOURCE_RADII-Vector2.ONE*SPAWN_SPRITE_MARGIN_SOURCE_PX
+	var normalized:=source_point-SOIL_SOURCE_CENTER
+	return pow(normalized.x/safe_radii.x,2.0)+pow(normalized.y/safe_radii.y,2.0)<=1.0
 
 func _plant_label()->Label:
 	var l:=Label.new(); l.text="1.6 cm"; l.size=Vector2(92,34); l.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; l.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; l.add_theme_font_size_override("font_size",17); l.add_theme_color_override("font_color",Color.WHITE); l.add_theme_stylebox_override("normal",_box(Color(0.14,0.08,0.05,.92),Color("#f4e1be"),11,2)); l.mouse_filter=Control.MOUSE_FILTER_IGNORE; return l
