@@ -17,10 +17,12 @@ const HABITAT_ITEM_RADIUS := 9.0
 const HABITAT_BEST_LINK_EVENT_CM := 30.0
 const RAIN_BONUS_DURATION_SECONDS := 60.0
 const RAIN_INITIAL_PLANT_COUNT := 12
+const RAIN_MAX_ACTIVE_PLANTS := 22
 const RAIN_TRIGGER_CHANCES := [0.05,0.07,0.10,0.15,0.25,0.40,0.98]
 const NORMAL_SEED_BAG_PRICE_YEN := 500
 const PREMIUM_SEED_BAG_PRICE_YEN := 800
 const HABITAT_SAFE_PLANT_POINTS := [Vector2(70,400),Vector2(155,410),Vector2(245,400),Vector2(335,420),Vector2(430,405),Vector2(535,415),Vector2(705,430),Vector2(820,410),Vector2(920,395),Vector2(1025,420),Vector2(1130,400),Vector2(1220,415)]
+const RAIN_GROUND_REGIONS := [Rect2(12,350,225,220),Rect2(245,382,255,188),Rect2(505,405,140,165),Rect2(650,462,165,108),Rect2(820,405,225,165),Rect2(1050,350,218,220)]
 const HABITAT_NEW_SPECIES_POINTS := [Vector2(640,385),Vector2(735,392),Vector2(545,388),Vector2(815,395),Vector2(465,392)]
 const HABITAT_SAFE_SEED_POINTS := [Vector2(45,430),Vector2(115,445),Vector2(190,430),Vector2(275,445),Vector2(360,440),Vector2(455,435),Vector2(545,445),Vector2(625,455),Vector2(715,450),Vector2(805,440),Vector2(895,430),Vector2(980,445),Vector2(1060,435),Vector2(1140,445),Vector2(1210,435),Vector2(1260,455)]
 const UI_CREAM := Color("#fff1d2")
@@ -140,6 +142,8 @@ var rain_time_remaining := 0.0
 var rain_spawn_queue := 0
 var rain_spawn_timer := 0.0
 var rain_last_saved_second := -1
+var rain_intro_normal_bags := 0
+var rain_draws_unlocked := false
 var forced_golden_done := false
 var view_yaw := 0.0
 var view_pitch := -3.0
@@ -185,6 +189,7 @@ func _load_save() -> void:
 			intro_story_complete=bool(value.get("intro_story_complete",false));total_play_count=int(value.get("total_play_count",0));completed_unlock_conditions=value.get("completed_unlock_conditions",{});pending_habitat_species=value.get("pending_habitat_species",[]);audio_settings=value.get("audio_settings",audio_settings)
 			encyclopedia_unlocked=bool(value.get("encyclopedia_unlocked",intro_story_complete and (total_play_count>=1 or bool(discovered.get("colorata",false)))));habitat_unlocked=bool(value.get("habitat_unlocked",intro_story_complete and total_play_count>=3));tutorial_steps=value.get("tutorial_steps",{});old_seed_bags=int(value.get("old_seed_bags",0));buyback_unlocked=bool(value.get("buyback_unlocked",total_play_count>=4))
 			rain_bag_count=maxi(0,int(value.get("rain_bag_count",0)));rain_event_pending=bool(value.get("rain_event_pending",false));rain_bonus_in_progress=bool(value.get("rain_bonus_in_progress",false));rain_time_remaining=clampf(float(value.get("rain_time_remaining",RAIN_BONUS_DURATION_SECONDS)),0.0,RAIN_BONUS_DURATION_SECONDS)
+			rain_intro_normal_bags=maxi(0,int(value.get("rain_intro_normal_bags",0)));rain_draws_unlocked=bool(value.get("rain_draws_unlocked",total_play_count>3))
 			if not rain_event_pending:rain_bonus_in_progress=false;rain_time_remaining=0.0
 			if value.has("normal_seed_bags"):
 				normal_seed_bags=int(value.get("normal_seed_bags",0));premium_seed_bags=int(value.get("premium_seed_bags",0));login_bonus_date=str(value.get("login_bonus_date",""))
@@ -206,7 +211,7 @@ func _load_save() -> void:
 func _save() -> void:
 	var f := FileAccess.open("user://records.json",FileAccess.WRITE)
 	if audio_manager:audio_settings=audio_manager.settings_dictionary()
-	f.store_string(JSON.stringify({"progression_version":PROGRESSION_VERSION,"bests":bests,"discovered":discovered,"unlocked_species":unlocked_species,"greenhouse_available":greenhouse_available,"completed_unlock_conditions":completed_unlock_conditions,"pending_habitat_species":pending_habitat_species,"total_play_count":total_play_count,"intro_story_complete":intro_story_complete,"encyclopedia_unlocked":encyclopedia_unlocked,"habitat_unlocked":habitat_unlocked,"tutorial_steps":tutorial_steps,"old_seed_bags":old_seed_bags,"buyback_unlocked":buyback_unlocked,"habitat_seed_date":habitat_seed_date,"habitat_seeds_collected":habitat_seeds_collected,"normal_seed_bags":normal_seed_bags,"premium_seed_bags":premium_seed_bags,"login_bonus_date":login_bonus_date,"audio_settings":audio_settings,"rain_bag_count":rain_bag_count,"rain_event_pending":rain_event_pending,"rain_bonus_in_progress":rain_bonus_in_progress,"rain_time_remaining":rain_time_remaining,"yen":coins}))
+	f.store_string(JSON.stringify({"progression_version":PROGRESSION_VERSION,"bests":bests,"discovered":discovered,"unlocked_species":unlocked_species,"greenhouse_available":greenhouse_available,"completed_unlock_conditions":completed_unlock_conditions,"pending_habitat_species":pending_habitat_species,"total_play_count":total_play_count,"intro_story_complete":intro_story_complete,"encyclopedia_unlocked":encyclopedia_unlocked,"habitat_unlocked":habitat_unlocked,"tutorial_steps":tutorial_steps,"old_seed_bags":old_seed_bags,"buyback_unlocked":buyback_unlocked,"habitat_seed_date":habitat_seed_date,"habitat_seeds_collected":habitat_seeds_collected,"normal_seed_bags":normal_seed_bags,"premium_seed_bags":premium_seed_bags,"login_bonus_date":login_bonus_date,"audio_settings":audio_settings,"rain_bag_count":rain_bag_count,"rain_event_pending":rain_event_pending,"rain_bonus_in_progress":rain_bonus_in_progress,"rain_time_remaining":rain_time_remaining,"rain_intro_normal_bags":rain_intro_normal_bags,"rain_draws_unlocked":rain_draws_unlocked,"yen":coins}))
 
 func _daily_seed_gift_due()->bool:
 	if not intro_story_complete:return false
@@ -509,7 +514,7 @@ func _change_audio_volume(value:float,is_bgm:bool)->void:
 	audio_settings["bgm_volume" if is_bgm else "se_volume"]=value/100.0;audio_manager.apply_settings(audio_settings);_save()
 
 func _reset_progression_state()->void:
-	coins=1000;bests.clear();discovered.clear();greenhouse_available={"colorata":true};unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;buyback_unlocked=false;tutorial_steps.clear();normal_seed_bags=0;premium_seed_bags=0;old_seed_bags=0;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;opening_species.clear();play_active=false;play_time_remaining=0.0;current_target_count=NORMAL_GERMINATION_COUNT;rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;habitat_scroll_tutorial_active=false;habitat_best_link_dialog_step=0;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_build_habitat_items();_save();_update_currency_ui();_update_play_ui()
+	coins=1000;bests.clear();discovered.clear();greenhouse_available={"colorata":true};unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;buyback_unlocked=false;tutorial_steps.clear();normal_seed_bags=0;premium_seed_bags=0;old_seed_bags=0;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;opening_species.clear();play_active=false;play_time_remaining=0.0;current_target_count=NORMAL_GERMINATION_COUNT;rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_scroll_tutorial_active=false;habitat_best_link_dialog_step=0;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_build_habitat_items();_save();_update_currency_ui();_update_play_ui()
 
 func _reset_progression_for_development(button:Button)->void:
 	_reset_progression_state();button.text="リセットしました（再読み込みしてください）"
@@ -726,7 +731,11 @@ func _update_habitat_ui()->void:
 	_update_habitat_button_glow()
 
 func _roll_rain_event()->void:
-	if rain_event_pending:return
+	if rain_event_pending or active_seed_type=="old":return
+	if not rain_draws_unlocked:
+		rain_intro_normal_bags+=1
+		if rain_intro_normal_bags<2:return
+		rain_draws_unlocked=true
 	rain_bag_count+=1
 	var chance:float=float(RAIN_TRIGGER_CHANCES[mini(rain_bag_count-1,RAIN_TRIGGER_CHANCES.size()-1)])
 	if rng.randf()>=chance:return
@@ -859,17 +868,20 @@ func _rain_species_pool()->Array:
 	return pool
 
 func _find_rain_spawn_position()->Vector3:
-	var points:Array=HABITAT_SAFE_PLANT_POINTS
-	var best:=_panorama_point_to_world(points[rng.randi_range(0,points.size()-1)],HABITAT_ITEM_RADIUS-.35)
+	var best:=_panorama_point_to_world(_random_rain_ground_point(),HABITAT_ITEM_RADIUS-.35)
 	var best_clearance:=-1.0
-	for attempt in range(64):
-		var candidate:=_panorama_point_to_world(points[rng.randi_range(0,points.size()-1)]+Vector2(rng.randf_range(-18.0,18.0),rng.randf_range(-8.0,8.0)),HABITAT_ITEM_RADIUS-.35)
+	for attempt in range(96):
+		var candidate:=_panorama_point_to_world(_random_rain_ground_point(),HABITAT_ITEM_RADIUS-.35)
 		var clearance:=99.0
 		for plant in plants:
 			if is_instance_valid(plant):clearance=minf(clearance,candidate.distance_to(plant.original_pos))
 		if clearance>best_clearance:best=candidate;best_clearance=clearance
 		if clearance>=1.15:return candidate
 	return best
+
+func _random_rain_ground_point()->Vector2:
+	var region:Rect2=RAIN_GROUND_REGIONS[rng.randi_range(0,RAIN_GROUND_REGIONS.size()-1)]
+	return Vector2(rng.randf_range(region.position.x,region.end.x),rng.randf_range(region.position.y,region.end.y))
 
 func _weighted_species()->Dictionary:
 	var total:=0.0
@@ -966,9 +978,9 @@ func _process(delta:float)->void:
 			return
 		for p in plants:
 			if is_instance_valid(p):p.simulate(delta)
-		if rain_spawn_queue>0:
+		if rain_spawn_queue>0 and plants.size()<RAIN_MAX_ACTIVE_PLANTS:
 			rain_spawn_timer-=delta
-			if rain_spawn_timer<=0.0:rain_spawn_queue-=1;spawn_plant();rain_spawn_timer=rng.randf_range(.35,.85)
+			if rain_spawn_timer<=0.0:rain_spawn_queue-=1;spawn_plant();rain_spawn_timer=rng.randf_range(.14,.32)
 	elif current_mode=="greenhouse" and play_active:
 		for p in plants:
 			if is_instance_valid(p):p.simulate(delta)
@@ -1215,8 +1227,8 @@ func _cleanup_later(p,delay:float)->void:
 	while recent_vacated_slots.size()>12:recent_vacated_slots.pop_front()
 	plants.erase(p)
 	if rain_bonus_active and rain_time_remaining>0.0:
-		rain_spawn_queue+=1
-		if rain_spawn_queue==1:rain_spawn_timer=rng.randf_range(.35,.85)
+		rain_spawn_queue=mini(RAIN_MAX_ACTIVE_PLANTS,rain_spawn_queue+2)
+		if rain_spawn_queue<=2:rain_spawn_timer=rng.randf_range(.14,.32)
 	elif play_active and plants.is_empty():call_deferred("_finish_greenhouse_play")
 	await get_tree().create_timer(delay).timeout
 	if is_instance_valid(p):p.label.queue_free();p.queue_free()

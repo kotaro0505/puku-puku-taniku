@@ -76,13 +76,15 @@ func _ready()->void:
 
 func _verify_jelly_probability()->void:
 	var succulent_script = load("res://scripts/succulent.gd")
-	for ramp_end in [8.0,11.0,16.5,25.0]:
-		assert(absf(succulent_script.jelly_chance_per_second(0.0,ramp_end)-0.0001)<0.000001)
-		assert(absf(succulent_script.jelly_chance_per_second(4.0,ramp_end)-0.005)<0.000001)
-		assert(absf(succulent_script.jelly_chance_per_second(ramp_end,ramp_end)-0.06)<0.000001)
-		assert(absf(succulent_script.jelly_chance_per_second(100.0,ramp_end)-0.06)<0.000001)
-		var reference_probability = succulent_script.jelly_probability_for_interval(0.0,35.0,ramp_end)
+	for profile in [[3.8,8.3],[4.7,15.0],[5.4,24.0],[6.2,42.0]]:
+		var safe_end:float=profile[0];var ramp_end:float=profile[1];var midpoint:float=(safe_end+ramp_end)*.5
+		assert(is_zero_approx(succulent_script.jelly_chance_per_second(0.0,safe_end,ramp_end)))
+		assert(is_zero_approx(succulent_script.jelly_chance_per_second(safe_end,safe_end,ramp_end)))
+		assert(succulent_script.jelly_chance_per_second(midpoint,safe_end,ramp_end)>0.0 and succulent_script.jelly_chance_per_second(midpoint,safe_end,ramp_end)<0.06)
+		assert(absf(succulent_script.jelly_chance_per_second(ramp_end,safe_end,ramp_end)-0.06)<0.000001)
+		assert(is_zero_approx(succulent_script.jelly_probability_for_interval(0.0,safe_end,safe_end,ramp_end)))
+		var reference_probability = succulent_script.jelly_probability_for_interval(0.0,50.0,safe_end,ramp_end)
 		for fps in [30,60,120]:
 			var delta := 1.0/float(fps);var survival:=1.0
-			for frame in range(35*fps):survival*=1.0-succulent_script.jelly_probability_for_interval(frame*delta,delta,ramp_end)
+			for frame in range(50*fps):survival*=1.0-succulent_script.jelly_probability_for_interval(frame*delta,delta,safe_end,ramp_end)
 			assert(is_equal_approx(1.0-survival,reference_probability))
