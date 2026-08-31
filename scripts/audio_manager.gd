@@ -15,6 +15,9 @@ var se_players: Array[AudioStreamPlayer] = []
 var active_bgm := 0
 var current_bgm_key := ""
 var fallback_se_cache: Dictionary = {}
+var web_audio_unlocked := not OS.has_feature("web")
+var bgm_restart_queued := false
+var bgm_fade_tween: Tween
 
 func _ready() -> void:
 	_load_config()
@@ -35,14 +38,21 @@ func _load_config() -> void:
 	if parsed is Dictionary: config = parsed
 
 func apply_settings(saved: Dictionary) -> void:
+	var was_bgm_enabled := bgm_enabled
 	bgm_enabled = bool(saved.get("bgm_enabled", true))
 	se_enabled = bool(saved.get("se_enabled", true))
 	bgm_volume = clampf(float(saved.get("bgm_volume", 0.65)), 0.0, 1.0)
 	se_volume = clampf(float(saved.get("se_volume", 0.62)), 0.0, 1.0)
 	if not bgm_enabled:
+		_cancel_bgm_fade()
 		for player in bgm_players: player.stop()
-	elif not current_bgm_key.is_empty():
-		play_bgm(current_bgm_key, true)
+	elif not was_bgm_enabled and not current_bgm_key.is_empty():
+		AudioServer.set_bus_mute(AudioServer.get_bus_index("Master"), false)
+		_queue_bgm_restart()
+	else:
+		var target_db := linear_to_db(maxf(bgm_volume, 0.001))
+		for player in bgm_players:
+			if player.playing: player.volume_db = target_db
 
 func settings_dictionary() -> Dictionary:
 	return {"bgm_enabled":bgm_enabled,"se_enabled":se_enabled,"bgm_volume":bgm_volume,"se_volume":se_volume}
@@ -56,17 +66,48 @@ func play_bgm(key: String, restart := false) -> void:
 		return
 	var current := bgm_players[active_bgm]
 	if not restart and current.playing and current.stream == stream: return
+	_cancel_bgm_fade()
 	var next_index := 1 - active_bgm
 	var next := bgm_players[next_index]
 	next.stream = stream
 	next.volume_db = -60.0
 	next.play()
 	var target_db := linear_to_db(maxf(bgm_volume, 0.001))
-	var tween := create_tween().set_parallel()
-	tween.tween_property(next, "volume_db", target_db, BGM_FADE_SECONDS)
-	if current.playing: tween.tween_property(current, "volume_db", -60.0, BGM_FADE_SECONDS)
-	tween.chain().tween_callback(current.stop)
+	bgm_fade_tween = create_tween().set_parallel()
+	bgm_fade_tween.tween_property(next, "volume_db", target_db, BGM_FADE_SECONDS)
+	if current.playing: bgm_fade_tween.tween_property(current, "volume_db", -60.0, BGM_FADE_SECONDS)
+	bgm_fade_tween.chain().tween_callback(current.stop)
 	active_bgm = next_index
+
+func notify_user_gesture() -> void:
+	if not bgm_enabled or current_bgm_key.is_empty(): return
+	AudioServer.set_bus_mute(AudioServer.get_bus_index("Master"), false)
+	if not web_audio_unlocked:
+		web_audio_unlocked = true
+		_queue_bgm_restart()
+	elif not _has_audible_bgm_player():
+		_queue_bgm_restart()
+
+func _queue_bgm_restart() -> void:
+	if bgm_restart_queued: return
+	bgm_restart_queued = true
+	call_deferred("_restart_current_bgm")
+
+func _restart_current_bgm() -> void:
+	bgm_restart_queued = false
+	if not bgm_enabled or current_bgm_key.is_empty(): return
+	_cancel_bgm_fade()
+	for player in bgm_players: player.stop()
+	play_bgm(current_bgm_key, true)
+
+func _cancel_bgm_fade() -> void:
+	if bgm_fade_tween and bgm_fade_tween.is_valid(): bgm_fade_tween.kill()
+	bgm_fade_tween = null
+
+func _has_audible_bgm_player() -> bool:
+	for player in bgm_players:
+		if player.playing and player.volume_db > -50.0: return true
+	return false
 
 func play_se(key: String, gain := 1.0) -> void:
 	if not se_enabled: return
@@ -95,6 +136,9 @@ func _stream_for(section: String, key: String) -> AudioStream:
 func _enable_bgm_loop(stream: AudioStream) -> void:
 	if stream is AudioStreamWAV:
 		stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		if stream.loop_end <= stream.loop_begin:
+			stream.loop_begin = 0
+			stream.loop_end = maxi(1, roundi(stream.get_length() * stream.mix_rate))
 	elif stream is AudioStreamOggVorbis:
 		stream.loop = true
 

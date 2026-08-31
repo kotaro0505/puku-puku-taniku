@@ -703,7 +703,7 @@ func _wire_ui_sounds(node:Node)->void:
 	for child in node.get_children():_wire_ui_sounds(child)
 
 func _play_ui_tap()->void:
-	if audio_manager:audio_manager.play_se("ui_tap",.22)
+	if audio_manager:audio_manager.notify_user_gesture();audio_manager.play_se("ui_tap",.22)
 
 func _layout() -> void:
 	_update_greenhouse_pan()
@@ -902,6 +902,7 @@ func _update_labels()->void:
 		p.label.position=r.position; p.label.text="%.1f cm"%p.diameter_cm; p.label.visible=p.state=="growing" and Rect2(Vector2.ZERO,get_viewport().get_visible_rect().size).grow(80).has_point(screen)
 
 func _input(event:InputEvent)->void:
+	if audio_manager and (event is InputEventScreenTouch or event is InputEventMouseButton or event is InputEventKey):audio_manager.notify_user_gesture()
 	if (tutorial_guide_overlay and tutorial_guide_overlay.visible) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible):return
 	if current_mode=="greenhouse" and not play_active:return
 	if event is InputEventScreenTouch:
