@@ -15,6 +15,9 @@ const GREENHOUSE_PAN_FOLLOW_SECONDS := 0.075
 const HABITAT_DRAG_SCALE := 0.055
 const HABITAT_ITEM_RADIUS := 9.0
 const HABITAT_BEST_LINK_EVENT_CM := 30.0
+const RAIN_BONUS_DURATION_SECONDS := 60.0
+const RAIN_INITIAL_PLANT_COUNT := 12
+const RAIN_TRIGGER_CHANCES := [0.05,0.07,0.10,0.15,0.25,0.40,0.98]
 const NORMAL_SEED_BAG_PRICE_YEN := 500
 const PREMIUM_SEED_BAG_PRICE_YEN := 800
 const HABITAT_SAFE_PLANT_POINTS := [Vector2(70,400),Vector2(155,410),Vector2(245,400),Vector2(335,420),Vector2(430,405),Vector2(535,415),Vector2(705,430),Vector2(820,410),Vector2(920,395),Vector2(1025,420),Vector2(1130,400),Vector2(1220,415)]
@@ -98,6 +101,8 @@ var audio_manager: Node
 var audio_settings: Dictionary = {"bgm_enabled":true,"se_enabled":true,"bgm_volume":0.65,"se_volume":0.62}
 var habitat_glow_tween: Tween
 var habitat_sparkle: Label
+var rain_visual: Control
+var rain_drops: Array = []
 var result_overlay: Control
 var result_card: PanelContainer
 var result_total_label: Label
@@ -127,7 +132,14 @@ var play_harvest_count := 0
 var play_max_size := 0.0
 var play_notable_species: Dictionary = {}
 var current_target_count := NORMAL_GERMINATION_COUNT
-var consecutive_jellies := 0
+var rain_bag_count := 0
+var rain_event_pending := false
+var rain_bonus_in_progress := false
+var rain_bonus_active := false
+var rain_time_remaining := 0.0
+var rain_spawn_queue := 0
+var rain_spawn_timer := 0.0
+var rain_last_saved_second := -1
 var forced_golden_done := false
 var view_yaw := 0.0
 var view_pitch := -3.0
@@ -172,6 +184,8 @@ func _load_save() -> void:
 			bests = value.get("bests",{}); coins = int(value.get("yen",value.get("coins",1000))); discovered=value.get("discovered",{"colorata":true});habitat_seed_date=str(value.get("habitat_seed_date",""));habitat_seeds_collected=int(value.get("habitat_seeds_collected",0))
 			intro_story_complete=bool(value.get("intro_story_complete",false));total_play_count=int(value.get("total_play_count",0));completed_unlock_conditions=value.get("completed_unlock_conditions",{});pending_habitat_species=value.get("pending_habitat_species",[]);audio_settings=value.get("audio_settings",audio_settings)
 			encyclopedia_unlocked=bool(value.get("encyclopedia_unlocked",intro_story_complete and (total_play_count>=1 or bool(discovered.get("colorata",false)))));habitat_unlocked=bool(value.get("habitat_unlocked",intro_story_complete and total_play_count>=3));tutorial_steps=value.get("tutorial_steps",{});old_seed_bags=int(value.get("old_seed_bags",0));buyback_unlocked=bool(value.get("buyback_unlocked",total_play_count>=4))
+			rain_bag_count=maxi(0,int(value.get("rain_bag_count",0)));rain_event_pending=bool(value.get("rain_event_pending",false));rain_bonus_in_progress=bool(value.get("rain_bonus_in_progress",false));rain_time_remaining=clampf(float(value.get("rain_time_remaining",RAIN_BONUS_DURATION_SECONDS)),0.0,RAIN_BONUS_DURATION_SECONDS)
+			if not rain_event_pending:rain_bonus_in_progress=false;rain_time_remaining=0.0
 			if value.has("normal_seed_bags"):
 				normal_seed_bags=int(value.get("normal_seed_bags",0));premium_seed_bags=int(value.get("premium_seed_bags",0));login_bonus_date=str(value.get("login_bonus_date",""))
 			else:
@@ -192,7 +206,7 @@ func _load_save() -> void:
 func _save() -> void:
 	var f := FileAccess.open("user://records.json",FileAccess.WRITE)
 	if audio_manager:audio_settings=audio_manager.settings_dictionary()
-	f.store_string(JSON.stringify({"progression_version":PROGRESSION_VERSION,"bests":bests,"discovered":discovered,"unlocked_species":unlocked_species,"greenhouse_available":greenhouse_available,"completed_unlock_conditions":completed_unlock_conditions,"pending_habitat_species":pending_habitat_species,"total_play_count":total_play_count,"intro_story_complete":intro_story_complete,"encyclopedia_unlocked":encyclopedia_unlocked,"habitat_unlocked":habitat_unlocked,"tutorial_steps":tutorial_steps,"old_seed_bags":old_seed_bags,"buyback_unlocked":buyback_unlocked,"habitat_seed_date":habitat_seed_date,"habitat_seeds_collected":habitat_seeds_collected,"normal_seed_bags":normal_seed_bags,"premium_seed_bags":premium_seed_bags,"login_bonus_date":login_bonus_date,"audio_settings":audio_settings,"yen":coins}))
+	f.store_string(JSON.stringify({"progression_version":PROGRESSION_VERSION,"bests":bests,"discovered":discovered,"unlocked_species":unlocked_species,"greenhouse_available":greenhouse_available,"completed_unlock_conditions":completed_unlock_conditions,"pending_habitat_species":pending_habitat_species,"total_play_count":total_play_count,"intro_story_complete":intro_story_complete,"encyclopedia_unlocked":encyclopedia_unlocked,"habitat_unlocked":habitat_unlocked,"tutorial_steps":tutorial_steps,"old_seed_bags":old_seed_bags,"buyback_unlocked":buyback_unlocked,"habitat_seed_date":habitat_seed_date,"habitat_seeds_collected":habitat_seeds_collected,"normal_seed_bags":normal_seed_bags,"premium_seed_bags":premium_seed_bags,"login_bonus_date":login_bonus_date,"audio_settings":audio_settings,"rain_bag_count":rain_bag_count,"rain_event_pending":rain_event_pending,"rain_bonus_in_progress":rain_bonus_in_progress,"rain_time_remaining":rain_time_remaining,"yen":coins}))
 
 func _daily_seed_gift_due()->bool:
 	if not intro_story_complete:return false
@@ -495,7 +509,7 @@ func _change_audio_volume(value:float,is_bgm:bool)->void:
 	audio_settings["bgm_volume" if is_bgm else "se_volume"]=value/100.0;audio_manager.apply_settings(audio_settings);_save()
 
 func _reset_progression_state()->void:
-	coins=1000;bests.clear();discovered.clear();greenhouse_available={"colorata":true};unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;buyback_unlocked=false;tutorial_steps.clear();normal_seed_bags=0;premium_seed_bags=0;old_seed_bags=0;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;opening_species.clear();play_active=false;play_time_remaining=0.0;current_target_count=NORMAL_GERMINATION_COUNT;consecutive_jellies=0;habitat_scroll_tutorial_active=false;habitat_best_link_dialog_step=0;tutorial_habitat_item.clear();_apply_saved_unlocks();_clear_greenhouse_plants();_build_habitat_items();_save();_update_currency_ui();_update_play_ui()
+	coins=1000;bests.clear();discovered.clear();greenhouse_available={"colorata":true};unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;buyback_unlocked=false;tutorial_steps.clear();normal_seed_bags=0;premium_seed_bags=0;old_seed_bags=0;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;opening_species.clear();play_active=false;play_time_remaining=0.0;current_target_count=NORMAL_GERMINATION_COUNT;rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;habitat_scroll_tutorial_active=false;habitat_best_link_dialog_step=0;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_build_habitat_items();_save();_update_currency_ui();_update_play_ui()
 
 func _reset_progression_for_development(button:Button)->void:
 	_reset_progression_state();button.text="リセットしました（再読み込みしてください）"
@@ -536,7 +550,7 @@ func _start_greenhouse_play(seed_type:String)->void:
 	else:
 		if normal_seed_bags<1:return
 		normal_seed_bags-=1;current_target_count=NORMAL_GERMINATION_COUNT
-	active_seed_type=seed_type;play_time_remaining=0.0;play_active=true;play_modal_open=false;play_earnings_total=0;play_harvest_count=0;play_max_size=0.0;play_notable_species.clear();consecutive_jellies=0;opening_species.clear();_clear_greenhouse_plants()
+	active_seed_type=seed_type;play_time_remaining=0.0;play_active=true;play_modal_open=false;play_earnings_total=0;play_harvest_count=0;play_max_size=0.0;play_notable_species.clear();opening_species.clear();_clear_greenhouse_plants()
 	if result_overlay:result_overlay.visible=false
 	for i in range(current_target_count):spawn_plant()
 	if total_play_count==0 and not bool(tutorial_steps.get("first_harvest_guide",false)):call_deferred("_show_first_harvest_guide_when_ready")
@@ -551,7 +565,7 @@ func _finish_greenhouse_play()->void:
 	if total_play_count==3 and not bool(tutorial_steps.get("habitat_species_queued",false)):
 		if pending_habitat_species.is_empty():_queue_random_species("通常")
 		tutorial_steps["habitat_species_queued"]=true
-	_evaluate_unlock_rules("play_count",float(total_play_count));_clear_greenhouse_plants();_save();_update_play_ui();_show_play_result();audio_manager.play_se("result",.7)
+	_evaluate_unlock_rules("play_count",float(total_play_count));_roll_rain_event();_clear_greenhouse_plants();_save();_update_play_ui();_show_play_result();audio_manager.play_se("result",.7)
 
 func _clear_greenhouse_plants()->void:
 	for plant in plants.duplicate():
@@ -613,6 +627,7 @@ func _show_play_result()->void:
 	var notable:Array=play_notable_species.values();notable.sort_custom(func(a,b):return float(a.get("size",0.0))>float(b.get("size",0.0)));var lines:Array[String]=[]
 	for i in range(mini(3,notable.size())):lines.append("%s　%.1fcm"%[str(notable[i].get("name","")),float(notable[i].get("size",0.0))])
 	result_notable_label.text="\n".join(lines) if not lines.is_empty() else "今回はまだありません"
+	if rain_event_pending:result_notable_label.text+="\n\n☂ 原生地に恵みの雨が降っています"
 	result_overlay.visible=true;result_overlay.modulate.a=0.0;result_card.position.y=225.0;play_open_button.visible=false
 	var tween:=create_tween().set_parallel();tween.tween_property(result_overlay,"modulate:a",1.0,.36).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT);tween.tween_property(result_card,"position:y",205.0,.42).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
@@ -705,9 +720,23 @@ func _reset_daily_seeds_if_needed()->void:
 	if habitat_seed_date!=today:habitat_seed_date=today;habitat_seeds_collected=0;_save()
 
 func _update_habitat_ui()->void:
-	if habitat_status_label:habitat_status_label.text="謎の種  %d / 10"%habitat_seeds_collected
-	if mode_button and current_mode=="greenhouse":mode_button.text="原生地"
+	if habitat_status_label:
+		habitat_status_label.text="恵みの雨  残り %d秒"%ceili(rain_time_remaining) if rain_bonus_active else "謎の種  %d / 10"%habitat_seeds_collected
+	if mode_button and current_mode=="greenhouse":mode_button.text="☂ 恵みの雨" if rain_event_pending else "原生地"
 	_update_habitat_button_glow()
+
+func _roll_rain_event()->void:
+	if rain_event_pending:return
+	rain_bag_count+=1
+	var chance:float=float(RAIN_TRIGGER_CHANCES[mini(rain_bag_count-1,RAIN_TRIGGER_CHANCES.size()-1)])
+	if rng.randf()>=chance:return
+	rain_event_pending=true;rain_bonus_in_progress=false;rain_time_remaining=RAIN_BONUS_DURATION_SECONDS
+	_show_rain_notice("原生地に恵みの雨が降っています")
+
+func _show_rain_notice(message:String)->void:
+	if effects_layer==null:return
+	var notice:=Label.new();notice.text=message;notice.position=Vector2(68,215);notice.size=Vector2(440,72);notice.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;notice.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;notice.add_theme_font_size_override("font_size",22);notice.add_theme_color_override("font_color",Color("#eef8ff"));notice.add_theme_color_override("font_outline_color",Color("#28465d"));notice.add_theme_constant_override("outline_size",7);notice.add_theme_stylebox_override("normal",_box(Color(0.16,0.28,0.34,.9),Color("#b9deec"),18,2));effects_layer.add_child(notice)
+	var tween:=create_tween();tween.tween_property(notice,"position:y",notice.position.y-12,.25).set_trans(Tween.TRANS_QUAD);tween.tween_interval(2.2);tween.tween_property(notice,"modulate:a",0.0,.45);tween.tween_callback(notice.queue_free)
 
 func _evaluate_unlock_rules(trigger:String,current_value:float)->void:
 	for rule in unlock_rules:
@@ -731,13 +760,14 @@ func _queue_random_species(rarity:String)->void:
 
 func _update_habitat_button_glow()->void:
 	if not mode_button:return
-	var has_pending:=not pending_habitat_species.is_empty()
+	var has_pending:=not pending_habitat_species.is_empty() or rain_event_pending
 	if habitat_glow_tween and habitat_glow_tween.is_valid():habitat_glow_tween.kill()
 	mode_button.self_modulate=Color.WHITE
 	if habitat_sparkle and is_instance_valid(habitat_sparkle):habitat_sparkle.queue_free()
 	if not has_pending:return
-	habitat_sparkle=Label.new();habitat_sparkle.text="✦";habitat_sparkle.position=Vector2(5,-9);habitat_sparkle.add_theme_font_size_override("font_size",22);habitat_sparkle.add_theme_color_override("font_color",Color("#fff2a1"));habitat_sparkle.mouse_filter=Control.MOUSE_FILTER_IGNORE;mode_button.add_child(habitat_sparkle)
-	habitat_glow_tween=create_tween().set_loops();habitat_glow_tween.tween_property(mode_button,"self_modulate",Color(1.2,1.12,.72,1),.75).set_trans(Tween.TRANS_SINE);habitat_glow_tween.parallel().tween_property(habitat_sparkle,"position:x",72.0,.75).set_trans(Tween.TRANS_SINE);habitat_glow_tween.parallel().tween_property(habitat_sparkle,"modulate:a",.25,.75);habitat_glow_tween.tween_property(mode_button,"self_modulate",Color.WHITE,.75);habitat_glow_tween.parallel().tween_property(habitat_sparkle,"position:x",5.0,.01);habitat_glow_tween.parallel().tween_property(habitat_sparkle,"modulate:a",1.0,.01);habitat_glow_tween.tween_interval(1.25)
+	habitat_sparkle=Label.new();habitat_sparkle.text="☂" if rain_event_pending else "✦";habitat_sparkle.position=Vector2(5,-9);habitat_sparkle.add_theme_font_size_override("font_size",22);habitat_sparkle.add_theme_color_override("font_color",Color("#bceaff") if rain_event_pending else Color("#fff2a1"));habitat_sparkle.mouse_filter=Control.MOUSE_FILTER_IGNORE;mode_button.add_child(habitat_sparkle)
+	var glow_color:=Color(0.72,1.05,1.22,1) if rain_event_pending else Color(1.2,1.12,.72,1)
+	habitat_glow_tween=create_tween().set_loops();habitat_glow_tween.tween_property(mode_button,"self_modulate",glow_color,.75).set_trans(Tween.TRANS_SINE);habitat_glow_tween.parallel().tween_property(habitat_sparkle,"position:x",72.0,.75).set_trans(Tween.TRANS_SINE);habitat_glow_tween.parallel().tween_property(habitat_sparkle,"modulate:a",.25,.75);habitat_glow_tween.tween_property(mode_button,"self_modulate",Color.WHITE,.75);habitat_glow_tween.parallel().tween_property(habitat_sparkle,"position:x",5.0,.01);habitat_glow_tween.parallel().tween_property(habitat_sparkle,"modulate:a",1.0,.01);habitat_glow_tween.tween_interval(1.25)
 
 func _open_species_detail(entry:Dictionary)->void:
 	for child in encyclopedia_detail_page.get_children():child.free()
@@ -787,6 +817,9 @@ func _update_greenhouse_pan()->void:
 		if absf(pixels_per_world)>.001:greenhouse_world_pan_x=greenhouse_pan_x/pixels_per_world
 
 func spawn_plant(force_golden := false) -> void:
+	if rain_bonus_active:
+		_spawn_rain_plant()
+		return
 	var chosen:Dictionary
 	if active_seed_type=="old":
 		for entry in catalog_species:
@@ -805,6 +838,38 @@ func spawn_plant(force_golden := false) -> void:
 	p.harvested.connect(_on_harvested); p.jellied.connect(_on_jellied)
 	plants.append(p)
 	if audio_manager:audio_manager.play_se("sprout",.28)
+
+func _spawn_rain_plant()->void:
+	var pool:=_rain_species_pool()
+	if pool.is_empty():return
+	var chosen:Dictionary=pool[rng.randi_range(0,pool.size()-1)]
+	var pos:=_find_rain_spawn_position()
+	var label:=_plant_label();labels_layer.add_child(label)
+	var p=SucculentClass.new();p.original_pos=pos;p.position=pos;world_root.add_child(p);p.setup(chosen,rng.randi(),label,null);p.harvested.connect(_on_harvested);p.jellied.connect(_on_jellied);plants.append(p)
+	if audio_manager:audio_manager.play_se("sprout",.22)
+
+func _rain_species_pool()->Array:
+	var pool:Array=[]
+	for entry in catalog_species:
+		var species_id:=str(entry.species_id)
+		if bool(discovered.get(species_id,false)) and bool(greenhouse_available.get(species_id,false)):pool.append(entry)
+	if pool.is_empty():
+		for entry in catalog_species:
+			if str(entry.species_id)=="colorata":pool.append(entry);break
+	return pool
+
+func _find_rain_spawn_position()->Vector3:
+	var points:Array=HABITAT_SAFE_PLANT_POINTS
+	var best:=_panorama_point_to_world(points[rng.randi_range(0,points.size()-1)],HABITAT_ITEM_RADIUS-.35)
+	var best_clearance:=-1.0
+	for attempt in range(64):
+		var candidate:=_panorama_point_to_world(points[rng.randi_range(0,points.size()-1)]+Vector2(rng.randf_range(-18.0,18.0),rng.randf_range(-8.0,8.0)),HABITAT_ITEM_RADIUS-.35)
+		var clearance:=99.0
+		for plant in plants:
+			if is_instance_valid(plant):clearance=minf(clearance,candidate.distance_to(plant.original_pos))
+		if clearance>best_clearance:best=candidate;best_clearance=clearance
+		if clearance>=1.15:return candidate
+	return best
 
 func _weighted_species()->Dictionary:
 	var total:=0.0
@@ -851,16 +916,63 @@ func _spawn_center_inside_soil(candidate:Vector3)->bool:
 func _plant_label()->Label:
 	var l:=Label.new(); l.text="1.6 cm"; l.size=Vector2(92,34); l.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; l.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; l.add_theme_font_size_override("font_size",17); l.add_theme_color_override("font_color",Color.WHITE); l.add_theme_stylebox_override("normal",_box(Color(0.14,0.08,0.05,.92),Color("#f4e1be"),11,2)); l.mouse_filter=Control.MOUSE_FILTER_IGNORE; return l
 
+func _start_rain_bonus()->void:
+	if not rain_event_pending or rain_bonus_active:return
+	rain_bonus_active=true;rain_bonus_in_progress=true;play_active=true;active_seed_type="rain";play_time_remaining=0.0
+	if rain_time_remaining<=0.0:rain_time_remaining=RAIN_BONUS_DURATION_SECONDS
+	rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=ceili(rain_time_remaining)
+	play_earnings_total=0;play_harvest_count=0;play_max_size=0.0;play_notable_species.clear();_clear_greenhouse_plants()
+	for child in habitat_items_root.get_children():child.free()
+	habitat_pickups.clear();habitat_items_root.visible=false
+	for i in range(RAIN_INITIAL_PLANT_COUNT):spawn_plant()
+	_start_rain_visual();_save();_update_play_ui();_update_habitat_ui();_show_rain_notice("恵みの雨が降り始めました")
+
+func _finish_rain_bonus()->void:
+	if not rain_bonus_active:return
+	rain_bonus_active=false;rain_bonus_in_progress=false;rain_event_pending=false;rain_time_remaining=0.0;rain_bag_count=0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;play_active=false
+	_clear_greenhouse_plants();_stop_rain_visual();_build_habitat_items();habitat_items_root.visible=current_mode=="habitat";_save();_update_play_ui();_update_habitat_ui();_show_rain_notice("恵みの雨が上がりました")
+
+func _start_rain_visual()->void:
+	_stop_rain_visual();rain_visual=Control.new();rain_visual.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);rain_visual.mouse_filter=Control.MOUSE_FILTER_IGNORE;effects_layer.add_child(rain_visual)
+	var tint:=ColorRect.new();tint.color=Color(0.18,0.34,0.46,.13);tint.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);tint.mouse_filter=Control.MOUSE_FILTER_IGNORE;rain_visual.add_child(tint)
+	rain_drops.clear()
+	var viewport_size:=get_viewport().get_visible_rect().size
+	for i in range(30):
+		var drop:=ColorRect.new();drop.color=Color(0.75,0.91,1.0,rng.randf_range(.25,.58));drop.size=Vector2(rng.randf_range(1.0,2.2),rng.randf_range(32.0,68.0));drop.rotation=-.16;drop.position=Vector2(rng.randf_range(0.0,viewport_size.x),rng.randf_range(-viewport_size.y,viewport_size.y));drop.mouse_filter=Control.MOUSE_FILTER_IGNORE;drop.set_meta("speed",rng.randf_range(520.0,850.0));rain_visual.add_child(drop);rain_drops.append(drop)
+
+func _stop_rain_visual()->void:
+	if rain_visual and is_instance_valid(rain_visual):rain_visual.queue_free()
+	rain_visual=null;rain_drops.clear()
+
+func _update_rain_visual(delta:float)->void:
+	if not rain_bonus_active:return
+	var viewport_size:=get_viewport().get_visible_rect().size
+	for drop in rain_drops:
+		if not is_instance_valid(drop):continue
+		drop.position+=Vector2(-70.0,float(drop.get_meta("speed",650.0)))*delta
+		if drop.position.y>viewport_size.y+80.0:drop.position=Vector2(rng.randf_range(0.0,viewport_size.x+100.0),rng.randf_range(-240.0,-40.0))
+
 func _process(delta:float)->void:
 	_update_greenhouse_pan_follow(delta)
 	_update_habitat_view_follow(delta)
 	_update_habitat_scroll_tutorial()
-	if current_mode=="greenhouse" and play_active:
+	_update_rain_visual(delta)
+	if rain_bonus_active:
+		rain_time_remaining=maxf(0.0,rain_time_remaining-delta)
+		var remaining_second:=ceili(rain_time_remaining)
+		if remaining_second!=rain_last_saved_second:rain_last_saved_second=remaining_second;_save();_update_habitat_ui()
+		if rain_time_remaining<=0.0:
+			_finish_rain_bonus()
+			return
 		for p in plants:
-			if is_instance_valid(p):
-				p.jelly_probability_multiplier=_current_jelly_multiplier()
-				p.simulate(delta)
-	_resolve_crowding(delta)
+			if is_instance_valid(p):p.simulate(delta)
+		if rain_spawn_queue>0:
+			rain_spawn_timer-=delta
+			if rain_spawn_timer<=0.0:rain_spawn_queue-=1;spawn_plant();rain_spawn_timer=rng.randf_range(.35,.85)
+	elif current_mode=="greenhouse" and play_active:
+		for p in plants:
+			if is_instance_valid(p):p.simulate(delta)
+	if not rain_bonus_active:_resolve_crowding(delta)
 	_update_labels()
 
 func _update_greenhouse_pan_follow(delta:float)->void:
@@ -879,11 +991,14 @@ func _update_habitat_view_follow(delta:float)->void:
 	_apply_view_rotation()
 
 func _toggle_mode()->void:
+	if rain_bonus_active:return
 	if current_mode=="greenhouse" and not habitat_unlocked:return
 	var leaving_habitat:=current_mode=="habitat"
 	current_mode="habitat" if current_mode=="greenhouse" else "greenhouse"
 	_apply_mode()
-	if current_mode=="habitat" and not bool(tutorial_steps.get("habitat_scroll_dialog",false)):
+	if current_mode=="habitat" and rain_event_pending:
+		call_deferred("_start_rain_bonus")
+	elif current_mode=="habitat" and not bool(tutorial_steps.get("habitat_scroll_dialog",false)):
 		call_deferred("_start_habitat_scroll_tutorial")
 	elif current_mode=="habitat" and _habitat_best_link_event_ready():
 		call_deferred("_start_habitat_best_link_dialog")
@@ -919,14 +1034,14 @@ func _apply_mode()->void:
 	pot_root.visible=false
 	habitat_environment.background_mode=Environment.BG_CANVAS if greenhouse_mode else Environment.BG_SKY
 	for p in plants:
-		if is_instance_valid(p):p.visible=greenhouse_mode;p.label.visible=false
+		if is_instance_valid(p):p.visible=greenhouse_mode or rain_bonus_active;p.label.visible=false
 	if greenhouse_mode:
 		camera.position=Vector3(0,7.3,8.6);camera.look_at_from_position(camera.position,Vector3(0,1.05,0),Vector3.UP)
 		_update_greenhouse_pan()
 	else:
 		camera.position=Vector3.ZERO;habitat_target_yaw=view_yaw;habitat_target_pitch=view_pitch;_apply_view_rotation()
 	if mode_button:
-		mode_button.text="原生地" if greenhouse_mode else "温室"
+		mode_button.text=("☂ 恵みの雨" if rain_event_pending else "原生地") if greenhouse_mode else "温室"
 	if audio_manager:audio_manager.play_bgm("greenhouse" if greenhouse_mode else "habitat")
 	_update_play_ui()
 
@@ -940,7 +1055,7 @@ func _resolve_crowding(_delta:float)->void:
 			p.position.z = p.original_pos.z
 
 func _update_labels()->void:
-	if current_mode!="greenhouse":
+	if current_mode!="greenhouse" and not rain_bonus_active:
 		for p in plants:
 			if is_instance_valid(p):p.label.visible=false
 		return
@@ -1008,7 +1123,7 @@ func _end_pointer(screen_pos:Vector2)->void:
 	if not pointer_down:return
 	pointer_down=false
 	if pointer_travel<13.0 and pointer_start.distance_to(screen_pos)<16.0:
-		if current_mode=="greenhouse":_try_harvest(screen_pos)
+		if current_mode=="greenhouse" or rain_bonus_active:_try_harvest(screen_pos)
 		elif current_mode=="habitat":_try_habitat_pick(screen_pos)
 
 func _apply_view_rotation()->void:
@@ -1075,7 +1190,6 @@ func _show_habitat_message(world_position:Vector3,message:String,color:Color)->v
 	var tween:=create_tween().set_parallel();tween.tween_property(label,"position:y",label.position.y-70,.7);tween.tween_property(label,"modulate:a",0.0,.7).set_delay(.25);tween.chain().tween_callback(label.queue_free)
 
 func _on_harvested(p)->void:
-	consecutive_jellies=0
 	var old:=float(bests.get(p.data.species_id,0.0));var is_record:bool=p.diameter_cm>old
 	discovered[p.data.species_id]=true
 	if is_record:bests[p.data.species_id]=p.diameter_cm
@@ -1091,7 +1205,6 @@ func _on_harvested(p)->void:
 	_cleanup_later(p,.68)
 
 func _on_jellied(p)->void:
-	consecutive_jellies=mini(2,consecutive_jellies+1)
 	_show_float(p,"ぷるん…\nジュレ",Color("#e7c9f0"))
 	audio_manager.play_se("jelly",.38)
 	var tw:=create_tween();tw.tween_property(p,"scale",Vector3(p.scale.x*1.05,p.scale.y*.46,p.scale.z*1.05),.28).set_trans(Tween.TRANS_BOUNCE);tw.tween_interval(.25);tw.tween_property(p,"scale",Vector3.ONE*0.01,.38)
@@ -1101,14 +1214,12 @@ func _cleanup_later(p,delay:float)->void:
 	recent_vacated_slots.append(p.original_pos)
 	while recent_vacated_slots.size()>12:recent_vacated_slots.pop_front()
 	plants.erase(p)
-	if play_active and plants.is_empty():call_deferred("_finish_greenhouse_play")
+	if rain_bonus_active and rain_time_remaining>0.0:
+		rain_spawn_queue+=1
+		if rain_spawn_queue==1:rain_spawn_timer=rng.randf_range(.35,.85)
+	elif play_active and plants.is_empty():call_deferred("_finish_greenhouse_play")
 	await get_tree().create_timer(delay).timeout
 	if is_instance_valid(p):p.label.queue_free();p.queue_free()
-
-func _current_jelly_multiplier()->float:
-	if consecutive_jellies>=2:return 0.0
-	if consecutive_jellies==1:return 0.45
-	return 1.0
 
 func _show_float(p,text:String,color:Color)->void:
 	var l:=Label.new();l.text=text;l.size=Vector2(230,90);l.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;l.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;l.add_theme_font_size_override("font_size",24);l.add_theme_color_override("font_color",color);l.add_theme_color_override("font_outline_color",UI_BROWN);l.add_theme_constant_override("outline_size",7);l.position=camera.unproject_position(p.global_position)-Vector2(115,40);effects_layer.add_child(l)
