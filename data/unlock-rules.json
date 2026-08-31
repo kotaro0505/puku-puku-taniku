@@ -1,5 +1,4 @@
 [
-  {"id":"first_play","trigger":"play_count","value":1,"rarity":"通常"},
   {"id":"harvest_30cm","trigger":"harvest_size","value":30.0,"rarity":"通常"},
   {"id":"harvest_50cm","trigger":"harvest_size","value":50.0,"rarity":"通常"},
   {"id":"harvest_80cm","trigger":"harvest_size","value":80.0,"rarity":"レア"},
