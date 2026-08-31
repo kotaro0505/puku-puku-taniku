@@ -8,9 +8,9 @@ func _ready()->void:
 	assert(game.plants.is_empty() and not game.play_active)
 	assert(game.play_open_button.visible and not game.play_overlay.visible)
 	game._open_play_modal();assert(game.play_overlay.visible);game._close_play_modal();assert(not game.play_overlay.visible)
-	game.normal_seed_bags=maxi(3,game.normal_seed_bags);game._update_play_ui();var bags_before:int=game.normal_seed_bags;game._start_greenhouse_play("normal");assert(game.play_active and game.normal_seed_bags==bags_before-1);assert(game.play_time_remaining==0.0 and not game.play_timer_label.visible)
+	game.normal_seed_bags=maxi(3,game.normal_seed_bags);game._update_play_ui();var bags_before:int=game.normal_seed_bags;game._start_greenhouse_play("normal");assert(game.play_active and game.normal_seed_bags==bags_before-1);assert(game.play_time_remaining==0.0 and game.play_timer_label.visible)
 	for control in game.external_navigation_controls:assert(not control.visible)
-	assert(game.plants.size()==12)
+	assert(game.plants.size()>=9 and game.plants.size()<=12);assert(game.play_seeds_remaining==36-game.plants.size());assert(game.play_timer_label.text=="たね  残り%d粒"%game.play_seeds_remaining)
 	assert(game.catalog_species.size()==11)
 	assert(game.harvest_reward_yen(9.9)==0 and game.harvest_reward_yen(10.0)==10 and game.harvest_reward_yen(99.9)==1000 and game.harvest_reward_yen(150.0)==4000)
 	var species_ids:Array=[]
@@ -30,7 +30,7 @@ func _ready()->void:
 	for plant in game.plants:
 		unique_positions["%.2f,%.2f"%[plant.original_pos.x,plant.original_pos.z]]=true
 		assert(game._spawn_center_inside_soil(plant.original_pos))
-	assert(unique_positions.size()>=11)
+	assert(unique_positions.size()>=game.plants.size()-1)
 	var initial_count:int=game.plants.size()
 	var harvest_target=game.plants[0]
 	harvest_target.jelly_checks_enabled=false
@@ -60,15 +60,17 @@ func _ready()->void:
 	assert(float(game.bests.get(species_id,0.0))>=21.7)
 	assert(bool(game.discovered.get(species_id,false)))
 	game._open_encyclopedia();assert(game.encyclopedia_overlay.visible);assert(game.encyclopedia_grid.get_child_count()==game.catalog_species.size());game._close_encyclopedia()
-	assert(game.plants.size()==initial_count-1 and game.play_active)
+	assert(game.play_active and game.play_seeds_remaining<36-initial_count)
 	for plant in game.plants:plant.jelly_checks_enabled=false
 	var jelly_target=game.plants[0]
 	jelly_target.jelly()
 	assert(jelly_target.state=="jelly")
 	await get_tree().create_timer(1.2).timeout
-	assert(game.plants.size()==initial_count-2 and game.play_active)
-	for plant in game.plants.duplicate():plant.harvest()
-	await get_tree().process_frame
+	assert(game.play_active)
+	var drain_guard:=0
+	while game.play_active and drain_guard<100:
+		for plant in game.plants.duplicate():plant.harvest()
+		game._process(1.0);await get_tree().process_frame;drain_guard+=1
 	assert(game.plants.is_empty() and not game.play_active);assert(game.result_overlay.visible);assert(game.play_harvest_count>=1 and game.play_earnings_total>=50 and game.play_max_size>=21.7);assert(not game.play_open_button.visible);game._close_result();assert(game.play_open_button.visible)
 	for control in game.external_navigation_controls:assert(control.visible)
 	print("SMOKE_OK panorama360 plants=",game.plants.size()," diameter=",grown_diameter," sprite_scale=",grown_scale," rooted=true species=",species_id)

@@ -3,9 +3,11 @@ extends Node
 const SucculentClass = preload("res://scripts/succulent.gd")
 const AudioManagerClass = preload("res://scripts/audio_manager.gd")
 const PROGRESSION_VERSION := 3
-const NORMAL_GERMINATION_COUNT := 12
-const PREMIUM_GERMINATION_COUNT := 12
-const OLD_SEED_GERMINATION_COUNT := 12
+const NORMAL_GERMINATION_COUNT := 36
+const PREMIUM_GERMINATION_COUNT := 36
+const OLD_SEED_GERMINATION_COUNT := 36
+const PLAY_INITIAL_MIN_PLANTS := 9
+const PLAY_INITIAL_MAX_PLANTS := 12
 const SOIL_SOURCE_CENTER := Vector2(426.5,700.0)
 const SOIL_SOURCE_RADII := Vector2(360.0,190.0)
 const SPAWN_SPRITE_MARGIN_SOURCE_PX := 40.0
@@ -134,6 +136,10 @@ var play_harvest_count := 0
 var play_max_size := 0.0
 var play_notable_species: Dictionary = {}
 var current_target_count := NORMAL_GERMINATION_COUNT
+var play_seeds_remaining := 0
+var play_spawn_queue := 0
+var play_spawn_timer := 0.0
+var play_concurrent_target := PLAY_INITIAL_MAX_PLANTS
 var rain_bag_count := 0
 var rain_event_pending := false
 var rain_bonus_in_progress := false
@@ -514,7 +520,7 @@ func _change_audio_volume(value:float,is_bgm:bool)->void:
 	audio_settings["bgm_volume" if is_bgm else "se_volume"]=value/100.0;audio_manager.apply_settings(audio_settings);_save()
 
 func _reset_progression_state()->void:
-	coins=1000;bests.clear();discovered.clear();greenhouse_available={"colorata":true};unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;buyback_unlocked=false;tutorial_steps.clear();normal_seed_bags=0;premium_seed_bags=0;old_seed_bags=0;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;opening_species.clear();play_active=false;play_time_remaining=0.0;current_target_count=NORMAL_GERMINATION_COUNT;rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_scroll_tutorial_active=false;habitat_best_link_dialog_step=0;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_build_habitat_items();_save();_update_currency_ui();_update_play_ui()
+	coins=1000;bests.clear();discovered.clear();greenhouse_available={"colorata":true};unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;buyback_unlocked=false;tutorial_steps.clear();normal_seed_bags=0;premium_seed_bags=0;old_seed_bags=0;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;opening_species.clear();play_active=false;play_time_remaining=0.0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_scroll_tutorial_active=false;habitat_best_link_dialog_step=0;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_build_habitat_items();_save();_update_currency_ui();_update_play_ui()
 
 func _reset_progression_for_development(button:Button)->void:
 	_reset_progression_state();button.text="リセットしました（再読み込みしてください）"
@@ -555,16 +561,16 @@ func _start_greenhouse_play(seed_type:String)->void:
 	else:
 		if normal_seed_bags<1:return
 		normal_seed_bags-=1;current_target_count=NORMAL_GERMINATION_COUNT
-	active_seed_type=seed_type;play_time_remaining=0.0;play_active=true;play_modal_open=false;play_earnings_total=0;play_harvest_count=0;play_max_size=0.0;play_notable_species.clear();opening_species.clear();_clear_greenhouse_plants()
+	active_seed_type=seed_type;play_time_remaining=0.0;play_active=true;play_modal_open=false;play_earnings_total=0;play_harvest_count=0;play_max_size=0.0;play_notable_species.clear();opening_species.clear();play_seeds_remaining=current_target_count;play_spawn_queue=0;play_spawn_timer=0.0;play_concurrent_target=rng.randi_range(PLAY_INITIAL_MIN_PLANTS,PLAY_INITIAL_MAX_PLANTS);_clear_greenhouse_plants()
 	if result_overlay:result_overlay.visible=false
-	for i in range(current_target_count):spawn_plant()
+	for i in range(play_concurrent_target):_spawn_greenhouse_seed()
 	if total_play_count==0 and not bool(tutorial_steps.get("first_harvest_guide",false)):call_deferred("_show_first_harvest_guide_when_ready")
 	audio_manager.play_se("rare_seed" if seed_type=="premium" else "seed_bag",.72)
 	_save();_update_play_ui()
 
 func _finish_greenhouse_play()->void:
-	if not play_active or not plants.is_empty():return
-	play_active=false;play_time_remaining=0.0;total_play_count+=1
+	if not play_active or rain_bonus_active or play_seeds_remaining>0 or play_spawn_queue>0 or not plants.is_empty():return
+	play_active=false;play_time_remaining=0.0;play_spawn_timer=0.0;total_play_count+=1
 	if total_play_count==1:discovered["colorata"]=true;encyclopedia_unlocked=true
 	if total_play_count>=3:habitat_unlocked=true
 	if total_play_count==3 and not bool(tutorial_steps.get("habitat_species_queued",false)):
@@ -583,19 +589,19 @@ func _update_play_ui()->void:
 	if not play_overlay:return
 	play_overlay.visible=current_mode=="greenhouse" and not play_active and play_modal_open
 	play_open_button.visible=current_mode=="greenhouse" and intro_story_complete and not play_active and not play_modal_open and (not result_overlay or not result_overlay.visible) and (not shop_overlay or not shop_overlay.visible) and (not encyclopedia_overlay or not encyclopedia_overlay.visible) and (not settings_overlay or not settings_overlay.visible)
-	play_timer_label.visible=false
+	play_timer_label.visible=current_mode=="greenhouse" and play_active and not rain_bonus_active
 	for control in external_navigation_controls:control.visible=not play_active
 	for control in encyclopedia_navigation_controls:control.visible=not play_active and encyclopedia_unlocked
 	if mode_button:mode_button.visible=not play_active and habitat_unlocked
-	play_timer_label.text=""
+	play_timer_label.text="たね  残り%d粒"%play_seeds_remaining if play_timer_label.visible else ""
 	var held:Array[String]=[]
 	if old_seed_bags>0:held.append("古いたね %d袋"%old_seed_bags)
 	if normal_seed_bags>0:held.append("たね %d袋"%normal_seed_bags)
 	if premium_seed_bags>0 and _premium_seed_unlocked():held.append("プレミアムたね %d袋"%premium_seed_bags)
 	play_bag_summary.text="　".join(held)
-	old_seed_play_button.visible=old_seed_bags>0;old_seed_play_button.text="古いたねをまく　12粒　残り%d袋"%old_seed_bags
-	normal_play_button.visible=normal_seed_bags>0;normal_play_button.text="たねをまく　12粒　残り%d袋"%normal_seed_bags;normal_play_button.disabled=normal_seed_bags<1
-	premium_play_button.visible=premium_seed_bags>0 and _premium_seed_unlocked();premium_play_button.text="プレミアムたねをまく　12粒　残り%d袋"%premium_seed_bags;premium_play_button.disabled=not _premium_seed_unlocked() or premium_seed_bags<1
+	old_seed_play_button.visible=old_seed_bags>0;old_seed_play_button.text="古いたねをまく　36粒　残り%d袋"%old_seed_bags
+	normal_play_button.visible=normal_seed_bags>0;normal_play_button.text="たねをまく　36粒　残り%d袋"%normal_seed_bags;normal_play_button.disabled=normal_seed_bags<1
+	premium_play_button.visible=premium_seed_bags>0 and _premium_seed_unlocked();premium_play_button.text="プレミアムたねをまく　36粒　残り%d袋"%premium_seed_bags;premium_play_button.disabled=not _premium_seed_unlocked() or premium_seed_bags<1
 
 func _open_shop()->void:
 	play_modal_open=false;_update_shop_ui();shop_message.text="たね袋を1袋ずつ購入できます";play_overlay.visible=false;shop_overlay.visible=true;audio_manager.play_bgm("shop");_update_play_ui()
@@ -848,6 +854,23 @@ func spawn_plant(force_golden := false) -> void:
 	plants.append(p)
 	if audio_manager:audio_manager.play_se("sprout",.28)
 
+func _spawn_greenhouse_seed()->void:
+	if not play_active or rain_bonus_active or play_seeds_remaining<=0:return
+	play_seeds_remaining-=1;spawn_plant();_update_play_ui()
+
+func _queue_greenhouse_replacements()->void:
+	if not play_active or rain_bonus_active or play_seeds_remaining<=play_spawn_queue:return
+	var open_slots:=maxi(0,play_concurrent_target-(plants.size()+play_spawn_queue))
+	var add_count:=mini(open_slots,play_seeds_remaining-play_spawn_queue)
+	if add_count<=0:return
+	var was_empty:=play_spawn_queue==0;play_spawn_queue+=add_count
+	if was_empty:play_spawn_timer=_next_greenhouse_spawn_interval()
+
+func _next_greenhouse_spawn_interval()->float:
+	if plants.size()<=3:return rng.randf_range(.04,.18)
+	if rng.randf()<.20:return rng.randf_range(.04,.16)
+	return rng.randf_range(.28,.92)
+
 func _spawn_rain_plant()->void:
 	var pool:=_rain_species_pool()
 	if pool.is_empty():return
@@ -984,6 +1007,11 @@ func _process(delta:float)->void:
 	elif current_mode=="greenhouse" and play_active:
 		for p in plants:
 			if is_instance_valid(p):p.simulate(delta)
+		if play_spawn_queue>0:
+			play_spawn_timer-=delta
+			if play_spawn_timer<=0.0:
+				play_spawn_queue-=1;_spawn_greenhouse_seed()
+				if play_spawn_queue>0:play_spawn_timer=_next_greenhouse_spawn_interval()
 	if not rain_bonus_active:_resolve_crowding(delta)
 	_update_labels()
 
@@ -1229,7 +1257,9 @@ func _cleanup_later(p,delay:float)->void:
 	if rain_bonus_active and rain_time_remaining>0.0:
 		rain_spawn_queue=mini(RAIN_MAX_ACTIVE_PLANTS,rain_spawn_queue+2)
 		if rain_spawn_queue<=2:rain_spawn_timer=rng.randf_range(.14,.32)
-	elif play_active and plants.is_empty():call_deferred("_finish_greenhouse_play")
+	elif play_active:
+		_queue_greenhouse_replacements();_update_play_ui()
+		if play_seeds_remaining==0 and play_spawn_queue==0 and plants.is_empty():call_deferred("_finish_greenhouse_play")
 	await get_tree().create_timer(delay).timeout
 	if is_instance_valid(p):p.label.queue_free();p.queue_free()
 
