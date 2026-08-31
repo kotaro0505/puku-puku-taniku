@@ -1,0 +1,18 @@
+{
+  "bgm": {
+    "greenhouse": "",
+    "habitat": "",
+    "shop": ""
+  },
+  "se": {
+    "sprout": "",
+    "harvest": "",
+    "jelly": "",
+    "squish": "",
+    "new_species": "",
+    "seed_bag": "",
+    "payment": "",
+    "play_result": "",
+    "ui_tap": ""
+  }
+}
