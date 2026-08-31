@@ -1,8 +1,8 @@
 {
   "bgm": {
-    "greenhouse": "",
+    "greenhouse": "res://assets/audio/puku-puku-taniku-main.wav",
     "habitat": "",
-    "shop": ""
+    "shop": "res://assets/audio/puku-puku-taniku-main.wav"
   },
   "se": {
     "ui_tap": "",

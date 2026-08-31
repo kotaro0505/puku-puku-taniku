@@ -85,9 +85,18 @@ func _stream_for(section: String, key: String) -> AudioStream:
 	var paths = config.get(section, {})
 	if paths is Dictionary:
 		var path := str(paths.get(key, ""))
-		if not path.is_empty() and ResourceLoader.exists(path): return load(path) as AudioStream
+		if not path.is_empty() and ResourceLoader.exists(path):
+			var stream := load(path) as AudioStream
+			if section == "bgm": _enable_bgm_loop(stream)
+			return stream
 	if section == "se": return _fallback_se(key)
 	return null
+
+func _enable_bgm_loop(stream: AudioStream) -> void:
+	if stream is AudioStreamWAV:
+		stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	elif stream is AudioStreamOggVorbis:
+		stream.loop = true
 
 func _fallback_se(key: String) -> AudioStreamWAV:
 	if fallback_se_cache.has(key): return fallback_se_cache[key]
