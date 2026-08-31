@@ -2,7 +2,7 @@ extends Node
 
 const SucculentClass = preload("res://scripts/succulent.gd")
 const AudioManagerClass = preload("res://scripts/audio_manager.gd")
-const PROGRESSION_VERSION := 1
+const PROGRESSION_VERSION := 2
 const TARGET_COUNT := 12
 const SOIL_SOURCE_CENTER := Vector2(426.5,700.0)
 const SOIL_SOURCE_RADII := Vector2(360.0,190.0)
@@ -94,6 +94,7 @@ var coins := 12450
 var bests: Dictionary = {}
 var discovered: Dictionary = {}
 var unlocked_species: Dictionary = {}
+var greenhouse_available: Dictionary = {"colorata":true}
 var habitat_seed_date := ""
 var habitat_seeds_collected := 0
 var normal_seed_bags := 0
@@ -143,10 +144,7 @@ func _load_species() -> void:
 	var all_species: Array = JSON.parse_string(raw)
 	catalog_species=all_species.duplicate(true)
 	unlock_rules=JSON.parse_string(FileAccess.get_file_as_string("res://data/unlock-rules.json"))
-	var enabled := ["colorata"]
-	for entry in all_species:
-		if str(entry.species_id) in enabled:
-			species.append(entry);unlocked_species[str(entry.species_id)]=true
+	unlocked_species={"colorata":true}
 
 func _load_save() -> void:
 	if FileAccess.file_exists("user://records.json"):
@@ -158,10 +156,15 @@ func _load_save() -> void:
 				normal_seed_bags=int(value.get("normal_seed_bags",0));premium_seed_bags=int(value.get("premium_seed_bags",0));login_bonus_date=str(value.get("login_bonus_date",""))
 			else:
 				normal_seed_bags=0;premium_seed_bags=0;login_bonus_date=""
-			var saved_unlocks=value.get("unlocked_species",{})
-			if saved_unlocks is Dictionary:
-				for species_id in saved_unlocks:
-					if bool(saved_unlocks[species_id]):unlocked_species[species_id]=true
+			# Legacy saves used unlocked_species for several meanings and could
+			# contain the full catalog. Only the dedicated greenhouse list is
+			# allowed to become a spawn source. Old saves safely restart from colorata.
+			var saved_greenhouse=value.get("greenhouse_available",{"colorata":true})
+			greenhouse_available={"colorata":true}
+			if saved_greenhouse is Dictionary:
+				for species_id in saved_greenhouse:
+					if bool(saved_greenhouse[species_id]):greenhouse_available[str(species_id)]=true
+			unlocked_species=greenhouse_available.duplicate(true)
 			# Saves created before the encyclopedia already contain valid best sizes.
 			for species_id in bests:
 				if float(bests[species_id])>0.0:discovered[species_id]=true
@@ -169,7 +172,7 @@ func _load_save() -> void:
 func _save() -> void:
 	var f := FileAccess.open("user://records.json",FileAccess.WRITE)
 	if audio_manager:audio_settings=audio_manager.settings_dictionary()
-	f.store_string(JSON.stringify({"progression_version":PROGRESSION_VERSION,"bests":bests,"discovered":discovered,"unlocked_species":unlocked_species,"completed_unlock_conditions":completed_unlock_conditions,"pending_habitat_species":pending_habitat_species,"total_play_count":total_play_count,"intro_story_complete":intro_story_complete,"habitat_seed_date":habitat_seed_date,"habitat_seeds_collected":habitat_seeds_collected,"normal_seed_bags":normal_seed_bags,"premium_seed_bags":premium_seed_bags,"login_bonus_date":login_bonus_date,"audio_settings":audio_settings,"yen":coins}))
+	f.store_string(JSON.stringify({"progression_version":PROGRESSION_VERSION,"bests":bests,"discovered":discovered,"unlocked_species":unlocked_species,"greenhouse_available":greenhouse_available,"completed_unlock_conditions":completed_unlock_conditions,"pending_habitat_species":pending_habitat_species,"total_play_count":total_play_count,"intro_story_complete":intro_story_complete,"habitat_seed_date":habitat_seed_date,"habitat_seeds_collected":habitat_seeds_collected,"normal_seed_bags":normal_seed_bags,"premium_seed_bags":premium_seed_bags,"login_bonus_date":login_bonus_date,"audio_settings":audio_settings,"yen":coins}))
 
 func _grant_daily_seed_bag()->void:
 	if not intro_story_complete:return
@@ -178,11 +181,14 @@ func _grant_daily_seed_bag()->void:
 	if login_bonus_date!=today:normal_seed_bags+=1;login_bonus_date=today;_save()
 
 func _apply_saved_unlocks()->void:
-	var present:Dictionary={}
-	for entry in species:present[str(entry.species_id)]=true
+	species.clear()
 	for entry in catalog_species:
 		var species_id:=str(entry.species_id)
-		if bool(unlocked_species.get(species_id,false)) and not present.has(species_id):species.append(entry);present[species_id]=true
+		if bool(greenhouse_available.get(species_id,false)):species.append(entry)
+	if species.is_empty():
+		greenhouse_available={"colorata":true};unlocked_species=greenhouse_available.duplicate(true)
+		for entry in catalog_species:
+			if str(entry.species_id)=="colorata":species.append(entry);break
 
 func _build_world() -> void:
 	greenhouse_layer=CanvasLayer.new();greenhouse_layer.layer=-10;add_child(greenhouse_layer)
@@ -361,7 +367,7 @@ func _change_audio_volume(value:float,is_bgm:bool)->void:
 	audio_settings["bgm_volume" if is_bgm else "se_volume"]=value/100.0;audio_manager.apply_settings(audio_settings);_save()
 
 func _reset_progression_for_development(button:Button)->void:
-	bests.clear();discovered.clear();unlocked_species={"colorata":true};completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;intro_story_complete=false;normal_seed_bags=0;premium_seed_bags=0;login_bonus_date="";species.clear();_apply_saved_unlocks();_clear_greenhouse_plants();_save();button.text="リセットしました（再読み込みしてください）"
+	bests.clear();discovered.clear();greenhouse_available={"colorata":true};unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;intro_story_complete=false;normal_seed_bags=0;premium_seed_bags=0;login_bonus_date="";opening_species.clear();_apply_saved_unlocks();_clear_greenhouse_plants();_save();button.text="リセットしました（再読み込みしてください）"
 
 func _build_result_overlay(hud:Control)->void:
 	result_overlay=Control.new();result_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);result_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;result_overlay.visible=false;hud.add_child(result_overlay)
@@ -555,7 +561,7 @@ func _queue_random_species(rarity:String)->void:
 	for entry in catalog_species:
 		var species_id:=str(entry.species_id)
 		if str(entry.get("rarity","通常"))!=rarity:continue
-		if bool(discovered.get(species_id,false)) or bool(unlocked_species.get(species_id,false)) or species_id in pending_habitat_species:continue
+		if bool(discovered.get(species_id,false)) or bool(greenhouse_available.get(species_id,false)) or species_id in pending_habitat_species:continue
 		candidates.append(entry)
 	if candidates.is_empty():return
 	var chosen:Dictionary=candidates[rng.randi_range(0,candidates.size()-1)];pending_habitat_species.append(str(chosen.species_id))
@@ -864,7 +870,7 @@ func _collect_habitat_species(item:Dictionary)->void:
 	var tween:=create_tween().set_parallel();tween.tween_property(flying,"position",target-flying.size*.5,.62).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN);tween.tween_property(flying,"scale",Vector2(.08,.08),.62).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN);tween.tween_property(flying,"rotation",.18,.62);tween.chain().tween_callback(_complete_habitat_species_get.bind(item,flying))
 
 func _complete_habitat_species_get(item:Dictionary,flying:TextureRect)->void:
-	var species_id:=str(item.species_id);unlocked_species[species_id]=true;discovered[species_id]=true;pending_habitat_species.erase(species_id);habitat_new_species_id=""
+	var species_id:=str(item.species_id);greenhouse_available[species_id]=true;unlocked_species[species_id]=true;discovered[species_id]=true;pending_habitat_species.erase(species_id);habitat_new_species_id=""
 	for entry in catalog_species:
 		if str(entry.species_id)==species_id:
 			var already_present:=false
