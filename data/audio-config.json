@@ -5,14 +5,20 @@
     "shop": ""
   },
   "se": {
+    "ui_tap": "",
+    "watering": "",
     "sprout": "",
     "harvest": "",
     "jelly": "",
     "squish": "",
+    "level_up": "",
     "new_species": "",
     "seed_bag": "",
+    "purchase": "",
     "payment": "",
-    "play_result": "",
-    "ui_tap": ""
+    "rare_seed": "",
+    "daily": "",
+    "result": "",
+    "result_new_best": ""
   }
 }

@@ -326,6 +326,7 @@ func _start_daily_seed_gift()->void:
 	intro_dialogue_label.text="今日も来てくれてありがとう。\n通常種袋 ×1 GET"
 	intro_dialogue_label.add_theme_font_size_override("font_size",25);intro_dialogue_label.add_theme_color_override("font_color",Color("#b66d20"));intro_continue_button.text="温室へ"
 	normal_seed_bags+=1;login_bonus_date=Time.get_date_string_from_system();_save();_show_intro_gift_effect();_update_play_ui()
+	audio_manager.play_se("daily",.58)
 
 func _advance_intro_story()->void:
 	if intro_is_daily_gift:
@@ -419,12 +420,12 @@ func _start_greenhouse_play(seed_type:String)->void:
 	active_seed_type=seed_type;play_time_remaining=PLAY_DURATION_SECONDS*selected_seed_bag_count;play_active=true;play_modal_open=false;play_earnings_total=0;play_harvest_count=0;play_max_size=0.0;play_notable_species.clear();spawn_queue=0;spawn_timer=0.0;opening_species.clear();_clear_greenhouse_plants()
 	if result_overlay:result_overlay.visible=false
 	for i in range(TARGET_COUNT):spawn_plant()
-	audio_manager.play_se("seed_bag",.72)
+	audio_manager.play_se("rare_seed" if seed_type=="premium" else "seed_bag",.72)
 	_save();_update_play_ui()
 
 func _finish_greenhouse_play()->void:
 	if not play_active:return
-	play_active=false;play_time_remaining=0.0;spawn_queue=0;spawn_timer=0.0;total_play_count+=1;_evaluate_unlock_rules("play_count",float(total_play_count));_clear_greenhouse_plants();play_message.text="次の種袋を選んでください";_save();_update_play_ui();_show_play_result();audio_manager.play_se("play_result",.7)
+	play_active=false;play_time_remaining=0.0;spawn_queue=0;spawn_timer=0.0;total_play_count+=1;_evaluate_unlock_rules("play_count",float(total_play_count));_clear_greenhouse_plants();play_message.text="次の種袋を選んでください";_save();_update_play_ui();_show_play_result();audio_manager.play_se("result",.7)
 
 func _clear_greenhouse_plants()->void:
 	for plant in plants.duplicate():
@@ -461,7 +462,7 @@ func _buy_seed_bag(seed_type:String)->void:
 	coins-=price
 	if seed_type=="premium":premium_seed_bags+=1;shop_message.text="プレミアム種を1袋購入しました"
 	else:normal_seed_bags+=1;shop_message.text="通常種を1袋購入しました"
-	audio_manager.play_se("payment",.48);_save();_update_currency_ui();_update_shop_ui();_update_play_ui()
+	audio_manager.play_se("purchase",.48);_save();_update_currency_ui();_update_shop_ui();_update_play_ui()
 
 func _update_shop_ui()->void:
 	if not shop_wallet_label:return
@@ -568,7 +569,8 @@ func _evaluate_unlock_rules(trigger:String,current_value:float)->void:
 		var rule_id:=str(rule.get("id",""))
 		if bool(completed_unlock_conditions.get(rule_id,false)) or current_value<float(rule.get("value",0.0)):continue
 		completed_unlock_conditions[rule_id]=true
-		_queue_random_species(str(rule.get("rarity","通常")))
+		var pending_before:=pending_habitat_species.size();_queue_random_species(str(rule.get("rarity","通常")))
+		if pending_habitat_species.size()>pending_before:audio_manager.play_se("level_up",.52)
 	_build_habitat_items();_save()
 
 func _queue_random_species(rarity:String)->void:
@@ -947,6 +949,7 @@ func _show_harvest_result(plant,reward:int)->void:
 	var tween:=create_tween();tween.tween_property(panel,"scale",Vector2.ONE,.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT);tween.tween_interval(1.12);tween.set_parallel(true);tween.tween_property(panel,"position:y",panel.position.y-34,.5).set_trans(Tween.TRANS_QUAD);tween.tween_property(panel,"modulate:a",0.0,.5);tween.set_parallel(false);tween.tween_callback(panel.queue_free)
 
 func _show_record(p,reward:int)->void:
+	audio_manager.play_se("result_new_best",.5)
 	record_text.text="収穫記録更新！\nNEW RECORD\n%.1f cm\n+%d円"%[p.diameter_cm,reward];record_card.visible=true;record_card.scale=Vector2(.72,.72);record_card.pivot_offset=record_card.size/2
 	var tw:=create_tween();tw.tween_property(record_card,"scale",Vector2.ONE,.24).set_trans(Tween.TRANS_BACK);tw.tween_interval(2.2);tw.tween_property(record_card,"modulate:a",0.0,.25);tw.tween_callback(func():record_card.visible=false;record_card.modulate.a=1.0)
 
