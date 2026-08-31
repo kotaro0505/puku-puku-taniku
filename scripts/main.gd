@@ -69,7 +69,6 @@ var play_timer_label: Label
 var play_open_button: Button
 var play_overlay: Control
 var play_bag_summary: Label
-var play_message: Label
 var normal_play_button: Button
 var premium_play_button: Button
 var old_seed_play_button: Button
@@ -81,6 +80,7 @@ var shop_premium_buy_button: Button
 var intro_overlay: Control
 var intro_dialogue_label: Label
 var intro_continue_button: Button
+var intro_speaker_label: Label
 var intro_story_step := 0
 var intro_is_daily_gift := false
 var tutorial_dialog_kind := ""
@@ -89,6 +89,7 @@ var tutorial_guide_button: Button
 var tutorial_guide_finger: Label
 var tutorial_guide_message: Label
 var tutorial_habitat_item: Dictionary = {}
+var tutorial_harvest_plant: Node
 var habitat_scroll_tutorial_active := false
 var buyback_unlocked := false
 var settings_overlay: Control
@@ -153,7 +154,9 @@ func _ready() -> void:
 	_wire_ui_sounds(self)
 	if not intro_story_complete:call_deferred("_start_intro_story")
 	elif _daily_seed_gift_due():call_deferred("_start_daily_seed_gift")
-	else:audio_manager.play_bgm("greenhouse")
+	else:
+		audio_manager.play_bgm("greenhouse")
+		if total_play_count==0 and not bool(tutorial_steps.get("play_open_guide",false)):call_deferred("_show_tutorial_guide","play_open")
 
 func _load_species() -> void:
 	var raw := FileAccess.get_file_as_string("res://data/species-v2.json")
@@ -275,9 +278,7 @@ func _build_ui() -> void:
 	external_navigation_controls.append(mode_button)
 	habitat_status_label=Label.new();habitat_status_label.position=Vector2(163,42);habitat_status_label.size=Vector2(250,56);habitat_status_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;habitat_status_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;habitat_status_label.add_theme_font_size_override("font_size",18);habitat_status_label.add_theme_color_override("font_color",UI_CREAM);habitat_status_label.add_theme_stylebox_override("normal",_box(Color("#4b2d20"),Color("#d8ad68"),18,2));habitat_status_label.visible=false;hud.add_child(habitat_status_label)
 	play_timer_label=Label.new();play_timer_label.position=Vector2(190,135);play_timer_label.size=Vector2(196,58);play_timer_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;play_timer_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;play_timer_label.add_theme_font_size_override("font_size",24);play_timer_label.add_theme_color_override("font_color",Color.WHITE);play_timer_label.add_theme_stylebox_override("normal",_box(Color("#5b3321"),Color("#f3cb72"),19,3));play_timer_label.visible=false;hud.add_child(play_timer_label)
-	play_open_button=Button.new();play_open_button.text="▶  たねをまく";play_open_button.position=Vector2(31,177);play_open_button.size=Vector2(180,58);_skin_button(play_open_button,Color("#8b5a35"),21);play_open_button.mouse_filter=Control.MOUSE_FILTER_STOP;play_open_button.pressed.connect(_open_play_modal);hud.add_child(play_open_button)
-	# lower gradient cards
-	var harvest:=Button.new(); harvest.text="タップで 収穫！"; harvest.position=Vector2(24,829); harvest.size=Vector2(360,121); _skin_button(harvest,Color("#caa538"),27); harvest.mouse_filter=Control.MOUSE_FILTER_IGNORE; hud.add_child(harvest)
+	play_open_button=Button.new();play_open_button.text="▶  たねをまく";play_open_button.position=Vector2(198,499);play_open_button.size=Vector2(180,58);_skin_button(play_open_button,Color("#8b5a35"),21);play_open_button.mouse_filter=Control.MOUSE_FILTER_STOP;play_open_button.pressed.connect(_open_play_modal);hud.add_child(play_open_button)
 	record_card=PanelContainer.new(); record_card.position=Vector2(394,816); record_card.size=Vector2(164,134); record_card.add_theme_stylebox_override("panel",_box(Color("#674135"),Color("#f4d36e"),18,3)); record_card.visible=false; hud.add_child(record_card)
 	record_text=Label.new(); record_text.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; record_text.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; record_text.add_theme_font_size_override("font_size",19); record_text.add_theme_color_override("font_color",Color.WHITE); record_card.add_child(record_text)
 	var nav:=HBoxContainer.new(); nav.position=Vector2(23,957); nav.size=Vector2(530,80); nav.add_theme_constant_override("separation",4); hud.add_child(nav)
@@ -301,19 +302,18 @@ func _build_play_overlay(hud:Control)->void:
 	var shade:=ColorRect.new();shade.color=Color(0.12,0.07,0.04,.42);shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);shade.mouse_filter=Control.MOUSE_FILTER_STOP;play_overlay.add_child(shade)
 	var panel:=PanelContainer.new();panel.position=Vector2(68,250);panel.size=Vector2(440,500);panel.mouse_filter=Control.MOUSE_FILTER_STOP;panel.add_theme_stylebox_override("panel",_box(Color("#f7e8c7"),Color("#9b642f"),26,4));play_overlay.add_child(panel)
 	var content:=VBoxContainer.new();content.alignment=BoxContainer.ALIGNMENT_CENTER;content.add_theme_constant_override("separation",13);panel.add_child(content)
-	var title:=Label.new();title.text="たね袋を選んで まく";title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;title.add_theme_font_size_override("font_size",24);title.add_theme_color_override("font_color",UI_BROWN);content.add_child(title)
+	var title:=Label.new();title.text="どのたねをまく？";title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;title.add_theme_font_size_override("font_size",24);title.add_theme_color_override("font_color",UI_BROWN);content.add_child(title)
 	play_bag_summary=Label.new();play_bag_summary.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;play_bag_summary.add_theme_font_size_override("font_size",18);play_bag_summary.add_theme_color_override("font_color",Color("#70472d"));content.add_child(play_bag_summary)
 	old_seed_play_button=Button.new();old_seed_play_button.custom_minimum_size=Vector2(350,68);_skin_button(old_seed_play_button,Color("#bba67d"),19);old_seed_play_button.pressed.connect(_start_greenhouse_play.bind("old"));content.add_child(old_seed_play_button)
 	normal_play_button=Button.new();normal_play_button.custom_minimum_size=Vector2(350,76);_skin_button(normal_play_button,Color("#d9b56a"),20);normal_play_button.pressed.connect(_start_greenhouse_play.bind("normal"));content.add_child(normal_play_button)
 	premium_play_button=Button.new();premium_play_button.custom_minimum_size=Vector2(350,76);_skin_button(premium_play_button,Color("#d18a55"),20);premium_play_button.pressed.connect(_start_greenhouse_play.bind("premium"));content.add_child(premium_play_button)
-	play_message=Label.new();play_message.text="1回につき1袋をまきます";play_message.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;play_message.add_theme_font_size_override("font_size",15);play_message.add_theme_color_override("font_color",Color("#815a42"));content.add_child(play_message)
 	var close:=Button.new();close.text="閉じる";close.custom_minimum_size=Vector2(250,44);_skin_button(close,Color("#ead8b1"),16);close.pressed.connect(_close_play_modal);content.add_child(close)
 
 func _build_shop(hud:Control)->void:
 	shop_overlay=Control.new();shop_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);shop_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;shop_overlay.visible=false;hud.add_child(shop_overlay)
 	var shop_texture:=load("res://assets/shop-background-final.jpg") as Texture2D
 	var background:=TextureRect.new();background.texture=shop_texture;background.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;background.stretch_mode=TextureRect.STRETCH_SCALE;background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);background.mouse_filter=Control.MOUSE_FILTER_IGNORE;shop_overlay.add_child(background)
-	var title:=Label.new();title.text="種袋ショップ";title.position=Vector2(20,24);title.size=Vector2(210,52);title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;title.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;title.add_theme_font_size_override("font_size",22);title.add_theme_color_override("font_color",UI_CREAM);title.add_theme_stylebox_override("normal",_box(Color(0.24,0.13,0.07,.82),Color("#e0b977"),18,2));shop_overlay.add_child(title)
+	var title:=Label.new();title.text="パンダのたねや";title.position=Vector2(20,24);title.size=Vector2(210,52);title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;title.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;title.add_theme_font_size_override("font_size",22);title.add_theme_color_override("font_color",UI_CREAM);title.add_theme_stylebox_override("normal",_box(Color(0.24,0.13,0.07,.82),Color("#e0b977"),18,2));shop_overlay.add_child(title)
 	var close:=Button.new();close.text="もどる";close.position=Vector2(446,24);close.size=Vector2(106,55);_skin_button(close,Color("#fff0cf"),17);close.pressed.connect(_close_shop);shop_overlay.add_child(close)
 	var purchase_panel:=PanelContainer.new();purchase_panel.position=Vector2(28,704);purchase_panel.size=Vector2(520,296);purchase_panel.add_theme_stylebox_override("panel",_box(Color(0.22,0.12,0.07,.93),Color("#d7aa64"),22,3));shop_overlay.add_child(purchase_panel)
 	shop_wallet_label=Label.new();shop_wallet_label.position=Vector2(50,714);shop_wallet_label.size=Vector2(476,40);shop_wallet_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;shop_wallet_label.add_theme_font_size_override("font_size",21);shop_wallet_label.add_theme_color_override("font_color",Color("#ffd778"));shop_overlay.add_child(shop_wallet_label)
@@ -327,15 +327,15 @@ func _build_intro_story(hud:Control)->void:
 	var shade:=ColorRect.new();shade.color=Color(0.08,0.05,0.025,.18);shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);shade.mouse_filter=Control.MOUSE_FILTER_STOP;intro_overlay.add_child(shade)
 	var panel:=PanelContainer.new();panel.position=Vector2(40,690);panel.size=Vector2(496,255);panel.add_theme_stylebox_override("panel",_box(Color(0.97,0.90,0.75,.96),Color("#a86f36"),24,4));intro_overlay.add_child(panel)
 	var content:=VBoxContainer.new();content.alignment=BoxContainer.ALIGNMENT_CENTER;content.add_theme_constant_override("separation",12);panel.add_child(content)
-	var speaker:=Label.new();speaker.text="パンダのたねや";speaker.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;speaker.add_theme_font_size_override("font_size",20);speaker.add_theme_color_override("font_color",Color("#8b5528"));content.add_child(speaker)
+	intro_speaker_label=Label.new();intro_speaker_label.text="パンダのたねや";intro_speaker_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;intro_speaker_label.add_theme_font_size_override("font_size",20);intro_speaker_label.add_theme_color_override("font_color",Color("#8b5528"));content.add_child(intro_speaker_label)
 	intro_dialogue_label=Label.new();intro_dialogue_label.custom_minimum_size=Vector2(440,90);intro_dialogue_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;intro_dialogue_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;intro_dialogue_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;intro_dialogue_label.add_theme_font_size_override("font_size",20);intro_dialogue_label.add_theme_color_override("font_color",UI_BROWN);content.add_child(intro_dialogue_label)
 	intro_continue_button=Button.new();intro_continue_button.text="つぎへ";intro_continue_button.custom_minimum_size=Vector2(250,55);_skin_button(intro_continue_button,Color("#d8b56b"),19);intro_continue_button.pressed.connect(_advance_intro_story);content.add_child(intro_continue_button)
 
 func _start_intro_story()->void:
-	intro_is_daily_gift=false;tutorial_dialog_kind="";intro_story_step=0;current_mode="greenhouse";_apply_mode();shop_overlay.visible=true;intro_overlay.visible=true;play_overlay.visible=false;play_open_button.visible=false;audio_manager.play_bgm("shop");_advance_intro_story()
+	intro_is_daily_gift=false;tutorial_dialog_kind="";intro_story_step=0;current_mode="greenhouse";_apply_mode();shop_overlay.visible=true;intro_overlay.visible=true;intro_speaker_label.visible=true;play_overlay.visible=false;play_open_button.visible=false;audio_manager.play_bgm("shop");_advance_intro_story()
 
 func _start_daily_seed_gift()->void:
-	intro_is_daily_gift=true;current_mode="greenhouse";_apply_mode();shop_overlay.visible=true;intro_overlay.visible=true;play_overlay.visible=false;play_open_button.visible=false;audio_manager.play_bgm("shop")
+	intro_is_daily_gift=true;current_mode="greenhouse";_apply_mode();shop_overlay.visible=true;intro_overlay.visible=true;intro_speaker_label.visible=true;play_overlay.visible=false;play_open_button.visible=false;audio_manager.play_bgm("shop")
 	intro_dialogue_label.text="今日も来てくれてありがとう。\nたね袋 ×1 GET"
 	intro_dialogue_label.add_theme_font_size_override("font_size",25);intro_dialogue_label.add_theme_color_override("font_color",Color("#b66d20"));intro_continue_button.text="温室へ"
 	normal_seed_bags+=1;login_bonus_date=Time.get_date_string_from_system();_save();_show_intro_gift_effect();_update_play_ui()
@@ -343,41 +343,44 @@ func _start_daily_seed_gift()->void:
 
 func _advance_intro_story()->void:
 	if not tutorial_dialog_kind.is_empty():
-		var finished_kind:=tutorial_dialog_kind;tutorial_dialog_kind="";tutorial_steps[finished_kind+"_dialog"]=true;intro_overlay.visible=false;shop_overlay.visible=false;intro_dialogue_label.add_theme_font_size_override("font_size",20);intro_dialogue_label.add_theme_color_override("font_color",UI_BROWN);intro_continue_button.text="つぎへ";_save();_update_play_ui();audio_manager.play_bgm("habitat" if current_mode=="habitat" else "greenhouse")
+		var finished_kind:=tutorial_dialog_kind;tutorial_dialog_kind="";tutorial_steps[finished_kind+"_dialog"]=true;intro_overlay.visible=false;shop_overlay.visible=false;intro_speaker_label.visible=true;intro_dialogue_label.add_theme_font_size_override("font_size",20);intro_dialogue_label.add_theme_color_override("font_color",UI_BROWN);intro_continue_button.text="つぎへ";_save();_update_play_ui();audio_manager.play_bgm("habitat" if current_mode=="habitat" else "greenhouse")
 		if finished_kind=="play1":_show_tutorial_guide("encyclopedia")
 		elif finished_kind=="play3":_show_tutorial_guide("habitat")
 		elif finished_kind=="habitat_scroll":habitat_scroll_tutorial_active=true
 		elif finished_kind=="buyback":buyback_unlocked=true;tutorial_steps["buyback_unlocked"]=true;_save();_update_currency_ui()
 		return
 	if intro_is_daily_gift:
-		intro_is_daily_gift=false;intro_overlay.visible=false;shop_overlay.visible=false;intro_dialogue_label.add_theme_font_size_override("font_size",20);intro_dialogue_label.add_theme_color_override("font_color",UI_BROWN);intro_continue_button.text="つぎへ";_update_play_ui();audio_manager.play_bgm("greenhouse");return
+		intro_is_daily_gift=false;intro_overlay.visible=false;shop_overlay.visible=false;intro_speaker_label.visible=true;intro_dialogue_label.add_theme_font_size_override("font_size",20);intro_dialogue_label.add_theme_color_override("font_color",UI_BROWN);intro_continue_button.text="つぎへ";_update_play_ui();audio_manager.play_bgm("greenhouse");return
 	intro_story_step+=1
 	match intro_story_step:
-		1:intro_dialogue_label.text="こんにちは。これ、売れ残った古いたねなんだけど……\n何のたねだったかなあ…。あげるからまいてみてよ！"
+		1:
+			intro_speaker_label.visible=true
+			intro_dialogue_label.text="こんにちは。売れ残った古いたねなんだけど…何のたねだったかな…。あげるからまいてみてよ！"
 		2:
+			intro_speaker_label.visible=false
 			intro_dialogue_label.text="古いたね 3袋 GET"
 			intro_dialogue_label.add_theme_font_size_override("font_size",29);intro_dialogue_label.add_theme_color_override("font_color",Color("#b66d20"));intro_continue_button.text="温室へ"
 			_show_intro_gift_effect()
 		_:
-			intro_story_complete=true;old_seed_bags=3;login_bonus_date=Time.get_date_string_from_system();intro_overlay.visible=false;shop_overlay.visible=false;intro_dialogue_label.add_theme_font_size_override("font_size",20);intro_dialogue_label.add_theme_color_override("font_color",UI_BROWN);intro_continue_button.text="つぎへ";_save();_update_play_ui();audio_manager.play_bgm("greenhouse")
+			intro_story_complete=true;old_seed_bags=3;login_bonus_date=Time.get_date_string_from_system();intro_overlay.visible=false;shop_overlay.visible=false;intro_speaker_label.visible=true;intro_dialogue_label.add_theme_font_size_override("font_size",20);intro_dialogue_label.add_theme_color_override("font_color",UI_BROWN);intro_continue_button.text="つぎへ";_save();_update_play_ui();audio_manager.play_bgm("greenhouse");_show_tutorial_guide("play_open")
 
 func _start_post_play_dialog(kind:String)->void:
-	tutorial_dialog_kind=kind;shop_overlay.visible=true;intro_overlay.visible=true;play_overlay.visible=false;play_open_button.visible=false;audio_manager.play_bgm("shop")
+	tutorial_dialog_kind=kind;shop_overlay.visible=true;intro_overlay.visible=true;intro_speaker_label.visible=true;play_overlay.visible=false;play_open_button.visible=false;audio_manager.play_bgm("shop")
 	if kind=="play1":intro_dialogue_label.text="育ったのはコロラータだったんだね！\n図鑑に登録しておいたよ。見てみよう。";intro_continue_button.text="図鑑を見る"
 	elif kind=="play2":intro_dialogue_label.text="センスいいね！そうだ、今度一緒に多肉の原生地へ行こうよ。\n準備してくるからもう少し待ってね。";intro_continue_button.text="温室へ"
 	else:intro_dialogue_label.text="準備できたよ！多肉の原生地へ行けるようになったよ。\n原生地を見に行ってみよう。";intro_continue_button.text="原生地へ"
 
 func _start_habitat_scroll_tutorial()->void:
-	tutorial_dialog_kind="habitat_scroll";intro_overlay.visible=true;shop_overlay.visible=false;play_overlay.visible=false;play_open_button.visible=false
+	tutorial_dialog_kind="habitat_scroll";intro_overlay.visible=true;intro_speaker_label.visible=true;shop_overlay.visible=false;play_overlay.visible=false;play_open_button.visible=false
 	intro_dialogue_label.text="指で画面をゆっくり左右に動かすと、原生地を見回せるよ。\n野生の多肉を探してみよう。";intro_continue_button.text="探してみる"
 
 func _start_habitat_get_explanation()->void:
-	tutorial_dialog_kind="habitat_get";intro_overlay.visible=true;shop_overlay.visible=false;play_overlay.visible=false;play_open_button.visible=false
+	tutorial_dialog_kind="habitat_get";intro_overlay.visible=true;intro_speaker_label.visible=true;shop_overlay.visible=false;play_overlay.visible=false;play_open_button.visible=false
 	intro_dialogue_label.text="見つけた多肉は図鑑に登録されたよ。\nこれからは、たねからもこの品種が育つようになるよ。";intro_continue_button.text="わかった"
 
 func _start_buyback_dialog()->void:
 	if buyback_unlocked or bool(tutorial_steps.get("buyback_dialog",false)):return
-	tutorial_dialog_kind="buyback";shop_overlay.visible=true;intro_overlay.visible=true;play_overlay.visible=false;play_open_button.visible=false;audio_manager.play_bgm("shop")
+	tutorial_dialog_kind="buyback";shop_overlay.visible=true;intro_overlay.visible=true;intro_speaker_label.visible=true;play_overlay.visible=false;play_open_button.visible=false;audio_manager.play_bgm("shop")
 	intro_dialogue_label.text="育てた多肉、これからはうちで買い取るよ！\n大きく育てた株ほど高く買い取るからね。";intro_continue_button.text="わかった"
 
 func _start_buyback_after_greenhouse_frame()->void:
@@ -392,7 +395,12 @@ func _build_tutorial_guide(hud:Control)->void:
 	tutorial_guide_message=Label.new();tutorial_guide_message.position=Vector2(38,120);tutorial_guide_message.size=Vector2(500,110);tutorial_guide_message.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;tutorial_guide_message.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;tutorial_guide_message.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;tutorial_guide_message.add_theme_font_size_override("font_size",23);tutorial_guide_message.add_theme_color_override("font_color",UI_CREAM);tutorial_guide_message.add_theme_color_override("font_outline_color",UI_BROWN);tutorial_guide_message.add_theme_constant_override("outline_size",7);tutorial_guide_message.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_guide_message.visible=false;tutorial_guide_overlay.add_child(tutorial_guide_message)
 
 func _show_tutorial_guide(target:String)->void:
-	var source:Button=encyclopedia_icon_button if target=="encyclopedia" else mode_button
+	var source:Button
+	if target=="encyclopedia":source=encyclopedia_icon_button
+	elif target=="habitat":source=mode_button
+	elif target=="play_open":source=play_open_button
+	elif target=="old_seed":source=old_seed_play_button
+	else:return
 	tutorial_guide_button.icon=null;tutorial_guide_button.expand_icon=false;tutorial_guide_message.visible=false
 	tutorial_guide_button.position=source.global_position;tutorial_guide_button.size=source.size;tutorial_guide_button.text=source.text;tutorial_guide_button.set_meta("target",target);_skin_button(tutorial_guide_button,Color("#fff0cf"),17 if target=="encyclopedia" else 15)
 	for connection in tutorial_guide_button.pressed.get_connections():tutorial_guide_button.pressed.disconnect(connection.callable)
@@ -404,7 +412,28 @@ func _complete_tutorial_guide()->void:
 	var target:=str(tutorial_guide_button.get_meta("target",""));tutorial_guide_overlay.visible=false;tutorial_steps[target+"_guide"]=true;_save()
 	if target=="encyclopedia":_open_encyclopedia()
 	elif target=="habitat":_toggle_mode()
+	elif target=="play_open":_open_play_modal();call_deferred("_show_tutorial_guide","old_seed")
+	elif target=="old_seed":_start_greenhouse_play("old")
+	elif target=="first_harvest" and is_instance_valid(tutorial_harvest_plant):tutorial_harvest_plant.harvest()
 	elif target=="habitat_species" and not tutorial_habitat_item.is_empty():_collect_habitat_species(tutorial_habitat_item)
+
+func _show_first_harvest_guide_when_ready()->void:
+	if bool(tutorial_steps.get("first_harvest_guide",false)):return
+	for frame in range(120):
+		await get_tree().process_frame
+		if not play_active:return
+		for plant in plants:
+			if is_instance_valid(plant) and plant.state=="growing":
+				_show_first_harvest_guide(plant)
+				return
+
+func _show_first_harvest_guide(plant)->void:
+	tutorial_harvest_plant=plant
+	var screen:=camera.unproject_position(plant.global_position)
+	tutorial_guide_button.position=screen-Vector2(66,66);tutorial_guide_button.size=Vector2(132,132);tutorial_guide_button.text="";tutorial_guide_button.icon=plant.plant_sprite.texture;tutorial_guide_button.expand_icon=true;tutorial_guide_button.set_meta("target","first_harvest");_skin_button(tutorial_guide_button,Color(0.25,0.18,0.08,.35),16)
+	for connection in tutorial_guide_button.pressed.get_connections():tutorial_guide_button.pressed.disconnect(connection.callable)
+	tutorial_guide_button.pressed.connect(_complete_tutorial_guide);tutorial_guide_message.text="育った多肉をタップして収穫しよう";tutorial_guide_message.visible=true;tutorial_guide_finger.position=tutorial_guide_button.position+Vector2(-35,70);tutorial_guide_overlay.visible=true
+	var tween:=create_tween().set_loops();tween.tween_property(tutorial_guide_button,"self_modulate",Color(1.3,1.18,.72,1),.55).set_trans(Tween.TRANS_SINE);tween.parallel().tween_property(tutorial_guide_finger,"position:y",tutorial_guide_finger.position.y-14,.55);tween.tween_property(tutorial_guide_button,"self_modulate",Color.WHITE,.55);tween.parallel().tween_property(tutorial_guide_finger,"position:y",tutorial_guide_finger.position.y,.55)
 
 func _show_habitat_species_guide(item:Dictionary,species_name:String)->void:
 	tutorial_habitat_item=item;var node:Node3D=item.node;var screen:=camera.unproject_position(node.global_position)
@@ -473,7 +502,7 @@ func _result_line_label()->Label:
 
 func _open_play_modal()->void:
 	if play_active or current_mode!="greenhouse":return
-	play_modal_open=true;play_message.text="1回につき1袋をまきます";_update_play_ui()
+	play_modal_open=true;_update_play_ui()
 
 func _close_play_modal()->void:
 	play_modal_open=false;_update_play_ui()
@@ -481,18 +510,19 @@ func _close_play_modal()->void:
 func _start_greenhouse_play(seed_type:String)->void:
 	if play_active:return
 	if seed_type=="old":
-		if old_seed_bags<1:play_message.text="古いたねがありません";return
+		if old_seed_bags<1:return
 		old_seed_bags-=1;current_target_count=OLD_SEED_GERMINATION_COUNT
 	elif seed_type=="premium":
-		if not _premium_seed_unlocked():play_message.text="レア種を1種発見すると解放";return
-		if premium_seed_bags<1:play_message.text="プレミアムたねの袋数が足りません";return
+		if not _premium_seed_unlocked():return
+		if premium_seed_bags<1:return
 		premium_seed_bags-=1;current_target_count=PREMIUM_GERMINATION_COUNT
 	else:
-		if normal_seed_bags<1:play_message.text="たねの袋数が足りません";return
+		if normal_seed_bags<1:return
 		normal_seed_bags-=1;current_target_count=NORMAL_GERMINATION_COUNT
 	active_seed_type=seed_type;play_time_remaining=30.0 if seed_type=="old" else PLAY_DURATION_SECONDS;play_active=true;play_modal_open=false;play_earnings_total=0;play_harvest_count=0;play_max_size=0.0;play_notable_species.clear();spawn_queue=0;spawn_timer=0.0;opening_species.clear();_clear_greenhouse_plants()
 	if result_overlay:result_overlay.visible=false
 	for i in range(current_target_count):spawn_plant()
+	if total_play_count==0 and not bool(tutorial_steps.get("first_harvest_guide",false)):call_deferred("_show_first_harvest_guide_when_ready")
 	audio_manager.play_se("rare_seed" if seed_type=="premium" else "seed_bag",.72)
 	_save();_update_play_ui()
 
@@ -504,7 +534,7 @@ func _finish_greenhouse_play()->void:
 	if total_play_count==3 and not bool(tutorial_steps.get("habitat_species_queued",false)):
 		if pending_habitat_species.is_empty():_queue_random_species("通常")
 		tutorial_steps["habitat_species_queued"]=true
-	_evaluate_unlock_rules("play_count",float(total_play_count));_clear_greenhouse_plants();play_message.text="次のたね袋を選んでください";_save();_update_play_ui();_show_play_result();audio_manager.play_se("result",.7)
+	_evaluate_unlock_rules("play_count",float(total_play_count));_clear_greenhouse_plants();_save();_update_play_ui();_show_play_result();audio_manager.play_se("result",.7)
 
 func _clear_greenhouse_plants()->void:
 	for plant in plants.duplicate():
@@ -522,10 +552,14 @@ func _update_play_ui()->void:
 	for control in encyclopedia_navigation_controls:control.visible=not play_active and encyclopedia_unlocked
 	if mode_button:mode_button.visible=not play_active and habitat_unlocked
 	play_timer_label.text="残り %d秒"%ceili(play_time_remaining)
-	play_bag_summary.text=("古いたね %d袋"%old_seed_bags) if old_seed_bags>0 else "たね %d袋　 プレミアムたね %d袋"%[normal_seed_bags,premium_seed_bags]
+	var held:Array[String]=[]
+	if old_seed_bags>0:held.append("古いたね %d袋"%old_seed_bags)
+	if normal_seed_bags>0:held.append("たね %d袋"%normal_seed_bags)
+	if premium_seed_bags>0 and _premium_seed_unlocked():held.append("プレミアムたね %d袋"%premium_seed_bags)
+	play_bag_summary.text="　".join(held)
 	old_seed_play_button.visible=old_seed_bags>0;old_seed_play_button.text="古いたねをまく　30秒　残り%d袋"%old_seed_bags
-	normal_play_button.text="たねをまく　残り%d袋"%normal_seed_bags;normal_play_button.disabled=normal_seed_bags<1
-	premium_play_button.text=("プレミアムたねをまく　残り%d袋"%premium_seed_bags) if _premium_seed_unlocked() else "レア種を1種発見すると解放";premium_play_button.disabled=not _premium_seed_unlocked() or premium_seed_bags<1
+	normal_play_button.visible=normal_seed_bags>0;normal_play_button.text="たねをまく　残り%d袋"%normal_seed_bags;normal_play_button.disabled=normal_seed_bags<1
+	premium_play_button.visible=premium_seed_bags>0 and _premium_seed_unlocked();premium_play_button.text="プレミアムたねをまく　残り%d袋"%premium_seed_bags;premium_play_button.disabled=not _premium_seed_unlocked() or premium_seed_bags<1
 
 func _open_shop()->void:
 	play_modal_open=false;_update_shop_ui();shop_message.text="たね袋を1袋ずつ購入できます";play_overlay.visible=false;shop_overlay.visible=true;audio_manager.play_bgm("shop");_update_play_ui()
@@ -557,6 +591,7 @@ func _update_currency_ui()->void:
 	if coin_label:coin_label.text=" ¥%s"%_comma(coins)
 
 func _show_play_result()->void:
+	result_total_label.visible=buyback_unlocked
 	result_total_label.text="合計  ＋¥%s"%_comma(play_earnings_total);result_count_label.text="収穫株数　%d株"%play_harvest_count;result_max_label.text="最大サイズ　%.1fcm"%play_max_size
 	var notable:Array=play_notable_species.values();notable.sort_custom(func(a,b):return float(a.get("size",0.0))>float(b.get("size",0.0)));var lines:Array[String]=[]
 	for i in range(mini(3,notable.size())):lines.append("%s　%.1fcm"%[str(notable[i].get("name","")),float(notable[i].get("size",0.0))])
@@ -719,6 +754,7 @@ func _update_greenhouse_pan()->void:
 	greenhouse_pan_target_x=clampf(greenhouse_pan_target_x,-greenhouse_pan_limit,greenhouse_pan_limit)
 	greenhouse_backdrop.size=display_size
 	greenhouse_backdrop.position=Vector2((viewport_size.x-display_size.x)*.5+greenhouse_pan_x,(viewport_size.y-display_size.y)*.5)
+	if play_open_button:play_open_button.position=Vector2(198.0+greenhouse_pan_x,499.0)
 	greenhouse_world_pan_x=0.0
 	if camera:
 		var soil_center:=camera.unproject_position(Vector3(0,.12,0))
@@ -1027,7 +1063,7 @@ func _on_harvested(p)->void:
 		play_earnings_total+=reward;play_harvest_count+=1;play_max_size=maxf(play_max_size,p.diameter_cm)
 		var species_id:=str(p.data.species_id);var notable=play_notable_species.get(species_id,{})
 		if notable.is_empty() or p.diameter_cm>float(notable.get("size",0.0)):play_notable_species[species_id]={"name":str(p.data.name_ja),"size":p.diameter_cm}
-	_show_harvest_result(p,reward)
+	_show_harvest_result(p,reward,buyback_unlocked)
 	if is_record:_show_record(p,reward)
 	var tween:=create_tween().set_parallel();tween.tween_property(p,"position:y",p.position.y+2.0,.42).set_trans(Tween.TRANS_BACK);tween.tween_property(p,"scale",p.scale*1.2,.22);tween.chain().tween_property(p,"scale",Vector3.ONE*0.01,.24)
 	_cleanup_later(p,.68)
@@ -1050,17 +1086,18 @@ func _show_float(p,text:String,color:Color)->void:
 	var l:=Label.new();l.text=text;l.size=Vector2(230,90);l.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;l.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;l.add_theme_font_size_override("font_size",24);l.add_theme_color_override("font_color",color);l.add_theme_color_override("font_outline_color",UI_BROWN);l.add_theme_constant_override("outline_size",7);l.position=camera.unproject_position(p.global_position)-Vector2(115,40);effects_layer.add_child(l)
 	var tw:=create_tween().set_parallel();tw.tween_property(l,"position:y",l.position.y-85,.62).set_trans(Tween.TRANS_BACK);tw.tween_property(l,"modulate:a",0.0,.62).set_delay(.18);tw.chain().tween_callback(l.queue_free)
 
-func _show_harvest_result(plant,reward:int)->void:
+func _show_harvest_result(plant,reward:int,show_money:bool)->void:
 	var panel:=PanelContainer.new();panel.size=Vector2(220,132);panel.position=camera.unproject_position(plant.global_position)-Vector2(110,82);panel.pivot_offset=panel.size*.5;panel.scale=Vector2(.78,.78);panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;panel.add_theme_stylebox_override("panel",_box(Color(0.22,0.12,0.07,.92),Color("#f0cc82"),17,2));effects_layer.add_child(panel)
 	var content:=VBoxContainer.new();content.alignment=BoxContainer.ALIGNMENT_CENTER;content.add_theme_constant_override("separation",0);content.mouse_filter=Control.MOUSE_FILTER_IGNORE;panel.add_child(content)
 	var name_label:=Label.new();name_label.text=str(plant.data.name_ja);name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name_label.add_theme_font_size_override("font_size",20);name_label.add_theme_color_override("font_color",Color.WHITE);content.add_child(name_label)
 	var size_label:=Label.new();size_label.text="%.1fcm"%plant.diameter_cm;size_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;size_label.add_theme_font_size_override("font_size",19);size_label.add_theme_color_override("font_color",UI_CREAM);content.add_child(size_label)
-	var yen_label:=Label.new();yen_label.text="＋¥%d"%reward;yen_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;yen_label.add_theme_font_size_override("font_size",27);yen_label.add_theme_color_override("font_color",Color("#ffe06f"));yen_label.add_theme_color_override("font_outline_color",Color("#6b3518"));yen_label.add_theme_constant_override("outline_size",4);content.add_child(yen_label)
+	if show_money:
+		var yen_label:=Label.new();yen_label.text="＋¥%d"%reward;yen_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;yen_label.add_theme_font_size_override("font_size",27);yen_label.add_theme_color_override("font_color",Color("#ffe06f"));yen_label.add_theme_color_override("font_outline_color",Color("#6b3518"));yen_label.add_theme_constant_override("outline_size",4);content.add_child(yen_label)
 	var tween:=create_tween();tween.tween_property(panel,"scale",Vector2.ONE,.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT);tween.tween_interval(1.12);tween.set_parallel(true);tween.tween_property(panel,"position:y",panel.position.y-34,.5).set_trans(Tween.TRANS_QUAD);tween.tween_property(panel,"modulate:a",0.0,.5);tween.set_parallel(false);tween.tween_callback(panel.queue_free)
 
 func _show_record(p,reward:int)->void:
 	audio_manager.play_se("result_new_best",.5)
-	record_text.text="収穫記録更新！\nNEW RECORD\n%.1f cm\n+%d円"%[p.diameter_cm,reward];record_card.visible=true;record_card.scale=Vector2(.72,.72);record_card.pivot_offset=record_card.size/2
+	record_text.text=("収穫記録更新！\nNEW RECORD\n%.1f cm\n+%d円"%[p.diameter_cm,reward]) if buyback_unlocked else ("収穫記録更新！\nNEW RECORD\n%.1f cm"%p.diameter_cm);record_card.visible=true;record_card.scale=Vector2(.72,.72);record_card.pivot_offset=record_card.size/2
 	var tw:=create_tween();tw.tween_property(record_card,"scale",Vector2.ONE,.24).set_trans(Tween.TRANS_BACK);tw.tween_interval(2.2);tw.tween_property(record_card,"modulate:a",0.0,.25);tw.tween_callback(func():record_card.visible=false;record_card.modulate.a=1.0)
 
 func _update_best_ui()->void:
