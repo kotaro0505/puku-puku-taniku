@@ -2,7 +2,7 @@ extends Node
 
 const SucculentClass = preload("res://scripts/succulent.gd")
 const AudioManagerClass = preload("res://scripts/audio_manager.gd")
-const PROGRESSION_VERSION := 2
+const PROGRESSION_VERSION := 3
 const TARGET_COUNT := 12
 const SOIL_SOURCE_CENTER := Vector2(426.5,700.0)
 const SOIL_SOURCE_RADII := Vector2(360.0,190.0)
@@ -77,6 +77,7 @@ var intro_overlay: Control
 var intro_dialogue_label: Label
 var intro_continue_button: Button
 var intro_story_step := 0
+var intro_is_daily_gift := false
 var settings_overlay: Control
 var audio_manager: Node
 var audio_settings: Dictionary = {"bgm_enabled":true,"se_enabled":true,"bgm_volume":0.65,"se_volume":0.62}
@@ -90,9 +91,9 @@ var result_max_label: Label
 var result_notable_label: Label
 var encyclopedia_icon_button: Button
 var external_navigation_controls: Array[Control] = []
-var coins := 12450
+var coins := 1000
 var bests: Dictionary = {}
-var discovered: Dictionary = {}
+var discovered: Dictionary = {"colorata":true}
 var unlocked_species: Dictionary = {}
 var greenhouse_available: Dictionary = {"colorata":true}
 var habitat_seed_date := ""
@@ -127,7 +128,6 @@ func _ready() -> void:
 	rng.randomize()
 	_load_species()
 	_load_save()
-	_grant_daily_seed_bag()
 	_apply_saved_unlocks()
 	audio_manager=AudioManagerClass.new();add_child(audio_manager);audio_manager.apply_settings(audio_settings)
 	_build_world()
@@ -136,8 +136,9 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_layout)
 	_layout()
 	_wire_ui_sounds(self)
-	if intro_story_complete:audio_manager.play_bgm("greenhouse")
-	else:call_deferred("_start_intro_story")
+	if not intro_story_complete:call_deferred("_start_intro_story")
+	elif _daily_seed_gift_due():call_deferred("_start_daily_seed_gift")
+	else:audio_manager.play_bgm("greenhouse")
 
 func _load_species() -> void:
 	var raw := FileAccess.get_file_as_string("res://data/species-v2.json")
@@ -150,7 +151,7 @@ func _load_save() -> void:
 	if FileAccess.file_exists("user://records.json"):
 		var value = JSON.parse_string(FileAccess.get_file_as_string("user://records.json"))
 		if value is Dictionary:
-			bests = value.get("bests",{}); coins = int(value.get("yen",value.get("coins",12450))); discovered=value.get("discovered",{});habitat_seed_date=str(value.get("habitat_seed_date",""));habitat_seeds_collected=int(value.get("habitat_seeds_collected",0))
+			bests = value.get("bests",{}); coins = int(value.get("yen",value.get("coins",1000))); discovered=value.get("discovered",{"colorata":true});habitat_seed_date=str(value.get("habitat_seed_date",""));habitat_seeds_collected=int(value.get("habitat_seeds_collected",0))
 			intro_story_complete=bool(value.get("intro_story_complete",false));total_play_count=int(value.get("total_play_count",0));completed_unlock_conditions=value.get("completed_unlock_conditions",{});pending_habitat_species=value.get("pending_habitat_species",[]);audio_settings=value.get("audio_settings",audio_settings)
 			if value.has("normal_seed_bags"):
 				normal_seed_bags=int(value.get("normal_seed_bags",0));premium_seed_bags=int(value.get("premium_seed_bags",0));login_bonus_date=str(value.get("login_bonus_date",""))
@@ -174,11 +175,11 @@ func _save() -> void:
 	if audio_manager:audio_settings=audio_manager.settings_dictionary()
 	f.store_string(JSON.stringify({"progression_version":PROGRESSION_VERSION,"bests":bests,"discovered":discovered,"unlocked_species":unlocked_species,"greenhouse_available":greenhouse_available,"completed_unlock_conditions":completed_unlock_conditions,"pending_habitat_species":pending_habitat_species,"total_play_count":total_play_count,"intro_story_complete":intro_story_complete,"habitat_seed_date":habitat_seed_date,"habitat_seeds_collected":habitat_seeds_collected,"normal_seed_bags":normal_seed_bags,"premium_seed_bags":premium_seed_bags,"login_bonus_date":login_bonus_date,"audio_settings":audio_settings,"yen":coins}))
 
-func _grant_daily_seed_bag()->void:
-	if not intro_story_complete:return
+func _daily_seed_gift_due()->bool:
+	if not intro_story_complete:return false
 	var today:=Time.get_date_string_from_system()
-	if login_bonus_date.is_empty():login_bonus_date=today;_save();return
-	if login_bonus_date!=today:normal_seed_bags+=1;login_bonus_date=today;_save()
+	if login_bonus_date.is_empty():login_bonus_date=today;_save();return false
+	return login_bonus_date!=today
 
 func _apply_saved_unlocks()->void:
 	species.clear()
@@ -317,9 +318,17 @@ func _build_intro_story(hud:Control)->void:
 	intro_continue_button=Button.new();intro_continue_button.text="つぎへ";intro_continue_button.custom_minimum_size=Vector2(250,55);_skin_button(intro_continue_button,Color("#d8b56b"),19);intro_continue_button.pressed.connect(_advance_intro_story);content.add_child(intro_continue_button)
 
 func _start_intro_story()->void:
-	intro_story_step=0;current_mode="greenhouse";_apply_mode();shop_overlay.visible=true;intro_overlay.visible=true;play_overlay.visible=false;play_open_button.visible=false;audio_manager.play_bgm("shop");_advance_intro_story()
+	intro_is_daily_gift=false;intro_story_step=0;current_mode="greenhouse";_apply_mode();shop_overlay.visible=true;intro_overlay.visible=true;play_overlay.visible=false;play_open_button.visible=false;audio_manager.play_bgm("shop");_advance_intro_story()
+
+func _start_daily_seed_gift()->void:
+	intro_is_daily_gift=true;current_mode="greenhouse";_apply_mode();shop_overlay.visible=true;intro_overlay.visible=true;play_overlay.visible=false;play_open_button.visible=false;audio_manager.play_bgm("shop")
+	intro_dialogue_label.text="今日も来てくれてありがとう。\n通常種袋 ×1 GET"
+	intro_dialogue_label.add_theme_font_size_override("font_size",25);intro_dialogue_label.add_theme_color_override("font_color",Color("#b66d20"));intro_continue_button.text="温室へ"
+	normal_seed_bags+=1;login_bonus_date=Time.get_date_string_from_system();_save();_show_intro_gift_effect();_update_play_ui()
 
 func _advance_intro_story()->void:
+	if intro_is_daily_gift:
+		intro_is_daily_gift=false;intro_overlay.visible=false;shop_overlay.visible=false;intro_dialogue_label.add_theme_font_size_override("font_size",20);intro_dialogue_label.add_theme_color_override("font_color",UI_BROWN);intro_continue_button.text="つぎへ";_update_play_ui();audio_manager.play_bgm("greenhouse");return
 	intro_story_step+=1
 	match intro_story_step:
 		1:intro_dialogue_label.text="こんにちは。ちょうど、余った\nコロラータの種があるんだ。"
@@ -366,8 +375,11 @@ func _change_audio_enabled(enabled:bool,is_bgm:bool)->void:
 func _change_audio_volume(value:float,is_bgm:bool)->void:
 	audio_settings["bgm_volume" if is_bgm else "se_volume"]=value/100.0;audio_manager.apply_settings(audio_settings);_save()
 
+func _reset_progression_state()->void:
+	coins=1000;bests.clear();discovered={"colorata":true};greenhouse_available={"colorata":true};unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;intro_story_complete=false;normal_seed_bags=0;premium_seed_bags=0;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;opening_species.clear();play_active=false;play_time_remaining=0.0;spawn_queue=0;spawn_timer=0.0;_apply_saved_unlocks();_clear_greenhouse_plants();_build_habitat_items();_save();_update_currency_ui();_update_play_ui()
+
 func _reset_progression_for_development(button:Button)->void:
-	bests.clear();discovered.clear();greenhouse_available={"colorata":true};unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;intro_story_complete=false;normal_seed_bags=0;premium_seed_bags=0;login_bonus_date="";opening_species.clear();_apply_saved_unlocks();_clear_greenhouse_plants();_save();button.text="リセットしました（再読み込みしてください）"
+	_reset_progression_state();button.text="リセットしました（再読み込みしてください）"
 
 func _build_result_overlay(hud:Control)->void:
 	result_overlay=Control.new();result_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);result_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;result_overlay.visible=false;hud.add_child(result_overlay)
