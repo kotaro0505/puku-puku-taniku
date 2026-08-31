@@ -5,6 +5,7 @@ func _ready()->void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	game._reset_progression_state();game.intro_story_complete=true;game.habitat_unlocked=true;game.encyclopedia_unlocked=true;game.buyback_unlocked=true;game.tutorial_steps["habitat_scroll_dialog"]=true;game.tutorial_steps["habitat_get_dialog"]=true;game.tutorial_steps["play1_dialog"]=true;game.intro_overlay.visible=false;game.shop_overlay.visible=false;game._update_play_ui()
+	assert(game.shop_button.position==Vector2(398,198) and game.shop_button.size==Vector2(68,73));assert(game.mode_button.position==Vector2(483,198) and game.mode_button.size==Vector2(68,73));assert(game.screen_name_label.position==Vector2(20,24))
 	assert(game.plants.is_empty() and not game.play_active)
 	assert(game.play_open_button.visible and not game.play_overlay.visible)
 	game._open_play_modal();assert(game.play_overlay.visible);game._close_play_modal();assert(not game.play_overlay.visible)
@@ -71,7 +72,7 @@ func _ready()->void:
 	while game.play_active and drain_guard<100:
 		for plant in game.plants.duplicate():plant.harvest()
 		game._process(1.0);await get_tree().process_frame;drain_guard+=1
-	assert(game.plants.is_empty() and not game.play_active);assert(game.result_overlay.visible);assert(game.play_harvest_count>=1 and game.play_earnings_total>=50 and game.play_max_size>=21.7);assert(not game.play_open_button.visible);game._close_result();assert(game.play_open_button.visible)
+	assert(game.plants.is_empty() and not game.play_active);assert(game.result_overlay.visible);assert(game.play_harvest_count>=1 and game.play_earnings_total>=50 and game.play_max_size>=21.7);assert(game.play_updated_global_best and "最大サイズ更新" in game.result_max_label.text and game.result_confetti_layer.get_child_count()>0);assert(not game.play_open_button.visible);game._close_result();assert(game.play_open_button.visible)
 	for control in game.external_navigation_controls:assert(control.visible)
 	print("SMOKE_OK panorama360 plants=",game.plants.size()," diameter=",grown_diameter," sprite_scale=",grown_scale," rooted=true species=",species_id)
 	get_tree().quit()
