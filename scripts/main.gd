@@ -18,6 +18,7 @@ const PREMIUM_SEED_BAG_PRICE_YEN := 800
 const PREMIUM_RARE_WEIGHT_MULTIPLIER := 3.0
 const PREMIUM_SUPER_RARE_WEIGHT_MULTIPLIER := 5.0
 const HABITAT_SAFE_PLANT_POINTS := [Vector2(70,400),Vector2(155,410),Vector2(245,400),Vector2(335,420),Vector2(430,405),Vector2(535,415),Vector2(705,430),Vector2(820,410),Vector2(920,395),Vector2(1025,420),Vector2(1130,400),Vector2(1220,415)]
+const HABITAT_NEW_SPECIES_POINTS := [Vector2(640,385),Vector2(735,392),Vector2(545,388),Vector2(815,395),Vector2(465,392)]
 const HABITAT_SAFE_SEED_POINTS := [Vector2(45,430),Vector2(115,445),Vector2(190,430),Vector2(275,445),Vector2(360,440),Vector2(455,435),Vector2(545,445),Vector2(625,455),Vector2(715,450),Vector2(805,440),Vector2(895,430),Vector2(980,445),Vector2(1060,435),Vector2(1140,445),Vector2(1210,435),Vector2(1260,455)]
 const UI_CREAM := Color("#fff1d2")
 const UI_BROWN := Color("#4a2618")
@@ -524,10 +525,12 @@ func _build_habitat_items()->void:
 		var species_id:=str(entry.species_id)
 		if bool(discovered.get(species_id,false)) and point_index<plant_points.size():
 			_add_habitat_plant(entry,plant_points[point_index],false);point_index+=1
+	var pending_spawn_index:=0
 	for pending_id in pending_habitat_species:
 		for entry in catalog_species:
-			if str(entry.species_id)==str(pending_id) and point_index<plant_points.size():
-				habitat_new_species_id=str(pending_id);_add_habitat_plant(entry,plant_points[point_index],true);point_index+=1;break
+			if str(entry.species_id)==str(pending_id):
+				var new_point:Vector2=HABITAT_NEW_SPECIES_POINTS[pending_spawn_index%HABITAT_NEW_SPECIES_POINTS.size()]
+				habitat_new_species_id=str(pending_id);_add_habitat_plant(entry,new_point,true);pending_spawn_index+=1;break
 	_reset_daily_seeds_if_needed()
 	var seed_points:Array=HABITAT_SAFE_SEED_POINTS.duplicate();var daily_rng:=RandomNumberGenerator.new();daily_rng.seed=habitat_seed_date.hash()
 	for i in range(seed_points.size()-1,0,-1):
