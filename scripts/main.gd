@@ -4,8 +4,8 @@ const SucculentClass = preload("res://scripts/succulent.gd")
 const AudioManagerClass = preload("res://scripts/audio_manager.gd")
 const PROGRESSION_VERSION := 3
 const NORMAL_GERMINATION_COUNT := 12
-const PREMIUM_GERMINATION_COUNT := 18
-const OLD_SEED_GERMINATION_COUNT := 6
+const PREMIUM_GERMINATION_COUNT := 12
+const OLD_SEED_GERMINATION_COUNT := 12
 const SOIL_SOURCE_CENTER := Vector2(426.5,700.0)
 const SOIL_SOURCE_RADII := Vector2(360.0,190.0)
 const SPAWN_SPRITE_MARGIN_SOURCE_PX := 40.0
@@ -14,7 +14,7 @@ const GREENHOUSE_DRAG_DEAD_ZONE := 3.0
 const GREENHOUSE_PAN_FOLLOW_SECONDS := 0.075
 const HABITAT_DRAG_SCALE := 0.055
 const HABITAT_ITEM_RADIUS := 9.0
-const PLAY_DURATION_SECONDS := 60.0
+const HABITAT_BEST_LINK_EVENT_CM := 30.0
 const NORMAL_SEED_BAG_PRICE_YEN := 500
 const PREMIUM_SEED_BAG_PRICE_YEN := 800
 const HABITAT_SAFE_PLANT_POINTS := [Vector2(70,400),Vector2(155,410),Vector2(245,400),Vector2(335,420),Vector2(430,405),Vector2(535,415),Vector2(705,430),Vector2(820,410),Vector2(920,395),Vector2(1025,420),Vector2(1130,400),Vector2(1220,415)]
@@ -92,6 +92,7 @@ var tutorial_habitat_item: Dictionary = {}
 var tutorial_harvest_plant: Node
 var habitat_scroll_tutorial_active := false
 var buyback_unlocked := false
+var habitat_best_link_dialog_step := 0
 var settings_overlay: Control
 var audio_manager: Node
 var audio_settings: Dictionary = {"bgm_enabled":true,"se_enabled":true,"bgm_volume":0.65,"se_volume":0.62}
@@ -125,9 +126,8 @@ var play_earnings_total := 0
 var play_harvest_count := 0
 var play_max_size := 0.0
 var play_notable_species: Dictionary = {}
-var spawn_queue := 0
-var spawn_timer := 0.0
 var current_target_count := NORMAL_GERMINATION_COUNT
+var consecutive_jellies := 0
 var forced_golden_done := false
 var view_yaw := 0.0
 var view_pitch := -3.0
@@ -342,6 +342,11 @@ func _start_daily_seed_gift()->void:
 	audio_manager.play_se("daily",.58)
 
 func _advance_intro_story()->void:
+	if tutorial_dialog_kind=="habitat_best_link" and habitat_best_link_dialog_step==0:
+		habitat_best_link_dialog_step=1
+		intro_dialogue_label.text="つまり、君が大きく育てれば育てるほど、ここにいる同じ品種も大きくなるってことだね。"
+		intro_continue_button.text="わかった"
+		return
 	if not tutorial_dialog_kind.is_empty():
 		var finished_kind:=tutorial_dialog_kind;tutorial_dialog_kind="";tutorial_steps[finished_kind+"_dialog"]=true;intro_overlay.visible=false;shop_overlay.visible=false;intro_speaker_label.visible=true;intro_dialogue_label.add_theme_font_size_override("font_size",20);intro_dialogue_label.add_theme_color_override("font_color",UI_BROWN);intro_continue_button.text="つぎへ";_save();_update_play_ui();audio_manager.play_bgm("habitat" if current_mode=="habitat" else "greenhouse")
 		if finished_kind=="play1":_show_tutorial_guide("encyclopedia")
@@ -377,6 +382,18 @@ func _start_habitat_scroll_tutorial()->void:
 func _start_habitat_get_explanation()->void:
 	tutorial_dialog_kind="habitat_get";intro_overlay.visible=true;intro_speaker_label.visible=true;shop_overlay.visible=false;play_overlay.visible=false;play_open_button.visible=false
 	intro_dialogue_label.text="見つけた多肉は図鑑に登録されたよ。\nこれからは、たねからもこの品種が育つようになるよ。";intro_continue_button.text="わかった"
+
+func _start_habitat_best_link_dialog()->void:
+	if bool(tutorial_steps.get("habitat_best_link_dialog",false)):return
+	tutorial_dialog_kind="habitat_best_link";habitat_best_link_dialog_step=0;intro_overlay.visible=true;intro_speaker_label.visible=true;shop_overlay.visible=false;play_overlay.visible=false;play_open_button.visible=false
+	intro_dialogue_label.text="驚いたな。やっぱり間違いないよ。君が温室で育てた多肉の記録が、この原生地にも映ってるんだ。";intro_continue_button.text="つぎへ"
+
+func _habitat_best_link_event_ready()->bool:
+	if bool(tutorial_steps.get("habitat_best_link_dialog",false)) or not pending_habitat_species.is_empty():return false
+	if not bool(tutorial_steps.get("habitat_scroll_dialog",false)):return false
+	for best in bests.values():
+		if float(best)>=HABITAT_BEST_LINK_EVENT_CM:return true
+	return false
 
 func _start_buyback_dialog()->void:
 	if buyback_unlocked or bool(tutorial_steps.get("buyback_dialog",false)):return
@@ -478,7 +495,7 @@ func _change_audio_volume(value:float,is_bgm:bool)->void:
 	audio_settings["bgm_volume" if is_bgm else "se_volume"]=value/100.0;audio_manager.apply_settings(audio_settings);_save()
 
 func _reset_progression_state()->void:
-	coins=1000;bests.clear();discovered.clear();greenhouse_available={"colorata":true};unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;buyback_unlocked=false;tutorial_steps.clear();normal_seed_bags=0;premium_seed_bags=0;old_seed_bags=0;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;opening_species.clear();play_active=false;play_time_remaining=0.0;spawn_queue=0;spawn_timer=0.0;current_target_count=NORMAL_GERMINATION_COUNT;habitat_scroll_tutorial_active=false;tutorial_habitat_item.clear();_apply_saved_unlocks();_clear_greenhouse_plants();_build_habitat_items();_save();_update_currency_ui();_update_play_ui()
+	coins=1000;bests.clear();discovered.clear();greenhouse_available={"colorata":true};unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;buyback_unlocked=false;tutorial_steps.clear();normal_seed_bags=0;premium_seed_bags=0;old_seed_bags=0;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;opening_species.clear();play_active=false;play_time_remaining=0.0;current_target_count=NORMAL_GERMINATION_COUNT;consecutive_jellies=0;habitat_scroll_tutorial_active=false;habitat_best_link_dialog_step=0;tutorial_habitat_item.clear();_apply_saved_unlocks();_clear_greenhouse_plants();_build_habitat_items();_save();_update_currency_ui();_update_play_ui()
 
 func _reset_progression_for_development(button:Button)->void:
 	_reset_progression_state();button.text="リセットしました（再読み込みしてください）"
@@ -519,7 +536,7 @@ func _start_greenhouse_play(seed_type:String)->void:
 	else:
 		if normal_seed_bags<1:return
 		normal_seed_bags-=1;current_target_count=NORMAL_GERMINATION_COUNT
-	active_seed_type=seed_type;play_time_remaining=30.0 if seed_type=="old" else PLAY_DURATION_SECONDS;play_active=true;play_modal_open=false;play_earnings_total=0;play_harvest_count=0;play_max_size=0.0;play_notable_species.clear();spawn_queue=0;spawn_timer=0.0;opening_species.clear();_clear_greenhouse_plants()
+	active_seed_type=seed_type;play_time_remaining=0.0;play_active=true;play_modal_open=false;play_earnings_total=0;play_harvest_count=0;play_max_size=0.0;play_notable_species.clear();consecutive_jellies=0;opening_species.clear();_clear_greenhouse_plants()
 	if result_overlay:result_overlay.visible=false
 	for i in range(current_target_count):spawn_plant()
 	if total_play_count==0 and not bool(tutorial_steps.get("first_harvest_guide",false)):call_deferred("_show_first_harvest_guide_when_ready")
@@ -527,8 +544,8 @@ func _start_greenhouse_play(seed_type:String)->void:
 	_save();_update_play_ui()
 
 func _finish_greenhouse_play()->void:
-	if not play_active:return
-	play_active=false;play_time_remaining=0.0;spawn_queue=0;spawn_timer=0.0;total_play_count+=1
+	if not play_active or not plants.is_empty():return
+	play_active=false;play_time_remaining=0.0;total_play_count+=1
 	if total_play_count==1:discovered["colorata"]=true;encyclopedia_unlocked=true
 	if total_play_count>=3:habitat_unlocked=true
 	if total_play_count==3 and not bool(tutorial_steps.get("habitat_species_queued",false)):
@@ -547,19 +564,19 @@ func _update_play_ui()->void:
 	if not play_overlay:return
 	play_overlay.visible=current_mode=="greenhouse" and not play_active and play_modal_open
 	play_open_button.visible=current_mode=="greenhouse" and intro_story_complete and not play_active and not play_modal_open and (not result_overlay or not result_overlay.visible) and (not shop_overlay or not shop_overlay.visible) and (not encyclopedia_overlay or not encyclopedia_overlay.visible) and (not settings_overlay or not settings_overlay.visible)
-	play_timer_label.visible=current_mode=="greenhouse" and play_active
+	play_timer_label.visible=false
 	for control in external_navigation_controls:control.visible=not play_active
 	for control in encyclopedia_navigation_controls:control.visible=not play_active and encyclopedia_unlocked
 	if mode_button:mode_button.visible=not play_active and habitat_unlocked
-	play_timer_label.text="残り %d秒"%ceili(play_time_remaining)
+	play_timer_label.text=""
 	var held:Array[String]=[]
 	if old_seed_bags>0:held.append("古いたね %d袋"%old_seed_bags)
 	if normal_seed_bags>0:held.append("たね %d袋"%normal_seed_bags)
 	if premium_seed_bags>0 and _premium_seed_unlocked():held.append("プレミアムたね %d袋"%premium_seed_bags)
 	play_bag_summary.text="　".join(held)
-	old_seed_play_button.visible=old_seed_bags>0;old_seed_play_button.text="古いたねをまく　30秒　残り%d袋"%old_seed_bags
-	normal_play_button.visible=normal_seed_bags>0;normal_play_button.text="たねをまく　残り%d袋"%normal_seed_bags;normal_play_button.disabled=normal_seed_bags<1
-	premium_play_button.visible=premium_seed_bags>0 and _premium_seed_unlocked();premium_play_button.text="プレミアムたねをまく　残り%d袋"%premium_seed_bags;premium_play_button.disabled=not _premium_seed_unlocked() or premium_seed_bags<1
+	old_seed_play_button.visible=old_seed_bags>0;old_seed_play_button.text="古いたねをまく　12粒　残り%d袋"%old_seed_bags
+	normal_play_button.visible=normal_seed_bags>0;normal_play_button.text="たねをまく　12粒　残り%d袋"%normal_seed_bags;normal_play_button.disabled=normal_seed_bags<1
+	premium_play_button.visible=premium_seed_bags>0 and _premium_seed_unlocked();premium_play_button.text="プレミアムたねをまく　12粒　残り%d袋"%premium_seed_bags;premium_play_button.disabled=not _premium_seed_unlocked() or premium_seed_bags<1
 
 func _open_shop()->void:
 	play_modal_open=false;_update_shop_ui();shop_message.text="たね袋を1袋ずつ購入できます";play_overlay.visible=false;shop_overlay.visible=true;audio_manager.play_bgm("shop");_update_play_ui()
@@ -663,10 +680,17 @@ func _build_habitat_items()->void:
 
 func _add_habitat_plant(entry:Dictionary,panorama_point:Vector2,is_new:bool)->void:
 	var sprite:=Sprite3D.new();sprite.texture=_species_texture(entry);sprite.billboard=BaseMaterial3D.BILLBOARD_ENABLED;sprite.no_depth_test=true;sprite.texture_filter=BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS;sprite.pixel_size=1.15/maxf(1.0,float(sprite.texture.get_width()));sprite.offset.y=-float(sprite.texture.get_height())*.18;sprite.position=_panorama_point_to_world(panorama_point,HABITAT_ITEM_RADIUS);habitat_items_root.add_child(sprite)
+	if not is_new:sprite.scale=Vector3.ONE*_habitat_best_visual_scale(str(entry.species_id))
 	var item={"node":sprite,"kind":"new_species" if is_new else "found_species","species_id":str(entry.species_id)};habitat_pickups.append(item)
 	if is_new:
 		sprite.modulate=Color(1.18,1.12,.78,1.0)
 		var badge:=Label3D.new();badge.text="NEW!";badge.position.y=.72;badge.font_size=42;badge.outline_size=9;badge.modulate=Color("#ffe26f");sprite.add_child(badge)
+
+func _habitat_best_visual_scale(species_id:String)->float:
+	var best_cm:=float(bests.get(species_id,0.0))
+	if best_cm<=0.0:return 1.0
+	var greenhouse_equivalent:=.18+(best_cm-1.6)*.058
+	return clampf(greenhouse_equivalent,.55,3.25)
 
 func _add_habitat_seed(panorama_point:Vector2)->void:
 	var seed:=MeshInstance3D.new();var mesh:=SphereMesh.new();mesh.radius=.105;mesh.height=.24;mesh.radial_segments=12;mesh.rings=6;seed.mesh=mesh
@@ -831,18 +855,13 @@ func _process(delta:float)->void:
 	_update_greenhouse_pan_follow(delta)
 	_update_habitat_view_follow(delta)
 	_update_habitat_scroll_tutorial()
-	if play_active:
-		play_time_remaining=maxf(0.0,play_time_remaining-delta)
-		if play_time_remaining<=0.0:_finish_greenhouse_play()
-		elif play_timer_label:play_timer_label.text="残り %d秒"%ceili(play_time_remaining)
 	if current_mode=="greenhouse" and play_active:
 		for p in plants:
-			if is_instance_valid(p):p.simulate(delta)
+			if is_instance_valid(p):
+				p.jelly_probability_multiplier=_current_jelly_multiplier()
+				p.simulate(delta)
 	_resolve_crowding(delta)
 	_update_labels()
-	if current_mode=="greenhouse" and play_active and spawn_queue>0:
-		spawn_timer-=delta
-		if spawn_timer<=0: spawn_queue-=1; spawn_plant(); spawn_timer=rng.randf_range(.35,.9)
 
 func _update_greenhouse_pan_follow(delta:float)->void:
 	if current_mode!="greenhouse" or is_equal_approx(greenhouse_pan_x,greenhouse_pan_target_x):return
@@ -866,6 +885,8 @@ func _toggle_mode()->void:
 	_apply_mode()
 	if current_mode=="habitat" and not bool(tutorial_steps.get("habitat_scroll_dialog",false)):
 		call_deferred("_start_habitat_scroll_tutorial")
+	elif current_mode=="habitat" and _habitat_best_link_event_ready():
+		call_deferred("_start_habitat_best_link_dialog")
 	elif leaving_habitat and bool(tutorial_steps.get("habitat_get_dialog",false)) and not buyback_unlocked:
 		call_deferred("_start_buyback_after_greenhouse_frame")
 
@@ -1054,6 +1075,7 @@ func _show_habitat_message(world_position:Vector3,message:String,color:Color)->v
 	var tween:=create_tween().set_parallel();tween.tween_property(label,"position:y",label.position.y-70,.7);tween.tween_property(label,"modulate:a",0.0,.7).set_delay(.25);tween.chain().tween_callback(label.queue_free)
 
 func _on_harvested(p)->void:
+	consecutive_jellies=0
 	var old:=float(bests.get(p.data.species_id,0.0));var is_record:bool=p.diameter_cm>old
 	discovered[p.data.species_id]=true
 	if is_record:bests[p.data.species_id]=p.diameter_cm
@@ -1069,6 +1091,7 @@ func _on_harvested(p)->void:
 	_cleanup_later(p,.68)
 
 func _on_jellied(p)->void:
+	consecutive_jellies=mini(2,consecutive_jellies+1)
 	_show_float(p,"ぷるん…\nジュレ",Color("#e7c9f0"))
 	audio_manager.play_se("jelly",.38)
 	var tw:=create_tween();tw.tween_property(p,"scale",Vector3(p.scale.x*1.05,p.scale.y*.46,p.scale.z*1.05),.28).set_trans(Tween.TRANS_BOUNCE);tw.tween_interval(.25);tw.tween_property(p,"scale",Vector3.ONE*0.01,.38)
@@ -1078,9 +1101,14 @@ func _cleanup_later(p,delay:float)->void:
 	recent_vacated_slots.append(p.original_pos)
 	while recent_vacated_slots.size()>12:recent_vacated_slots.pop_front()
 	plants.erase(p)
-	if play_active:spawn_queue+=1;spawn_timer=rng.randf_range(.35,.85)
+	if play_active and plants.is_empty():call_deferred("_finish_greenhouse_play")
 	await get_tree().create_timer(delay).timeout
 	if is_instance_valid(p):p.label.queue_free();p.queue_free()
+
+func _current_jelly_multiplier()->float:
+	if consecutive_jellies>=2:return 0.0
+	if consecutive_jellies==1:return 0.45
+	return 1.0
 
 func _show_float(p,text:String,color:Color)->void:
 	var l:=Label.new();l.text=text;l.size=Vector2(230,90);l.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;l.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;l.add_theme_font_size_override("font_size",24);l.add_theme_color_override("font_color",color);l.add_theme_color_override("font_outline_color",UI_BROWN);l.add_theme_constant_override("outline_size",7);l.position=camera.unproject_position(p.global_position)-Vector2(115,40);effects_layer.add_child(l)

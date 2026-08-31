@@ -44,6 +44,7 @@ var jelly_ramp_end_seconds := 11.0
 var growth_rhythm_period := 22.0
 var growth_rhythm_phase := 0.0
 var jelly_checks_enabled := true
+var jelly_probability_multiplier := 1.0
 var sway_phase := 0.0
 
 func setup(species: Dictionary, seed_value: int, screen_label: Label, _danger: Label) -> void:
@@ -125,7 +126,7 @@ func simulate(delta: float) -> void:
 	visual_scale = .18 + (diameter_cm - 1.6) * .058
 	_update_visual(delta)
 	if jelly_checks_enabled:
-		var jelly_probability := jelly_probability_for_interval(age - delta, delta, jelly_ramp_end_seconds)
+		var jelly_probability := jelly_probability_for_interval(age - delta, delta, jelly_ramp_end_seconds) * jelly_probability_multiplier
 		if rng.randf() < jelly_probability: jelly()
 
 func _integrated_growth_multiplier(start_time: float, end_time: float) -> float:
