@@ -4,20 +4,21 @@ func _ready()->void:
 	var scene:PackedScene=load("res://main.tscn");var game:Node=scene.instantiate();add_child(game)
 	await get_tree().process_frame
 	await get_tree().process_frame
+	game._reset_progression_state();game.intro_story_complete=true;game.habitat_unlocked=true;game.encyclopedia_unlocked=true;game.buyback_unlocked=true;game.tutorial_steps["habitat_scroll_dialog"]=true;game.tutorial_steps["habitat_get_dialog"]=true;game.tutorial_steps["play1_dialog"]=true;game.intro_overlay.visible=false;game.shop_overlay.visible=false;game._update_play_ui()
 	assert(game.plants.is_empty() and not game.play_active)
 	assert(game.play_open_button.visible and not game.play_overlay.visible)
 	game._open_play_modal();assert(game.play_overlay.visible);game._close_play_modal();assert(not game.play_overlay.visible)
-	game.normal_seed_bags=maxi(3,game.normal_seed_bags);game.selected_seed_bag_count=3;game._update_play_ui();assert(game.play_selection_label.text=="使用：3袋 / プレイ時間：180秒");var bags_before:int=game.normal_seed_bags;game._start_greenhouse_play("normal");assert(game.play_active and game.normal_seed_bags==bags_before-3);assert(game.play_time_remaining==180.0)
+	game.normal_seed_bags=maxi(3,game.normal_seed_bags);game._update_play_ui();var bags_before:int=game.normal_seed_bags;game._start_greenhouse_play("normal");assert(game.play_active and game.normal_seed_bags==bags_before-1);assert(game.play_time_remaining==60.0)
 	for control in game.external_navigation_controls:assert(not control.visible)
 	assert(game.plants.size()==12)
 	assert(game.catalog_species.size()==11)
 	assert(game.harvest_reward_yen(9.9)==0 and game.harvest_reward_yen(10.0)==10 and game.harvest_reward_yen(99.9)==1000 and game.harvest_reward_yen(150.0)==4000)
 	var species_ids:Array=[]
-	for entry in game.species:species_ids.append(str(entry.species_id))
+	for entry in game.catalog_species:species_ids.append(str(entry.species_id))
 	for required in ["laui","golden_laui","colorata","affinis","lutea","shaviana","kannte"]:assert(required in species_ids)
 	var opening_ids:Array=[]
 	for plant in game.plants:opening_ids.append(str(plant.data.species_id))
-	for spawned_id in opening_ids:assert(spawned_id in species_ids)
+	for spawned_id in opening_ids:assert(spawned_id in species_ids and spawned_id=="colorata")
 	for plant in game.plants:
 		plant.jelly_checks_enabled=false
 		assert(plant.growth_rhythm_period >= 16.0 and plant.growth_rhythm_period <= 28.0)
