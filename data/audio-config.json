@@ -2,7 +2,7 @@
   "bgm": {
     "opening": "res://assets/audio/morning-garden-jingle.wav",
     "greenhouse": "res://assets/audio/puku-puku-taniku-main.wav",
-    "habitat": "",
+    "habitat": "res://assets/audio/mexico-habitat.wav",
     "shop": "res://assets/audio/puku-puku-taniku-main.wav"
   },
   "bgm_gain": {
