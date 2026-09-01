@@ -1037,7 +1037,7 @@ func _refresh_encyclopedia_cards()->void:
 		if not found:image.modulate=Color(0.12,0.09,0.08,0.82)
 		content.add_child(image)
 		var name_label:=Label.new();name_label.text=str(entry.get("name_ja","？？？")) if found else "？？？";name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name_label.add_theme_font_size_override("font_size",18);name_label.add_theme_color_override("font_color",UI_BROWN);content.add_child(name_label)
-		var best_label_card:=Label.new();best_label_card.text=("自己ベスト  %.1f cm"%float(bests.get(species_id,0.0))) if found else "未発見";best_label_card.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;best_label_card.add_theme_font_size_override("font_size",14);best_label_card.add_theme_color_override("font_color",Color("#79543a"));content.add_child(best_label_card)
+		var best_label_card:=Label.new();var card_best:=float(bests.get(species_id,0.0));best_label_card.text=(("自己ベスト  %.1f cm"%card_best) if card_best>0.0 else "自己ベスト　ー") if found else "未発見";best_label_card.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;best_label_card.add_theme_font_size_override("font_size",14);best_label_card.add_theme_color_override("font_color",Color("#79543a"));content.add_child(best_label_card)
 		if found:card.pressed.connect(_open_species_detail.bind(entry))
 
 func _species_texture(entry:Dictionary)->Texture2D:
@@ -1157,9 +1157,10 @@ func _open_species_detail(entry:Dictionary)->void:
 	var back:=Button.new();back.text="一覧へ";back.position=Vector2(24,28);back.size=Vector2(105,55);_skin_button(back,Color("#fff0cf"),17);back.pressed.connect(func():encyclopedia_detail_page.visible=false;encyclopedia_list_page.visible=true);encyclopedia_detail_page.add_child(back)
 	var panel:=PanelContainer.new();panel.position=Vector2(28,115);panel.size=Vector2(520,760);panel.add_theme_stylebox_override("panel",_box(Color("#f6e7c5"),Color("#d3a75f"),24,4));encyclopedia_detail_page.add_child(panel)
 	var content:=VBoxContainer.new();content.alignment=BoxContainer.ALIGNMENT_CENTER;content.add_theme_constant_override("separation",18);panel.add_child(content)
-	var image:=TextureRect.new();image.custom_minimum_size=Vector2(450,470);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.texture=_species_texture(entry);content.add_child(image)
+	var image_frame:=MarginContainer.new();image_frame.name="SpeciesImageFrame";image_frame.custom_minimum_size=Vector2(450,470);image_frame.add_theme_constant_override("margin_left",22);image_frame.add_theme_constant_override("margin_top",22);image_frame.add_theme_constant_override("margin_right",22);image_frame.add_theme_constant_override("margin_bottom",22);content.add_child(image_frame)
+	var image:=TextureRect.new();image.name="SpeciesImage";image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.texture=_species_texture(entry);image.mouse_filter=Control.MOUSE_FILTER_IGNORE;image_frame.add_child(image)
 	var name_label:=Label.new();name_label.text=str(entry.get("name_ja",""));name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name_label.add_theme_font_size_override("font_size",31);name_label.add_theme_color_override("font_color",UI_BROWN);content.add_child(name_label)
-	var species_id:=str(entry.get("species_id",""));var best_detail:=Label.new();best_detail.text="自己ベスト  %.1f cm"%float(bests.get(species_id,0.0));best_detail.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;best_detail.add_theme_font_size_override("font_size",23);best_detail.add_theme_color_override("font_color",Color("#98602e"));content.add_child(best_detail)
+	var species_id:=str(entry.get("species_id",""));var best_detail:=Label.new();best_detail.name="SpeciesBest";var best_cm:=float(bests.get(species_id,0.0));best_detail.text="自己ベスト  %.1f cm"%best_cm if best_cm>0.0 else "自己ベスト　ー";best_detail.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;best_detail.add_theme_font_size_override("font_size",23);best_detail.add_theme_color_override("font_color",Color("#98602e"));content.add_child(best_detail)
 
 func _box(bg: Color, border: Color, radius: int, width: int) -> StyleBoxFlat:
 	var s:=StyleBoxFlat.new(); s.bg_color=bg; s.border_color=border
