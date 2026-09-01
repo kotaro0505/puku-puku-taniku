@@ -128,6 +128,7 @@ var shop_message: Label
 var shop_premium_buy_button: Button
 var shop_purchase_controls: Array[Control] = []
 var shop_chatter_bubble: PanelContainer
+var shop_chatter_portrait: TextureRect
 var shop_chatter_label: Label
 var shop_chatter_action_button: Button
 var shop_chatter_decline_button: Button
@@ -438,7 +439,9 @@ func _build_shop(hud:Control)->void:
 	shop_purchase_controls=[purchase_panel,shop_wallet_label,shop_bag_label,normal_buy,shop_premium_buy_button,shop_message]
 	shop_chatter_bubble=PanelContainer.new();shop_chatter_bubble.position=Vector2(88,276);shop_chatter_bubble.size=Vector2(400,108);shop_chatter_bubble.mouse_filter=Control.MOUSE_FILTER_STOP;shop_chatter_bubble.gui_input.connect(_on_shop_chatter_gui_input);shop_chatter_bubble.add_theme_stylebox_override("panel",_box(Color(1.0,.95,.82,.97),Color("#9b6739"),24,3));shop_chatter_bubble.visible=false;shop_overlay.add_child(shop_chatter_bubble)
 	var chatter_content:=VBoxContainer.new();chatter_content.alignment=BoxContainer.ALIGNMENT_CENTER;chatter_content.add_theme_constant_override("separation",9);chatter_content.mouse_filter=Control.MOUSE_FILTER_PASS;shop_chatter_bubble.add_child(chatter_content)
-	shop_chatter_label=Label.new();shop_chatter_label.custom_minimum_size=Vector2(220,64);shop_chatter_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;shop_chatter_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;shop_chatter_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;shop_chatter_label.add_theme_font_size_override("font_size",18);shop_chatter_label.add_theme_color_override("font_color",UI_BROWN);shop_chatter_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;chatter_content.add_child(shop_chatter_label)
+	var chatter_row:=HBoxContainer.new();chatter_row.alignment=BoxContainer.ALIGNMENT_CENTER;chatter_row.add_theme_constant_override("separation",10);chatter_row.mouse_filter=Control.MOUSE_FILTER_PASS;chatter_content.add_child(chatter_row)
+	shop_chatter_portrait=TextureRect.new();shop_chatter_portrait.custom_minimum_size=Vector2(78,78);shop_chatter_portrait.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;shop_chatter_portrait.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;shop_chatter_portrait.mouse_filter=Control.MOUSE_FILTER_IGNORE;chatter_row.add_child(shop_chatter_portrait)
+	shop_chatter_label=Label.new();shop_chatter_label.custom_minimum_size=Vector2(170,64);shop_chatter_label.size_flags_horizontal=Control.SIZE_EXPAND_FILL;shop_chatter_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;shop_chatter_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;shop_chatter_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;shop_chatter_label.add_theme_font_size_override("font_size",18);shop_chatter_label.add_theme_color_override("font_color",UI_BROWN);shop_chatter_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;chatter_row.add_child(shop_chatter_label)
 	var chatter_actions:=HBoxContainer.new();chatter_actions.alignment=BoxContainer.ALIGNMENT_CENTER;chatter_actions.add_theme_constant_override("separation",12);chatter_content.add_child(chatter_actions)
 	shop_chatter_action_button=Button.new();shop_chatter_action_button.text="広告を見て種をもらう";shop_chatter_action_button.custom_minimum_size=Vector2(250,48);_skin_button(shop_chatter_action_button,Color("#d8b56b"),17);shop_chatter_action_button.pressed.connect(_on_shop_chatter_action);shop_chatter_action_button.visible=false;chatter_actions.add_child(shop_chatter_action_button)
 	shop_chatter_decline_button=Button.new();shop_chatter_decline_button.text="いいえ";shop_chatter_decline_button.custom_minimum_size=Vector2(130,48);_skin_button(shop_chatter_decline_button,Color("#ead8b1"),17);shop_chatter_decline_button.pressed.connect(_decline_armadillo_research);shop_chatter_decline_button.visible=false;chatter_actions.add_child(shop_chatter_decline_button)
@@ -454,9 +457,9 @@ func _on_shop_panda_tapped()->void:
 		return
 	_show_shop_chatter(_pick_shop_chatter(),false)
 
-func _show_shop_chatter(message:String,is_rescue:bool,dialog_mode:="normal")->void:
+func _show_shop_chatter(message:String,is_rescue:bool,dialog_mode:="normal",speaker_id:="panda")->void:
 	armadillo_dialog_mode="rescue" if is_rescue else dialog_mode
-	shop_chatter_bubble.modulate=Color.WHITE;shop_chatter_bubble.visible=true;shop_chatter_label.text=message
+	shop_chatter_bubble.modulate=Color.WHITE;shop_chatter_bubble.visible=true;shop_chatter_label.text=message;_set_shop_speaker(str(speaker_id))
 	if is_rescue or dialog_mode in ["research_offer","pinwheel_continue","research_result"]:
 		shop_chatter_bubble.position=Vector2(22,86);shop_chatter_bubble.size=Vector2(420,250)
 	else:
@@ -488,6 +491,10 @@ func _hide_shop_chatter(force:=false)->void:
 	if not shop_chatter_bubble.visible:return
 	if shop_chatter_action_button.visible and not force:return
 	shop_chatter_bubble.visible=false;shop_chatter_bubble.modulate.a=1.0;armadillo_dialog_mode=""
+
+func _set_shop_speaker(speaker_id:String)->void:
+	shop_chatter_portrait.texture=_speaker_portrait_texture(speaker_id)
+	shop_chatter_portrait.visible=shop_chatter_portrait.texture!=null
 
 func _pick_shop_chatter()->String:
 	var date:=Time.get_date_dict_from_system();var month:=int(date.get("month",1));var day:=int(date.get("day",1));var japan:=_is_japan_region();var new_year:="あけましておめでとう！今年もよろしくね！"
@@ -567,10 +574,10 @@ func _position_tutorial_dialog(avoid:Rect2)->void:
 	tutorial_dialog_panel.position=center if Rect2(bottom,tutorial_dialog_panel.size).intersects(avoid) else bottom
 
 func _start_intro_story()->void:
-	intro_is_daily_gift=false;tutorial_dialog_kind="";intro_story_step=0;current_mode="greenhouse";_apply_mode();_set_shop_purchase_visible(false);shop_overlay.visible=true;intro_overlay.visible=true;intro_panda_portrait.visible=false;_position_intro_dialog();intro_speaker_label.visible=true;play_overlay.visible=false;play_open_button.visible=false;audio_manager.play_bgm("shop");_advance_intro_story()
+	intro_is_daily_gift=false;tutorial_dialog_kind="";intro_story_step=0;current_mode="greenhouse";_apply_mode();_set_shop_purchase_visible(false);shop_overlay.visible=true;intro_overlay.visible=true;_set_intro_speaker("panda");_position_intro_dialog();intro_speaker_label.visible=true;play_overlay.visible=false;play_open_button.visible=false;audio_manager.play_bgm("shop");_advance_intro_story()
 
 func _start_daily_seed_gift()->void:
-	intro_is_daily_gift=true;current_mode="greenhouse";_apply_mode();_set_shop_purchase_visible(false);shop_overlay.visible=true;intro_overlay.visible=true;intro_panda_portrait.visible=false;_position_intro_dialog();intro_speaker_label.visible=true;play_overlay.visible=false;play_open_button.visible=false;audio_manager.play_bgm("shop")
+	intro_is_daily_gift=true;current_mode="greenhouse";_apply_mode();_set_shop_purchase_visible(false);shop_overlay.visible=true;intro_overlay.visible=true;_set_intro_speaker("panda");_position_intro_dialog();intro_speaker_label.visible=true;play_overlay.visible=false;play_open_button.visible=false;audio_manager.play_bgm("shop")
 	intro_dialogue_label.text="今日も来てくれてありがとう。\nたね袋 ×1 GET"
 	intro_dialogue_label.add_theme_font_size_override("font_size",25);intro_dialogue_label.add_theme_color_override("font_color",Color("#b66d20"));intro_continue_button.text="温室へ"
 	normal_seed_bags+=1;login_bonus_date=Time.get_date_string_from_system();_save();_show_intro_gift_effect();_update_play_ui()
@@ -597,7 +604,7 @@ func _advance_intro_story()->void:
 			intro_speaker_label.visible=true
 			intro_dialogue_label.text="こんにちは。売れ残った古いたねなんだけど…何のたねだったかな…。あげるからまいてみてよ！"
 		2:
-			intro_speaker_label.visible=false
+			intro_speaker_label.visible=false;_set_intro_speaker("")
 			intro_dialogue_label.text="古いたね 3袋 GET"
 			intro_dialogue_label.add_theme_font_size_override("font_size",29);intro_dialogue_label.add_theme_color_override("font_color",Color("#b66d20"));intro_continue_button.text="温室へ"
 			_show_intro_gift_effect()
@@ -605,22 +612,22 @@ func _advance_intro_story()->void:
 			intro_story_complete=true;old_seed_bags=3;login_bonus_date=Time.get_date_string_from_system();intro_overlay.visible=false;shop_overlay.visible=false;intro_speaker_label.visible=true;intro_dialogue_label.add_theme_font_size_override("font_size",20);intro_dialogue_label.add_theme_color_override("font_color",UI_BROWN);intro_continue_button.text="つぎへ";_save();_update_play_ui();audio_manager.play_bgm("greenhouse");_show_tutorial_guide("play_open")
 
 func _start_post_play_dialog(kind:String)->void:
-	tutorial_dialog_kind=kind;_set_shop_purchase_visible(false);shop_overlay.visible=true;intro_overlay.visible=true;intro_panda_portrait.visible=false;_position_intro_dialog();intro_speaker_label.visible=true;play_overlay.visible=false;play_open_button.visible=false;audio_manager.play_bgm("shop")
+	tutorial_dialog_kind=kind;_set_shop_purchase_visible(false);shop_overlay.visible=true;intro_overlay.visible=true;_set_intro_speaker("panda");_position_intro_dialog();intro_speaker_label.visible=true;play_overlay.visible=false;play_open_button.visible=false;audio_manager.play_bgm("shop")
 	if kind=="play1":intro_dialogue_label.text="育ったのはコロラータだったんだね！\n図鑑に登録しておいたよ。見てみよう。";intro_continue_button.text="図鑑を見る"
 	elif kind=="play2":intro_dialogue_label.text="センスいいね！そうだ、今度一緒に多肉の原生地へ行こうよ。\n準備してくるからもう少し待ってね。";intro_continue_button.text="温室へ"
 	else:intro_dialogue_label.text="準備できたよ！多肉の原生地へ行けるようになったよ。\n原生地を見に行ってみよう。";intro_continue_button.text="原生地へ"
 
 func _start_habitat_scroll_tutorial()->void:
-	tutorial_dialog_kind="habitat_scroll";intro_overlay.visible=true;intro_panda_portrait.visible=true;_position_intro_dialog();intro_speaker_label.visible=true;shop_overlay.visible=false;play_overlay.visible=false;play_open_button.visible=false
+	tutorial_dialog_kind="habitat_scroll";intro_overlay.visible=true;_set_intro_speaker("panda");_position_intro_dialog();intro_speaker_label.visible=true;shop_overlay.visible=false;play_overlay.visible=false;play_open_button.visible=false
 	intro_dialogue_label.text="指で画面をゆっくり左右に動かすと、原生地を見回せるよ。\n野生の多肉を探してみよう。";intro_continue_button.text="探してみる"
 
 func _start_habitat_get_explanation()->void:
-	tutorial_dialog_kind="habitat_get";intro_overlay.visible=true;intro_panda_portrait.visible=true;_position_intro_dialog();intro_speaker_label.visible=true;shop_overlay.visible=false;play_overlay.visible=false;play_open_button.visible=false
+	tutorial_dialog_kind="habitat_get";intro_overlay.visible=true;_set_intro_speaker("panda");_position_intro_dialog();intro_speaker_label.visible=true;shop_overlay.visible=false;play_overlay.visible=false;play_open_button.visible=false
 	intro_dialogue_label.text="見つけた多肉は図鑑に登録されたよ。\nこれからは、たねからもこの品種が育つようになるよ。";intro_continue_button.text="わかった"
 
 func _start_habitat_best_link_dialog()->void:
 	if bool(tutorial_steps.get("habitat_best_link_dialog",false)):return
-	tutorial_dialog_kind="habitat_best_link";habitat_best_link_dialog_step=0;intro_overlay.visible=true;intro_panda_portrait.visible=true;_position_intro_dialog();intro_speaker_label.visible=true;shop_overlay.visible=false;play_overlay.visible=false;play_open_button.visible=false
+	tutorial_dialog_kind="habitat_best_link";habitat_best_link_dialog_step=0;intro_overlay.visible=true;_set_intro_speaker("panda");_position_intro_dialog();intro_speaker_label.visible=true;shop_overlay.visible=false;play_overlay.visible=false;play_open_button.visible=false
 	intro_dialogue_label.text="驚いたな。やっぱり間違いないよ。君が温室で育てた多肉の記録が、この原生地にも映ってるんだ。";intro_continue_button.text="つぎへ"
 
 func _habitat_best_link_event_ready()->bool:
@@ -632,7 +639,7 @@ func _habitat_best_link_event_ready()->bool:
 
 func _start_buyback_dialog()->void:
 	if buyback_unlocked or bool(tutorial_steps.get("buyback_dialog",false)):return
-	tutorial_dialog_kind="buyback";_set_shop_purchase_visible(false);shop_overlay.visible=true;intro_overlay.visible=true;intro_panda_portrait.visible=false;_position_intro_dialog();intro_speaker_label.visible=true;play_overlay.visible=false;play_open_button.visible=false;audio_manager.play_bgm("shop")
+	tutorial_dialog_kind="buyback";_set_shop_purchase_visible(false);shop_overlay.visible=true;intro_overlay.visible=true;_set_intro_speaker("panda");_position_intro_dialog();intro_speaker_label.visible=true;play_overlay.visible=false;play_open_button.visible=false;audio_manager.play_bgm("shop")
 	intro_dialogue_label.text="育てた多肉、これからはうちで買い取るよ！\n大きく育てた株ほど高く買い取るからね。";intro_continue_button.text="わかった"
 
 func _start_buyback_after_greenhouse_frame()->void:
@@ -890,18 +897,18 @@ func _on_armadillo_tapped()->void:
 	if not armadillo_present:return
 	if not _hidden_species_owned(HIDDEN_PINWHEEL_ID):
 		_grant_hidden_species(HIDDEN_PINWHEEL_ID)
-		if mystery_seed_count>0:_show_shop_chatter("アルマジロ君が、ピンウィールを1株わけてくれたよ！\nまだ話したいことがあるみたい。",false,"pinwheel_continue")
-		else:_show_shop_chatter("アルマジロ君が、ピンウィールを1株わけてくれたよ！",false)
+		if mystery_seed_count>0:_show_shop_chatter("アルマジロ君が、ピンウィールを1株わけてくれたよ！\nまだ話したいことがあるみたい。",false,"pinwheel_continue","armadillo")
+		else:_show_shop_chatter("アルマジロ君が、ピンウィールを1株わけてくれたよ！",false,"normal","armadillo")
 	elif mystery_seed_count>0:
 		_start_armadillo_research()
 	else:
 		var lines:=["また会えたね。ゆっくりしていって！","今日の多肉も元気そうだね。","土の匂いって落ち着くよね。"]
-		_show_shop_chatter(lines[rng.randi_range(0,lines.size()-1)],false)
+		_show_shop_chatter(lines[rng.randi_range(0,lines.size()-1)],false,"normal","armadillo")
 
 func _start_armadillo_research()->void:
 	if mystery_seed_count<=0:return
 	var intro:="おや？ そのたね……。\nもしかして、原生地で拾ったのかい？\nじつはぼく、この“謎のたね”を研究してるんだ。\nまだ、何の種なのかはわからないんだけどね…\nよかったら、そのたねを研究させてもらえないかな？" if not armadillo_research_intro_seen else "謎のたねを持ってきてくれたんだね。\n研究のために、まとめて預かってもいいかい？"
-	_show_shop_chatter(intro,false,"research_offer")
+	_show_shop_chatter(intro,false,"research_offer","armadillo")
 
 func _decline_armadillo_research()->void:
 	armadillo_research_intro_seen=true;_save();_hide_shop_chatter(true)
@@ -914,7 +921,7 @@ func _accept_armadillo_research()->void:
 	_show_mystery_seed_transfer(amount)
 	var message:=_armadillo_research_message(armadillo_research_total,amount)
 	if not reward_messages.is_empty():message+="\n\n"+"\n".join(reward_messages)
-	_save();_update_shop_ui();_update_play_ui();_update_habitat_ui();_show_shop_chatter(message,false,"research_result")
+	_save();_update_shop_ui();_update_play_ui();_update_habitat_ui();_show_shop_chatter(message,false,"research_result","armadillo")
 
 func _armadillo_research_message(total:int,amount:int)->String:
 	if total==18:return "聞いてよ！\nやっと、たねが発芽したんだ！\n大きくなるのをお楽しみに！"
@@ -1174,6 +1181,21 @@ func _panda_portrait_texture()->Texture2D:
 	var source:=load("res://assets/panda-clerk.png") as Texture2D
 	var portrait:=AtlasTexture.new();portrait.atlas=source;portrait.region=Rect2(0.0,0.0,source.get_width(),source.get_height()*.70)
 	return portrait
+
+func _armadillo_portrait_texture()->Texture2D:
+	var source:=load("res://assets/shop-background-armadillo.jpg") as Texture2D
+	var portrait:=AtlasTexture.new();portrait.atlas=source;portrait.region=Rect2(55.0,720.0,245.0,300.0)
+	return portrait
+
+func _speaker_portrait_texture(speaker_id:String)->Texture2D:
+	match speaker_id:
+		"panda":return _panda_portrait_texture()
+		"armadillo":return _armadillo_portrait_texture()
+		_:return null
+
+func _set_intro_speaker(speaker_id:String)->void:
+	intro_panda_portrait.texture=_speaker_portrait_texture(speaker_id)
+	intro_panda_portrait.visible=intro_panda_portrait.texture!=null
 
 func _skin_button(b:Button,bg:Color,font_size:int)->void:
 	b.add_theme_font_size_override("font_size",font_size); b.add_theme_color_override("font_color",UI_BROWN if bg.get_luminance()>.55 else Color.WHITE); b.add_theme_color_override("font_hover_color",UI_BROWN); b.add_theme_stylebox_override("normal",_box(bg,bg.lightened(.22),20,3)); b.add_theme_stylebox_override("hover",_box(bg.lightened(.08),Color.WHITE,20,3)); b.add_theme_stylebox_override("pressed",_box(bg.darkened(.08),bg.lightened(.2),20,3))
