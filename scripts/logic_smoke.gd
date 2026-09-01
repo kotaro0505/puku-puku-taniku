@@ -6,13 +6,14 @@ func _ready()->void:
 	await get_tree().process_frame
 	game._reset_progression_state();game.intro_story_complete=true;game.habitat_unlocked=true;game.encyclopedia_unlocked=true;game.buyback_unlocked=true;game.tutorial_steps["habitat_scroll_dialog"]=true;game.tutorial_steps["habitat_get_dialog"]=true;game.tutorial_steps["play1_dialog"]=true;game.intro_overlay.visible=false;game.shop_overlay.visible=false;game._update_play_ui()
 	assert(game.mode_button.position==Vector2(398,198) and game.mode_button.size==Vector2(153,55));assert(game.shop_button.position==Vector2(398,262) and game.shop_button.size==Vector2(153,55));assert(game.result_confetti_layer.get_parent()==game.result_overlay)
-	game._toggle_mode();assert(game.current_mode=="habitat" and not game.shop_button.visible);game._toggle_mode();assert(game.current_mode=="greenhouse" and game.shop_button.visible)
+	game._toggle_mode();assert(game.current_mode=="habitat" and not game.shop_button.visible and not game.habitat_status_label.visible and game.habitat_status_label.text.is_empty());game._start_habitat_scroll_tutorial();assert(game.intro_panda_portrait.visible);game.intro_overlay.visible=false;game.tutorial_dialog_kind="";game._toggle_mode();assert(game.current_mode=="greenhouse" and game.shop_button.visible);game._start_post_play_dialog("play2");assert(not game.intro_panda_portrait.visible);game.intro_overlay.visible=false;game.shop_overlay.visible=false;game.tutorial_dialog_kind="";game._update_play_ui()
 	assert(game.plants.is_empty() and not game.play_active)
 	assert(game.play_open_button.visible and not game.play_overlay.visible)
 	game._open_play_modal();assert(game.play_overlay.visible);game._close_play_modal();assert(not game.play_overlay.visible)
-	game.normal_seed_bags=maxi(3,game.normal_seed_bags);game._update_play_ui();var bags_before:int=game.normal_seed_bags;game._start_greenhouse_play("normal");assert(game.play_active and game.normal_seed_bags==bags_before-1);assert(game.play_time_remaining==0.0 and game.play_timer_label.visible)
+	game.normal_seed_bags=maxi(3,game.normal_seed_bags);game._update_play_ui();var bags_before:int=game.normal_seed_bags;game._start_greenhouse_play("normal");assert(game.play_active and game.normal_seed_bags==bags_before-1);assert(game.play_time_remaining==0.0 and game.seed_bag_panel.visible and game.play_timer_label.visible)
 	for control in game.external_navigation_controls:assert(not control.visible)
-	assert(game.plants.size()>=9 and game.plants.size()<=12);assert(game.play_seeds_remaining==24-game.plants.size());assert(game.play_timer_label.text=="たね  残り%d粒"%game.play_seeds_remaining)
+	assert(game.plants.is_empty() and game.play_seed_animations_pending>=9 and game.play_seed_animations_pending<=12);assert(game.play_seeds_remaining==24-game.play_seed_animations_pending);assert(game.play_timer_label.text=="● たね袋 ●\n残り %d粒"%game.play_seeds_remaining);await get_tree().create_timer(.45).timeout
+	assert(game.plants.size()>=9 and game.plants.size()<=12 and game.play_seed_animations_pending==0);assert(game.play_seeds_remaining==24-game.plants.size())
 	assert(game.catalog_species.size()==11)
 	assert(game.harvest_reward_yen(9.9)==0 and game.harvest_reward_yen(10.0)==10 and game.harvest_reward_yen(99.9)==1000 and game.harvest_reward_yen(150.0)==4000)
 	var species_ids:Array=[]
