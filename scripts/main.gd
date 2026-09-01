@@ -4,9 +4,11 @@ signal rescue_reward_ad_requested(reward_context:String)
 
 const SucculentClass = preload("res://scripts/succulent.gd")
 const AudioManagerClass = preload("res://scripts/audio_manager.gd")
-const PROGRESSION_VERSION := 5
+const PROGRESSION_VERSION := 6
 const NORMAL_GERMINATION_COUNT := 24
+const VOLUME_GERMINATION_COUNT := 36
 const PREMIUM_GERMINATION_COUNT := 24
+const MYSTERY_GERMINATION_COUNT := 5
 const OLD_SEED_GERMINATION_COUNT := 7
 const PLAY_INITIAL_MIN_PLANTS := 9
 const PLAY_INITIAL_MAX_PLANTS := 12
@@ -24,7 +26,15 @@ const RAIN_INITIAL_PLANT_COUNT := 12
 const RAIN_MAX_ACTIVE_PLANTS := 22
 const RAIN_TRIGGER_CHANCES := [0.05,0.07,0.10,0.15,0.25,0.40,0.98]
 const NORMAL_SEED_BAG_PRICE_YEN := 500
-const PREMIUM_SEED_BAG_PRICE_YEN := 800
+const VOLUME_SEED_BAG_PRICE_YEN := 700
+const PREMIUM_SEED_BAG_PRICE_YEN := 1500
+const MYSTERY_SEED_BAG_PRICE_YEN := 1500
+const SEED_PACK_CONFIG := {
+	"normal":{"count":24,"rare":0.10,"super":0.05,"new":0.00001},
+	"volume":{"count":36,"rare":0.12,"super":0.07,"new":0.00001},
+	"premium":{"count":24,"rare":0.30,"super":0.10,"new":0.01},
+	"mystery":{"count":5,"rare":0.0,"super":0.0,"new":0.0}
+}
 const RESCUE_REWARD_SEED_TYPE := "normal"
 const RESCUE_REWARD_SEED_BAGS := 1
 const REWARDED_AD_DEVELOPMENT_STUB_ENABLED := true
@@ -85,6 +95,7 @@ var completed_unlock_conditions: Dictionary = {}
 var unlock_rules: Array = []
 var total_play_count := 0
 var normal_play_count := 0
+var formal_play_count := 0
 var shop_visit_count := 0
 var hidden_species_acquired: Dictionary = {}
 var tovar_next_play := TOVAR_FIRST_PLAY
@@ -116,7 +127,9 @@ var play_open_button: Button
 var play_overlay: Control
 var play_bag_summary: Label
 var normal_play_button: Button
+var volume_play_button: Button
 var premium_play_button: Button
+var mystery_play_button: Button
 var old_seed_play_button: Button
 var shop_overlay: Control
 var shop_background: TextureRect
@@ -131,6 +144,8 @@ var shop_wallet_label: Label
 var shop_bag_label: Label
 var shop_message: Label
 var shop_premium_buy_button: Button
+var shop_volume_buy_button: Button
+var shop_mystery_buy_button: Button
 var shop_purchase_controls: Array[Control] = []
 var shop_chatter_bubble: PanelContainer
 var shop_chatter_portrait: TextureRect
@@ -186,9 +201,18 @@ var greenhouse_available: Dictionary = {"colorata":true}
 var best_spawn_unlocks_dirty := false
 var habitat_seed_date := ""
 var habitat_seeds_collected := 0
+var habitat_mystery_seeds_pending := 0
 var normal_seed_bags := 0
+var volume_seed_bags := 0
 var premium_seed_bags := 0
+var mystery_seed_bags := 0
 var old_seed_bags := 0
+var volume_seed_unlocked := false
+var volume_seed_intro_seen := false
+var premium_seed_unlocked := false
+var mystery_seed_pack_unlocked := false
+var result_new_species_queue: Array[String] = []
+var shop_new_species_queue: Array[String] = []
 var login_bonus_date := ""
 var play_active := false
 var play_time_remaining := 0.0
@@ -271,10 +295,13 @@ func _load_save() -> void:
 			rain_bag_count=maxi(0,int(value.get("rain_bag_count",0)));rain_event_pending=bool(value.get("rain_event_pending",false));rain_bonus_in_progress=bool(value.get("rain_bonus_in_progress",false));rain_time_remaining=clampf(float(value.get("rain_time_remaining",RAIN_BONUS_DURATION_SECONDS)),0.0,RAIN_BONUS_DURATION_SECONDS)
 			rain_intro_normal_bags=maxi(0,int(value.get("rain_intro_normal_bags",0)));rain_draws_unlocked=bool(value.get("rain_draws_unlocked",total_play_count>3))
 			normal_play_count=maxi(0,int(value.get("normal_play_count",0)));shop_visit_count=maxi(0,int(value.get("shop_visit_count",0)));hidden_species_acquired=value.get("hidden_species_acquired",{});tovar_next_play=maxi(TOVAR_FIRST_PLAY,int(value.get("tovar_next_play",TOVAR_FIRST_PLAY)));tovar_attempt_count=maxi(0,int(value.get("tovar_attempt_count",0)));tovar_event_active=false;tovar_harvested_this_play=false
+			formal_play_count=maxi(0,int(value.get("formal_play_count",normal_play_count)))
+			volume_seed_unlocked=bool(value.get("volume_seed_unlocked",formal_play_count>=7));volume_seed_intro_seen=bool(value.get("volume_seed_intro_seen",false));premium_seed_unlocked=bool(value.get("premium_seed_unlocked",formal_play_count>=13 or int(value.get("premium_seed_bags",0))>0));mystery_seed_pack_unlocked=bool(value.get("mystery_seed_pack_unlocked",false))
 			mystery_seed_count=maxi(0,int(value.get("mystery_seed_count",0)));armadillo_research_total=maxi(0,int(value.get("armadillo_research_total",0)));armadillo_research_rewards=value.get("armadillo_research_rewards",{});armadillo_research_intro_seen=bool(value.get("armadillo_research_intro_seen",armadillo_research_total>0))
+			habitat_mystery_seeds_pending=maxi(0,int(value.get("habitat_mystery_seeds_pending",0)))
 			if not rain_event_pending:rain_bonus_in_progress=false;rain_time_remaining=0.0
 			if value.has("normal_seed_bags"):
-				normal_seed_bags=int(value.get("normal_seed_bags",0));premium_seed_bags=int(value.get("premium_seed_bags",0));login_bonus_date=str(value.get("login_bonus_date",""))
+				normal_seed_bags=int(value.get("normal_seed_bags",0));volume_seed_bags=int(value.get("volume_seed_bags",0));premium_seed_bags=int(value.get("premium_seed_bags",0));mystery_seed_bags=int(value.get("mystery_seed_bags",0));login_bonus_date=str(value.get("login_bonus_date",""))
 			else:
 				normal_seed_bags=0;premium_seed_bags=0;login_bonus_date=""
 			# Legacy saves used unlocked_species for several meanings and could
@@ -292,11 +319,12 @@ func _load_save() -> void:
 			for hidden_id in [HIDDEN_PINWHEEL_ID,HIDDEN_TOVAR_ID,HIDDEN_BUSTAMANTE_ID]:
 				if bool(discovered.get(hidden_id,false)):hidden_species_acquired[hidden_id]=true
 			best_spawn_unlocks_dirty=_evaluate_best_spawn_unlocks(false)
+			_refresh_seed_pack_unlocks()
 
 func _save() -> void:
 	var f := FileAccess.open("user://records.json",FileAccess.WRITE)
 	if audio_manager:audio_settings=audio_manager.settings_dictionary()
-	f.store_string(JSON.stringify({"progression_version":PROGRESSION_VERSION,"bests":bests,"discovered":discovered,"unlocked_species":unlocked_species,"greenhouse_available":greenhouse_available,"completed_unlock_conditions":completed_unlock_conditions,"pending_habitat_species":pending_habitat_species,"total_play_count":total_play_count,"normal_play_count":normal_play_count,"shop_visit_count":shop_visit_count,"hidden_species_acquired":hidden_species_acquired,"tovar_next_play":tovar_next_play,"tovar_attempt_count":tovar_attempt_count,"intro_story_complete":intro_story_complete,"encyclopedia_unlocked":encyclopedia_unlocked,"habitat_unlocked":habitat_unlocked,"tutorial_steps":tutorial_steps,"old_seed_bags":old_seed_bags,"buyback_unlocked":buyback_unlocked,"habitat_seed_date":habitat_seed_date,"habitat_seeds_collected":habitat_seeds_collected,"mystery_seed_count":mystery_seed_count,"armadillo_research_total":armadillo_research_total,"armadillo_research_rewards":armadillo_research_rewards,"armadillo_research_intro_seen":armadillo_research_intro_seen,"normal_seed_bags":normal_seed_bags,"premium_seed_bags":premium_seed_bags,"login_bonus_date":login_bonus_date,"audio_settings":audio_settings,"rain_bag_count":rain_bag_count,"rain_event_pending":rain_event_pending,"rain_bonus_in_progress":rain_bonus_in_progress,"rain_time_remaining":rain_time_remaining,"rain_intro_normal_bags":rain_intro_normal_bags,"rain_draws_unlocked":rain_draws_unlocked,"yen":coins}))
+	f.store_string(JSON.stringify({"progression_version":PROGRESSION_VERSION,"bests":bests,"discovered":discovered,"unlocked_species":unlocked_species,"greenhouse_available":greenhouse_available,"completed_unlock_conditions":completed_unlock_conditions,"pending_habitat_species":pending_habitat_species,"total_play_count":total_play_count,"normal_play_count":normal_play_count,"formal_play_count":formal_play_count,"shop_visit_count":shop_visit_count,"hidden_species_acquired":hidden_species_acquired,"tovar_next_play":tovar_next_play,"tovar_attempt_count":tovar_attempt_count,"intro_story_complete":intro_story_complete,"encyclopedia_unlocked":encyclopedia_unlocked,"habitat_unlocked":habitat_unlocked,"tutorial_steps":tutorial_steps,"old_seed_bags":old_seed_bags,"buyback_unlocked":buyback_unlocked,"habitat_seed_date":habitat_seed_date,"habitat_seeds_collected":habitat_seeds_collected,"habitat_mystery_seeds_pending":habitat_mystery_seeds_pending,"mystery_seed_count":mystery_seed_count,"armadillo_research_total":armadillo_research_total,"armadillo_research_rewards":armadillo_research_rewards,"armadillo_research_intro_seen":armadillo_research_intro_seen,"normal_seed_bags":normal_seed_bags,"volume_seed_bags":volume_seed_bags,"premium_seed_bags":premium_seed_bags,"mystery_seed_bags":mystery_seed_bags,"volume_seed_unlocked":volume_seed_unlocked,"volume_seed_intro_seen":volume_seed_intro_seen,"premium_seed_unlocked":premium_seed_unlocked,"mystery_seed_pack_unlocked":mystery_seed_pack_unlocked,"login_bonus_date":login_bonus_date,"audio_settings":audio_settings,"rain_bag_count":rain_bag_count,"rain_event_pending":rain_event_pending,"rain_bonus_in_progress":rain_bonus_in_progress,"rain_time_remaining":rain_time_remaining,"rain_intro_normal_bags":rain_intro_normal_bags,"rain_draws_unlocked":rain_draws_unlocked,"yen":coins}))
 
 func _daily_seed_gift_due()->bool:
 	if not intro_story_complete:return false
@@ -443,13 +471,15 @@ func _finish_opening()->void:
 func _build_play_overlay(hud:Control)->void:
 	play_overlay=Control.new();play_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);play_overlay.mouse_filter=Control.MOUSE_FILTER_IGNORE;hud.add_child(play_overlay)
 	var shade:=ColorRect.new();shade.color=Color(0.12,0.07,0.04,.42);shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);shade.mouse_filter=Control.MOUSE_FILTER_STOP;play_overlay.add_child(shade)
-	var panel:=PanelContainer.new();panel.position=Vector2(68,250);panel.size=Vector2(440,500);panel.mouse_filter=Control.MOUSE_FILTER_STOP;panel.add_theme_stylebox_override("panel",_box(Color("#f7e8c7"),Color("#9b642f"),26,4));play_overlay.add_child(panel)
+	var panel:=PanelContainer.new();panel.position=Vector2(68,205);panel.size=Vector2(440,590);panel.mouse_filter=Control.MOUSE_FILTER_STOP;panel.add_theme_stylebox_override("panel",_box(Color("#f7e8c7"),Color("#9b642f"),26,4));play_overlay.add_child(panel)
 	var content:=VBoxContainer.new();content.alignment=BoxContainer.ALIGNMENT_CENTER;content.add_theme_constant_override("separation",13);panel.add_child(content)
 	var title:=Label.new();title.text="どのたねをまく？";title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;title.add_theme_font_size_override("font_size",24);title.add_theme_color_override("font_color",UI_BROWN);content.add_child(title)
 	play_bag_summary=Label.new();play_bag_summary.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;play_bag_summary.add_theme_font_size_override("font_size",18);play_bag_summary.add_theme_color_override("font_color",Color("#70472d"));content.add_child(play_bag_summary)
 	old_seed_play_button=Button.new();old_seed_play_button.custom_minimum_size=Vector2(350,68);_skin_button(old_seed_play_button,Color("#bba67d"),19);old_seed_play_button.pressed.connect(_start_greenhouse_play.bind("old"));content.add_child(old_seed_play_button)
 	normal_play_button=Button.new();normal_play_button.custom_minimum_size=Vector2(350,76);_skin_button(normal_play_button,Color("#d9b56a"),20);normal_play_button.pressed.connect(_start_greenhouse_play.bind("normal"));content.add_child(normal_play_button)
+	volume_play_button=Button.new();volume_play_button.custom_minimum_size=Vector2(350,68);_skin_button(volume_play_button,Color("#c99d57"),18);volume_play_button.pressed.connect(_start_greenhouse_play.bind("volume"));content.add_child(volume_play_button)
 	premium_play_button=Button.new();premium_play_button.custom_minimum_size=Vector2(350,76);_skin_button(premium_play_button,Color("#d18a55"),20);premium_play_button.pressed.connect(_start_greenhouse_play.bind("premium"));content.add_child(premium_play_button)
+	mystery_play_button=Button.new();mystery_play_button.custom_minimum_size=Vector2(350,68);_skin_button(mystery_play_button,Color("#8d755f"),18);mystery_play_button.pressed.connect(_start_greenhouse_play.bind("mystery"));content.add_child(mystery_play_button)
 	var close:=Button.new();close.text="閉じる";close.custom_minimum_size=Vector2(250,44);_skin_button(close,Color("#ead8b1"),16);close.pressed.connect(_close_play_modal);content.add_child(close)
 
 func _build_shop(hud:Control)->void:
@@ -462,10 +492,12 @@ func _build_shop(hud:Control)->void:
 	var purchase_panel:=PanelContainer.new();purchase_panel.position=Vector2(28,836);purchase_panel.size=Vector2(520,164);purchase_panel.add_theme_stylebox_override("panel",_box(Color(0.22,0.12,0.07,.93),Color("#d7aa64"),20,3));shop_overlay.add_child(purchase_panel)
 	shop_wallet_label=Label.new();shop_wallet_label.position=Vector2(50,842);shop_wallet_label.size=Vector2(476,28);shop_wallet_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;shop_wallet_label.add_theme_font_size_override("font_size",18);shop_wallet_label.add_theme_color_override("font_color",Color("#ffd778"));shop_overlay.add_child(shop_wallet_label)
 	shop_bag_label=Label.new();shop_bag_label.position=Vector2(50,869);shop_bag_label.size=Vector2(476,25);shop_bag_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;shop_bag_label.add_theme_font_size_override("font_size",14);shop_bag_label.add_theme_color_override("font_color",UI_CREAM);shop_overlay.add_child(shop_bag_label)
-	var normal_buy:=Button.new();normal_buy.text="たね 1袋 500円";normal_buy.position=Vector2(48,899);normal_buy.size=Vector2(232,55);_skin_button(normal_buy,Color("#d8b56b"),17);normal_buy.pressed.connect(_buy_seed_bag.bind("normal"));shop_overlay.add_child(normal_buy)
-	shop_premium_buy_button=Button.new();shop_premium_buy_button.position=Vector2(296,899);shop_premium_buy_button.size=Vector2(232,55);_skin_button(shop_premium_buy_button,Color("#d18a55"),15);shop_premium_buy_button.pressed.connect(_buy_seed_bag.bind("premium"));shop_overlay.add_child(shop_premium_buy_button)
-	shop_message=Label.new();shop_message.position=Vector2(48,960);shop_message.size=Vector2(480,32);shop_message.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;shop_message.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;shop_message.add_theme_font_size_override("font_size",13);shop_message.add_theme_color_override("font_color",UI_CREAM);shop_overlay.add_child(shop_message)
-	shop_purchase_controls=[purchase_panel,shop_wallet_label,shop_bag_label,normal_buy,shop_premium_buy_button,shop_message]
+	var normal_buy:=Button.new();normal_buy.position=Vector2(48,897);normal_buy.size=Vector2(232,43);_skin_button(normal_buy,Color("#d8b56b"),14);normal_buy.pressed.connect(_buy_seed_bag.bind("normal"));shop_overlay.add_child(normal_buy)
+	shop_volume_buy_button=Button.new();shop_volume_buy_button.position=Vector2(296,897);shop_volume_buy_button.size=Vector2(232,43);_skin_button(shop_volume_buy_button,Color("#c99d57"),13);shop_volume_buy_button.pressed.connect(_buy_seed_bag.bind("volume"));shop_overlay.add_child(shop_volume_buy_button)
+	shop_premium_buy_button=Button.new();shop_premium_buy_button.position=Vector2(48,945);shop_premium_buy_button.size=Vector2(232,43);_skin_button(shop_premium_buy_button,Color("#d18a55"),13);shop_premium_buy_button.pressed.connect(_buy_seed_bag.bind("premium"));shop_overlay.add_child(shop_premium_buy_button)
+	shop_mystery_buy_button=Button.new();shop_mystery_buy_button.position=Vector2(296,945);shop_mystery_buy_button.size=Vector2(232,43);_skin_button(shop_mystery_buy_button,Color("#8d755f"),13);shop_mystery_buy_button.pressed.connect(_buy_seed_bag.bind("mystery"));shop_overlay.add_child(shop_mystery_buy_button)
+	shop_message=Label.new();shop_message.position=Vector2(48,811);shop_message.size=Vector2(480,23);shop_message.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;shop_message.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;shop_message.add_theme_font_size_override("font_size",13);shop_message.add_theme_color_override("font_color",UI_CREAM);shop_overlay.add_child(shop_message)
+	shop_purchase_controls=[purchase_panel,shop_wallet_label,shop_bag_label,normal_buy,shop_volume_buy_button,shop_premium_buy_button,shop_mystery_buy_button,shop_message]
 	shop_chatter_bubble=PanelContainer.new();shop_chatter_bubble.position=Vector2(88,276);shop_chatter_bubble.size=Vector2(400,108);shop_chatter_bubble.mouse_filter=Control.MOUSE_FILTER_STOP;shop_chatter_bubble.gui_input.connect(_on_shop_chatter_gui_input);shop_chatter_bubble.add_theme_stylebox_override("panel",_box(Color(1.0,.95,.82,.97),Color("#9b6739"),24,3));shop_chatter_bubble.visible=false;shop_overlay.add_child(shop_chatter_bubble)
 	var chatter_content:=VBoxContainer.new();chatter_content.alignment=BoxContainer.ALIGNMENT_CENTER;chatter_content.add_theme_constant_override("separation",9);chatter_content.mouse_filter=Control.MOUSE_FILTER_PASS;shop_chatter_bubble.add_child(chatter_content)
 	var chatter_row:=HBoxContainer.new();chatter_row.alignment=BoxContainer.ALIGNMENT_CENTER;chatter_row.add_theme_constant_override("separation",10);chatter_row.mouse_filter=Control.MOUSE_FILTER_PASS;chatter_content.add_child(chatter_row)
@@ -474,13 +506,14 @@ func _build_shop(hud:Control)->void:
 	var chatter_actions:=HBoxContainer.new();chatter_actions.alignment=BoxContainer.ALIGNMENT_CENTER;chatter_actions.add_theme_constant_override("separation",12);chatter_content.add_child(chatter_actions)
 	shop_chatter_action_button=Button.new();shop_chatter_action_button.text="広告を見て種をもらう";shop_chatter_action_button.custom_minimum_size=Vector2(250,48);_skin_button(shop_chatter_action_button,Color("#d8b56b"),17);shop_chatter_action_button.pressed.connect(_on_shop_chatter_action);shop_chatter_action_button.visible=false;chatter_actions.add_child(shop_chatter_action_button)
 	shop_chatter_decline_button=Button.new();shop_chatter_decline_button.text="いいえ";shop_chatter_decline_button.custom_minimum_size=Vector2(130,48);_skin_button(shop_chatter_decline_button,Color("#ead8b1"),17);shop_chatter_decline_button.pressed.connect(_decline_armadillo_research);shop_chatter_decline_button.visible=false;chatter_actions.add_child(shop_chatter_decline_button)
-	shop_transfer_notice=Label.new();shop_transfer_notice.position=Vector2(138,350);shop_transfer_notice.size=Vector2(300,42);shop_transfer_notice.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;shop_transfer_notice.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;shop_transfer_notice.add_theme_font_size_override("font_size",17);shop_transfer_notice.add_theme_color_override("font_color",Color("#fff0bd"));shop_transfer_notice.add_theme_color_override("font_shadow_color",Color(0.15,0.08,0.03,.9));shop_transfer_notice.add_theme_constant_override("shadow_offset_x",2);shop_transfer_notice.add_theme_constant_override("shadow_offset_y",2);shop_transfer_notice.mouse_filter=Control.MOUSE_FILTER_IGNORE;shop_transfer_notice.visible=false;shop_overlay.add_child(shop_transfer_notice)
+	shop_transfer_notice=Label.new();shop_transfer_notice.position=Vector2(113,350);shop_transfer_notice.size=Vector2(350,46);shop_transfer_notice.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;shop_transfer_notice.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;shop_transfer_notice.add_theme_font_size_override("font_size",20);shop_transfer_notice.add_theme_color_override("font_color",Color("#fff0bd"));shop_transfer_notice.add_theme_color_override("font_shadow_color",Color(0.15,0.08,0.03,.9));shop_transfer_notice.add_theme_constant_override("shadow_offset_x",2);shop_transfer_notice.add_theme_constant_override("shadow_offset_y",2);shop_transfer_notice.mouse_filter=Control.MOUSE_FILTER_IGNORE;shop_transfer_notice.visible=false;shop_overlay.add_child(shop_transfer_notice)
 
 func _set_shop_purchase_visible(is_visible:bool)->void:
 	for control in shop_purchase_controls:
 		if is_instance_valid(control):control.visible=is_visible
 
 func _on_shop_panda_tapped()->void:
+	if shop_chatter_bubble.visible:_hide_shop_chatter();return
 	if _shop_rescue_needed():
 		_show_shop_chatter("種が買えなくて困ってる？\nちょっと待ってて。余ってるのがあるから、1袋持っていきなよ。",true)
 		return
@@ -489,20 +522,19 @@ func _on_shop_panda_tapped()->void:
 func _show_shop_chatter(message:String,is_rescue:bool,dialog_mode:="normal",speaker_id:="panda")->void:
 	armadillo_dialog_mode="rescue" if is_rescue else dialog_mode
 	shop_chatter_bubble.modulate=Color.WHITE;shop_chatter_bubble.visible=true;shop_chatter_label.text=message;_set_shop_speaker(str(speaker_id))
-	if is_rescue or dialog_mode in ["research_offer","pinwheel_continue","research_result"]:
+	if is_rescue or dialog_mode in ["research_offer","research_result"]:
 		shop_chatter_bubble.position=Vector2(22,86);shop_chatter_bubble.size=Vector2(420,250)
 	else:
 		var bubble_width:=clampf(210.0+message.length()*4.8,280.0,440.0);var bubble_height:=118.0 if message.length()>38 else 108.0
 		shop_chatter_bubble.size=Vector2(bubble_width,bubble_height);shop_chatter_bubble.position=Vector2((576.0-bubble_width)*.5,276)
-	shop_chatter_action_button.visible=is_rescue or dialog_mode in ["research_offer","pinwheel_continue"]
+	shop_chatter_action_button.visible=is_rescue or dialog_mode=="research_offer"
 	shop_chatter_action_button.disabled=rescue_reward_in_progress if is_rescue else false
-	shop_chatter_action_button.text=("広告を準備中…" if rescue_reward_in_progress else "広告を見て種をもらう") if is_rescue else ("つぎへ" if dialog_mode=="pinwheel_continue" else "はい")
+	shop_chatter_action_button.text=("広告を準備中…" if rescue_reward_in_progress else "広告を見て種をもらう") if is_rescue else "はい"
 	shop_chatter_decline_button.visible=dialog_mode=="research_offer"
 
 func _on_shop_chatter_action()->void:
 	match armadillo_dialog_mode:
 		"rescue":_request_rescue_reward_ad()
-		"pinwheel_continue":_start_armadillo_research()
 		"research_offer":_accept_armadillo_research()
 
 func _on_shop_background_gui_input(event:InputEvent)->void:
@@ -519,11 +551,18 @@ func _shop_dismiss_pressed(event:InputEvent)->bool:
 func _hide_shop_chatter(force:=false)->void:
 	if not shop_chatter_bubble.visible:return
 	if shop_chatter_action_button.visible and not force:return
-	shop_chatter_bubble.visible=false;shop_chatter_bubble.modulate.a=1.0;armadillo_dialog_mode=""
+	shop_chatter_bubble.visible=false;shop_chatter_bubble.modulate.a=1.0;shop_transfer_notice.visible=false;armadillo_dialog_mode=""
+	if not shop_new_species_queue.is_empty():call_deferred("_play_shop_new_species_animations")
 
 func _set_shop_speaker(speaker_id:String)->void:
 	shop_chatter_portrait.texture=_speaker_portrait_texture(speaker_id)
 	shop_chatter_portrait.visible=shop_chatter_portrait.texture!=null
+	# Keep the portrait inside its fixed 78 px speaker slot.  The armadillo
+	# artwork reaches the source edge, so a small inset prevents its right side
+	# from being clipped by the following dialogue label on narrow Web layouts.
+	shop_chatter_portrait.pivot_offset=shop_chatter_portrait.custom_minimum_size*.5
+	shop_chatter_portrait.scale=Vector2(.82,.82) if speaker_id=="armadillo" else Vector2.ONE
+	shop_chatter_portrait.clip_contents=false
 
 func _pick_shop_chatter()->String:
 	var date:=Time.get_date_dict_from_system();var month:=int(date.get("month",1));var day:=int(date.get("day",1));var japan:=_is_japan_region();var new_year:="あけましておめでとう！今年もよろしくね！"
@@ -546,7 +585,7 @@ func _is_japan_region()->bool:
 	return locale=="ja" or locale.begins_with("ja_") or locale.ends_with("_jp")
 
 func _shop_rescue_needed()->bool:
-	return old_seed_bags+normal_seed_bags+premium_seed_bags==0 and coins<NORMAL_SEED_BAG_PRICE_YEN
+	return old_seed_bags+normal_seed_bags+volume_seed_bags+premium_seed_bags+mystery_seed_bags==0 and coins<NORMAL_SEED_BAG_PRICE_YEN
 
 func _request_rescue_reward_ad()->void:
 	if rescue_reward_in_progress or not _shop_rescue_needed():return
@@ -769,7 +808,7 @@ func _change_audio_volume(value:float,is_bgm:bool)->void:
 	audio_settings["bgm_volume" if is_bgm else "se_volume"]=value/100.0;audio_manager.apply_settings(audio_settings);_save()
 
 func _reset_progression_state()->void:
-	coins=1000;bests.clear();discovered.clear();greenhouse_available={"colorata":true};unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;buyback_unlocked=false;tutorial_steps.clear();normal_seed_bags=0;premium_seed_bags=0;old_seed_bags=0;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;mystery_seed_count=0;armadillo_research_total=0;armadillo_research_rewards.clear();armadillo_research_intro_seen=false;armadillo_dialog_mode="";opening_species.clear();play_active=false;play_time_remaining=0.0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_scroll_tutorial_active=false;habitat_best_link_dialog_step=0;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_build_habitat_items();_save();_update_currency_ui();_update_play_ui()
+	coins=1000;bests.clear();discovered.clear();greenhouse_available={"colorata":true};unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;buyback_unlocked=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;mystery_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;mystery_seed_pack_unlocked=false;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;habitat_mystery_seeds_pending=0;mystery_seed_count=0;armadillo_research_total=0;armadillo_research_rewards.clear();armadillo_research_intro_seen=false;armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();shop_new_species_queue.clear();play_active=false;play_time_remaining=0.0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_scroll_tutorial_active=false;habitat_best_link_dialog_step=0;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_build_habitat_items();_save();_update_currency_ui();_update_play_ui()
 	normal_play_count=0;shop_visit_count=0;hidden_species_acquired.clear();tovar_next_play=TOVAR_FIRST_PLAY;tovar_attempt_count=0;tovar_event_active=false;tovar_harvested_this_play=false;armadillo_present=false;_save()
 
 func _reset_progression_for_development(button:Button)->void:
@@ -824,24 +863,35 @@ func _start_greenhouse_play(seed_type:String)->void:
 	if seed_type=="old":
 		if old_seed_bags<1:return
 		old_seed_bags-=1;current_target_count=OLD_SEED_GERMINATION_COUNT
+	elif seed_type=="volume":
+		if not _volume_seed_unlocked() or volume_seed_bags<1:return
+		volume_seed_bags-=1;current_target_count=VOLUME_GERMINATION_COUNT
 	elif seed_type=="premium":
 		if not _premium_seed_unlocked():return
 		if premium_seed_bags<1:return
 		premium_seed_bags-=1;current_target_count=PREMIUM_GERMINATION_COUNT
+	elif seed_type=="mystery":
+		if not _mystery_seed_pack_unlocked() or mystery_seed_bags<1:return
+		mystery_seed_bags-=1;current_target_count=MYSTERY_GERMINATION_COUNT
 	else:
 		if normal_seed_bags<1:return
 		normal_seed_bags-=1;current_target_count=NORMAL_GERMINATION_COUNT
-	active_seed_type=seed_type;play_time_remaining=0.0;play_active=true;play_modal_open=false;play_earnings_total=0;play_harvest_count=0;play_max_size=0.0;play_previous_global_best=_global_best_size();play_updated_global_best=false;play_notable_species.clear();play_hidden_species_unlocked="";opening_species.clear();play_seeds_remaining=current_target_count;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=OLD_SEED_GERMINATION_COUNT if seed_type=="old" else rng.randi_range(PLAY_INITIAL_MIN_PLANTS,PLAY_INITIAL_MAX_PLANTS);_clear_greenhouse_plants()
+	active_seed_type=seed_type;play_time_remaining=0.0;play_active=true;play_modal_open=false;play_earnings_total=0;play_harvest_count=0;play_max_size=0.0;play_previous_global_best=_global_best_size();play_updated_global_best=false;play_notable_species.clear();play_hidden_species_unlocked="";result_new_species_queue.clear();opening_species.clear();play_seeds_remaining=current_target_count;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=OLD_SEED_GERMINATION_COUNT if seed_type=="old" else mini(current_target_count,rng.randi_range(PLAY_INITIAL_MIN_PLANTS,PLAY_INITIAL_MAX_PLANTS));_clear_greenhouse_plants()
 	if result_overlay:result_overlay.visible=false
 	for i in range(play_concurrent_target):_spawn_greenhouse_seed()
 	_prepare_tovar_event_for_play()
 	if total_play_count==0 and not bool(tutorial_steps.get("first_harvest_guide",false)):call_deferred("_show_first_harvest_guide_when_ready")
-	audio_manager.play_se("rare_seed" if seed_type=="premium" else "seed_bag",.72)
+	audio_manager.play_se("rare_seed" if seed_type in ["premium","mystery"] else "seed_bag",.72)
 	_save();_update_play_ui()
 
 func _finish_greenhouse_play()->void:
 	if not play_active or rain_bonus_active or play_seeds_remaining>0 or play_spawn_queue>0 or play_seed_animations_pending>0 or not plants.is_empty():return
 	play_active=false;play_time_remaining=0.0;play_spawn_timer=0.0;total_play_count+=1
+	var formal_play:=_tutorial_fully_complete() and active_seed_type!="old"
+	if formal_play:
+		formal_play_count+=1
+		habitat_mystery_seeds_pending+=rng.randi_range(0,3)
+		_refresh_seed_pack_unlocks()
 	_resolve_tovar_event_after_play()
 	if total_play_count==1:discovered["colorata"]=true;encyclopedia_unlocked=true
 	if total_play_count>=3:habitat_unlocked=true
@@ -852,19 +902,19 @@ func _finish_greenhouse_play()->void:
 
 func _prepare_tovar_event_for_play()->void:
 	tovar_event_active=false;tovar_harvested_this_play=false
-	if active_seed_type not in ["normal","premium"] or _hidden_species_owned(HIDDEN_TOVAR_ID):return
+	if not _tutorial_fully_complete() or active_seed_type not in ["normal","volume","premium"] or _hidden_species_owned(HIDDEN_TOVAR_ID):return
 	var current_normal_play:=normal_play_count+1
 	if current_normal_play!=tovar_next_play:return
 	tovar_event_active=true
 	for i in range(3):_spawn_specific_plant(HIDDEN_TOVAR_ID)
 
 func _resolve_tovar_event_after_play()->void:
-	if active_seed_type not in ["normal","premium"]:return
+	if not _tutorial_fully_complete() or active_seed_type not in ["normal","volume","premium"]:return
 	normal_play_count+=1
 	if not tovar_event_active:return
 	tovar_attempt_count+=1
 	if tovar_harvested_this_play:
-		_grant_hidden_species(HIDDEN_TOVAR_ID);play_hidden_species_unlocked=HIDDEN_TOVAR_ID;tovar_next_play=0
+		_grant_hidden_species(HIDDEN_TOVAR_ID);shop_new_species_queue.erase(HIDDEN_TOVAR_ID);result_new_species_queue.append(HIDDEN_TOVAR_ID);play_hidden_species_unlocked=HIDDEN_TOVAR_ID;tovar_next_play=0
 	else:
 		tovar_next_play=normal_play_count+(2 if tovar_attempt_count==1 else 3)
 	tovar_event_active=false;tovar_harvested_this_play=false
@@ -902,32 +952,41 @@ func _update_play_ui()->void:
 	var held:Array[String]=[]
 	if old_seed_bags>0:held.append("古いたね %d袋"%old_seed_bags)
 	if normal_seed_bags>0:held.append("たね %d袋"%normal_seed_bags)
+	if volume_seed_bags>0 and _volume_seed_unlocked():held.append("ボリューム %d袋"%volume_seed_bags)
 	if premium_seed_bags>0 and _premium_seed_unlocked():held.append("プレミアムたね %d袋"%premium_seed_bags)
+	if mystery_seed_bags>0 and _mystery_seed_pack_unlocked():held.append("謎種 %d袋"%mystery_seed_bags)
 	play_bag_summary.text="　".join(held)
 	old_seed_play_button.visible=old_seed_bags>0;old_seed_play_button.text="古いたねをまく　7粒　残り%d袋"%old_seed_bags
 	normal_play_button.visible=normal_seed_bags>0;normal_play_button.text="たねをまく　24粒　残り%d袋"%normal_seed_bags;normal_play_button.disabled=normal_seed_bags<1
+	volume_play_button.visible=volume_seed_bags>0 and _volume_seed_unlocked();volume_play_button.text="ボリュームパックをまく　36粒　残り%d袋"%volume_seed_bags;volume_play_button.disabled=not _volume_seed_unlocked() or volume_seed_bags<1
 	premium_play_button.visible=premium_seed_bags>0 and _premium_seed_unlocked();premium_play_button.text="プレミアムたねをまく　24粒　残り%d袋"%premium_seed_bags;premium_play_button.disabled=not _premium_seed_unlocked() or premium_seed_bags<1
+	mystery_play_button.visible=mystery_seed_bags>0 and _mystery_seed_pack_unlocked();mystery_play_button.text="謎種パックをまく　5粒　残り%d袋"%mystery_seed_bags;mystery_play_button.disabled=not _mystery_seed_pack_unlocked() or mystery_seed_bags<1
 
 func _open_shop()->void:
 	play_modal_open=false;_set_shop_purchase_visible(true);_update_shop_ui();shop_message.text="たね袋を1袋ずつ購入できます";play_overlay.visible=false;shop_chatter_bubble.visible=false;shop_overlay.visible=true;audio_manager.play_bgm("shop");_prepare_shop_visit();_update_play_ui()
 
 func _prepare_shop_visit(force_armadillo:Variant=null)->void:
-	if not intro_story_complete:return
+	_refresh_seed_pack_unlocks()
+	if not _tutorial_fully_complete():
+		armadillo_present=false;shop_background.texture=load("res://assets/shop-background-final.jpg");armadillo_tap_button.visible=false;_save();return
 	shop_visit_count+=1
 	armadillo_present=bool(force_armadillo) if force_armadillo!=null else (mystery_seed_count>0 or rng.randi_range(1,5)==1)
 	shop_background.texture=load("res://assets/shop-background-armadillo.jpg" if armadillo_present else "res://assets/shop-background-final.jpg")
 	armadillo_tap_button.visible=armadillo_present
-	if shop_visit_count==8 and not _hidden_species_owned(HIDDEN_BUSTAMANTE_ID):
+	if _volume_seed_unlocked() and not volume_seed_intro_seen:
+		volume_seed_intro_seen=true
+		_show_shop_chatter("新しいたねを入荷したよ！\nボリュームパックたねっていうんだ。\n36粒入ってるから、普通のたねよりたっぷり楽しめるよ。\nこれなら、じっくりどデカい多肉を育てられるね！",false,"normal","panda")
+	elif shop_visit_count>=8 and not _hidden_species_owned(HIDDEN_BUSTAMANTE_ID):
 		_grant_hidden_species(HIDDEN_BUSTAMANTE_ID)
 		_show_shop_chatter("いつも来てくれてありがとう。\nブスタマンテを1株、君にあげるよ。",false)
 	_save()
 
 func _on_armadillo_tapped()->void:
 	if not armadillo_present:return
+	if shop_chatter_bubble.visible:_hide_shop_chatter();return
 	if not _hidden_species_owned(HIDDEN_PINWHEEL_ID):
 		_grant_hidden_species(HIDDEN_PINWHEEL_ID)
-		if mystery_seed_count>0:_show_shop_chatter("アルマジロ君が、ピンウィールを1株わけてくれたよ！\nまだ話したいことがあるみたい。",false,"pinwheel_continue","armadillo")
-		else:_show_shop_chatter("アルマジロ君が、ピンウィールを1株わけてくれたよ！",false,"normal","armadillo")
+		_show_shop_chatter("アルマジロ君が、ピンウィールを1株わけてくれたよ！",false,"normal","armadillo")
 	elif mystery_seed_count>0:
 		_start_armadillo_research()
 	else:
@@ -947,7 +1006,7 @@ func _accept_armadillo_research()->void:
 	var amount:=mystery_seed_count;var previous_total:=armadillo_research_total
 	mystery_seed_count=0;armadillo_research_total+=amount;armadillo_research_intro_seen=true
 	var reward_messages:=_grant_armadillo_research_milestones(previous_total,armadillo_research_total)
-	_show_mystery_seed_transfer(amount)
+	_show_mystery_seed_transfer(armadillo_research_total)
 	var message:=_armadillo_research_message(armadillo_research_total,amount)
 	if not reward_messages.is_empty():message+="\n\n"+"\n".join(reward_messages)
 	_save();_update_shop_ui();_update_play_ui();_update_habitat_ui();_show_shop_chatter(message,false,"research_result","armadillo")
@@ -989,7 +1048,6 @@ func _grant_armadillo_research_milestones(previous_total:int,new_total:int)->Arr
 
 func _show_mystery_seed_transfer(amount:int)->void:
 	shop_transfer_notice.text="渡した謎のたね ×%d個"%amount;shop_transfer_notice.modulate=Color.WHITE;shop_transfer_notice.visible=true
-	var tween:=create_tween();tween.tween_interval(1.8);tween.tween_property(shop_transfer_notice,"modulate:a",0.0,.4);tween.tween_callback(func():shop_transfer_notice.visible=false)
 
 func _hidden_species_owned(species_id:String)->bool:
 	return bool(hidden_species_acquired.get(species_id,false)) or bool(discovered.get(species_id,false))
@@ -997,30 +1055,57 @@ func _hidden_species_owned(species_id:String)->bool:
 func _grant_hidden_species(species_id:String)->void:
 	if _hidden_species_owned(species_id):return
 	hidden_species_acquired[species_id]=true;discovered[species_id]=true;encyclopedia_unlocked=true
+	_refresh_seed_pack_unlocks()
+	if play_active:result_new_species_queue.append(species_id)
+	else:shop_new_species_queue.append(species_id)
 	audio_manager.play_se("new_species",.62);_save()
 
 func _close_shop()->void:
 	_hide_shop_chatter(true);shop_overlay.visible=false;audio_manager.play_bgm("greenhouse" if current_mode=="greenhouse" else "habitat");_update_play_ui()
 
 func _buy_seed_bag(seed_type:String)->void:
-	if seed_type=="premium" and not _premium_seed_unlocked():shop_message.text="レア種を1種発見すると解放";return
-	var price:=PREMIUM_SEED_BAG_PRICE_YEN if seed_type=="premium" else NORMAL_SEED_BAG_PRICE_YEN
+	if seed_type=="volume" and not _volume_seed_unlocked():shop_message.text="正式プレイ7回後に解禁";return
+	if seed_type=="premium" and not _premium_seed_unlocked():shop_message.text="正式プレイ13回後に解禁";return
+	if seed_type=="mystery" and not _mystery_seed_pack_unlocked():shop_message.text="謎品種を1種発見で解禁";return
+	var price:=NORMAL_SEED_BAG_PRICE_YEN
+	if seed_type=="volume":price=VOLUME_SEED_BAG_PRICE_YEN
+	elif seed_type=="premium":price=PREMIUM_SEED_BAG_PRICE_YEN
+	elif seed_type=="mystery":price=MYSTERY_SEED_BAG_PRICE_YEN
 	if coins<price:shop_message.text="所持金が足りません";return
 	coins-=price
-	if seed_type=="premium":premium_seed_bags+=1;shop_message.text="プレミアムたねを1袋購入しました"
+	if seed_type=="volume":volume_seed_bags+=1;shop_message.text="ボリュームパックを1袋購入しました"
+	elif seed_type=="premium":premium_seed_bags+=1;shop_message.text="プレミアムたねを1袋購入しました"
+	elif seed_type=="mystery":mystery_seed_bags+=1;shop_message.text="謎種パックを1袋購入しました"
 	else:normal_seed_bags+=1;shop_message.text="たねを1袋購入しました"
 	audio_manager.play_se("purchase",.48);_save();_update_currency_ui();_update_shop_ui();_update_play_ui()
 
 func _update_shop_ui()->void:
 	if not shop_wallet_label:return
-	shop_wallet_label.text="所持金　¥%s"%_comma(coins);shop_bag_label.text="たね %d袋　｜　プレミアムたね %d袋"%[normal_seed_bags,premium_seed_bags]
-	var premium_ok:=_premium_seed_unlocked();shop_premium_buy_button.text="プレミアムたね  1袋  800円" if premium_ok else "レア種を1種発見すると解放";shop_premium_buy_button.disabled=not premium_ok
+	shop_wallet_label.text="所持金　¥%s"%_comma(coins);shop_bag_label.text="普通 %d｜量 %d｜プレ %d｜謎 %d 袋"%[normal_seed_bags,volume_seed_bags,premium_seed_bags,mystery_seed_bags]
+	shop_purchase_controls[3].text="普通のたね 24粒  500円"
+	var volume_ok:=_volume_seed_unlocked();shop_volume_buy_button.text="ボリューム 36粒  700円" if volume_ok else "7プレイ後に解禁";shop_volume_buy_button.disabled=not volume_ok
+	var premium_ok:=_premium_seed_unlocked();shop_premium_buy_button.text="プレミアム 24粒  1500円" if premium_ok else "13プレイ後に解禁";shop_premium_buy_button.disabled=not premium_ok
+	var mystery_ok:=_mystery_seed_pack_unlocked();shop_mystery_buy_button.text="謎種パック 5粒  1500円" if mystery_ok else "謎品種を1種発見で解禁";shop_mystery_buy_button.disabled=not mystery_ok
+
+func _tutorial_fully_complete()->bool:
+	return intro_story_complete and habitat_unlocked and buyback_unlocked and total_play_count>=3
+
+func _refresh_seed_pack_unlocks()->void:
+	if formal_play_count>=7:volume_seed_unlocked=true
+	if formal_play_count>=13:premium_seed_unlocked=true
+	for entry in catalog_species:
+		if str(entry.get("rarity","通常"))=="隠し原種" and bool(discovered.get(str(entry.get("species_id","")),false)):
+			mystery_seed_pack_unlocked=true;break
+
+func _volume_seed_unlocked()->bool:
+	return volume_seed_unlocked or formal_play_count>=7
 
 func _premium_seed_unlocked()->bool:
-	for entry in catalog_species:
-		if not bool(discovered.get(str(entry.species_id),false)):continue
-		if str(entry.get("rarity","通常")) in ["レア","スーパーレア"]:return true
-	return false
+	return premium_seed_unlocked or formal_play_count>=13
+
+func _mystery_seed_pack_unlocked()->bool:
+	_refresh_seed_pack_unlocks()
+	return mystery_seed_pack_unlocked
 
 func _update_currency_ui()->void:
 	if coin_label:coin_label.text=" ¥%s"%_comma(coins)
@@ -1040,6 +1125,30 @@ func _show_play_result()->void:
 	if rain_event_pending:result_notable_label.text+="\n\n☂ 原生地に恵みの雨が降っています"
 	result_overlay.visible=true;result_overlay.modulate.a=0.0;result_card.position.y=225.0;play_open_button.visible=false
 	var tween:=create_tween().set_parallel();tween.tween_property(result_overlay,"modulate:a",1.0,.36).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT);tween.tween_property(result_card,"position:y",205.0,.42).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	if not result_new_species_queue.is_empty():call_deferred("_play_result_new_species_animations")
+
+func _play_result_new_species_animations()->void:
+	await get_tree().create_timer(.48).timeout
+	while not result_new_species_queue.is_empty() and result_overlay.visible:
+		var species_id:String=str(result_new_species_queue.pop_front())
+		await _animate_species_to_encyclopedia(species_id,result_card.global_position+result_card.size*.5,result_overlay)
+		await get_tree().create_timer(.15).timeout
+
+func _play_shop_new_species_animations()->void:
+	while not shop_new_species_queue.is_empty() and shop_overlay.visible:
+		var species_id:String=str(shop_new_species_queue.pop_front())
+		await _animate_species_to_encyclopedia(species_id,Vector2(288,470),shop_overlay)
+		await get_tree().create_timer(.12).timeout
+
+func _animate_species_to_encyclopedia(species_id:String,start:Vector2,parent:Control)->void:
+	var entry:=_catalog_entry(species_id);var texture:=_species_texture(entry)
+	if texture==null:return
+	var flying:=TextureRect.new();flying.texture=texture;flying.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;flying.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;flying.size=Vector2(104,104);flying.position=start-flying.size*.5;flying.pivot_offset=flying.size*.5;flying.mouse_filter=Control.MOUSE_FILTER_IGNORE;parent.add_child(flying)
+	var target:=Vector2(500,150)
+	if encyclopedia_icon_button:target=encyclopedia_icon_button.global_position+encyclopedia_icon_button.size*.5
+	var tween:=create_tween().set_parallel();tween.tween_property(flying,"position",target-flying.size*.5,.58).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN);tween.tween_property(flying,"scale",Vector2(.08,.08),.58).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN);tween.tween_property(flying,"rotation",.16,.58);await tween.finished
+	if is_instance_valid(flying):flying.queue_free()
+	if audio_manager:audio_manager.play_se("new_species",.55)
 
 func _close_result()->void:
 	result_overlay.visible=false;result_overlay.modulate.a=1.0;_clear_result_confetti();_update_play_ui()
@@ -1103,11 +1212,10 @@ func _build_habitat_items()->void:
 				var is_first_tutorial_species:=pending_spawn_index==0 and not bool(tutorial_steps.get("habitat_wild_get",false))
 				var new_point:Vector2=Vector2(810,385) if is_first_tutorial_species else HABITAT_NEW_SPECIES_POINTS[pending_spawn_index%HABITAT_NEW_SPECIES_POINTS.size()]
 				habitat_new_species_id=str(pending_id);_add_habitat_plant(entry,new_point,true);pending_spawn_index+=1;break
-	_reset_daily_seeds_if_needed()
-	var seed_points:Array=HABITAT_SAFE_SEED_POINTS.duplicate();var daily_rng:=RandomNumberGenerator.new();daily_rng.seed=habitat_seed_date.hash()
+	var seed_points:Array=HABITAT_SAFE_SEED_POINTS.duplicate();var daily_rng:=RandomNumberGenerator.new();daily_rng.seed=("%d:%d"%[formal_play_count,habitat_mystery_seeds_pending]).hash()
 	for i in range(seed_points.size()-1,0,-1):
 		var swap_index:=daily_rng.randi_range(0,i);var held=seed_points[i];seed_points[i]=seed_points[swap_index];seed_points[swap_index]=held
-	for i in range(maxi(0,10-habitat_seeds_collected)):_add_habitat_seed(seed_points[i])
+	for i in range(mini(habitat_mystery_seeds_pending,seed_points.size())):_add_habitat_seed(seed_points[i])
 	_update_habitat_ui()
 
 func _add_habitat_plant(entry:Dictionary,panorama_point:Vector2,is_new:bool)->void:
@@ -1272,7 +1380,7 @@ func spawn_plant(force_golden := false,spawn_position:Variant=null) -> void:
 		if chosen.is_empty(): chosen = species[0]
 		forced_golden_done=true
 	elif not opening_species.is_empty():chosen=opening_species.pop_front()
-	else:chosen=_weighted_species()
+	else:chosen=_select_species_for_seed(active_seed_type)
 	var pos:Vector3=_find_spawn_position() if spawn_position==null else spawn_position
 	var label:=_plant_label(); labels_layer.add_child(label)
 	var p = SucculentClass.new()
@@ -1353,6 +1461,52 @@ func _weighted_species()->Dictionary:
 		roll-=float(s.spawn_weight)
 		if roll<=0:return s
 	return species[0]
+
+func _select_species_for_seed(seed_type:String)->Dictionary:
+	if seed_type=="mystery":
+		var mystery_pool:Array=[]
+		for entry in catalog_species:
+			if str(entry.get("rarity","通常"))=="隠し原種" and bool(discovered.get(str(entry.get("species_id","")),false)):mystery_pool.append(entry)
+		if not mystery_pool.is_empty():return mystery_pool[rng.randi_range(0,mystery_pool.size()-1)]
+		return _catalog_entry("colorata")
+	var config:Dictionary=SEED_PACK_CONFIG.get(seed_type,SEED_PACK_CONFIG.normal)
+	var new_candidates:Array=[]
+	var normal_pool:Array=[];var rare_pool:Array=[];var super_pool:Array=[];var any_pool:Array=[]
+	for entry in catalog_species:
+		var species_id:=str(entry.get("species_id",""))
+		if not bool(greenhouse_available.get(species_id,false)):continue
+		var is_found:=bool(discovered.get(species_id,false))
+		if not is_found:
+			if not _seed_new_species_blocked(species_id):new_candidates.append(entry)
+			continue
+		any_pool.append(entry)
+		match str(entry.get("rarity","通常")):
+			"レア":rare_pool.append(entry)
+			"スーパーレア":super_pool.append(entry)
+			_:normal_pool.append(entry)
+	var category_roll:=rng.randf();var new_rate:=float(config.get("new",0.0));var super_rate:=float(config.get("super",0.0));var rare_rate:=float(config.get("rare",0.0))
+	var target_pool:Array
+	if category_roll<new_rate:
+		if not new_candidates.is_empty():return new_candidates[rng.randi_range(0,new_candidates.size()-1)]
+		target_pool=normal_pool
+	elif category_roll<new_rate+super_rate:target_pool=super_pool
+	elif category_roll<new_rate+super_rate+rare_rate:target_pool=rare_pool
+	else:target_pool=normal_pool
+	if target_pool.is_empty():target_pool=normal_pool if not normal_pool.is_empty() else any_pool
+	if target_pool.is_empty():return _catalog_entry("colorata")
+	return _weighted_from_pool(target_pool)
+
+func _weighted_from_pool(pool:Array)->Dictionary:
+	var total:=0.0
+	for entry in pool:total+=maxf(.001,float(entry.get("spawn_weight",1.0)))
+	var roll:=rng.randf()*total
+	for entry in pool:
+		roll-=maxf(.001,float(entry.get("spawn_weight",1.0)))
+		if roll<=0.0:return entry
+	return pool[0]
+
+func _seed_new_species_blocked(species_id:String)->bool:
+	return species_id in [HIDDEN_PINWHEEL_ID,HIDDEN_TOVAR_ID,HIDDEN_BUSTAMANTE_ID,MYSTERY_RESEARCH_TRANSPARENT_ID,"golden_laui","golden_kannte"]
 
 func _find_spawn_position()->Vector3:
 	# Sample world positions, but accept them only after projecting into the
@@ -1637,8 +1791,8 @@ func _try_habitat_pick(screen_pos:Vector2)->void:
 	elif str(selected.kind)=="found_species":_squish_habitat_plant(selected)
 
 func _collect_habitat_seed(item:Dictionary)->void:
-	if habitat_seeds_collected>=10:return
-	habitat_seeds_collected+=1;mystery_seed_count+=1;habitat_pickups.erase(item);var node=item.node;_show_habitat_message(node.global_position,"謎のたね GET!",Color("#ffe4a0"));node.queue_free();_save();_update_habitat_ui()
+	if habitat_mystery_seeds_pending<=0:return
+	habitat_mystery_seeds_pending-=1;mystery_seed_count+=1;habitat_pickups.erase(item);var node=item.node;_show_habitat_message(node.global_position,"謎のたね GET!",Color("#ffe4a0"));node.queue_free();_save();_update_habitat_ui()
 
 func _collect_habitat_species(item:Dictionary)->void:
 	var node:Sprite3D=item.node;habitat_pickups.erase(item);node.visible=false
@@ -1648,7 +1802,7 @@ func _collect_habitat_species(item:Dictionary)->void:
 	var tween:=create_tween().set_parallel();tween.tween_property(flying,"position",target-flying.size*.5,.62).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN);tween.tween_property(flying,"scale",Vector2(.08,.08),.62).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN);tween.tween_property(flying,"rotation",.18,.62);tween.chain().tween_callback(_complete_habitat_species_get.bind(item,flying))
 
 func _complete_habitat_species_get(item:Dictionary,flying:TextureRect)->void:
-	var species_id:=str(item.species_id);greenhouse_available[species_id]=true;unlocked_species[species_id]=true;discovered[species_id]=true;pending_habitat_species.erase(species_id);habitat_new_species_id=""
+	var species_id:=str(item.species_id);greenhouse_available[species_id]=true;unlocked_species[species_id]=true;discovered[species_id]=true;_refresh_seed_pack_unlocks();pending_habitat_species.erase(species_id);habitat_new_species_id=""
 	for entry in catalog_species:
 		if str(entry.species_id)==species_id:
 			var already_present:=false
@@ -1674,7 +1828,10 @@ func _on_harvested(p)->void:
 	var deferred_tovar:=tovar_event_active and str(p.data.species_id)==HIDDEN_TOVAR_ID
 	if deferred_tovar:tovar_harvested_this_play=true
 	var old:=float(bests.get(p.data.species_id,0.0));var is_record:bool=not deferred_tovar and p.diameter_cm>old
-	if not deferred_tovar:discovered[p.data.species_id]=true
+	var first_discovery:=not deferred_tovar and not bool(discovered.get(str(p.data.species_id),false))
+	if not deferred_tovar:
+		discovered[p.data.species_id]=true
+		if first_discovery:result_new_species_queue.append(str(p.data.species_id));encyclopedia_unlocked=true;_refresh_seed_pack_unlocks()
 	if is_record:bests[p.data.species_id]=p.diameter_cm
 	if is_record:_evaluate_best_spawn_unlocks()
 	var reward:=harvest_reward_yen(p.diameter_cm) if buyback_unlocked else 0;coins+=reward;_evaluate_unlock_rules("harvest_size",p.diameter_cm);_save();_update_best_ui();_update_currency_ui();audio_manager.play_se("harvest",.55)
