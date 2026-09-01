@@ -109,6 +109,8 @@ var shop_purchase_controls: Array[Control] = []
 var shop_chatter_bubble: PanelContainer
 var shop_chatter_label: Label
 var shop_chatter_action_button: Button
+var shop_chatter_tail: Polygon2D
+var shop_chatter_tail_outline: Line2D
 var last_shop_chatter := ""
 var rescue_reward_in_progress := false
 var intro_overlay: Control
@@ -380,9 +382,11 @@ func _build_shop(hud:Control)->void:
 	shop_premium_buy_button=Button.new();shop_premium_buy_button.position=Vector2(62,872);shop_premium_buy_button.size=Vector2(452,64);_skin_button(shop_premium_buy_button,Color("#d18a55"),20);shop_premium_buy_button.pressed.connect(_buy_seed_bag.bind("premium"));shop_overlay.add_child(shop_premium_buy_button)
 	shop_message=Label.new();shop_message.position=Vector2(48,944);shop_message.size=Vector2(480,45);shop_message.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;shop_message.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;shop_message.add_theme_font_size_override("font_size",15);shop_message.add_theme_color_override("font_color",UI_CREAM);shop_overlay.add_child(shop_message)
 	shop_purchase_controls=[purchase_panel,shop_wallet_label,shop_bag_label,normal_buy,shop_premium_buy_button,shop_message]
-	shop_chatter_bubble=PanelContainer.new();shop_chatter_bubble.position=Vector2(22,104);shop_chatter_bubble.size=Vector2(400,190);shop_chatter_bubble.mouse_filter=Control.MOUSE_FILTER_STOP;shop_chatter_bubble.gui_input.connect(_on_shop_chatter_gui_input);shop_chatter_bubble.add_theme_stylebox_override("panel",_box(Color(1.0,.95,.82,.97),Color("#9b6739"),24,3));shop_chatter_bubble.visible=false;shop_overlay.add_child(shop_chatter_bubble)
+	shop_chatter_tail=Polygon2D.new();shop_chatter_tail.color=Color(1.0,.95,.82,.97);shop_chatter_tail.visible=false;shop_overlay.add_child(shop_chatter_tail)
+	shop_chatter_tail_outline=Line2D.new();shop_chatter_tail_outline.default_color=Color("#9b6739");shop_chatter_tail_outline.width=3.0;shop_chatter_tail_outline.antialiased=true;shop_chatter_tail_outline.visible=false;shop_overlay.add_child(shop_chatter_tail_outline)
+	shop_chatter_bubble=PanelContainer.new();shop_chatter_bubble.position=Vector2(88,110);shop_chatter_bubble.size=Vector2(400,108);shop_chatter_bubble.mouse_filter=Control.MOUSE_FILTER_STOP;shop_chatter_bubble.gui_input.connect(_on_shop_chatter_gui_input);shop_chatter_bubble.add_theme_stylebox_override("panel",_box(Color(1.0,.95,.82,.97),Color("#9b6739"),24,3));shop_chatter_bubble.visible=false;shop_overlay.add_child(shop_chatter_bubble)
 	var chatter_content:=VBoxContainer.new();chatter_content.alignment=BoxContainer.ALIGNMENT_CENTER;chatter_content.add_theme_constant_override("separation",9);chatter_content.mouse_filter=Control.MOUSE_FILTER_PASS;shop_chatter_bubble.add_child(chatter_content)
-	shop_chatter_label=Label.new();shop_chatter_label.custom_minimum_size=Vector2(308,92);shop_chatter_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;shop_chatter_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;shop_chatter_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;shop_chatter_label.add_theme_font_size_override("font_size",18);shop_chatter_label.add_theme_color_override("font_color",UI_BROWN);shop_chatter_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;chatter_content.add_child(shop_chatter_label)
+	shop_chatter_label=Label.new();shop_chatter_label.custom_minimum_size=Vector2(220,64);shop_chatter_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;shop_chatter_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;shop_chatter_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;shop_chatter_label.add_theme_font_size_override("font_size",18);shop_chatter_label.add_theme_color_override("font_color",UI_BROWN);shop_chatter_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;chatter_content.add_child(shop_chatter_label)
 	shop_chatter_action_button=Button.new();shop_chatter_action_button.text="広告を見て種をもらう";shop_chatter_action_button.custom_minimum_size=Vector2(310,48);_skin_button(shop_chatter_action_button,Color("#d8b56b"),17);shop_chatter_action_button.pressed.connect(_request_rescue_reward_ad);shop_chatter_action_button.visible=false;chatter_content.add_child(shop_chatter_action_button)
 
 func _set_shop_purchase_visible(is_visible:bool)->void:
@@ -397,8 +401,17 @@ func _on_shop_panda_tapped()->void:
 
 func _show_shop_chatter(message:String,is_rescue:bool)->void:
 	shop_chatter_bubble.modulate=Color.WHITE;shop_chatter_bubble.visible=true;shop_chatter_label.text=message
-	shop_chatter_bubble.position=Vector2(22,86) if is_rescue else Vector2(22,104);shop_chatter_bubble.size=Vector2(420,250) if is_rescue else Vector2(400,190)
+	if is_rescue:
+		shop_chatter_bubble.position=Vector2(22,86);shop_chatter_bubble.size=Vector2(420,250);shop_chatter_tail.visible=false;shop_chatter_tail_outline.visible=false
+	else:
+		var bubble_width:=clampf(210.0+message.length()*4.8,280.0,440.0);var bubble_height:=118.0 if message.length()>38 else 108.0
+		shop_chatter_bubble.size=Vector2(bubble_width,bubble_height);shop_chatter_bubble.position=Vector2((576.0-bubble_width)*.5,110);_update_shop_chatter_tail()
 	shop_chatter_action_button.visible=is_rescue;shop_chatter_action_button.disabled=rescue_reward_in_progress;shop_chatter_action_button.text="広告を準備中…" if rescue_reward_in_progress else "広告を見て種をもらう"
+
+func _update_shop_chatter_tail()->void:
+	var right:=shop_chatter_bubble.position.x+shop_chatter_bubble.size.x;var top:=shop_chatter_bubble.position.y;var height:=shop_chatter_bubble.size.y
+	var base_top:=Vector2(right-5.0,top+height*.57);var base_bottom:=Vector2(right-5.0,top+height*.79);var tip:=Vector2(right-43.0,top+height+23.0)
+	shop_chatter_tail.polygon=PackedVector2Array([base_top,tip,base_bottom]);shop_chatter_tail_outline.points=PackedVector2Array([base_top,tip,base_bottom]);shop_chatter_tail.visible=true;shop_chatter_tail_outline.visible=true
 
 func _on_shop_background_gui_input(event:InputEvent)->void:
 	if _shop_dismiss_pressed(event):_hide_shop_chatter()
@@ -414,7 +427,7 @@ func _shop_dismiss_pressed(event:InputEvent)->bool:
 func _hide_shop_chatter(force:=false)->void:
 	if not shop_chatter_bubble.visible:return
 	if shop_chatter_action_button.visible and not force:return
-	shop_chatter_bubble.visible=false;shop_chatter_bubble.modulate.a=1.0
+	shop_chatter_bubble.visible=false;shop_chatter_tail.visible=false;shop_chatter_tail_outline.visible=false;shop_chatter_bubble.modulate.a=1.0
 
 func _pick_shop_chatter()->String:
 	var date:=Time.get_date_dict_from_system();var month:=int(date.get("month",1));var day:=int(date.get("day",1));var japan:=_is_japan_region();var new_year:="あけましておめでとう！今年もよろしくね！"
@@ -766,7 +779,7 @@ func _update_play_ui()->void:
 	premium_play_button.visible=premium_seed_bags>0 and _premium_seed_unlocked();premium_play_button.text="プレミアムたねをまく　24粒　残り%d袋"%premium_seed_bags;premium_play_button.disabled=not _premium_seed_unlocked() or premium_seed_bags<1
 
 func _open_shop()->void:
-	play_modal_open=false;_set_shop_purchase_visible(true);_update_shop_ui();shop_message.text="たね袋を1袋ずつ購入できます";play_overlay.visible=false;shop_chatter_bubble.visible=false;shop_overlay.visible=true;audio_manager.play_bgm("shop");_update_play_ui()
+	play_modal_open=false;_set_shop_purchase_visible(true);_update_shop_ui();shop_message.text="たね袋を1袋ずつ購入できます";play_overlay.visible=false;shop_chatter_bubble.visible=false;shop_chatter_tail.visible=false;shop_chatter_tail_outline.visible=false;shop_overlay.visible=true;audio_manager.play_bgm("shop");_update_play_ui()
 
 func _close_shop()->void:
 	_hide_shop_chatter(true);shop_overlay.visible=false;audio_manager.play_bgm("greenhouse" if current_mode=="greenhouse" else "habitat");_update_play_ui()
