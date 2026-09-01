@@ -15,6 +15,7 @@ const SPRITES := {
 	"kannte": "res://assets/plants/sprite-kante.png",
 	"shaviana": "res://assets/plants/sprite-shaviana.png",
 	"pinwheel": "res://assets/plants/sprite-kante.png",
+	"tovarensis_tovar": "res://assets/plants/sprite-tovarensis-tovar.png",
 	"gold_kannte": "res://assets/plants/sprite-golden-laui.png"
 }
 
