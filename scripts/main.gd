@@ -557,11 +557,8 @@ func _hide_shop_chatter(force:=false)->void:
 func _set_shop_speaker(speaker_id:String)->void:
 	shop_chatter_portrait.texture=_speaker_portrait_texture(speaker_id)
 	shop_chatter_portrait.visible=shop_chatter_portrait.texture!=null
-	# Keep the portrait inside its fixed 78 px speaker slot.  The armadillo
-	# artwork reaches the source edge, so a small inset prevents its right side
-	# from being clipped by the following dialogue label on narrow Web layouts.
 	shop_chatter_portrait.pivot_offset=shop_chatter_portrait.custom_minimum_size*.5
-	shop_chatter_portrait.scale=Vector2(.82,.82) if speaker_id=="armadillo" else Vector2.ONE
+	shop_chatter_portrait.scale=Vector2.ONE
 	shop_chatter_portrait.clip_contents=false
 
 func _pick_shop_chatter()->String:
