@@ -1213,8 +1213,8 @@ func _panda_portrait_texture()->Texture2D:
 	return portrait
 
 func _armadillo_portrait_texture()->Texture2D:
-	var source:=load("res://assets/shop-background-armadillo.jpg") as Texture2D
-	var portrait:=AtlasTexture.new();portrait.atlas=source;portrait.region=Rect2(55.0,720.0,245.0,300.0)
+	var source:=load("res://assets/armadillo-dialogue.png") as Texture2D
+	var portrait:=AtlasTexture.new();portrait.atlas=source;portrait.region=Rect2(60.0,0.0,840.0,860.0)
 	return portrait
 
 func _speaker_portrait_texture(speaker_id:String)->Texture2D:
