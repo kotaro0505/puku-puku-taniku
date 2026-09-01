@@ -5,7 +5,7 @@ func _ready()->void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	game._reset_progression_state();game.intro_story_complete=true;game.habitat_unlocked=true;game.encyclopedia_unlocked=true;game.buyback_unlocked=true;game.tutorial_steps["habitat_scroll_dialog"]=true;game.tutorial_steps["habitat_get_dialog"]=true;game.tutorial_steps["play1_dialog"]=true;game.intro_overlay.visible=false;game.shop_overlay.visible=false;game._update_play_ui()
-	assert(game.shop_button.position==Vector2(398,198) and game.shop_button.size==Vector2(68,73));assert(game.mode_button.position==Vector2(483,198) and game.mode_button.size==Vector2(68,73));assert(game.screen_name_label.position==Vector2(20,24))
+	assert(game.mode_button.position==Vector2(398,206) and game.mode_button.size==Vector2(68,73));assert(game.shop_button.position==Vector2(483,206) and game.shop_button.size==Vector2(68,73))
 	assert(game.plants.is_empty() and not game.play_active)
 	assert(game.play_open_button.visible and not game.play_overlay.visible)
 	game._open_play_modal();assert(game.play_overlay.visible);game._close_play_modal();assert(not game.play_overlay.visible)

@@ -61,7 +61,6 @@ var habitat_unlocked := false
 var tutorial_steps: Dictionary = {}
 var mode_button: Button
 var shop_button: Button
-var screen_name_label: Label
 var current_mode := "greenhouse"
 var labels_layer: Control
 var effects_layer: Control
@@ -117,6 +116,7 @@ var result_count_label: Label
 var result_max_label: Label
 var result_notable_label: Label
 var result_confetti_layer: Control
+var result_record_pulse_tween: Tween
 var encyclopedia_icon_button: Button
 var external_navigation_controls: Array[Control] = []
 var encyclopedia_navigation_controls: Array[Control] = []
@@ -300,16 +300,15 @@ func _build_ui() -> void:
 	best_label=Label.new(); best_label.text="最高記録\n0.0 cm"; best_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; best_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; best_label.add_theme_font_size_override("font_size",17); best_label.add_theme_color_override("font_color",Color.WHITE); best_panel.add_child(best_label)
 	var coin_panel:=PanelContainer.new(); coin_panel.position=Vector2(398,54); coin_panel.size=Vector2(153,53); coin_panel.add_theme_stylebox_override("panel",_box(Color("#55301d"),Color("#f1d19c"),22,2)); hud.add_child(coin_panel)
 	coin_label=Label.new(); coin_label.text=" ¥%s" % _comma(coins); coin_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; coin_label.add_theme_font_size_override("font_size",20); coin_label.add_theme_color_override("font_color",Color("#ffd85b")); coin_panel.add_child(coin_label)
-	for entry in [{"x":421,"t":"図鑑"},{"x":495,"t":"設定"}]:
+	for entry in [{"x":398,"t":"図鑑"},{"x":483,"t":"設定"}]:
 		var b:=Button.new(); b.text=entry.t; b.position=Vector2(entry.x,116); b.size=Vector2(68,73); _skin_button(b,Color("#fff0cf"),17); hud.add_child(b)
 		external_navigation_controls.append(b)
 		if entry.t=="図鑑":encyclopedia_icon_button=b;encyclopedia_navigation_controls.append(b);b.mouse_filter=Control.MOUSE_FILTER_STOP;b.pressed.connect(_open_encyclopedia)
 		else:b.pressed.connect(_open_settings)
-	shop_button=Button.new();shop_button.text="おみせ";shop_button.position=Vector2(398,198);shop_button.size=Vector2(68,73);_skin_button(shop_button,Color("#fff0cf"),15);shop_button.mouse_filter=Control.MOUSE_FILTER_STOP;shop_button.pressed.connect(_open_shop);hud.add_child(shop_button)
-	external_navigation_controls.append(shop_button)
-	mode_button=Button.new();mode_button.text="原生地";mode_button.position=Vector2(483,198);mode_button.size=Vector2(68,73);_skin_button(mode_button,Color("#fff0cf"),15);mode_button.mouse_filter=Control.MOUSE_FILTER_STOP;mode_button.pressed.connect(_toggle_mode);hud.add_child(mode_button)
+	mode_button=Button.new();mode_button.text="原生地";mode_button.position=Vector2(398,206);mode_button.size=Vector2(68,73);_skin_button(mode_button,Color("#fff0cf"),15);mode_button.mouse_filter=Control.MOUSE_FILTER_STOP;mode_button.pressed.connect(_toggle_mode);hud.add_child(mode_button)
 	external_navigation_controls.append(mode_button)
-	screen_name_label=Label.new();screen_name_label.text="温室";screen_name_label.position=Vector2(20,24);screen_name_label.size=Vector2(210,52);screen_name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;screen_name_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;screen_name_label.add_theme_font_size_override("font_size",22);screen_name_label.add_theme_color_override("font_color",UI_CREAM);screen_name_label.add_theme_stylebox_override("normal",_box(Color(0.24,0.13,0.07,.82),Color("#e0b977"),18,2));screen_name_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;hud.add_child(screen_name_label)
+	shop_button=Button.new();shop_button.text="おみせ";shop_button.position=Vector2(483,206);shop_button.size=Vector2(68,73);_skin_button(shop_button,Color("#fff0cf"),15);shop_button.mouse_filter=Control.MOUSE_FILTER_STOP;shop_button.pressed.connect(_open_shop);hud.add_child(shop_button)
+	external_navigation_controls.append(shop_button)
 	habitat_status_label=Label.new();habitat_status_label.position=Vector2(163,42);habitat_status_label.size=Vector2(250,56);habitat_status_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;habitat_status_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;habitat_status_label.add_theme_font_size_override("font_size",18);habitat_status_label.add_theme_color_override("font_color",UI_CREAM);habitat_status_label.add_theme_stylebox_override("normal",_box(Color("#4b2d20"),Color("#d8ad68"),18,2));habitat_status_label.visible=false;hud.add_child(habitat_status_label)
 	play_timer_label=Label.new();play_timer_label.position=Vector2(190,135);play_timer_label.size=Vector2(196,58);play_timer_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;play_timer_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;play_timer_label.add_theme_font_size_override("font_size",24);play_timer_label.add_theme_color_override("font_color",Color.WHITE);play_timer_label.add_theme_stylebox_override("normal",_box(Color("#5b3321"),Color("#f3cb72"),19,3));play_timer_label.visible=false;hud.add_child(play_timer_label)
 	play_open_button=Button.new();play_open_button.text="▶  たねをまく";play_open_button.position=Vector2(198,499);play_open_button.size=Vector2(180,58);_skin_button(play_open_button,Color("#8b5a35"),21);play_open_button.mouse_filter=Control.MOUSE_FILTER_STOP;play_open_button.pressed.connect(_open_play_modal);hud.add_child(play_open_button)
@@ -341,7 +340,6 @@ func _build_shop(hud:Control)->void:
 	shop_overlay=Control.new();shop_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);shop_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;shop_overlay.visible=false;hud.add_child(shop_overlay)
 	var shop_texture:=load("res://assets/shop-background-final.jpg") as Texture2D
 	var background:=TextureRect.new();background.texture=shop_texture;background.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;background.stretch_mode=TextureRect.STRETCH_SCALE;background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);background.mouse_filter=Control.MOUSE_FILTER_IGNORE;shop_overlay.add_child(background)
-	var title:=Label.new();title.text="パンダのたねや";title.position=Vector2(20,24);title.size=Vector2(210,52);title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;title.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;title.add_theme_font_size_override("font_size",22);title.add_theme_color_override("font_color",UI_CREAM);title.add_theme_stylebox_override("normal",_box(Color(0.24,0.13,0.07,.82),Color("#e0b977"),18,2));shop_overlay.add_child(title)
 	var close:=Button.new();close.text="もどる";close.position=Vector2(446,24);close.size=Vector2(106,55);_skin_button(close,Color("#fff0cf"),17);close.pressed.connect(_close_shop);shop_overlay.add_child(close)
 	var purchase_panel:=PanelContainer.new();purchase_panel.position=Vector2(28,704);purchase_panel.size=Vector2(520,296);purchase_panel.add_theme_stylebox_override("panel",_box(Color(0.22,0.12,0.07,.93),Color("#d7aa64"),22,3));shop_overlay.add_child(purchase_panel)
 	shop_wallet_label=Label.new();shop_wallet_label.position=Vector2(50,714);shop_wallet_label.size=Vector2(476,40);shop_wallet_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;shop_wallet_label.add_theme_font_size_override("font_size",21);shop_wallet_label.add_theme_color_override("font_color",Color("#ffd778"));shop_overlay.add_child(shop_wallet_label)
@@ -536,8 +534,7 @@ func _reset_progression_for_development(button:Button)->void:
 func _build_result_overlay(hud:Control)->void:
 	result_overlay=Control.new();result_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);result_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;result_overlay.visible=false;hud.add_child(result_overlay)
 	var shade:=ColorRect.new();shade.color=Color(0.08,0.05,0.035,.68);shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);shade.mouse_filter=Control.MOUSE_FILTER_STOP;result_overlay.add_child(shade)
-	result_confetti_layer=Control.new();result_confetti_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);result_confetti_layer.mouse_filter=Control.MOUSE_FILTER_IGNORE;result_overlay.add_child(result_confetti_layer)
-	result_card=PanelContainer.new();result_card.position=Vector2(54,205);result_card.size=Vector2(468,610);result_card.add_theme_stylebox_override("panel",_box(Color("#f7e8c7"),Color("#c8944f"),28,4));result_overlay.add_child(result_card)
+	result_card=PanelContainer.new();result_card.position=Vector2(54,205);result_card.size=Vector2(468,610);result_card.clip_contents=true;result_card.add_theme_stylebox_override("panel",_box(Color("#f7e8c7"),Color("#c8944f"),28,4));result_overlay.add_child(result_card)
 	var content:=VBoxContainer.new();content.alignment=BoxContainer.ALIGNMENT_CENTER;content.add_theme_constant_override("separation",15);result_card.add_child(content)
 	var title:=Label.new();title.text="今回の収穫";title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;title.add_theme_font_size_override("font_size",30);title.add_theme_color_override("font_color",UI_BROWN);content.add_child(title)
 	result_total_label=Label.new();result_total_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;result_total_label.add_theme_font_size_override("font_size",34);result_total_label.add_theme_color_override("font_color",Color("#b06c24"));content.add_child(result_total_label)
@@ -547,21 +544,29 @@ func _build_result_overlay(hud:Control)->void:
 	var notable_title:=Label.new();notable_title.text="目立った収穫株";notable_title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;notable_title.add_theme_font_size_override("font_size",19);notable_title.add_theme_color_override("font_color",Color("#725039"));content.add_child(notable_title)
 	result_notable_label=Label.new();result_notable_label.custom_minimum_size=Vector2(390,112);result_notable_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;result_notable_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;result_notable_label.add_theme_font_size_override("font_size",18);result_notable_label.add_theme_color_override("font_color",UI_BROWN);content.add_child(result_notable_label)
 	var close:=Button.new();close.text="閉じる / 戻る";close.custom_minimum_size=Vector2(350,54);_skin_button(close,Color("#ead8b1"),17);close.pressed.connect(_close_result);content.add_child(close)
+	result_confetti_layer=Control.new();result_confetti_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);result_confetti_layer.mouse_filter=Control.MOUSE_FILTER_IGNORE;result_card.add_child(result_confetti_layer)
 
 func _result_line_label()->Label:
 	var label:=Label.new();label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;label.add_theme_font_size_override("font_size",21);label.add_theme_color_override("font_color",Color("#65432e"));return label
 
 func _clear_result_confetti()->void:
+	if result_record_pulse_tween and result_record_pulse_tween.is_valid():result_record_pulse_tween.kill()
+	result_record_pulse_tween=null
+	if result_max_label:result_max_label.scale=Vector2.ONE
 	if not result_confetti_layer:return
 	for piece in result_confetti_layer.get_children():piece.queue_free()
 
 func _play_result_confetti()->void:
 	_clear_result_confetti()
 	var colors:=[Color("#c98758"),Color("#d8b66a"),Color("#91a982"),Color("#c98b83"),Color("#e5d3a1")]
-	for i in range(32):
-		var piece:=ColorRect.new();piece.color=colors[rng.randi_range(0,colors.size()-1)];piece.size=Vector2(rng.randf_range(5.0,8.0),rng.randf_range(9.0,14.0));piece.position=Vector2(rng.randf_range(34.0,542.0),rng.randf_range(-90.0,135.0));piece.rotation=rng.randf_range(-1.0,1.0);piece.mouse_filter=Control.MOUSE_FILTER_IGNORE;result_confetti_layer.add_child(piece)
-		var destination:=piece.position+Vector2(rng.randf_range(-42.0,42.0),rng.randf_range(780.0,1030.0));var duration:=rng.randf_range(2.9,4.1)
+	for i in range(40):
+		var piece:=ColorRect.new();piece.color=colors[rng.randi_range(0,colors.size()-1)];piece.color.a=.88;piece.size=Vector2(rng.randf_range(4.0,7.0),rng.randf_range(8.0,13.0));piece.position=Vector2(rng.randf_range(10.0,458.0),rng.randf_range(-65.0,115.0));piece.rotation=rng.randf_range(-1.0,1.0);piece.mouse_filter=Control.MOUSE_FILTER_IGNORE;result_confetti_layer.add_child(piece)
+		var destination:=piece.position+Vector2(rng.randf_range(-34.0,34.0),rng.randf_range(500.0,710.0));var duration:=rng.randf_range(2.8,4.0)
 		var tween:=create_tween().set_parallel();tween.tween_property(piece,"position",destination,duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN);tween.tween_property(piece,"rotation",piece.rotation+rng.randf_range(2.0,5.0),duration);tween.tween_property(piece,"modulate:a",0.0,.7).set_delay(duration-.7);tween.chain().tween_callback(piece.queue_free)
+
+func _start_result_record_pulse()->void:
+	result_max_label.pivot_offset=result_max_label.size*.5;result_max_label.scale=Vector2.ONE
+	result_record_pulse_tween=create_tween().set_loops();result_record_pulse_tween.tween_property(result_max_label,"scale",Vector2(1.10,1.10),.52).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT);result_record_pulse_tween.tween_property(result_max_label,"scale",Vector2.ONE,.52).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 func _open_play_modal()->void:
 	if play_active or current_mode!="greenhouse":return
@@ -658,7 +663,7 @@ func _show_play_result()->void:
 	result_total_label.text="合計  ＋¥%s"%_comma(play_earnings_total);result_count_label.text="収穫株数　%d株"%play_harvest_count
 	result_max_label.remove_theme_color_override("font_outline_color");result_max_label.remove_theme_constant_override("outline_size")
 	if play_updated_global_best:
-		result_max_label.text="最大サイズ更新！\n%.1fcm"%play_max_size;result_max_label.add_theme_font_size_override("font_size",30);result_max_label.add_theme_color_override("font_color",Color("#b83b32"));result_max_label.add_theme_color_override("font_outline_color",Color("#f8e8c8"));result_max_label.add_theme_constant_override("outline_size",3);_play_result_confetti();audio_manager.play_se("result_new_best",.48)
+		result_max_label.text="最大サイズ更新！\n%.1fcm"%play_max_size;result_max_label.add_theme_font_size_override("font_size",30);result_max_label.add_theme_color_override("font_color",Color("#b83b32"));result_max_label.add_theme_color_override("font_outline_color",Color("#f8e8c8"));result_max_label.add_theme_constant_override("outline_size",3);_play_result_confetti();call_deferred("_start_result_record_pulse");audio_manager.play_se("result_new_best",.48)
 	else:
 		result_max_label.text="最大サイズ　%.1fcm"%play_max_size;result_max_label.add_theme_font_size_override("font_size",21);result_max_label.add_theme_color_override("font_color",Color("#65432e"));_clear_result_confetti()
 	var notable:Array=play_notable_species.values();notable.sort_custom(func(a,b):return float(a.get("size",0.0))>float(b.get("size",0.0)));var lines:Array[String]=[]
@@ -1108,9 +1113,6 @@ func _apply_mode()->void:
 		camera.position=Vector3.ZERO;habitat_target_yaw=view_yaw;habitat_target_pitch=view_pitch;_apply_view_rotation()
 	if mode_button:
 		mode_button.text=("☂\n原生地" if rain_event_pending else "原生地") if greenhouse_mode else "温室"
-	if screen_name_label:
-		screen_name_label.text="温室" if greenhouse_mode else "原生地"
-		screen_name_label.position=Vector2(20,24)
 	if audio_manager:audio_manager.play_bgm("greenhouse" if greenhouse_mode else "habitat")
 	_update_play_ui()
 
