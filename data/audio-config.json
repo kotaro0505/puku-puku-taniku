@@ -1,8 +1,12 @@
 {
   "bgm": {
+    "opening": "res://assets/audio/morning-garden-jingle.wav",
     "greenhouse": "res://assets/audio/puku-puku-taniku-main.wav",
     "habitat": "",
     "shop": "res://assets/audio/puku-puku-taniku-main.wav"
+  },
+  "bgm_gain": {
+    "opening": 0.58
   },
   "se": {
     "ui_tap": "",

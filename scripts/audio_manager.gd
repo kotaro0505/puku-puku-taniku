@@ -50,7 +50,7 @@ func apply_settings(saved: Dictionary) -> void:
 		AudioServer.set_bus_mute(AudioServer.get_bus_index("Master"), false)
 		_queue_bgm_restart()
 	else:
-		var target_db := linear_to_db(maxf(bgm_volume, 0.001))
+		var target_db := _bgm_target_db(current_bgm_key)
 		for player in bgm_players:
 			if player.playing: player.volume_db = target_db
 
@@ -72,12 +72,18 @@ func play_bgm(key: String, restart := false) -> void:
 	next.stream = stream
 	next.volume_db = -60.0
 	next.play()
-	var target_db := linear_to_db(maxf(bgm_volume, 0.001))
+	var target_db := _bgm_target_db(key)
 	bgm_fade_tween = create_tween().set_parallel()
 	bgm_fade_tween.tween_property(next, "volume_db", target_db, BGM_FADE_SECONDS)
 	if current.playing: bgm_fade_tween.tween_property(current, "volume_db", -60.0, BGM_FADE_SECONDS)
 	bgm_fade_tween.chain().tween_callback(current.stop)
 	active_bgm = next_index
+
+func _bgm_target_db(key:String)->float:
+	var gains=config.get("bgm_gain",{})
+	var gain:=1.0
+	if gains is Dictionary:gain=clampf(float(gains.get(key,1.0)),0.0,1.0)
+	return linear_to_db(maxf(bgm_volume*gain,0.001))
 
 func notify_user_gesture() -> void:
 	if not bgm_enabled or current_bgm_key.is_empty(): return

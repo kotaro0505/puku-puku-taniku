@@ -367,7 +367,13 @@ func _build_opening_screen(hud:Control)->void:
 	var background:=TextureRect.new();background.texture=load("res://assets/opening-background.jpg");background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);background.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;background.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_COVERED;background.mouse_filter=Control.MOUSE_FILTER_IGNORE;opening_overlay.add_child(background)
 	opening_prompt=TextureRect.new();opening_prompt.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;opening_prompt.texture=load("res://assets/opening-tap.png");opening_prompt.position=Vector2(86,820);opening_prompt.size=Vector2(404,136);opening_prompt.pivot_offset=opening_prompt.size*.5;opening_prompt.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;opening_prompt.mouse_filter=Control.MOUSE_FILTER_IGNORE;opening_overlay.add_child(opening_prompt)
 	var tap_area:=Button.new();tap_area.flat=true;tap_area.focus_mode=Control.FOCUS_NONE;tap_area.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);tap_area.mouse_default_cursor_shape=Control.CURSOR_POINTING_HAND;tap_area.pressed.connect(_finish_opening);opening_overlay.add_child(tap_area)
+	_show_opening()
+
+func _show_opening()->void:
+	opening_finished=false;opening_overlay.visible=true;opening_prompt.scale=Vector2.ONE
+	if opening_prompt_tween and opening_prompt_tween.is_valid():opening_prompt_tween.kill()
 	opening_prompt_tween=create_tween().set_loops();opening_prompt_tween.tween_property(opening_prompt,"scale",Vector2(1.035,1.035),1.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT);opening_prompt_tween.tween_property(opening_prompt,"scale",Vector2.ONE,1.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	if audio_manager:audio_manager.play_bgm("opening")
 
 func _finish_opening()->void:
 	if opening_finished:return
