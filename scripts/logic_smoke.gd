@@ -32,6 +32,8 @@ func _ready()->void:
 	var species_ids:Array=[]
 	for entry in game.catalog_species:species_ids.append(str(entry.species_id))
 	for required in ["laui","golden_laui","colorata","affinis","lutea","shaviana","kannte","pinwheel","tovarensis_tovar","strictiflora_bustamante"]:assert(required in species_ids)
+	var succulent_assets = load("res://scripts/succulent.gd")
+	assert(succulent_assets.SPRITES.pinwheel=="res://assets/plants/sprite-pinwheel.png" and ResourceLoader.exists(succulent_assets.SPRITES.pinwheel))
 	var opening_ids:Array=[]
 	for plant in game.plants:opening_ids.append(str(plant.data.species_id))
 	for spawned_id in opening_ids:assert(spawned_id in species_ids and spawned_id=="colorata")
