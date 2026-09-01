@@ -51,6 +51,7 @@ func _ready()->void:
 	assert(succulent_assets.SPRITES.pinwheel=="res://assets/plants/sprite-pinwheel.png" and ResourceLoader.exists(succulent_assets.SPRITES.pinwheel))
 	assert(succulent_assets.SPRITES.transparent_mystery=="res://assets/plants/sprite-transparent-mystery.png" and ResourceLoader.exists(succulent_assets.SPRITES.transparent_mystery))
 	assert(succulent_assets.SPRITES.hyalina_san_luis=="res://assets/plants/sprite-hyalina-san-luis.png" and ResourceLoader.exists(succulent_assets.SPRITES.hyalina_san_luis));assert(succulent_assets.SPRITES.purpusorum=="res://assets/plants/sprite-purpusorum.png" and ResourceLoader.exists(succulent_assets.SPRITES.purpusorum))
+	var hyalina_bitmap:Image=(load(succulent_assets.SPRITES.hyalina_san_luis) as Texture2D).get_image();var hyalina_used:=hyalina_bitmap.get_used_rect();assert(hyalina_used.position.x>0 and hyalina_used.position.y>0 and hyalina_used.end.x<hyalina_bitmap.get_width() and hyalina_used.end.y<hyalina_bitmap.get_height())
 	var pinwheel_bitmap:Image=(load(succulent_assets.SPRITES.pinwheel) as Texture2D).get_image();var pinwheel_used:=pinwheel_bitmap.get_used_rect();assert(pinwheel_used.position.x>0 and pinwheel_used.position.y>0 and pinwheel_used.end.x<pinwheel_bitmap.get_width() and pinwheel_used.end.y<pinwheel_bitmap.get_height())
 	var opening_ids:Array=[]
 	for plant in game.plants:opening_ids.append(str(plant.data.species_id))
