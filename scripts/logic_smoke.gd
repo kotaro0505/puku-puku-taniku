@@ -8,6 +8,8 @@ func _ready()->void:
 	assert(game.best_label.get_parent().position==Vector2(204,54))
 	assert(game.mode_button.position==Vector2(398,198) and game.mode_button.size==Vector2(153,55));assert(game.shop_button.position==Vector2(398,262) and game.shop_button.size==Vector2(153,55));assert(game.result_confetti_layer.get_parent()==game.result_overlay)
 	game._toggle_mode();assert(game.current_mode=="habitat" and not game.shop_button.visible and not game.habitat_status_label.visible and game.habitat_status_label.text.is_empty());game._start_habitat_scroll_tutorial();assert(game.intro_panda_portrait.visible and game.intro_panda_portrait.stretch_mode==TextureRect.STRETCH_KEEP_ASPECT_CENTERED and game.intro_dialog_panel.position in [Vector2(40,725),Vector2(40,385)]);game.intro_overlay.visible=false;game.tutorial_dialog_kind="";game._toggle_mode();assert(game.current_mode=="greenhouse" and game.shop_button.visible);game._start_post_play_dialog("play2");assert(not game.intro_panda_portrait.visible);game.intro_overlay.visible=false;game.shop_overlay.visible=false;game.tutorial_dialog_kind="";game._update_play_ui()
+	game._open_shop();game._on_shop_panda_tapped();var first_chatter:String=game.shop_chatter_label.text;assert(game.shop_chatter_bubble.visible and not game.shop_chatter_action_button.visible);game._on_shop_panda_tapped();assert(game.shop_chatter_label.text!=first_chatter)
+	game.coins=499;game.old_seed_bags=0;game.normal_seed_bags=0;game.premium_seed_bags=0;game._on_shop_panda_tapped();assert(game.shop_chatter_action_button.visible and "広告" not in game.shop_chatter_label.text);game.rescue_reward_in_progress=true;game._on_rescue_reward_ad_completed(false);assert(game.normal_seed_bags==0);game._request_rescue_reward_ad();await get_tree().create_timer(.8).timeout;assert(game.normal_seed_bags==1 and not game.rescue_reward_in_progress);game._on_rescue_reward_ad_completed(true);assert(game.normal_seed_bags==1);game._close_shop();game.coins=1000
 	assert(game.plants.is_empty() and not game.play_active)
 	assert(game.play_open_button.visible and not game.play_overlay.visible)
 	game._open_play_modal();assert(game.play_overlay.visible);game._close_play_modal();assert(not game.play_overlay.visible)
@@ -57,8 +59,8 @@ func _ready()->void:
 	var pan_target=game.plants[0];var pan_screen_before:Vector2=game.camera.unproject_position(pan_target.global_position);var backdrop_y:float=game.greenhouse_backdrop.position.y
 	game._begin_pointer(Vector2(280,500));game._drag_pointer(Vector2(282,500),Vector2(2,0));assert(is_equal_approx(game.greenhouse_pan_target_x,game.greenhouse_pan_x));game._drag_pointer(Vector2(380,500),Vector2(98,0));assert(game.greenhouse_pan_target_x>game.greenhouse_pan_x);game._update_greenhouse_pan_follow(.5);game._resolve_crowding(0.0);game._end_pointer(Vector2(380,500));var pan_screen_after:Vector2=game.camera.unproject_position(pan_target.global_position)
 	assert(game.greenhouse_pan_x>0.0 and game.greenhouse_pan_x<=game.greenhouse_pan_limit);assert(game.greenhouse_pan_limit<80.0);assert(pan_screen_after.x>pan_screen_before.x);assert(is_equal_approx(game.greenhouse_backdrop.position.y,backdrop_y))
-	for plant in game.plants:assert(game._spawn_center_inside_soil(plant.original_pos))
 	game.greenhouse_pan_x=0.0;game._update_greenhouse_pan();game._resolve_crowding(0.0)
+	for plant in game.plants:assert(game._spawn_center_inside_soil(plant.original_pos))
 	var species_id:String=harvest_target.data.species_id;harvest_target.diameter_cm=21.7;harvest_target.harvest()
 	await get_tree().create_timer(1.2).timeout
 	assert(float(game.bests.get(species_id,0.0))>=21.7)
