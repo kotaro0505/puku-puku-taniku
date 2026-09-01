@@ -44,6 +44,7 @@ func _ready()->void:
 	for required in ["laui","golden_laui","colorata","affinis","lutea","shaviana","kannte","pinwheel","tovarensis_tovar","strictiflora_bustamante"]:assert(required in species_ids)
 	var succulent_assets = load("res://scripts/succulent.gd")
 	assert(succulent_assets.SPRITES.pinwheel=="res://assets/plants/sprite-pinwheel.png" and ResourceLoader.exists(succulent_assets.SPRITES.pinwheel))
+	var pinwheel_bitmap:Image=(load(succulent_assets.SPRITES.pinwheel) as Texture2D).get_image();var pinwheel_used:=pinwheel_bitmap.get_used_rect();assert(pinwheel_used.position.x>0 and pinwheel_used.position.y>0 and pinwheel_used.end.x<pinwheel_bitmap.get_width() and pinwheel_used.end.y<pinwheel_bitmap.get_height())
 	var opening_ids:Array=[]
 	for plant in game.plants:opening_ids.append(str(plant.data.species_id))
 	for spawned_id in opening_ids:assert(spawned_id in species_ids and spawned_id=="colorata")
@@ -87,7 +88,10 @@ func _ready()->void:
 	await get_tree().create_timer(1.2).timeout
 	assert(float(game.bests.get(species_id,0.0))>=21.7)
 	assert(bool(game.discovered.get(species_id,false)))
-	game._open_encyclopedia();assert(game.encyclopedia_overlay.visible);assert(game.encyclopedia_grid.get_child_count()==game.catalog_species.size());game._close_encyclopedia()
+	game._open_encyclopedia();assert(game.encyclopedia_overlay.visible);assert(game.encyclopedia_grid.get_child_count()==game.catalog_species.size());var pinwheel_card_index:=-1
+	for catalog_index in range(game.catalog_species.size()):
+		if str(game.catalog_species[catalog_index].species_id)=="pinwheel":pinwheel_card_index=catalog_index;break
+	var pinwheel_card_frame:MarginContainer=game.encyclopedia_grid.get_child(pinwheel_card_index).find_child("SpeciesCardImageFrame",true,false);assert(pinwheel_card_frame.get_theme_constant("margin_left")==10 and pinwheel_card_frame.get_theme_constant("margin_right")==10);game._close_encyclopedia()
 	assert(game.play_active and game.play_seeds_remaining<24-initial_count)
 	for plant in game.plants:plant.jelly_checks_enabled=false
 	var jelly_target=game.plants[0]

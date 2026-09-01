@@ -1033,9 +1033,10 @@ func _refresh_encyclopedia_cards()->void:
 		var species_id:=str(entry.get("species_id",""));var found:=bool(discovered.get(species_id,false))
 		var card:=Button.new();card.custom_minimum_size=Vector2(252,218);_skin_button(card,Color("#f6e7c5"),16);card.disabled=not found;encyclopedia_grid.add_child(card)
 		var content:=VBoxContainer.new();content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);content.offset_left=10;content.offset_top=8;content.offset_right=-10;content.offset_bottom=-8;content.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.alignment=BoxContainer.ALIGNMENT_CENTER;card.add_child(content)
-		var image:=TextureRect.new();image.custom_minimum_size=Vector2(210,137);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.texture=_species_texture(entry);image.mouse_filter=Control.MOUSE_FILTER_IGNORE
+		var image_frame:=MarginContainer.new();image_frame.name="SpeciesCardImageFrame";image_frame.custom_minimum_size=Vector2(210,137);image_frame.add_theme_constant_override("margin_left",10);image_frame.add_theme_constant_override("margin_top",8);image_frame.add_theme_constant_override("margin_right",10);image_frame.add_theme_constant_override("margin_bottom",8);image_frame.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.add_child(image_frame)
+		var image:=TextureRect.new();image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.texture=_species_texture(entry);image.mouse_filter=Control.MOUSE_FILTER_IGNORE
 		if not found:image.modulate=Color(0.12,0.09,0.08,0.82)
-		content.add_child(image)
+		image_frame.add_child(image)
 		var name_label:=Label.new();name_label.text=str(entry.get("name_ja","？？？")) if found else "？？？";name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name_label.add_theme_font_size_override("font_size",18);name_label.add_theme_color_override("font_color",UI_BROWN);content.add_child(name_label)
 		var best_label_card:=Label.new();var card_best:=float(bests.get(species_id,0.0));best_label_card.text=(("自己ベスト  %.1f cm"%card_best) if card_best>0.0 else "自己ベスト　ー") if found else "未発見";best_label_card.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;best_label_card.add_theme_font_size_override("font_size",14);best_label_card.add_theme_color_override("font_color",Color("#79543a"));content.add_child(best_label_card)
 		if found:card.pressed.connect(_open_species_detail.bind(entry))
