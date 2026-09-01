@@ -109,7 +109,6 @@ var shop_purchase_controls: Array[Control] = []
 var shop_chatter_bubble: PanelContainer
 var shop_chatter_label: Label
 var shop_chatter_action_button: Button
-var shop_chatter_tween: Tween
 var last_shop_chatter := ""
 var rescue_reward_in_progress := false
 var intro_overlay: Control
@@ -371,7 +370,7 @@ func _build_play_overlay(hud:Control)->void:
 func _build_shop(hud:Control)->void:
 	shop_overlay=Control.new();shop_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);shop_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;shop_overlay.visible=false;hud.add_child(shop_overlay)
 	var shop_texture:=load("res://assets/shop-background-final.jpg") as Texture2D
-	var background:=TextureRect.new();background.texture=shop_texture;background.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;background.stretch_mode=TextureRect.STRETCH_SCALE;background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);background.mouse_filter=Control.MOUSE_FILTER_IGNORE;shop_overlay.add_child(background)
+	var background:=TextureRect.new();background.texture=shop_texture;background.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;background.stretch_mode=TextureRect.STRETCH_SCALE;background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);background.mouse_filter=Control.MOUSE_FILTER_STOP;background.gui_input.connect(_on_shop_background_gui_input);shop_overlay.add_child(background)
 	var panda_tap:=Button.new();panda_tap.position=Vector2(190,405);panda_tap.size=Vector2(196,315);panda_tap.flat=true;panda_tap.focus_mode=Control.FOCUS_NONE;panda_tap.mouse_default_cursor_shape=Control.CURSOR_POINTING_HAND;panda_tap.pressed.connect(_on_shop_panda_tapped);shop_overlay.add_child(panda_tap)
 	var close:=Button.new();close.text="もどる";close.position=Vector2(446,24);close.size=Vector2(106,55);_skin_button(close,Color("#fff0cf"),17);close.pressed.connect(_close_shop);shop_overlay.add_child(close)
 	var purchase_panel:=PanelContainer.new();purchase_panel.position=Vector2(28,704);purchase_panel.size=Vector2(520,296);purchase_panel.add_theme_stylebox_override("panel",_box(Color(0.22,0.12,0.07,.93),Color("#d7aa64"),22,3));shop_overlay.add_child(purchase_panel)
@@ -381,7 +380,7 @@ func _build_shop(hud:Control)->void:
 	shop_premium_buy_button=Button.new();shop_premium_buy_button.position=Vector2(62,872);shop_premium_buy_button.size=Vector2(452,64);_skin_button(shop_premium_buy_button,Color("#d18a55"),20);shop_premium_buy_button.pressed.connect(_buy_seed_bag.bind("premium"));shop_overlay.add_child(shop_premium_buy_button)
 	shop_message=Label.new();shop_message.position=Vector2(48,944);shop_message.size=Vector2(480,45);shop_message.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;shop_message.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;shop_message.add_theme_font_size_override("font_size",15);shop_message.add_theme_color_override("font_color",UI_CREAM);shop_overlay.add_child(shop_message)
 	shop_purchase_controls=[purchase_panel,shop_wallet_label,shop_bag_label,normal_buy,shop_premium_buy_button,shop_message]
-	shop_chatter_bubble=PanelContainer.new();shop_chatter_bubble.position=Vector2(36,330);shop_chatter_bubble.size=Vector2(340,158);shop_chatter_bubble.mouse_filter=Control.MOUSE_FILTER_PASS;shop_chatter_bubble.add_theme_stylebox_override("panel",_box(Color(1.0,.95,.82,.97),Color("#9b6739"),24,3));shop_chatter_bubble.visible=false;shop_overlay.add_child(shop_chatter_bubble)
+	shop_chatter_bubble=PanelContainer.new();shop_chatter_bubble.position=Vector2(22,104);shop_chatter_bubble.size=Vector2(400,190);shop_chatter_bubble.mouse_filter=Control.MOUSE_FILTER_STOP;shop_chatter_bubble.gui_input.connect(_on_shop_chatter_gui_input);shop_chatter_bubble.add_theme_stylebox_override("panel",_box(Color(1.0,.95,.82,.97),Color("#9b6739"),24,3));shop_chatter_bubble.visible=false;shop_overlay.add_child(shop_chatter_bubble)
 	var chatter_content:=VBoxContainer.new();chatter_content.alignment=BoxContainer.ALIGNMENT_CENTER;chatter_content.add_theme_constant_override("separation",9);chatter_content.mouse_filter=Control.MOUSE_FILTER_PASS;shop_chatter_bubble.add_child(chatter_content)
 	shop_chatter_label=Label.new();shop_chatter_label.custom_minimum_size=Vector2(308,92);shop_chatter_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;shop_chatter_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;shop_chatter_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;shop_chatter_label.add_theme_font_size_override("font_size",18);shop_chatter_label.add_theme_color_override("font_color",UI_BROWN);shop_chatter_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;chatter_content.add_child(shop_chatter_label)
 	shop_chatter_action_button=Button.new();shop_chatter_action_button.text="広告を見て種をもらう";shop_chatter_action_button.custom_minimum_size=Vector2(310,48);_skin_button(shop_chatter_action_button,Color("#d8b56b"),17);shop_chatter_action_button.pressed.connect(_request_rescue_reward_ad);shop_chatter_action_button.visible=false;chatter_content.add_child(shop_chatter_action_button)
@@ -397,13 +396,25 @@ func _on_shop_panda_tapped()->void:
 	_show_shop_chatter(_pick_shop_chatter(),false)
 
 func _show_shop_chatter(message:String,is_rescue:bool)->void:
-	if shop_chatter_tween and shop_chatter_tween.is_valid():shop_chatter_tween.kill()
-	shop_chatter_tween=null;shop_chatter_bubble.modulate=Color.WHITE;shop_chatter_bubble.visible=true;shop_chatter_label.text=message
-	shop_chatter_bubble.mouse_filter=Control.MOUSE_FILTER_STOP if is_rescue else Control.MOUSE_FILTER_IGNORE
-	shop_chatter_bubble.position=Vector2(26,286) if is_rescue else Vector2(36,330);shop_chatter_bubble.size=Vector2(410,226) if is_rescue else Vector2(340,158)
+	shop_chatter_bubble.modulate=Color.WHITE;shop_chatter_bubble.visible=true;shop_chatter_label.text=message
+	shop_chatter_bubble.position=Vector2(22,86) if is_rescue else Vector2(22,104);shop_chatter_bubble.size=Vector2(420,250) if is_rescue else Vector2(400,190)
 	shop_chatter_action_button.visible=is_rescue;shop_chatter_action_button.disabled=rescue_reward_in_progress;shop_chatter_action_button.text="広告を準備中…" if rescue_reward_in_progress else "広告を見て種をもらう"
-	if is_rescue:return
-	shop_chatter_tween=create_tween();shop_chatter_tween.tween_interval(3.35);shop_chatter_tween.tween_property(shop_chatter_bubble,"modulate:a",0.0,.45).set_trans(Tween.TRANS_QUAD);shop_chatter_tween.tween_callback(func():shop_chatter_bubble.visible=false;shop_chatter_bubble.modulate.a=1.0)
+
+func _on_shop_background_gui_input(event:InputEvent)->void:
+	if _shop_dismiss_pressed(event):_hide_shop_chatter()
+
+func _on_shop_chatter_gui_input(event:InputEvent)->void:
+	if _shop_dismiss_pressed(event):_hide_shop_chatter()
+
+func _shop_dismiss_pressed(event:InputEvent)->bool:
+	if event is InputEventMouseButton:return event.button_index==MOUSE_BUTTON_LEFT and event.pressed
+	if event is InputEventScreenTouch:return event.pressed
+	return false
+
+func _hide_shop_chatter(force:=false)->void:
+	if not shop_chatter_bubble.visible:return
+	if shop_chatter_action_button.visible and not force:return
+	shop_chatter_bubble.visible=false;shop_chatter_bubble.modulate.a=1.0
 
 func _pick_shop_chatter()->String:
 	var date:=Time.get_date_dict_from_system();var month:=int(date.get("month",1));var day:=int(date.get("day",1));var japan:=_is_japan_region();var new_year:="あけましておめでとう！今年もよろしくね！"
@@ -758,8 +769,7 @@ func _open_shop()->void:
 	play_modal_open=false;_set_shop_purchase_visible(true);_update_shop_ui();shop_message.text="たね袋を1袋ずつ購入できます";play_overlay.visible=false;shop_chatter_bubble.visible=false;shop_overlay.visible=true;audio_manager.play_bgm("shop");_update_play_ui()
 
 func _close_shop()->void:
-	if shop_chatter_tween and shop_chatter_tween.is_valid():shop_chatter_tween.kill()
-	shop_chatter_bubble.visible=false;shop_overlay.visible=false;audio_manager.play_bgm("greenhouse" if current_mode=="greenhouse" else "habitat");_update_play_ui()
+	_hide_shop_chatter(true);shop_overlay.visible=false;audio_manager.play_bgm("greenhouse" if current_mode=="greenhouse" else "habitat");_update_play_ui()
 
 func _buy_seed_bag(seed_type:String)->void:
 	if seed_type=="premium" and not _premium_seed_unlocked():shop_message.text="レア種を1種発見すると解放";return
