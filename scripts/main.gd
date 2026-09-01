@@ -197,6 +197,10 @@ var pointer_last := Vector2.ZERO
 var pointer_travel := 0.0
 var greenhouse_drag_accumulator := 0.0
 var greenhouse_drag_started := false
+var opening_overlay: Control
+var opening_prompt: TextureRect
+var opening_prompt_tween: Tween
+var opening_finished := false
 
 func _ready() -> void:
 	rng.randomize()
@@ -210,6 +214,8 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_layout)
 	_layout()
 	_wire_ui_sounds(self)
+
+func _continue_after_opening()->void:
 	if not intro_story_complete:call_deferred("_start_intro_story")
 	elif _daily_seed_gift_due():call_deferred("_start_daily_seed_gift")
 	else:
@@ -352,8 +358,23 @@ func _build_ui() -> void:
 	_build_settings(hud)
 	_build_intro_story(hud)
 	_build_tutorial_guide(hud)
+	_build_opening_screen(hud)
 	_update_best_ui()
 	_update_play_ui()
+
+func _build_opening_screen(hud:Control)->void:
+	opening_overlay=Control.new();opening_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);opening_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;hud.add_child(opening_overlay)
+	var background:=TextureRect.new();background.texture=load("res://assets/opening-background.jpg");background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);background.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;background.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_COVERED;background.mouse_filter=Control.MOUSE_FILTER_IGNORE;opening_overlay.add_child(background)
+	opening_prompt=TextureRect.new();opening_prompt.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;opening_prompt.texture=load("res://assets/opening-tap.png");opening_prompt.position=Vector2(86,820);opening_prompt.size=Vector2(404,136);opening_prompt.pivot_offset=opening_prompt.size*.5;opening_prompt.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;opening_prompt.mouse_filter=Control.MOUSE_FILTER_IGNORE;opening_overlay.add_child(opening_prompt)
+	var tap_area:=Button.new();tap_area.flat=true;tap_area.focus_mode=Control.FOCUS_NONE;tap_area.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);tap_area.mouse_default_cursor_shape=Control.CURSOR_POINTING_HAND;tap_area.pressed.connect(_finish_opening);opening_overlay.add_child(tap_area)
+	opening_prompt_tween=create_tween().set_loops();opening_prompt_tween.tween_property(opening_prompt,"scale",Vector2(1.035,1.035),1.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT);opening_prompt_tween.tween_property(opening_prompt,"scale",Vector2.ONE,1.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+func _finish_opening()->void:
+	if opening_finished:return
+	opening_finished=true
+	if opening_prompt_tween:opening_prompt_tween.kill()
+	opening_overlay.visible=false
+	_continue_after_opening()
 
 func _build_play_overlay(hud:Control)->void:
 	play_overlay=Control.new();play_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);play_overlay.mouse_filter=Control.MOUSE_FILTER_IGNORE;hud.add_child(play_overlay)

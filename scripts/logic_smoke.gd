@@ -4,6 +4,7 @@ func _ready()->void:
 	var scene:PackedScene=load("res://main.tscn");var game:Node=scene.instantiate();add_child(game)
 	await get_tree().process_frame
 	await get_tree().process_frame
+	assert(game.opening_overlay.visible and game.opening_prompt.size==Vector2(404,136) and game.opening_prompt.stretch_mode==TextureRect.STRETCH_KEEP_ASPECT_CENTERED);game._finish_opening();assert(not game.opening_overlay.visible)
 	game._reset_progression_state();game.intro_story_complete=true;game.habitat_unlocked=true;game.encyclopedia_unlocked=true;game.buyback_unlocked=true;game.tutorial_steps["habitat_scroll_dialog"]=true;game.tutorial_steps["habitat_get_dialog"]=true;game.tutorial_steps["play1_dialog"]=true;game.intro_overlay.visible=false;game.shop_overlay.visible=false;game._update_play_ui()
 	assert(game.best_label.get_parent().position==Vector2(204,54))
 	assert(game.mode_button.position==Vector2(398,198) and game.mode_button.size==Vector2(153,55));assert(game.shop_button.position==Vector2(398,262) and game.shop_button.size==Vector2(153,55));assert(game.result_confetti_layer.get_parent()==game.result_overlay)
