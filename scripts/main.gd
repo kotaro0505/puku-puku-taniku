@@ -938,7 +938,7 @@ func _grant_armadillo_research_milestones(previous_total:int,new_total:int)->Arr
 		armadillo_research_rewards["18"]=true;messages.append("研究していた謎のたねが、ついに発芽したよ！")
 	if new_total>=25 and not bool(armadillo_research_rewards.get("25",false)):
 		if not _catalog_entry(MYSTERY_RESEARCH_TRANSPARENT_ID).is_empty():
-			_grant_hidden_species(MYSTERY_RESEARCH_TRANSPARENT_ID);armadillo_research_rewards["25"]=true;messages.append("透明な多肉、これあげる！")
+			_grant_hidden_species(MYSTERY_RESEARCH_TRANSPARENT_ID);armadillo_research_rewards["25"]=true;messages.append("透明謎多肉、これあげる！")
 		else:messages.append("透明な多肉の記録を整理しているよ。もう少し待ってね。")
 	if previous_total<35 and new_total>=35 and not bool(armadillo_research_rewards.get("35",false)):
 		_grant_hidden_species("golden_laui");armadillo_research_rewards["35"]=true;messages.append("びっくりだ。金色のラウイ……！？ これ、あげる！")

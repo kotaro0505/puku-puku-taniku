@@ -12,8 +12,8 @@ func _ready()->void:
 	assert(random_armadillo_visits>0 and random_armadillo_visits<25)
 	game.mystery_seed_count=3;game._prepare_shop_visit();assert(game.armadillo_present and game.armadillo_tap_button.visible);game._on_armadillo_tapped();assert(game.armadillo_dialog_mode=="research_offer" and game.shop_chatter_action_button.visible and game.shop_chatter_decline_button.visible);game._decline_armadillo_research();assert(game.mystery_seed_count==3 and game.armadillo_research_total==0);game._on_armadillo_tapped();game._accept_armadillo_research();assert(game.mystery_seed_count==0 and game.armadillo_research_total==3 and game.shop_transfer_notice.text=="渡した謎のたね ×3個")
 	game.armadillo_research_total=6;game.armadillo_research_rewards.clear();game.mystery_seed_count=39;var research_bags_before:int=game.normal_seed_bags;game._accept_armadillo_research();assert(game.armadillo_research_total==45 and game.mystery_seed_count==0 and game.normal_seed_bags>=research_bags_before+3)
-	for milestone in ["8","13","18","35","40","45"]:assert(bool(game.armadillo_research_rewards.get(milestone,false)))
-	assert(not bool(game.armadillo_research_rewards.get("25",false)));assert(bool(game.discovered.get("golden_laui",false)));game._save();game.armadillo_research_total=0;game.armadillo_research_rewards.clear();game._load_save();assert(game.armadillo_research_total==45 and bool(game.armadillo_research_rewards.get("45",false)))
+	for milestone in ["8","13","18","25","35","40","45"]:assert(bool(game.armadillo_research_rewards.get(milestone,false)))
+	assert(bool(game.discovered.get("transparent_succulent",false)) and bool(game.discovered.get("golden_laui",false)));game._save();game.armadillo_research_total=0;game.armadillo_research_rewards.clear();game._load_save();assert(game.armadillo_research_total==45 and bool(game.armadillo_research_rewards.get("45",false)))
 	game.bests.erase("pinwheel");game._open_species_detail(game._catalog_entry("pinwheel"));await get_tree().process_frame;var detail_image:TextureRect=game.encyclopedia_detail_page.find_child("SpeciesImage",true,false);var detail_frame:MarginContainer=game.encyclopedia_detail_page.find_child("SpeciesImageFrame",true,false);var detail_best:Label=game.encyclopedia_detail_page.find_child("SpeciesBest",true,false);assert(detail_image.stretch_mode==TextureRect.STRETCH_KEEP_ASPECT_CENTERED and detail_frame.get_theme_constant("margin_left")==22 and detail_best.text=="自己ベスト　ー");game.bests["pinwheel"]=12.3;game._open_species_detail(game._catalog_entry("pinwheel"));detail_best=game.encyclopedia_detail_page.find_child("SpeciesBest",true,false);assert(detail_best.text=="自己ベスト  12.3 cm");game.bests.erase("pinwheel")
 	assert(game.shop_wallet_label.position.y==842.0 and game.shop_premium_buy_button.position==Vector2(296,899) and game.shop_premium_buy_button.size==Vector2(232,55) and game.armadillo_tap_button.position.y+game.armadillo_tap_button.size.y<836.0)
 	game.coins=1000;var purchased_bags_before:int=game.normal_seed_bags;game._buy_seed_bag("normal");assert(game.coins==500 and game.normal_seed_bags==purchased_bags_before+1);game.coins=1000
@@ -37,13 +37,14 @@ func _ready()->void:
 	for control in game.external_navigation_controls:assert(not control.visible)
 	assert(game.plants.is_empty() and game.play_seed_animations_pending>=9 and game.play_seed_animations_pending<=12);assert(game.play_seeds_remaining==24-game.play_seed_animations_pending);assert(game.play_timer_label.text=="● たね袋 ●\n残り %d粒"%game.play_seeds_remaining);await get_tree().create_timer(.45).timeout
 	assert(game.plants.size()>=9 and game.plants.size()<=12 and game.play_seed_animations_pending==0);assert(game.play_seeds_remaining==24-game.plants.size())
-	assert(game.catalog_species.size()==13)
+	assert(game.catalog_species.size()==14)
 	assert(game.harvest_reward_yen(9.9)==0 and game.harvest_reward_yen(10.0)==10 and game.harvest_reward_yen(99.9)==1000 and game.harvest_reward_yen(150.0)==4000)
 	var species_ids:Array=[]
 	for entry in game.catalog_species:species_ids.append(str(entry.species_id))
-	for required in ["laui","golden_laui","colorata","affinis","lutea","shaviana","kannte","pinwheel","tovarensis_tovar","strictiflora_bustamante"]:assert(required in species_ids)
+	for required in ["laui","golden_laui","colorata","affinis","lutea","shaviana","kannte","pinwheel","tovarensis_tovar","transparent_succulent","strictiflora_bustamante"]:assert(required in species_ids)
 	var succulent_assets = load("res://scripts/succulent.gd")
 	assert(succulent_assets.SPRITES.pinwheel=="res://assets/plants/sprite-pinwheel.png" and ResourceLoader.exists(succulent_assets.SPRITES.pinwheel))
+	assert(succulent_assets.SPRITES.transparent_mystery=="res://assets/plants/sprite-transparent-mystery.png" and ResourceLoader.exists(succulent_assets.SPRITES.transparent_mystery))
 	var pinwheel_bitmap:Image=(load(succulent_assets.SPRITES.pinwheel) as Texture2D).get_image();var pinwheel_used:=pinwheel_bitmap.get_used_rect();assert(pinwheel_used.position.x>0 and pinwheel_used.position.y>0 and pinwheel_used.end.x<pinwheel_bitmap.get_width() and pinwheel_used.end.y<pinwheel_bitmap.get_height())
 	var opening_ids:Array=[]
 	for plant in game.plants:opening_ids.append(str(plant.data.species_id))
