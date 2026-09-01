@@ -32,6 +32,11 @@ const HIDDEN_PINWHEEL_ID := "pinwheel"
 const HIDDEN_TOVAR_ID := "tovarensis_tovar"
 const HIDDEN_BUSTAMANTE_ID := "strictiflora_bustamante"
 const MYSTERY_RESEARCH_TRANSPARENT_ID := "transparent_succulent"
+const BEST_UNLOCK_HYALINA_ID := "hyalina_san_luis_de_la_paz"
+const BEST_UNLOCK_PURPUSORUM_ID := "purpusorum"
+const BEST_UNLOCK_HYALINA_CM := 40.0
+const BEST_UNLOCK_PURPUSORUM_CM := 60.0
+const BEST_UNLOCK_PURPUSORUM_SPECIES_COUNT := 3
 const TOVAR_FIRST_PLAY := 6
 const SHOP_CHATTER_LINES := [
 	"多肉を触ってみて柔らかくなっていたら水やりのタイミングだよ",
@@ -178,6 +183,7 @@ var bests: Dictionary = {}
 var discovered: Dictionary = {}
 var unlocked_species: Dictionary = {}
 var greenhouse_available: Dictionary = {"colorata":true}
+var best_spawn_unlocks_dirty := false
 var habitat_seed_date := ""
 var habitat_seeds_collected := 0
 var normal_seed_bags := 0
@@ -233,6 +239,7 @@ func _ready() -> void:
 	_load_save()
 	_apply_saved_unlocks()
 	audio_manager=AudioManagerClass.new();add_child(audio_manager);audio_manager.apply_settings(audio_settings)
+	if best_spawn_unlocks_dirty:_save();best_spawn_unlocks_dirty=false
 	_build_world()
 	_build_ui()
 	_build_habitat_items()
@@ -284,6 +291,7 @@ func _load_save() -> void:
 				if float(bests[species_id])>0.0:discovered[species_id]=true
 			for hidden_id in [HIDDEN_PINWHEEL_ID,HIDDEN_TOVAR_ID,HIDDEN_BUSTAMANTE_ID]:
 				if bool(discovered.get(hidden_id,false)):hidden_species_acquired[hidden_id]=true
+			best_spawn_unlocks_dirty=_evaluate_best_spawn_unlocks(false)
 
 func _save() -> void:
 	var f := FileAccess.open("user://records.json",FileAccess.WRITE)
@@ -305,6 +313,27 @@ func _apply_saved_unlocks()->void:
 		greenhouse_available={"colorata":true};unlocked_species=greenhouse_available.duplicate(true)
 		for entry in catalog_species:
 			if str(entry.species_id)=="colorata":species.append(entry);break
+
+func _evaluate_best_spawn_unlocks(apply_now:=true)->bool:
+	var has_hyalina_best:=false
+	var purpusorum_best_species_count:=0
+	for best_value in bests.values():
+		var best_cm:=float(best_value)
+		if best_cm>=BEST_UNLOCK_HYALINA_CM:has_hyalina_best=true
+		if best_cm>=BEST_UNLOCK_PURPUSORUM_CM:purpusorum_best_species_count+=1
+	var changed:=false
+	if has_hyalina_best:
+		if not bool(greenhouse_available.get(BEST_UNLOCK_HYALINA_ID,false)):changed=true
+		greenhouse_available[BEST_UNLOCK_HYALINA_ID]=true;unlocked_species[BEST_UNLOCK_HYALINA_ID]=true;completed_unlock_conditions["best_40_hyalina"]=true
+	elif not bool(greenhouse_available.get(BEST_UNLOCK_HYALINA_ID,false)):
+		pending_habitat_species.erase(BEST_UNLOCK_HYALINA_ID)
+	if purpusorum_best_species_count>=BEST_UNLOCK_PURPUSORUM_SPECIES_COUNT:
+		if not bool(greenhouse_available.get(BEST_UNLOCK_PURPUSORUM_ID,false)):changed=true
+		greenhouse_available[BEST_UNLOCK_PURPUSORUM_ID]=true;unlocked_species[BEST_UNLOCK_PURPUSORUM_ID]=true;completed_unlock_conditions["three_species_best_60_purpusorum"]=true
+	elif not bool(greenhouse_available.get(BEST_UNLOCK_PURPUSORUM_ID,false)):
+		pending_habitat_species.erase(BEST_UNLOCK_PURPUSORUM_ID)
+	if changed and apply_now:_apply_saved_unlocks()
+	return changed
 
 func _build_world() -> void:
 	greenhouse_layer=CanvasLayer.new();greenhouse_layer.layer=-10;add_child(greenhouse_layer)
@@ -1146,6 +1175,7 @@ func _queue_random_species(rarity:String)->void:
 	for entry in catalog_species:
 		var species_id:=str(entry.species_id)
 		if str(entry.get("rarity","通常"))!=rarity:continue
+		if species_id in [BEST_UNLOCK_HYALINA_ID,BEST_UNLOCK_PURPUSORUM_ID]:continue
 		if bool(discovered.get(species_id,false)) or bool(greenhouse_available.get(species_id,false)) or species_id in pending_habitat_species:continue
 		candidates.append(entry)
 	if candidates.is_empty():return
@@ -1648,6 +1678,7 @@ func _on_harvested(p)->void:
 	var old:=float(bests.get(p.data.species_id,0.0));var is_record:bool=not deferred_tovar and p.diameter_cm>old
 	if not deferred_tovar:discovered[p.data.species_id]=true
 	if is_record:bests[p.data.species_id]=p.diameter_cm
+	if is_record:_evaluate_best_spawn_unlocks()
 	var reward:=harvest_reward_yen(p.diameter_cm) if buyback_unlocked else 0;coins+=reward;_evaluate_unlock_rules("harvest_size",p.diameter_cm);_save();_update_best_ui();_update_currency_ui();audio_manager.play_se("harvest",.55)
 	if reward>0:audio_manager.play_se("payment",.25)
 	if play_active:
