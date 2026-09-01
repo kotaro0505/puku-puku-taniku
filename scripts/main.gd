@@ -384,7 +384,7 @@ func _build_shop(hud:Control)->void:
 	shop_purchase_controls=[purchase_panel,shop_wallet_label,shop_bag_label,normal_buy,shop_premium_buy_button,shop_message]
 	shop_chatter_tail=Polygon2D.new();shop_chatter_tail.color=Color(1.0,.95,.82,.97);shop_chatter_tail.visible=false;shop_overlay.add_child(shop_chatter_tail)
 	shop_chatter_tail_outline=Line2D.new();shop_chatter_tail_outline.default_color=Color("#9b6739");shop_chatter_tail_outline.width=3.0;shop_chatter_tail_outline.antialiased=true;shop_chatter_tail_outline.visible=false;shop_overlay.add_child(shop_chatter_tail_outline)
-	shop_chatter_bubble=PanelContainer.new();shop_chatter_bubble.position=Vector2(88,110);shop_chatter_bubble.size=Vector2(400,108);shop_chatter_bubble.mouse_filter=Control.MOUSE_FILTER_STOP;shop_chatter_bubble.gui_input.connect(_on_shop_chatter_gui_input);shop_chatter_bubble.add_theme_stylebox_override("panel",_box(Color(1.0,.95,.82,.97),Color("#9b6739"),24,3));shop_chatter_bubble.visible=false;shop_overlay.add_child(shop_chatter_bubble)
+	shop_chatter_bubble=PanelContainer.new();shop_chatter_bubble.position=Vector2(88,245);shop_chatter_bubble.size=Vector2(400,108);shop_chatter_bubble.mouse_filter=Control.MOUSE_FILTER_STOP;shop_chatter_bubble.gui_input.connect(_on_shop_chatter_gui_input);shop_chatter_bubble.add_theme_stylebox_override("panel",_box(Color(1.0,.95,.82,.97),Color("#9b6739"),24,3));shop_chatter_bubble.visible=false;shop_overlay.add_child(shop_chatter_bubble)
 	var chatter_content:=VBoxContainer.new();chatter_content.alignment=BoxContainer.ALIGNMENT_CENTER;chatter_content.add_theme_constant_override("separation",9);chatter_content.mouse_filter=Control.MOUSE_FILTER_PASS;shop_chatter_bubble.add_child(chatter_content)
 	shop_chatter_label=Label.new();shop_chatter_label.custom_minimum_size=Vector2(220,64);shop_chatter_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;shop_chatter_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;shop_chatter_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;shop_chatter_label.add_theme_font_size_override("font_size",18);shop_chatter_label.add_theme_color_override("font_color",UI_BROWN);shop_chatter_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;chatter_content.add_child(shop_chatter_label)
 	shop_chatter_action_button=Button.new();shop_chatter_action_button.text="広告を見て種をもらう";shop_chatter_action_button.custom_minimum_size=Vector2(310,48);_skin_button(shop_chatter_action_button,Color("#d8b56b"),17);shop_chatter_action_button.pressed.connect(_request_rescue_reward_ad);shop_chatter_action_button.visible=false;chatter_content.add_child(shop_chatter_action_button)
@@ -405,12 +405,12 @@ func _show_shop_chatter(message:String,is_rescue:bool)->void:
 		shop_chatter_bubble.position=Vector2(22,86);shop_chatter_bubble.size=Vector2(420,250);shop_chatter_tail.visible=false;shop_chatter_tail_outline.visible=false
 	else:
 		var bubble_width:=clampf(210.0+message.length()*4.8,280.0,440.0);var bubble_height:=118.0 if message.length()>38 else 108.0
-		shop_chatter_bubble.size=Vector2(bubble_width,bubble_height);shop_chatter_bubble.position=Vector2((576.0-bubble_width)*.5,110);_update_shop_chatter_tail()
+		shop_chatter_bubble.size=Vector2(bubble_width,bubble_height);shop_chatter_bubble.position=Vector2((576.0-bubble_width)*.5,245);_update_shop_chatter_tail()
 	shop_chatter_action_button.visible=is_rescue;shop_chatter_action_button.disabled=rescue_reward_in_progress;shop_chatter_action_button.text="広告を準備中…" if rescue_reward_in_progress else "広告を見て種をもらう"
 
 func _update_shop_chatter_tail()->void:
 	var right:=shop_chatter_bubble.position.x+shop_chatter_bubble.size.x;var top:=shop_chatter_bubble.position.y;var height:=shop_chatter_bubble.size.y
-	var base_top:=Vector2(right-5.0,top+height*.57);var base_bottom:=Vector2(right-5.0,top+height*.79);var tip:=Vector2(right-43.0,top+height+23.0)
+	var base_top:=Vector2(right-5.0,top+height*.42);var base_bottom:=Vector2(right-5.0,top+height*.88);var tip:=Vector2(right-55.0,top+height+22.0)
 	shop_chatter_tail.polygon=PackedVector2Array([base_top,tip,base_bottom]);shop_chatter_tail_outline.points=PackedVector2Array([base_top,tip,base_bottom]);shop_chatter_tail.visible=true;shop_chatter_tail_outline.visible=true
 
 func _on_shop_background_gui_input(event:InputEvent)->void:
