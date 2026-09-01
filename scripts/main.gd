@@ -305,9 +305,9 @@ func _build_ui() -> void:
 		external_navigation_controls.append(b)
 		if entry.t=="図鑑":encyclopedia_icon_button=b;encyclopedia_navigation_controls.append(b);b.mouse_filter=Control.MOUSE_FILTER_STOP;b.pressed.connect(_open_encyclopedia)
 		else:b.pressed.connect(_open_settings)
-	mode_button=Button.new();mode_button.text="原生地";mode_button.position=Vector2(398,206);mode_button.size=Vector2(68,73);_skin_button(mode_button,Color("#fff0cf"),15);mode_button.mouse_filter=Control.MOUSE_FILTER_STOP;mode_button.pressed.connect(_toggle_mode);hud.add_child(mode_button)
+	mode_button=Button.new();mode_button.text="原生地";mode_button.position=Vector2(398,198);mode_button.size=Vector2(153,55);_skin_button(mode_button,Color("#fff0cf"),16);mode_button.mouse_filter=Control.MOUSE_FILTER_STOP;mode_button.pressed.connect(_toggle_mode);hud.add_child(mode_button)
 	external_navigation_controls.append(mode_button)
-	shop_button=Button.new();shop_button.text="おみせ";shop_button.position=Vector2(483,206);shop_button.size=Vector2(68,73);_skin_button(shop_button,Color("#fff0cf"),15);shop_button.mouse_filter=Control.MOUSE_FILTER_STOP;shop_button.pressed.connect(_open_shop);hud.add_child(shop_button)
+	shop_button=Button.new();shop_button.text="おみせ";shop_button.position=Vector2(398,262);shop_button.size=Vector2(153,55);_skin_button(shop_button,Color("#fff0cf"),16);shop_button.mouse_filter=Control.MOUSE_FILTER_STOP;shop_button.pressed.connect(_open_shop);hud.add_child(shop_button)
 	external_navigation_controls.append(shop_button)
 	habitat_status_label=Label.new();habitat_status_label.position=Vector2(163,42);habitat_status_label.size=Vector2(250,56);habitat_status_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;habitat_status_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;habitat_status_label.add_theme_font_size_override("font_size",18);habitat_status_label.add_theme_color_override("font_color",UI_CREAM);habitat_status_label.add_theme_stylebox_override("normal",_box(Color("#4b2d20"),Color("#d8ad68"),18,2));habitat_status_label.visible=false;hud.add_child(habitat_status_label)
 	play_timer_label=Label.new();play_timer_label.position=Vector2(190,135);play_timer_label.size=Vector2(196,58);play_timer_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;play_timer_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;play_timer_label.add_theme_font_size_override("font_size",24);play_timer_label.add_theme_color_override("font_color",Color.WHITE);play_timer_label.add_theme_stylebox_override("normal",_box(Color("#5b3321"),Color("#f3cb72"),19,3));play_timer_label.visible=false;hud.add_child(play_timer_label)
@@ -544,7 +544,7 @@ func _build_result_overlay(hud:Control)->void:
 	var notable_title:=Label.new();notable_title.text="目立った収穫株";notable_title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;notable_title.add_theme_font_size_override("font_size",19);notable_title.add_theme_color_override("font_color",Color("#725039"));content.add_child(notable_title)
 	result_notable_label=Label.new();result_notable_label.custom_minimum_size=Vector2(390,112);result_notable_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;result_notable_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;result_notable_label.add_theme_font_size_override("font_size",18);result_notable_label.add_theme_color_override("font_color",UI_BROWN);content.add_child(result_notable_label)
 	var close:=Button.new();close.text="閉じる / 戻る";close.custom_minimum_size=Vector2(350,54);_skin_button(close,Color("#ead8b1"),17);close.pressed.connect(_close_result);content.add_child(close)
-	result_confetti_layer=Control.new();result_confetti_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);result_confetti_layer.mouse_filter=Control.MOUSE_FILTER_IGNORE;result_card.add_child(result_confetti_layer)
+	result_confetti_layer=Control.new();result_confetti_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);result_confetti_layer.mouse_filter=Control.MOUSE_FILTER_IGNORE;result_overlay.add_child(result_confetti_layer)
 
 func _result_line_label()->Label:
 	var label:=Label.new();label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;label.add_theme_font_size_override("font_size",21);label.add_theme_color_override("font_color",Color("#65432e"));return label
@@ -619,6 +619,7 @@ func _update_play_ui()->void:
 	for control in external_navigation_controls:control.visible=not play_active
 	for control in encyclopedia_navigation_controls:control.visible=not play_active and encyclopedia_unlocked
 	if mode_button:mode_button.visible=not play_active and habitat_unlocked
+	if shop_button:shop_button.visible=not play_active and current_mode=="greenhouse"
 	play_timer_label.text="たね  残り%d粒"%play_seeds_remaining if play_timer_label.visible else ""
 	var held:Array[String]=[]
 	if old_seed_bags>0:held.append("古いたね %d袋"%old_seed_bags)
