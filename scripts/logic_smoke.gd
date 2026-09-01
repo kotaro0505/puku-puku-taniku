@@ -88,10 +88,10 @@ func _ready()->void:
 	await get_tree().create_timer(1.2).timeout
 	assert(float(game.bests.get(species_id,0.0))>=21.7)
 	assert(bool(game.discovered.get(species_id,false)))
-	game._open_encyclopedia();assert(game.encyclopedia_overlay.visible);assert(game.encyclopedia_grid.get_child_count()==game.catalog_species.size());var pinwheel_card_index:=-1
+	game._open_encyclopedia();await get_tree().process_frame;assert(game.encyclopedia_overlay.visible);assert(game.encyclopedia_grid.get_child_count()==game.catalog_species.size());assert(game.encyclopedia_scroll.vertical_scroll_mode==ScrollContainer.SCROLL_MODE_AUTO and game.encyclopedia_scroll.get_v_scroll_bar().max_value>game.encyclopedia_scroll.size.y and game.encyclopedia_grid.mouse_filter==Control.MOUSE_FILTER_PASS and game.encyclopedia_grid.get_parent().get_child(1).custom_minimum_size.y==54.0);var pinwheel_card_index:=-1
 	for catalog_index in range(game.catalog_species.size()):
 		if str(game.catalog_species[catalog_index].species_id)=="pinwheel":pinwheel_card_index=catalog_index;break
-	var pinwheel_card_frame:MarginContainer=game.encyclopedia_grid.get_child(pinwheel_card_index).find_child("SpeciesCardImageFrame",true,false);assert(pinwheel_card_frame.get_theme_constant("margin_left")==10 and pinwheel_card_frame.get_theme_constant("margin_right")==10);game._close_encyclopedia()
+	var pinwheel_card:Button=game.encyclopedia_grid.get_child(pinwheel_card_index);var pinwheel_card_frame:MarginContainer=pinwheel_card.find_child("SpeciesCardImageFrame",true,false);assert(pinwheel_card.mouse_filter==Control.MOUSE_FILTER_PASS and pinwheel_card.action_mode==BaseButton.ACTION_MODE_BUTTON_RELEASE and pinwheel_card.pressed.get_connections().size()>0 and pinwheel_card_frame.get_theme_constant("margin_left")==10 and pinwheel_card_frame.get_theme_constant("margin_right")==10);game.encyclopedia_scroll.scroll_vertical=int(game.encyclopedia_scroll.get_v_scroll_bar().max_value);assert(game.encyclopedia_scroll.scroll_vertical>0);pinwheel_card.pressed.emit();assert(game.encyclopedia_detail_page.visible);var list_back:Button=game.encyclopedia_detail_page.get_child(0);assert(list_back.text=="一覧へ");list_back.pressed.emit();assert(game.encyclopedia_list_page.visible and not game.encyclopedia_detail_page.visible);game._close_encyclopedia()
 	assert(game.play_active and game.play_seeds_remaining<24-initial_count)
 	for plant in game.plants:plant.jelly_checks_enabled=false
 	var jelly_target=game.plants[0]

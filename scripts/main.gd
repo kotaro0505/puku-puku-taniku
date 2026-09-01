@@ -103,6 +103,7 @@ var encyclopedia_overlay: Control
 var encyclopedia_list_page: Control
 var encyclopedia_detail_page: Control
 var encyclopedia_grid: GridContainer
+var encyclopedia_scroll: ScrollContainer
 var habitat_status_label: Label
 var seed_bag_panel: PanelContainer
 var play_timer_label: Label
@@ -1016,8 +1017,10 @@ func _build_encyclopedia(hud:Control)->void:
 	encyclopedia_list_page=Control.new();encyclopedia_list_page.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);encyclopedia_overlay.add_child(encyclopedia_list_page)
 	var title:=Label.new();title.text="ぷくぷく図鑑";title.position=Vector2(28,28);title.size=Vector2(390,65);title.add_theme_font_size_override("font_size",31);title.add_theme_color_override("font_color",UI_CREAM);encyclopedia_list_page.add_child(title)
 	var close:=Button.new();close.text="もどる";close.position=Vector2(447,27);close.size=Vector2(105,55);_skin_button(close,Color("#fff0cf"),17);close.pressed.connect(_close_encyclopedia);encyclopedia_list_page.add_child(close)
-	var scroll:=ScrollContainer.new();scroll.position=Vector2(20,105);scroll.size=Vector2(536,890);scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;encyclopedia_list_page.add_child(scroll)
-	encyclopedia_grid=GridContainer.new();encyclopedia_grid.columns=2;encyclopedia_grid.custom_minimum_size=Vector2(516,0);encyclopedia_grid.add_theme_constant_override("h_separation",12);encyclopedia_grid.add_theme_constant_override("v_separation",14);scroll.add_child(encyclopedia_grid)
+	encyclopedia_scroll=ScrollContainer.new();encyclopedia_scroll.position=Vector2(20,105);encyclopedia_scroll.size=Vector2(536,890);encyclopedia_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;encyclopedia_scroll.vertical_scroll_mode=ScrollContainer.SCROLL_MODE_AUTO;encyclopedia_scroll.scroll_deadzone=8;encyclopedia_scroll.mouse_filter=Control.MOUSE_FILTER_STOP;encyclopedia_list_page.add_child(encyclopedia_scroll)
+	var scroll_content:=VBoxContainer.new();scroll_content.custom_minimum_size=Vector2(516,0);scroll_content.mouse_filter=Control.MOUSE_FILTER_PASS;encyclopedia_scroll.add_child(scroll_content)
+	encyclopedia_grid=GridContainer.new();encyclopedia_grid.columns=2;encyclopedia_grid.custom_minimum_size=Vector2(516,0);encyclopedia_grid.size_flags_horizontal=Control.SIZE_EXPAND_FILL;encyclopedia_grid.mouse_filter=Control.MOUSE_FILTER_PASS;encyclopedia_grid.add_theme_constant_override("h_separation",12);encyclopedia_grid.add_theme_constant_override("v_separation",14);scroll_content.add_child(encyclopedia_grid)
+	var bottom_space:=Control.new();bottom_space.custom_minimum_size=Vector2(516,54);bottom_space.mouse_filter=Control.MOUSE_FILTER_PASS;scroll_content.add_child(bottom_space)
 	encyclopedia_detail_page=Control.new();encyclopedia_detail_page.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);encyclopedia_detail_page.visible=false;encyclopedia_overlay.add_child(encyclopedia_detail_page)
 
 func _open_encyclopedia()->void:
@@ -1031,7 +1034,7 @@ func _refresh_encyclopedia_cards()->void:
 	for child in encyclopedia_grid.get_children():child.free()
 	for entry in catalog_species:
 		var species_id:=str(entry.get("species_id",""));var found:=bool(discovered.get(species_id,false))
-		var card:=Button.new();card.custom_minimum_size=Vector2(252,218);_skin_button(card,Color("#f6e7c5"),16);card.disabled=not found;encyclopedia_grid.add_child(card)
+		var card:=Button.new();card.custom_minimum_size=Vector2(252,218);card.mouse_filter=Control.MOUSE_FILTER_PASS;card.mouse_force_pass_scroll_events=true;card.action_mode=BaseButton.ACTION_MODE_BUTTON_RELEASE;_skin_button(card,Color("#f6e7c5"),16);card.disabled=not found;encyclopedia_grid.add_child(card)
 		var content:=VBoxContainer.new();content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);content.offset_left=10;content.offset_top=8;content.offset_right=-10;content.offset_bottom=-8;content.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.alignment=BoxContainer.ALIGNMENT_CENTER;card.add_child(content)
 		var image_frame:=MarginContainer.new();image_frame.name="SpeciesCardImageFrame";image_frame.custom_minimum_size=Vector2(210,137);image_frame.add_theme_constant_override("margin_left",10);image_frame.add_theme_constant_override("margin_top",8);image_frame.add_theme_constant_override("margin_right",10);image_frame.add_theme_constant_override("margin_bottom",8);image_frame.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.add_child(image_frame)
 		var image:=TextureRect.new();image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.texture=_species_texture(entry);image.mouse_filter=Control.MOUSE_FILTER_IGNORE
