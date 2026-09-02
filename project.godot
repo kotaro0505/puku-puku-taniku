@@ -1,5 +1,6 @@
 [application]
 config/name="ぷくぷく多肉"
+config/version="1.0.0"
 run/main_scene="res://main.tscn"
 
 [display]
@@ -13,6 +14,7 @@ window/handheld/orientation=1
 [rendering]
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
+textures/vram_compression/import_etc2_astc=true
 textures/default_filters/use_nearest_mipmap_filter=false
 environment/defaults/default_clear_color=Color(0.82, 0.78, 0.63, 1)
 

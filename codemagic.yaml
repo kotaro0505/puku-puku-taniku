@@ -1,0 +1,244 @@
+workflows:
+  ios-testflight:
+    name: ぷくぷく多肉 iOS TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 120
+    integrations:
+      app_store_connect: Codemagic
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.ohanayanouen.pukupukutaniku
+      vars:
+        GODOT_VERSION: "4.7.2"
+        GODOT_TEMPLATE_VERSION: "4.7.2.stable"
+        APP_VERSION: "1.0.0"
+        APPLE_TEAM_ID: "UK8FRB9XKH"
+        BUNDLE_ID: "com.ohanayanouen.pukupukutaniku"
+        XCODE_PROJECT: "build/ios/puku_puku_taniku.xcodeproj"
+        XCODE_SCHEME: "puku_puku_taniku"
+      xcode: latest
+    cache:
+      cache_paths:
+        - $HOME/.cache/puku-puku-taniku/godot-4.7.2
+        - $HOME/Library/Application Support/Godot/export_templates/4.7.2.stable
+    scripts:
+      - name: Validate iOS release configuration
+        script: |
+          #!/bin/bash
+          set -euo pipefail
+          test "$BUNDLE_ID" = "com.ohanayanouen.pukupukutaniku"
+          test "$APPLE_TEAM_ID" = "UK8FRB9XKH"
+          test "$APP_VERSION" = "1.0.0"
+          grep -Fq 'application/bundle_identifier="com.ohanayanouen.pukupukutaniku"' export_presets.cfg
+          grep -Fq 'application/app_store_team_id="UK8FRB9XKH"' export_presets.cfg
+          grep -Fq 'application/targeted_device_family=0' export_presets.cfg
+          grep -Fq 'entitlements/game_center=false' export_presets.cfg
+          grep -Fq 'entitlements/push_notifications="Disabled"' export_presets.cfg
+          grep -Fq 'textures/vram_compression/import_etc2_astc=true' project.godot
+          python3 - <<'PY'
+          import struct
+          from pathlib import Path
+
+          icon = Path("assets/ios/app-icon-1024.png")
+          data = icon.read_bytes()
+          if data[:8] != b"\x89PNG\r\n\x1a\n":
+              raise SystemExit("iOS icon is not PNG")
+          width, height, bit_depth, color_type = struct.unpack(">IIBB", data[16:26])
+          if (width, height) != (1024, 1024):
+              raise SystemExit(f"iOS icon must be 1024x1024, got {width}x{height}")
+          if color_type not in (0, 2):
+              raise SystemExit(f"iOS icon must be opaque, PNG color type is {color_type}")
+          print(f"IOS_ICON_OK size={width}x{height} bit_depth={bit_depth} opaque=true")
+          PY
+
+      - name: Install Godot 4.7.2 and matching iOS export template
+        script: |
+          #!/bin/bash
+          set -euo pipefail
+          GODOT_CACHE="$HOME/.cache/puku-puku-taniku/godot-$GODOT_VERSION"
+          GODOT_APP="$GODOT_CACHE/Godot.app"
+          GODOT_BIN="$GODOT_APP/Contents/MacOS/Godot"
+          TEMPLATE_DIR="$HOME/Library/Application Support/Godot/export_templates/$GODOT_TEMPLATE_VERSION"
+          RELEASE_BASE="https://github.com/godotengine/godot/releases/download/$GODOT_VERSION-stable"
+          MAC_ARCHIVE="Godot_v$GODOT_VERSION-stable_macos.universal.zip"
+          TEMPLATE_ARCHIVE="Godot_v$GODOT_VERSION-stable_export_templates.tpz"
+
+          mkdir -p "$GODOT_CACHE" "$TEMPLATE_DIR"
+          if [ ! -x "$GODOT_BIN" ]; then
+            curl --fail --location --retry 3 --output "$GODOT_CACHE/$MAC_ARCHIVE" "$RELEASE_BASE/$MAC_ARCHIVE"
+            curl --fail --location --retry 3 --output "$GODOT_CACHE/SHA512-SUMS.txt" "$RELEASE_BASE/SHA512-SUMS.txt"
+            grep "  $MAC_ARCHIVE\$" "$GODOT_CACHE/SHA512-SUMS.txt" > "$GODOT_CACHE/mac.sha512"
+            (cd "$GODOT_CACHE" && shasum -a 512 -c mac.sha512)
+            ditto -x -k "$GODOT_CACHE/$MAC_ARCHIVE" "$GODOT_CACHE"
+          fi
+
+          if [ ! -f "$TEMPLATE_DIR/ios.zip" ] || [ ! -f "$TEMPLATE_DIR/version.txt" ]; then
+            TEMP_TEMPLATE_DIR="$(mktemp -d)"
+            curl --fail --location --retry 3 --output "$TEMP_TEMPLATE_DIR/$TEMPLATE_ARCHIVE" "$RELEASE_BASE/$TEMPLATE_ARCHIVE"
+            curl --fail --location --retry 3 --output "$TEMP_TEMPLATE_DIR/SHA512-SUMS.txt" "$RELEASE_BASE/SHA512-SUMS.txt"
+            grep "  $TEMPLATE_ARCHIVE\$" "$TEMP_TEMPLATE_DIR/SHA512-SUMS.txt" > "$TEMP_TEMPLATE_DIR/templates.sha512"
+            (cd "$TEMP_TEMPLATE_DIR" && shasum -a 512 -c templates.sha512)
+            unzip -j "$TEMP_TEMPLATE_DIR/$TEMPLATE_ARCHIVE" templates/ios.zip templates/version.txt -d "$TEMPLATE_DIR"
+          fi
+
+          ACTUAL_GODOT_VERSION="$("$GODOT_BIN" --version)"
+          case "$ACTUAL_GODOT_VERSION" in
+            "$GODOT_VERSION.stable.official."*) ;;
+            *) echo "Unexpected Godot version: $ACTUAL_GODOT_VERSION" >&2; exit 1 ;;
+          esac
+          test "$(cat "$TEMPLATE_DIR/version.txt")" = "$GODOT_TEMPLATE_VERSION"
+          test -f "$TEMPLATE_DIR/ios.zip"
+          echo "GODOT_BIN=$GODOT_BIN" >> "$CM_ENV"
+          echo "GODOT_IOS_TEMPLATE=$TEMPLATE_DIR/ios.zip" >> "$CM_ENV"
+          echo "GODOT_VERSION_OK editor=$ACTUAL_GODOT_VERSION templates=$(cat "$TEMPLATE_DIR/version.txt")"
+
+      - name: Import project and run regression smoke tests
+        script: |
+          #!/bin/bash
+          set -euo pipefail
+          "$GODOT_BIN" --headless --path "$CM_BUILD_DIR" --editor --quit
+
+          run_scene_smoke() {
+            local scene="$1"
+            local marker="$2"
+            local log_file
+            log_file="$(mktemp)"
+            "$GODOT_BIN" --headless --quit-after 3600 --path "$CM_BUILD_DIR" "$scene" 2>&1 | tee "$log_file"
+            grep -Fq "$marker" "$log_file"
+          }
+
+          run_script_smoke() {
+            local script="$1"
+            local marker="$2"
+            shift 2
+            local log_file
+            log_file="$(mktemp)"
+            "$GODOT_BIN" --headless --quit-after 3600 --path "$CM_BUILD_DIR" --script scripts/smoke_runner.gd -- "$script" "$@" 2>&1 | tee "$log_file"
+            grep -Fq "$marker" "$log_file"
+          }
+
+          run_scene_smoke res://logic_smoke.tscn SMOKE_OK
+          run_scene_smoke res://scripts/mystery_routes_smoke.tscn MYSTERY_ROUTES_SMOKE_OK
+          run_scene_smoke res://scripts/shop_fix_smoke.tscn SHOP_FIX_SMOKE_OK
+          run_scene_smoke res://scripts/tutorial_rain_ui_smoke.tscn TUTORIAL_RAIN_UI_SMOKE_OK
+          run_script_smoke res://scripts/jelly_dev_smoke.gd JELLY_DEV_SMOKE_OK
+          run_script_smoke res://scripts/web_memory_smoke.gd WEB_MEMORY_SMOKE_OK
+          run_script_smoke res://scripts/habitat_texture_ab_smoke.gd HABITAT_TEXTURE_AB_SMOKE_OK
+          run_script_smoke res://scripts/habitat_background_ab_smoke.gd HABITAT_BACKGROUND_AB_SMOKE_OK current
+          run_script_smoke res://scripts/habitat_background_ab_smoke.gd HABITAT_BACKGROUND_AB_SMOKE_OK no_sky
+          run_script_smoke res://scripts/habitat_background_ab_smoke.gd HABITAT_BACKGROUND_AB_SMOKE_OK panorama_mesh
+          run_script_smoke res://scripts/ios_native_smoke.gd IOS_NATIVE_SMOKE_OK
+
+      - name: Resolve App Store Connect app by bundle ID
+        script: |
+          #!/bin/bash
+          set -euo pipefail
+          APP_LIST_JSON="$(mktemp)"
+          app-store-connect apps --json --silent list \
+            --bundle-id-identifier "$BUNDLE_ID" \
+            --strict-match-identifier > "$APP_LIST_JSON"
+          APP_STORE_APPLE_ID="$(python3 - "$APP_LIST_JSON" "$BUNDLE_ID" <<'PY'
+          import json
+          import sys
+
+          payload = json.load(open(sys.argv[1], encoding="utf-8"))
+          bundle_id = sys.argv[2]
+          if isinstance(payload, list):
+              apps = payload
+          elif isinstance(payload, dict):
+              apps = payload.get("data") or payload.get("apps") or payload.get("items") or []
+          else:
+              apps = []
+          matches = []
+          for app in apps:
+              attrs = app.get("attributes", app)
+              if attrs.get("bundleId") == bundle_id or attrs.get("bundle_id") == bundle_id:
+                  matches.append(str(app.get("id", attrs.get("id", ""))))
+          matches = [value for value in matches if value]
+          if len(matches) != 1:
+              raise SystemExit(f"Expected exactly one App Store Connect app for {bundle_id}, found {len(matches)}")
+          print(matches[0])
+          PY
+          )"
+          echo "APP_STORE_APPLE_ID=$APP_STORE_APPLE_ID" >> "$CM_ENV"
+          echo "APP_STORE_APP_RESOLVED bundle_id=$BUNDLE_ID apple_id=$APP_STORE_APPLE_ID"
+
+      - name: Set unique iOS build number
+        script: |
+          #!/bin/bash
+          set -euo pipefail
+          IOS_BUILD_NUMBER="$PROJECT_BUILD_NUMBER"
+          case "$IOS_BUILD_NUMBER" in
+            ''|*[!0-9]*) echo "PROJECT_BUILD_NUMBER must be numeric" >&2; exit 1 ;;
+          esac
+          python3 - "$IOS_BUILD_NUMBER" <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+
+          path = Path("export_presets.cfg")
+          text = path.read_text(encoding="utf-8")
+          updated, count = re.subn(r'application/version="[^"]*"', f'application/version="{sys.argv[1]}"', text, count=1)
+          if count != 1:
+              raise SystemExit("Unable to set iOS build number in export_presets.cfg")
+          path.write_text(updated, encoding="utf-8", newline="\n")
+          PY
+          echo "IOS_BUILD_NUMBER=$IOS_BUILD_NUMBER" >> "$CM_ENV"
+          echo "IOS_VERSION_SET version=$APP_VERSION build=$IOS_BUILD_NUMBER"
+
+      - name: Export Godot native iOS Xcode project
+        script: |
+          #!/bin/bash
+          set -euo pipefail
+          mkdir -p build/ios
+          "$GODOT_BIN" --headless --path "$CM_BUILD_DIR" --export-release iOS "$CM_BUILD_DIR/$XCODE_PROJECT"
+          test -d "$CM_BUILD_DIR/$XCODE_PROJECT"
+          test -f "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
+          grep -Fq "PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID;" "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
+          grep -Fq "DEVELOPMENT_TEAM = $APPLE_TEAM_ID;" "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
+          grep -Fq "MARKETING_VERSION = $APP_VERSION;" "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
+          grep -Fq "CURRENT_PROJECT_VERSION = $IOS_BUILD_NUMBER;" "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
+          grep -Fq 'INFOPLIST_KEY_CFBundleDisplayName = "ぷくぷく多肉";' "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
+          test -f "$CM_BUILD_DIR/build/ios/puku_puku_taniku/Images.xcassets/AppIcon.appiconset/Icon-1024.png"
+          test "$(grep -c '<key>ITSAppUsesNonExemptEncryption</key>' "$CM_BUILD_DIR/build/ios/puku_puku_taniku/puku_puku_taniku-Info.plist")" = "1"
+          echo "GODOT_IOS_EXPORT_OK project=$XCODE_PROJECT"
+
+      - name: Apply App Store distribution signing
+        script: |
+          #!/bin/bash
+          set -euo pipefail
+          xcode-project use-profiles --custom-export-options='{"testFlightInternalTestingOnly": true}'
+          echo "IOS_SIGNING_APPLIED bundle_id=$BUNDLE_ID team_id=$APPLE_TEAM_ID"
+
+      - name: Archive and build signed IPA
+        script: |
+          #!/bin/bash
+          set -euo pipefail
+          xcode-project build-ipa \
+            --project "$CM_BUILD_DIR/$XCODE_PROJECT" \
+            --scheme "$XCODE_SCHEME"
+          IPA_PATH="$(find build/ios/ipa -type f -name '*.ipa' -print -quit)"
+          test -n "$IPA_PATH"
+          xcode-project ipa-info "$IPA_PATH"
+          echo "IOS_IPA_OK path=$IPA_PATH version=$APP_VERSION build=$IOS_BUILD_NUMBER"
+
+      - name: Record iOS build diagnostics
+        script: |
+          #!/bin/bash
+          set -euo pipefail
+          mkdir -p build/ios-diagnostics
+          printf '{"bundle_id":"%s","apple_id":"%s","team_id":"%s","version":"%s","build":"%s"}\n' \
+            "$BUNDLE_ID" "$APP_STORE_APPLE_ID" "$APPLE_TEAM_ID" "$APP_VERSION" "$IOS_BUILD_NUMBER" \
+            > build/ios-diagnostics/app-store-app.json
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - build/ios-diagnostics/*.json
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: false
+        submit_to_app_store: false

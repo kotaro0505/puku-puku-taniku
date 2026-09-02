@@ -1,5 +1,6 @@
 # Godot editor-generated cache
 .godot/
+build/
 
 # Local editor and OS files
 .DS_Store

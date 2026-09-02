@@ -87,6 +87,7 @@ func _bgm_target_db(key:String)->float:
 	return linear_to_db(maxf(bgm_volume*gain,0.001))
 
 func notify_user_gesture() -> void:
+	if not OS.has_feature("web"): return
 	if not bgm_enabled or current_bgm_key.is_empty(): return
 	AudioServer.set_bus_mute(AudioServer.get_bus_index("Master"), false)
 	if not web_audio_unlocked:
