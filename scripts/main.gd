@@ -450,9 +450,10 @@ func _build_world() -> void:
 	world_root = Node3D.new(); add_child(world_root)
 	habitat_env=WorldEnvironment.new(); var env:=Environment.new()
 	var sky := Sky.new(); var panorama := PanoramaSkyMaterial.new()
-	# The default 256px sky radiance map noticeably softens this 1280x640
-	# panorama. 1024 keeps the source detail while remaining Web/mobile-safe.
-	sky.radiance_size = Sky.RADIANCE_SIZE_1024
+	# Radiance is only used for environment lighting/reflections. Keep the
+	# directly visible panorama at its imported source resolution while reducing
+	# this internal cubemap for iPhone Safari memory stability.
+	sky.radiance_size = Sky.RADIANCE_SIZE_512
 	panorama.panorama = load("res://assets/highland-panorama.jpg")
 	sky.sky_material = panorama
 	env.background_mode=Environment.BG_SKY; env.sky=sky; env.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR; env.ambient_light_color=Color("#d6b98b"); env.ambient_light_energy=0.32

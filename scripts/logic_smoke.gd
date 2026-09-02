@@ -30,6 +30,7 @@ func _ready()->void:
 	for player in game.audio_manager.bgm_players:opening_players+=1 if player.playing and player.stream==opening_stream else 0
 	assert(game.opening_overlay.visible and game.audio_manager.current_bgm_key=="opening" and opening_players<=1 and opening_stream is AudioStreamWAV and opening_stream.loop_mode==AudioStreamWAV.LOOP_FORWARD and game.audio_manager._bgm_target_db("opening")<game.audio_manager._bgm_target_db("greenhouse"));game._finish_opening();assert(not game.opening_overlay.visible)
 	assert(game.best_label.get_parent().position==Vector2(204,54))
+	var habitat_sky:Sky=game.habitat_environment.sky;var habitat_panorama:PanoramaSkyMaterial=habitat_sky.sky_material;assert(habitat_sky.radiance_size==Sky.RADIANCE_SIZE_512 and habitat_panorama.panorama.resource_path=="res://assets/highland-panorama.jpg" and habitat_panorama.panorama.get_width()==1280 and habitat_panorama.panorama.get_height()==640)
 	assert(game.mode_button.position==Vector2(398,198) and game.mode_button.size==Vector2(153,55));assert(game.shop_button.position==Vector2(398,262) and game.shop_button.size==Vector2(153,55));assert(game.result_confetti_layer.get_parent()==game.result_overlay)
 	game._toggle_mode();assert(game.current_mode=="habitat" and game.audio_manager.current_bgm_key=="habitat" and not game.shop_button.visible and not game.habitat_status_label.visible and game.habitat_status_label.text.is_empty());game._start_habitat_scroll_tutorial();assert(game.intro_panda_portrait.visible and game.intro_panda_portrait.stretch_mode==TextureRect.STRETCH_KEEP_ASPECT_CENTERED and game.intro_dialog_panel.position in [Vector2(40,725),Vector2(40,385)]);game.intro_overlay.visible=false;game.tutorial_dialog_kind="";game._toggle_mode();assert(game.current_mode=="greenhouse" and game.audio_manager.current_bgm_key=="greenhouse" and game.shop_button.visible);game._toggle_mode();var habitat_stream:AudioStream=game.audio_manager._stream_for("bgm","habitat");var habitat_players:=0
 	for player in game.audio_manager.bgm_players:habitat_players+=1 if player.playing and player.stream==habitat_stream else 0
@@ -115,6 +116,10 @@ func _ready()->void:
 		game._process(1.0);await get_tree().process_frame;drain_guard+=1
 	assert(game.plants.is_empty() and not game.play_active);assert(game.result_overlay.visible);assert(game.play_harvest_count>=1 and game.play_earnings_total>=50 and game.play_max_size>=21.7);assert(game.play_updated_global_best and "最大サイズ更新" in game.result_max_label.text and game.result_confetti_layer.get_child_count()>0);assert(not game.play_open_button.visible);game._close_result();assert(game.play_open_button.visible)
 	for control in game.external_navigation_controls:assert(control.visible)
+	var panorama_resource_id:=habitat_panorama.panorama.get_instance_id();game.tutorial_steps["habitat_scroll_dialog"]=true;game.tutorial_steps["rain_first_dialog"]=true;game.rain_event_pending=false
+	for transition_cycle in range(8):
+		if game.current_mode!="greenhouse":game._toggle_mode()
+		game._toggle_mode();assert(game.current_mode=="habitat" and habitat_panorama.panorama.get_instance_id()==panorama_resource_id);game._toggle_mode();game._open_shop();game._close_shop();game._open_encyclopedia();game._close_encyclopedia()
 	print("SMOKE_OK panorama360 plants=",game.plants.size()," diameter=",grown_diameter," sprite_scale=",grown_scale," rooted=true species=",species_id)
 	get_tree().quit()
 
