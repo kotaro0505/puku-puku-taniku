@@ -96,6 +96,8 @@ var greenhouse_pan_limit := 0.0
 var greenhouse_world_pan_x := 0.0
 var habitat_env: WorldEnvironment
 var habitat_environment: Environment
+var habitat_background_mode := "current"
+var habitat_panorama_mesh: MeshInstance3D
 var habitat_items_root: Node3D
 var habitat_pickups: Array = []
 var habitat_new_species_id := ""
@@ -301,6 +303,7 @@ var opening_finished := false
 
 func _ready() -> void:
 	_configure_habitat_texture_ab()
+	_configure_habitat_background_ab()
 	rng.randomize()
 	_load_species()
 	_load_save()
@@ -319,6 +322,12 @@ func _configure_habitat_texture_ab()->void:
 		var requested=JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('habitat_texture')",true)
 		habitat_texture_mode="thumb" if str(requested)=="thumb" else "full"
 	print("HABITAT_TEXTURE_AB mode=",habitat_texture_mode)
+
+func _configure_habitat_background_ab()->void:
+	if OS.has_feature("web"):
+		var requested=JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('habitat_background')",true)
+		habitat_background_mode=str(requested) if str(requested) in ["no_sky","panorama_mesh"] else "current"
+	print("HABITAT_BACKGROUND_AB mode=",habitat_background_mode)
 
 func _continue_after_opening()->void:
 	if not intro_story_complete:call_deferred("_start_intro_story")
@@ -481,14 +490,8 @@ func _build_world() -> void:
 	greenhouse_backdrop=TextureRect.new();greenhouse_backdrop.texture=load("res://assets/greenhouse-main.jpg");greenhouse_backdrop.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;greenhouse_backdrop.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT;greenhouse_backdrop.mouse_filter=Control.MOUSE_FILTER_IGNORE;greenhouse_layer.add_child(greenhouse_backdrop)
 	world_root = Node3D.new(); add_child(world_root)
 	habitat_env=WorldEnvironment.new(); var env:=Environment.new()
-	var sky := Sky.new(); var panorama := PanoramaSkyMaterial.new()
-	# Radiance is only used for environment lighting/reflections. Keep the
-	# directly visible panorama at its imported source resolution while reducing
-	# this internal cubemap for iPhone Safari memory stability.
-	sky.radiance_size = Sky.RADIANCE_SIZE_512
-	panorama.panorama = load("res://assets/highland-panorama.jpg")
-	sky.sky_material = panorama
-	env.background_mode=Environment.BG_SKY; env.sky=sky; env.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR; env.ambient_light_color=Color("#d6b98b"); env.ambient_light_energy=0.32
+	_build_habitat_background(env)
+	env.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR; env.ambient_light_color=Color("#d6b98b"); env.ambient_light_energy=0.32
 	env.tonemap_mode=Environment.TONE_MAPPER_FILMIC
 	habitat_environment=env;habitat_env.environment=env; world_root.add_child(habitat_env)
 	habitat_items_root=Node3D.new();habitat_items_root.visible=false;world_root.add_child(habitat_items_root)
@@ -496,6 +499,27 @@ func _build_world() -> void:
 	camera=Camera3D.new(); camera.fov=54.0; camera.current=true; world_root.add_child(camera)
 	_build_greenhouse_pot()
 	_apply_mode()
+
+func _build_habitat_background(env:Environment)->void:
+	habitat_panorama_mesh=null
+	env.sky=null
+	env.background_color=Color("#71816f")
+	if habitat_background_mode=="current":
+		var sky:=Sky.new();var panorama:=PanoramaSkyMaterial.new()
+		# The visible panorama stays at its imported resolution. Only the
+		# environment-lighting radiance cubemap uses the existing 512 setting.
+		sky.radiance_size=Sky.RADIANCE_SIZE_512
+		panorama.panorama=load("res://assets/highland-panorama.jpg")
+		sky.sky_material=panorama;env.sky=sky;env.background_mode=Environment.BG_SKY
+	elif habitat_background_mode=="panorama_mesh":
+		env.background_mode=Environment.BG_COLOR
+		habitat_panorama_mesh=MeshInstance3D.new();habitat_panorama_mesh.name="HabitatPanoramaMesh"
+		var sphere:=SphereMesh.new();sphere.radius=50.0;sphere.height=100.0;sphere.radial_segments=64;sphere.rings=32;habitat_panorama_mesh.mesh=sphere
+		var material:=StandardMaterial3D.new();material.albedo_texture=load("res://assets/highland-panorama.jpg");material.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED;material.cull_mode=BaseMaterial3D.CULL_FRONT;material.no_depth_test=true;material.texture_filter=BaseMaterial3D.TEXTURE_FILTER_LINEAR
+		habitat_panorama_mesh.material_override=material;habitat_panorama_mesh.visible=false;world_root.add_child(habitat_panorama_mesh)
+	else:
+		env.background_mode=Environment.BG_COLOR
+	print("HABITAT_BACKGROUND_BUILD mode=",habitat_background_mode," sky_present=",env.sky!=null," panorama_mesh_present=",habitat_panorama_mesh!=null)
 
 func _build_greenhouse_pot()->void:
 	pot_root=Node3D.new();world_root.add_child(pot_root)
@@ -2052,7 +2076,10 @@ func _apply_mode()->void:
 	# The official greenhouse artwork already contains the finished pot and soil.
 	# Keep the old geometry disabled so no duplicate rim covers the sprites.
 	pot_root.visible=false
-	habitat_environment.background_mode=Environment.BG_CANVAS if greenhouse_mode else Environment.BG_SKY
+	if greenhouse_mode:habitat_environment.background_mode=Environment.BG_CANVAS
+	else:habitat_environment.background_mode=Environment.BG_SKY if habitat_background_mode=="current" else Environment.BG_COLOR
+	if habitat_panorama_mesh:habitat_panorama_mesh.visible=not greenhouse_mode
+	print("HABITAT_BACKGROUND_STATE mode=",habitat_background_mode," screen=",("greenhouse" if greenhouse_mode else "habitat")," background_mode=",habitat_environment.background_mode," sky_present=",habitat_environment.sky!=null," panorama_mesh_visible=",habitat_panorama_mesh!=null and habitat_panorama_mesh.visible)
 	for p in plants:
 		if is_instance_valid(p):p.visible=greenhouse_mode or rain_bonus_active;p.label.visible=false
 	if greenhouse_mode:
