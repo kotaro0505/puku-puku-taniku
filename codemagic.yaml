@@ -125,40 +125,6 @@ workflows:
           run_script_smoke res://scripts/jelly_dev_smoke.gd JELLY_DEV_SMOKE_OK
           run_script_smoke res://scripts/ios_native_smoke.gd IOS_NATIVE_SMOKE_OK
 
-      - name: Resolve App Store Connect app by bundle ID
-        script: |
-          #!/bin/bash
-          set -euo pipefail
-          APP_LIST_JSON="$(mktemp)"
-          app-store-connect apps --json --silent list \
-            --bundle-id-identifier "$BUNDLE_ID" \
-            --strict-match-identifier > "$APP_LIST_JSON"
-          APP_STORE_APPLE_ID="$(python3 - "$APP_LIST_JSON" "$BUNDLE_ID" <<'PY'
-          import json
-          import sys
-
-          payload = json.load(open(sys.argv[1], encoding="utf-8"))
-          bundle_id = sys.argv[2]
-          if isinstance(payload, list):
-              apps = payload
-          elif isinstance(payload, dict):
-              apps = payload.get("data") or payload.get("apps") or payload.get("items") or []
-          else:
-              apps = []
-          matches = []
-          for app in apps:
-              attrs = app.get("attributes", app)
-              if attrs.get("bundleId") == bundle_id or attrs.get("bundle_id") == bundle_id:
-                  matches.append(str(app.get("id", attrs.get("id", ""))))
-          matches = [value for value in matches if value]
-          if len(matches) != 1:
-              raise SystemExit(f"Expected exactly one App Store Connect app for {bundle_id}, found {len(matches)}")
-          print(matches[0])
-          PY
-          )"
-          echo "APP_STORE_APPLE_ID=$APP_STORE_APPLE_ID" >> "$CM_ENV"
-          echo "APP_STORE_APP_RESOLVED bundle_id=$BUNDLE_ID apple_id=$APP_STORE_APPLE_ID"
-
       - name: Set unique iOS build number
         script: |
           #!/bin/bash
@@ -223,8 +189,8 @@ workflows:
           #!/bin/bash
           set -euo pipefail
           mkdir -p build/ios-diagnostics
-          printf '{"bundle_id":"%s","apple_id":"%s","team_id":"%s","version":"%s","build":"%s"}\n' \
-            "$BUNDLE_ID" "$APP_STORE_APPLE_ID" "$APPLE_TEAM_ID" "$APP_VERSION" "$IOS_BUILD_NUMBER" \
+          printf '{"bundle_id":"%s","team_id":"%s","version":"%s","build":"%s"}\n' \
+            "$BUNDLE_ID" "$APPLE_TEAM_ID" "$APP_VERSION" "$IOS_BUILD_NUMBER" \
             > build/ios-diagnostics/app-store-app.json
     artifacts:
       - build/ios/ipa/*.ipa
