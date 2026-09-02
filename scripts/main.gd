@@ -992,6 +992,8 @@ func _build_jelly_dev_overlay(hud:Control)->void:
 	for kind in ["short","normal","long","ultra"]:
 		var heading:=Label.new();heading.text={"short":"短命タイプ","normal":"普通タイプ","long":"長命タイプ","ultra":"超長命タイプ"}[kind];heading.add_theme_font_size_override("font_size",18);heading.add_theme_color_override("font_color",Color("#754326"));content.add_child(heading)
 		_add_jelly_dev_row(content,kind+"_weight",1.0);_add_jelly_dev_row(content,kind+"_min",.1);_add_jelly_dev_row(content,kind+"_max",.1)
+	var slow_heading:=Label.new();slow_heading.text="遅育・粘り型（短命から派生）";slow_heading.add_theme_font_size_override("font_size",18);slow_heading.add_theme_color_override("font_color",Color("#754326"));content.add_child(slow_heading)
+	_add_jelly_dev_row(content,"slow_short_rate",1.0);_add_jelly_dev_row(content,"slow_growth_min",.01);_add_jelly_dev_row(content,"slow_growth_max",.01);_add_jelly_dev_row(content,"slow_ramp_min",.1);_add_jelly_dev_row(content,"slow_ramp_max",.1)
 	_add_jelly_dev_row(content,"growth_speed",.1);_add_jelly_dev_row(content,"rhythm_amplitude",.01)
 	jelly_dev_total_label=Label.new();jelly_dev_total_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;jelly_dev_total_label.add_theme_font_size_override("font_size",17);content.add_child(jelly_dev_total_label)
 	var actions:=HBoxContainer.new();actions.alignment=BoxContainer.ALIGNMENT_CENTER;actions.add_theme_constant_override("separation",7);outer.add_child(actions)
@@ -1006,16 +1008,17 @@ func _add_jelly_dev_row(parent:VBoxContainer,key:String,step:float)->void:
 		var button:=Button.new();button.text="−" if delta<0 else "+";button.custom_minimum_size=Vector2(64,38);_skin_button(button,Color("#d9c49d"),18);button.pressed.connect(_change_jelly_dev_value.bind(key,delta));row.add_child(button)
 
 func _open_jelly_dev()->void:
-	JellyBalanceClass.begin_test_defaults();settings_overlay.visible=false;jelly_dev_overlay.visible=true;_refresh_jelly_dev_ui();_update_play_ui()
+	JellyBalanceClass.begin_test_defaults();JellyBalanceClass.override_enabled=true;settings_overlay.visible=false;jelly_dev_overlay.visible=true;_refresh_jelly_dev_ui();_update_play_ui()
 
 func _close_jelly_dev()->void:
 	jelly_dev_overlay.visible=false;_update_play_ui()
 
 func _change_jelly_dev_value(key:String,delta:float)->void:
 	var value:=float(JellyBalanceClass.values[key])+delta
-	if key.ends_with("_weight"):value=clampf(value,0.0,100.0)
+	if key.ends_with("_weight") or key=="slow_short_rate":value=clampf(value,0.0,100.0)
 	elif key=="final_chance":value=clampf(value,.0,.50)
 	elif key=="growth_speed":value=clampf(value,.1,10.0)
+	elif key=="slow_growth_min" or key=="slow_growth_max":value=clampf(value,.05,2.0)
 	elif key=="rhythm_amplitude":value=clampf(value,.0,.50)
 	else:value=clampf(value,.0,120.0)
 	if key.ends_with("_min"):
@@ -1025,10 +1028,11 @@ func _change_jelly_dev_value(key:String,delta:float)->void:
 	JellyBalanceClass.set_value(key,value);_refresh_jelly_dev_ui()
 
 func _jelly_dev_text(key:String)->String:
-	var names={"final_chance":"最終ジュレ率","cooldown":"連続ジュレ回避","safe_min":"初期安全 MIN","safe_max":"初期安全 MAX","short_weight":"短命 割合","short_min":"短命 時間 MIN","short_max":"短命 時間 MAX","normal_weight":"普通 割合","normal_min":"普通 時間 MIN","normal_max":"普通 時間 MAX","long_weight":"長命 割合","long_min":"長命 時間 MIN","long_max":"長命 時間 MAX","ultra_weight":"超長命 割合","ultra_min":"超長命 時間 MIN","ultra_max":"超長命 時間 MAX","growth_speed":"成長速度倍率","rhythm_amplitude":"成長リズム幅"}
+	var names={"final_chance":"最終ジュレ率","cooldown":"連続ジュレ回避","safe_min":"初期安全 MIN","safe_max":"初期安全 MAX","short_weight":"短命 割合","short_min":"短命 時間 MIN","short_max":"短命 時間 MAX","normal_weight":"普通 割合","normal_min":"普通 時間 MIN","normal_max":"普通 時間 MAX","long_weight":"長命 割合","long_min":"長命 時間 MIN","long_max":"長命 時間 MAX","ultra_weight":"超長命 割合","ultra_min":"超長命 時間 MIN","ultra_max":"超長命 時間 MAX","slow_short_rate":"短命内 遅育化率","slow_growth_min":"遅育 成長 MIN","slow_growth_max":"遅育 成長 MAX","slow_ramp_min":"遅育 危険上昇 MIN","slow_ramp_max":"遅育 危険上昇 MAX","growth_speed":"成長速度倍率","rhythm_amplitude":"成長リズム幅"}
 	var value:=float(JellyBalanceClass.values[key])
 	if key=="final_chance" or key=="rhythm_amplitude":return "%s　%.1f%%"%[names[key],value*100.0]
-	if key.ends_with("_weight"):return "%s　%.0f%%"%[names[key],value]
+	if key.ends_with("_weight") or key=="slow_short_rate":return "%s　%.0f%%"%[names[key],value]
+	if key=="slow_growth_min" or key=="slow_growth_max":return "%s　×%.2f"%[names[key],value]
 	if key=="growth_speed":return "%s　×%.1f"%[names[key],value]
 	return "%s　%.1f秒"%[names[key],value]
 
