@@ -18,8 +18,11 @@ var fallback_se_cache: Dictionary = {}
 var web_audio_unlocked := not OS.has_feature("web")
 var bgm_restart_queued := false
 var bgm_fade_tween: Tween
+var bgm_format := "ogg"
+var release_stream_on_stop := true
 
 func _ready() -> void:
+	_configure_audio_ab()
 	_load_config()
 	for i in range(2):
 		var player := AudioStreamPlayer.new()
@@ -31,6 +34,14 @@ func _ready() -> void:
 		player.bus = "Master"
 		add_child(player)
 		se_players.append(player)
+	print("AUDIO_AB format=",bgm_format," release=",("null" if release_stream_on_stop else "retain"))
+
+func _configure_audio_ab()->void:
+	if not OS.has_feature("web"):return
+	var requested_format=JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('audio_format')",true)
+	var requested_release=JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('audio_release')",true)
+	bgm_format="wav" if str(requested_format)=="wav" else "ogg"
+	release_stream_on_stop=str(requested_release)!="retain"
 
 func _load_config() -> void:
 	if not FileAccess.file_exists(CONFIG_PATH): return
@@ -109,7 +120,7 @@ func _restart_current_bgm() -> void:
 
 func _stop_and_release_bgm_player(player:AudioStreamPlayer)->void:
 	player.stop()
-	player.stream=null
+	if release_stream_on_stop:player.stream=null
 
 func _cancel_bgm_fade() -> void:
 	if bgm_fade_tween and bgm_fade_tween.is_valid(): bgm_fade_tween.kill()
@@ -134,7 +145,9 @@ func play_se(key: String, gain := 1.0) -> void:
 	player.play()
 
 func _stream_for(section: String, key: String) -> AudioStream:
-	var paths = config.get(section, {})
+	var config_section:=section
+	if section=="bgm" and bgm_format=="wav":config_section="bgm_wav"
+	var paths = config.get(config_section, {})
 	if paths is Dictionary:
 		var path := str(paths.get(key, ""))
 		if not path.is_empty() and ResourceLoader.exists(path):

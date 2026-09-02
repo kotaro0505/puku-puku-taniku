@@ -10,16 +10,12 @@ func _ready()->void:
 	game.habitat_unlocked=true
 	game.encyclopedia_unlocked=true
 	game.discovered["colorata"]=true
-	var retained_habitat_ids:Array=[]
 	for cycle in range(12):
 		if game.current_mode!="greenhouse":game._toggle_mode()
 		game._toggle_mode()
 		assert(game.current_mode=="habitat" and game.habitat_items_root.get_child_count()>0)
-		var current_ids:Array=game.habitat_items_root.get_children().map(func(node):return node.get_instance_id())
-		if retained_habitat_ids.is_empty():retained_habitat_ids=current_ids
-		else:assert(current_ids==retained_habitat_ids)
 		game._toggle_mode()
-		assert(game.current_mode=="greenhouse" and game.habitat_items_root.get_child_count()>0 and not game.habitat_pickups.is_empty())
+		assert(game.current_mode=="greenhouse" and game.habitat_items_root.get_child_count()==0 and game.habitat_pickups.is_empty())
 		game._open_shop();game._close_shop()
 		game._open_encyclopedia()
 		await get_tree().process_frame
@@ -36,10 +32,7 @@ func _ready()->void:
 		game._finish_rain_bonus()
 		assert(game.rain_visual==null and game.rain_drops.is_empty())
 		game._toggle_mode()
-		assert(game.habitat_items_root.get_child_count()>0)
-	game.habitat_reuse_ab_enabled=false
-	game._toggle_mode();assert(game.current_mode=="habitat" and game.habitat_items_root.get_child_count()>0)
-	game._toggle_mode();assert(game.current_mode=="greenhouse" and game.habitat_items_root.get_child_count()==0)
+		assert(game.habitat_items_root.get_child_count()==0)
 	game.audio_manager.play_bgm("greenhouse",true)
 	await get_tree().create_timer(.55).timeout
 	game.audio_manager.play_bgm("habitat",true)
