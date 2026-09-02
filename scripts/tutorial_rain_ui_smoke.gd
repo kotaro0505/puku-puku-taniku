@@ -7,7 +7,13 @@ func _ready()->void:
 	game._start_post_play_dialog("play1");assert(game.intro_dialogue_label.text=="コロラータのたねだったんだね！\n図鑑に登録したよ。見てみよう。")
 	game.intro_overlay.visible=false;game.tutorial_dialog_kind="";game._start_post_play_dialog("play2");assert(game.intro_dialogue_label.text=="センスいいね！そうだ、今度一緒に多肉の原生地へ行こうよ。\n準備してくるから少し待ってね。")
 	game.intro_overlay.visible=false;game.tutorial_dialog_kind="";assert(game.play_open_button.text=="たねをまく")
-	game._show_tutorial_guide("play_open");assert(is_equal_approx(game.tutorial_guide_finger.rotation_degrees,28.0) and game.tutorial_guide_finger.position.x>game.tutorial_guide_button.position.x and game.tutorial_guide_finger.position.y<game.tutorial_guide_button.position.y)
+	for guide_target in ["play_open","encyclopedia","habitat","old_seed"]:
+		game._show_tutorial_guide(guide_target)
+		var pressed_position:Vector2=game._tutorial_finger_position_for(game.tutorial_guide_button,true)
+		var pressed_tip:Vector2=pressed_position+game.tutorial_guide_finger.pivot_offset+(game.TUTORIAL_FINGER_TIP_LOCAL-game.tutorial_guide_finger.pivot_offset).rotated(game.tutorial_guide_finger.rotation)
+		var expected_tip:Vector2=game.tutorial_guide_button.global_position+game.tutorial_guide_button.size*game.TUTORIAL_FINGER_PRESS_RATIO
+		var button_rect:Rect2=Rect2(game.tutorial_guide_button.global_position,game.tutorial_guide_button.size)
+		assert(is_equal_approx(game.tutorial_guide_finger.rotation_degrees,28.0) and pressed_tip.distance_to(expected_tip)<.01 and button_rect.has_point(pressed_tip) and pressed_tip.y>button_rect.position.y+8.0)
 	game.tutorial_guide_overlay.visible=false
 	var min_y:=999.0;var max_y:=-999.0;var longitudes:Array[float]=[]
 	for i in range(240):

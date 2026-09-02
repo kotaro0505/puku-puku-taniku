@@ -72,6 +72,10 @@ const HABITAT_SAFE_SEED_POINTS := [Vector2(45,430),Vector2(115,445),Vector2(190,
 const UI_CREAM := Color("#fff1d2")
 const UI_BROWN := Color("#4a2618")
 const UI_GOLD := Color("#e8aa35")
+const TUTORIAL_FINGER_SIZE := Vector2(58,64)
+const TUTORIAL_FINGER_TIP_LOCAL := Vector2(27,5)
+const TUTORIAL_FINGER_PRESS_RATIO := Vector2(.58,.30)
+const TUTORIAL_FINGER_RELEASE_OFFSET := Vector2(-3,-7)
 
 var rng := RandomNumberGenerator.new()
 var species: Array = []
@@ -178,6 +182,7 @@ var tutorial_dialog_kind := ""
 var tutorial_guide_overlay: Control
 var tutorial_guide_button: Button
 var tutorial_guide_finger: Label
+var tutorial_finger_tween: Tween
 var tutorial_guide_message: Label
 var tutorial_panda_portrait: TextureRect
 var tutorial_dialog_panel: PanelContainer
@@ -813,7 +818,7 @@ func _build_tutorial_guide(hud:Control)->void:
 	tutorial_guide_overlay=Control.new();tutorial_guide_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);tutorial_guide_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_overlay.visible=false;hud.add_child(tutorial_guide_overlay)
 	var shade:=ColorRect.new();shade.color=Color(0.05,0.035,0.025,.72);shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);shade.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_overlay.add_child(shade)
 	tutorial_guide_button=Button.new();tutorial_guide_button.pivot_offset=Vector2(50,35);tutorial_guide_overlay.add_child(tutorial_guide_button)
-	tutorial_guide_finger=Label.new();tutorial_guide_finger.text="☝";tutorial_guide_finger.rotation_degrees=28.0;tutorial_guide_finger.pivot_offset=Vector2(22,22);tutorial_guide_finger.add_theme_font_size_override("font_size",44);tutorial_guide_finger.add_theme_color_override("font_color",Color("#fff1b0"));tutorial_guide_finger.add_theme_color_override("font_outline_color",UI_BROWN);tutorial_guide_finger.add_theme_constant_override("outline_size",6);tutorial_guide_finger.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_guide_overlay.add_child(tutorial_guide_finger)
+	tutorial_guide_finger=Label.new();tutorial_guide_finger.text="☝";tutorial_guide_finger.size=TUTORIAL_FINGER_SIZE;tutorial_guide_finger.rotation_degrees=28.0;tutorial_guide_finger.pivot_offset=TUTORIAL_FINGER_SIZE*.5;tutorial_guide_finger.add_theme_font_size_override("font_size",44);tutorial_guide_finger.add_theme_color_override("font_color",Color("#fff1b0"));tutorial_guide_finger.add_theme_color_override("font_outline_color",UI_BROWN);tutorial_guide_finger.add_theme_constant_override("outline_size",6);tutorial_guide_finger.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_guide_overlay.add_child(tutorial_guide_finger)
 	tutorial_dialog_panel=PanelContainer.new();tutorial_dialog_panel.position=Vector2(40,790);tutorial_dialog_panel.size=Vector2(496,190);tutorial_dialog_panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_dialog_panel.add_theme_stylebox_override("panel",_box(Color(0.97,0.90,0.75,.97),Color("#a86f36"),24,4));tutorial_dialog_panel.visible=false;tutorial_guide_overlay.add_child(tutorial_dialog_panel)
 	var tutorial_row:=HBoxContainer.new();tutorial_row.alignment=BoxContainer.ALIGNMENT_CENTER;tutorial_row.add_theme_constant_override("separation",12);tutorial_row.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_dialog_panel.add_child(tutorial_row)
 	tutorial_panda_portrait=TextureRect.new();tutorial_panda_portrait.texture=_panda_portrait_texture();tutorial_panda_portrait.custom_minimum_size=Vector2(126,164);tutorial_panda_portrait.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;tutorial_panda_portrait.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;tutorial_panda_portrait.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_row.add_child(tutorial_panda_portrait)
@@ -830,10 +835,29 @@ func _show_tutorial_guide(target:String)->void:
 	tutorial_guide_button.position=source.global_position;tutorial_guide_button.size=source.size;tutorial_guide_button.text=source.text;tutorial_guide_button.set_meta("target",target);_skin_button(tutorial_guide_button,Color("#fff0cf"),17 if target=="encyclopedia" else 15)
 	for connection in tutorial_guide_button.pressed.get_connections():tutorial_guide_button.pressed.disconnect(connection.callable)
 	tutorial_guide_button.pressed.connect(_complete_tutorial_guide)
-	tutorial_guide_finger.position=tutorial_guide_button.position+Vector2(tutorial_guide_button.size.x*.5-18,-38);tutorial_guide_overlay.visible=true
-	var finger_y:=tutorial_guide_finger.position.y;var tween:=create_tween().set_loops();tween.tween_property(tutorial_guide_button,"self_modulate",Color(1.25,1.18,.7,1),.42).set_trans(Tween.TRANS_SINE);tween.parallel().tween_property(tutorial_guide_finger,"position:y",finger_y+11,.42).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN);tween.tween_property(tutorial_guide_button,"self_modulate",Color.WHITE,.5);tween.parallel().tween_property(tutorial_guide_finger,"position:y",finger_y,.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tutorial_guide_overlay.visible=true;_start_tutorial_finger_press(tutorial_guide_button,Color(1.25,1.18,.7,1))
+
+func _tutorial_finger_position_for(target:Control,pressed:bool)->Vector2:
+	var contact_point:=target.global_position+target.size*TUTORIAL_FINGER_PRESS_RATIO
+	var desired_tip:=contact_point if pressed else contact_point+TUTORIAL_FINGER_RELEASE_OFFSET
+	var rotated_tip_offset:=(TUTORIAL_FINGER_TIP_LOCAL-tutorial_guide_finger.pivot_offset).rotated(tutorial_guide_finger.rotation)
+	return desired_tip-tutorial_guide_finger.pivot_offset-rotated_tip_offset
+
+func _start_tutorial_finger_press(target:Control,glow_color:Color)->void:
+	if tutorial_finger_tween and tutorial_finger_tween.is_valid():tutorial_finger_tween.kill()
+	var released_position:=_tutorial_finger_position_for(target,false)
+	var pressed_position:=_tutorial_finger_position_for(target,true)
+	tutorial_guide_finger.position=released_position;tutorial_guide_button.self_modulate=Color.WHITE
+	tutorial_finger_tween=create_tween().set_loops()
+	tutorial_finger_tween.tween_property(tutorial_guide_finger,"position",pressed_position,.34).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tutorial_finger_tween.parallel().tween_property(tutorial_guide_button,"self_modulate",glow_color,.34).set_trans(Tween.TRANS_SINE)
+	tutorial_finger_tween.tween_interval(.12)
+	tutorial_finger_tween.tween_property(tutorial_guide_finger,"position",released_position,.46).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tutorial_finger_tween.parallel().tween_property(tutorial_guide_button,"self_modulate",Color.WHITE,.46)
 
 func _complete_tutorial_guide()->void:
+	if tutorial_finger_tween and tutorial_finger_tween.is_valid():tutorial_finger_tween.kill()
+	tutorial_finger_tween=null;tutorial_guide_button.self_modulate=Color.WHITE
 	var target:=str(tutorial_guide_button.get_meta("target",""));tutorial_guide_overlay.visible=false;tutorial_steps[target+"_guide"]=true;_save()
 	if target=="encyclopedia":_open_encyclopedia()
 	elif target=="habitat":_toggle_mode()
@@ -857,15 +881,13 @@ func _show_first_harvest_guide(plant)->void:
 	var screen:=camera.unproject_position(plant.global_position)
 	tutorial_guide_button.position=screen-Vector2(66,66);tutorial_guide_button.size=Vector2(132,132);tutorial_guide_button.text="";tutorial_guide_button.icon=plant.plant_sprite.texture;tutorial_guide_button.expand_icon=true;tutorial_guide_button.set_meta("target","first_harvest");_skin_button(tutorial_guide_button,Color(0.25,0.18,0.08,.35),16)
 	for connection in tutorial_guide_button.pressed.get_connections():tutorial_guide_button.pressed.disconnect(connection.callable)
-	tutorial_guide_button.pressed.connect(_complete_tutorial_guide);tutorial_guide_message.text="育った多肉をタップして収穫しよう";tutorial_dialog_panel.visible=true;_position_tutorial_dialog(Rect2(tutorial_guide_button.position,tutorial_guide_button.size));tutorial_guide_finger.position=tutorial_guide_button.position+Vector2(48,-24);tutorial_guide_overlay.visible=true
-	var finger_y:=tutorial_guide_finger.position.y;var tween:=create_tween().set_loops();tween.tween_property(tutorial_guide_button,"self_modulate",Color(1.3,1.18,.72,1),.42).set_trans(Tween.TRANS_SINE);tween.parallel().tween_property(tutorial_guide_finger,"position:y",finger_y+11,.42);tween.tween_property(tutorial_guide_button,"self_modulate",Color.WHITE,.5);tween.parallel().tween_property(tutorial_guide_finger,"position:y",finger_y,.5)
+	tutorial_guide_button.pressed.connect(_complete_tutorial_guide);tutorial_guide_message.text="育った多肉をタップして収穫しよう";tutorial_dialog_panel.visible=true;_position_tutorial_dialog(Rect2(tutorial_guide_button.position,tutorial_guide_button.size));tutorial_guide_overlay.visible=true;_start_tutorial_finger_press(tutorial_guide_button,Color(1.3,1.18,.72,1))
 
 func _show_habitat_species_guide(item:Dictionary,species_name:String)->void:
 	tutorial_habitat_item=item;var node:Node3D=item.node;var screen:=camera.unproject_position(node.global_position)
 	tutorial_guide_button.position=screen-Vector2(66,66);tutorial_guide_button.size=Vector2(132,132);tutorial_guide_button.text="";tutorial_guide_button.icon=node.texture;tutorial_guide_button.expand_icon=true;tutorial_guide_button.set_meta("target","habitat_species");_skin_button(tutorial_guide_button,Color(0.25,0.18,0.08,.35),16)
 	for connection in tutorial_guide_button.pressed.get_connections():tutorial_guide_button.pressed.disconnect(connection.callable)
-	tutorial_guide_button.pressed.connect(_complete_tutorial_guide);tutorial_guide_message.text="あ、あそこに野生の%sが生えているよ！"%species_name;tutorial_dialog_panel.visible=true;_position_tutorial_dialog(Rect2(tutorial_guide_button.position,tutorial_guide_button.size));tutorial_guide_finger.position=tutorial_guide_button.position+Vector2(48,-24);tutorial_guide_overlay.visible=true
-	var finger_y:=tutorial_guide_finger.position.y;var tween:=create_tween().set_loops();tween.tween_property(tutorial_guide_button,"self_modulate",Color(1.35,1.22,.65,1),.42).set_trans(Tween.TRANS_SINE);tween.parallel().tween_property(tutorial_guide_finger,"position:y",finger_y+11,.42);tween.tween_property(tutorial_guide_button,"self_modulate",Color.WHITE,.5);tween.parallel().tween_property(tutorial_guide_finger,"position:y",finger_y,.5)
+	tutorial_guide_button.pressed.connect(_complete_tutorial_guide);tutorial_guide_message.text="あ、あそこに野生の%sが生えているよ！"%species_name;tutorial_dialog_panel.visible=true;_position_tutorial_dialog(Rect2(tutorial_guide_button.position,tutorial_guide_button.size));tutorial_guide_overlay.visible=true;_start_tutorial_finger_press(tutorial_guide_button,Color(1.35,1.22,.65,1))
 
 func _show_intro_gift_effect()->void:
 	for i in range(7):
