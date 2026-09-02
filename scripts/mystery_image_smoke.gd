@@ -24,6 +24,27 @@ func _assert_padded_texture(texture: Texture2D, expected_size: Vector2i, min_mar
 	var used_center := Vector2(used.position) + Vector2(used.size) * 0.5
 	var canvas_center := Vector2(expected_size) * 0.5
 	assert(used_center.distance_to(canvas_center) <= float(mini(expected_size.x, expected_size.y)) * 0.035)
+	_assert_no_flat_crop(image, used)
+
+func _assert_no_flat_crop(image: Image, used: Rect2i) -> void:
+	var left_edge_pixels := 0
+	var right_edge_pixels := 0
+	var top_edge_pixels := 0
+	var bottom_edge_pixels := 0
+	for y in range(used.position.y, used.end.y):
+		if image.get_pixel(used.position.x, y).a >= 0.1:
+			left_edge_pixels += 1
+		if image.get_pixel(used.end.x - 1, y).a >= 0.1:
+			right_edge_pixels += 1
+	for x in range(used.position.x, used.end.x):
+		if image.get_pixel(x, used.position.y).a >= 0.1:
+			top_edge_pixels += 1
+		if image.get_pixel(x, used.end.y - 1).a >= 0.1:
+			bottom_edge_pixels += 1
+	var vertical_limit := maxi(12, ceili(float(used.size.y) * 0.08))
+	var horizontal_limit := maxi(12, ceili(float(used.size.x) * 0.08))
+	assert(left_edge_pixels <= vertical_limit and right_edge_pixels <= vertical_limit)
+	assert(top_edge_pixels <= horizontal_limit and bottom_edge_pixels <= horizontal_limit)
 
 func _assert_card_fit(texture: Texture2D) -> void:
 	var image := texture.get_image()
