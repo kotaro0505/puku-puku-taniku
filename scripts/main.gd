@@ -291,8 +291,10 @@ var opening_overlay: Control
 var opening_prompt: TextureRect
 var opening_prompt_tween: Tween
 var opening_finished := false
+var habitat_reuse_ab_enabled := true
 
 func _ready() -> void:
+	_configure_habitat_lifecycle_ab()
 	rng.randomize()
 	_load_species()
 	_load_save()
@@ -305,6 +307,11 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_layout)
 	_layout()
 	_wire_ui_sounds(self)
+
+func _configure_habitat_lifecycle_ab()->void:
+	if not OS.has_feature("web"):return
+	var requested=JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('habitat_lifecycle')",true)
+	habitat_reuse_ab_enabled=str(requested)!="control"
 
 func _continue_after_opening()->void:
 	if not intro_story_complete:call_deferred("_start_intro_story")
@@ -1991,7 +1998,10 @@ func _update_habitat_scroll_tutorial()->void:
 func _apply_mode()->void:
 	if camera==null:return
 	var greenhouse_mode:=current_mode=="greenhouse"
-	if not greenhouse_mode:_ensure_habitat_items()
+	if not greenhouse_mode:
+		if habitat_reuse_ab_enabled:_ensure_habitat_items()
+		else:_build_habitat_items()
+	elif not habitat_reuse_ab_enabled:_clear_habitat_items()
 	greenhouse_layer.visible=greenhouse_mode
 	habitat_items_root.visible=not greenhouse_mode
 	if habitat_status_label:habitat_status_label.visible=not greenhouse_mode and rain_bonus_active

@@ -37,6 +37,9 @@ func _ready()->void:
 		assert(game.rain_visual==null and game.rain_drops.is_empty())
 		game._toggle_mode()
 		assert(game.habitat_items_root.get_child_count()>0)
+	game.habitat_reuse_ab_enabled=false
+	game._toggle_mode();assert(game.current_mode=="habitat" and game.habitat_items_root.get_child_count()>0)
+	game._toggle_mode();assert(game.current_mode=="greenhouse" and game.habitat_items_root.get_child_count()==0)
 	game.audio_manager.play_bgm("greenhouse",true)
 	await get_tree().create_timer(.55).timeout
 	game.audio_manager.play_bgm("habitat",true)
