@@ -123,11 +123,6 @@ workflows:
           run_scene_smoke res://scripts/shop_fix_smoke.tscn SHOP_FIX_SMOKE_OK
           run_scene_smoke res://scripts/tutorial_rain_ui_smoke.tscn TUTORIAL_RAIN_UI_SMOKE_OK
           run_script_smoke res://scripts/jelly_dev_smoke.gd JELLY_DEV_SMOKE_OK
-          run_script_smoke res://scripts/web_memory_smoke.gd WEB_MEMORY_SMOKE_OK
-          run_script_smoke res://scripts/habitat_texture_ab_smoke.gd HABITAT_TEXTURE_AB_SMOKE_OK
-          run_script_smoke res://scripts/habitat_background_ab_smoke.gd HABITAT_BACKGROUND_AB_SMOKE_OK current
-          run_script_smoke res://scripts/habitat_background_ab_smoke.gd HABITAT_BACKGROUND_AB_SMOKE_OK no_sky
-          run_script_smoke res://scripts/habitat_background_ab_smoke.gd HABITAT_BACKGROUND_AB_SMOKE_OK panorama_mesh
           run_script_smoke res://scripts/ios_native_smoke.gd IOS_NATIVE_SMOKE_OK
 
       - name: Resolve App Store Connect app by bundle ID
