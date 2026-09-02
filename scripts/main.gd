@@ -1525,6 +1525,14 @@ func _build_habitat_items(force:=false)->void:
 	for i in range(mini(habitat_mystery_seeds_pending,seed_points.size())):_add_habitat_seed(seed_points[i])
 	_update_habitat_ui()
 
+func _ensure_habitat_items()->void:
+	# Safari/WebGL A/B: keep the already uploaded habitat sprites while the
+	# greenhouse/shop/encyclopedia is shown. Rebuilding them on every habitat
+	# entry creates a large allocation/upload peak even when their data did not
+	# change. Explicit state-changing paths still call _build_habitat_items().
+	if habitat_items_root.get_child_count()==0:_build_habitat_items()
+	else:_update_habitat_ui()
+
 func _add_habitat_plant(entry:Dictionary,panorama_point:Vector2,is_new:bool)->void:
 	var sprite:=Sprite3D.new();sprite.texture=_species_texture(entry);sprite.billboard=BaseMaterial3D.BILLBOARD_ENABLED;sprite.no_depth_test=true;sprite.texture_filter=BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS;sprite.pixel_size=1.15/maxf(1.0,float(sprite.texture.get_width()));sprite.offset.y=-float(sprite.texture.get_height())*.18;sprite.position=_panorama_point_to_world(panorama_point,HABITAT_ITEM_RADIUS);habitat_items_root.add_child(sprite)
 	if not is_new:sprite.scale=Vector3.ONE*_habitat_best_visual_scale(str(entry.species_id))
@@ -1983,8 +1991,7 @@ func _update_habitat_scroll_tutorial()->void:
 func _apply_mode()->void:
 	if camera==null:return
 	var greenhouse_mode:=current_mode=="greenhouse"
-	if not greenhouse_mode:_build_habitat_items()
-	else:_clear_habitat_items()
+	if not greenhouse_mode:_ensure_habitat_items()
 	greenhouse_layer.visible=greenhouse_mode
 	habitat_items_root.visible=not greenhouse_mode
 	if habitat_status_label:habitat_status_label.visible=not greenhouse_mode and rain_bonus_active
