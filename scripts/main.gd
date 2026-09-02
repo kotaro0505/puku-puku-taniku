@@ -4,6 +4,7 @@ signal rescue_reward_ad_requested(reward_context:String)
 
 const SucculentClass = preload("res://scripts/succulent.gd")
 const AudioManagerClass = preload("res://scripts/audio_manager.gd")
+const JellyBalanceClass = preload("res://scripts/jelly_balance.gd")
 const PROGRESSION_VERSION := 6
 const NORMAL_GERMINATION_COUNT := 24
 const VOLUME_GERMINATION_COUNT := 36
@@ -197,6 +198,11 @@ var habitat_scroll_tutorial_active := false
 var buyback_unlocked := false
 var habitat_best_link_dialog_step := 0
 var settings_overlay: Control
+var jelly_dev_overlay: Control
+var jelly_dev_labels:Dictionary={}
+var jelly_dev_total_label:Label
+var dev_jelly_test_active:=false
+var last_jelly_claim_msec:=-1000000000
 var audio_manager: Node
 var audio_settings: Dictionary = {"bgm_enabled":true,"se_enabled":true,"bgm_volume":0.65,"se_volume":0.62}
 var habitat_glow_tween: Tween
@@ -536,6 +542,7 @@ func _build_ui() -> void:
 	_build_shop(hud)
 	_build_result_overlay(hud)
 	_build_settings(hud)
+	_build_jelly_dev_overlay(hud)
 	_build_intro_story(hud)
 	_build_tutorial_guide(hud)
 	_build_opening_screen(hud)
@@ -931,7 +938,85 @@ func _build_settings(hud:Control)->void:
 	_add_audio_setting_controls(content,"効果音",false)
 	var note:=Label.new();note.text="音源はモード・効果ごとに後から差し替えできます";note.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;note.add_theme_font_size_override("font_size",14);note.add_theme_color_override("font_color",Color("#76513b"));content.add_child(note)
 	var reset:=Button.new();reset.text="開発用：進行を初期状態へ戻す";reset.custom_minimum_size=Vector2(370,58);_skin_button(reset,Color("#d9c49d"),16);reset.pressed.connect(_reset_progression_for_development.bind(reset));content.add_child(reset)
+	var jelly_test:=Button.new();jelly_test.text="開発用：ジュレテスト";jelly_test.custom_minimum_size=Vector2(370,58);_skin_button(jelly_test,Color("#c7b4d9"),17);jelly_test.pressed.connect(_open_jelly_dev);content.add_child(jelly_test)
 	var close:=Button.new();close.text="閉じる";close.custom_minimum_size=Vector2(280,55);_skin_button(close,Color("#ead8b1"),18);close.pressed.connect(_close_settings);content.add_child(close)
+
+func _build_jelly_dev_overlay(hud:Control)->void:
+	jelly_dev_overlay=Control.new();jelly_dev_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);jelly_dev_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;jelly_dev_overlay.visible=false;hud.add_child(jelly_dev_overlay)
+	var shade:=ColorRect.new();shade.color=Color(0.08,0.04,0.03,.78);shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);shade.mouse_filter=Control.MOUSE_FILTER_STOP;jelly_dev_overlay.add_child(shade)
+	var panel:=PanelContainer.new();panel.position=Vector2(18,28);panel.size=Vector2(540,968);panel.add_theme_stylebox_override("panel",_box(Color("#f7e8c7"),Color("#8f633b"),24,4));jelly_dev_overlay.add_child(panel)
+	var outer:=VBoxContainer.new();outer.add_theme_constant_override("separation",8);panel.add_child(outer)
+	var title:=Label.new();title.text="開発用：ジュレテスト";title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;title.add_theme_font_size_override("font_size",24);title.add_theme_color_override("font_color",UI_BROWN);outer.add_child(title)
+	var note:=Label.new();note.text="正式ロジックは保持したまま、テスト中だけ上書きします";note.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;note.add_theme_font_size_override("font_size",13);note.add_theme_color_override("font_color",Color("#76513b"));outer.add_child(note)
+	var scroll:=ScrollContainer.new();scroll.custom_minimum_size=Vector2(500,735);scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;outer.add_child(scroll)
+	var content:=VBoxContainer.new();content.size_flags_horizontal=Control.SIZE_EXPAND_FILL;content.add_theme_constant_override("separation",5);scroll.add_child(content)
+	_add_jelly_dev_row(content,"final_chance",.005);_add_jelly_dev_row(content,"cooldown",.1);_add_jelly_dev_row(content,"safe_min",.1);_add_jelly_dev_row(content,"safe_max",.1)
+	for kind in ["short","normal","long","ultra"]:
+		var heading:=Label.new();heading.text={"short":"短命タイプ","normal":"普通タイプ","long":"長命タイプ","ultra":"超長命タイプ"}[kind];heading.add_theme_font_size_override("font_size",18);heading.add_theme_color_override("font_color",Color("#754326"));content.add_child(heading)
+		_add_jelly_dev_row(content,kind+"_weight",1.0);_add_jelly_dev_row(content,kind+"_min",.1);_add_jelly_dev_row(content,kind+"_max",.1)
+	_add_jelly_dev_row(content,"growth_speed",.1);_add_jelly_dev_row(content,"rhythm_amplitude",.01)
+	jelly_dev_total_label=Label.new();jelly_dev_total_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;jelly_dev_total_label.add_theme_font_size_override("font_size",17);content.add_child(jelly_dev_total_label)
+	var actions:=HBoxContainer.new();actions.alignment=BoxContainer.ALIGNMENT_CENTER;actions.add_theme_constant_override("separation",7);outer.add_child(actions)
+	for spec in [["普通のたね +1袋",Callable(self,"_dev_add_seed_bag")],["50cm株 ×4 テスト",Callable(self,"_dev_spawn_50cm")],["正式値に戻す",Callable(self,"_dev_reset_jelly")]]:
+		var button:=Button.new();button.text=spec[0];button.custom_minimum_size=Vector2(158,52);_skin_button(button,Color("#d8b56b"),14);button.pressed.connect(spec[1]);actions.add_child(button)
+	var close:=Button.new();close.text="閉じる";close.custom_minimum_size=Vector2(280,45);_skin_button(close,Color("#ead8b1"),16);close.pressed.connect(_close_jelly_dev);outer.add_child(close)
+
+func _add_jelly_dev_row(parent:VBoxContainer,key:String,step:float)->void:
+	var row:=HBoxContainer.new();row.alignment=BoxContainer.ALIGNMENT_CENTER;row.add_theme_constant_override("separation",6);parent.add_child(row)
+	var label:=Label.new();label.custom_minimum_size=Vector2(330,38);label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.add_theme_font_size_override("font_size",15);label.add_theme_color_override("font_color",UI_BROWN);row.add_child(label);jelly_dev_labels[key]=label
+	for delta in [-step,step]:
+		var button:=Button.new();button.text="−" if delta<0 else "+";button.custom_minimum_size=Vector2(64,38);_skin_button(button,Color("#d9c49d"),18);button.pressed.connect(_change_jelly_dev_value.bind(key,delta));row.add_child(button)
+
+func _open_jelly_dev()->void:
+	JellyBalanceClass.begin_test_defaults();settings_overlay.visible=false;jelly_dev_overlay.visible=true;_refresh_jelly_dev_ui();_update_play_ui()
+
+func _close_jelly_dev()->void:
+	jelly_dev_overlay.visible=false;_update_play_ui()
+
+func _change_jelly_dev_value(key:String,delta:float)->void:
+	var value:=float(JellyBalanceClass.values[key])+delta
+	if key.ends_with("_weight"):value=clampf(value,0.0,100.0)
+	elif key=="final_chance":value=clampf(value,.0,.50)
+	elif key=="growth_speed":value=clampf(value,.1,10.0)
+	elif key=="rhythm_amplitude":value=clampf(value,.0,.50)
+	else:value=clampf(value,.0,120.0)
+	if key.ends_with("_min"):
+		var max_key:=key.trim_suffix("_min")+"_max";value=minf(value,float(JellyBalanceClass.values[max_key]))
+	elif key.ends_with("_max"):
+		var min_key:=key.trim_suffix("_max")+"_min";value=maxf(value,float(JellyBalanceClass.values[min_key]))
+	JellyBalanceClass.set_value(key,value);_refresh_jelly_dev_ui()
+
+func _jelly_dev_text(key:String)->String:
+	var names={"final_chance":"最終ジュレ率","cooldown":"連続ジュレ回避","safe_min":"初期安全 MIN","safe_max":"初期安全 MAX","short_weight":"短命 割合","short_min":"短命 時間 MIN","short_max":"短命 時間 MAX","normal_weight":"普通 割合","normal_min":"普通 時間 MIN","normal_max":"普通 時間 MAX","long_weight":"長命 割合","long_min":"長命 時間 MIN","long_max":"長命 時間 MAX","ultra_weight":"超長命 割合","ultra_min":"超長命 時間 MIN","ultra_max":"超長命 時間 MAX","growth_speed":"成長速度倍率","rhythm_amplitude":"成長リズム幅"}
+	var value:=float(JellyBalanceClass.values[key])
+	if key=="final_chance" or key=="rhythm_amplitude":return "%s　%.1f%%"%[names[key],value*100.0]
+	if key.ends_with("_weight"):return "%s　%.0f%%"%[names[key],value]
+	if key=="growth_speed":return "%s　×%.1f"%[names[key],value]
+	return "%s　%.1f秒"%[names[key],value]
+
+func _refresh_jelly_dev_ui()->void:
+	for key in jelly_dev_labels:jelly_dev_labels[key].text=_jelly_dev_text(str(key))
+	var total:=JellyBalanceClass.weight_total();jelly_dev_total_label.text="タイプ割合 合計 %.0f%%　%s"%[total,"OK" if is_equal_approx(total,100.0) else "⚠ 100%にしてください"]
+	jelly_dev_total_label.add_theme_color_override("font_color",Color("#47713b") if is_equal_approx(total,100.0) else Color("#b33b31"))
+
+func _dev_add_seed_bag()->void:
+	normal_seed_bags+=1;_update_play_ui();_save()
+
+func _dev_reset_jelly()->void:
+	JellyBalanceClass.reset_formal();_refresh_jelly_dev_ui()
+
+func _dev_spawn_50cm()->void:
+	JellyBalanceClass.override_enabled=true;dev_jelly_test_active=true;last_jelly_claim_msec=-1000000000
+	jelly_dev_overlay.visible=false;settings_overlay.visible=false;current_mode="greenhouse";_apply_mode();_clear_greenhouse_plants();play_active=false;active_seed_type="dev_jelly";play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0
+	for i in range(4):
+		_spawn_specific_plant("colorata");var plant=plants.back();plant.fast_forward_to_diameter(50.0)
+	_update_play_ui()
+
+func _try_claim_jelly()->bool:
+	var cooldown:=float(JellyBalanceClass.effective().cooldown)
+	var now:=Time.get_ticks_msec()
+	if cooldown>0.0 and now-last_jelly_claim_msec<int(cooldown*1000.0):return false
+	last_jelly_claim_msec=now;return true
 
 func _add_audio_setting_controls(parent:VBoxContainer,label_text:String,is_bgm:bool)->void:
 	var row:=HBoxContainer.new();row.alignment=BoxContainer.ALIGNMENT_CENTER;row.add_theme_constant_override("separation",12);parent.add_child(row)
@@ -952,6 +1037,7 @@ func _change_audio_volume(value:float,is_bgm:bool)->void:
 	audio_settings["bgm_volume" if is_bgm else "se_volume"]=value/100.0;audio_manager.apply_settings(audio_settings);_save()
 
 func _reset_progression_state()->void:
+	JellyBalanceClass.reset_formal();dev_jelly_test_active=false;last_jelly_claim_msec=-1000000000
 	mystery_route_assignments.clear();mystery_route_completed.clear();mystery_route_dialog_seen.clear();rain_completion_count=0;best_100_achieved=false;normal_habitat_complete=false;shop_selected_seed_type="normal"
 	coins=1000;bests.clear();discovered.clear();greenhouse_available={"colorata":true};unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;buyback_unlocked=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;mystery_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;mystery_seed_pack_unlocked=false;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;habitat_mystery_seeds_pending=0;mystery_seed_count=0;armadillo_research_total=0;armadillo_research_rewards.clear();armadillo_research_intro_seen=false;armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();shop_chatter_acquired_species.clear();play_active=false;play_time_remaining=0.0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_scroll_tutorial_active=false;habitat_best_link_dialog_step=0;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_build_habitat_items();_save();_update_currency_ui();_update_play_ui()
 	normal_play_count=0;shop_visit_count=0;hidden_species_acquired.clear();tovar_next_play=TOVAR_FIRST_PLAY;tovar_attempt_count=0;tovar_event_active=false;tovar_harvested_this_play=false;armadillo_present=false;_save()
@@ -1005,6 +1091,7 @@ func _close_play_modal()->void:
 	play_modal_open=false;_update_play_ui()
 
 func _start_greenhouse_play(seed_type:String)->void:
+	dev_jelly_test_active=false
 	if play_active:return
 	if seed_type=="old":
 		if old_seed_bags<1:return
@@ -1070,7 +1157,7 @@ func _spawn_specific_plant(species_id:String)->void:
 	var chosen:=_catalog_entry(species_id)
 	if chosen.is_empty():return
 	var pos:=_find_spawn_position();var label:=_plant_label();labels_layer.add_child(label)
-	var p=SucculentClass.new();p.original_pos=pos;p.position=pos;world_root.add_child(p);p.setup(chosen,rng.randi(),label,null);p.harvested.connect(_on_harvested);p.jellied.connect(_on_jellied);plants.append(p)
+	var p=SucculentClass.new();p.original_pos=pos;p.position=pos;world_root.add_child(p);p.setup(chosen,rng.randi(),label,null);p.jelly_permission=Callable(self,"_try_claim_jelly");p.harvested.connect(_on_harvested);p.jellied.connect(_on_jellied);plants.append(p)
 	if audio_manager:audio_manager.play_se("sprout",.28)
 
 func _catalog_entry(species_id:String)->Dictionary:
@@ -1604,7 +1691,7 @@ func spawn_plant(force_golden := false,spawn_position:Variant=null) -> void:
 	var pos:Vector3=_find_spawn_position() if spawn_position==null else spawn_position
 	var label:=_plant_label(); labels_layer.add_child(label)
 	var p = SucculentClass.new()
-	p.original_pos=pos; p.position=pos; world_root.add_child(p); p.setup(chosen,rng.randi(),label,null)
+	p.original_pos=pos; p.position=pos; world_root.add_child(p); p.setup(chosen,rng.randi(),label,null);p.jelly_permission=Callable(self,"_try_claim_jelly")
 	p.harvested.connect(_on_harvested); p.jellied.connect(_on_jellied)
 	plants.append(p)
 	if audio_manager:audio_manager.play_se("sprout",.28)
@@ -1644,7 +1731,7 @@ func _spawn_rain_plant()->void:
 	var chosen:Dictionary=pool[rng.randi_range(0,pool.size()-1)]
 	var pos:=_find_rain_spawn_position()
 	var label:=_plant_label();labels_layer.add_child(label)
-	var p=SucculentClass.new();p.original_pos=pos;p.position=pos;world_root.add_child(p);p.setup(chosen,rng.randi(),label,null);p.harvested.connect(_on_harvested);p.jellied.connect(_on_jellied);plants.append(p)
+	var p=SucculentClass.new();p.original_pos=pos;p.position=pos;world_root.add_child(p);p.setup(chosen,rng.randi(),label,null);p.jelly_permission=Callable(self,"_try_claim_jelly");p.harvested.connect(_on_harvested);p.jellied.connect(_on_jellied);plants.append(p)
 	if audio_manager:audio_manager.play_se("sprout",.22)
 
 func _rain_species_pool()->Array:
@@ -1835,7 +1922,7 @@ func _process(delta:float)->void:
 		if rain_spawn_queue>0 and plants.size()<RAIN_MAX_ACTIVE_PLANTS:
 			rain_spawn_timer-=delta
 			if rain_spawn_timer<=0.0:rain_spawn_queue-=1;spawn_plant();rain_spawn_timer=rng.randf_range(.14,.32)
-	elif current_mode=="greenhouse" and play_active:
+	elif current_mode=="greenhouse" and (play_active or dev_jelly_test_active):
 		for p in plants:
 			if is_instance_valid(p):p.simulate(delta)
 		if play_spawn_queue>0:
@@ -1947,7 +2034,7 @@ func _update_labels()->void:
 
 func _input(event:InputEvent)->void:
 	if audio_manager and (event is InputEventScreenTouch or event is InputEventMouseButton or event is InputEventKey):audio_manager.notify_user_gesture()
-	if (tutorial_guide_overlay and tutorial_guide_overlay.visible) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible):return
+	if (tutorial_guide_overlay and tutorial_guide_overlay.visible) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible):return
 	if current_mode=="greenhouse" and not play_active:return
 	if event is InputEventScreenTouch:
 		if event.pressed:
@@ -2076,6 +2163,8 @@ func _show_habitat_message(world_position:Vector3,message:String,color:Color)->v
 	var tween:=create_tween().bind_node(label).set_parallel();tween.tween_property(label,"position:y",label.position.y-70,.7);tween.tween_property(label,"modulate:a",0.0,.7).set_delay(.25);tween.chain().tween_callback(label.queue_free)
 
 func _on_harvested(p)->void:
+	if dev_jelly_test_active:
+		plants.erase(p);var tween:=create_tween().bind_node(p);tween.tween_property(p,"scale",Vector3.ONE*.01,.2);_cleanup_later(p,.25);return
 	var deferred_tovar:=tovar_event_active and str(p.data.species_id)==HIDDEN_TOVAR_ID
 	if deferred_tovar:tovar_harvested_this_play=true
 	var old:=float(bests.get(p.data.species_id,0.0));var is_record:bool=not deferred_tovar and p.diameter_cm>old
@@ -2112,7 +2201,7 @@ func _cleanup_later(p,delay:float)->void:
 	if rain_bonus_active and rain_time_remaining>0.0:
 		rain_spawn_queue=mini(RAIN_MAX_ACTIVE_PLANTS,rain_spawn_queue+2)
 		if rain_spawn_queue<=2:rain_spawn_timer=rng.randf_range(.14,.32)
-	elif play_active:
+	elif play_active and not dev_jelly_test_active:
 		_queue_greenhouse_replacements();_update_play_ui()
 		if play_seeds_remaining==0 and play_spawn_queue==0 and play_seed_animations_pending==0 and plants.is_empty():call_deferred("_finish_greenhouse_play")
 	await get_tree().create_timer(delay).timeout

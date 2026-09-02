@@ -1,6 +1,8 @@
 class_name Succulent
 extends Node3D
 
+const JellyBalanceClass = preload("res://scripts/jelly_balance.gd")
+
 signal harvested(plant: Succulent)
 signal jellied(plant: Succulent)
 
@@ -49,6 +51,11 @@ var jelly_safe_end_seconds := 4.5
 var jelly_ramp_end_seconds := 13.0
 var growth_rhythm_period := 22.0
 var growth_rhythm_phase := 0.0
+var growth_rhythm_amplitude := GROWTH_RHYTHM_AMPLITUDE
+var growth_speed_multiplier := 1.0
+var jelly_final_chance := JELLY_CHANCE_FINAL
+var resistance_type := "normal"
+var jelly_permission:Callable
 var jelly_checks_enabled := true
 var sway_phase := 0.0
 
@@ -60,16 +67,12 @@ func setup(species: Dictionary, seed_value: int, screen_label: Label, _danger: L
 	# Every plant gets a short guaranteed establishment period. Its later
 	# vulnerability is individual: both the safe period and the time needed to
 	# reach the common 6%/second mature risk vary continuously.
-	jelly_safe_end_seconds = rng.randf_range(3.8, 6.2)
+	var balance:=JellyBalanceClass.effective()
+	jelly_final_chance=float(balance.final_chance);growth_speed_multiplier=float(balance.growth_speed);growth_rhythm_amplitude=float(balance.rhythm_amplitude)
+	jelly_safe_end_seconds = rng.randf_range(float(balance.safe_min), float(balance.safe_max))
 	var ramp_roll := rng.randf()
-	if ramp_roll < 0.45:
-		jelly_ramp_end_seconds = jelly_safe_end_seconds + rng.randf_range(4.5, 8.5)
-	elif ramp_roll < 0.80:
-		jelly_ramp_end_seconds = jelly_safe_end_seconds + rng.randf_range(7.5, 13.5)
-	elif ramp_roll < 0.96:
-		jelly_ramp_end_seconds = jelly_safe_end_seconds + rng.randf_range(12.0, 22.0)
-	else:
-		jelly_ramp_end_seconds = jelly_safe_end_seconds + rng.randf_range(22.0, 38.0)
+	resistance_type=JellyBalanceClass.resistance_for_roll(ramp_roll)
+	jelly_ramp_end_seconds=jelly_safe_end_seconds+rng.randf_range(float(balance[resistance_type+"_min"]),float(balance[resistance_type+"_max"]))
 	growth_rhythm_period = rng.randf_range(16.0, 28.0)
 	growth_rhythm_phase = rng.randf_range(0.0, TAU)
 	label = screen_label
@@ -125,37 +128,37 @@ void fragment(){vec2 p=(UV-vec2(.5))*2.0;float a=smoothstep(1.0,.08,dot(p,p));AL
 func simulate(delta: float) -> void:
 	if state != "growing": return
 	if growth_time == 0.0 and diameter_cm > 1.6:
-		growth_time = (diameter_cm - 1.6) / (GROWTH_CM_PER_SECOND * growth_rate)
+		growth_time = (diameter_cm - 1.6) / (GROWTH_CM_PER_SECOND * growth_rate * growth_speed_multiplier)
 	var previous_age := age
 	age += delta
 	growth_time += _integrated_growth_multiplier(previous_age, age)
-	diameter_cm = 1.6 + growth_time * GROWTH_CM_PER_SECOND * growth_rate
+	diameter_cm = 1.6 + growth_time * GROWTH_CM_PER_SECOND * growth_rate * growth_speed_multiplier
 	# One physical-looking scale mapping for all sizes, with no clamp or cap.
 	# 30cm is now a moderate plant; 60–70cm is when it dominates the view.
 	visual_scale = .18 + (diameter_cm - 1.6) * .058
 	_update_visual(delta)
 	if jelly_checks_enabled:
-		var jelly_probability := jelly_probability_for_interval(age - delta, delta, jelly_safe_end_seconds, jelly_ramp_end_seconds)
-		if rng.randf() < jelly_probability: jelly()
+		var jelly_probability := jelly_probability_for_interval(age - delta, delta, jelly_safe_end_seconds, jelly_ramp_end_seconds,jelly_final_chance)
+		if rng.randf() < jelly_probability and (not jelly_permission.is_valid() or bool(jelly_permission.call())): jelly()
 
 func _integrated_growth_multiplier(start_time: float, end_time: float) -> float:
 	# Integrate 1 + amplitude*sin(omega*t+phase) exactly. The multiplier stays
 	# between 90% and 110%, never stops, and averages to 100% over each cycle.
 	var omega := TAU / growth_rhythm_period
-	return (end_time - start_time) + GROWTH_RHYTHM_AMPLITUDE / omega * (
+	return (end_time - start_time) + growth_rhythm_amplitude / omega * (
 		cos(omega * start_time + growth_rhythm_phase)
 		- cos(omega * end_time + growth_rhythm_phase)
 	)
 
-static func jelly_probability_for_interval(start_age: float, delta: float, safe_end_seconds := 4.5, ramp_end_seconds := 13.0) -> float:
+static func jelly_probability_for_interval(start_age: float, delta: float, safe_end_seconds := 4.5, ramp_end_seconds := 13.0, final_chance:=JELLY_CHANCE_FINAL) -> float:
 	# This is the single source of truth for jelly probability. Integrating the
 	# smoothly varying hazard over the whole frame makes the result FPS independent.
 	if delta <= 0.0: return 0.0
 	var end_age := start_age + delta
-	var integrated_hazard := _integrate_hazard_segment(start_age,end_age,safe_end_seconds,ramp_end_seconds,0.0,JELLY_CHANCE_FINAL)
+	var integrated_hazard := _integrate_hazard_segment(start_age,end_age,safe_end_seconds,ramp_end_seconds,0.0,final_chance)
 	var constant_start := maxf(start_age, ramp_end_seconds)
 	if end_age > constant_start:
-		integrated_hazard += -log(1.0 - JELLY_CHANCE_FINAL) * (end_age - constant_start)
+		integrated_hazard += -log(1.0 - final_chance) * (end_age - constant_start)
 	return 1.0 - exp(-integrated_hazard)
 
 static func jelly_chance_per_second(at_age: float, safe_end_seconds := 4.5, ramp_end_seconds := 13.0) -> float:
@@ -165,6 +168,16 @@ static func jelly_chance_per_second(at_age: float, safe_end_seconds := 4.5, ramp
 	elif at_age >= ramp_end_seconds:
 		hazard = -log(1.0-JELLY_CHANCE_FINAL)
 	return 1.0 - exp(-hazard)
+
+func fast_forward_to_diameter(target_cm:float)->void:
+	var target_growth:=(target_cm-1.6)/(GROWTH_CM_PER_SECOND*growth_rate*growth_speed_multiplier)
+	var low:=0.0;var high:=maxf(1.0,target_growth*1.2)
+	while _integrated_growth_multiplier(0.0,high)<target_growth:high*=2.0
+	for i in range(32):
+		var mid:=(low+high)*.5
+		if _integrated_growth_multiplier(0.0,mid)<target_growth:low=mid
+		else:high=mid
+	age=(low+high)*.5;growth_time=_integrated_growth_multiplier(0.0,age);diameter_cm=1.6+growth_time*GROWTH_CM_PER_SECOND*growth_rate*growth_speed_multiplier;visual_scale=.18+(diameter_cm-1.6)*.058;_update_visual(0.0)
 
 static func _smooth_hazard(at_age: float, segment_start: float, segment_end: float, start_chance: float, end_chance: float) -> float:
 	var t := clampf((at_age - segment_start) / (segment_end - segment_start), 0.0, 1.0)
