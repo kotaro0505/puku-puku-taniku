@@ -20,12 +20,12 @@ const SPRITES := {
 	"pinwheel": "res://assets/plants/sprite-pinwheel.png",
 	"tovarensis_tovar": "res://assets/plants/sprite-tovarensis-tovar.png",
 	"transparent_mystery": "res://assets/plants/sprite-transparent-mystery.png",
-	"mystery_glow_colorata": "res://assets/plants/mystery-glow-colorata.jpg",
-	"mystery_metal_laui": "res://assets/plants/mystery-metal-laui.jpg",
-	"mystery_seaglass_veria": "res://assets/plants/mystery-seaglass-veria.jpg",
-	"mystery_amber_agavoides": "res://assets/plants/mystery-amber-agavoides.jpg",
-	"mystery_yumefuwa_jelly": "res://assets/plants/mystery-yumefuwa-jelly.jpg",
-	"mystery_peach_jelly": "res://assets/plants/mystery-peach-jelly.jpg",
+	"mystery_glow_colorata": "res://assets/plants/mystery-glow-colorata.png",
+	"mystery_metal_laui": "res://assets/plants/mystery-metal-laui.png",
+	"mystery_seaglass_veria": "res://assets/plants/mystery-seaglass-veria.png",
+	"mystery_amber_agavoides": "res://assets/plants/mystery-amber-agavoides.png",
+	"mystery_yumefuwa_jelly": "res://assets/plants/mystery-yumefuwa-jelly.png",
+	"mystery_peach_jelly": "res://assets/plants/mystery-peach-jelly.png",
 	"gold_kannte": "res://assets/plants/sprite-golden-laui.png"
 }
 
