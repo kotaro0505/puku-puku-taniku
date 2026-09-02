@@ -45,7 +45,7 @@ func apply_settings(saved: Dictionary) -> void:
 	se_volume = clampf(float(saved.get("se_volume", 0.62)), 0.0, 1.0)
 	if not bgm_enabled:
 		_cancel_bgm_fade()
-		for player in bgm_players: player.stop()
+		for player in bgm_players: _stop_and_release_bgm_player(player)
 	elif not was_bgm_enabled and not current_bgm_key.is_empty():
 		AudioServer.set_bus_mute(AudioServer.get_bus_index("Master"), false)
 		_queue_bgm_restart()
@@ -62,13 +62,14 @@ func play_bgm(key: String, restart := false) -> void:
 	if not bgm_enabled: return
 	var stream := _stream_for("bgm", key)
 	if stream == null:
-		for player in bgm_players: player.stop()
+		for player in bgm_players: _stop_and_release_bgm_player(player)
 		return
 	var current := bgm_players[active_bgm]
 	if not restart and current.playing and current.stream == stream: return
 	_cancel_bgm_fade()
 	var next_index := 1 - active_bgm
 	var next := bgm_players[next_index]
+	_stop_and_release_bgm_player(next)
 	next.stream = stream
 	next.volume_db = -60.0
 	next.play()
@@ -76,7 +77,7 @@ func play_bgm(key: String, restart := false) -> void:
 	bgm_fade_tween = create_tween().set_parallel()
 	bgm_fade_tween.tween_property(next, "volume_db", target_db, BGM_FADE_SECONDS)
 	if current.playing: bgm_fade_tween.tween_property(current, "volume_db", -60.0, BGM_FADE_SECONDS)
-	bgm_fade_tween.chain().tween_callback(current.stop)
+	bgm_fade_tween.chain().tween_callback(_stop_and_release_bgm_player.bind(current))
 	active_bgm = next_index
 
 func _bgm_target_db(key:String)->float:
@@ -103,8 +104,12 @@ func _restart_current_bgm() -> void:
 	bgm_restart_queued = false
 	if not bgm_enabled or current_bgm_key.is_empty(): return
 	_cancel_bgm_fade()
-	for player in bgm_players: player.stop()
+	for player in bgm_players: _stop_and_release_bgm_player(player)
 	play_bgm(current_bgm_key, true)
+
+func _stop_and_release_bgm_player(player:AudioStreamPlayer)->void:
+	player.stop()
+	player.stream=null
 
 func _cancel_bgm_fade() -> void:
 	if bgm_fade_tween and bgm_fade_tween.is_valid(): bgm_fade_tween.kill()

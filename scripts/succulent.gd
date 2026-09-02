@@ -101,7 +101,7 @@ func _play_special_birth_glow() -> void:
 	glow.omni_range = 3.2
 	glow.position = Vector3(0, .75, .08)
 	add_child(glow)
-	var tw := create_tween().set_parallel()
+	var tw := create_tween().bind_node(glow).set_parallel()
 	tw.tween_property(plant_sprite, "modulate", Color.WHITE, .9).set_trans(Tween.TRANS_QUAD)
 	tw.tween_property(glow, "light_energy", 0.0, .9).set_trans(Tween.TRANS_QUAD)
 	tw.chain().tween_callback(glow.queue_free)

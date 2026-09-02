@@ -124,6 +124,8 @@ var encyclopedia_list_page: Control
 var encyclopedia_detail_page: Control
 var encyclopedia_grid: GridContainer
 var encyclopedia_scroll: ScrollContainer
+var encyclopedia_card_images: Array[TextureRect] = []
+var encyclopedia_card_entries: Array[Dictionary] = []
 var habitat_status_label: Label
 var seed_bag_panel: PanelContainer
 var play_timer_label: Label
@@ -868,7 +870,7 @@ func _show_habitat_species_guide(item:Dictionary,species_name:String)->void:
 func _show_intro_gift_effect()->void:
 	for i in range(7):
 		var mote:=Label.new();mote.text="❧" if i%2==0 else "✦";mote.position=Vector2(245+rng.randf_range(-55,55),730+rng.randf_range(-15,25));mote.add_theme_font_size_override("font_size",18+rng.randi_range(0,7));mote.add_theme_color_override("font_color",Color("#f4ca58") if i%2 else Color("#8dad64"));effects_layer.add_child(mote)
-		var tween:=create_tween().set_parallel();tween.tween_property(mote,"position",mote.position+Vector2(rng.randf_range(-80,80),rng.randf_range(-150,-90)),.75).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT);tween.tween_property(mote,"modulate:a",0.0,.75).set_delay(.2);tween.chain().tween_callback(mote.queue_free)
+		var tween:=create_tween().bind_node(mote).set_parallel();tween.tween_property(mote,"position",mote.position+Vector2(rng.randf_range(-80,80),rng.randf_range(-150,-90)),.75).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT);tween.tween_property(mote,"modulate:a",0.0,.75).set_delay(.2);tween.chain().tween_callback(mote.queue_free)
 
 func _build_settings(hud:Control)->void:
 	settings_overlay=Control.new();settings_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);settings_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;settings_overlay.visible=false;hud.add_child(settings_overlay)
@@ -932,7 +934,7 @@ func _clear_result_confetti()->void:
 	result_record_pulse_tween=null
 	if result_max_label:result_max_label.scale=Vector2.ONE
 	if not result_confetti_layer:return
-	for piece in result_confetti_layer.get_children():piece.queue_free()
+	for piece in result_confetti_layer.get_children():piece.free()
 
 func _play_result_confetti()->void:
 	_clear_result_confetti()
@@ -940,7 +942,7 @@ func _play_result_confetti()->void:
 	for i in range(40):
 		var piece:=ColorRect.new();piece.color=colors[rng.randi_range(0,colors.size()-1)];piece.color.a=.88;piece.size=Vector2(rng.randf_range(4.0,7.0),rng.randf_range(8.0,13.0));piece.position=Vector2(rng.randf_range(64.0,512.0),rng.randf_range(-65.0,115.0));piece.rotation=rng.randf_range(-1.0,1.0);piece.mouse_filter=Control.MOUSE_FILTER_IGNORE;result_confetti_layer.add_child(piece)
 		var destination:=piece.position+Vector2(rng.randf_range(-34.0,34.0),rng.randf_range(500.0,710.0));var duration:=rng.randf_range(2.8,4.0)
-		var tween:=create_tween().set_parallel();tween.tween_property(piece,"position",destination,duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN);tween.tween_property(piece,"rotation",piece.rotation+rng.randf_range(2.0,5.0),duration);tween.tween_property(piece,"modulate:a",0.0,.7).set_delay(duration-.7);tween.chain().tween_callback(piece.queue_free)
+		var tween:=create_tween().bind_node(piece).set_parallel();tween.tween_property(piece,"position",destination,duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN);tween.tween_property(piece,"rotation",piece.rotation+rng.randf_range(2.0,5.0),duration);tween.tween_property(piece,"modulate:a",0.0,.7).set_delay(duration-.7);tween.chain().tween_callback(piece.queue_free)
 
 func _start_result_record_pulse()->void:
 	result_max_label.pivot_offset=result_max_label.size*.5;result_max_label.scale=Vector2.ONE
@@ -1167,7 +1169,9 @@ func _grant_hidden_species(species_id:String)->bool:
 	return true
 
 func _close_shop()->void:
-	_hide_shop_chatter(true);shop_overlay.visible=false;audio_manager.play_bgm("greenhouse" if current_mode=="greenhouse" else "habitat");_update_play_ui()
+	_hide_shop_chatter(true);shop_overlay.visible=false;shop_background.texture=null
+	if shop_buy_pulse_tween and shop_buy_pulse_tween.is_valid():shop_buy_pulse_tween.kill()
+	shop_buy_pulse_tween=null;audio_manager.play_bgm("greenhouse" if current_mode=="greenhouse" else "habitat");_update_play_ui()
 
 func _buy_seed_bag(seed_type:String)->void:
 	if seed_type=="volume" and not _volume_seed_unlocked():shop_message.text="あと%d回プレイで解禁"%maxi(0,3-formal_play_count);return
@@ -1287,7 +1291,7 @@ func _animate_species_to_encyclopedia(species_id:String,start:Vector2,parent:Con
 	var flying:=TextureRect.new();flying.texture=texture;flying.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;flying.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;flying.size=Vector2(104,104);flying.position=start-flying.size*.5;flying.pivot_offset=flying.size*.5;flying.mouse_filter=Control.MOUSE_FILTER_IGNORE;parent.add_child(flying)
 	var target:=Vector2(500,150)
 	if encyclopedia_icon_button:target=encyclopedia_icon_button.global_position+encyclopedia_icon_button.size*.5
-	var tween:=create_tween().set_parallel();tween.tween_property(flying,"position",target-flying.size*.5,.58).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN);tween.tween_property(flying,"scale",Vector2(.08,.08),.58).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN);tween.tween_property(flying,"rotation",.16,.58);await tween.finished
+	var tween:=create_tween().bind_node(flying).set_parallel();tween.tween_property(flying,"position",target-flying.size*.5,.58).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN);tween.tween_property(flying,"scale",Vector2(.08,.08),.58).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN);tween.tween_property(flying,"rotation",.16,.58);await tween.finished
 	if is_instance_valid(flying):flying.queue_free()
 	if audio_manager:audio_manager.play_se("new_species",.55)
 
@@ -1305,6 +1309,7 @@ func _build_encyclopedia(hud:Control)->void:
 	var title:=Label.new();title.text="ぷくぷく図鑑";title.position=Vector2(28,28);title.size=Vector2(390,65);title.add_theme_font_size_override("font_size",31);title.add_theme_color_override("font_color",UI_CREAM);encyclopedia_list_page.add_child(title)
 	var close:=Button.new();close.text="もどる";close.position=Vector2(447,27);close.size=Vector2(105,55);_skin_button(close,Color("#fff0cf"),17);close.pressed.connect(_close_encyclopedia);encyclopedia_list_page.add_child(close)
 	encyclopedia_scroll=ScrollContainer.new();encyclopedia_scroll.position=Vector2(20,105);encyclopedia_scroll.size=Vector2(536,890);encyclopedia_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;encyclopedia_scroll.vertical_scroll_mode=ScrollContainer.SCROLL_MODE_AUTO;encyclopedia_scroll.scroll_deadzone=8;encyclopedia_scroll.mouse_filter=Control.MOUSE_FILTER_STOP;encyclopedia_list_page.add_child(encyclopedia_scroll)
+	encyclopedia_scroll.get_v_scroll_bar().value_changed.connect(func(_value:float):call_deferred("_update_encyclopedia_visible_textures"))
 	var scroll_content:=VBoxContainer.new();scroll_content.custom_minimum_size=Vector2(516,0);scroll_content.mouse_filter=Control.MOUSE_FILTER_PASS;encyclopedia_scroll.add_child(scroll_content)
 	encyclopedia_grid=GridContainer.new();encyclopedia_grid.columns=2;encyclopedia_grid.custom_minimum_size=Vector2(516,0);encyclopedia_grid.size_flags_horizontal=Control.SIZE_EXPAND_FILL;encyclopedia_grid.mouse_filter=Control.MOUSE_FILTER_PASS;encyclopedia_grid.add_theme_constant_override("h_separation",12);encyclopedia_grid.add_theme_constant_override("v_separation",14);scroll_content.add_child(encyclopedia_grid)
 	var bottom_space:=Control.new();bottom_space.custom_minimum_size=Vector2(516,54);bottom_space.mouse_filter=Control.MOUSE_FILTER_PASS;scroll_content.add_child(bottom_space)
@@ -1315,21 +1320,42 @@ func _open_encyclopedia()->void:
 	play_modal_open=false;_refresh_encyclopedia_cards();encyclopedia_detail_page.visible=false;encyclopedia_list_page.visible=true;play_overlay.visible=false;encyclopedia_overlay.visible=true;_update_play_ui()
 
 func _close_encyclopedia()->void:
-	encyclopedia_overlay.visible=false;_update_play_ui()
+	encyclopedia_overlay.visible=false
+	_release_encyclopedia_textures()
+	for child in encyclopedia_detail_page.get_children():child.free()
+	_update_play_ui()
 
 func _refresh_encyclopedia_cards()->void:
+	encyclopedia_card_images.clear();encyclopedia_card_entries.clear()
 	for child in encyclopedia_grid.get_children():child.free()
 	for entry in catalog_species:
 		var species_id:=str(entry.get("species_id",""));var found:=bool(discovered.get(species_id,false))
 		var card:=Button.new();card.custom_minimum_size=Vector2(252,218);card.mouse_filter=Control.MOUSE_FILTER_PASS;card.mouse_force_pass_scroll_events=true;card.action_mode=BaseButton.ACTION_MODE_BUTTON_RELEASE;_skin_button(card,Color("#f6e7c5"),16);card.disabled=not found;encyclopedia_grid.add_child(card)
 		var content:=VBoxContainer.new();content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);content.offset_left=10;content.offset_top=8;content.offset_right=-10;content.offset_bottom=-8;content.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.alignment=BoxContainer.ALIGNMENT_CENTER;card.add_child(content)
 		var image_frame:=MarginContainer.new();image_frame.name="SpeciesCardImageFrame";image_frame.custom_minimum_size=Vector2(210,137);image_frame.add_theme_constant_override("margin_left",10);image_frame.add_theme_constant_override("margin_top",8);image_frame.add_theme_constant_override("margin_right",10);image_frame.add_theme_constant_override("margin_bottom",8);image_frame.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.add_child(image_frame)
-		var image:=TextureRect.new();image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.texture=_species_texture(entry);image.mouse_filter=Control.MOUSE_FILTER_IGNORE
+		var image:=TextureRect.new();image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.mouse_filter=Control.MOUSE_FILTER_IGNORE
 		if not found:image.modulate=Color(0.12,0.09,0.08,0.82)
-		image_frame.add_child(image)
+		image_frame.add_child(image);encyclopedia_card_images.append(image);encyclopedia_card_entries.append(entry)
 		var name_label:=Label.new();name_label.text=str(entry.get("name_ja","？？？")) if found else "？？？";name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name_label.add_theme_font_size_override("font_size",18);name_label.add_theme_color_override("font_color",UI_BROWN);content.add_child(name_label)
 		var best_label_card:=Label.new();var card_best:=float(bests.get(species_id,0.0));best_label_card.text=(("自己ベスト  %.1f cm"%card_best) if card_best>0.0 else "自己ベスト　ー") if found else "未発見";best_label_card.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;best_label_card.add_theme_font_size_override("font_size",14);best_label_card.add_theme_color_override("font_color",Color("#79543a"));content.add_child(best_label_card)
 		if found:card.pressed.connect(_open_species_detail.bind(entry))
+	call_deferred("_update_encyclopedia_visible_textures")
+
+func _update_encyclopedia_visible_textures()->void:
+	if not encyclopedia_overlay.visible or not encyclopedia_list_page.visible:return
+	var view_top:=float(encyclopedia_scroll.scroll_vertical)-240.0
+	var view_bottom:=float(encyclopedia_scroll.scroll_vertical)+encyclopedia_scroll.size.y+240.0
+	for i in range(encyclopedia_card_images.size()):
+		var image:=encyclopedia_card_images[i]
+		if not is_instance_valid(image):continue
+		var card:=image.get_parent().get_parent().get_parent() as Control
+		var should_load:=card.position.y+card.size.y>=view_top and card.position.y<=view_bottom
+		if should_load and image.texture==null:image.texture=_species_texture(encyclopedia_card_entries[i])
+		elif not should_load and image.texture!=null:image.texture=null
+
+func _release_encyclopedia_textures()->void:
+	for image in encyclopedia_card_images:
+		if is_instance_valid(image):image.texture=null
 
 func _species_texture(entry:Dictionary)->Texture2D:
 	if entry.has("image_path"):
@@ -1338,9 +1364,13 @@ func _species_texture(entry:Dictionary)->Texture2D:
 		return load(explicit_path) as Texture2D
 	var variant:=str(entry.get("visual_variant","laui"));var path:=str(SucculentClass.SPRITES.get(variant,SucculentClass.SPRITES.laui));return load(path) as Texture2D
 
-func _build_habitat_items()->void:
+func _clear_habitat_items()->void:
 	for child in habitat_items_root.get_children():child.free()
 	habitat_pickups.clear();habitat_new_species_id=""
+
+func _build_habitat_items(force:=false)->void:
+	_clear_habitat_items()
+	if current_mode!="habitat" and not rain_bonus_active and not force:return
 	var plant_points:Array=HABITAT_SAFE_PLANT_POINTS.duplicate()
 	var point_index:=0
 	for entry in catalog_species:
@@ -1408,7 +1438,7 @@ func _roll_rain_event()->void:
 func _show_rain_notice(message:String)->void:
 	if effects_layer==null:return
 	var notice:=Label.new();notice.text=message;notice.position=Vector2(68,215);notice.size=Vector2(440,72);notice.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;notice.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;notice.add_theme_font_size_override("font_size",22);notice.add_theme_color_override("font_color",Color("#eef8ff"));notice.add_theme_color_override("font_outline_color",Color("#28465d"));notice.add_theme_constant_override("outline_size",7);notice.add_theme_stylebox_override("normal",_box(Color(0.16,0.28,0.34,.9),Color("#b9deec"),18,2));effects_layer.add_child(notice)
-	var tween:=create_tween();tween.tween_property(notice,"position:y",notice.position.y-12,.25).set_trans(Tween.TRANS_QUAD);tween.tween_interval(2.2);tween.tween_property(notice,"modulate:a",0.0,.45);tween.tween_callback(notice.queue_free)
+	var tween:=create_tween().bind_node(notice);tween.tween_property(notice,"position:y",notice.position.y-12,.25).set_trans(Tween.TRANS_QUAD);tween.tween_interval(2.2);tween.tween_property(notice,"modulate:a",0.0,.45);tween.tween_callback(notice.queue_free)
 
 func _evaluate_unlock_rules(trigger:String,current_value:float)->void:
 	for rule in unlock_rules:
@@ -1726,7 +1756,7 @@ func _start_rain_visual()->void:
 		var drop:=ColorRect.new();drop.color=Color(0.75,0.91,1.0,rng.randf_range(.25,.58));drop.size=Vector2(rng.randf_range(1.0,2.2),rng.randf_range(32.0,68.0));drop.rotation=-.16;drop.position=Vector2(rng.randf_range(0.0,viewport_size.x),rng.randf_range(-viewport_size.y,viewport_size.y));drop.mouse_filter=Control.MOUSE_FILTER_IGNORE;drop.set_meta("speed",rng.randf_range(520.0,850.0));rain_visual.add_child(drop);rain_drops.append(drop)
 
 func _stop_rain_visual()->void:
-	if rain_visual and is_instance_valid(rain_visual):rain_visual.queue_free()
+	if rain_visual and is_instance_valid(rain_visual):rain_visual.free()
 	rain_visual=null;rain_drops.clear()
 
 func _update_rain_visual(delta:float)->void:
@@ -1819,6 +1849,7 @@ func _apply_mode()->void:
 	if camera==null:return
 	var greenhouse_mode:=current_mode=="greenhouse"
 	if not greenhouse_mode:_build_habitat_items()
+	else:_clear_habitat_items()
 	greenhouse_layer.visible=greenhouse_mode
 	habitat_items_root.visible=not greenhouse_mode
 	if habitat_status_label:habitat_status_label.visible=not greenhouse_mode and rain_bonus_active
@@ -1957,7 +1988,7 @@ func _collect_habitat_species(item:Dictionary)->void:
 	var flying:=TextureRect.new();flying.texture=node.texture;flying.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;flying.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;flying.mouse_filter=Control.MOUSE_FILTER_IGNORE;flying.size=Vector2(112,112);flying.position=camera.unproject_position(node.global_position)-flying.size*.5;flying.pivot_offset=flying.size*.5;effects_layer.add_child(flying)
 	var target:=Vector2(500,150)
 	if encyclopedia_icon_button:target=encyclopedia_icon_button.global_position+encyclopedia_icon_button.size*.5
-	var tween:=create_tween().set_parallel();tween.tween_property(flying,"position",target-flying.size*.5,.62).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN);tween.tween_property(flying,"scale",Vector2(.08,.08),.62).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN);tween.tween_property(flying,"rotation",.18,.62);tween.chain().tween_callback(_complete_habitat_species_get.bind(item,flying))
+	var tween:=create_tween().bind_node(flying).set_parallel();tween.tween_property(flying,"position",target-flying.size*.5,.62).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN);tween.tween_property(flying,"scale",Vector2(.08,.08),.62).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN);tween.tween_property(flying,"rotation",.18,.62);tween.chain().tween_callback(_complete_habitat_species_get.bind(item,flying))
 
 func _complete_habitat_species_get(item:Dictionary,flying:TextureRect)->void:
 	var species_id:=str(item.species_id);greenhouse_available[species_id]=true;unlocked_species[species_id]=true;discovered[species_id]=true;_refresh_seed_pack_unlocks();pending_habitat_species.erase(species_id);habitat_new_species_id=""
@@ -1994,7 +2025,7 @@ func _squish_habitat_plant(item:Dictionary)->void:
 
 func _show_habitat_message(world_position:Vector3,message:String,color:Color)->void:
 	var label:=Label.new();label.text=message;label.size=Vector2(300,80);label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.add_theme_font_size_override("font_size",25);label.add_theme_color_override("font_color",color);label.add_theme_color_override("font_outline_color",UI_BROWN);label.add_theme_constant_override("outline_size",8);label.position=camera.unproject_position(world_position)-Vector2(150,40);effects_layer.add_child(label)
-	var tween:=create_tween().set_parallel();tween.tween_property(label,"position:y",label.position.y-70,.7);tween.tween_property(label,"modulate:a",0.0,.7).set_delay(.25);tween.chain().tween_callback(label.queue_free)
+	var tween:=create_tween().bind_node(label).set_parallel();tween.tween_property(label,"position:y",label.position.y-70,.7);tween.tween_property(label,"modulate:a",0.0,.7).set_delay(.25);tween.chain().tween_callback(label.queue_free)
 
 func _on_harvested(p)->void:
 	var deferred_tovar:=tovar_event_active and str(p.data.species_id)==HIDDEN_TOVAR_ID
@@ -2017,7 +2048,7 @@ func _on_harvested(p)->void:
 		if notable.is_empty() or p.diameter_cm>float(notable.get("size",0.0)):play_notable_species[species_id]={"name":str(p.data.name_ja),"size":p.diameter_cm}
 	_show_harvest_result(p,reward,buyback_unlocked)
 	if is_record:_show_record(p,reward)
-	var tween:=create_tween().set_parallel();tween.tween_property(p,"position:y",p.position.y+2.0,.42).set_trans(Tween.TRANS_BACK);tween.tween_property(p,"scale",p.scale*1.2,.22);tween.chain().tween_property(p,"scale",Vector3.ONE*0.01,.24)
+	var tween:=create_tween().bind_node(p).set_parallel();tween.tween_property(p,"position:y",p.position.y+2.0,.42).set_trans(Tween.TRANS_BACK);tween.tween_property(p,"scale",p.scale*1.2,.22);tween.chain().tween_property(p,"scale",Vector3.ONE*0.01,.24)
 	_cleanup_later(p,.68)
 
 func _on_jellied(p)->void:
@@ -2041,7 +2072,7 @@ func _cleanup_later(p,delay:float)->void:
 
 func _show_float(p,text:String,color:Color)->void:
 	var l:=Label.new();l.text=text;l.size=Vector2(230,90);l.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;l.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;l.add_theme_font_size_override("font_size",24);l.add_theme_color_override("font_color",color);l.add_theme_color_override("font_outline_color",UI_BROWN);l.add_theme_constant_override("outline_size",7);l.position=camera.unproject_position(p.global_position)-Vector2(115,40);effects_layer.add_child(l)
-	var tw:=create_tween().set_parallel();tw.tween_property(l,"position:y",l.position.y-85,.62).set_trans(Tween.TRANS_BACK);tw.tween_property(l,"modulate:a",0.0,.62).set_delay(.18);tw.chain().tween_callback(l.queue_free)
+	var tw:=create_tween().bind_node(l).set_parallel();tw.tween_property(l,"position:y",l.position.y-85,.62).set_trans(Tween.TRANS_BACK);tw.tween_property(l,"modulate:a",0.0,.62).set_delay(.18);tw.chain().tween_callback(l.queue_free)
 
 func _show_harvest_result(plant,reward:int,show_money:bool)->void:
 	var panel:=PanelContainer.new();panel.size=Vector2(220,132);panel.position=camera.unproject_position(plant.global_position)-Vector2(110,82);panel.pivot_offset=panel.size*.5;panel.scale=Vector2(.78,.78);panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;panel.add_theme_stylebox_override("panel",_box(Color(0.22,0.12,0.07,.92),Color("#f0cc82"),17,2));effects_layer.add_child(panel)
@@ -2050,7 +2081,7 @@ func _show_harvest_result(plant,reward:int,show_money:bool)->void:
 	var size_label:=Label.new();size_label.text="%.1fcm"%plant.diameter_cm;size_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;size_label.add_theme_font_size_override("font_size",19);size_label.add_theme_color_override("font_color",UI_CREAM);content.add_child(size_label)
 	if show_money:
 		var yen_label:=Label.new();yen_label.text="＋¥%d"%reward;yen_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;yen_label.add_theme_font_size_override("font_size",27);yen_label.add_theme_color_override("font_color",Color("#ffe06f"));yen_label.add_theme_color_override("font_outline_color",Color("#6b3518"));yen_label.add_theme_constant_override("outline_size",4);content.add_child(yen_label)
-	var tween:=create_tween();tween.tween_property(panel,"scale",Vector2.ONE,.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT);tween.tween_interval(1.12);tween.set_parallel(true);tween.tween_property(panel,"position:y",panel.position.y-34,.5).set_trans(Tween.TRANS_QUAD);tween.tween_property(panel,"modulate:a",0.0,.5);tween.set_parallel(false);tween.tween_callback(panel.queue_free)
+	var tween:=create_tween().bind_node(panel);tween.tween_property(panel,"scale",Vector2.ONE,.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT);tween.tween_interval(1.12);tween.set_parallel(true);tween.tween_property(panel,"position:y",panel.position.y-34,.5).set_trans(Tween.TRANS_QUAD);tween.tween_property(panel,"modulate:a",0.0,.5);tween.set_parallel(false);tween.tween_callback(panel.queue_free)
 
 func _show_record(p,reward:int)->void:
 	audio_manager.play_se("result_new_best",.5)
