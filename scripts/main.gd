@@ -159,6 +159,7 @@ var shop_mystery_buy_button: Button
 var shop_product_tabs: Dictionary = {}
 var shop_product_detail_label: Label
 var shop_selected_buy_button: Button
+var shop_buy_glow: Panel
 var shop_selected_seed_type := "normal"
 var shop_buy_pulse_tween: Tween
 var shop_purchase_controls: Array[Control] = []
@@ -168,6 +169,10 @@ var shop_chatter_label: Label
 var shop_chatter_action_button: Button
 var shop_chatter_decline_button: Button
 var shop_transfer_notice: Label
+var shop_chatter_pages: Array[String] = []
+var shop_chatter_page_index := 0
+var shop_chatter_sequence_kind := ""
+var shop_chatter_sequence_speaker := "panda"
 var last_shop_chatter := ""
 var rescue_reward_in_progress := false
 var intro_overlay: Control
@@ -588,6 +593,8 @@ func _build_shop(hud:Control)->void:
 	shop_volume_buy_button=shop_product_tabs["volume"];shop_premium_buy_button=shop_product_tabs["premium"];shop_mystery_buy_button=shop_product_tabs["mystery"]
 	shop_product_detail_label=Label.new();shop_product_detail_label.position=Vector2(49,892);shop_product_detail_label.size=Vector2(330,94);shop_product_detail_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;shop_product_detail_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;shop_product_detail_label.add_theme_font_size_override("font_size",15);shop_product_detail_label.add_theme_color_override("font_color",UI_CREAM);shop_overlay.add_child(shop_product_detail_label)
 	shop_selected_buy_button=Button.new();shop_selected_buy_button.position=Vector2(391,914);shop_selected_buy_button.size=Vector2(137,55);_skin_button(shop_selected_buy_button,Color("#d8b56b"),16);shop_selected_buy_button.pressed.disconnect(_play_ui_tap);shop_selected_buy_button.pressed.connect(_buy_selected_shop_product);shop_overlay.add_child(shop_selected_buy_button)
+	shop_buy_glow=Panel.new();shop_buy_glow.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);shop_buy_glow.offset_left=-8;shop_buy_glow.offset_top=-8;shop_buy_glow.offset_right=8;shop_buy_glow.offset_bottom=8;shop_buy_glow.mouse_filter=Control.MOUSE_FILTER_IGNORE;shop_buy_glow.show_behind_parent=true
+	var glow_style:=StyleBoxFlat.new();glow_style.bg_color=Color(1.0,.80,.35,.05);glow_style.border_color=Color(1.0,.84,.48,.42);glow_style.set_border_width_all(2);glow_style.set_corner_radius_all(23);glow_style.shadow_color=Color(1.0,.72,.25,.72);glow_style.shadow_size=12;glow_style.shadow_offset=Vector2.ZERO;shop_buy_glow.add_theme_stylebox_override("panel",glow_style);shop_buy_glow.visible=false;shop_selected_buy_button.add_child(shop_buy_glow)
 	shop_message=Label.new();shop_message.position=Vector2(48,775);shop_message.size=Vector2(480,25);shop_message.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;shop_message.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;shop_message.add_theme_font_size_override("font_size",14);shop_message.add_theme_color_override("font_color",UI_CREAM);shop_overlay.add_child(shop_message)
 	shop_purchase_controls=[purchase_panel,shop_wallet_label,shop_bag_label,shop_product_detail_label,shop_selected_buy_button,shop_message]
 	for tab in shop_product_tabs.values():shop_purchase_controls.append(tab)
@@ -606,11 +613,7 @@ func _set_shop_purchase_visible(is_visible:bool)->void:
 		if is_instance_valid(control):control.visible=is_visible
 
 func _on_shop_panda_tapped()->void:
-	if shop_chatter_bubble.visible:_hide_shop_chatter();return
-	if int(tutorial_steps.get("volume_intro_step",0))==1 and not volume_seed_intro_seen:
-		tutorial_steps["volume_intro_step"]=2;volume_seed_intro_seen=true;_save()
-		_show_shop_chatter("36粒入ってるから、普通のたねよりたっぷり楽しめるよ。\nこれなら、じっくりどデカい多肉を育てられるね！",false,"normal","panda")
-		return
+	if shop_chatter_bubble.visible:_dismiss_or_advance_shop_chatter();return
 	if _shop_rescue_needed():
 		_show_shop_chatter("種が買えなくて困ってる？\nちょっと待ってて。余ってるのがあるから、1袋持っていきなよ。",true)
 		return
@@ -634,16 +637,40 @@ func _show_shop_chatter(message:String,is_rescue:bool,dialog_mode:="normal",spea
 	shop_chatter_action_button.text=("広告を準備中…" if rescue_reward_in_progress else "広告を見て種をもらう") if is_rescue else "はい"
 	shop_chatter_decline_button.visible=dialog_mode=="research_offer"
 
+func _start_shop_chatter_sequence(kind:String,pages:Array,speaker_id:String)->void:
+	shop_chatter_pages.clear()
+	for page in pages:shop_chatter_pages.append(str(page))
+	shop_chatter_page_index=0;shop_chatter_sequence_kind=kind;shop_chatter_sequence_speaker=speaker_id
+	_show_shop_chatter(shop_chatter_pages[0],false,"sequence",speaker_id)
+
+func _dismiss_or_advance_shop_chatter()->void:
+	if shop_chatter_action_button.visible:return
+	if shop_chatter_sequence_kind.is_empty():_hide_shop_chatter();return
+	if shop_chatter_page_index+1<shop_chatter_pages.size():
+		shop_chatter_page_index+=1
+		var is_research_choice:=shop_chatter_sequence_kind=="research_intro" and shop_chatter_page_index==shop_chatter_pages.size()-1
+		_show_shop_chatter(shop_chatter_pages[shop_chatter_page_index],false,"research_offer" if is_research_choice else "sequence",shop_chatter_sequence_speaker)
+		return
+	var finished_kind:=shop_chatter_sequence_kind
+	shop_chatter_sequence_kind="";shop_chatter_pages.clear();shop_chatter_page_index=0
+	if finished_kind=="volume_intro":
+		tutorial_steps["volume_intro_step"]=2;volume_seed_intro_seen=true;_save()
+	elif finished_kind=="pinwheel_intro":
+		var acquired:=_grant_hidden_species(HIDDEN_PINWHEEL_ID);tutorial_steps["pinwheel_intro_step"]=3
+		if acquired:shop_chatter_acquired_species.append(HIDDEN_PINWHEEL_ID)
+		_save()
+	_hide_shop_chatter()
+
 func _on_shop_chatter_action()->void:
 	match armadillo_dialog_mode:
 		"rescue":_request_rescue_reward_ad()
 		"research_offer":_accept_armadillo_research()
 
 func _on_shop_background_gui_input(event:InputEvent)->void:
-	if _shop_dismiss_pressed(event):_hide_shop_chatter()
+	if _shop_dismiss_pressed(event):_dismiss_or_advance_shop_chatter()
 
 func _on_shop_chatter_gui_input(event:InputEvent)->void:
-	if _shop_dismiss_pressed(event):_hide_shop_chatter()
+	if _shop_dismiss_pressed(event):_dismiss_or_advance_shop_chatter()
 
 func _shop_dismiss_pressed(event:InputEvent)->bool:
 	if event is InputEventMouseButton:return event.button_index==MOUSE_BUTTON_LEFT and event.pressed
@@ -654,7 +681,7 @@ func _hide_shop_chatter(force:=false)->void:
 	if not shop_chatter_bubble.visible:return
 	if shop_chatter_action_button.visible and not force:return
 	var acquired_now:=shop_chatter_acquired_species.duplicate();shop_chatter_acquired_species.clear()
-	shop_chatter_bubble.visible=false;shop_chatter_bubble.modulate.a=1.0;shop_transfer_notice.visible=false;armadillo_dialog_mode=""
+	shop_chatter_bubble.visible=false;shop_chatter_bubble.modulate.a=1.0;shop_transfer_notice.visible=false;armadillo_dialog_mode="";shop_chatter_sequence_kind="";shop_chatter_pages.clear();shop_chatter_page_index=0
 	if not acquired_now.is_empty():call_deferred("_play_shop_new_species_animations",acquired_now)
 
 func _set_shop_speaker(speaker_id:String)->void:
@@ -1067,7 +1094,7 @@ func _update_play_ui()->void:
 	for control in external_navigation_controls:control.visible=not play_active
 	for control in encyclopedia_navigation_controls:control.visible=not play_active and encyclopedia_unlocked
 	if mode_button:mode_button.visible=not play_active and habitat_unlocked
-	if shop_button:shop_button.visible=not play_active and current_mode=="greenhouse"
+	if shop_button:shop_button.visible=not play_active and current_mode=="greenhouse" and _tutorial_fully_complete()
 	play_timer_label.text="● たね袋 ●\n残り %d粒"%play_seeds_remaining if play_timer_label.visible else ""
 	var held:Array[String]=[]
 	if old_seed_bags>0:held.append("古いたね %d袋"%old_seed_bags)
@@ -1083,6 +1110,8 @@ func _update_play_ui()->void:
 	mystery_play_button.visible=mystery_seed_bags>0 and _mystery_seed_pack_unlocked();mystery_play_button.text="謎種パックをまく　5粒　残り%d袋"%mystery_seed_bags;mystery_play_button.disabled=not _mystery_seed_pack_unlocked() or mystery_seed_bags<1
 
 func _open_shop()->void:
+	if not _tutorial_fully_complete():
+		shop_overlay.visible=false;_set_shop_purchase_visible(false);_update_play_ui();return
 	play_modal_open=false;_set_shop_purchase_visible(true);_update_shop_ui();shop_message.text="たね袋を1袋ずつ購入できます";play_overlay.visible=false;shop_chatter_bubble.visible=false;shop_overlay.visible=true;audio_manager.play_bgm("shop");_prepare_shop_visit();_update_play_ui()
 
 func _prepare_shop_visit(force_armadillo:Variant=null)->void:
@@ -1093,9 +1122,9 @@ func _prepare_shop_visit(force_armadillo:Variant=null)->void:
 	armadillo_present=bool(force_armadillo) if force_armadillo!=null else (mystery_seed_count>0 or rng.randi_range(1,5)==1)
 	shop_background.texture=load("res://assets/shop-background-armadillo.jpg" if armadillo_present else "res://assets/shop-background-final.jpg")
 	armadillo_tap_button.visible=armadillo_present
-	if _volume_seed_unlocked() and not volume_seed_intro_seen and int(tutorial_steps.get("volume_intro_step",0))==0:
+	if _volume_seed_unlocked() and not volume_seed_intro_seen:
 		tutorial_steps["volume_intro_step"]=1
-		_show_shop_chatter("新しいたねを入荷したよ！\nボリュームパックたねっていうんだ。",false,"normal","panda")
+		_start_shop_chatter_sequence("volume_intro",["新しいたねを入荷したよ！\nボリュームパックたねっていうんだ。","36粒入ってるから、普通のたねよりたっぷり楽しめるよ。\nこれなら、じっくりどデカい多肉を育てられるね！"],"panda")
 	elif shop_visit_count>=8 and not _hidden_species_owned(HIDDEN_BUSTAMANTE_ID):
 		var acquired:=_grant_hidden_species(HIDDEN_BUSTAMANTE_ID)
 		_show_shop_chatter("いつも来てくれてありがとう。\nストリクチフローラ　ブスタマンテを1株、君にあげるよ。",false,"normal","panda",[HIDDEN_BUSTAMANTE_ID] if acquired else [])
@@ -1103,16 +1132,9 @@ func _prepare_shop_visit(force_armadillo:Variant=null)->void:
 
 func _on_armadillo_tapped()->void:
 	if not armadillo_present:return
-	if shop_chatter_bubble.visible:_hide_shop_chatter();return
+	if shop_chatter_bubble.visible:_dismiss_or_advance_shop_chatter();return
 	if not _hidden_species_owned(HIDDEN_PINWHEEL_ID):
-		var pinwheel_step:=int(tutorial_steps.get("pinwheel_intro_step",0))
-		if pinwheel_step==0:
-			tutorial_steps["pinwheel_intro_step"]=1;_save();_show_shop_chatter("やあ、ぼくは世界中の多肉を集めているんだ。",false,"normal","armadillo")
-		elif pinwheel_step==1:
-			tutorial_steps["pinwheel_intro_step"]=2;_save();_show_shop_chatter("君も多肉を始めたんだね。",false,"normal","armadillo")
-		else:
-			var acquired:=_grant_hidden_species(HIDDEN_PINWHEEL_ID);tutorial_steps["pinwheel_intro_step"]=3;_save()
-			_show_shop_chatter("良かったらこれ、持っていきなよ。\nピンウィールという品種だよ。",false,"normal","armadillo",[HIDDEN_PINWHEEL_ID] if acquired else [])
+		_start_shop_chatter_sequence("pinwheel_intro",["やあ、ぼくは世界中の多肉を集めているんだ。","君も多肉を始めたんだね。","良かったらこれ、持っていきなよ。\nピンウィールという品種だよ。"],"armadillo")
 	elif mystery_seed_count>0:
 		_start_armadillo_research()
 	else:
@@ -1121,14 +1143,16 @@ func _on_armadillo_tapped()->void:
 
 func _start_armadillo_research()->void:
 	if mystery_seed_count<=0:return
-	var intro:="おや？ そのたね……。\nもしかして、原生地で拾ったのかい？\nじつはぼく、この“謎のたね”を研究してるんだ。\nまだ、何の種なのかはわからないんだけどね…\nよかったら、そのたねを研究させてもらえないかな？" if not armadillo_research_intro_seen else "謎のたねを持ってきてくれたんだね。\n研究のために、まとめて預かってもいいかい？"
-	_show_shop_chatter(intro,false,"research_offer","armadillo")
+	if not armadillo_research_intro_seen:
+		_start_shop_chatter_sequence("research_intro",["おや？ そのたね……。\nもしかして、原生地で拾ったのかい？","じつはぼく、この“謎のたね”を研究してるんだ。\nまだ、何の種なのかはわからないんだけどね…","よかったら、そのたねを研究させてもらえないかな？"],"armadillo")
+	else:_show_shop_chatter("謎のたねを持ってきてくれたんだね。\n研究のために、まとめて預かってもいいかい？",false,"research_offer","armadillo")
 
 func _decline_armadillo_research()->void:
 	armadillo_research_intro_seen=true;_save();_hide_shop_chatter(true)
 
 func _accept_armadillo_research()->void:
 	if mystery_seed_count<=0:_hide_shop_chatter(true);return
+	shop_chatter_sequence_kind="";shop_chatter_pages.clear();shop_chatter_page_index=0
 	var amount:=mystery_seed_count;var previous_total:=armadillo_research_total
 	mystery_seed_count=0;armadillo_research_total+=amount;armadillo_research_intro_seen=true
 	var research_species:Array[String]=[]
@@ -1196,6 +1220,7 @@ func _close_shop()->void:
 	shop_buy_pulse_tween=null;audio_manager.play_bgm("greenhouse" if current_mode=="greenhouse" else "habitat");_update_play_ui()
 
 func _buy_seed_bag(seed_type:String)->void:
+	if not _tutorial_fully_complete():return
 	if seed_type=="volume" and not _volume_seed_unlocked():shop_message.text="あと%d回プレイで解禁"%maxi(0,3-formal_play_count);return
 	if seed_type=="premium" and not _premium_seed_unlocked():shop_message.text="あと%d回プレイで解禁"%maxi(0,13-formal_play_count);return
 	if seed_type=="mystery" and not _mystery_seed_pack_unlocked():shop_message.text="謎品種を1種発見で解禁";return
@@ -1209,7 +1234,7 @@ func _buy_seed_bag(seed_type:String)->void:
 	elif seed_type=="premium":premium_seed_bags+=1;shop_message.text="プレミアムたねを1袋購入しました"
 	elif seed_type=="mystery":mystery_seed_bags+=1;shop_message.text="謎種パックを1袋購入しました"
 	else:normal_seed_bags+=1;shop_message.text="たねを1袋購入しました"
-	audio_manager.play_se("payment",.46);_save();_update_currency_ui();_update_shop_ui();_update_play_ui()
+	audio_manager.notify_user_gesture();audio_manager.play_se("purchase",1.0);_save();_update_currency_ui();_update_shop_ui();_update_play_ui()
 
 func _select_shop_product(seed_type:String)->void:
 	shop_selected_seed_type=seed_type;shop_message.text="";_update_shop_ui()
@@ -1225,7 +1250,7 @@ func _update_shop_ui()->void:
 	var unlocked:=true;var detail:="";var price:=0
 	match shop_selected_seed_type:
 		"volume":
-			price=VOLUME_SEED_BAG_PRICE_YEN;unlocked=_volume_seed_unlocked();detail="ボリュームパックたね　36粒 / 袋\n36粒入りのお得な大容量。じっくり大物を狙えます。\nレア10%　スーパーレア5%　新種0.001%"
+			price=VOLUME_SEED_BAG_PRICE_YEN;unlocked=_volume_seed_unlocked();detail="ボリュームパックたね　36粒 / 袋\nお得な大容量。じっくり大物を狙えます。\nレア10%　スーパーレア5%　新種0.001%"
 			if not unlocked:detail+="\nあと%d回プレイで解禁"%maxi(0,3-formal_play_count)
 		"premium":
 			price=PREMIUM_SEED_BAG_PRICE_YEN;unlocked=_premium_seed_unlocked();detail="プレミアムたね　24粒 / 袋\nレアや新種を狙いやすい、特別なたね。\nレア30%　スーパーレア10%　新種1%"
@@ -1235,11 +1260,12 @@ func _update_shop_ui()->void:
 			if not unlocked:detail+="\nパック対象の謎品種を1種発見で解禁"
 		_:
 			price=NORMAL_SEED_BAG_PRICE_YEN;detail="普通のたね　24粒 / 袋\nお手頃な基本のたね。いろんな多肉が育ちます。\nレア10%　スーパーレア5%　新種0.001%"
+	var can_purchase:=unlocked and coins>=price
 	shop_product_detail_label.text=detail;shop_selected_buy_button.text="買う\n1袋  %d円"%price if unlocked else "未解禁";shop_selected_buy_button.disabled=not unlocked
 	if shop_buy_pulse_tween and shop_buy_pulse_tween.is_valid():shop_buy_pulse_tween.kill()
-	shop_selected_buy_button.self_modulate=Color.WHITE
-	if unlocked and coins>=price:
-		shop_buy_pulse_tween=create_tween().set_loops();shop_buy_pulse_tween.tween_property(shop_selected_buy_button,"self_modulate",Color(1.18,1.12,.78,1.0),.72).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT);shop_buy_pulse_tween.tween_property(shop_selected_buy_button,"self_modulate",Color.WHITE,.72).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	shop_selected_buy_button.self_modulate=Color.WHITE;shop_buy_glow.visible=can_purchase;shop_buy_glow.modulate=Color(1,1,1,.34)
+	if can_purchase:
+		shop_buy_pulse_tween=create_tween().set_loops();shop_buy_pulse_tween.tween_property(shop_buy_glow,"modulate:a",.88,.9).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT);shop_buy_pulse_tween.tween_property(shop_buy_glow,"modulate:a",.34,.9).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 func _tutorial_fully_complete()->bool:
 	return intro_story_complete and habitat_unlocked and buyback_unlocked and total_play_count>=3
