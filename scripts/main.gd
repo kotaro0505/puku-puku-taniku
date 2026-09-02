@@ -281,6 +281,13 @@ var view_yaw := 0.0
 var view_pitch := -3.0
 var habitat_target_yaw := 0.0
 var habitat_target_pitch := -3.0
+var habitat_texture_mode := "full"
+var habitat_texture_build_active := false
+var habitat_full_texture_loads_during_build := 0
+var habitat_texture_count := 0
+var habitat_texture_max_size := Vector2i.ZERO
+var habitat_texture_estimated_bytes := 0
+var habitat_build_texture_paths: Dictionary = {}
 var pointer_down := false
 var pointer_start := Vector2.ZERO
 var pointer_last := Vector2.ZERO
@@ -293,6 +300,7 @@ var opening_prompt_tween: Tween
 var opening_finished := false
 
 func _ready() -> void:
+	_configure_habitat_texture_ab()
 	rng.randomize()
 	_load_species()
 	_load_save()
@@ -305,6 +313,12 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_layout)
 	_layout()
 	_wire_ui_sounds(self)
+
+func _configure_habitat_texture_ab()->void:
+	if OS.has_feature("web"):
+		var requested=JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('habitat_texture')",true)
+		habitat_texture_mode="thumb" if str(requested)=="thumb" else "full"
+	print("HABITAT_TEXTURE_AB mode=",habitat_texture_mode)
 
 func _continue_after_opening()->void:
 	if not intro_story_complete:call_deferred("_start_intro_story")
@@ -1499,6 +1513,41 @@ func _species_texture(entry:Dictionary)->Texture2D:
 		return load(explicit_path) as Texture2D
 	var variant:=str(entry.get("visual_variant","laui"));var path:=str(SucculentClass.SPRITES.get(variant,SucculentClass.SPRITES.laui));return load(path) as Texture2D
 
+func _habitat_species_texture(entry:Dictionary)->Texture2D:
+	if habitat_texture_mode!="thumb":
+		if habitat_texture_build_active:habitat_full_texture_loads_during_build+=1
+		var full_texture:=_species_texture(entry)
+		_record_habitat_build_texture(full_texture.resource_path if full_texture else "",full_texture)
+		return full_texture
+	var habitat_path:=str(entry.get("habitat_image_path",""))
+	if habitat_path.is_empty() or not ResourceLoader.exists(habitat_path):return null
+	var habitat_texture:=load(habitat_path) as Texture2D
+	_record_habitat_build_texture(habitat_path,habitat_texture)
+	return habitat_texture
+
+func _record_habitat_build_texture(path:String,texture:Texture2D)->void:
+	if not habitat_texture_build_active or texture==null or path.is_empty() or habitat_build_texture_paths.has(path):return
+	habitat_build_texture_paths[path]=true
+	habitat_texture_count+=1
+	var texture_size:=Vector2i(texture.get_width(),texture.get_height())
+	habitat_texture_max_size=Vector2i(maxi(habitat_texture_max_size.x,texture_size.x),maxi(habitat_texture_max_size.y,texture_size.y))
+	habitat_texture_estimated_bytes+=texture_size.x*texture_size.y*4
+
+func _begin_habitat_texture_build()->void:
+	habitat_texture_build_active=true
+	habitat_full_texture_loads_during_build=0
+	habitat_texture_count=0
+	habitat_texture_max_size=Vector2i.ZERO
+	habitat_texture_estimated_bytes=0
+	habitat_build_texture_paths.clear()
+
+func _finish_habitat_texture_build()->void:
+	habitat_texture_build_active=false
+	print("HABITAT_TEXTURE_BUILD mode=",habitat_texture_mode," habitat_texture_count=",habitat_texture_count," max_texture_size=",habitat_texture_max_size.x,"x",habitat_texture_max_size.y," estimated_expanded_bytes=",habitat_texture_estimated_bytes," full_texture_loads_during_habitat_build=",habitat_full_texture_loads_during_build)
+
+func _print_habitat_memory_snapshot(point:String)->void:
+	print("HABITAT_TEXTURE_MEMORY point=",point," mode=",habitat_texture_mode," memory_static=",int(Performance.get_monitor(Performance.MEMORY_STATIC))," memory_static_max=",int(Performance.get_monitor(Performance.MEMORY_STATIC_MAX))," object_count=",int(Performance.get_monitor(Performance.OBJECT_COUNT))," resource_count=",int(Performance.get_monitor(Performance.OBJECT_RESOURCE_COUNT))," node_count=",int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)))
+
 func _clear_habitat_items()->void:
 	for child in habitat_items_root.get_children():child.free()
 	habitat_pickups.clear();habitat_new_species_id=""
@@ -1506,27 +1555,33 @@ func _clear_habitat_items()->void:
 func _build_habitat_items(force:=false)->void:
 	_clear_habitat_items()
 	if current_mode!="habitat" and not rain_bonus_active and not force:return
+	_begin_habitat_texture_build()
 	var plant_points:Array=HABITAT_SAFE_PLANT_POINTS.duplicate()
 	var point_index:=0
 	for entry in catalog_species:
 		var species_id:=str(entry.species_id)
-		if bool(discovered.get(species_id,false)) and _species_texture(entry)!=null and point_index<plant_points.size():
-			_add_habitat_plant(entry,plant_points[point_index],false);point_index+=1
+		if bool(discovered.get(species_id,false)):
+			var texture:=_habitat_species_texture(entry)
+			if texture!=null and point_index<plant_points.size():
+				_add_habitat_plant(entry,plant_points[point_index],false,texture);point_index+=1
 	var pending_spawn_index:=0
 	for pending_id in pending_habitat_species:
 		for entry in catalog_species:
 			if str(entry.species_id)==str(pending_id):
 				var is_first_tutorial_species:=pending_spawn_index==0 and not bool(tutorial_steps.get("habitat_wild_get",false))
 				var new_point:Vector2=Vector2(810,385) if is_first_tutorial_species else HABITAT_NEW_SPECIES_POINTS[pending_spawn_index%HABITAT_NEW_SPECIES_POINTS.size()]
-				habitat_new_species_id=str(pending_id);_add_habitat_plant(entry,new_point,true);pending_spawn_index+=1;break
+				var texture:=_habitat_species_texture(entry)
+				if texture!=null:habitat_new_species_id=str(pending_id);_add_habitat_plant(entry,new_point,true,texture);pending_spawn_index+=1
+				break
 	var seed_points:Array=HABITAT_SAFE_SEED_POINTS.duplicate();var daily_rng:=RandomNumberGenerator.new();daily_rng.seed=("%d:%d"%[formal_play_count,habitat_mystery_seeds_pending]).hash()
 	for i in range(seed_points.size()-1,0,-1):
 		var swap_index:=daily_rng.randi_range(0,i);var held=seed_points[i];seed_points[i]=seed_points[swap_index];seed_points[swap_index]=held
 	for i in range(mini(habitat_mystery_seeds_pending,seed_points.size())):_add_habitat_seed(seed_points[i])
+	_finish_habitat_texture_build()
 	_update_habitat_ui()
 
-func _add_habitat_plant(entry:Dictionary,panorama_point:Vector2,is_new:bool)->void:
-	var sprite:=Sprite3D.new();sprite.texture=_species_texture(entry);sprite.billboard=BaseMaterial3D.BILLBOARD_ENABLED;sprite.no_depth_test=true;sprite.texture_filter=BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS;sprite.pixel_size=1.15/maxf(1.0,float(sprite.texture.get_width()));sprite.offset.y=-float(sprite.texture.get_height())*.18;sprite.position=_panorama_point_to_world(panorama_point,HABITAT_ITEM_RADIUS);habitat_items_root.add_child(sprite)
+func _add_habitat_plant(entry:Dictionary,panorama_point:Vector2,is_new:bool,texture:Texture2D)->void:
+	var sprite:=Sprite3D.new();sprite.texture=texture;sprite.billboard=BaseMaterial3D.BILLBOARD_ENABLED;sprite.no_depth_test=true;sprite.texture_filter=BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS;sprite.pixel_size=1.15/maxf(1.0,float(sprite.texture.get_width()));sprite.offset.y=-float(sprite.texture.get_height())*.18;sprite.position=_panorama_point_to_world(panorama_point,HABITAT_ITEM_RADIUS);habitat_items_root.add_child(sprite)
 	if not is_new:sprite.scale=Vector3.ONE*_habitat_best_visual_scale(str(entry.species_id))
 	var item={"node":sprite,"kind":"new_species" if is_new else "found_species","species_id":str(entry.species_id)};habitat_pickups.append(item)
 	if is_new:
@@ -1983,8 +2038,14 @@ func _update_habitat_scroll_tutorial()->void:
 func _apply_mode()->void:
 	if camera==null:return
 	var greenhouse_mode:=current_mode=="greenhouse"
-	if not greenhouse_mode:_build_habitat_items()
-	else:_clear_habitat_items()
+	if not greenhouse_mode:
+		_print_habitat_memory_snapshot("enter_before")
+		_build_habitat_items()
+		_print_habitat_memory_snapshot("enter_after")
+	else:
+		_print_habitat_memory_snapshot("exit_before")
+		_clear_habitat_items()
+		_print_habitat_memory_snapshot("exit_after")
 	greenhouse_layer.visible=greenhouse_mode
 	habitat_items_root.visible=not greenhouse_mode
 	if habitat_status_label:habitat_status_label.visible=not greenhouse_mode and rain_bonus_active
@@ -2120,7 +2181,8 @@ func _collect_habitat_seed(item:Dictionary)->void:
 
 func _collect_habitat_species(item:Dictionary)->void:
 	var node:Sprite3D=item.node;habitat_pickups.erase(item);node.visible=false
-	var flying:=TextureRect.new();flying.texture=node.texture;flying.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;flying.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;flying.mouse_filter=Control.MOUSE_FILTER_IGNORE;flying.size=Vector2(112,112);flying.position=camera.unproject_position(node.global_position)-flying.size*.5;flying.pivot_offset=flying.size*.5;effects_layer.add_child(flying)
+	var full_texture:=_species_texture(_catalog_entry(str(item.species_id)))
+	var flying:=TextureRect.new();flying.texture=full_texture if full_texture else node.texture;flying.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;flying.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;flying.mouse_filter=Control.MOUSE_FILTER_IGNORE;flying.size=Vector2(112,112);flying.position=camera.unproject_position(node.global_position)-flying.size*.5;flying.pivot_offset=flying.size*.5;effects_layer.add_child(flying)
 	var target:=Vector2(500,150)
 	if encyclopedia_icon_button:target=encyclopedia_icon_button.global_position+encyclopedia_icon_button.size*.5
 	var tween:=create_tween().bind_node(flying).set_parallel();tween.tween_property(flying,"position",target-flying.size*.5,.62).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN);tween.tween_property(flying,"scale",Vector2(.08,.08),.62).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN);tween.tween_property(flying,"rotation",.18,.62);tween.chain().tween_callback(_complete_habitat_species_get.bind(item,flying))

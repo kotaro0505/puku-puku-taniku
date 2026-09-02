@@ -5,12 +5,6 @@
     "habitat": "res://assets/audio/mexico-habitat.ogg",
     "shop": "res://assets/audio/puku-puku-taniku-main.ogg"
   },
-  "bgm_wav": {
-    "opening": "res://assets/audio/morning-garden-jingle.wav",
-    "greenhouse": "res://assets/audio/puku-puku-taniku-main.wav",
-    "habitat": "res://assets/audio/mexico-habitat.wav",
-    "shop": "res://assets/audio/puku-puku-taniku-main.wav"
-  },
   "bgm_gain": {
     "opening": 0.58
   },
