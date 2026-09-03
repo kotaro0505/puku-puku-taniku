@@ -696,6 +696,7 @@ func _show_opening()->void:
 func _finish_opening()->void:
 	if opening_finished:return
 	opening_finished=true
+	if audio_manager:audio_manager.notify_user_gesture()
 	if opening_prompt_tween:opening_prompt_tween.kill()
 	opening_overlay.visible=false
 	_continue_after_opening()

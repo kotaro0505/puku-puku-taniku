@@ -15,15 +15,20 @@ var se_players: Array[AudioStreamPlayer] = []
 var active_bgm := 0
 var current_bgm_key := ""
 var fallback_se_cache: Dictionary = {}
-var web_audio_unlocked := not OS.has_feature("web")
+var web_audio_mode := OS.has_feature("web")
+var web_audio_unlocked := not web_audio_mode
 var bgm_restart_queued := false
 var bgm_fade_tween: Tween
+var application_audio_paused := false
+var bgm_changed_while_paused := false
+var web_visibility_callback
 
 func _ready() -> void:
 	_load_config()
 	for i in range(2):
 		var player := AudioStreamPlayer.new()
 		player.bus = "Master"
+		if web_audio_mode: player.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
 		add_child(player)
 		bgm_players.append(player)
 	for i in range(SE_POOL_SIZE):
@@ -31,6 +36,13 @@ func _ready() -> void:
 		player.bus = "Master"
 		add_child(player)
 		se_players.append(player)
+	if web_audio_mode and OS.has_feature("web"): _install_web_visibility_listener()
+
+func _exit_tree() -> void:
+	if web_visibility_callback != null and OS.has_feature("web"):
+		var document = JavaScriptBridge.get_interface("document")
+		if document != null: document.removeEventListener("visibilitychange", web_visibility_callback)
+	web_visibility_callback = null
 
 func _load_config() -> void:
 	if not FileAccess.file_exists(CONFIG_PATH): return
@@ -46,7 +58,8 @@ func apply_settings(saved: Dictionary) -> void:
 	if not bgm_enabled:
 		_cancel_bgm_fade()
 		for player in bgm_players: _stop_and_release_bgm_player(player)
-	elif not was_bgm_enabled and not current_bgm_key.is_empty():
+		bgm_changed_while_paused = false
+	elif not was_bgm_enabled and not current_bgm_key.is_empty() and _bgm_playback_allowed():
 		AudioServer.set_bus_mute(AudioServer.get_bus_index("Master"), false)
 		_queue_bgm_restart()
 	else:
@@ -58,8 +71,9 @@ func settings_dictionary() -> Dictionary:
 	return {"bgm_enabled":bgm_enabled,"se_enabled":se_enabled,"bgm_volume":bgm_volume,"se_volume":se_volume}
 
 func play_bgm(key: String, restart := false) -> void:
+	if application_audio_paused and key != current_bgm_key: bgm_changed_while_paused = true
 	current_bgm_key = key
-	if not bgm_enabled: return
+	if not _bgm_playback_allowed(): return
 	var stream := _stream_for("bgm", key)
 	if stream == null:
 		for player in bgm_players: _stop_and_release_bgm_player(player)
@@ -87,14 +101,13 @@ func _bgm_target_db(key:String)->float:
 	return linear_to_db(maxf(bgm_volume*gain,0.001))
 
 func notify_user_gesture() -> void:
-	if not OS.has_feature("web"): return
-	if not bgm_enabled or current_bgm_key.is_empty(): return
+	if not web_audio_mode or web_audio_unlocked: return
+	web_audio_unlocked = true
 	AudioServer.set_bus_mute(AudioServer.get_bus_index("Master"), false)
-	if not web_audio_unlocked:
-		web_audio_unlocked = true
-		_queue_bgm_restart()
-	elif not _has_audible_bgm_player():
-		_queue_bgm_restart()
+	_cancel_bgm_fade()
+	for player in bgm_players: _stop_and_release_bgm_player(player)
+	bgm_changed_while_paused = false
+	if bgm_enabled and not application_audio_paused and not current_bgm_key.is_empty(): play_bgm(current_bgm_key, true)
 
 func _queue_bgm_restart() -> void:
 	if bgm_restart_queued: return
@@ -103,10 +116,54 @@ func _queue_bgm_restart() -> void:
 
 func _restart_current_bgm() -> void:
 	bgm_restart_queued = false
-	if not bgm_enabled or current_bgm_key.is_empty(): return
+	if not _bgm_playback_allowed() or current_bgm_key.is_empty(): return
+	bgm_changed_while_paused = false
 	_cancel_bgm_fade()
 	for player in bgm_players: _stop_and_release_bgm_player(player)
 	play_bgm(current_bgm_key, true)
+
+func _bgm_playback_allowed() -> bool:
+	return bgm_enabled and not application_audio_paused and (not web_audio_mode or web_audio_unlocked)
+
+func _install_web_visibility_listener() -> void:
+	var document = JavaScriptBridge.get_interface("document")
+	if document == null: return
+	web_visibility_callback = JavaScriptBridge.create_callback(_on_web_visibility_changed)
+	document.addEventListener("visibilitychange", web_visibility_callback)
+
+func _on_web_visibility_changed(_arguments:Array) -> void:
+	var document = JavaScriptBridge.get_interface("document")
+	if document == null: return
+	if bool(document.hidden): _pause_bgm_for_background()
+	else: _resume_bgm_from_background()
+
+func _notification(what:int) -> void:
+	if web_audio_mode: return
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_APPLICATION_PAUSED:
+		_pause_bgm_for_background()
+	elif what == NOTIFICATION_APPLICATION_FOCUS_IN or what == NOTIFICATION_APPLICATION_RESUMED:
+		_resume_bgm_from_background()
+
+func _pause_bgm_for_background() -> void:
+	if application_audio_paused: return
+	application_audio_paused = true
+	for player in bgm_players:
+		if player.playing: player.stream_paused = true
+
+func _resume_bgm_from_background() -> void:
+	if not application_audio_paused: return
+	application_audio_paused = false
+	if not bgm_enabled or (web_audio_mode and not web_audio_unlocked): return
+	if bgm_changed_while_paused:
+		bgm_changed_while_paused = false
+		_restart_current_bgm()
+		return
+	var resumed := false
+	for player in bgm_players:
+		if player.playing and player.stream_paused:
+			player.stream_paused = false
+			resumed = true
+	if not resumed and not current_bgm_key.is_empty(): _restart_current_bgm()
 
 func _stop_and_release_bgm_player(player:AudioStreamPlayer)->void:
 	player.stop()
@@ -115,11 +172,6 @@ func _stop_and_release_bgm_player(player:AudioStreamPlayer)->void:
 func _cancel_bgm_fade() -> void:
 	if bgm_fade_tween and bgm_fade_tween.is_valid(): bgm_fade_tween.kill()
 	bgm_fade_tween = null
-
-func _has_audible_bgm_player() -> bool:
-	for player in bgm_players:
-		if player.playing and player.volume_db > -50.0: return true
-	return false
 
 func play_se(key: String, gain := 1.0) -> void:
 	if not se_enabled: return
