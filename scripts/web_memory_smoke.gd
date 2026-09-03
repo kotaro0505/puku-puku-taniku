@@ -18,6 +18,7 @@ func _ready()->void:
 		assert(game.current_mode=="greenhouse" and game.habitat_items_root.get_child_count()==0 and game.habitat_pickups.is_empty())
 		game._open_shop();game._close_shop()
 		game._open_encyclopedia()
+		game._open_selected_series_encyclopedia()
 		await get_tree().process_frame
 		await get_tree().process_frame
 		var loaded_cards:int=game.encyclopedia_card_images.filter(func(image):return image.texture!=null).size()

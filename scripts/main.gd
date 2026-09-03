@@ -5,7 +5,7 @@ signal rescue_reward_ad_requested(reward_context:String)
 const SucculentClass = preload("res://scripts/succulent.gd")
 const AudioManagerClass = preload("res://scripts/audio_manager.gd")
 const JellyBalanceClass = preload("res://scripts/jelly_balance.gd")
-const PROGRESSION_VERSION := 6
+const PROGRESSION_VERSION := 7
 const NORMAL_GERMINATION_COUNT := 24
 const VOLUME_GERMINATION_COUNT := 36
 const PREMIUM_GERMINATION_COUNT := 24
@@ -127,12 +127,37 @@ var coin_label: Label
 var record_card: PanelContainer
 var record_text: Label
 var encyclopedia_overlay: Control
+var encyclopedia_series_page: Control
 var encyclopedia_list_page: Control
 var encyclopedia_detail_page: Control
 var encyclopedia_grid: GridContainer
 var encyclopedia_scroll: ScrollContainer
 var encyclopedia_card_images: Array[TextureRect] = []
 var encyclopedia_card_entries: Array[Dictionary] = []
+var series_catalog: Array = []
+var field_catalog: Dictionary = {}
+var selected_series_index := 0
+var current_encyclopedia_series_id := "base"
+var series_title_label: Label
+var series_subtitle_label: Label
+var series_description_label: Label
+var series_cover_image: TextureRect
+var series_cover_placeholder: Label
+var series_lock_label: Label
+var series_progress_label: Label
+var series_get_label: Label
+var all_series_get_label: Label
+var series_position_label: Label
+var series_open_button: Button
+var series_previous_button: Button
+var series_next_button: Button
+var series_swipe_start := Vector2.ZERO
+var series_swipe_tracking := false
+var encyclopedia_list_title: Label
+var encyclopedia_list_progress: Label
+var encyclopedia_list_get: Label
+var encyclopedia_field_button: Button
+var encyclopedia_field_status: Label
 var habitat_status_label: Label
 var seed_bag_panel: PanelContainer
 var play_timer_label: Label
@@ -227,6 +252,9 @@ var encyclopedia_navigation_controls: Array[Control] = []
 var coins := 1000
 var bests: Dictionary = {}
 var discovered: Dictionary = {}
+var species_get_counts: Dictionary = {}
+var unlocked_series: Dictionary = {"base":true}
+var get_counts_migration_dirty := false
 var unlocked_species: Dictionary = {}
 var greenhouse_available: Dictionary = {"colorata":true}
 var best_spawn_unlocks_dirty := false
@@ -306,10 +334,11 @@ func _ready() -> void:
 	_configure_habitat_background_ab()
 	rng.randomize()
 	_load_species()
+	_load_series_data()
 	_load_save()
 	_apply_saved_unlocks()
 	audio_manager=AudioManagerClass.new();add_child(audio_manager);audio_manager.apply_settings(audio_settings)
-	if best_spawn_unlocks_dirty:_save();best_spawn_unlocks_dirty=false
+	if best_spawn_unlocks_dirty or get_counts_migration_dirty:_save();best_spawn_unlocks_dirty=false;get_counts_migration_dirty=false
 	_build_world()
 	_build_ui()
 	_build_habitat_items()
@@ -343,11 +372,32 @@ func _load_species() -> void:
 	unlock_rules=JSON.parse_string(FileAccess.get_file_as_string("res://data/unlock-rules.json"))
 	unlocked_species={"colorata":true}
 
+func _load_series_data() -> void:
+	series_catalog.clear();field_catalog.clear()
+	var parsed_series=JSON.parse_string(FileAccess.get_file_as_string("res://data/series.json"))
+	if parsed_series is Array:
+		for raw_entry in parsed_series:
+			if raw_entry is Dictionary and not str(raw_entry.get("series_id","")).is_empty():series_catalog.append(raw_entry.duplicate(true))
+	series_catalog.sort_custom(func(a:Dictionary,b:Dictionary)->bool:return int(a.get("sort_order",0))<int(b.get("sort_order",0)))
+	var parsed_fields=JSON.parse_string(FileAccess.get_file_as_string("res://data/fields.json"))
+	if parsed_fields is Array:
+		for raw_field in parsed_fields:
+			if raw_field is Dictionary and not str(raw_field.get("field_id","")).is_empty():field_catalog[str(raw_field.get("field_id",""))]=raw_field.duplicate(true)
+	if series_catalog.is_empty():
+		var fallback_ids:Array[String]=[]
+		for entry in catalog_species:fallback_ids.append(str(entry.get("species_id","")))
+		series_catalog.append({"series_id":"base","display_name":"基本図鑑","subtitle":"ぷくぷく多肉の基本シリーズ","description":"これまでに出会った多肉をまとめた図鑑です。","cover_image_path":"","species_ids":fallback_ids,"field_id":"base_field","unlock_type":"default","unlock_condition":{},"iap_product_id":"","sort_order":0})
+	if not field_catalog.has("base_field"):field_catalog["base_field"]={"field_id":"base_field","display_name":"いつもの原生地","implemented":true,"field_type":"current_habitat"}
+
 func _load_save() -> void:
 	if FileAccess.file_exists("user://records.json"):
 		var value = JSON.parse_string(FileAccess.get_file_as_string("user://records.json"))
 		if value is Dictionary:
 			bests = value.get("bests",{}); coins = int(value.get("yen",value.get("coins",1000))); discovered=value.get("discovered",{"colorata":true});habitat_seed_date=str(value.get("habitat_seed_date",""));habitat_seeds_collected=int(value.get("habitat_seeds_collected",0))
+			species_get_counts=value.get("species_get_counts",{});unlocked_series=value.get("unlocked_series",{"base":true})
+			if not species_get_counts is Dictionary:species_get_counts={}
+			if not unlocked_series is Dictionary:unlocked_series={"base":true}
+			unlocked_series["base"]=true
 			intro_story_complete=bool(value.get("intro_story_complete",false));total_play_count=int(value.get("total_play_count",0));completed_unlock_conditions=value.get("completed_unlock_conditions",{});pending_habitat_species=value.get("pending_habitat_species",[]);audio_settings=value.get("audio_settings",audio_settings)
 			encyclopedia_unlocked=bool(value.get("encyclopedia_unlocked",intro_story_complete and (total_play_count>=1 or bool(discovered.get("colorata",false)))));habitat_unlocked=bool(value.get("habitat_unlocked",intro_story_complete and total_play_count>=3));tutorial_steps=value.get("tutorial_steps",{});old_seed_bags=int(value.get("old_seed_bags",0));buyback_unlocked=bool(value.get("buyback_unlocked",total_play_count>=4))
 			rain_bag_count=maxi(0,int(value.get("rain_bag_count",0)));rain_event_pending=bool(value.get("rain_event_pending",false));rain_bonus_in_progress=bool(value.get("rain_bonus_in_progress",false));rain_time_remaining=clampf(float(value.get("rain_time_remaining",RAIN_BONUS_DURATION_SECONDS)),0.0,RAIN_BONUS_DURATION_SECONDS)
@@ -376,6 +426,18 @@ func _load_save() -> void:
 			# Saves created before the encyclopedia already contain valid best sizes.
 			for species_id in bests:
 				if float(bests[species_id])>0.0:discovered[species_id]=true
+			if not value.has("species_get_counts"):
+				# Earlier saves did not count repeat harvests. A discovered entry proves at
+				# least one real acquisition, so migrate that safe minimum exactly once.
+				for species_id in discovered:
+					if bool(discovered.get(species_id,false)):species_get_counts[str(species_id)]=1
+				get_counts_migration_dirty=true
+			else:
+				var sanitized_get_counts:Dictionary={}
+				for species_id in species_get_counts:
+					var saved_count:=maxi(0,int(species_get_counts.get(species_id,0)))
+					if saved_count>0:sanitized_get_counts[str(species_id)]=saved_count
+				species_get_counts=sanitized_get_counts
 			for hidden_id in [HIDDEN_PINWHEEL_ID,HIDDEN_TOVAR_ID,HIDDEN_BUSTAMANTE_ID]:
 				if bool(discovered.get(hidden_id,false)):hidden_species_acquired[hidden_id]=true
 			best_spawn_unlocks_dirty=_evaluate_best_spawn_unlocks(false)
@@ -385,7 +447,7 @@ func _load_save() -> void:
 func _save() -> void:
 	var f := FileAccess.open("user://records.json",FileAccess.WRITE)
 	if audio_manager:audio_settings=audio_manager.settings_dictionary()
-	f.store_string(JSON.stringify({"progression_version":PROGRESSION_VERSION,"bests":bests,"discovered":discovered,"unlocked_species":unlocked_species,"greenhouse_available":greenhouse_available,"completed_unlock_conditions":completed_unlock_conditions,"pending_habitat_species":pending_habitat_species,"total_play_count":total_play_count,"normal_play_count":normal_play_count,"formal_play_count":formal_play_count,"shop_visit_count":shop_visit_count,"hidden_species_acquired":hidden_species_acquired,"tovar_next_play":tovar_next_play,"tovar_attempt_count":tovar_attempt_count,"intro_story_complete":intro_story_complete,"encyclopedia_unlocked":encyclopedia_unlocked,"habitat_unlocked":habitat_unlocked,"tutorial_steps":tutorial_steps,"old_seed_bags":old_seed_bags,"buyback_unlocked":buyback_unlocked,"habitat_seed_date":habitat_seed_date,"habitat_seeds_collected":habitat_seeds_collected,"habitat_mystery_seeds_pending":habitat_mystery_seeds_pending,"mystery_seed_count":mystery_seed_count,"armadillo_research_total":armadillo_research_total,"armadillo_research_rewards":armadillo_research_rewards,"armadillo_research_intro_seen":armadillo_research_intro_seen,"normal_seed_bags":normal_seed_bags,"volume_seed_bags":volume_seed_bags,"premium_seed_bags":premium_seed_bags,"mystery_seed_bags":mystery_seed_bags,"volume_seed_unlocked":volume_seed_unlocked,"volume_seed_intro_seen":volume_seed_intro_seen,"premium_seed_unlocked":premium_seed_unlocked,"mystery_seed_pack_unlocked":mystery_seed_pack_unlocked,"mystery_route_assignments":mystery_route_assignments,"mystery_route_completed":mystery_route_completed,"mystery_route_dialog_seen":mystery_route_dialog_seen,"rain_completion_count":rain_completion_count,"best_100_achieved":best_100_achieved,"normal_habitat_complete":normal_habitat_complete,"login_bonus_date":login_bonus_date,"audio_settings":audio_settings,"rain_bag_count":rain_bag_count,"rain_event_pending":rain_event_pending,"rain_bonus_in_progress":rain_bonus_in_progress,"rain_time_remaining":rain_time_remaining,"rain_intro_normal_bags":rain_intro_normal_bags,"rain_draws_unlocked":rain_draws_unlocked,"yen":coins}))
+	f.store_string(JSON.stringify({"progression_version":PROGRESSION_VERSION,"bests":bests,"discovered":discovered,"species_get_counts":species_get_counts,"unlocked_series":unlocked_series,"unlocked_species":unlocked_species,"greenhouse_available":greenhouse_available,"completed_unlock_conditions":completed_unlock_conditions,"pending_habitat_species":pending_habitat_species,"total_play_count":total_play_count,"normal_play_count":normal_play_count,"formal_play_count":formal_play_count,"shop_visit_count":shop_visit_count,"hidden_species_acquired":hidden_species_acquired,"tovar_next_play":tovar_next_play,"tovar_attempt_count":tovar_attempt_count,"intro_story_complete":intro_story_complete,"encyclopedia_unlocked":encyclopedia_unlocked,"habitat_unlocked":habitat_unlocked,"tutorial_steps":tutorial_steps,"old_seed_bags":old_seed_bags,"buyback_unlocked":buyback_unlocked,"habitat_seed_date":habitat_seed_date,"habitat_seeds_collected":habitat_seeds_collected,"habitat_mystery_seeds_pending":habitat_mystery_seeds_pending,"mystery_seed_count":mystery_seed_count,"armadillo_research_total":armadillo_research_total,"armadillo_research_rewards":armadillo_research_rewards,"armadillo_research_intro_seen":armadillo_research_intro_seen,"normal_seed_bags":normal_seed_bags,"volume_seed_bags":volume_seed_bags,"premium_seed_bags":premium_seed_bags,"mystery_seed_bags":mystery_seed_bags,"volume_seed_unlocked":volume_seed_unlocked,"volume_seed_intro_seen":volume_seed_intro_seen,"premium_seed_unlocked":premium_seed_unlocked,"mystery_seed_pack_unlocked":mystery_seed_pack_unlocked,"mystery_route_assignments":mystery_route_assignments,"mystery_route_completed":mystery_route_completed,"mystery_route_dialog_seen":mystery_route_dialog_seen,"rain_completion_count":rain_completion_count,"best_100_achieved":best_100_achieved,"normal_habitat_complete":normal_habitat_complete,"login_bonus_date":login_bonus_date,"audio_settings":audio_settings,"rain_bag_count":rain_bag_count,"rain_event_pending":rain_event_pending,"rain_bonus_in_progress":rain_bonus_in_progress,"rain_time_remaining":rain_time_remaining,"rain_intro_normal_bags":rain_intro_normal_bags,"rain_draws_unlocked":rain_draws_unlocked,"yen":coins}))
 
 func _daily_seed_gift_due()->bool:
 	if not intro_story_complete:return false
@@ -1081,7 +1143,7 @@ func _change_audio_volume(value:float,is_bgm:bool)->void:
 func _reset_progression_state()->void:
 	JellyBalanceClass.reset_formal();dev_jelly_test_active=false;last_jelly_claim_msec=-1000000000
 	mystery_route_assignments.clear();mystery_route_completed.clear();mystery_route_dialog_seen.clear();rain_completion_count=0;best_100_achieved=false;normal_habitat_complete=false;shop_selected_seed_type="normal"
-	coins=1000;bests.clear();discovered.clear();greenhouse_available={"colorata":true};unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;buyback_unlocked=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;mystery_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;mystery_seed_pack_unlocked=false;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;habitat_mystery_seeds_pending=0;mystery_seed_count=0;armadillo_research_total=0;armadillo_research_rewards.clear();armadillo_research_intro_seen=false;armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();shop_chatter_acquired_species.clear();play_active=false;play_time_remaining=0.0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_scroll_tutorial_active=false;habitat_best_link_dialog_step=0;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_build_habitat_items();_save();_update_currency_ui();_update_play_ui()
+	coins=1000;bests.clear();discovered.clear();species_get_counts.clear();unlocked_series={"base":true};greenhouse_available={"colorata":true};unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;buyback_unlocked=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;mystery_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;mystery_seed_pack_unlocked=false;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;habitat_mystery_seeds_pending=0;mystery_seed_count=0;armadillo_research_total=0;armadillo_research_rewards.clear();armadillo_research_intro_seen=false;armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();shop_chatter_acquired_species.clear();play_active=false;play_time_remaining=0.0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_scroll_tutorial_active=false;habitat_best_link_dialog_step=0;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_build_habitat_items();_save();_update_currency_ui();_update_play_ui()
 	normal_play_count=0;shop_visit_count=0;hidden_species_acquired.clear();tovar_next_play=TOVAR_FIRST_PLAY;tovar_attempt_count=0;tovar_event_active=false;tovar_harvested_this_play=false;armadillo_present=false;_save()
 
 func _reset_progression_for_development(button:Button)->void:
@@ -1338,7 +1400,7 @@ func _hidden_species_owned(species_id:String)->bool:
 
 func _grant_hidden_species(species_id:String)->bool:
 	if _hidden_species_owned(species_id):return false
-	hidden_species_acquired[species_id]=true;discovered[species_id]=true;encyclopedia_unlocked=true
+	hidden_species_acquired[species_id]=true;discovered[species_id]=true;_record_species_get(species_id);encyclopedia_unlocked=true
 	_refresh_seed_pack_unlocks()
 	audio_manager.play_se("new_species",.62);_save()
 	return true
@@ -1482,32 +1544,177 @@ func _close_result()->void:
 func _build_encyclopedia(hud:Control)->void:
 	encyclopedia_overlay=Control.new();encyclopedia_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);encyclopedia_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;encyclopedia_overlay.visible=false;hud.add_child(encyclopedia_overlay)
 	var background:=ColorRect.new();background.color=Color("#3d2419");background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);background.mouse_filter=Control.MOUSE_FILTER_STOP;encyclopedia_overlay.add_child(background)
-	encyclopedia_list_page=Control.new();encyclopedia_list_page.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);encyclopedia_overlay.add_child(encyclopedia_list_page)
-	var title:=Label.new();title.text="ぷくぷく図鑑";title.position=Vector2(28,28);title.size=Vector2(390,65);title.add_theme_font_size_override("font_size",31);title.add_theme_color_override("font_color",UI_CREAM);encyclopedia_list_page.add_child(title)
-	var close:=Button.new();close.text="もどる";close.position=Vector2(447,27);close.size=Vector2(105,55);_skin_button(close,Color("#fff0cf"),17);close.pressed.connect(_close_encyclopedia);encyclopedia_list_page.add_child(close)
-	encyclopedia_scroll=ScrollContainer.new();encyclopedia_scroll.position=Vector2(20,105);encyclopedia_scroll.size=Vector2(536,890);encyclopedia_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;encyclopedia_scroll.vertical_scroll_mode=ScrollContainer.SCROLL_MODE_AUTO;encyclopedia_scroll.scroll_deadzone=8;encyclopedia_scroll.mouse_filter=Control.MOUSE_FILTER_STOP;encyclopedia_list_page.add_child(encyclopedia_scroll)
+	_build_series_selection_page()
+	encyclopedia_list_page=Control.new();encyclopedia_list_page.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);encyclopedia_list_page.visible=false;encyclopedia_overlay.add_child(encyclopedia_list_page)
+	var back_to_series:=Button.new();back_to_series.name="BackToSeries";back_to_series.text="もどる";back_to_series.position=Vector2(20,25);back_to_series.size=Vector2(105,55);_skin_button(back_to_series,Color("#fff0cf"),17);back_to_series.pressed.connect(_return_to_series_selection);encyclopedia_list_page.add_child(back_to_series)
+	encyclopedia_list_title=Label.new();encyclopedia_list_title.position=Vector2(132,20);encyclopedia_list_title.size=Vector2(424,48);encyclopedia_list_title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;encyclopedia_list_title.add_theme_font_size_override("font_size",28);encyclopedia_list_title.add_theme_color_override("font_color",UI_CREAM);encyclopedia_list_page.add_child(encyclopedia_list_title)
+	encyclopedia_list_progress=Label.new();encyclopedia_list_progress.position=Vector2(132,67);encyclopedia_list_progress.size=Vector2(424,29);encyclopedia_list_progress.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;encyclopedia_list_progress.add_theme_font_size_override("font_size",18);encyclopedia_list_progress.add_theme_color_override("font_color",Color("#f3cf8a"));encyclopedia_list_page.add_child(encyclopedia_list_progress)
+	encyclopedia_list_get=Label.new();encyclopedia_list_get.position=Vector2(132,95);encyclopedia_list_get.size=Vector2(424,28);encyclopedia_list_get.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;encyclopedia_list_get.add_theme_font_size_override("font_size",16);encyclopedia_list_get.add_theme_color_override("font_color",UI_CREAM);encyclopedia_list_page.add_child(encyclopedia_list_get)
+	encyclopedia_field_button=Button.new();encyclopedia_field_button.position=Vector2(104,130);encyclopedia_field_button.size=Vector2(368,58);_skin_button(encyclopedia_field_button,Color("#dca85e"),18);encyclopedia_field_button.pressed.connect(_open_current_series_field);encyclopedia_list_page.add_child(encyclopedia_field_button)
+	encyclopedia_field_status=Label.new();encyclopedia_field_status.position=Vector2(38,191);encyclopedia_field_status.size=Vector2(500,34);encyclopedia_field_status.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;encyclopedia_field_status.add_theme_font_size_override("font_size",15);encyclopedia_field_status.add_theme_color_override("font_color",Color("#e9cda3"));encyclopedia_list_page.add_child(encyclopedia_field_status)
+	encyclopedia_scroll=ScrollContainer.new();encyclopedia_scroll.position=Vector2(20,230);encyclopedia_scroll.size=Vector2(536,765);encyclopedia_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;encyclopedia_scroll.vertical_scroll_mode=ScrollContainer.SCROLL_MODE_AUTO;encyclopedia_scroll.scroll_deadzone=8;encyclopedia_scroll.mouse_filter=Control.MOUSE_FILTER_STOP;encyclopedia_list_page.add_child(encyclopedia_scroll)
 	encyclopedia_scroll.get_v_scroll_bar().value_changed.connect(func(_value:float):call_deferred("_update_encyclopedia_visible_textures"))
 	var scroll_content:=VBoxContainer.new();scroll_content.custom_minimum_size=Vector2(516,0);scroll_content.mouse_filter=Control.MOUSE_FILTER_PASS;encyclopedia_scroll.add_child(scroll_content)
 	encyclopedia_grid=GridContainer.new();encyclopedia_grid.columns=2;encyclopedia_grid.custom_minimum_size=Vector2(516,0);encyclopedia_grid.size_flags_horizontal=Control.SIZE_EXPAND_FILL;encyclopedia_grid.mouse_filter=Control.MOUSE_FILTER_PASS;encyclopedia_grid.add_theme_constant_override("h_separation",12);encyclopedia_grid.add_theme_constant_override("v_separation",14);scroll_content.add_child(encyclopedia_grid)
 	var bottom_space:=Control.new();bottom_space.custom_minimum_size=Vector2(516,54);bottom_space.mouse_filter=Control.MOUSE_FILTER_PASS;scroll_content.add_child(bottom_space)
 	encyclopedia_detail_page=Control.new();encyclopedia_detail_page.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);encyclopedia_detail_page.visible=false;encyclopedia_overlay.add_child(encyclopedia_detail_page)
 
+func _build_series_selection_page()->void:
+	encyclopedia_series_page=Control.new();encyclopedia_series_page.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);encyclopedia_overlay.add_child(encyclopedia_series_page)
+	var title:=Label.new();title.text="ぷくぷく図鑑";title.position=Vector2(28,25);title.size=Vector2(390,55);title.add_theme_font_size_override("font_size",31);title.add_theme_color_override("font_color",UI_CREAM);encyclopedia_series_page.add_child(title)
+	var close:=Button.new();close.text="もどる";close.position=Vector2(447,27);close.size=Vector2(105,55);_skin_button(close,Color("#fff0cf"),17);close.pressed.connect(_close_encyclopedia);encyclopedia_series_page.add_child(close)
+	all_series_get_label=Label.new();all_series_get_label.position=Vector2(28,82);all_series_get_label.size=Vector2(520,35);all_series_get_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;all_series_get_label.add_theme_font_size_override("font_size",18);all_series_get_label.add_theme_color_override("font_color",Color("#f3cf8a"));encyclopedia_series_page.add_child(all_series_get_label)
+	series_title_label=Label.new();series_title_label.position=Vector2(88,123);series_title_label.size=Vector2(400,50);series_title_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;series_title_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;series_title_label.add_theme_font_size_override("font_size",29);series_title_label.add_theme_color_override("font_color",UI_CREAM);encyclopedia_series_page.add_child(series_title_label)
+	series_subtitle_label=Label.new();series_subtitle_label.position=Vector2(40,171);series_subtitle_label.size=Vector2(496,31);series_subtitle_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;series_subtitle_label.add_theme_font_size_override("font_size",16);series_subtitle_label.add_theme_color_override("font_color",Color("#e9cda3"));encyclopedia_series_page.add_child(series_subtitle_label)
+	series_previous_button=Button.new();series_previous_button.text="＜";series_previous_button.position=Vector2(16,382);series_previous_button.size=Vector2(58,64);_skin_button(series_previous_button,Color("#f3dfb9"),25);series_previous_button.pressed.connect(_change_series_selection.bind(-1));encyclopedia_series_page.add_child(series_previous_button)
+	series_next_button=Button.new();series_next_button.text="＞";series_next_button.position=Vector2(502,382);series_next_button.size=Vector2(58,64);_skin_button(series_next_button,Color("#f3dfb9"),25);series_next_button.pressed.connect(_change_series_selection.bind(1));encyclopedia_series_page.add_child(series_next_button)
+	var cover_panel:=PanelContainer.new();cover_panel.name="SeriesCoverFrame";cover_panel.position=Vector2(82,211);cover_panel.size=Vector2(412,420);cover_panel.add_theme_stylebox_override("panel",_box(Color("#ead9b5"),Color("#c38c4b"),28,4));cover_panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;encyclopedia_series_page.add_child(cover_panel)
+	var cover_content:=Control.new();cover_content.custom_minimum_size=Vector2(384,392);cover_content.mouse_filter=Control.MOUSE_FILTER_IGNORE;cover_panel.add_child(cover_content)
+	series_cover_image=TextureRect.new();series_cover_image.name="SeriesCoverImage";series_cover_image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);series_cover_image.offset_left=12;series_cover_image.offset_top=12;series_cover_image.offset_right=-12;series_cover_image.offset_bottom=-12;series_cover_image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;series_cover_image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;series_cover_image.mouse_filter=Control.MOUSE_FILTER_IGNORE;cover_content.add_child(series_cover_image)
+	series_cover_placeholder=Label.new();series_cover_placeholder.text="表紙画像\n準備中";series_cover_placeholder.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);series_cover_placeholder.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;series_cover_placeholder.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;series_cover_placeholder.add_theme_font_size_override("font_size",25);series_cover_placeholder.add_theme_color_override("font_color",Color("#815d43"));series_cover_placeholder.mouse_filter=Control.MOUSE_FILTER_IGNORE;cover_content.add_child(series_cover_placeholder)
+	series_lock_label=Label.new();series_lock_label.position=Vector2(62,112);series_lock_label.size=Vector2(260,168);series_lock_label.text="🔒\n未開放";series_lock_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;series_lock_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;series_lock_label.add_theme_font_size_override("font_size",24);series_lock_label.add_theme_color_override("font_color",UI_CREAM);series_lock_label.add_theme_color_override("font_outline_color",UI_BROWN);series_lock_label.add_theme_constant_override("outline_size",7);series_lock_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;cover_content.add_child(series_lock_label)
+	var swipe_area:=Control.new();swipe_area.name="SeriesSwipeArea";swipe_area.position=Vector2(82,211);swipe_area.size=Vector2(412,420);swipe_area.mouse_filter=Control.MOUSE_FILTER_STOP;swipe_area.gui_input.connect(_on_series_swipe_input);encyclopedia_series_page.add_child(swipe_area)
+	series_description_label=Label.new();series_description_label.position=Vector2(42,646);series_description_label.size=Vector2(492,61);series_description_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;series_description_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;series_description_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;series_description_label.add_theme_font_size_override("font_size",17);series_description_label.add_theme_color_override("font_color",UI_CREAM);encyclopedia_series_page.add_child(series_description_label)
+	series_progress_label=Label.new();series_progress_label.position=Vector2(48,714);series_progress_label.size=Vector2(480,34);series_progress_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;series_progress_label.add_theme_font_size_override("font_size",22);series_progress_label.add_theme_color_override("font_color",Color("#f4d27d"));encyclopedia_series_page.add_child(series_progress_label)
+	series_get_label=Label.new();series_get_label.position=Vector2(48,750);series_get_label.size=Vector2(480,31);series_get_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;series_get_label.add_theme_font_size_override("font_size",18);series_get_label.add_theme_color_override("font_color",UI_CREAM);encyclopedia_series_page.add_child(series_get_label)
+	series_open_button=Button.new();series_open_button.position=Vector2(126,801);series_open_button.size=Vector2(324,62);_skin_button(series_open_button,Color("#dca85e"),21);series_open_button.add_theme_stylebox_override("disabled",_box(Color("#6a4939"),Color("#876552"),20,3));series_open_button.add_theme_color_override("font_disabled_color",Color("#d8c4b3"));series_open_button.pressed.connect(_open_selected_series_encyclopedia);encyclopedia_series_page.add_child(series_open_button)
+	series_position_label=Label.new();series_position_label.position=Vector2(48,885);series_position_label.size=Vector2(480,32);series_position_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;series_position_label.add_theme_font_size_override("font_size",17);series_position_label.add_theme_color_override("font_color",Color("#dcbf91"));encyclopedia_series_page.add_child(series_position_label)
+
 func _open_encyclopedia()->void:
 	if not encyclopedia_unlocked:return
-	play_modal_open=false;_refresh_encyclopedia_cards();encyclopedia_detail_page.visible=false;encyclopedia_list_page.visible=true;play_overlay.visible=false;encyclopedia_overlay.visible=true;_update_play_ui()
+	play_modal_open=false;encyclopedia_detail_page.visible=false;encyclopedia_list_page.visible=false;encyclopedia_series_page.visible=true;play_overlay.visible=false;encyclopedia_overlay.visible=true;_refresh_series_selection();_update_play_ui()
 
 func _close_encyclopedia()->void:
 	encyclopedia_overlay.visible=false
 	_release_encyclopedia_textures()
+	if series_cover_image:series_cover_image.texture=null
 	for child in encyclopedia_detail_page.get_children():child.free()
 	_update_play_ui()
+
+func _current_series_entry()->Dictionary:
+	if series_catalog.is_empty():return {}
+	selected_series_index=clampi(selected_series_index,0,series_catalog.size()-1)
+	return series_catalog[selected_series_index]
+
+func _series_entry(series_id:String)->Dictionary:
+	for entry in series_catalog:
+		if str(entry.get("series_id",""))==series_id:return entry
+	return {}
+
+func _series_species_entries(series_id:String)->Array[Dictionary]:
+	var entries:Array[Dictionary]=[];var selected:=_series_entry(series_id)
+	var ids:Array=selected.get("species_ids",[])
+	for species_id_value in ids:
+		var entry:=_catalog_entry(str(species_id_value))
+		if not entry.is_empty():entries.append(entry)
+	return entries
+
+func _is_series_unlocked(entry:Dictionary)->bool:
+	var series_id:=str(entry.get("series_id",""))
+	return str(entry.get("unlock_type","future"))=="default" or bool(unlocked_series.get(series_id,false))
+
+func _series_unlock_text(entry:Dictionary)->String:
+	if _is_series_unlocked(entry):return ""
+	var condition=entry.get("unlock_condition",{})
+	if condition is Dictionary:
+		var display_text:=str(condition.get("display_text",""))
+		if not display_text.is_empty():return display_text
+	return "開放条件は今後追加予定"
+
+func _species_get_count(species_id:String)->int:
+	return maxi(0,int(species_get_counts.get(species_id,0)))
+
+func _series_get_count(series_id:String)->int:
+	var total:=0
+	for entry in _series_species_entries(series_id):total+=_species_get_count(str(entry.get("species_id","")))
+	return total
+
+func _all_series_get_count()->int:
+	var total:=0;var counted:Dictionary={}
+	for series_entry in series_catalog:
+		for species_id_value in series_entry.get("species_ids",[]):
+			var species_id:=str(species_id_value)
+			if species_id.is_empty() or counted.has(species_id):continue
+			counted[species_id]=true;total+=_species_get_count(species_id)
+	return total
+
+func _record_species_get(species_id:String,amount:int=1)->void:
+	if amount<=0 or _catalog_entry(species_id).is_empty():return
+	species_get_counts[species_id]=_species_get_count(species_id)+amount
+
+func _series_found_count(series_id:String)->int:
+	var found:=0
+	for entry in _series_species_entries(series_id):
+		if bool(discovered.get(str(entry.get("species_id","")),false)):found+=1
+	return found
+
+func _refresh_series_selection()->void:
+	var entry:=_current_series_entry()
+	if entry.is_empty():return
+	var series_id:=str(entry.get("series_id",""));var entries:=_series_species_entries(series_id);var unlocked:=_is_series_unlocked(entry)
+	series_title_label.text=str(entry.get("display_name","シリーズ図鑑"));series_subtitle_label.text=str(entry.get("subtitle",""));series_description_label.text=str(entry.get("description",""))
+	series_progress_label.text="%d / %d種"%[_series_found_count(series_id),entries.size()];series_get_label.text="総GET %d"%_series_get_count(series_id);all_series_get_label.text="全シリーズ総GET %d"%_all_series_get_count()
+	series_position_label.text="%d / %d"%[selected_series_index+1,series_catalog.size()]
+	var cover_path:=str(entry.get("cover_image_path",""));series_cover_image.texture=load(cover_path) as Texture2D if not cover_path.is_empty() and ResourceLoader.exists(cover_path) else null
+	series_cover_placeholder.visible=series_cover_image.texture==null and unlocked;series_lock_label.visible=not unlocked;series_lock_label.text="🔒\n未開放\n表紙画像 準備中" if series_cover_image.texture==null else "🔒\n未開放"
+	series_open_button.disabled=not unlocked;series_open_button.text="図鑑をひらく" if unlocked else "🔒  未開放　%s"%_series_unlock_text(entry)
+	series_previous_button.disabled=series_catalog.size()<2;series_next_button.disabled=series_catalog.size()<2
+
+func _change_series_selection(direction:int)->void:
+	if series_catalog.size()<2:return
+	selected_series_index=wrapi(selected_series_index+direction,0,series_catalog.size());_refresh_series_selection()
+
+func _on_series_swipe_input(event:InputEvent)->void:
+	if event is InputEventScreenTouch:
+		if event.pressed:series_swipe_start=event.position;series_swipe_tracking=true
+		elif series_swipe_tracking:_finish_series_swipe(event.position)
+	elif event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT:
+		if event.pressed:series_swipe_start=event.position;series_swipe_tracking=true
+		elif series_swipe_tracking:_finish_series_swipe(event.position)
+
+func _finish_series_swipe(end_position:Vector2)->void:
+	series_swipe_tracking=false;var delta:=end_position-series_swipe_start
+	if absf(delta.x)>=48.0 and absf(delta.x)>absf(delta.y):_change_series_selection(1 if delta.x<0.0 else -1)
+
+func _open_selected_series_encyclopedia()->void:
+	var entry:=_current_series_entry()
+	if entry.is_empty() or not _is_series_unlocked(entry):return
+	current_encyclopedia_series_id=str(entry.get("series_id","base"));encyclopedia_series_page.visible=false;encyclopedia_detail_page.visible=false;encyclopedia_list_page.visible=true;_refresh_encyclopedia_header();_refresh_encyclopedia_cards()
+
+func _return_to_series_selection()->void:
+	_release_encyclopedia_textures()
+	for child in encyclopedia_detail_page.get_children():child.free()
+	encyclopedia_detail_page.visible=false;encyclopedia_list_page.visible=false;encyclopedia_series_page.visible=true;_refresh_series_selection()
+
+func _field_entry(field_id:String)->Dictionary:
+	var entry=field_catalog.get(field_id,{})
+	return entry if entry is Dictionary else {}
+
+func _current_series_field_available()->bool:
+	var series_entry:=_series_entry(current_encyclopedia_series_id);var field:=_field_entry(str(series_entry.get("field_id","")))
+	if series_entry.is_empty() or not _is_series_unlocked(series_entry) or not bool(field.get("implemented",false)):return false
+	if str(field.get("field_type",""))=="current_habitat":return habitat_unlocked
+	return false
+
+func _refresh_encyclopedia_header()->void:
+	var entry:=_series_entry(current_encyclopedia_series_id);var species_entries:=_series_species_entries(current_encyclopedia_series_id)
+	encyclopedia_list_title.text=str(entry.get("display_name","シリーズ図鑑"));encyclopedia_list_progress.text="%d / %d種"%[_series_found_count(current_encyclopedia_series_id),species_entries.size()];encyclopedia_list_get.text="シリーズ総GET %d"%_series_get_count(current_encyclopedia_series_id)
+	var field:=_field_entry(str(entry.get("field_id","")));var available:=_current_series_field_available();encyclopedia_field_button.disabled=not available;encyclopedia_field_button.text="このシリーズの原生地へ" if available else "この原生地はまだ見つかっていません"
+	encyclopedia_field_status.text=str(field.get("display_name","専用原生地")) if available else "専用原生地は未開放または準備中です"
+
+func _open_current_series_field()->void:
+	if not _current_series_field_available():return
+	var series_entry:=_series_entry(current_encyclopedia_series_id);var field:=_field_entry(str(series_entry.get("field_id","")))
+	if str(field.get("field_type",""))!="current_habitat":return
+	_close_encyclopedia()
+	if current_mode=="greenhouse":_toggle_mode()
 
 func _refresh_encyclopedia_cards()->void:
 	encyclopedia_card_images.clear();encyclopedia_card_entries.clear()
 	for child in encyclopedia_grid.get_children():child.free()
-	for entry in catalog_species:
+	for entry in _series_species_entries(current_encyclopedia_series_id):
 		var species_id:=str(entry.get("species_id",""));var found:=bool(discovered.get(species_id,false))
-		var card:=Button.new();card.custom_minimum_size=Vector2(252,218);card.mouse_filter=Control.MOUSE_FILTER_PASS;card.mouse_force_pass_scroll_events=true;card.action_mode=BaseButton.ACTION_MODE_BUTTON_RELEASE;_skin_button(card,Color("#f6e7c5"),16);card.disabled=not found;encyclopedia_grid.add_child(card)
+		var card:=Button.new();card.custom_minimum_size=Vector2(252,236);card.mouse_filter=Control.MOUSE_FILTER_PASS;card.mouse_force_pass_scroll_events=true;card.action_mode=BaseButton.ACTION_MODE_BUTTON_RELEASE;_skin_button(card,Color("#f6e7c5"),16);card.disabled=not found;encyclopedia_grid.add_child(card)
 		var content:=VBoxContainer.new();content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);content.offset_left=10;content.offset_top=8;content.offset_right=-10;content.offset_bottom=-8;content.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.alignment=BoxContainer.ALIGNMENT_CENTER;card.add_child(content)
 		var image_frame:=MarginContainer.new();image_frame.name="SpeciesCardImageFrame";image_frame.custom_minimum_size=Vector2(210,137);image_frame.add_theme_constant_override("margin_left",10);image_frame.add_theme_constant_override("margin_top",8);image_frame.add_theme_constant_override("margin_right",10);image_frame.add_theme_constant_override("margin_bottom",8);image_frame.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.add_child(image_frame)
 		var image:=TextureRect.new();image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.mouse_filter=Control.MOUSE_FILTER_IGNORE
@@ -1515,6 +1722,7 @@ func _refresh_encyclopedia_cards()->void:
 		image_frame.add_child(image);encyclopedia_card_images.append(image);encyclopedia_card_entries.append(entry)
 		var name_label:=Label.new();name_label.text=str(entry.get("name_ja","？？？")) if found else "？？？";name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name_label.add_theme_font_size_override("font_size",18);name_label.add_theme_color_override("font_color",UI_BROWN);content.add_child(name_label)
 		var best_label_card:=Label.new();var card_best:=float(bests.get(species_id,0.0));best_label_card.text=(("自己ベスト  %.1f cm"%card_best) if card_best>0.0 else "自己ベスト　ー") if found else "未発見";best_label_card.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;best_label_card.add_theme_font_size_override("font_size",14);best_label_card.add_theme_color_override("font_color",Color("#79543a"));content.add_child(best_label_card)
+		var get_label_card:=Label.new();get_label_card.text="GET %d"%_species_get_count(species_id) if found else "GET 0";get_label_card.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;get_label_card.add_theme_font_size_override("font_size",13);get_label_card.add_theme_color_override("font_color",Color("#98602e"));content.add_child(get_label_card)
 		if found:card.pressed.connect(_open_species_detail.bind(entry))
 	call_deferred("_update_encyclopedia_visible_textures")
 
@@ -1700,6 +1908,7 @@ func _open_species_detail(entry:Dictionary)->void:
 	var image:=TextureRect.new();image.name="SpeciesImage";image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.texture=_species_texture(entry);image.mouse_filter=Control.MOUSE_FILTER_IGNORE;image_frame.add_child(image)
 	var name_label:=Label.new();name_label.text=str(entry.get("name_ja",""));name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name_label.add_theme_font_size_override("font_size",31);name_label.add_theme_color_override("font_color",UI_BROWN);content.add_child(name_label)
 	var species_id:=str(entry.get("species_id",""));var best_detail:=Label.new();best_detail.name="SpeciesBest";var best_cm:=float(bests.get(species_id,0.0));best_detail.text="自己ベスト  %.1f cm"%best_cm if best_cm>0.0 else "自己ベスト　ー";best_detail.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;best_detail.add_theme_font_size_override("font_size",23);best_detail.add_theme_color_override("font_color",Color("#98602e"));content.add_child(best_detail)
+	var get_detail:=Label.new();get_detail.name="SpeciesGetCount";get_detail.text="GET %d"%_species_get_count(species_id);get_detail.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;get_detail.add_theme_font_size_override("font_size",20);get_detail.add_theme_color_override("font_color",Color("#7f5a3d"));content.add_child(get_detail)
 
 func _box(bg: Color, border: Color, radius: int, width: int) -> StyleBoxFlat:
 	var s:=StyleBoxFlat.new(); s.bg_color=bg; s.border_color=border
@@ -2219,7 +2428,7 @@ func _collect_habitat_species(item:Dictionary)->void:
 	var tween:=create_tween().bind_node(flying).set_parallel();tween.tween_property(flying,"position",target-flying.size*.5,.62).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN);tween.tween_property(flying,"scale",Vector2(.08,.08),.62).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN);tween.tween_property(flying,"rotation",.18,.62);tween.chain().tween_callback(_complete_habitat_species_get.bind(item,flying))
 
 func _complete_habitat_species_get(item:Dictionary,flying:TextureRect)->void:
-	var species_id:=str(item.species_id);greenhouse_available[species_id]=true;unlocked_species[species_id]=true;discovered[species_id]=true;_refresh_seed_pack_unlocks();pending_habitat_species.erase(species_id);habitat_new_species_id=""
+	var species_id:=str(item.species_id);greenhouse_available[species_id]=true;unlocked_species[species_id]=true;discovered[species_id]=true;_record_species_get(species_id);_refresh_seed_pack_unlocks();pending_habitat_species.erase(species_id);habitat_new_species_id=""
 	var mystery_route:=_mystery_route_for_species(species_id)
 	if not mystery_route.is_empty():mystery_route_completed[mystery_route]=true
 	for entry in catalog_species:
@@ -2263,7 +2472,7 @@ func _on_harvested(p)->void:
 	var old:=float(bests.get(p.data.species_id,0.0));var is_record:bool=not deferred_tovar and p.diameter_cm>old
 	var first_discovery:=not deferred_tovar and not bool(discovered.get(str(p.data.species_id),false))
 	if not deferred_tovar:
-		discovered[p.data.species_id]=true
+		var harvested_species_id:=str(p.data.species_id);discovered[harvested_species_id]=true;_record_species_get(harvested_species_id)
 		if first_discovery:result_new_species_queue.append(str(p.data.species_id));encyclopedia_unlocked=true;_refresh_seed_pack_unlocks()
 	if is_record:bests[p.data.species_id]=p.diameter_cm
 	if is_record:_evaluate_best_spawn_unlocks()

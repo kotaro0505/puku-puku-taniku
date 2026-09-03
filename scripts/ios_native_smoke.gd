@@ -22,6 +22,8 @@ func _ready() -> void:
 	assert(game.habitat_panorama_mesh == null)
 	assert(game.audio_manager.web_audio_unlocked)
 	assert(game.audio_manager._stream_for("bgm", "greenhouse") is AudioStreamOggVorbis)
+	# Keep this scale check independent from saves written by earlier smoke tests.
+	game.bests.erase("colorata")
 	assert(is_equal_approx(game._habitat_best_visual_scale("colorata"), 1.0))
 	game.bests["colorata"] = 100.0
 	assert(is_equal_approx(game._habitat_best_visual_scale("colorata"), 3.25))

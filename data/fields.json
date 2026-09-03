@@ -1,0 +1,16 @@
+[
+  {"field_id":"base_field","display_name":"いつもの原生地","implemented":true,"field_type":"current_habitat","scene_path":"","background_image_path":"res://assets/highland-panorama.jpg"},
+  {"field_id":"metal_field","display_name":"金属多肉の原生地","implemented":false,"field_type":"series_field","scene_path":"","background_image_path":"res://assets/series_fields/metal.jpg"},
+  {"field_id":"jewel_field","display_name":"宝石多肉の原生地","implemented":false,"field_type":"series_field","scene_path":"","background_image_path":"res://assets/series_fields/jewel.jpg"},
+  {"field_id":"jelly_field","display_name":"ゼリー多肉の原生地","implemented":false,"field_type":"series_field","scene_path":"","background_image_path":"res://assets/series_fields/jelly.jpg"},
+  {"field_id":"sweets_field","display_name":"スイーツ多肉の原生地","implemented":false,"field_type":"series_field","scene_path":"","background_image_path":"res://assets/series_fields/sweets.jpg"},
+  {"field_id":"gummy_field","display_name":"グミ多肉の原生地","implemented":false,"field_type":"series_field","scene_path":"","background_image_path":"res://assets/series_fields/gummy.jpg"},
+  {"field_id":"stardust_field","display_name":"星屑多肉の原生地","implemented":false,"field_type":"series_field","scene_path":"","background_image_path":"res://assets/series_fields/stardust.jpg"},
+  {"field_id":"glow_field","display_name":"蓄光多肉の原生地","implemented":false,"field_type":"series_field","scene_path":"","background_image_path":"res://assets/series_fields/glow.jpg"},
+  {"field_id":"neon_field","display_name":"ネオン多肉の原生地","implemented":false,"field_type":"series_field","scene_path":"","background_image_path":"res://assets/series_fields/neon.jpg"},
+  {"field_id":"stone_field","display_name":"ストーン多肉の原生地","implemented":false,"field_type":"series_field","scene_path":"","background_image_path":"res://assets/series_fields/stone.jpg"},
+  {"field_id":"sea_field","display_name":"海の多肉の原生地","implemented":false,"field_type":"series_field","scene_path":"","background_image_path":"res://assets/series_fields/sea.jpg"},
+  {"field_id":"halloween_field","display_name":"ハロウィンおばけ多肉の原生地","implemented":false,"field_type":"series_field","scene_path":"","background_image_path":"res://assets/series_fields/halloween.jpg"},
+  {"field_id":"christmas_field","display_name":"クリスマス多肉の原生地","implemented":false,"field_type":"series_field","scene_path":"","background_image_path":"res://assets/series_fields/christmas.jpg"},
+  {"field_id":"yumekawa_field","display_name":"ゆめかわ多肉の原生地","implemented":false,"field_type":"series_field","scene_path":"","background_image_path":"res://assets/series_fields/yumekawa.jpg"}
+]
