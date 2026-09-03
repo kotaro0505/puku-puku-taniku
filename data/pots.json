@@ -2,7 +2,7 @@
   {
     "pot_id": "starter_terracotta",
     "display_name": "はじめての素焼き鉢",
-    "image_path": "res://assets/arrangement/pots/succulent_arrange_pot_starter_terracotta.png",
+    "image_path": "res://assets/arrangement/pots/starter-terracotta.png",
     "price": 0,
     "unlock_condition": {"type": "default", "display_text": "最初から使用できます"},
     "iap_product_id": "",
@@ -12,7 +12,7 @@
   {
     "pot_id": "cream_ceramic",
     "display_name": "クリーム陶器鉢",
-    "image_path": "res://assets/arrangement/pots/succulent_arrange_pot_cream_ceramic.png",
+    "image_path": "res://assets/arrangement/pots/cream-ceramic.png",
     "price": 900,
     "unlock_condition": {"type": "default", "display_text": "たねやで購入できます"},
     "iap_product_id": "",
@@ -22,7 +22,7 @@
   {
     "pot_id": "wooden_box",
     "display_name": "やさしい木箱",
-    "image_path": "res://assets/arrangement/pots/succulent_arrange_pot_wooden_box.png",
+    "image_path": "res://assets/arrangement/pots/wooden-box.png",
     "price": 1200,
     "unlock_condition": {"type": "default", "display_text": "たねやで購入できます"},
     "iap_product_id": "",

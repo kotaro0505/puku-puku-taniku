@@ -6,7 +6,7 @@ const SucculentClass = preload("res://scripts/succulent.gd")
 const AudioManagerClass = preload("res://scripts/audio_manager.gd")
 const JellyBalanceClass = preload("res://scripts/jelly_balance.gd")
 const ArrangementUIClass = preload("res://scripts/arrangement_ui.gd")
-const PROGRESSION_VERSION := 9
+const PROGRESSION_VERSION := 8
 const NORMAL_GERMINATION_COUNT := 24
 const VOLUME_GERMINATION_COUNT := 36
 const PREMIUM_GERMINATION_COUNT := 24
@@ -20,12 +20,6 @@ const SPAWN_SPRITE_MARGIN_SOURCE_PX := 40.0
 const GREENHOUSE_DRAG_SCALE := 0.30
 const GREENHOUSE_DRAG_DEAD_ZONE := 3.0
 const GREENHOUSE_PAN_FOLLOW_SECONDS := 0.075
-const GREENHOUSE_MAIN_EXTENDED_PATH := "res://assets/greenhouse_main_extended.png"
-const GREENHOUSE_MAIN_FALLBACK_PATH := "res://assets/greenhouse-main.jpg"
-const ARRANGEMENT_CAMERA_TRANSITION_SECONDS := 0.48
-const EXTENDED_GREENHOUSE_NORMAL_VIEW_RATIO := 0.70
-const EXTENDED_GREENHOUSE_ARRANGEMENT_VIEW_RATIO := 0.22
-const EXTENDED_GREENHOUSE_NORMAL_PAN_PIXELS := 54.0
 const HABITAT_DRAG_SCALE := 0.055
 const HABITAT_ITEM_RADIUS := 9.0
 const HABITAT_BEST_LINK_EVENT_CM := 30.0
@@ -100,16 +94,6 @@ var greenhouse_backdrop: TextureRect
 var greenhouse_pan_x := 0.0
 var greenhouse_pan_target_x := 0.0
 var greenhouse_pan_limit := 0.0
-var greenhouse_normal_pan_min := 0.0
-var greenhouse_normal_pan_max := 0.0
-var greenhouse_normal_view_x := 0.0
-var greenhouse_arrangement_view_x := 0.0
-var greenhouse_pan_before_arrangement := 0.0
-var greenhouse_view_initialized := false
-var greenhouse_extended_background_active := false
-var arrangement_mode_active := false
-var arrangement_transition_active := false
-var arrangement_camera_tween:Tween
 var greenhouse_world_pan_x := 0.0
 var habitat_env: WorldEnvironment
 var habitat_environment: Environment
@@ -137,7 +121,6 @@ var tutorial_steps: Dictionary = {}
 var mode_button: Button
 var shop_button: Button
 var arrangement_button: Button
-var greenhouse_status_controls:Array[Control]=[]
 var current_mode := "greenhouse"
 var labels_layer: Control
 var effects_layer: Control
@@ -594,10 +577,7 @@ func _evaluate_best_spawn_unlocks(apply_now:=true)->bool:
 
 func _build_world() -> void:
 	greenhouse_layer=CanvasLayer.new();greenhouse_layer.layer=-10;add_child(greenhouse_layer)
-	greenhouse_extended_background_active=ResourceLoader.exists(GREENHOUSE_MAIN_EXTENDED_PATH)
-	var greenhouse_background_path:=GREENHOUSE_MAIN_EXTENDED_PATH if greenhouse_extended_background_active else GREENHOUSE_MAIN_FALLBACK_PATH
-	greenhouse_backdrop=TextureRect.new();greenhouse_backdrop.texture=load(greenhouse_background_path);greenhouse_backdrop.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;greenhouse_backdrop.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT;greenhouse_backdrop.mouse_filter=Control.MOUSE_FILTER_IGNORE;greenhouse_layer.add_child(greenhouse_backdrop)
-	print("ARRANGEMENT_GREENHOUSE_BACKGROUND path=",greenhouse_background_path," extended=",greenhouse_extended_background_active)
+	greenhouse_backdrop=TextureRect.new();greenhouse_backdrop.texture=load("res://assets/greenhouse-main.jpg");greenhouse_backdrop.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;greenhouse_backdrop.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT;greenhouse_backdrop.mouse_filter=Control.MOUSE_FILTER_IGNORE;greenhouse_layer.add_child(greenhouse_backdrop)
 	world_root = Node3D.new(); add_child(world_root)
 	habitat_env=WorldEnvironment.new(); var env:=Environment.new()
 	_build_habitat_background(env)
@@ -669,7 +649,6 @@ func _build_ui() -> void:
 	var best_panel:=PanelContainer.new(); best_panel.position=Vector2(204,54); best_panel.size=Vector2(168,66); best_panel.add_theme_stylebox_override("panel",_box(Color("#47261b"),Color("#f5c985"),16,2)); hud.add_child(best_panel)
 	best_label=Label.new(); best_label.text="最高記録\n0.0 cm"; best_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; best_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; best_label.add_theme_font_size_override("font_size",17); best_label.add_theme_color_override("font_color",Color.WHITE); best_panel.add_child(best_label)
 	var coin_panel:=PanelContainer.new(); coin_panel.position=Vector2(398,54); coin_panel.size=Vector2(153,53); coin_panel.add_theme_stylebox_override("panel",_box(Color("#55301d"),Color("#f1d19c"),22,2)); hud.add_child(coin_panel)
-	greenhouse_status_controls=[logo,ribbon,best_panel,coin_panel]
 	coin_label=Label.new(); coin_label.text=" ¥%s" % _comma(coins); coin_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; coin_label.add_theme_font_size_override("font_size",20); coin_label.add_theme_color_override("font_color",Color("#ffd85b")); coin_panel.add_child(coin_label)
 	for entry in [{"x":398,"t":"図鑑"},{"x":483,"t":"設定"}]:
 		var b:=Button.new(); b.text=entry.t; b.position=Vector2(entry.x,116); b.size=Vector2(68,73); _skin_button(b,Color("#fff0cf"),17); hud.add_child(b)
@@ -784,35 +763,15 @@ func _sync_arrangement_ui()->void:
 	arrangement_ui.configure(catalog_species,series_catalog,pot_catalog,discovered,owned_pots,saved_arrangements,arrangement_save_capacity,coins,_species_texture)
 
 func _open_arrangements()->void:
-	if not _tutorial_fully_complete() or current_mode!="greenhouse" or arrangement_mode_active or arrangement_transition_active:return
-	play_modal_open=false;arrangement_mode_active=true;arrangement_transition_active=true;greenhouse_pan_before_arrangement=clampf(greenhouse_pan_x,greenhouse_normal_pan_min,greenhouse_normal_pan_max)
-	_sync_arrangement_ui();arrangement_ui.visible=false;_update_play_ui();_start_arrangement_camera_move(greenhouse_arrangement_view_x,_finish_arrangement_entry)
+	if not _tutorial_fully_complete():return
+	play_modal_open=false;_sync_arrangement_ui();arrangement_ui.open_home();_update_play_ui()
 
 func _open_pot_shop()->void:
 	if not _tutorial_fully_complete():return
 	_hide_shop_chatter(true);_sync_arrangement_ui();arrangement_ui.open_pot_shop()
 
-func _on_arrangement_close_requested(context:String)->void:
-	if context!="greenhouse":
-		_update_play_ui()
-		return
-	arrangement_transition_active=true
-	_start_arrangement_camera_move(clampf(greenhouse_pan_before_arrangement,greenhouse_normal_pan_min,greenhouse_normal_pan_max),_finish_arrangement_return)
-
-func _start_arrangement_camera_move(target_x:float,finished_callback:Callable)->void:
-	if arrangement_camera_tween and arrangement_camera_tween.is_valid():arrangement_camera_tween.kill()
-	arrangement_camera_tween=create_tween()
-	arrangement_camera_tween.tween_method(_set_arrangement_camera_pan,greenhouse_pan_x,target_x,ARRANGEMENT_CAMERA_TRANSITION_SECONDS).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
-	arrangement_camera_tween.tween_callback(finished_callback)
-
-func _set_arrangement_camera_pan(value:float)->void:
-	greenhouse_pan_x=clampf(value,-greenhouse_pan_limit,greenhouse_pan_limit);greenhouse_pan_target_x=greenhouse_pan_x;_update_greenhouse_pan()
-
-func _finish_arrangement_entry()->void:
-	arrangement_transition_active=false;greenhouse_pan_x=greenhouse_arrangement_view_x;greenhouse_pan_target_x=greenhouse_pan_x;_update_greenhouse_pan();arrangement_ui.open_home();_update_play_ui()
-
-func _finish_arrangement_return()->void:
-	arrangement_transition_active=false;arrangement_mode_active=false;greenhouse_pan_target_x=clampf(greenhouse_pan_x,greenhouse_normal_pan_min,greenhouse_normal_pan_max);_update_greenhouse_pan();_update_play_ui()
+func _on_arrangement_close_requested(_context:String)->void:
+	_update_play_ui()
 
 func _on_arrangement_save_requested(arrangement:Dictionary)->void:
 	var normalized:=_normalize_arrangement(arrangement)
@@ -859,7 +818,7 @@ func _normalize_arrangement(source:Dictionary)->Dictionary:
 			if not plant_value is Dictionary:continue
 			var species_id:=str(plant_value.get("species_id",""))
 			if _catalog_entry(species_id).is_empty() or not bool(discovered.get(species_id,false)):continue
-			plants_data.append({"species_id":species_id,"x":clampf(float(plant_value.get("x",268.0)),0.0,536.0),"y":clampf(float(plant_value.get("y",276.0)),0.0,552.0),"scale":clampf(float(plant_value.get("scale",1.0)),.45,1.8),"rotation":fposmod(float(plant_value.get("rotation",0.0)),360.0),"flipped":bool(plant_value.get("flipped",false)),"z_index":clampi(int(plant_value.get("z_index",plants_data.size())),-100,100)})
+			plants_data.append({"species_id":species_id,"x":clampf(float(plant_value.get("x",268.0)),0.0,536.0),"y":clampf(float(plant_value.get("y",276.0)),0.0,552.0),"scale":clampf(float(plant_value.get("scale",1.0)),.45,1.8),"rotation":fposmod(float(plant_value.get("rotation",0.0)),360.0),"z_index":clampi(int(plant_value.get("z_index",plants_data.size())),-100,100)})
 	var arrangement_id:=str(source.get("arrangement_id",""))
 	if arrangement_id.is_empty():arrangement_id="arrangement_%d_%d"%[Time.get_unix_time_from_system(),Time.get_ticks_msec()%100000]
 	var arrangement_name:=str(source.get("name","")).strip_edges()
@@ -1425,16 +1384,15 @@ func _clear_greenhouse_plants()->void:
 
 func _update_play_ui()->void:
 	if not play_overlay:return
-	for control in greenhouse_status_controls:control.visible=not arrangement_mode_active and not arrangement_transition_active
 	play_overlay.visible=current_mode=="greenhouse" and not play_active and play_modal_open
-	play_open_button.visible=current_mode=="greenhouse" and intro_story_complete and not play_active and not play_modal_open and not arrangement_mode_active and not arrangement_transition_active and (not result_overlay or not result_overlay.visible) and (not shop_overlay or not shop_overlay.visible) and (not encyclopedia_overlay or not encyclopedia_overlay.visible) and (not settings_overlay or not settings_overlay.visible) and (not arrangement_ui or not arrangement_ui.visible)
+	play_open_button.visible=current_mode=="greenhouse" and intro_story_complete and not play_active and not play_modal_open and (not result_overlay or not result_overlay.visible) and (not shop_overlay or not shop_overlay.visible) and (not encyclopedia_overlay or not encyclopedia_overlay.visible) and (not settings_overlay or not settings_overlay.visible) and (not arrangement_ui or not arrangement_ui.visible)
 	seed_bag_panel.visible=current_mode=="greenhouse" and play_active and not rain_bonus_active and active_seed_type!="old"
 	play_timer_label.visible=seed_bag_panel.visible
-	for control in external_navigation_controls:control.visible=not play_active and not arrangement_mode_active and not arrangement_transition_active
-	for control in encyclopedia_navigation_controls:control.visible=not play_active and not arrangement_mode_active and not arrangement_transition_active and encyclopedia_unlocked
-	if mode_button:mode_button.visible=not play_active and not arrangement_mode_active and not arrangement_transition_active and habitat_unlocked
-	if shop_button:shop_button.visible=not play_active and not arrangement_mode_active and not arrangement_transition_active and current_mode=="greenhouse" and _tutorial_fully_complete()
-	if arrangement_button:arrangement_button.visible=not play_active and not arrangement_mode_active and not arrangement_transition_active and current_mode=="greenhouse" and _tutorial_fully_complete()
+	for control in external_navigation_controls:control.visible=not play_active
+	for control in encyclopedia_navigation_controls:control.visible=not play_active and encyclopedia_unlocked
+	if mode_button:mode_button.visible=not play_active and habitat_unlocked
+	if shop_button:shop_button.visible=not play_active and current_mode=="greenhouse" and _tutorial_fully_complete()
+	if arrangement_button:arrangement_button.visible=not play_active and current_mode=="greenhouse" and _tutorial_fully_complete()
 	play_timer_label.text="● たね袋 ●\n残り %d粒"%play_seeds_remaining if play_timer_label.visible else ""
 	var held:Array[String]=[]
 	if old_seed_bags>0:held.append("古いたね %d袋"%old_seed_bags)
@@ -2102,24 +2060,8 @@ func _update_greenhouse_pan()->void:
 	var cover_scale:=maxf(viewport_size.x/texture_size.x,viewport_size.y/texture_size.y)
 	var display_size:=texture_size*cover_scale
 	greenhouse_pan_limit=maxf(0.0,(display_size.x-viewport_size.x)*.5)
-	if greenhouse_extended_background_active:
-		greenhouse_normal_view_x=clampf(display_size.x*(.5-EXTENDED_GREENHOUSE_NORMAL_VIEW_RATIO),-greenhouse_pan_limit,greenhouse_pan_limit)
-		greenhouse_arrangement_view_x=clampf(display_size.x*(.5-EXTENDED_GREENHOUSE_ARRANGEMENT_VIEW_RATIO),-greenhouse_pan_limit,greenhouse_pan_limit)
-	else:
-		greenhouse_normal_view_x=0.0
-		# Until the extended master artwork arrives, use the existing image's
-		# leftmost safe view and draw the workbench as a foreground placeholder.
-		greenhouse_arrangement_view_x=greenhouse_pan_limit
-	greenhouse_normal_pan_min=maxf(-greenhouse_pan_limit,greenhouse_normal_view_x-EXTENDED_GREENHOUSE_NORMAL_PAN_PIXELS)
-	greenhouse_normal_pan_max=minf(greenhouse_pan_limit,greenhouse_normal_view_x+EXTENDED_GREENHOUSE_NORMAL_PAN_PIXELS)
-	if not greenhouse_view_initialized:
-		greenhouse_view_initialized=true;greenhouse_pan_x=greenhouse_normal_view_x;greenhouse_pan_target_x=greenhouse_normal_view_x;greenhouse_pan_before_arrangement=greenhouse_normal_view_x
-	if arrangement_mode_active or arrangement_transition_active:
-		greenhouse_pan_x=clampf(greenhouse_pan_x,-greenhouse_pan_limit,greenhouse_pan_limit)
-		greenhouse_pan_target_x=clampf(greenhouse_pan_target_x,-greenhouse_pan_limit,greenhouse_pan_limit)
-	else:
-		greenhouse_pan_x=clampf(greenhouse_pan_x,greenhouse_normal_pan_min,greenhouse_normal_pan_max)
-		greenhouse_pan_target_x=clampf(greenhouse_pan_target_x,greenhouse_normal_pan_min,greenhouse_normal_pan_max)
+	greenhouse_pan_x=clampf(greenhouse_pan_x,-greenhouse_pan_limit,greenhouse_pan_limit)
+	greenhouse_pan_target_x=clampf(greenhouse_pan_target_x,-greenhouse_pan_limit,greenhouse_pan_limit)
 	greenhouse_backdrop.size=display_size
 	greenhouse_backdrop.position=Vector2((viewport_size.x-display_size.x)*.5+greenhouse_pan_x,(viewport_size.y-display_size.y)*.5)
 	if play_open_button:play_open_button.position=Vector2(198.0+greenhouse_pan_x,499.0)
@@ -2391,7 +2333,7 @@ func _process(delta:float)->void:
 	_update_labels()
 
 func _update_greenhouse_pan_follow(delta:float)->void:
-	if current_mode!="greenhouse" or arrangement_transition_active or arrangement_mode_active or is_equal_approx(greenhouse_pan_x,greenhouse_pan_target_x):return
+	if current_mode!="greenhouse" or is_equal_approx(greenhouse_pan_x,greenhouse_pan_target_x):return
 	var follow:=1.0-exp(-delta/GREENHOUSE_PAN_FOLLOW_SECONDS)
 	greenhouse_pan_x=lerpf(greenhouse_pan_x,greenhouse_pan_target_x,follow)
 	if absf(greenhouse_pan_target_x-greenhouse_pan_x)<0.05:greenhouse_pan_x=greenhouse_pan_target_x
@@ -2406,7 +2348,7 @@ func _update_habitat_view_follow(delta:float)->void:
 	_apply_view_rotation()
 
 func _toggle_mode()->void:
-	if rain_bonus_active or arrangement_mode_active or arrangement_transition_active:return
+	if rain_bonus_active:return
 	if current_mode=="greenhouse" and not habitat_unlocked:return
 	var leaving_habitat:=current_mode=="habitat"
 	current_mode="habitat" if current_mode=="greenhouse" else "greenhouse"
@@ -2500,7 +2442,6 @@ func _update_labels()->void:
 
 func _input(event:InputEvent)->void:
 	if audio_manager and (event is InputEventScreenTouch or event is InputEventMouseButton or event is InputEventKey):audio_manager.notify_user_gesture()
-	if arrangement_mode_active or arrangement_transition_active:return
 	if (tutorial_guide_overlay and tutorial_guide_overlay.visible) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible):return
 	if current_mode=="greenhouse" and not play_active:return
 	if event is InputEventScreenTouch:
@@ -2531,9 +2472,9 @@ func _drag_pointer(screen_pos:Vector2,relative:Vector2)->void:
 			if absf(greenhouse_drag_accumulator)<=GREENHOUSE_DRAG_DEAD_ZONE:return
 			greenhouse_drag_started=true
 			var excess:=greenhouse_drag_accumulator-signf(greenhouse_drag_accumulator)*GREENHOUSE_DRAG_DEAD_ZONE
-			greenhouse_pan_target_x=clampf(greenhouse_pan_target_x+excess*GREENHOUSE_DRAG_SCALE,greenhouse_normal_pan_min,greenhouse_normal_pan_max)
+			greenhouse_pan_target_x=clampf(greenhouse_pan_target_x+excess*GREENHOUSE_DRAG_SCALE,-greenhouse_pan_limit,greenhouse_pan_limit)
 		else:
-			greenhouse_pan_target_x=clampf(greenhouse_pan_target_x+relative.x*GREENHOUSE_DRAG_SCALE,greenhouse_normal_pan_min,greenhouse_normal_pan_max)
+			greenhouse_pan_target_x=clampf(greenhouse_pan_target_x+relative.x*GREENHOUSE_DRAG_SCALE,-greenhouse_pan_limit,greenhouse_pan_limit)
 		return
 	if current_mode!="habitat":return
 	if not greenhouse_drag_started:
