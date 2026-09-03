@@ -1,0 +1,32 @@
+[
+  {
+    "pot_id": "starter_terracotta",
+    "display_name": "はじめての素焼き鉢",
+    "image_path": "res://assets/arrangement/pots/starter-terracotta.png",
+    "price": 0,
+    "unlock_condition": {"type": "default", "display_text": "最初から使用できます"},
+    "iap_product_id": "",
+    "placement_area": {"x": 0.08, "y": 0.12, "width": 0.84, "height": 0.60},
+    "sort_order": 0
+  },
+  {
+    "pot_id": "cream_ceramic",
+    "display_name": "クリーム陶器鉢",
+    "image_path": "res://assets/arrangement/pots/cream-ceramic.png",
+    "price": 900,
+    "unlock_condition": {"type": "default", "display_text": "たねやで購入できます"},
+    "iap_product_id": "",
+    "placement_area": {"x": 0.10, "y": 0.13, "width": 0.80, "height": 0.58},
+    "sort_order": 10
+  },
+  {
+    "pot_id": "wooden_box",
+    "display_name": "やさしい木箱",
+    "image_path": "res://assets/arrangement/pots/wooden-box.png",
+    "price": 1200,
+    "unlock_condition": {"type": "default", "display_text": "たねやで購入できます"},
+    "iap_product_id": "",
+    "placement_area": {"x": 0.06, "y": 0.16, "width": 0.88, "height": 0.54},
+    "sort_order": 20
+  }
+]
