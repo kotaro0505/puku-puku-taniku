@@ -18,9 +18,14 @@ func _ready()->void:
 		var future_entry:Dictionary=game._series_entry(str(future_id));assert(not game._is_series_unlocked(future_entry) and future_entry.species_ids.is_empty())
 		var future_field:Dictionary=game._field_entry(str(future_entry.field_id));assert(not bool(future_field.get("implemented",true)))
 	game._open_encyclopedia();assert(game.encyclopedia_series_page.visible and not game.encyclopedia_list_page.visible and game.series_title_label.text=="基本図鑑" and game.series_cover_placeholder.visible)
+	assert(game.series_side_covers.size()==2)
+	var previous_cover:Dictionary=game.series_side_covers[0];var next_cover:Dictionary=game.series_side_covers[1]
+	assert(previous_cover.panel.visible and previous_cover.panel.position.x<0.0 and previous_cover.panel.position.x+previous_cover.panel.size.x>0.0 and str(previous_cover.panel.get_meta("series_id"))=="yumekawa")
+	assert(next_cover.panel.visible and next_cover.panel.position.x<576.0 and next_cover.panel.position.x+next_cover.panel.size.x>576.0 and str(next_cover.panel.get_meta("series_id"))=="metal")
 	var counts_before:Dictionary=game.species_get_counts.duplicate(true);game._refresh_series_selection();game._refresh_series_selection();assert(game.species_get_counts==counts_before)
 	var swipe_start:=InputEventScreenTouch.new();swipe_start.pressed=true;swipe_start.position=Vector2(350,200);game._on_series_swipe_input(swipe_start);var swipe_end:=InputEventScreenTouch.new();swipe_end.pressed=false;swipe_end.position=Vector2(100,200);game._on_series_swipe_input(swipe_end)
 	assert(game._current_series_entry().series_id=="metal" and game.series_open_button.disabled and game.series_lock_label.visible and "今後追加予定" in game.series_open_button.text)
+	assert(str(previous_cover.panel.get_meta("series_id"))=="base" and str(next_cover.panel.get_meta("series_id"))=="jewel")
 	game._open_selected_series_encyclopedia();assert(game.encyclopedia_series_page.visible and not game.encyclopedia_list_page.visible)
 	game._change_series_selection(-1);assert(game._current_series_entry().series_id=="base")
 	for repeat in range(2):

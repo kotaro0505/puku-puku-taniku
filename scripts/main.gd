@@ -146,6 +146,7 @@ var series_description_label: Label
 var series_cover_image: TextureRect
 var series_cover_placeholder: Label
 var series_lock_label: Label
+var series_side_covers: Array[Dictionary] = []
 var series_progress_label: Label
 var series_get_label: Label
 var all_series_get_label: Label
@@ -1674,19 +1675,31 @@ func _build_series_selection_page()->void:
 	all_series_get_label=Label.new();all_series_get_label.position=Vector2(28,82);all_series_get_label.size=Vector2(520,35);all_series_get_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;all_series_get_label.add_theme_font_size_override("font_size",18);all_series_get_label.add_theme_color_override("font_color",Color("#f3cf8a"));encyclopedia_series_page.add_child(all_series_get_label)
 	series_title_label=Label.new();series_title_label.position=Vector2(88,123);series_title_label.size=Vector2(400,50);series_title_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;series_title_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;series_title_label.add_theme_font_size_override("font_size",29);series_title_label.add_theme_color_override("font_color",UI_CREAM);encyclopedia_series_page.add_child(series_title_label)
 	series_subtitle_label=Label.new();series_subtitle_label.position=Vector2(40,171);series_subtitle_label.size=Vector2(496,31);series_subtitle_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;series_subtitle_label.add_theme_font_size_override("font_size",16);series_subtitle_label.add_theme_color_override("font_color",Color("#e9cda3"));encyclopedia_series_page.add_child(series_subtitle_label)
-	series_previous_button=Button.new();series_previous_button.text="＜";series_previous_button.position=Vector2(16,382);series_previous_button.size=Vector2(58,64);_skin_button(series_previous_button,Color("#f3dfb9"),25);series_previous_button.pressed.connect(_change_series_selection.bind(-1));encyclopedia_series_page.add_child(series_previous_button)
-	series_next_button=Button.new();series_next_button.text="＞";series_next_button.position=Vector2(502,382);series_next_button.size=Vector2(58,64);_skin_button(series_next_button,Color("#f3dfb9"),25);series_next_button.pressed.connect(_change_series_selection.bind(1));encyclopedia_series_page.add_child(series_next_button)
-	var cover_panel:=PanelContainer.new();cover_panel.name="SeriesCoverFrame";cover_panel.position=Vector2(82,211);cover_panel.size=Vector2(412,420);cover_panel.add_theme_stylebox_override("panel",_box(Color("#ead9b5"),Color("#c38c4b"),28,4));cover_panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;encyclopedia_series_page.add_child(cover_panel)
-	var cover_content:=Control.new();cover_content.custom_minimum_size=Vector2(384,392);cover_content.mouse_filter=Control.MOUSE_FILTER_IGNORE;cover_panel.add_child(cover_content)
+	series_side_covers.clear()
+	series_side_covers.append(_build_series_side_cover(encyclopedia_series_page,Vector2(-212,246),-1))
+	series_side_covers.append(_build_series_side_cover(encyclopedia_series_page,Vector2(488,246),1))
+	var cover_panel:=PanelContainer.new();cover_panel.name="SeriesCoverFrame";cover_panel.position=Vector2(98,211);cover_panel.size=Vector2(380,420);cover_panel.add_theme_stylebox_override("panel",_box(Color("#ead9b5"),Color("#c38c4b"),28,4));cover_panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;encyclopedia_series_page.add_child(cover_panel)
+	var cover_content:=Control.new();cover_content.custom_minimum_size=Vector2(352,392);cover_content.mouse_filter=Control.MOUSE_FILTER_IGNORE;cover_panel.add_child(cover_content)
 	series_cover_image=TextureRect.new();series_cover_image.name="SeriesCoverImage";series_cover_image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);series_cover_image.offset_left=12;series_cover_image.offset_top=12;series_cover_image.offset_right=-12;series_cover_image.offset_bottom=-12;series_cover_image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;series_cover_image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;series_cover_image.mouse_filter=Control.MOUSE_FILTER_IGNORE;cover_content.add_child(series_cover_image)
 	series_cover_placeholder=Label.new();series_cover_placeholder.text="表紙画像\n準備中";series_cover_placeholder.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);series_cover_placeholder.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;series_cover_placeholder.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;series_cover_placeholder.add_theme_font_size_override("font_size",25);series_cover_placeholder.add_theme_color_override("font_color",Color("#815d43"));series_cover_placeholder.mouse_filter=Control.MOUSE_FILTER_IGNORE;cover_content.add_child(series_cover_placeholder)
 	series_lock_label=Label.new();series_lock_label.position=Vector2(62,112);series_lock_label.size=Vector2(260,168);series_lock_label.text="🔒\n未開放";series_lock_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;series_lock_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;series_lock_label.add_theme_font_size_override("font_size",24);series_lock_label.add_theme_color_override("font_color",UI_CREAM);series_lock_label.add_theme_color_override("font_outline_color",UI_BROWN);series_lock_label.add_theme_constant_override("outline_size",7);series_lock_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;cover_content.add_child(series_lock_label)
-	var swipe_area:=Control.new();swipe_area.name="SeriesSwipeArea";swipe_area.position=Vector2(82,211);swipe_area.size=Vector2(412,420);swipe_area.mouse_filter=Control.MOUSE_FILTER_STOP;swipe_area.gui_input.connect(_on_series_swipe_input);encyclopedia_series_page.add_child(swipe_area)
+	var swipe_area:=Control.new();swipe_area.name="SeriesSwipeArea";swipe_area.position=Vector2(0,211);swipe_area.size=Vector2(576,420);swipe_area.mouse_filter=Control.MOUSE_FILTER_STOP;swipe_area.gui_input.connect(_on_series_swipe_input);encyclopedia_series_page.add_child(swipe_area)
+	series_previous_button=Button.new();series_previous_button.text="＜";series_previous_button.position=Vector2(16,382);series_previous_button.size=Vector2(58,64);_skin_button(series_previous_button,Color("#f3dfb9"),25);series_previous_button.pressed.connect(_change_series_selection.bind(-1));encyclopedia_series_page.add_child(series_previous_button)
+	series_next_button=Button.new();series_next_button.text="＞";series_next_button.position=Vector2(502,382);series_next_button.size=Vector2(58,64);_skin_button(series_next_button,Color("#f3dfb9"),25);series_next_button.pressed.connect(_change_series_selection.bind(1));encyclopedia_series_page.add_child(series_next_button)
 	series_description_label=Label.new();series_description_label.position=Vector2(42,646);series_description_label.size=Vector2(492,61);series_description_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;series_description_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;series_description_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;series_description_label.add_theme_font_size_override("font_size",17);series_description_label.add_theme_color_override("font_color",UI_CREAM);encyclopedia_series_page.add_child(series_description_label)
 	series_progress_label=Label.new();series_progress_label.position=Vector2(48,714);series_progress_label.size=Vector2(480,34);series_progress_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;series_progress_label.add_theme_font_size_override("font_size",22);series_progress_label.add_theme_color_override("font_color",Color("#f4d27d"));encyclopedia_series_page.add_child(series_progress_label)
 	series_get_label=Label.new();series_get_label.position=Vector2(48,750);series_get_label.size=Vector2(480,31);series_get_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;series_get_label.add_theme_font_size_override("font_size",18);series_get_label.add_theme_color_override("font_color",UI_CREAM);encyclopedia_series_page.add_child(series_get_label)
 	series_open_button=Button.new();series_open_button.position=Vector2(126,801);series_open_button.size=Vector2(324,62);_skin_button(series_open_button,Color("#dca85e"),21);series_open_button.add_theme_stylebox_override("disabled",_box(Color("#6a4939"),Color("#876552"),20,3));series_open_button.add_theme_color_override("font_disabled_color",Color("#d8c4b3"));series_open_button.pressed.connect(_open_selected_series_encyclopedia);encyclopedia_series_page.add_child(series_open_button)
 	series_position_label=Label.new();series_position_label.position=Vector2(48,885);series_position_label.size=Vector2(480,32);series_position_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;series_position_label.add_theme_font_size_override("font_size",17);series_position_label.add_theme_color_override("font_color",Color("#dcbf91"));encyclopedia_series_page.add_child(series_position_label)
+
+func _build_series_side_cover(parent:Control,position:Vector2,direction:int)->Dictionary:
+	var panel:=PanelContainer.new();panel.name="PreviousSeriesCover" if direction<0 else "NextSeriesCover";panel.position=position;panel.size=Vector2(300,350);panel.modulate=Color(0.78,0.75,0.70,.88);panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;panel.add_theme_stylebox_override("panel",_box(Color("#d9c39f"),Color("#9b6b3c"),24,3));parent.add_child(panel)
+	var content:=Control.new();content.custom_minimum_size=Vector2(276,326);content.mouse_filter=Control.MOUSE_FILTER_IGNORE;panel.add_child(content)
+	var image:=TextureRect.new();image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.offset_left=9;image.offset_top=9;image.offset_right=-9;image.offset_bottom=-9;image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.add_child(image)
+	var placeholder:=Label.new();placeholder.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);placeholder.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;placeholder.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;placeholder.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;placeholder.add_theme_font_size_override("font_size",18);placeholder.add_theme_color_override("font_color",Color("#674731"));placeholder.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.add_child(placeholder)
+	var name_label:=Label.new();name_label.position=Vector2(18,262);name_label.size=Vector2(240,50);name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;name_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;name_label.add_theme_font_size_override("font_size",17);name_label.add_theme_color_override("font_color",UI_CREAM);name_label.add_theme_color_override("font_outline_color",UI_BROWN);name_label.add_theme_constant_override("outline_size",5);name_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.add_child(name_label)
+	var lock_label:=Label.new();lock_label.text="🔒";lock_label.position=Vector2(103,112);lock_label.size=Vector2(70,70);lock_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;lock_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;lock_label.add_theme_font_size_override("font_size",30);lock_label.add_theme_color_override("font_color",UI_CREAM);lock_label.add_theme_color_override("font_outline_color",UI_BROWN);lock_label.add_theme_constant_override("outline_size",6);lock_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.add_child(lock_label)
+	return {"direction":direction,"panel":panel,"image":image,"placeholder":placeholder,"name_label":name_label,"lock_label":lock_label}
 
 func _open_encyclopedia()->void:
 	if not encyclopedia_unlocked:return
@@ -1696,6 +1709,9 @@ func _close_encyclopedia()->void:
 	encyclopedia_overlay.visible=false
 	_release_encyclopedia_textures()
 	if series_cover_image:series_cover_image.texture=null
+	for side_cover in series_side_covers:
+		var side_image=side_cover.get("image")
+		if side_image is TextureRect:side_image.texture=null
 	for child in encyclopedia_detail_page.get_children():child.free()
 	_update_play_ui()
 
@@ -1765,8 +1781,23 @@ func _refresh_series_selection()->void:
 	series_position_label.text="%d / %d"%[selected_series_index+1,series_catalog.size()]
 	var cover_path:=str(entry.get("cover_image_path",""));series_cover_image.texture=load(cover_path) as Texture2D if not cover_path.is_empty() and ResourceLoader.exists(cover_path) else null
 	series_cover_placeholder.visible=series_cover_image.texture==null and unlocked;series_lock_label.visible=not unlocked;series_lock_label.text="🔒\n未開放\n表紙画像 準備中" if series_cover_image.texture==null else "🔒\n未開放"
+	_refresh_series_side_covers()
 	series_open_button.disabled=not unlocked;series_open_button.text="図鑑をひらく" if unlocked else "🔒  未開放　%s"%_series_unlock_text(entry)
 	series_previous_button.disabled=series_catalog.size()<2;series_next_button.disabled=series_catalog.size()<2
+
+func _refresh_series_side_covers()->void:
+	for side_cover in series_side_covers:
+		var direction:=int(side_cover.get("direction",0));var panel=side_cover.get("panel");var image=side_cover.get("image");var placeholder=side_cover.get("placeholder");var name_label=side_cover.get("name_label");var lock_label=side_cover.get("lock_label")
+		if series_catalog.size()<2:
+			if panel is Control:panel.visible=false
+			continue
+		if panel is Control:panel.visible=true
+		var side_index:=wrapi(selected_series_index+direction,0,series_catalog.size());var side_entry:Dictionary=series_catalog[side_index];var side_unlocked:=_is_series_unlocked(side_entry);var side_path:=str(side_entry.get("cover_image_path",""));var side_texture:=load(side_path) as Texture2D if not side_path.is_empty() and ResourceLoader.exists(side_path) else null
+		if image is TextureRect:image.texture=side_texture
+		if placeholder is Label:placeholder.visible=side_texture==null;placeholder.text="表紙画像\n準備中"
+		if name_label is Label:name_label.text=str(side_entry.get("display_name","シリーズ図鑑"))
+		if lock_label is Label:lock_label.visible=not side_unlocked
+		if panel is Control:panel.set_meta("series_index",side_index);panel.set_meta("series_id",str(side_entry.get("series_id","")))
 
 func _change_series_selection(direction:int)->void:
 	if series_catalog.size()<2:return
