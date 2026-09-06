@@ -78,6 +78,11 @@ const TUTORIAL_FINGER_SIZE := Vector2(58,64)
 const TUTORIAL_FINGER_TIP_LOCAL := Vector2(27,5)
 const TUTORIAL_FINGER_PRESS_RATIO := Vector2(.58,.30)
 const TUTORIAL_FINGER_RELEASE_OFFSET := Vector2(-3,-7)
+const SERIES_CAROUSEL_TRACK_ORIGIN := Vector2(48,123)
+const SERIES_CAROUSEL_CARD_SIZE := Vector2(480,740)
+const SERIES_CAROUSEL_SPACING := 420.0
+const SERIES_CAROUSEL_SWIPE_THRESHOLD := 78.0
+const SERIES_CAROUSEL_SLIDE_SECONDS := 0.28
 
 var rng := RandomNumberGenerator.new()
 var species: Array = []
@@ -146,7 +151,11 @@ var series_description_label: Label
 var series_cover_image: TextureRect
 var series_cover_placeholder: Label
 var series_lock_label: Label
-var series_side_covers: Array[Dictionary] = []
+var series_carousel_track: Control
+var series_carousel_cards: Array[Dictionary] = []
+var series_carousel_offset := 0.0
+var series_carousel_animating := false
+var series_carousel_tween: Tween
 var series_progress_label: Label
 var series_get_label: Label
 var all_series_get_label: Label
@@ -1673,45 +1682,43 @@ func _build_series_selection_page()->void:
 	var title:=Label.new();title.text="ぷくぷく図鑑";title.position=Vector2(28,25);title.size=Vector2(390,55);title.add_theme_font_size_override("font_size",31);title.add_theme_color_override("font_color",UI_CREAM);encyclopedia_series_page.add_child(title)
 	var close:=Button.new();close.text="もどる";close.position=Vector2(447,27);close.size=Vector2(105,55);_skin_button(close,Color("#fff0cf"),17);close.pressed.connect(_close_encyclopedia);encyclopedia_series_page.add_child(close)
 	all_series_get_label=Label.new();all_series_get_label.position=Vector2(28,82);all_series_get_label.size=Vector2(520,35);all_series_get_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;all_series_get_label.add_theme_font_size_override("font_size",18);all_series_get_label.add_theme_color_override("font_color",Color("#f3cf8a"));encyclopedia_series_page.add_child(all_series_get_label)
-	series_title_label=Label.new();series_title_label.position=Vector2(88,123);series_title_label.size=Vector2(400,50);series_title_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;series_title_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;series_title_label.add_theme_font_size_override("font_size",29);series_title_label.add_theme_color_override("font_color",UI_CREAM);encyclopedia_series_page.add_child(series_title_label)
-	series_subtitle_label=Label.new();series_subtitle_label.position=Vector2(40,171);series_subtitle_label.size=Vector2(496,31);series_subtitle_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;series_subtitle_label.add_theme_font_size_override("font_size",16);series_subtitle_label.add_theme_color_override("font_color",Color("#e9cda3"));encyclopedia_series_page.add_child(series_subtitle_label)
-	series_side_covers.clear()
-	series_side_covers.append(_build_series_side_cover(encyclopedia_series_page,Vector2(-212,246),-1))
-	series_side_covers.append(_build_series_side_cover(encyclopedia_series_page,Vector2(488,246),1))
-	var cover_panel:=PanelContainer.new();cover_panel.name="SeriesCoverFrame";cover_panel.position=Vector2(98,211);cover_panel.size=Vector2(380,420);cover_panel.add_theme_stylebox_override("panel",_box(Color("#ead9b5"),Color("#c38c4b"),28,4));cover_panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;encyclopedia_series_page.add_child(cover_panel)
-	var cover_content:=Control.new();cover_content.custom_minimum_size=Vector2(352,392);cover_content.mouse_filter=Control.MOUSE_FILTER_IGNORE;cover_panel.add_child(cover_content)
-	series_cover_image=TextureRect.new();series_cover_image.name="SeriesCoverImage";series_cover_image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);series_cover_image.offset_left=12;series_cover_image.offset_top=12;series_cover_image.offset_right=-12;series_cover_image.offset_bottom=-12;series_cover_image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;series_cover_image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;series_cover_image.mouse_filter=Control.MOUSE_FILTER_IGNORE;cover_content.add_child(series_cover_image)
-	series_cover_placeholder=Label.new();series_cover_placeholder.text="表紙画像\n準備中";series_cover_placeholder.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);series_cover_placeholder.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;series_cover_placeholder.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;series_cover_placeholder.add_theme_font_size_override("font_size",25);series_cover_placeholder.add_theme_color_override("font_color",Color("#815d43"));series_cover_placeholder.mouse_filter=Control.MOUSE_FILTER_IGNORE;cover_content.add_child(series_cover_placeholder)
-	series_lock_label=Label.new();series_lock_label.position=Vector2(62,112);series_lock_label.size=Vector2(260,168);series_lock_label.text="🔒\n未開放";series_lock_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;series_lock_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;series_lock_label.add_theme_font_size_override("font_size",24);series_lock_label.add_theme_color_override("font_color",UI_CREAM);series_lock_label.add_theme_color_override("font_outline_color",UI_BROWN);series_lock_label.add_theme_constant_override("outline_size",7);series_lock_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;cover_content.add_child(series_lock_label)
-	var swipe_area:=Control.new();swipe_area.name="SeriesSwipeArea";swipe_area.position=Vector2(0,211);swipe_area.size=Vector2(576,420);swipe_area.mouse_filter=Control.MOUSE_FILTER_STOP;swipe_area.gui_input.connect(_on_series_swipe_input);encyclopedia_series_page.add_child(swipe_area)
+	series_carousel_track=Control.new();series_carousel_track.name="SeriesCarouselTrack";series_carousel_track.position=SERIES_CAROUSEL_TRACK_ORIGIN;series_carousel_track.size=SERIES_CAROUSEL_CARD_SIZE;series_carousel_track.mouse_filter=Control.MOUSE_FILTER_IGNORE;encyclopedia_series_page.add_child(series_carousel_track)
+	series_carousel_cards.clear()
+	for relative_index in [-1,0,1]:series_carousel_cards.append(_build_series_card(series_carousel_track,relative_index))
+	var center_card:Dictionary=series_carousel_cards[1]
+	series_title_label=center_card.title;series_subtitle_label=center_card.subtitle;series_description_label=center_card.description;series_cover_image=center_card.cover_image;series_cover_placeholder=center_card.cover_placeholder;series_lock_label=center_card.lock_label;series_progress_label=center_card.progress;series_get_label=center_card.get_label;series_open_button=center_card.open_button
+	var swipe_area:=Control.new();swipe_area.name="SeriesSwipeArea";swipe_area.position=Vector2(0,123);swipe_area.size=Vector2(576,650);swipe_area.mouse_filter=Control.MOUSE_FILTER_STOP;swipe_area.gui_input.connect(_on_series_swipe_input);encyclopedia_series_page.add_child(swipe_area)
 	series_previous_button=Button.new();series_previous_button.text="＜";series_previous_button.position=Vector2(16,382);series_previous_button.size=Vector2(58,64);_skin_button(series_previous_button,Color("#f3dfb9"),25);series_previous_button.pressed.connect(_change_series_selection.bind(-1));encyclopedia_series_page.add_child(series_previous_button)
 	series_next_button=Button.new();series_next_button.text="＞";series_next_button.position=Vector2(502,382);series_next_button.size=Vector2(58,64);_skin_button(series_next_button,Color("#f3dfb9"),25);series_next_button.pressed.connect(_change_series_selection.bind(1));encyclopedia_series_page.add_child(series_next_button)
-	series_description_label=Label.new();series_description_label.position=Vector2(42,646);series_description_label.size=Vector2(492,61);series_description_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;series_description_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;series_description_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;series_description_label.add_theme_font_size_override("font_size",17);series_description_label.add_theme_color_override("font_color",UI_CREAM);encyclopedia_series_page.add_child(series_description_label)
-	series_progress_label=Label.new();series_progress_label.position=Vector2(48,714);series_progress_label.size=Vector2(480,34);series_progress_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;series_progress_label.add_theme_font_size_override("font_size",22);series_progress_label.add_theme_color_override("font_color",Color("#f4d27d"));encyclopedia_series_page.add_child(series_progress_label)
-	series_get_label=Label.new();series_get_label.position=Vector2(48,750);series_get_label.size=Vector2(480,31);series_get_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;series_get_label.add_theme_font_size_override("font_size",18);series_get_label.add_theme_color_override("font_color",UI_CREAM);encyclopedia_series_page.add_child(series_get_label)
-	series_open_button=Button.new();series_open_button.position=Vector2(126,801);series_open_button.size=Vector2(324,62);_skin_button(series_open_button,Color("#dca85e"),21);series_open_button.add_theme_stylebox_override("disabled",_box(Color("#6a4939"),Color("#876552"),20,3));series_open_button.add_theme_color_override("font_disabled_color",Color("#d8c4b3"));series_open_button.pressed.connect(_open_selected_series_encyclopedia);encyclopedia_series_page.add_child(series_open_button)
 	series_position_label=Label.new();series_position_label.position=Vector2(48,885);series_position_label.size=Vector2(480,32);series_position_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;series_position_label.add_theme_font_size_override("font_size",17);series_position_label.add_theme_color_override("font_color",Color("#dcbf91"));encyclopedia_series_page.add_child(series_position_label)
 
-func _build_series_side_cover(parent:Control,position:Vector2,direction:int)->Dictionary:
-	var panel:=PanelContainer.new();panel.name="PreviousSeriesCover" if direction<0 else "NextSeriesCover";panel.position=position;panel.size=Vector2(300,350);panel.modulate=Color(0.78,0.75,0.70,.88);panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;panel.add_theme_stylebox_override("panel",_box(Color("#d9c39f"),Color("#9b6b3c"),24,3));parent.add_child(panel)
-	var content:=Control.new();content.custom_minimum_size=Vector2(276,326);content.mouse_filter=Control.MOUSE_FILTER_IGNORE;panel.add_child(content)
-	var image:=TextureRect.new();image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.offset_left=9;image.offset_top=9;image.offset_right=-9;image.offset_bottom=-9;image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.add_child(image)
-	var placeholder:=Label.new();placeholder.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);placeholder.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;placeholder.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;placeholder.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;placeholder.add_theme_font_size_override("font_size",18);placeholder.add_theme_color_override("font_color",Color("#674731"));placeholder.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.add_child(placeholder)
-	var name_label:=Label.new();name_label.position=Vector2(18,262);name_label.size=Vector2(240,50);name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;name_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;name_label.add_theme_font_size_override("font_size",17);name_label.add_theme_color_override("font_color",UI_CREAM);name_label.add_theme_color_override("font_outline_color",UI_BROWN);name_label.add_theme_constant_override("outline_size",5);name_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.add_child(name_label)
-	var lock_label:=Label.new();lock_label.text="🔒";lock_label.position=Vector2(103,112);lock_label.size=Vector2(70,70);lock_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;lock_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;lock_label.add_theme_font_size_override("font_size",30);lock_label.add_theme_color_override("font_color",UI_CREAM);lock_label.add_theme_color_override("font_outline_color",UI_BROWN);lock_label.add_theme_constant_override("outline_size",6);lock_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.add_child(lock_label)
-	return {"direction":direction,"panel":panel,"image":image,"placeholder":placeholder,"name_label":name_label,"lock_label":lock_label}
+func _build_series_card(parent:Control,relative_index:int)->Dictionary:
+	var card:=Control.new();card.name="SeriesCard%d"%relative_index;card.position=Vector2(relative_index*SERIES_CAROUSEL_SPACING,0);card.size=SERIES_CAROUSEL_CARD_SIZE;card.mouse_filter=Control.MOUSE_FILTER_IGNORE;parent.add_child(card)
+	var title:=Label.new();title.position=Vector2(40,0);title.size=Vector2(400,50);title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;title.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;title.add_theme_font_size_override("font_size",29);title.add_theme_color_override("font_color",UI_CREAM);title.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(title)
+	var subtitle:=Label.new();subtitle.position=Vector2(-8,48);subtitle.size=Vector2(496,31);subtitle.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;subtitle.add_theme_font_size_override("font_size",16);subtitle.add_theme_color_override("font_color",Color("#e9cda3"));subtitle.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(subtitle)
+	var cover_panel:=PanelContainer.new();cover_panel.name="SeriesCoverFrame";cover_panel.position=Vector2(50,88);cover_panel.size=Vector2(380,420);cover_panel.add_theme_stylebox_override("panel",_box(Color("#ead9b5"),Color("#c38c4b"),28,4));cover_panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(cover_panel)
+	var cover_content:=Control.new();cover_content.custom_minimum_size=Vector2(352,392);cover_content.mouse_filter=Control.MOUSE_FILTER_IGNORE;cover_panel.add_child(cover_content)
+	var cover_image:=TextureRect.new();cover_image.name="SeriesCoverImage";cover_image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);cover_image.offset_left=12;cover_image.offset_top=12;cover_image.offset_right=-12;cover_image.offset_bottom=-12;cover_image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;cover_image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;cover_image.mouse_filter=Control.MOUSE_FILTER_IGNORE;cover_content.add_child(cover_image)
+	var cover_placeholder:=Label.new();cover_placeholder.text="表紙画像\n準備中";cover_placeholder.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);cover_placeholder.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;cover_placeholder.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;cover_placeholder.add_theme_font_size_override("font_size",25);cover_placeholder.add_theme_color_override("font_color",Color("#815d43"));cover_placeholder.mouse_filter=Control.MOUSE_FILTER_IGNORE;cover_content.add_child(cover_placeholder)
+	var lock_label:=Label.new();lock_label.position=Vector2(62,112);lock_label.size=Vector2(260,168);lock_label.text="🔒\n未開放";lock_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;lock_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;lock_label.add_theme_font_size_override("font_size",24);lock_label.add_theme_color_override("font_color",UI_CREAM);lock_label.add_theme_color_override("font_outline_color",UI_BROWN);lock_label.add_theme_constant_override("outline_size",7);lock_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;cover_content.add_child(lock_label)
+	var description:=Label.new();description.position=Vector2(-6,523);description.size=Vector2(492,61);description.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;description.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;description.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;description.add_theme_font_size_override("font_size",17);description.add_theme_color_override("font_color",UI_CREAM);description.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(description)
+	var progress:=Label.new();progress.position=Vector2(0,591);progress.size=Vector2(480,34);progress.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;progress.add_theme_font_size_override("font_size",22);progress.add_theme_color_override("font_color",Color("#f4d27d"));progress.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(progress)
+	var get_label:=Label.new();get_label.position=Vector2(0,627);get_label.size=Vector2(480,31);get_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;get_label.add_theme_font_size_override("font_size",18);get_label.add_theme_color_override("font_color",UI_CREAM);get_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(get_label)
+	var open_button:=Button.new();open_button.position=Vector2(78,678);open_button.size=Vector2(324,62);_skin_button(open_button,Color("#dca85e"),21);open_button.add_theme_stylebox_override("disabled",_box(Color("#6a4939"),Color("#876552"),20,3));open_button.add_theme_color_override("font_disabled_color",Color("#d8c4b3"));open_button.mouse_filter=Control.MOUSE_FILTER_STOP if relative_index==0 else Control.MOUSE_FILTER_IGNORE;card.add_child(open_button)
+	if relative_index==0:open_button.pressed.connect(_open_selected_series_encyclopedia)
+	return {"relative_index":relative_index,"container":card,"title":title,"subtitle":subtitle,"cover_image":cover_image,"cover_placeholder":cover_placeholder,"lock_label":lock_label,"description":description,"progress":progress,"get_label":get_label,"open_button":open_button,"detail_nodes":[title,subtitle,description,progress,get_label,open_button]}
 
 func _open_encyclopedia()->void:
 	if not encyclopedia_unlocked:return
 	play_modal_open=false;encyclopedia_detail_page.visible=false;encyclopedia_list_page.visible=false;encyclopedia_series_page.visible=true;play_overlay.visible=false;encyclopedia_overlay.visible=true;_refresh_series_selection();_update_play_ui()
 
 func _close_encyclopedia()->void:
+	_cancel_series_carousel_motion()
 	encyclopedia_overlay.visible=false
 	_release_encyclopedia_textures()
-	if series_cover_image:series_cover_image.texture=null
-	for side_cover in series_side_covers:
-		var side_image=side_cover.get("image")
-		if side_image is TextureRect:side_image.texture=null
+	for card in series_carousel_cards:
+		var cover_image=card.get("cover_image")
+		if cover_image is TextureRect:cover_image.texture=null
 	for child in encyclopedia_detail_page.get_children():child.free()
 	_update_play_ui()
 
@@ -1775,49 +1782,90 @@ func _series_found_count(series_id:String)->int:
 func _refresh_series_selection()->void:
 	var entry:=_current_series_entry()
 	if entry.is_empty():return
-	var series_id:=str(entry.get("series_id",""));var entries:=_series_species_entries(series_id);var unlocked:=_is_series_unlocked(entry)
-	series_title_label.text=str(entry.get("display_name","シリーズ図鑑"));series_subtitle_label.text=str(entry.get("subtitle",""));series_description_label.text=str(entry.get("description",""))
-	series_progress_label.text="%d / %d種"%[_series_found_count(series_id),entries.size()];series_get_label.text="総GET %d"%_series_get_count(series_id);all_series_get_label.text="全シリーズ総GET %d"%_all_series_get_count()
+	_refresh_series_carousel_cards()
+	all_series_get_label.text="全シリーズ総GET %d"%_all_series_get_count()
 	series_position_label.text="%d / %d"%[selected_series_index+1,series_catalog.size()]
-	var cover_path:=str(entry.get("cover_image_path",""));series_cover_image.texture=load(cover_path) as Texture2D if not cover_path.is_empty() and ResourceLoader.exists(cover_path) else null
-	series_cover_placeholder.visible=series_cover_image.texture==null and unlocked;series_lock_label.visible=not unlocked;series_lock_label.text="🔒\n未開放\n表紙画像 準備中" if series_cover_image.texture==null else "🔒\n未開放"
-	_refresh_series_side_covers()
-	series_open_button.disabled=not unlocked;series_open_button.text="図鑑をひらく" if unlocked else "🔒  未開放　%s"%_series_unlock_text(entry)
 	series_previous_button.disabled=series_catalog.size()<2;series_next_button.disabled=series_catalog.size()<2
 
-func _refresh_series_side_covers()->void:
-	for side_cover in series_side_covers:
-		var direction:=int(side_cover.get("direction",0));var panel=side_cover.get("panel");var image=side_cover.get("image");var placeholder=side_cover.get("placeholder");var name_label=side_cover.get("name_label");var lock_label=side_cover.get("lock_label")
-		if series_catalog.size()<2:
-			if panel is Control:panel.visible=false
-			continue
-		if panel is Control:panel.visible=true
-		var side_index:=wrapi(selected_series_index+direction,0,series_catalog.size());var side_entry:Dictionary=series_catalog[side_index];var side_unlocked:=_is_series_unlocked(side_entry);var side_path:=str(side_entry.get("cover_image_path",""));var side_texture:=load(side_path) as Texture2D if not side_path.is_empty() and ResourceLoader.exists(side_path) else null
-		if image is TextureRect:image.texture=side_texture
-		if placeholder is Label:placeholder.visible=side_texture==null;placeholder.text="表紙画像\n準備中"
-		if name_label is Label:name_label.text=str(side_entry.get("display_name","シリーズ図鑑"))
-		if lock_label is Label:lock_label.visible=not side_unlocked
-		if panel is Control:panel.set_meta("series_index",side_index);panel.set_meta("series_id",str(side_entry.get("series_id","")))
+func _refresh_series_carousel_cards()->void:
+	if series_catalog.is_empty():return
+	for card in series_carousel_cards:
+		var relative_index:=int(card.get("relative_index",0));var series_index:=wrapi(selected_series_index+relative_index,0,series_catalog.size())
+		_populate_series_card(card,series_index)
+	_set_series_carousel_offset(series_carousel_offset)
+
+func _populate_series_card(card:Dictionary,series_index:int)->void:
+	var entry:Dictionary=series_catalog[series_index];var series_id:=str(entry.get("series_id",""));var entries:=_series_species_entries(series_id);var unlocked:=_is_series_unlocked(entry)
+	var container:Control=card.container;var cover_image:TextureRect=card.cover_image;var cover_path:=str(entry.get("cover_image_path",""))
+	card.title.text=str(entry.get("display_name","シリーズ図鑑"));card.subtitle.text=str(entry.get("subtitle",""));card.description.text=str(entry.get("description",""));card.progress.text="%d / %d種"%[_series_found_count(series_id),entries.size()];card.get_label.text="総GET %d"%_series_get_count(series_id)
+	cover_image.texture=load(cover_path) as Texture2D if not cover_path.is_empty() and ResourceLoader.exists(cover_path) else null
+	card.cover_placeholder.visible=cover_image.texture==null and unlocked;card.lock_label.visible=not unlocked;card.lock_label.text="🔒\n未開放\n表紙画像 準備中" if cover_image.texture==null else "🔒\n未開放"
+	card.open_button.disabled=not unlocked;card.open_button.text="図鑑をひらく" if unlocked else "🔒  未開放　%s"%_series_unlock_text(entry)
+	container.visible=series_catalog.size()>1 or int(card.relative_index)==0;container.set_meta("series_index",series_index);container.set_meta("series_id",series_id)
 
 func _change_series_selection(direction:int)->void:
-	if series_catalog.size()<2:return
-	selected_series_index=wrapi(selected_series_index+direction,0,series_catalog.size());_refresh_series_selection()
+	if series_catalog.size()<2 or direction==0 or series_carousel_animating:return
+	_animate_series_selection(signi(direction))
 
 func _on_series_swipe_input(event:InputEvent)->void:
 	if event is InputEventScreenTouch:
-		if event.pressed:series_swipe_start=event.position;series_swipe_tracking=true
+		if event.pressed and not series_carousel_animating:series_swipe_start=event.position;series_swipe_tracking=true
 		elif series_swipe_tracking:_finish_series_swipe(event.position)
+	elif event is InputEventScreenDrag and series_swipe_tracking:
+		_update_series_swipe(event.position)
 	elif event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT:
-		if event.pressed:series_swipe_start=event.position;series_swipe_tracking=true
+		if event.pressed and not series_carousel_animating:series_swipe_start=event.position;series_swipe_tracking=true
 		elif series_swipe_tracking:_finish_series_swipe(event.position)
+	elif event is InputEventMouseMotion and series_swipe_tracking and event.button_mask&MOUSE_BUTTON_MASK_LEFT:
+		_update_series_swipe(event.position)
+
+func _update_series_swipe(position:Vector2)->void:
+	var delta:=position-series_swipe_start
+	if absf(delta.y)>absf(delta.x)*1.25:return
+	_set_series_carousel_offset(clampf(delta.x,-SERIES_CAROUSEL_SPACING,SERIES_CAROUSEL_SPACING))
 
 func _finish_series_swipe(end_position:Vector2)->void:
-	series_swipe_tracking=false;var delta:=end_position-series_swipe_start
-	if absf(delta.x)>=48.0 and absf(delta.x)>absf(delta.y):_change_series_selection(1 if delta.x<0.0 else -1)
+	_update_series_swipe(end_position);series_swipe_tracking=false;var delta:=end_position-series_swipe_start
+	if absf(delta.x)>=SERIES_CAROUSEL_SWIPE_THRESHOLD and absf(delta.x)>absf(delta.y):_animate_series_selection(1 if delta.x<0.0 else -1)
+	else:_animate_series_snap_back()
+
+func _set_series_carousel_offset(value:float)->void:
+	series_carousel_offset=value
+	if not series_carousel_track:return
+	series_carousel_track.position=SERIES_CAROUSEL_TRACK_ORIGIN+Vector2(value,0)
+	var travel:=clampf(absf(value)/SERIES_CAROUSEL_SPACING,0.0,1.0);var incoming_relative:=1 if value<0.0 else -1
+	for card in series_carousel_cards:
+		var relative_index:=int(card.get("relative_index",0));var container:Control=card.container;var brightness:=1.0 if relative_index==0 else 0.72
+		if relative_index==incoming_relative:brightness=lerpf(0.72,1.0,travel)
+		elif relative_index==0:brightness=lerpf(1.0,0.72,travel)
+		container.modulate=Color(brightness,brightness,brightness,1.0)
+		var detail_alpha:=1.0 if relative_index==0 else 0.0
+		if relative_index==incoming_relative:detail_alpha=travel
+		elif relative_index==0:detail_alpha=1.0-travel
+		for detail_node in card.detail_nodes:detail_node.self_modulate.a=detail_alpha
+
+func _animate_series_selection(direction:int)->void:
+	if series_catalog.size()<2 or series_carousel_animating:return
+	series_swipe_tracking=false;series_carousel_animating=true
+	if series_carousel_tween and series_carousel_tween.is_valid():series_carousel_tween.kill()
+	series_carousel_tween=create_tween();series_carousel_tween.tween_method(_set_series_carousel_offset,series_carousel_offset,-direction*SERIES_CAROUSEL_SPACING,SERIES_CAROUSEL_SLIDE_SECONDS).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT);series_carousel_tween.tween_callback(_finish_series_transition.bind(direction))
+
+func _finish_series_transition(direction:int)->void:
+	selected_series_index=wrapi(selected_series_index+direction,0,series_catalog.size());_refresh_series_carousel_cards();_set_series_carousel_offset(0.0);series_position_label.text="%d / %d"%[selected_series_index+1,series_catalog.size()];series_carousel_animating=false
+
+func _animate_series_snap_back()->void:
+	if is_zero_approx(series_carousel_offset):_set_series_carousel_offset(0.0);return
+	series_carousel_animating=true
+	if series_carousel_tween and series_carousel_tween.is_valid():series_carousel_tween.kill()
+	series_carousel_tween=create_tween();series_carousel_tween.tween_method(_set_series_carousel_offset,series_carousel_offset,0.0,SERIES_CAROUSEL_SLIDE_SECONDS*.75).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT);series_carousel_tween.tween_callback(func():series_carousel_animating=false)
+
+func _cancel_series_carousel_motion()->void:
+	if series_carousel_tween and series_carousel_tween.is_valid():series_carousel_tween.kill()
+	series_carousel_animating=false;series_swipe_tracking=false;_set_series_carousel_offset(0.0)
 
 func _open_selected_series_encyclopedia()->void:
 	var entry:=_current_series_entry()
-	if entry.is_empty() or not _is_series_unlocked(entry):return
+	if series_carousel_animating or series_swipe_tracking or entry.is_empty() or not _is_series_unlocked(entry):return
 	current_encyclopedia_series_id=str(entry.get("series_id","base"));encyclopedia_series_page.visible=false;encyclopedia_detail_page.visible=false;encyclopedia_list_page.visible=true;_refresh_encyclopedia_header();_refresh_encyclopedia_cards()
 
 func _return_to_series_selection()->void:

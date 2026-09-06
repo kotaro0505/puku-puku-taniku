@@ -18,16 +18,25 @@ func _ready()->void:
 		var future_entry:Dictionary=game._series_entry(str(future_id));assert(not game._is_series_unlocked(future_entry) and future_entry.species_ids.is_empty())
 		var future_field:Dictionary=game._field_entry(str(future_entry.field_id));assert(not bool(future_field.get("implemented",true)))
 	game._open_encyclopedia();assert(game.encyclopedia_series_page.visible and not game.encyclopedia_list_page.visible and game.series_title_label.text=="基本図鑑" and game.series_cover_placeholder.visible)
-	assert(game.series_side_covers.size()==2)
-	var previous_cover:Dictionary=game.series_side_covers[0];var next_cover:Dictionary=game.series_side_covers[1]
-	assert(previous_cover.panel.visible and previous_cover.panel.position.x<0.0 and previous_cover.panel.position.x+previous_cover.panel.size.x>0.0 and str(previous_cover.panel.get_meta("series_id"))=="yumekawa")
-	assert(next_cover.panel.visible and next_cover.panel.position.x<576.0 and next_cover.panel.position.x+next_cover.panel.size.x>576.0 and str(next_cover.panel.get_meta("series_id"))=="metal")
+	assert(game.series_carousel_cards.size()==3)
+	var previous_card:Dictionary=game.series_carousel_cards[0];var current_card:Dictionary=game.series_carousel_cards[1];var next_card:Dictionary=game.series_carousel_cards[2]
+	assert(str(previous_card.container.get_meta("series_id"))=="yumekawa" and str(current_card.container.get_meta("series_id"))=="base" and str(next_card.container.get_meta("series_id"))=="metal")
+	assert(previous_card.container.position.x<0.0 and next_card.container.position.x>0.0)
+	for detail_node in current_card.detail_nodes:assert(detail_node.get_parent()==current_card.container)
 	var counts_before:Dictionary=game.species_get_counts.duplicate(true);game._refresh_series_selection();game._refresh_series_selection();assert(game.species_get_counts==counts_before)
-	var swipe_start:=InputEventScreenTouch.new();swipe_start.pressed=true;swipe_start.position=Vector2(350,200);game._on_series_swipe_input(swipe_start);var swipe_end:=InputEventScreenTouch.new();swipe_end.pressed=false;swipe_end.position=Vector2(100,200);game._on_series_swipe_input(swipe_end)
+	var swipe_start:=InputEventScreenTouch.new();swipe_start.pressed=true;swipe_start.position=Vector2(350,200);game._on_series_swipe_input(swipe_start)
+	var swipe_drag:=InputEventScreenDrag.new();swipe_drag.position=Vector2(210,202);game._on_series_swipe_input(swipe_drag)
+	assert(game.series_carousel_offset==-140.0 and game.series_carousel_track.position.x<game.SERIES_CAROUSEL_TRACK_ORIGIN.x and next_card.title.self_modulate.a>0.0)
+	var swipe_end:=InputEventScreenTouch.new();swipe_end.pressed=false;swipe_end.position=Vector2(210,202);game._on_series_swipe_input(swipe_end);assert(game.series_carousel_animating)
+	await get_tree().create_timer(.36).timeout
 	assert(game._current_series_entry().series_id=="metal" and game.series_open_button.disabled and game.series_lock_label.visible and "今後追加予定" in game.series_open_button.text)
-	assert(str(previous_cover.panel.get_meta("series_id"))=="base" and str(next_cover.panel.get_meta("series_id"))=="jewel")
+	assert(is_zero_approx(game.series_carousel_offset) and str(previous_card.container.get_meta("series_id"))=="base" and str(next_card.container.get_meta("series_id"))=="jewel")
+	var short_start:=InputEventScreenTouch.new();short_start.pressed=true;short_start.position=Vector2(300,200);game._on_series_swipe_input(short_start)
+	var short_drag:=InputEventScreenDrag.new();short_drag.position=Vector2(270,200);game._on_series_swipe_input(short_drag)
+	var short_end:=InputEventScreenTouch.new();short_end.pressed=false;short_end.position=Vector2(270,200);game._on_series_swipe_input(short_end);await get_tree().create_timer(.28).timeout
+	assert(game._current_series_entry().series_id=="metal" and is_zero_approx(game.series_carousel_offset))
 	game._open_selected_series_encyclopedia();assert(game.encyclopedia_series_page.visible and not game.encyclopedia_list_page.visible)
-	game._change_series_selection(-1);assert(game._current_series_entry().series_id=="base")
+	game._change_series_selection(-1);assert(game.series_carousel_animating);await get_tree().create_timer(.36).timeout;assert(game._current_series_entry().series_id=="base" and is_zero_approx(game.series_carousel_offset))
 	for repeat in range(2):
 		game._spawn_specific_plant("colorata");var harvested=game.plants.back();harvested.diameter_cm=12.0+repeat;harvested.harvest()
 	assert(game._grant_hidden_species("pinwheel") and not game._grant_hidden_species("pinwheel"))
