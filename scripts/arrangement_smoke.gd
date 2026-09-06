@@ -10,7 +10,19 @@ func _ready()->void:
 	for pot_value in game.pot_catalog:
 		for required_key in ["pot_id","display_name","image_path","price","unlock_condition","iap_product_id","placement_area","sort_order"]:assert(pot_value.has(required_key))
 	assert(game.arrangement_button.visible)
+	assert(game.greenhouse_backdrop.texture.resource_path==game.GREENHOUSE_MAIN_BACKGROUND_PATH)
+	assert(game.greenhouse_main_view_x<game.greenhouse_arrange_view_x and game.greenhouse_main_pan_min<game.greenhouse_main_pan_max)
 	var available:Array=ui._available_species_entries("all");assert(available.size()==1 and str(available[0].species_id)=="colorata")
+	var starting_pan:float=game.greenhouse_pan_x;game._open_arrangements();assert(game.arrangement_mode_active and game.arrangement_transition_active and not ui.visible)
+	for status_control in game.greenhouse_status_controls:assert(not status_control.visible)
+	await get_tree().create_timer(game.ARRANGEMENT_VIEW_TRANSITION_SECONDS+.08).timeout
+	assert(ui.visible and not game.arrangement_transition_active and is_equal_approx(game.greenhouse_pan_x,game.greenhouse_arrange_view_x) and game.greenhouse_pan_x>starting_pan)
+	game._toggle_mode();assert(game.current_mode=="greenhouse")
+	var blocked_touch:=InputEventScreenTouch.new();blocked_touch.pressed=true;blocked_touch.position=Vector2(280,520);game._input(blocked_touch);assert(not game.pointer_down)
+	ui.close();assert(game.arrangement_mode_active and game.arrangement_transition_active and not ui.visible)
+	await get_tree().create_timer(game.ARRANGEMENT_VIEW_TRANSITION_SECONDS+.08).timeout
+	assert(not game.arrangement_mode_active and not game.arrangement_transition_active and is_equal_approx(game.greenhouse_pan_x,starting_pan))
+	for status_control in game.greenhouse_status_controls:assert(status_control.visible)
 	ui.open_home();ui._start_new_arrangement();assert(ui.pot_select_page.visible)
 	ui._select_editor_pot("starter_terracotta");assert(ui.editor_page.visible and str(ui.current_arrangement.pot_id)=="starter_terracotta")
 	ui._add_species_to_editor("laui");assert(ui.editor_plants.is_empty())
