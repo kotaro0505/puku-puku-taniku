@@ -89,13 +89,22 @@
   {
     "series_id": "gummy",
     "display_name": "グミ多肉",
-    "subtitle": "今後追加予定",
-    "description": "このシリーズは準備中です。",
+    "subtitle": "品種画像登録済み・開放条件準備中",
+    "description": "ぷにっとカラフルなグミ多肉のシリーズです。開放条件は今後追加予定です。",
     "cover_image_path": "res://assets/series_covers/gummy.png",
-    "species_ids": [],
+    "species_ids": [
+      "gummy_peach_milk",
+      "gummy_melon_milk",
+      "gummy_fruit_punch",
+      "gummy_grape_milk",
+      "gummy_strawberry",
+      "gummy_orange",
+      "gummy_rainbow",
+      "gummy_soda"
+    ],
     "field_id": "gummy_field",
     "unlock_type": "future",
-    "unlock_condition": {"display_text": "今後追加予定"},
+    "unlock_condition": {"display_text": "開放条件は今後追加予定"},
     "iap_product_id": "",
     "sort_order": 50
   },

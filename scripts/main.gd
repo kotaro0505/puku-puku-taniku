@@ -512,6 +512,7 @@ func _apply_saved_unlocks()->void:
 	species.clear()
 	for entry in catalog_species:
 		var species_id:=str(entry.species_id)
+		if bool(entry.get("catalog_only",false)):continue
 		if bool(greenhouse_available.get(species_id,false)):species.append(entry)
 	if species.is_empty():
 		greenhouse_available={"colorata":true};unlocked_species=greenhouse_available.duplicate(true)
@@ -2100,6 +2101,7 @@ func _queue_random_species(rarity:String)->void:
 	var candidates:Array=[]
 	for entry in catalog_species:
 		var species_id:=str(entry.species_id)
+		if bool(entry.get("catalog_only",false)):continue
 		if str(entry.get("rarity","通常"))!=rarity:continue
 		if species_id in [BEST_UNLOCK_HYALINA_ID,BEST_UNLOCK_PURPUSORUM_ID]:continue
 		if bool(discovered.get(species_id,false)) or bool(greenhouse_available.get(species_id,false)) or species_id in pending_habitat_species:continue
@@ -2259,6 +2261,7 @@ func _rain_species_pool()->Array:
 	var pool:Array=[]
 	for entry in catalog_species:
 		var species_id:=str(entry.species_id)
+		if bool(entry.get("catalog_only",false)):continue
 		if bool(discovered.get(species_id,false)) and bool(greenhouse_available.get(species_id,false)):pool.append(entry)
 	if pool.is_empty():
 		for entry in catalog_species:
@@ -2305,6 +2308,7 @@ func _select_species_for_seed(seed_type:String)->Dictionary:
 	var normal_pool:Array=[];var rare_pool:Array=[];var super_pool:Array=[];var any_pool:Array=[]
 	for entry in catalog_species:
 		var species_id:=str(entry.get("species_id",""))
+		if bool(entry.get("catalog_only",false)):continue
 		if bool(entry.get("special_route_only",false)):continue
 		if not bool(greenhouse_available.get(species_id,false)):continue
 		var is_found:=bool(discovered.get(species_id,false))

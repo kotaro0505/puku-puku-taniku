@@ -26,6 +26,14 @@ const SPRITES := {
 	"mystery_amber_agavoides": "res://assets/plants/mystery-amber-agavoides.png",
 	"mystery_yumefuwa_jelly": "res://assets/plants/mystery-yumefuwa-jelly.png",
 	"mystery_peach_jelly": "res://assets/plants/mystery-peach-jelly.png",
+	"gummy_peach_milk": "res://assets/plants/gummy/gummy-peach-milk.jpg",
+	"gummy_melon_milk": "res://assets/plants/gummy/gummy-melon-milk.jpg",
+	"gummy_fruit_punch": "res://assets/plants/gummy/gummy-fruit-punch.jpg",
+	"gummy_grape_milk": "res://assets/plants/gummy/gummy-grape-milk.jpg",
+	"gummy_strawberry": "res://assets/plants/gummy/gummy-strawberry.jpg",
+	"gummy_orange": "res://assets/plants/gummy/gummy-orange.jpg",
+	"gummy_rainbow": "res://assets/plants/gummy/gummy-rainbow.jpg",
+	"gummy_soda": "res://assets/plants/gummy/gummy-soda.jpg",
 	"gold_kannte": "res://assets/plants/sprite-golden-laui.png"
 }
 
