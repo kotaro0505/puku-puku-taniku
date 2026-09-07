@@ -2174,6 +2174,9 @@ func _is_series_unlocked(entry:Dictionary)->bool:
 func _can_browse_series(entry:Dictionary)->bool:
 	return _is_series_unlocked(entry) or bool(entry.get("preview_catalog_when_locked",false)) or not _series_species_entries(str(entry.get("series_id",""))).is_empty()
 
+func _catalog_purchase_enabled(entry:Dictionary)->bool:
+	return bool(entry.get("catalog_purchase_enabled",true)) and not _series_species_entries(str(entry.get("series_id",""))).is_empty()
+
 func _series_unlock_text(entry:Dictionary)->String:
 	if _is_series_unlocked(entry):return ""
 	var condition=entry.get("unlock_condition",{})
@@ -2337,14 +2340,14 @@ func _refresh_encyclopedia_header()->void:
 	encyclopedia_field_status.text=str(field.get("display_name","専用原生地")) if available else "専用原生地は未開放または準備中です"
 	encyclopedia_unlock_panel.visible=not unlocked
 	if not unlocked:
-		var yen_price:int=mystery_pod_system.catalog_price_yen(entry);var pod_price:int=mystery_pod_system.catalog_price_pods(entry);var available_for_purchase:=not species_entries.is_empty()
+		var yen_price:int=mystery_pod_system.catalog_price_yen(entry);var pod_price:int=mystery_pod_system.catalog_price_pods(entry);var available_for_purchase:=_catalog_purchase_enabled(entry)
 		encyclopedia_unlock_status.text="この図鑑を入手すると、シリーズ種と出会えるようになります\n所持 ¥%s　／　さや %d個"%[_comma(coins),mystery_pod_count] if available_for_purchase else "このシリーズは準備中です"
 		encyclopedia_unlock_yen_button.text="¥%sで入手"%_comma(yen_price);encyclopedia_unlock_yen_button.disabled=not available_for_purchase or coins<yen_price
 		encyclopedia_unlock_pod_button.text="さや%d個で入手"%pod_price;encyclopedia_unlock_pod_button.disabled=not available_for_purchase or mystery_pod_count<pod_price
 
 func _acquire_current_catalog(method:String)->void:
 	var entry:=_series_entry(current_encyclopedia_series_id)
-	if entry.is_empty() or _is_series_unlocked(entry) or _series_species_entries(current_encyclopedia_series_id).is_empty():return
+	if entry.is_empty() or _is_series_unlocked(entry) or not _catalog_purchase_enabled(entry):return
 	if method=="yen":
 		var yen_price:int=mystery_pod_system.catalog_price_yen(entry)
 		if coins<yen_price:return
