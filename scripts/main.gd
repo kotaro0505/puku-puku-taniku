@@ -17,6 +17,7 @@ const PLAY_INITIAL_MAX_PLANTS := 12
 const SOIL_SOURCE_CENTER := Vector2(426.5,700.0)
 const SOIL_SOURCE_RADII := Vector2(360.0,190.0)
 const SPAWN_SPRITE_MARGIN_SOURCE_PX := 40.0
+const GREENHOUSE_DRAG_SCALE := 0.30
 const GREENHOUSE_DRAG_DEAD_ZONE := 3.0
 const GREENHOUSE_PAN_FOLLOW_SECONDS := 0.075
 const HABITAT_DRAG_SCALE := 0.055
@@ -96,6 +97,7 @@ var pot_root: Node3D
 var greenhouse_layer: CanvasLayer
 var greenhouse_backdrop: TextureRect
 var greenhouse_pan_x := 0.0
+var greenhouse_pan_target_x := 0.0
 var greenhouse_pan_limit := 0.0
 var greenhouse_world_pan_x := 0.0
 var habitat_env: WorldEnvironment
@@ -2170,8 +2172,10 @@ func _update_greenhouse_pan()->void:
 	var display_size:=texture_size*cover_scale
 	greenhouse_pan_limit=maxf(0.0,(display_size.x-viewport_size.x)*.5)
 	greenhouse_pan_x=clampf(greenhouse_pan_x,-greenhouse_pan_limit,greenhouse_pan_limit)
+	greenhouse_pan_target_x=clampf(greenhouse_pan_target_x,-greenhouse_pan_limit,greenhouse_pan_limit)
 	greenhouse_backdrop.size=display_size
 	greenhouse_backdrop.position=Vector2((viewport_size.x-display_size.x)*.5+greenhouse_pan_x,(viewport_size.y-display_size.y)*.5)
+	if play_open_button:play_open_button.position=Vector2(198.0+greenhouse_pan_x,499.0)
 	greenhouse_world_pan_x=0.0
 	if camera:
 		var soil_center:=camera.unproject_position(Vector3(0,.12,0))
@@ -2411,6 +2415,7 @@ func _update_rain_visual(delta:float)->void:
 		if drop.position.y>viewport_size.y+80.0:drop.position=Vector2(rng.randf_range(0.0,viewport_size.x+100.0),rng.randf_range(-240.0,-40.0))
 
 func _process(delta:float)->void:
+	_update_greenhouse_pan_follow(delta)
 	_update_habitat_view_follow(delta)
 	_update_habitat_scroll_tutorial()
 	_update_rain_visual(delta)
@@ -2439,6 +2444,13 @@ func _process(delta:float)->void:
 				if play_spawn_queue>0:play_spawn_timer=_next_greenhouse_spawn_interval()
 	if not rain_bonus_active:_resolve_crowding(delta)
 	_update_labels()
+
+func _update_greenhouse_pan_follow(delta:float)->void:
+	if current_mode!="greenhouse" or is_equal_approx(greenhouse_pan_x,greenhouse_pan_target_x):return
+	var follow:=1.0-exp(-delta/GREENHOUSE_PAN_FOLLOW_SECONDS)
+	greenhouse_pan_x=lerpf(greenhouse_pan_x,greenhouse_pan_target_x,follow)
+	if absf(greenhouse_pan_target_x-greenhouse_pan_x)<0.05:greenhouse_pan_x=greenhouse_pan_target_x
+	_update_greenhouse_pan()
 
 func _update_habitat_view_follow(delta:float)->void:
 	if current_mode!="habitat":return
@@ -2543,7 +2555,8 @@ func _update_labels()->void:
 
 func _input(event:InputEvent)->void:
 	if audio_manager and (event is InputEventScreenTouch or event is InputEventMouseButton or event is InputEventKey):audio_manager.notify_user_gesture()
-	if (opening_overlay and opening_overlay.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible) or (arrangement_ui and arrangement_ui.visible):return
+	if (tutorial_guide_overlay and tutorial_guide_overlay.visible) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible):return
+	if current_mode=="greenhouse" and not play_active:return
 	if event is InputEventScreenTouch:
 		if event.pressed:
 			_begin_pointer(event.position)
@@ -2561,15 +2574,20 @@ func _input(event:InputEvent)->void:
 
 func _begin_pointer(screen_pos:Vector2)->void:
 	pointer_down=true;pointer_start=screen_pos;pointer_last=screen_pos;pointer_travel=0.0
-	greenhouse_drag_accumulator=0.0;greenhouse_drag_started=false
+	greenhouse_drag_accumulator=0.0;greenhouse_drag_started=false;greenhouse_pan_target_x=greenhouse_pan_x
 	habitat_target_yaw=view_yaw;habitat_target_pitch=view_pitch
 
 func _drag_pointer(screen_pos:Vector2,relative:Vector2)->void:
 	pointer_travel+=relative.length();pointer_last=screen_pos
 	if current_mode=="greenhouse":
-		greenhouse_pan_x=clampf(greenhouse_pan_x+relative.x,-greenhouse_pan_limit,greenhouse_pan_limit)
-		_update_greenhouse_pan()
-		_resolve_crowding(0.0)
+		if not greenhouse_drag_started:
+			greenhouse_drag_accumulator+=relative.x
+			if absf(greenhouse_drag_accumulator)<=GREENHOUSE_DRAG_DEAD_ZONE:return
+			greenhouse_drag_started=true
+			var excess:=greenhouse_drag_accumulator-signf(greenhouse_drag_accumulator)*GREENHOUSE_DRAG_DEAD_ZONE
+			greenhouse_pan_target_x=clampf(greenhouse_pan_target_x+excess*GREENHOUSE_DRAG_SCALE,-greenhouse_pan_limit,greenhouse_pan_limit)
+		else:
+			greenhouse_pan_target_x=clampf(greenhouse_pan_target_x+relative.x*GREENHOUSE_DRAG_SCALE,-greenhouse_pan_limit,greenhouse_pan_limit)
 		return
 	if current_mode!="habitat":return
 	if not greenhouse_drag_started:
@@ -2585,7 +2603,7 @@ func _end_pointer(screen_pos:Vector2)->void:
 	if not pointer_down:return
 	pointer_down=false
 	if pointer_travel<13.0 and pointer_start.distance_to(screen_pos)<16.0:
-		if (current_mode=="greenhouse" and play_active) or rain_bonus_active:_try_harvest(screen_pos)
+		if current_mode=="greenhouse" or rain_bonus_active:_try_harvest(screen_pos)
 		elif current_mode=="habitat":_try_habitat_pick(screen_pos)
 
 func _apply_view_rotation()->void:
