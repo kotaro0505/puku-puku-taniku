@@ -27,28 +27,26 @@ func _ready()->void:
 		assert(str(game.SucculentClass.SPRITES.get(str(gummy_entry.get("visual_variant","")),""))==image_path)
 		var gummy_texture:=load(image_path) as Texture2D;var gummy_source:=gummy_texture.get_image();var gummy_used:=gummy_source.get_used_rect();assert(gummy_texture.get_size()==Vector2(1254,1254) and gummy_source.detect_alpha()!=Image.ALPHA_NONE and gummy_source.get_pixel(0,0).a<.01 and gummy_used.position.x>0 and gummy_used.position.y>0 and gummy_used.end.x<1254 and gummy_used.end.y<1254)
 	assert(gummy_ids.size()==8)
-	var base_style:=TextureRect.new();var gummy_style:=TextureRect.new();game._apply_encyclopedia_image_style(base_style,game._series_species_entries("base")[0],false);game._apply_encyclopedia_image_style(gummy_style,game._series_species_entries("gummy")[0],false);var base_material:=base_style.material as ShaderMaterial;var gummy_material:=gummy_style.material as ShaderMaterial;assert(base_material!=null and gummy_material!=null and base_material.shader==gummy_material.shader and "remove_white_background" not in base_material.shader.code)
+	var base_style:=TextureRect.new();var gummy_style:=TextureRect.new();game._apply_encyclopedia_image_style(base_style,game._series_species_entries("base")[0],false);game._apply_encyclopedia_image_style(gummy_style,game._series_species_entries("gummy")[0],false);assert(base_style.material==null and gummy_style.material==null and base_style.modulate.is_equal_approx(Color(0.12,0.09,0.08,0.82)) and gummy_style.modulate.is_equal_approx(base_style.modulate))
 	game.pending_habitat_species.clear();game._queue_random_species("シリーズ未解禁");assert(game.pending_habitat_species.is_empty())
 	game.greenhouse_available["gummy_peach_milk"]=true;game.discovered["gummy_peach_milk"]=true;game._apply_saved_unlocks();assert(game.species.all(func(entry):return str(entry.species_id)!="gummy_peach_milk"));game.greenhouse_available.erase("gummy_peach_milk");game.discovered.erase("gummy_peach_milk");game._apply_saved_unlocks()
 	game.selected_series_index=5;game._open_encyclopedia();assert(not game.series_open_button.disabled and game.series_lock_label.visible and game.series_open_button.text=="シルエット図鑑をみる" and not game.series_cover_placeholder.visible and game.series_cover_image.texture.resource_path=="res://assets/series_covers/gummy.jpg" and game.series_cover_image.texture.get_size()==Vector2(1158,1280) and game.series_cover_image.stretch_mode==TextureRect.STRETCH_KEEP_ASPECT_CENTERED);game._open_selected_series_encyclopedia();await get_tree().process_frame
 	assert(game.encyclopedia_list_page.visible and game.encyclopedia_list_title.text=="グミ多肉" and game.encyclopedia_grid.get_child_count()==8 and game.encyclopedia_list_progress.text=="0 / 8種" and game.encyclopedia_field_button.disabled)
 	for gummy_card in game.encyclopedia_grid.get_children():
-		assert(not gummy_card.disabled and gummy_card.pressed.get_connections().size()>0)
+		assert(gummy_card.disabled)
 		var card_texts:Array[String]=[]
 		for label in gummy_card.find_children("*","Label",true,false):card_texts.append(str(label.text))
-		assert("？？？" in card_texts and "未開放" in card_texts and "GET 0" in card_texts)
+		assert("？？？" in card_texts and "未発見" in card_texts and "GET 0" in card_texts)
 	game._update_encyclopedia_visible_textures()
 	for gummy_image in game.encyclopedia_card_images:
-		assert(gummy_image.material is ShaderMaterial and (gummy_image.material as ShaderMaterial).shader==base_material.shader and gummy_image.stretch_mode==TextureRect.STRETCH_KEEP_ASPECT_CENTERED)
+		assert(gummy_image.material==null and gummy_image.modulate.is_equal_approx(Color(0.12,0.09,0.08,0.82)) and gummy_image.stretch_mode==TextureRect.STRETCH_KEEP_ASPECT_CENTERED)
 		if gummy_image.texture!=null:assert(str(gummy_image.texture.resource_path).begins_with("res://assets/plants/gummy/") and str(gummy_image.texture.resource_path).ends_with(".png"))
-	base_style.free();gummy_style.free();base_material=null;gummy_material=null
-	var first_gummy_card:Button=game.encyclopedia_grid.get_child(0);first_gummy_card.pressed.emit();assert(game.encyclopedia_detail_page.visible)
-	assert(game.encyclopedia_detail_page.find_child("SpeciesName",true,false).text=="？？？" and game.encyclopedia_detail_page.find_child("SpeciesDescription",true,false).text=="未開放" and game.encyclopedia_detail_page.find_child("SpeciesGetCount",true,false).text=="GET 0")
-	assert(game.encyclopedia_detail_page.find_child("SpeciesImage",true,false).material is ShaderMaterial)
-	game.encyclopedia_detail_page.get_child(0).pressed.emit();game.discovered["gummy_peach_milk"]=true;game.species_get_counts["gummy_peach_milk"]=3;game._refresh_encyclopedia_header();game._refresh_encyclopedia_cards();await get_tree().process_frame;game._update_encyclopedia_visible_textures()
+	base_style.free();gummy_style.free()
+	var first_gummy_card:Button=game.encyclopedia_grid.get_child(0);first_gummy_card.pressed.emit();assert(not game.encyclopedia_detail_page.visible and game.encyclopedia_list_page.visible)
+	game.discovered["gummy_peach_milk"]=true;game.species_get_counts["gummy_peach_milk"]=3;game._refresh_encyclopedia_header();game._refresh_encyclopedia_cards();await get_tree().process_frame;game._update_encyclopedia_visible_textures()
 	var found_card:Button=game.encyclopedia_grid.get_child(0);var found_texts:Array[String]=[]
 	for label in found_card.find_children("*","Label",true,false):found_texts.append(str(label.text))
-	assert("ももミルクグミ" in found_texts and "GET 3" in found_texts and game.encyclopedia_card_images[0].material==null)
+	assert(not found_card.disabled and "ももミルクグミ" in found_texts and "GET 3" in found_texts and game.encyclopedia_card_images[0].material==null and game.encyclopedia_card_images[0].modulate.is_equal_approx(Color.WHITE))
 	found_card.pressed.emit();assert(game.encyclopedia_detail_page.find_child("SpeciesName",true,false).text=="ももミルクグミ" and not game.encyclopedia_detail_page.find_child("SpeciesDescription",true,false).text.is_empty() and game.encyclopedia_detail_page.find_child("SpeciesGetCount",true,false).text=="GET 3" and game.encyclopedia_detail_page.find_child("SpeciesImage",true,false).material==null)
 	game._close_encyclopedia();game.discovered.erase("gummy_peach_milk");game.species_get_counts.erase("gummy_peach_milk");game.selected_series_index=0
 	game._open_encyclopedia();assert(game.encyclopedia_series_page.visible and not game.encyclopedia_list_page.visible and game.series_title_label.text=="基本図鑑" and game.series_cover_placeholder.visible)
