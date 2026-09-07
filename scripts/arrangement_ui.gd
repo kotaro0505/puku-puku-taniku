@@ -4,6 +4,7 @@ extends Control
 signal close_requested(context:String)
 signal save_requested(arrangement:Dictionary)
 signal pot_purchase_requested(pot_id:String)
+signal world_scroll_input(event:InputEvent)
 
 const PotPlaceholderClass = preload("res://scripts/arrangement_pot_placeholder.gd")
 const MAX_PLANTS_PER_ARRANGEMENT := 24
@@ -113,7 +114,7 @@ func set_world_backdrop_mode(enabled:bool,pot_anchor_screen:Vector2)->void:
 
 func _build_ui()->void:
 	backdrop_shade=ColorRect.new();backdrop_shade.color=Color("#43281f");backdrop_shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);backdrop_shade.mouse_filter=Control.MOUSE_FILTER_STOP;add_child(backdrop_shade)
-	home_page=_page();_build_home_page()
+	home_page=_page();home_page.gui_input.connect(_on_home_world_scroll_input);_build_home_page()
 	pot_select_page=_page();_build_pot_select_page()
 	editor_page=_page();_build_editor_page()
 	picker_page=_page();_build_picker_page()
@@ -126,6 +127,9 @@ func _page()->Control:
 func _show_page(page:Control)->void:
 	for candidate in [home_page,pot_select_page,editor_page,picker_page,viewer_page,shop_page]:
 		if candidate:candidate.visible=candidate==page
+
+func _on_home_world_scroll_input(event:InputEvent)->void:
+	if world_backdrop_enabled and visible and home_page.visible:world_scroll_input.emit(event)
 
 func _build_header(page:Control,title_text:String,back_callable:Callable,back_text:="もどる")->Label:
 	var back:=_button(back_text,Vector2(20,24),Vector2(108,54),Color("#f4dfb8"),16);back.pressed.connect(back_callable);page.add_child(back)
