@@ -6,6 +6,7 @@ func _ready()->void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	game._finish_opening()
+	game._reset_progression_state()
 	game.intro_story_complete=true
 	game.habitat_unlocked=true
 	game.encyclopedia_unlocked=true

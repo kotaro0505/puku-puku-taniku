@@ -1,0 +1,27 @@
+{
+  "formal": {
+    "slots_per_pod": 3,
+    "series_seed_weight": 85.0,
+    "yen_weight": 15.0,
+    "yen_rewards": [
+      {"amount": 1000, "weight": 60.0},
+      {"amount": 3000, "weight": 25.0},
+      {"amount": 5000, "weight": 12.0},
+      {"amount": 10000, "weight": 3.0}
+    ],
+    "main_play_pod_chance": 0.20,
+    "habitat_pod_chance": 0.05,
+    "armadillo_pod_bonus_chance": 0.08,
+    "armadillo_pod_bonus_count": 1,
+    "completed_series_weight_multiplier": 0.20,
+    "discovered_species_weight_multiplier": 0.10,
+    "default_catalog_price_yen": 10000,
+    "default_catalog_price_pods": 10
+  },
+  "iap_products": [
+    {"product_id":"com.ohanayanouen.pukupukutaniku.pods.1","pod_count":1,"display_price":"¥100","product_type":"consumable"},
+    {"product_id":"com.ohanayanouen.pukupukutaniku.pods.6","pod_count":6,"display_price":"¥500","product_type":"consumable"},
+    {"product_id":"com.ohanayanouen.pukupukutaniku.pods.15","pod_count":15,"display_price":"¥1,000","product_type":"consumable"},
+    {"product_id":"com.ohanayanouen.pukupukutaniku.pods.35","pod_count":35,"display_price":"¥2,000","product_type":"consumable"}
+  ]
+}

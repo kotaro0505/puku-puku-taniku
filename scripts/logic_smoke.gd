@@ -58,7 +58,7 @@ func _ready()->void:
 	var pinwheel_bitmap:Image=(load(succulent_assets.SPRITES.pinwheel) as Texture2D).get_image();var pinwheel_used:=pinwheel_bitmap.get_used_rect();assert(pinwheel_used.position.x>0 and pinwheel_used.position.y>0 and pinwheel_used.end.x<pinwheel_bitmap.get_width() and pinwheel_used.end.y<pinwheel_bitmap.get_height())
 	var opening_ids:Array=[]
 	for plant in game.plants:opening_ids.append(str(plant.data.species_id))
-	for spawned_id in opening_ids:assert(spawned_id in species_ids and spawned_id=="colorata")
+	for spawned_id in opening_ids:assert(spawned_id in species_ids and bool(game.greenhouse_available.get(spawned_id,false)))
 	for plant in game.plants:
 		plant.jelly_checks_enabled=false
 		assert(plant.growth_rhythm_period >= 16.0 and plant.growth_rhythm_period <= 28.0)

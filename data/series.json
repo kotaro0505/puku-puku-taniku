@@ -107,6 +107,9 @@
     "preview_catalog_when_locked": true,
     "unlock_condition": {"display_text": "開放条件は今後追加予定"},
     "iap_product_id": "",
+    "unlock_price_yen": 10000,
+    "unlock_price_pods": 10,
+    "pod_seed_weight": 1.0,
     "sort_order": 50
   },
   {
