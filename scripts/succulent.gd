@@ -66,6 +66,7 @@ var jelly_final_chance := JELLY_CHANCE_FINAL
 var resistance_type := "normal"
 var base_resistance_type := "normal"
 var is_slow_sticky := false
+var is_resilient := false
 var jelly_permission:Callable
 var jelly_checks_enabled := true
 var sway_phase := 0.0
@@ -80,7 +81,7 @@ func setup(species: Dictionary, seed_value: int, screen_label: Label, _danger: L
 	# reach the common 6%/second mature risk vary continuously.
 	var balance:=JellyBalanceClass.effective()
 	jelly_final_chance=float(balance.final_chance);growth_speed_multiplier=float(balance.growth_speed);growth_rhythm_amplitude=float(balance.rhythm_amplitude)
-	individual_growth_multiplier=1.0;is_slow_sticky=false
+	individual_growth_multiplier=1.0;is_slow_sticky=false;is_resilient=false
 	jelly_safe_end_seconds = rng.randf_range(float(balance.safe_min), float(balance.safe_max))
 	var ramp_roll := rng.randf()
 	base_resistance_type=JellyBalanceClass.resistance_for_roll(ramp_roll,balance);resistance_type=base_resistance_type
@@ -91,8 +92,12 @@ func setup(species: Dictionary, seed_value: int, screen_label: Label, _danger: L
 		var slow_roll:=rng.randf()
 		if JellyBalanceClass.slow_sticky_for_roll(base_resistance_type,slow_roll,balance):
 			is_slow_sticky=true;resistance_type="slow_sticky"
+			if float(balance.slow_resilient_rate)>0.0:is_resilient=JellyBalanceClass.resilient_for_roll(base_resistance_type,true,rng.randf(),balance)
 			individual_growth_multiplier=rng.randf_range(float(balance.slow_growth_min),float(balance.slow_growth_max))
 			ramp_min=float(balance.slow_ramp_min);ramp_max=float(balance.slow_ramp_max)
+	if base_resistance_type=="short" and not is_slow_sticky and float(balance.regular_short_resilient_rate)>0.0:
+		is_resilient=JellyBalanceClass.resilient_for_roll(base_resistance_type,false,rng.randf(),balance)
+	if is_resilient:jelly_final_chance=float(balance.resilient_final_chance)
 	jelly_ramp_end_seconds=jelly_safe_end_seconds+rng.randf_range(ramp_min,ramp_max)
 	growth_rhythm_period = rng.randf_range(16.0, 28.0)
 	growth_rhythm_phase = rng.randf_range(0.0, TAU)
@@ -173,6 +178,10 @@ func _integrated_growth_multiplier(start_time: float, end_time: float) -> float:
 
 func effective_growth_speed_multiplier()->float:
 	return growth_speed_multiplier*individual_growth_multiplier
+
+func development_trait_text()->String:
+	var type_name:=str({"short":"短命","normal":"普通","long":"長命","ultra":"超長命"}.get(base_resistance_type,base_resistance_type))
+	return "%s\n%s / %s\n成長×%.2f\n最終%.1f%%"%[type_name,"遅育" if is_slow_sticky else "通常育","強健" if is_resilient else "標準",individual_growth_multiplier,jelly_final_chance*100.0]
 
 static func jelly_probability_for_interval(start_age: float, delta: float, safe_end_seconds := 4.5, ramp_end_seconds := 13.0, final_chance:=JELLY_CHANCE_FINAL) -> float:
 	# This is the single source of truth for jelly probability. Integrating the

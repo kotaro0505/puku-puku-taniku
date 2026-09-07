@@ -242,6 +242,8 @@ var settings_overlay: Control
 var jelly_dev_overlay: Control
 var jelly_dev_labels:Dictionary={}
 var jelly_dev_total_label:Label
+var jelly_trait_toggle_button:Button
+var jelly_trait_display_enabled:=false
 var dev_jelly_test_active:=false
 var last_jelly_claim_msec:=-1000000000
 var audio_manager: Node
@@ -1173,8 +1175,12 @@ func _build_jelly_dev_overlay(hud:Control)->void:
 	for kind in ["short","normal","long","ultra"]:
 		var heading:=Label.new();heading.text={"short":"短命タイプ","normal":"普通タイプ","long":"長命タイプ","ultra":"超長命タイプ"}[kind];heading.add_theme_font_size_override("font_size",18);heading.add_theme_color_override("font_color",Color("#754326"));content.add_child(heading)
 		_add_jelly_dev_row(content,kind+"_weight",1.0);_add_jelly_dev_row(content,kind+"_min",.1);_add_jelly_dev_row(content,kind+"_max",.1)
-	var slow_heading:=Label.new();slow_heading.text="遅育・粘り型（短命から派生）";slow_heading.add_theme_font_size_override("font_size",18);slow_heading.add_theme_color_override("font_color",Color("#754326"));content.add_child(slow_heading)
-	_add_jelly_dev_row(content,"slow_short_rate",1.0);_add_jelly_dev_row(content,"slow_growth_min",.01);_add_jelly_dev_row(content,"slow_growth_max",.01);_add_jelly_dev_row(content,"slow_ramp_min",.1);_add_jelly_dev_row(content,"slow_ramp_max",.1)
+	var slow_heading:=Label.new();slow_heading.text="生育予測 v1（短命から派生）";slow_heading.add_theme_font_size_override("font_size",18);slow_heading.add_theme_color_override("font_color",Color("#754326"));content.add_child(slow_heading)
+	_add_jelly_dev_row(content,"slow_short_rate",1.0);_add_jelly_dev_row(content,"slow_resilient_rate",1.0);_add_jelly_dev_row(content,"regular_short_resilient_rate",1.0);_add_jelly_dev_row(content,"resilient_final_chance",.005)
+	_add_jelly_dev_row(content,"slow_growth_min",.01);_add_jelly_dev_row(content,"slow_growth_max",.01);_add_jelly_dev_row(content,"slow_ramp_min",.1);_add_jelly_dev_row(content,"slow_ramp_max",.1)
+	var prediction_actions:=HBoxContainer.new();prediction_actions.alignment=BoxContainer.ALIGNMENT_CENTER;prediction_actions.add_theme_constant_override("separation",8);content.add_child(prediction_actions)
+	var apply_prediction:=Button.new();apply_prediction.text="生育予測 v1\nテスト値を適用";apply_prediction.custom_minimum_size=Vector2(238,54);_skin_button(apply_prediction,Color("#c7b4d9"),14);apply_prediction.pressed.connect(_dev_apply_prediction_v1);prediction_actions.add_child(apply_prediction)
+	jelly_trait_toggle_button=Button.new();jelly_trait_toggle_button.custom_minimum_size=Vector2(220,54);_skin_button(jelly_trait_toggle_button,Color("#d9c49d"),14);jelly_trait_toggle_button.pressed.connect(_toggle_jelly_trait_display);prediction_actions.add_child(jelly_trait_toggle_button)
 	_add_jelly_dev_row(content,"growth_speed",.1);_add_jelly_dev_row(content,"rhythm_amplitude",.01)
 	jelly_dev_total_label=Label.new();jelly_dev_total_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;jelly_dev_total_label.add_theme_font_size_override("font_size",17);content.add_child(jelly_dev_total_label)
 	var actions:=HBoxContainer.new();actions.alignment=BoxContainer.ALIGNMENT_CENTER;actions.add_theme_constant_override("separation",7);outer.add_child(actions)
@@ -1196,8 +1202,8 @@ func _close_jelly_dev()->void:
 
 func _change_jelly_dev_value(key:String,delta:float)->void:
 	var value:=float(JellyBalanceClass.values[key])+delta
-	if key.ends_with("_weight") or key=="slow_short_rate":value=clampf(value,0.0,100.0)
-	elif key=="final_chance":value=clampf(value,.0,.50)
+	if key.ends_with("_weight") or key in ["slow_short_rate","slow_resilient_rate","regular_short_resilient_rate"]:value=clampf(value,0.0,100.0)
+	elif key in ["final_chance","resilient_final_chance"]:value=clampf(value,.0,.50)
 	elif key=="growth_speed":value=clampf(value,.1,10.0)
 	elif key=="slow_growth_min" or key=="slow_growth_max":value=clampf(value,.05,2.0)
 	elif key=="rhythm_amplitude":value=clampf(value,.0,.50)
@@ -1209,16 +1215,17 @@ func _change_jelly_dev_value(key:String,delta:float)->void:
 	JellyBalanceClass.set_value(key,value);_refresh_jelly_dev_ui()
 
 func _jelly_dev_text(key:String)->String:
-	var names={"final_chance":"最終ジュレ率","cooldown":"連続ジュレ回避","safe_min":"初期安全 MIN","safe_max":"初期安全 MAX","short_weight":"短命 割合","short_min":"短命 時間 MIN","short_max":"短命 時間 MAX","normal_weight":"普通 割合","normal_min":"普通 時間 MIN","normal_max":"普通 時間 MAX","long_weight":"長命 割合","long_min":"長命 時間 MIN","long_max":"長命 時間 MAX","ultra_weight":"超長命 割合","ultra_min":"超長命 時間 MIN","ultra_max":"超長命 時間 MAX","slow_short_rate":"短命内 遅育化率","slow_growth_min":"遅育 成長 MIN","slow_growth_max":"遅育 成長 MAX","slow_ramp_min":"遅育 危険上昇 MIN","slow_ramp_max":"遅育 危険上昇 MAX","growth_speed":"成長速度倍率","rhythm_amplitude":"成長リズム幅"}
+	var names={"final_chance":"最終ジュレ率","cooldown":"連続ジュレ回避","safe_min":"初期安全 MIN","safe_max":"初期安全 MAX","short_weight":"短命 割合","short_min":"短命 時間 MIN","short_max":"短命 時間 MAX","normal_weight":"普通 割合","normal_min":"普通 時間 MIN","normal_max":"普通 時間 MAX","long_weight":"長命 割合","long_min":"長命 時間 MIN","long_max":"長命 時間 MAX","ultra_weight":"超長命 割合","ultra_min":"超長命 時間 MIN","ultra_max":"超長命 時間 MAX","slow_short_rate":"短命 → 遅育率","slow_resilient_rate":"遅育 → 強健率","regular_short_resilient_rate":"通常短命 → 強健率","resilient_final_chance":"強健個体 最終ジュレ率","slow_growth_min":"遅育 成長 MIN","slow_growth_max":"遅育 成長 MAX","slow_ramp_min":"遅育 危険上昇 MIN","slow_ramp_max":"遅育 危険上昇 MAX","growth_speed":"成長速度倍率","rhythm_amplitude":"成長リズム幅"}
 	var value:=float(JellyBalanceClass.values[key])
-	if key=="final_chance" or key=="rhythm_amplitude":return "%s　%.1f%%"%[names[key],value*100.0]
-	if key.ends_with("_weight") or key=="slow_short_rate":return "%s　%.0f%%"%[names[key],value]
+	if key in ["final_chance","resilient_final_chance","rhythm_amplitude"]:return "%s　%.1f%%"%[names[key],value*100.0]
+	if key.ends_with("_weight") or key in ["slow_short_rate","slow_resilient_rate","regular_short_resilient_rate"]:return "%s　%.0f%%"%[names[key],value]
 	if key=="slow_growth_min" or key=="slow_growth_max":return "%s　×%.2f"%[names[key],value]
 	if key=="growth_speed":return "%s　×%.1f"%[names[key],value]
 	return "%s　%.1f秒"%[names[key],value]
 
 func _refresh_jelly_dev_ui()->void:
 	for key in jelly_dev_labels:jelly_dev_labels[key].text=_jelly_dev_text(str(key))
+	if jelly_trait_toggle_button:jelly_trait_toggle_button.text="体質表示　%s"%("ON" if jelly_trait_display_enabled else "OFF")
 	var total:=JellyBalanceClass.weight_total();jelly_dev_total_label.text="タイプ割合 合計 %.0f%%　%s"%[total,"OK" if is_equal_approx(total,100.0) else "⚠ 100%にしてください"]
 	jelly_dev_total_label.add_theme_color_override("font_color",Color("#47713b") if is_equal_approx(total,100.0) else Color("#b33b31"))
 
@@ -1226,7 +1233,13 @@ func _dev_add_seed_bag()->void:
 	normal_seed_bags+=1;_update_play_ui();_save()
 
 func _dev_reset_jelly()->void:
-	JellyBalanceClass.reset_formal();_refresh_jelly_dev_ui()
+	JellyBalanceClass.reset_formal();jelly_trait_display_enabled=false;_refresh_jelly_dev_ui()
+
+func _dev_apply_prediction_v1()->void:
+	JellyBalanceClass.apply_prediction_v1_test_values();_refresh_jelly_dev_ui()
+
+func _toggle_jelly_trait_display()->void:
+	jelly_trait_display_enabled=not jelly_trait_display_enabled;_refresh_jelly_dev_ui();_update_labels()
 
 func _dev_spawn_50cm()->void:
 	JellyBalanceClass.override_enabled=true;dev_jelly_test_active=true;last_jelly_claim_msec=-1000000000
@@ -1260,7 +1273,7 @@ func _change_audio_volume(value:float,is_bgm:bool)->void:
 	audio_settings["bgm_volume" if is_bgm else "se_volume"]=value/100.0;audio_manager.apply_settings(audio_settings);_save()
 
 func _reset_progression_state()->void:
-	JellyBalanceClass.reset_formal();dev_jelly_test_active=false;last_jelly_claim_msec=-1000000000
+	JellyBalanceClass.reset_formal();jelly_trait_display_enabled=false;dev_jelly_test_active=false;last_jelly_claim_msec=-1000000000
 	mystery_route_assignments.clear();mystery_route_completed.clear();mystery_route_dialog_seen.clear();rain_completion_count=0;best_100_achieved=false;normal_habitat_complete=false;shop_selected_seed_type="normal"
 	coins=1000;bests.clear();discovered.clear();species_get_counts.clear();unlocked_series={"base":true};owned_pots={"starter_terracotta":true};saved_arrangements.clear();arrangement_save_capacity=20;greenhouse_available={"colorata":true};unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;buyback_unlocked=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;mystery_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;mystery_seed_pack_unlocked=false;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;habitat_mystery_seeds_pending=0;mystery_seed_count=0;armadillo_research_total=0;armadillo_research_rewards.clear();armadillo_research_intro_seen=false;armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();shop_chatter_acquired_species.clear();play_active=false;play_time_remaining=0.0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_scroll_tutorial_active=false;habitat_best_link_dialog_step=0;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_build_habitat_items();_save();_update_currency_ui();_update_play_ui()
 	normal_play_count=0;shop_visit_count=0;hidden_species_acquired.clear();tovar_next_play=TOVAR_FIRST_PLAY;tovar_attempt_count=0;tovar_event_active=false;tovar_harvested_this_play=false;armadillo_present=false;_save()
@@ -2547,11 +2560,13 @@ func _update_labels()->void:
 			p.label.visible=false
 			continue
 		var screen:=camera.unproject_position(p.global_position+Vector3(0,p.visual_scale*.7,0))
-		var r:=Rect2(screen-Vector2(46,62),Vector2(92,34))
+		var show_traits:=jelly_trait_display_enabled and JellyBalanceClass.override_enabled
+		var label_size:=Vector2(154,100) if show_traits else Vector2(92,34)
+		var r:=Rect2(screen-Vector2(label_size.x*.5,label_size.y+28),label_size)
 		for other in occupied:
-			if r.intersects(other):r.position.y=other.position.y-37
+			if r.intersects(other):r.position.y=other.position.y-label_size.y-3
 		occupied.append(r)
-		p.label.position=r.position; p.label.text="%.1f cm"%p.diameter_cm; p.label.visible=p.state=="growing" and Rect2(Vector2.ZERO,get_viewport().get_visible_rect().size).grow(80).has_point(screen)
+		p.label.position=r.position;p.label.size=label_size;p.label.add_theme_font_size_override("font_size",12 if show_traits else 17);p.label.text=("%.1f cm\n%s"%[p.diameter_cm,p.development_trait_text()]) if show_traits else "%.1f cm"%p.diameter_cm;p.label.visible=p.state=="growing" and Rect2(Vector2.ZERO,get_viewport().get_visible_rect().size).grow(80).has_point(screen)
 
 func _input(event:InputEvent)->void:
 	if audio_manager and (event is InputEventScreenTouch or event is InputEventMouseButton or event is InputEventKey):audio_manager.notify_user_gesture()
