@@ -25,7 +25,6 @@ var save_capacity:=20
 var wallet_coins:=0
 var texture_resolver:Callable
 var return_context:="greenhouse"
-var arrangement_shade:ColorRect
 
 var home_page:Control
 var home_summary:Label
@@ -86,10 +85,10 @@ func sync_state(purchased_pots:Dictionary,arrangements:Array,capacity:int,coins:
 	if visible and home_page.visible:_refresh_home()
 
 func open_home()->void:
-	return_context="greenhouse";arrangement_shade.color=Color(0.20,0.105,0.07,.30);visible=true;_show_page(home_page);_refresh_home()
+	return_context="greenhouse";visible=true;_show_page(home_page);_refresh_home()
 
 func open_pot_shop()->void:
-	return_context="shop";arrangement_shade.color=Color("#43281f");visible=true;_show_page(shop_page);_refresh_pot_shop()
+	return_context="shop";visible=true;_show_page(shop_page);_refresh_pot_shop()
 
 func close()->void:
 	drag_active=false;visible=false;close_requested.emit(return_context)
@@ -98,7 +97,7 @@ func show_pot_shop_message(message:String)->void:
 	shop_message.text=message;_refresh_pot_shop_cards()
 
 func _build_ui()->void:
-	arrangement_shade=ColorRect.new();arrangement_shade.color=Color(0.20,0.105,0.07,.30);arrangement_shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);arrangement_shade.mouse_filter=Control.MOUSE_FILTER_STOP;add_child(arrangement_shade)
+	var shade:=ColorRect.new();shade.color=Color("#43281f");shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);shade.mouse_filter=Control.MOUSE_FILTER_STOP;add_child(shade)
 	home_page=_page();_build_home_page()
 	pot_select_page=_page();_build_pot_select_page()
 	editor_page=_page();_build_editor_page()
@@ -178,7 +177,7 @@ func _build_editor_page()->void:
 	var back:=_button("もどる",Vector2(18,20),Vector2(98,50),Color("#f4dfb8"),15);back.pressed.connect(_return_home_from_editor);editor_page.add_child(back)
 	editor_name=LineEdit.new();editor_name.placeholder_text="寄せ植えの名前";editor_name.position=Vector2(124,20);editor_name.size=Vector2(286,50);editor_name.add_theme_font_size_override("font_size",18);editor_name.add_theme_color_override("font_color",UI_BROWN);editor_name.add_theme_stylebox_override("normal",_box(Color("#fff3d8"),Color("#b47d49"),16,2));editor_page.add_child(editor_name)
 	var save:=_button("完成 / 保存",Vector2(418,20),Vector2(140,50),Color("#d7aa64"),15);save.pressed.connect(_save_current_arrangement);editor_page.add_child(save)
-	editor_canvas=Panel.new();editor_canvas.position=Vector2(20,88);editor_canvas.size=Vector2(536,552);editor_canvas.clip_contents=false;editor_canvas.add_theme_stylebox_override("panel",_box(Color(0.97,.91,.80,.86),Color("#c58b50"),24,4));editor_page.add_child(editor_canvas)
+	editor_canvas=Panel.new();editor_canvas.position=Vector2(20,88);editor_canvas.size=Vector2(536,552);editor_canvas.clip_contents=false;editor_canvas.add_theme_stylebox_override("panel",_box(Color("#f8e9c9"),Color("#c58b50"),24,4));editor_page.add_child(editor_canvas)
 	editor_pot_layer=Control.new();editor_pot_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);editor_pot_layer.mouse_filter=Control.MOUSE_FILTER_IGNORE;editor_canvas.add_child(editor_pot_layer)
 	editor_plant_layer=Control.new();editor_plant_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);editor_plant_layer.mouse_filter=Control.MOUSE_FILTER_IGNORE;editor_canvas.add_child(editor_plant_layer)
 	editor_message=Label.new();editor_message.position=Vector2(28,648);editor_message.size=Vector2(520,31);editor_message.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;editor_message.add_theme_font_size_override("font_size",15);editor_message.add_theme_color_override("font_color",Color("#f5d48c"));editor_page.add_child(editor_message)
@@ -379,7 +378,7 @@ func _build_viewer_page()->void:
 	_build_header(viewer_page,"完成した寄せ植え",_return_from_viewer)
 	var edit:=_button("編集",Vector2(458,24),Vector2(98,54),Color("#d7aa64"),16);edit.pressed.connect(_edit_viewed_arrangement);viewer_page.add_child(edit)
 	viewer_name=Label.new();viewer_name.position=Vector2(30,90);viewer_name.size=Vector2(516,48);viewer_name.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;viewer_name.add_theme_font_size_override("font_size",24);viewer_name.add_theme_color_override("font_color",Color("#f5d48c"));viewer_page.add_child(viewer_name)
-	viewer_canvas=Panel.new();viewer_canvas.position=Vector2(20,150);viewer_canvas.size=Vector2(536,552);viewer_canvas.clip_contents=false;viewer_canvas.add_theme_stylebox_override("panel",_box(Color(0.97,.91,.80,.86),Color("#c58b50"),24,4));viewer_page.add_child(viewer_canvas)
+	viewer_canvas=Panel.new();viewer_canvas.position=Vector2(20,150);viewer_canvas.size=Vector2(536,552);viewer_canvas.clip_contents=false;viewer_canvas.add_theme_stylebox_override("panel",_box(Color("#f8e9c9"),Color("#c58b50"),24,4));viewer_page.add_child(viewer_canvas)
 	viewer_pot_layer=Control.new();viewer_pot_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);viewer_pot_layer.mouse_filter=Control.MOUSE_FILTER_IGNORE;viewer_canvas.add_child(viewer_pot_layer)
 	viewer_plant_layer=Control.new();viewer_plant_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);viewer_plant_layer.mouse_filter=Control.MOUSE_FILTER_IGNORE;viewer_canvas.add_child(viewer_plant_layer)
 	var note:=Label.new();note.text="完成作品では編集用の枠を表示しません";note.position=Vector2(30,728);note.size=Vector2(516,34);note.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;note.add_theme_font_size_override("font_size",16);note.add_theme_color_override("font_color",Color("#e8cfaa"));viewer_page.add_child(note)
