@@ -7,4 +7,4 @@
 - Before every push, verify `git remote -v` points only to the dedicated `puku-puku-taniku` repository.
 - The game uses Godot 4.x, GDScript, and the Compatibility renderer.
 - Keep the root Web export (`index.html`, `index.js`, `index.wasm`, `index.pck`, and related assets) deployable on GitHub Pages.
-
+- After any Web change, build, or push, include the complete browser-ready GitHub Pages URL in the final report, even if deployment may still be propagating.
