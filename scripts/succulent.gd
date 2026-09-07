@@ -107,7 +107,9 @@ func setup(species: Dictionary, seed_value: int, screen_label: Label, _danger: L
 	_build_contact_shadow()
 	plant_sprite = Sprite3D.new()
 	var variant := str(data.get("visual_variant", "laui"))
-	plant_sprite.texture = load(str(SPRITES.get(variant, SPRITES.laui)))
+	var configured_image_path:=str(data.get("image_path",""))
+	var texture_path:=configured_image_path if not configured_image_path.is_empty() and ResourceLoader.exists(configured_image_path) else str(SPRITES.get(variant, SPRITES.laui))
+	plant_sprite.texture = load(texture_path)
 	plant_sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	plant_sprite.no_depth_test = false
 	plant_sprite.alpha_cut = SpriteBase3D.ALPHA_CUT_DISABLED

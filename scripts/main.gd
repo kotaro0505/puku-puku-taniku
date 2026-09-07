@@ -6,6 +6,8 @@ const SucculentClass = preload("res://scripts/succulent.gd")
 const AudioManagerClass = preload("res://scripts/audio_manager.gd")
 const JellyBalanceClass = preload("res://scripts/jelly_balance.gd")
 const ArrangementUIClass = preload("res://scripts/arrangement_ui.gd")
+const CatalogPreviewDevClass = preload("res://scripts/catalog_preview_dev.gd")
+const DEVELOPMENT_CATALOG_PREVIEW_ENABLED := true
 const PROGRESSION_VERSION := 8
 const NORMAL_GERMINATION_COUNT := 24
 const VOLUME_GERMINATION_COUNT := 36
@@ -127,6 +129,7 @@ const SERIES_CAROUSEL_SWIPE_THRESHOLD := 78.0
 const SERIES_CAROUSEL_SLIDE_SECONDS := 0.28
 
 var rng := RandomNumberGenerator.new()
+var catalog_preview_rng := RandomNumberGenerator.new()
 var species: Array = []
 var catalog_species: Array = []
 var opening_species: Array = []
@@ -294,6 +297,9 @@ var jelly_dev_total_label:Label
 var jelly_trait_toggle_button:Button
 var jelly_trait_display_enabled:=false
 var dev_jelly_test_active:=false
+var catalog_preview_ui
+var catalog_preview_settings_button:Button
+var catalog_preview_mode_active:=false
 var last_jelly_claim_msec:=-1000000000
 var audio_manager: Node
 var audio_settings: Dictionary = {"bgm_enabled":true,"se_enabled":true,"bgm_volume":0.65,"se_volume":0.62}
@@ -403,6 +409,7 @@ func _ready() -> void:
 	_configure_habitat_texture_ab()
 	_configure_habitat_background_ab()
 	rng.randomize()
+	catalog_preview_rng.randomize()
 	_load_species()
 	_load_series_data()
 	_load_pot_data()
@@ -749,6 +756,7 @@ func _build_ui() -> void:
 	_build_arrangement_ui(hud)
 	_build_result_overlay(hud)
 	_build_settings(hud)
+	if DEVELOPMENT_CATALOG_PREVIEW_ENABLED:_build_catalog_preview_dev(hud)
 	_build_jelly_dev_overlay(hud)
 	_build_intro_story(hud)
 	_build_tutorial_guide(hud)
@@ -840,7 +848,7 @@ func _sync_arrangement_ui()->void:
 	arrangement_ui.configure(catalog_species,series_catalog,pot_catalog,discovered,owned_pots,saved_arrangements,arrangement_save_capacity,coins,_species_texture)
 
 func _open_arrangements()->void:
-	if not _tutorial_fully_complete() or current_mode!="greenhouse" or play_active or arrangement_scene_active or arrangement_transitioning:return
+	if not _tutorial_fully_complete() or current_mode!="greenhouse" or play_active or catalog_preview_mode_active or arrangement_scene_active or arrangement_transitioning:return
 	play_modal_open=false;pointer_down=false;greenhouse_drag_accumulator=0.0;greenhouse_drag_started=false
 	saved_greenhouse_pan_x=greenhouse_pan_x;greenhouse_pan_target_x=greenhouse_pan_x
 	arrangement_scene_active=true;arrangement_transitioning=true
@@ -1252,7 +1260,48 @@ func _build_settings(hud:Control)->void:
 	var note:=Label.new();note.text="音源はモード・効果ごとに後から差し替えできます";note.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;note.add_theme_font_size_override("font_size",14);note.add_theme_color_override("font_color",Color("#76513b"));content.add_child(note)
 	var reset:=Button.new();reset.text="開発用：進行を初期状態へ戻す";reset.custom_minimum_size=Vector2(370,58);_skin_button(reset,Color("#d9c49d"),16);reset.pressed.connect(_reset_progression_for_development.bind(reset));content.add_child(reset)
 	var jelly_test:=Button.new();jelly_test.text="開発用：ジュレテスト";jelly_test.custom_minimum_size=Vector2(370,58);_skin_button(jelly_test,Color("#c7b4d9"),17);jelly_test.pressed.connect(_open_jelly_dev);content.add_child(jelly_test)
+	if DEVELOPMENT_CATALOG_PREVIEW_ENABLED:
+		catalog_preview_settings_button=Button.new();catalog_preview_settings_button.text="開発用：品種プレビュー";catalog_preview_settings_button.custom_minimum_size=Vector2(370,58);_skin_button(catalog_preview_settings_button,Color("#c7d6ad"),17);catalog_preview_settings_button.pressed.connect(_open_catalog_preview_dev);content.add_child(catalog_preview_settings_button)
 	var close:=Button.new();close.text="閉じる";close.custom_minimum_size=Vector2(280,55);_skin_button(close,Color("#ead8b1"),18);close.pressed.connect(_close_settings);content.add_child(close)
+
+func _build_catalog_preview_dev(hud:Control)->void:
+	catalog_preview_ui=CatalogPreviewDevClass.new();hud.add_child(catalog_preview_ui)
+	catalog_preview_ui.preview_species_requested.connect(_preview_catalog_species)
+	catalog_preview_ui.preview_batch_requested.connect(_preview_catalog_batch)
+	catalog_preview_ui.clear_requested.connect(_clear_catalog_preview_plants)
+	catalog_preview_ui.close_requested.connect(_update_play_ui)
+	catalog_preview_ui.configure(catalog_species,series_catalog)
+
+func _open_catalog_preview_dev()->void:
+	if not DEVELOPMENT_CATALOG_PREVIEW_ENABLED or catalog_preview_ui==null or play_active or rain_bonus_active or arrangement_scene_active:return
+	settings_overlay.visible=false;play_modal_open=false;current_mode="greenhouse";_apply_mode()
+	catalog_preview_ui.configure(catalog_species,series_catalog);catalog_preview_ui.open();_update_play_ui()
+
+func _preview_catalog_species(species_id:String)->void:
+	_preview_catalog_batch([species_id],str(_catalog_entry(species_id).get("name_ja",species_id)))
+
+func _preview_catalog_batch(species_ids:Array,_series_name:String)->void:
+	if not DEVELOPMENT_CATALOG_PREVIEW_ENABLED:return
+	_clear_catalog_preview_plants(false)
+	catalog_preview_mode_active=true
+	for species_id_value in species_ids:_spawn_specific_plant(str(species_id_value),true)
+	if catalog_preview_ui:catalog_preview_ui.set_session_active(not _catalog_preview_plants().is_empty())
+	_update_play_ui()
+
+func _catalog_preview_plants()->Array:
+	var result:Array=[]
+	for plant in plants:
+		if is_instance_valid(plant) and bool(plant.get_meta("catalog_preview",false)):result.append(plant)
+	return result
+
+func _clear_catalog_preview_plants(update_ui:=true)->void:
+	for plant in _catalog_preview_plants():
+		plants.erase(plant)
+		if plant.label and is_instance_valid(plant.label):plant.label.free()
+		plant.free()
+	catalog_preview_mode_active=false
+	if catalog_preview_ui:catalog_preview_ui.set_session_active(false)
+	if update_ui:_update_play_ui()
 
 func _build_jelly_dev_overlay(hud:Control)->void:
 	jelly_dev_overlay=Control.new();jelly_dev_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);jelly_dev_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;jelly_dev_overlay.visible=false;hud.add_child(jelly_dev_overlay)
@@ -1420,7 +1469,7 @@ func _close_play_modal()->void:
 
 func _start_greenhouse_play(seed_type:String)->void:
 	dev_jelly_test_active=false
-	if play_active:return
+	if play_active or catalog_preview_mode_active:return
 	if seed_type=="old":
 		if old_seed_bags<1:return
 		old_seed_bags-=1;current_target_count=OLD_SEED_GERMINATION_COUNT
@@ -1481,11 +1530,18 @@ func _resolve_tovar_event_after_play()->void:
 		tovar_next_play=normal_play_count+(2 if tovar_attempt_count==1 else 3)
 	tovar_event_active=false;tovar_harvested_this_play=false
 
-func _spawn_specific_plant(species_id:String)->void:
+func _spawn_specific_plant(species_id:String,is_catalog_preview:=false)->void:
+	if is_catalog_preview and not DEVELOPMENT_CATALOG_PREVIEW_ENABLED:return
 	var chosen:=_catalog_entry(species_id)
 	if chosen.is_empty():return
-	var pos:=_find_spawn_position();var label:=_plant_label();labels_layer.add_child(label)
-	var p=SucculentClass.new();p.original_pos=pos;p.position=pos;world_root.add_child(p);p.setup(chosen,rng.randi(),label,null);p.jelly_permission=Callable(self,"_try_claim_jelly");p.harvested.connect(_on_harvested);p.jellied.connect(_on_jellied);plants.append(p)
+	var spawn_rng:=catalog_preview_rng if is_catalog_preview else rng
+	var pos:=_find_spawn_position(spawn_rng);var label:=_plant_label();labels_layer.add_child(label)
+	var p=SucculentClass.new();p.original_pos=pos;p.position=pos;p.set_meta("catalog_preview",is_catalog_preview);world_root.add_child(p);p.setup(chosen,spawn_rng.randi(),label,null)
+	if is_catalog_preview:
+		p.harvested.connect(_on_catalog_preview_harvested);p.jellied.connect(_on_catalog_preview_jellied)
+	else:
+		p.jelly_permission=Callable(self,"_try_claim_jelly");p.harvested.connect(_on_harvested);p.jellied.connect(_on_jellied)
+	plants.append(p)
 	if audio_manager:audio_manager.play_se("sprout",.28)
 
 func _catalog_entry(species_id:String)->Dictionary:
@@ -1502,7 +1558,8 @@ func _clear_greenhouse_plants()->void:
 
 func _update_play_ui()->void:
 	if not play_overlay:return
-	var arrangement_navigation_suspended:=arrangement_scene_active or arrangement_transitioning
+	var preview_overlay_open:bool=catalog_preview_ui!=null and catalog_preview_ui.is_overlay_open()
+	var arrangement_navigation_suspended:bool=arrangement_scene_active or arrangement_transitioning or catalog_preview_mode_active or preview_overlay_open
 	play_overlay.visible=current_mode=="greenhouse" and not play_active and play_modal_open
 	play_open_button.visible=current_mode=="greenhouse" and intro_story_complete and not play_active and not play_modal_open and not arrangement_navigation_suspended and (not result_overlay or not result_overlay.visible) and (not shop_overlay or not shop_overlay.visible) and (not encyclopedia_overlay or not encyclopedia_overlay.visible) and (not settings_overlay or not settings_overlay.visible) and (not arrangement_ui or not arrangement_ui.visible)
 	seed_bag_panel.visible=current_mode=="greenhouse" and play_active and not rain_bonus_active and active_seed_type!="old"
@@ -1527,6 +1584,7 @@ func _update_play_ui()->void:
 	mystery_play_button.visible=mystery_seed_bags>0 and _mystery_seed_pack_unlocked();mystery_play_button.text="謎種パックをまく　5粒　残り%d袋"%mystery_seed_bags;mystery_play_button.disabled=not _mystery_seed_pack_unlocked() or mystery_seed_bags<1
 
 func _open_shop()->void:
+	if catalog_preview_mode_active:return
 	if not _tutorial_fully_complete():
 		shop_overlay.visible=false;_set_shop_purchase_visible(false);_update_play_ui();return
 	play_modal_open=false;_set_shop_purchase_visible(true);_update_shop_ui();shop_message.text="たね袋を1袋ずつ購入できます";play_overlay.visible=false;shop_chatter_bubble.visible=false;shop_overlay.visible=true;audio_manager.play_bgm("shop");_prepare_shop_visit();_update_play_ui()
@@ -1817,6 +1875,7 @@ func _build_series_card(parent:Control,relative_index:int)->Dictionary:
 	return {"relative_index":relative_index,"container":card,"title":title,"subtitle":subtitle,"cover_image":cover_image,"cover_placeholder":cover_placeholder,"lock_label":lock_label,"description":description,"progress":progress,"get_label":get_label,"open_button":open_button,"detail_nodes":[title,subtitle,description,progress,get_label,open_button]}
 
 func _open_encyclopedia()->void:
+	if catalog_preview_mode_active:return
 	if not encyclopedia_unlocked:return
 	play_modal_open=false;encyclopedia_detail_page.visible=false;encyclopedia_list_page.visible=false;encyclopedia_series_page.visible=true;play_overlay.visible=false;encyclopedia_overlay.visible=true;_refresh_series_selection();_update_play_ui()
 
@@ -2456,14 +2515,15 @@ func _seed_new_species_blocked(species_id:String)->bool:
 	if species_id in _mystery_event_species_ids():return true
 	return species_id in [HIDDEN_PINWHEEL_ID,HIDDEN_TOVAR_ID,HIDDEN_BUSTAMANTE_ID,MYSTERY_RESEARCH_TRANSPARENT_ID,"golden_laui","golden_kannte"]
 
-func _find_spawn_position()->Vector3:
+func _find_spawn_position(position_rng:RandomNumberGenerator=null)->Vector3:
 	# Sample world positions, but accept them only after projecting into the
 	# scrolling background image's source-pixel coordinates.
+	var spawn_rng:=position_rng if position_rng!=null else rng
 	var best := Vector3.ZERO
 	var best_clearance := -1.0
 	for attempt in range(192):
-		var angle := rng.randf_range(0.0, TAU)
-		var radius := sqrt(rng.randf())
+		var angle := spawn_rng.randf_range(0.0, TAU)
+		var radius := sqrt(spawn_rng.randf())
 		var candidate := Vector3(cos(angle)*3.55*radius,.12,sin(angle)*3.15*radius)
 		if not _spawn_center_inside_soil(candidate):continue
 		var clearance := 99.0
@@ -2558,7 +2618,7 @@ func _process(delta:float)->void:
 		if rain_spawn_queue>0 and plants.size()<RAIN_MAX_ACTIVE_PLANTS:
 			rain_spawn_timer-=delta
 			if rain_spawn_timer<=0.0:rain_spawn_queue-=1;spawn_plant();rain_spawn_timer=rng.randf_range(.14,.32)
-	elif current_mode=="greenhouse" and (play_active or dev_jelly_test_active):
+	elif current_mode=="greenhouse" and (play_active or dev_jelly_test_active or catalog_preview_mode_active):
 		for p in plants:
 			if is_instance_valid(p):p.simulate(delta)
 		if play_spawn_queue>0:
@@ -2585,6 +2645,7 @@ func _update_habitat_view_follow(delta:float)->void:
 	_apply_view_rotation()
 
 func _toggle_mode()->void:
+	if catalog_preview_mode_active:return
 	if rain_bonus_active:return
 	if current_mode=="greenhouse" and not habitat_unlocked:return
 	var leaving_habitat:=current_mode=="habitat"
@@ -2689,8 +2750,8 @@ func _update_labels()->void:
 func _input(event:InputEvent)->void:
 	if audio_manager and (event is InputEventScreenTouch or event is InputEventMouseButton or event is InputEventKey):audio_manager.notify_user_gesture()
 	if arrangement_scene_active or arrangement_transitioning:return
-	if (tutorial_guide_overlay and tutorial_guide_overlay.visible) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible):return
-	if current_mode=="greenhouse" and not play_active:return
+	if (tutorial_guide_overlay and tutorial_guide_overlay.visible) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible):return
+	if current_mode=="greenhouse" and not play_active and not catalog_preview_mode_active:return
 	if event is InputEventScreenTouch:
 		if event.pressed:
 			_begin_pointer(event.position)
@@ -2819,6 +2880,7 @@ func _show_habitat_message(world_position:Vector3,message:String,color:Color)->v
 	var tween:=create_tween().bind_node(label).set_parallel();tween.tween_property(label,"position:y",label.position.y-70,.7);tween.tween_property(label,"modulate:a",0.0,.7).set_delay(.25);tween.chain().tween_callback(label.queue_free)
 
 func _on_harvested(p)->void:
+	if bool(p.get_meta("catalog_preview",false)):_on_catalog_preview_harvested(p);return
 	if dev_jelly_test_active:
 		plants.erase(p);var tween:=create_tween().bind_node(p);tween.tween_property(p,"scale",Vector3.ONE*.01,.2);_cleanup_later(p,.25);return
 	var deferred_tovar:=tovar_event_active and str(p.data.species_id)==HIDDEN_TOVAR_ID
@@ -2845,14 +2907,26 @@ func _on_harvested(p)->void:
 	_cleanup_later(p,.68)
 
 func _on_jellied(p)->void:
+	if bool(p.get_meta("catalog_preview",false)):_on_catalog_preview_jellied(p);return
 	_show_float(p,"ジュレ",Color("#e7c9f0"))
 	audio_manager.play_se("jelly",.38)
 	var tw:=create_tween();tw.tween_property(p,"scale",Vector3(p.scale.x*1.05,p.scale.y*.46,p.scale.z*1.05),.28).set_trans(Tween.TRANS_BOUNCE);tw.tween_interval(.25);tw.tween_property(p,"scale",Vector3.ONE*0.01,.38)
 	_cleanup_later(p,1.0)
 
-func _cleanup_later(p,delay:float)->void:
-	recent_vacated_slots.append(p.original_pos)
-	while recent_vacated_slots.size()>12:recent_vacated_slots.pop_front()
+func _on_catalog_preview_harvested(p)->void:
+	_show_float(p,"プレビュー終了",Color("#d9c9f0"))
+	var tween:=create_tween().bind_node(p);tween.tween_property(p,"scale",Vector3.ONE*.01,.22)
+	_cleanup_later(p,.25,false)
+
+func _on_catalog_preview_jellied(p)->void:
+	_show_float(p,"ジュレ（プレビュー）",Color("#e7c9f0"))
+	var tween:=create_tween();tween.tween_property(p,"scale",Vector3(p.scale.x*1.05,p.scale.y*.46,p.scale.z*1.05),.28).set_trans(Tween.TRANS_BOUNCE);tween.tween_interval(.25);tween.tween_property(p,"scale",Vector3.ONE*.01,.38)
+	_cleanup_later(p,1.0,false)
+
+func _cleanup_later(p,delay:float,track_vacated:=true)->void:
+	if track_vacated:
+		recent_vacated_slots.append(p.original_pos)
+		while recent_vacated_slots.size()>12:recent_vacated_slots.pop_front()
 	plants.erase(p)
 	if rain_bonus_active and rain_time_remaining>0.0:
 		rain_spawn_queue=mini(RAIN_MAX_ACTIVE_PLANTS,rain_spawn_queue+2)
