@@ -104,6 +104,7 @@
     ],
     "field_id": "gummy_field",
     "unlock_type": "future",
+    "preview_catalog_when_locked": true,
     "unlock_condition": {"display_text": "開放条件は今後追加予定"},
     "iap_product_id": "",
     "sort_order": 50

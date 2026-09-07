@@ -141,6 +141,7 @@ var encyclopedia_grid: GridContainer
 var encyclopedia_scroll: ScrollContainer
 var encyclopedia_card_images: Array[TextureRect] = []
 var encyclopedia_card_entries: Array[Dictionary] = []
+var encyclopedia_silhouette_shader: Shader
 var series_catalog: Array = []
 var field_catalog: Dictionary = {}
 var selected_series_index := 0
@@ -1745,6 +1746,9 @@ func _is_series_unlocked(entry:Dictionary)->bool:
 	var series_id:=str(entry.get("series_id",""))
 	return str(entry.get("unlock_type","future"))=="default" or bool(unlocked_series.get(series_id,false))
 
+func _can_browse_series(entry:Dictionary)->bool:
+	return _is_series_unlocked(entry) or bool(entry.get("preview_catalog_when_locked",false))
+
 func _series_unlock_text(entry:Dictionary)->String:
 	if _is_series_unlocked(entry):return ""
 	var condition=entry.get("unlock_condition",{})
@@ -1801,7 +1805,10 @@ func _populate_series_card(card:Dictionary,series_index:int)->void:
 	card.title.text=str(entry.get("display_name","シリーズ図鑑"));card.subtitle.text=str(entry.get("subtitle",""));card.description.text=str(entry.get("description",""));card.progress.text="%d / %d種"%[_series_found_count(series_id),entries.size()];card.get_label.text="総GET %d"%_series_get_count(series_id)
 	cover_image.texture=load(cover_path) as Texture2D if not cover_path.is_empty() and ResourceLoader.exists(cover_path) else null
 	card.cover_placeholder.visible=cover_image.texture==null and unlocked;card.lock_label.visible=not unlocked;card.lock_label.text="🔒\n未開放\n表紙画像 準備中" if cover_image.texture==null else "🔒\n未開放"
-	card.open_button.disabled=not unlocked;card.open_button.text="図鑑をひらく" if unlocked else "🔒  未開放　%s"%_series_unlock_text(entry)
+	var browsable:=_can_browse_series(entry);card.open_button.disabled=not browsable
+	if unlocked:card.open_button.text="図鑑をひらく"
+	elif browsable:card.open_button.text="シルエット図鑑をみる"
+	else:card.open_button.text="🔒  未開放　%s"%_series_unlock_text(entry)
 	container.visible=series_catalog.size()>1 or int(card.relative_index)==0;container.set_meta("series_index",series_index);container.set_meta("series_id",series_id)
 
 func _change_series_selection(direction:int)->void:
@@ -1866,7 +1873,7 @@ func _cancel_series_carousel_motion()->void:
 
 func _open_selected_series_encyclopedia()->void:
 	var entry:=_current_series_entry()
-	if series_carousel_animating or series_swipe_tracking or entry.is_empty() or not _is_series_unlocked(entry):return
+	if series_carousel_animating or series_swipe_tracking or entry.is_empty() or not _can_browse_series(entry):return
 	current_encyclopedia_series_id=str(entry.get("series_id","base"));encyclopedia_series_page.visible=false;encyclopedia_detail_page.visible=false;encyclopedia_list_page.visible=true;_refresh_encyclopedia_header();_refresh_encyclopedia_cards()
 
 func _return_to_series_selection()->void:
@@ -1900,19 +1907,43 @@ func _open_current_series_field()->void:
 func _refresh_encyclopedia_cards()->void:
 	encyclopedia_card_images.clear();encyclopedia_card_entries.clear()
 	for child in encyclopedia_grid.get_children():child.free()
+	var series_entry:=_series_entry(current_encyclopedia_series_id);var allow_unfound_preview:=bool(series_entry.get("preview_catalog_when_locked",false));var unfound_status:=_encyclopedia_unfound_status(current_encyclopedia_series_id)
 	for entry in _series_species_entries(current_encyclopedia_series_id):
 		var species_id:=str(entry.get("species_id",""));var found:=bool(discovered.get(species_id,false))
-		var card:=Button.new();card.custom_minimum_size=Vector2(252,236);card.mouse_filter=Control.MOUSE_FILTER_PASS;card.mouse_force_pass_scroll_events=true;card.action_mode=BaseButton.ACTION_MODE_BUTTON_RELEASE;_skin_button(card,Color("#f6e7c5"),16);card.disabled=not found;encyclopedia_grid.add_child(card)
+		var card:=Button.new();card.custom_minimum_size=Vector2(252,236);card.mouse_filter=Control.MOUSE_FILTER_PASS;card.mouse_force_pass_scroll_events=true;card.action_mode=BaseButton.ACTION_MODE_BUTTON_RELEASE;_skin_button(card,Color("#f6e7c5"),16);card.disabled=not found and not allow_unfound_preview;encyclopedia_grid.add_child(card)
 		var content:=VBoxContainer.new();content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);content.offset_left=10;content.offset_top=8;content.offset_right=-10;content.offset_bottom=-8;content.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.alignment=BoxContainer.ALIGNMENT_CENTER;card.add_child(content)
 		var image_frame:=MarginContainer.new();image_frame.name="SpeciesCardImageFrame";image_frame.custom_minimum_size=Vector2(210,137);image_frame.add_theme_constant_override("margin_left",10);image_frame.add_theme_constant_override("margin_top",8);image_frame.add_theme_constant_override("margin_right",10);image_frame.add_theme_constant_override("margin_bottom",8);image_frame.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.add_child(image_frame)
 		var image:=TextureRect.new();image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.mouse_filter=Control.MOUSE_FILTER_IGNORE
-		if not found:image.modulate=Color(0.12,0.09,0.08,0.82)
+		_apply_encyclopedia_image_style(image,entry,found)
 		image_frame.add_child(image);encyclopedia_card_images.append(image);encyclopedia_card_entries.append(entry)
 		var name_label:=Label.new();name_label.text=str(entry.get("name_ja","？？？")) if found else "？？？";name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name_label.add_theme_font_size_override("font_size",18);name_label.add_theme_color_override("font_color",UI_BROWN);content.add_child(name_label)
-		var best_label_card:=Label.new();var card_best:=float(bests.get(species_id,0.0));best_label_card.text=(("自己ベスト  %.1f cm"%card_best) if card_best>0.0 else "自己ベスト　ー") if found else "未発見";best_label_card.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;best_label_card.add_theme_font_size_override("font_size",14);best_label_card.add_theme_color_override("font_color",Color("#79543a"));content.add_child(best_label_card)
+		var best_label_card:=Label.new();var card_best:=float(bests.get(species_id,0.0));best_label_card.text=(("自己ベスト  %.1f cm"%card_best) if card_best>0.0 else "自己ベスト　ー") if found else unfound_status;best_label_card.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;best_label_card.add_theme_font_size_override("font_size",14);best_label_card.add_theme_color_override("font_color",Color("#79543a"));content.add_child(best_label_card)
 		var get_label_card:=Label.new();get_label_card.text="GET %d"%_species_get_count(species_id) if found else "GET 0";get_label_card.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;get_label_card.add_theme_font_size_override("font_size",13);get_label_card.add_theme_color_override("font_color",Color("#98602e"));content.add_child(get_label_card)
-		if found:card.pressed.connect(_open_species_detail.bind(entry))
+		if found or allow_unfound_preview:card.pressed.connect(_open_species_detail.bind(entry))
 	call_deferred("_update_encyclopedia_visible_textures")
+
+func _encyclopedia_unfound_status(series_id:String)->String:
+	return "未開放" if not _is_series_unlocked(_series_entry(series_id)) else "未発見"
+
+func _apply_encyclopedia_image_style(image:TextureRect,entry:Dictionary,found:bool)->void:
+	image.modulate=Color.WHITE;image.material=null
+	if found:return
+	if encyclopedia_silhouette_shader==null:
+		encyclopedia_silhouette_shader=Shader.new();encyclopedia_silhouette_shader.code="""
+shader_type canvas_item;
+uniform vec4 silhouette_color : source_color = vec4(0.12, 0.09, 0.08, 0.82);
+uniform float remove_white_background = 0.0;
+void fragment() {
+	vec4 source = texture(TEXTURE, UV);
+	float lightest = max(source.r, max(source.g, source.b));
+	float darkest = min(source.r, min(source.g, source.b));
+	float near_white = smoothstep(0.965, 0.995, darkest);
+	float neutral = 1.0 - smoothstep(0.02, 0.10, lightest - darkest);
+	float background_mask = near_white * neutral * remove_white_background;
+	COLOR = vec4(silhouette_color.rgb, source.a * (1.0 - background_mask) * silhouette_color.a);
+}
+"""
+	var silhouette_material:=ShaderMaterial.new();silhouette_material.shader=encyclopedia_silhouette_shader;silhouette_material.set_shader_parameter("remove_white_background",1.0 if bool(entry.get("silhouette_remove_white_background",false)) else 0.0);image.material=silhouette_material
 
 func _update_encyclopedia_visible_textures()->void:
 	if not encyclopedia_overlay.visible or not encyclopedia_list_page.visible:return
@@ -2094,10 +2125,14 @@ func _open_species_detail(entry:Dictionary)->void:
 	var panel:=PanelContainer.new();panel.position=Vector2(28,115);panel.size=Vector2(520,760);panel.add_theme_stylebox_override("panel",_box(Color("#f6e7c5"),Color("#d3a75f"),24,4));encyclopedia_detail_page.add_child(panel)
 	var content:=VBoxContainer.new();content.alignment=BoxContainer.ALIGNMENT_CENTER;content.add_theme_constant_override("separation",18);panel.add_child(content)
 	var image_frame:=MarginContainer.new();image_frame.name="SpeciesImageFrame";image_frame.custom_minimum_size=Vector2(450,470);image_frame.add_theme_constant_override("margin_left",22);image_frame.add_theme_constant_override("margin_top",22);image_frame.add_theme_constant_override("margin_right",22);image_frame.add_theme_constant_override("margin_bottom",22);content.add_child(image_frame)
-	var image:=TextureRect.new();image.name="SpeciesImage";image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.texture=_species_texture(entry);image.mouse_filter=Control.MOUSE_FILTER_IGNORE;image_frame.add_child(image)
-	var name_label:=Label.new();name_label.text=str(entry.get("name_ja",""));name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name_label.add_theme_font_size_override("font_size",31);name_label.add_theme_color_override("font_color",UI_BROWN);content.add_child(name_label)
-	var species_id:=str(entry.get("species_id",""));var best_detail:=Label.new();best_detail.name="SpeciesBest";var best_cm:=float(bests.get(species_id,0.0));best_detail.text="自己ベスト  %.1f cm"%best_cm if best_cm>0.0 else "自己ベスト　ー";best_detail.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;best_detail.add_theme_font_size_override("font_size",23);best_detail.add_theme_color_override("font_color",Color("#98602e"));content.add_child(best_detail)
-	var get_detail:=Label.new();get_detail.name="SpeciesGetCount";get_detail.text="GET %d"%_species_get_count(species_id);get_detail.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;get_detail.add_theme_font_size_override("font_size",20);get_detail.add_theme_color_override("font_color",Color("#7f5a3d"));content.add_child(get_detail)
+	var species_id:=str(entry.get("species_id",""));var found:=bool(discovered.get(species_id,false))
+	var image:=TextureRect.new();image.name="SpeciesImage";image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.texture=_species_texture(entry);image.mouse_filter=Control.MOUSE_FILTER_IGNORE;_apply_encyclopedia_image_style(image,entry,found);image_frame.add_child(image)
+	var name_label:=Label.new();name_label.name="SpeciesName";name_label.text=str(entry.get("name_ja","")) if found else "？？？";name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name_label.add_theme_font_size_override("font_size",31);name_label.add_theme_color_override("font_color",UI_BROWN);content.add_child(name_label)
+	var description_text:=str(entry.get("description_ja","")) if found else _encyclopedia_unfound_status(current_encyclopedia_series_id)
+	if not description_text.is_empty():
+		var description:=Label.new();description.name="SpeciesDescription";description.text=description_text;description.custom_minimum_size=Vector2(450,48);description.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;description.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;description.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;description.add_theme_font_size_override("font_size",17);description.add_theme_color_override("font_color",Color("#79543a"));content.add_child(description)
+	var best_detail:=Label.new();best_detail.name="SpeciesBest";var best_cm:=float(bests.get(species_id,0.0));best_detail.text=("自己ベスト  %.1f cm"%best_cm if best_cm>0.0 else "自己ベスト　ー") if found else "自己ベスト　ー";best_detail.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;best_detail.add_theme_font_size_override("font_size",23);best_detail.add_theme_color_override("font_color",Color("#98602e"));content.add_child(best_detail)
+	var get_detail:=Label.new();get_detail.name="SpeciesGetCount";get_detail.text="GET %d"%_species_get_count(species_id) if found else "GET 0";get_detail.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;get_detail.add_theme_font_size_override("font_size",20);get_detail.add_theme_color_override("font_color",Color("#7f5a3d"));content.add_child(get_detail)
 
 func _box(bg: Color, border: Color, radius: int, width: int) -> StyleBoxFlat:
 	var s:=StyleBoxFlat.new(); s.bg_color=bg; s.border_color=border
