@@ -63,6 +63,13 @@ func _test_core_draws()->void:
 func _test_game_loop()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
+	assert(game._mystery_pod_dev_tools_allowed_for_environment(true,false,false))
+	assert(game._mystery_pod_dev_tools_allowed_for_environment(false,true,false))
+	assert(not game._mystery_pod_dev_tools_allowed_for_environment(false,false,true))
+	assert(not game._mystery_pod_dev_tools_allowed_for_environment(true,false,true))
+	assert(not game._mystery_pod_dev_tools_allowed_for_environment(false,false,false))
+	assert(game.mystery_pod_dev!=null and game.mystery_pod_settings_button!=null)
+	game._open_mystery_pod_dev();assert(game.mystery_pod_dev.visible);game.mystery_pod_dev.visible=false
 	game._reset_progression_state();game.intro_story_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.buyback_unlocked=true;game.total_play_count=3
 	var gummy:Dictionary=game._series_entry("gummy");assert(not game._is_series_unlocked(gummy) and game._can_browse_series(gummy))
 	game.current_encyclopedia_series_id="gummy";game.coins=10000;game._acquire_current_catalog("yen")

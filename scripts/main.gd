@@ -807,7 +807,7 @@ func _build_ui() -> void:
 	_build_result_overlay(hud)
 	_build_settings(hud)
 	_build_mystery_pod_ui(hud)
-	if DEVELOPMENT_MYSTERY_POD_TOOLS_ENABLED and OS.is_debug_build():_build_mystery_pod_dev(hud)
+	if _mystery_pod_dev_tools_allowed():_build_mystery_pod_dev(hud)
 	if DEVELOPMENT_CATALOG_PREVIEW_ENABLED:_build_catalog_preview_dev(hud)
 	_build_jelly_dev_overlay(hud)
 	_build_intro_story(hud)
@@ -1348,7 +1348,7 @@ func _build_settings(hud:Control)->void:
 	var jelly_test:=Button.new();jelly_test.text="開発用：ジュレテスト";jelly_test.custom_minimum_size=Vector2(370,58);_skin_button(jelly_test,Color("#c7b4d9"),17);jelly_test.pressed.connect(_open_jelly_dev);content.add_child(jelly_test)
 	if DEVELOPMENT_CATALOG_PREVIEW_ENABLED:
 		catalog_preview_settings_button=Button.new();catalog_preview_settings_button.text="開発用：品種プレビュー";catalog_preview_settings_button.custom_minimum_size=Vector2(370,58);_skin_button(catalog_preview_settings_button,Color("#c7d6ad"),17);catalog_preview_settings_button.pressed.connect(_open_catalog_preview_dev);content.add_child(catalog_preview_settings_button)
-	if DEVELOPMENT_MYSTERY_POD_TOOLS_ENABLED and OS.is_debug_build():
+	if _mystery_pod_dev_tools_allowed():
 		mystery_pod_settings_button=Button.new();mystery_pod_settings_button.text="開発用：不思議なさや調整";mystery_pod_settings_button.custom_minimum_size=Vector2(370,58);_skin_button(mystery_pod_settings_button,Color("#e1c48d"),16);mystery_pod_settings_button.pressed.connect(_open_mystery_pod_dev);content.add_child(mystery_pod_settings_button)
 	var close:=Button.new();close.text="閉じる";close.custom_minimum_size=Vector2(280,55);_skin_button(close,Color("#ead8b1"),18);close.pressed.connect(_close_settings);content.add_child(close)
 
@@ -1585,8 +1585,17 @@ func _sync_mystery_pod_ui()->void:
 	if mystery_pod_ui:
 		mystery_pod_ui.configure(mystery_pod_count,series_seed_inventory,series_catalog,unlocked_series,mystery_pod_system.iap_products,localized_iap_prices,mystery_pod_system.probability_text(unlocked_series,discovered),mystery_pod_iap!=null and mystery_pod_iap.native_available)
 
+func _mystery_pod_dev_tools_allowed()->bool:
+	return _mystery_pod_dev_tools_allowed_for_environment(OS.has_feature("web"),OS.is_debug_build(),OS.has_feature("ios"))
+
+func _mystery_pod_dev_tools_allowed_for_environment(is_web:bool,is_debug:bool,is_ios:bool)->bool:
+	if not DEVELOPMENT_MYSTERY_POD_TOOLS_ENABLED:return false
+	# GitHub Pages is exported as Release, while App Store builds must never expose these tools.
+	if is_ios and not is_debug:return false
+	return is_web or is_debug
+
 func _open_mystery_pod_dev()->void:
-	if not DEVELOPMENT_MYSTERY_POD_TOOLS_ENABLED or not OS.is_debug_build() or mystery_pod_dev==null:return
+	if not _mystery_pod_dev_tools_allowed() or mystery_pod_dev==null:return
 	settings_overlay.visible=false;mystery_pod_dev.configure(mystery_pod_system);mystery_pod_dev.open();_update_play_ui()
 
 func _on_mystery_pod_settings_changed()->void:
