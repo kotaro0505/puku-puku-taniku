@@ -20,6 +20,11 @@ const SPAWN_SPRITE_MARGIN_SOURCE_PX := 40.0
 const GREENHOUSE_DRAG_SCALE := 0.30
 const GREENHOUSE_DRAG_DEAD_ZONE := 3.0
 const GREENHOUSE_PAN_FOLLOW_SECONDS := 0.075
+const ARRANGEMENT_TRANSITION_SECONDS := 0.65
+const ARRANGEMENT_BACKDROP_OVERLAP_PX := 8.0
+const ARRANGEMENT_TABLE_SOURCE_CENTER := Vector2(260.0,530.0)
+const ARRANGEMENT_TABLE_SCREEN_TARGET_RATIO := Vector2(0.50,0.615)
+const ARRANGEMENT_POT_ANCHOR := Vector2(0.50,0.615)
 const HABITAT_DRAG_SCALE := 0.055
 const HABITAT_ITEM_RADIUS := 9.0
 const HABITAT_BEST_LINK_EVENT_CM := 30.0
@@ -95,11 +100,19 @@ var camera: Camera3D
 var world_root: Node3D
 var pot_root: Node3D
 var greenhouse_layer: CanvasLayer
+var arrangement_backdrop: TextureRect
 var greenhouse_backdrop: TextureRect
 var greenhouse_pan_x := 0.0
 var greenhouse_pan_target_x := 0.0
 var greenhouse_pan_limit := 0.0
 var greenhouse_world_pan_x := 0.0
+var arrangement_transition_x := 0.0
+var arrangement_transition_target_x := 0.0
+var arrangement_world_transition_x := 0.0
+var saved_greenhouse_pan_x := 0.0
+var arrangement_scene_active := false
+var arrangement_transitioning := false
+var arrangement_transition_tween: Tween
 var habitat_env: WorldEnvironment
 var habitat_environment: Environment
 var habitat_background_mode := "current"
@@ -590,6 +603,7 @@ func _evaluate_best_spawn_unlocks(apply_now:=true)->bool:
 
 func _build_world() -> void:
 	greenhouse_layer=CanvasLayer.new();greenhouse_layer.layer=-10;add_child(greenhouse_layer)
+	arrangement_backdrop=TextureRect.new();arrangement_backdrop.name="ArrangementBackdrop";arrangement_backdrop.texture=load("res://assets/arrangement/greenhouse-arrangement-area.jpg");arrangement_backdrop.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;arrangement_backdrop.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT;arrangement_backdrop.mouse_filter=Control.MOUSE_FILTER_IGNORE;greenhouse_layer.add_child(arrangement_backdrop)
 	greenhouse_backdrop=TextureRect.new();greenhouse_backdrop.texture=load("res://assets/greenhouse-main.jpg");greenhouse_backdrop.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;greenhouse_backdrop.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT;greenhouse_backdrop.mouse_filter=Control.MOUSE_FILTER_IGNORE;greenhouse_layer.add_child(greenhouse_backdrop)
 	world_root = Node3D.new(); add_child(world_root)
 	habitat_env=WorldEnvironment.new(); var env:=Environment.new()
@@ -777,15 +791,45 @@ func _sync_arrangement_ui()->void:
 	arrangement_ui.configure(catalog_species,series_catalog,pot_catalog,discovered,owned_pots,saved_arrangements,arrangement_save_capacity,coins,_species_texture)
 
 func _open_arrangements()->void:
-	if not _tutorial_fully_complete():return
-	play_modal_open=false;_sync_arrangement_ui();arrangement_ui.open_home();_update_play_ui()
+	if not _tutorial_fully_complete() or current_mode!="greenhouse" or play_active or arrangement_scene_active or arrangement_transitioning:return
+	play_modal_open=false;pointer_down=false;greenhouse_drag_accumulator=0.0;greenhouse_drag_started=false
+	saved_greenhouse_pan_x=greenhouse_pan_x;greenhouse_pan_target_x=greenhouse_pan_x
+	arrangement_scene_active=true;arrangement_transitioning=true
+	_sync_arrangement_ui();arrangement_ui.set_world_backdrop_mode(true,_arrangement_pot_anchor_screen());_update_play_ui()
+	arrangement_transition_target_x=_arrangement_focus_transition_for_pan(saved_greenhouse_pan_x)
+	_start_arrangement_transition(arrangement_transition_target_x,_finish_arrangement_entry)
 
 func _open_pot_shop()->void:
 	if not _tutorial_fully_complete():return
 	_hide_shop_chatter(true);_sync_arrangement_ui();arrangement_ui.open_pot_shop()
 
-func _on_arrangement_close_requested(_context:String)->void:
+func _on_arrangement_close_requested(context:String)->void:
+	if context=="greenhouse" and arrangement_scene_active:
+		if arrangement_transitioning:return
+		arrangement_transitioning=true;arrangement_transition_target_x=0.0;_update_play_ui()
+		_start_arrangement_transition(0.0,_finish_arrangement_return)
+		return
 	_update_play_ui()
+
+func _start_arrangement_transition(target_x:float,finished:Callable)->void:
+	if arrangement_transition_tween and arrangement_transition_tween.is_valid():arrangement_transition_tween.kill()
+	arrangement_transition_tween=create_tween()
+	arrangement_transition_tween.tween_method(_set_arrangement_transition_x,arrangement_transition_x,target_x,ARRANGEMENT_TRANSITION_SECONDS).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	arrangement_transition_tween.tween_callback(finished)
+
+func _set_arrangement_transition_x(value:float)->void:
+	arrangement_transition_x=value
+	_update_greenhouse_pan()
+
+func _finish_arrangement_entry()->void:
+	arrangement_transition_x=arrangement_transition_target_x;arrangement_transitioning=false
+	_update_greenhouse_pan();arrangement_ui.set_world_backdrop_mode(true,_arrangement_pot_anchor_screen());arrangement_ui.open_home();_update_play_ui()
+
+func _finish_arrangement_return()->void:
+	arrangement_transition_x=0.0;arrangement_transition_target_x=0.0
+	greenhouse_pan_x=clampf(saved_greenhouse_pan_x,-greenhouse_pan_limit,greenhouse_pan_limit);greenhouse_pan_target_x=greenhouse_pan_x
+	arrangement_transitioning=false;arrangement_scene_active=false
+	arrangement_ui.set_world_backdrop_mode(false,_arrangement_pot_anchor_screen());_update_greenhouse_pan();_update_play_ui()
 
 func _on_arrangement_save_requested(arrangement:Dictionary)->void:
 	var normalized:=_normalize_arrangement(arrangement)
@@ -1409,15 +1453,16 @@ func _clear_greenhouse_plants()->void:
 
 func _update_play_ui()->void:
 	if not play_overlay:return
+	var arrangement_navigation_suspended:=arrangement_scene_active or arrangement_transitioning
 	play_overlay.visible=current_mode=="greenhouse" and not play_active and play_modal_open
-	play_open_button.visible=current_mode=="greenhouse" and intro_story_complete and not play_active and not play_modal_open and (not result_overlay or not result_overlay.visible) and (not shop_overlay or not shop_overlay.visible) and (not encyclopedia_overlay or not encyclopedia_overlay.visible) and (not settings_overlay or not settings_overlay.visible) and (not arrangement_ui or not arrangement_ui.visible)
+	play_open_button.visible=current_mode=="greenhouse" and intro_story_complete and not play_active and not play_modal_open and not arrangement_navigation_suspended and (not result_overlay or not result_overlay.visible) and (not shop_overlay or not shop_overlay.visible) and (not encyclopedia_overlay or not encyclopedia_overlay.visible) and (not settings_overlay or not settings_overlay.visible) and (not arrangement_ui or not arrangement_ui.visible)
 	seed_bag_panel.visible=current_mode=="greenhouse" and play_active and not rain_bonus_active and active_seed_type!="old"
 	play_timer_label.visible=seed_bag_panel.visible
-	for control in external_navigation_controls:control.visible=not play_active
-	for control in encyclopedia_navigation_controls:control.visible=not play_active and encyclopedia_unlocked
-	if mode_button:mode_button.visible=not play_active and habitat_unlocked
-	if shop_button:shop_button.visible=not play_active and current_mode=="greenhouse" and _tutorial_fully_complete()
-	if arrangement_button:arrangement_button.visible=not play_active and current_mode=="greenhouse" and _tutorial_fully_complete()
+	for control in external_navigation_controls:control.visible=not play_active and not arrangement_navigation_suspended
+	for control in encyclopedia_navigation_controls:control.visible=not play_active and not arrangement_navigation_suspended and encyclopedia_unlocked
+	if mode_button:mode_button.visible=not play_active and not arrangement_navigation_suspended and habitat_unlocked
+	if shop_button:shop_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete()
+	if arrangement_button:arrangement_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete()
 	play_timer_label.text="● たね袋 ●\n残り %d粒"%play_seeds_remaining if play_timer_label.visible else ""
 	var held:Array[String]=[]
 	if old_seed_bags>0:held.append("古いたね %d袋"%old_seed_bags)
@@ -2163,6 +2208,10 @@ func _play_ui_tap()->void:
 	if audio_manager:audio_manager.notify_user_gesture();audio_manager.play_se("ui_tap",.22)
 
 func _layout() -> void:
+	if arrangement_scene_active:
+		arrangement_transition_target_x=_arrangement_focus_transition_for_pan(saved_greenhouse_pan_x)
+		if not arrangement_transitioning:arrangement_transition_x=arrangement_transition_target_x
+	if arrangement_ui:arrangement_ui.set_world_backdrop_mode(arrangement_scene_active,_arrangement_pot_anchor_screen())
 	_update_greenhouse_pan()
 
 func _update_greenhouse_pan()->void:
@@ -2175,14 +2224,39 @@ func _update_greenhouse_pan()->void:
 	greenhouse_pan_x=clampf(greenhouse_pan_x,-greenhouse_pan_limit,greenhouse_pan_limit)
 	greenhouse_pan_target_x=clampf(greenhouse_pan_target_x,-greenhouse_pan_limit,greenhouse_pan_limit)
 	greenhouse_backdrop.size=display_size
-	greenhouse_backdrop.position=Vector2((viewport_size.x-display_size.x)*.5+greenhouse_pan_x,(viewport_size.y-display_size.y)*.5)
+	var greenhouse_base_position:=Vector2((viewport_size.x-display_size.x)*.5,(viewport_size.y-display_size.y)*.5)
+	greenhouse_backdrop.position=greenhouse_base_position+Vector2(greenhouse_pan_x+arrangement_transition_x,0.0)
+	_update_arrangement_backdrop_layout(viewport_size,greenhouse_base_position.x)
 	if play_open_button:play_open_button.position=Vector2(198.0+greenhouse_pan_x,499.0)
 	greenhouse_world_pan_x=0.0
+	arrangement_world_transition_x=0.0
 	if camera:
 		var soil_center:=camera.unproject_position(Vector3(0,.12,0))
 		var soil_right:=camera.unproject_position(Vector3(1,.12,0))
 		var pixels_per_world:=soil_right.x-soil_center.x
-		if absf(pixels_per_world)>.001:greenhouse_world_pan_x=greenhouse_pan_x/pixels_per_world
+		if absf(pixels_per_world)>.001:
+			greenhouse_world_pan_x=greenhouse_pan_x/pixels_per_world
+			arrangement_world_transition_x=arrangement_transition_x/pixels_per_world
+
+func _arrangement_backdrop_scale(viewport_size:Vector2)->float:
+	if arrangement_backdrop==null or arrangement_backdrop.texture==null:return 1.0
+	var texture_size:=arrangement_backdrop.texture.get_size();var target:=viewport_size*ARRANGEMENT_TABLE_SCREEN_TARGET_RATIO
+	return maxf(maxf(target.x/ARRANGEMENT_TABLE_SOURCE_CENTER.x,(viewport_size.x-target.x)/(texture_size.x-ARRANGEMENT_TABLE_SOURCE_CENTER.x)),maxf(target.y/ARRANGEMENT_TABLE_SOURCE_CENTER.y,(viewport_size.y-target.y)/(texture_size.y-ARRANGEMENT_TABLE_SOURCE_CENTER.y)))
+
+func _update_arrangement_backdrop_layout(viewport_size:Vector2,greenhouse_base_x:float)->void:
+	if arrangement_backdrop==null or arrangement_backdrop.texture==null:return
+	var scale_factor:=_arrangement_backdrop_scale(viewport_size);var display_size:=arrangement_backdrop.texture.get_size()*scale_factor;var table_target:=viewport_size*ARRANGEMENT_TABLE_SCREEN_TARGET_RATIO
+	arrangement_backdrop.size=display_size
+	arrangement_backdrop.position=Vector2(greenhouse_base_x+greenhouse_pan_x+arrangement_transition_x-display_size.x+ARRANGEMENT_BACKDROP_OVERLAP_PX,table_target.y-ARRANGEMENT_TABLE_SOURCE_CENTER.y*scale_factor)
+
+func _arrangement_focus_transition_for_pan(pan_x:float)->float:
+	if greenhouse_backdrop==null or greenhouse_backdrop.texture==null or arrangement_backdrop==null or arrangement_backdrop.texture==null:return 0.0
+	var viewport_size:=get_viewport().get_visible_rect().size;var greenhouse_texture_size:=greenhouse_backdrop.texture.get_size();var greenhouse_scale:=maxf(viewport_size.x/greenhouse_texture_size.x,viewport_size.y/greenhouse_texture_size.y);var greenhouse_base_x:=(viewport_size.x-greenhouse_texture_size.x*greenhouse_scale)*.5
+	var arrangement_scale:=_arrangement_backdrop_scale(viewport_size);var arrangement_width:=arrangement_backdrop.texture.get_width()*arrangement_scale;var table_x_without_transition:=greenhouse_base_x+pan_x-arrangement_width+ARRANGEMENT_BACKDROP_OVERLAP_PX+ARRANGEMENT_TABLE_SOURCE_CENTER.x*arrangement_scale
+	return viewport_size.x*ARRANGEMENT_TABLE_SCREEN_TARGET_RATIO.x-table_x_without_transition
+
+func _arrangement_pot_anchor_screen()->Vector2:
+	return get_viewport().get_visible_rect().size*ARRANGEMENT_POT_ANCHOR
 
 func spawn_plant(force_golden := false,spawn_position:Variant=null) -> void:
 	if rain_bonus_active:
@@ -2532,8 +2606,15 @@ func _resolve_crowding(_delta:float)->void:
 	for p in plants:
 		if is_instance_valid(p):
 			p.target_offset = Vector3.ZERO
-			p.position.x = p.original_pos.x + (greenhouse_world_pan_x if current_mode=="greenhouse" else 0.0)
+			var combined_pan:=0.0
+			if current_mode=="greenhouse":combined_pan=greenhouse_world_pan_x+_arrangement_world_offset_for_position(p.original_pos+Vector3(greenhouse_world_pan_x,0,0))
+			p.position.x = p.original_pos.x+combined_pan
 			p.position.z = p.original_pos.z
+
+func _arrangement_world_offset_for_position(world_position:Vector3)->float:
+	if camera==null or is_zero_approx(arrangement_transition_x):return 0.0
+	var screen_x:=camera.unproject_position(world_position).x;var screen_right_x:=camera.unproject_position(world_position+Vector3.RIGHT).x;var pixels_per_world:=screen_right_x-screen_x
+	return arrangement_transition_x/pixels_per_world if absf(pixels_per_world)>.001 else arrangement_world_transition_x
 
 func _update_labels()->void:
 	if current_mode!="greenhouse" and not rain_bonus_active:
@@ -2558,6 +2639,7 @@ func _update_labels()->void:
 
 func _input(event:InputEvent)->void:
 	if audio_manager and (event is InputEventScreenTouch or event is InputEventMouseButton or event is InputEventKey):audio_manager.notify_user_gesture()
+	if arrangement_scene_active or arrangement_transitioning:return
 	if (tutorial_guide_overlay and tutorial_guide_overlay.visible) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible):return
 	if current_mode=="greenhouse" and not play_active:return
 	if event is InputEventScreenTouch:

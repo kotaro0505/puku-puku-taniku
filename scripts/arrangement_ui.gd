@@ -25,7 +25,10 @@ var save_capacity:=20
 var wallet_coins:=0
 var texture_resolver:Callable
 var return_context:="greenhouse"
+var world_backdrop_enabled:=false
+var world_pot_anchor_screen:=Vector2(288,630)
 
+var backdrop_shade:ColorRect
 var home_page:Control
 var home_summary:Label
 var home_list:VBoxContainer
@@ -88,7 +91,7 @@ func open_home()->void:
 	return_context="greenhouse";visible=true;_show_page(home_page);_refresh_home()
 
 func open_pot_shop()->void:
-	return_context="shop";visible=true;_show_page(shop_page);_refresh_pot_shop()
+	set_world_backdrop_mode(false,world_pot_anchor_screen);return_context="shop";visible=true;_show_page(shop_page);_refresh_pot_shop()
 
 func close()->void:
 	drag_active=false;visible=false;close_requested.emit(return_context)
@@ -96,8 +99,20 @@ func close()->void:
 func show_pot_shop_message(message:String)->void:
 	shop_message.text=message;_refresh_pot_shop_cards()
 
+func set_world_backdrop_mode(enabled:bool,pot_anchor_screen:Vector2)->void:
+	var changed:=world_backdrop_enabled!=enabled or not world_pot_anchor_screen.is_equal_approx(pot_anchor_screen)
+	world_backdrop_enabled=enabled;world_pot_anchor_screen=pot_anchor_screen
+	if backdrop_shade==null:return
+	backdrop_shade.color=Color(0.16,0.09,0.05,.22) if enabled else Color("#43281f")
+	if editor_canvas:
+		editor_canvas.add_theme_stylebox_override("panel",_box(Color(0.12,0.07,0.04,.12),Color(0.96,0.79,0.52,.62),24,3) if enabled else _box(Color("#f8e9c9"),Color("#c58b50"),24,4))
+	if viewer_canvas:
+		viewer_canvas.add_theme_stylebox_override("panel",_box(Color(0.12,0.07,0.04,.08),Color(0.96,0.79,0.52,.50),24,3) if enabled else _box(Color("#f8e9c9"),Color("#c58b50"),24,4))
+	if changed and visible and editor_page and editor_page.visible and not current_arrangement.is_empty():_rebuild_editor_scene()
+	if changed and visible and viewer_page and viewer_page.visible and not current_arrangement.is_empty():_render_readonly_arrangement(current_arrangement)
+
 func _build_ui()->void:
-	var shade:=ColorRect.new();shade.color=Color("#43281f");shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);shade.mouse_filter=Control.MOUSE_FILTER_STOP;add_child(shade)
+	backdrop_shade=ColorRect.new();backdrop_shade.color=Color("#43281f");backdrop_shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);backdrop_shade.mouse_filter=Control.MOUSE_FILTER_STOP;add_child(backdrop_shade)
 	home_page=_page();_build_home_page()
 	pot_select_page=_page();_build_pot_select_page()
 	editor_page=_page();_build_editor_page()
@@ -208,7 +223,7 @@ func _rebuild_editor_scene()->void:
 func _render_editor_pot(pot:Dictionary)->void:
 	if pot.is_empty():return
 	var placement:=Panel.new();var placement_rect:=_placement_rect(pot,editor_canvas.size);placement.position=placement_rect.position;placement.size=placement_rect.size;placement.mouse_filter=Control.MOUSE_FILTER_IGNORE;placement.add_theme_stylebox_override("panel",_box(Color(1,.92,.68,.08),Color(0.58,.36,.20,.34),20,2));editor_pot_layer.add_child(placement)
-	var holder:=Control.new();holder.position=Vector2(52,294);holder.size=Vector2(432,244);holder.mouse_filter=Control.MOUSE_FILTER_IGNORE;editor_pot_layer.add_child(holder);_render_pot(holder,pot,false)
+	var holder:=Control.new();holder.size=Vector2(432,244);holder.position=_pot_holder_position(editor_canvas,holder.size);holder.mouse_filter=Control.MOUSE_FILTER_IGNORE;editor_pot_layer.add_child(holder);_render_pot(holder,pot,false)
 
 func _create_editor_plant(index:int)->void:
 	var plant:Dictionary=editor_plants[index];var entry:=_species_entry(str(plant.get("species_id","")));var texture:=_resolve_texture(entry)
@@ -388,13 +403,17 @@ func _open_viewer(arrangement:Dictionary)->void:
 
 func _render_readonly_arrangement(arrangement:Dictionary)->void:
 	_clear_children(viewer_pot_layer);_clear_children(viewer_plant_layer)
-	var pot:=_pot_entry(str(arrangement.get("pot_id","")));var holder:=Control.new();holder.position=Vector2(52,294);holder.size=Vector2(432,244);holder.mouse_filter=Control.MOUSE_FILTER_IGNORE;viewer_pot_layer.add_child(holder);_render_pot(holder,pot,false)
+	var pot:=_pot_entry(str(arrangement.get("pot_id","")));var holder:=Control.new();holder.size=Vector2(432,244);holder.position=_pot_holder_position(viewer_canvas,holder.size);holder.mouse_filter=Control.MOUSE_FILTER_IGNORE;viewer_pot_layer.add_child(holder);_render_pot(holder,pot,false)
 	for plant_value in _plant_array(arrangement):
 		if not plant_value is Dictionary:continue
 		var plant:Dictionary=plant_value;var texture:=_resolve_texture(_species_entry(str(plant.get("species_id",""))))
 		if texture==null:continue
 		var root:=Control.new();root.size=PLANT_CONTROL_SIZE;root.pivot_offset=PLANT_CONTROL_SIZE*.5;root.position=Vector2(float(plant.get("x",0.0)),float(plant.get("y",0.0)))-PLANT_CONTROL_SIZE*.5;root.scale=Vector2.ONE*clampf(float(plant.get("scale",1.0)),PLANT_SCALE_MIN,PLANT_SCALE_MAX);root.rotation_degrees=fposmod(float(plant.get("rotation",0.0)),360.0);root.z_index=int(plant.get("z_index",0));root.mouse_filter=Control.MOUSE_FILTER_IGNORE;viewer_plant_layer.add_child(root)
 		var image:=TextureRect.new();image.texture=texture;image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.mouse_filter=Control.MOUSE_FILTER_IGNORE;root.add_child(image)
+
+func _pot_holder_position(canvas:Control,holder_size:Vector2)->Vector2:
+	if not world_backdrop_enabled:return Vector2(52,294)
+	return Vector2(world_pot_anchor_screen.x-canvas.position.x-holder_size.x*.5,world_pot_anchor_screen.y-canvas.position.y-holder_size.y*.94)
 
 func _return_from_viewer()->void:
 	_show_page(home_page);_refresh_home()
