@@ -25,6 +25,43 @@ const ARRANGEMENT_BACKDROP_OVERLAP_PX := 8.0
 const ARRANGEMENT_TABLE_SOURCE_CENTER := Vector2(260.0,530.0)
 const ARRANGEMENT_TABLE_SCREEN_TARGET_RATIO := Vector2(0.50,0.615)
 const ARRANGEMENT_POT_ANCHOR := Vector2(0.50,0.615)
+const ARRANGEMENT_COLOR_EXPOSURE := -0.12
+const ARRANGEMENT_COLOR_CONTRAST := 1.04
+const ARRANGEMENT_COLOR_SATURATION := 0.90
+const ARRANGEMENT_COLOR_TEMPERATURE := -0.025
+const ARRANGEMENT_COLOR_GREEN := 0.0
+const ARRANGEMENT_EDGE_BLEND_START := 0.72
+const ARRANGEMENT_EDGE_BLEND_STRENGTH := 0.65
+const ARRANGEMENT_COLOR_SHADER := """
+shader_type canvas_item;
+
+uniform float color_exposure = -0.12;
+uniform float color_contrast = 1.04;
+uniform float color_saturation = 0.90;
+uniform float color_temperature = -0.025;
+uniform float color_green = 0.0;
+uniform float edge_blend_start = 0.72;
+uniform float edge_blend_strength = 0.65;
+
+vec3 correct_color(vec3 color, float amount) {
+	color *= exp2(color_exposure * amount);
+	float contrast = mix(1.0, color_contrast, amount);
+	color = (color - vec3(0.5)) * contrast + vec3(0.5);
+	float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
+	float saturation = mix(1.0, color_saturation, amount);
+	color = mix(vec3(luminance), color, saturation);
+	float temperature = color_temperature * amount;
+	color *= vec3(1.0 + temperature, 1.0 + color_green * amount, 1.0 - temperature);
+	return clamp(color, vec3(0.0), vec3(1.0));
+}
+
+void fragment() {
+	vec4 source = texture(TEXTURE, UV) * COLOR;
+	float edge_blend = smoothstep(edge_blend_start, 1.0, UV.x);
+	float correction_amount = 1.0 + edge_blend * edge_blend_strength;
+	COLOR = vec4(correct_color(source.rgb, correction_amount), source.a);
+}
+"""
 const HABITAT_DRAG_SCALE := 0.055
 const HABITAT_ITEM_RADIUS := 9.0
 const HABITAT_BEST_LINK_EVENT_CM := 30.0
@@ -603,7 +640,7 @@ func _evaluate_best_spawn_unlocks(apply_now:=true)->bool:
 
 func _build_world() -> void:
 	greenhouse_layer=CanvasLayer.new();greenhouse_layer.layer=-10;add_child(greenhouse_layer)
-	arrangement_backdrop=TextureRect.new();arrangement_backdrop.name="ArrangementBackdrop";arrangement_backdrop.texture=load("res://assets/arrangement/greenhouse-arrangement-area.jpg");arrangement_backdrop.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;arrangement_backdrop.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT;arrangement_backdrop.mouse_filter=Control.MOUSE_FILTER_IGNORE;greenhouse_layer.add_child(arrangement_backdrop)
+	arrangement_backdrop=TextureRect.new();arrangement_backdrop.name="ArrangementBackdrop";arrangement_backdrop.texture=load("res://assets/arrangement/greenhouse-arrangement-area.jpg");arrangement_backdrop.material=_create_arrangement_color_material();arrangement_backdrop.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;arrangement_backdrop.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT;arrangement_backdrop.mouse_filter=Control.MOUSE_FILTER_IGNORE;greenhouse_layer.add_child(arrangement_backdrop)
 	greenhouse_backdrop=TextureRect.new();greenhouse_backdrop.texture=load("res://assets/greenhouse-main.jpg");greenhouse_backdrop.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;greenhouse_backdrop.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT;greenhouse_backdrop.mouse_filter=Control.MOUSE_FILTER_IGNORE;greenhouse_layer.add_child(greenhouse_backdrop)
 	world_root = Node3D.new(); add_child(world_root)
 	habitat_env=WorldEnvironment.new(); var env:=Environment.new()
@@ -616,6 +653,18 @@ func _build_world() -> void:
 	camera=Camera3D.new(); camera.fov=54.0; camera.current=true; world_root.add_child(camera)
 	_build_greenhouse_pot()
 	_apply_mode()
+
+func _create_arrangement_color_material()->ShaderMaterial:
+	var shader:=Shader.new();shader.code=ARRANGEMENT_COLOR_SHADER
+	var material:=ShaderMaterial.new();material.shader=shader
+	material.set_shader_parameter("color_exposure",ARRANGEMENT_COLOR_EXPOSURE)
+	material.set_shader_parameter("color_contrast",ARRANGEMENT_COLOR_CONTRAST)
+	material.set_shader_parameter("color_saturation",ARRANGEMENT_COLOR_SATURATION)
+	material.set_shader_parameter("color_temperature",ARRANGEMENT_COLOR_TEMPERATURE)
+	material.set_shader_parameter("color_green",ARRANGEMENT_COLOR_GREEN)
+	material.set_shader_parameter("edge_blend_start",ARRANGEMENT_EDGE_BLEND_START)
+	material.set_shader_parameter("edge_blend_strength",ARRANGEMENT_EDGE_BLEND_STRENGTH)
+	return material
 
 func _build_habitat_background(env:Environment)->void:
 	habitat_panorama_mesh=null

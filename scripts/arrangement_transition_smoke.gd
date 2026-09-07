@@ -14,6 +14,17 @@ func _ready()->void:
 	assert(game.greenhouse_backdrop.texture.resource_path=="res://assets/greenhouse-main.jpg")
 	assert(game.arrangement_backdrop.texture.resource_path=="res://assets/arrangement/greenhouse-arrangement-area.jpg")
 	assert(game.arrangement_backdrop.texture.get_size()==Vector2(790,971))
+	assert(game.greenhouse_backdrop.material==null)
+	var color_material:=game.arrangement_backdrop.material as ShaderMaterial
+	assert(color_material!=null and color_material.shader!=null)
+	assert(is_equal_approx(float(color_material.get_shader_parameter("color_exposure")),game.ARRANGEMENT_COLOR_EXPOSURE))
+	assert(is_equal_approx(float(color_material.get_shader_parameter("color_contrast")),game.ARRANGEMENT_COLOR_CONTRAST))
+	assert(is_equal_approx(float(color_material.get_shader_parameter("color_saturation")),game.ARRANGEMENT_COLOR_SATURATION))
+	assert(is_equal_approx(float(color_material.get_shader_parameter("color_temperature")),game.ARRANGEMENT_COLOR_TEMPERATURE))
+	assert(is_equal_approx(float(color_material.get_shader_parameter("color_green")),game.ARRANGEMENT_COLOR_GREEN))
+	assert(is_equal_approx(float(color_material.get_shader_parameter("edge_blend_start")),game.ARRANGEMENT_EDGE_BLEND_START))
+	assert(is_equal_approx(float(color_material.get_shader_parameter("edge_blend_strength")),game.ARRANGEMENT_EDGE_BLEND_STRENGTH))
+	assert("smoothstep(edge_blend_start, 1.0, UV.x)" in color_material.shader.code)
 	var viewport_size:Vector2=get_viewport().get_visible_rect().size
 	var main_texture_size:Vector2=game.greenhouse_backdrop.texture.get_size();var main_scale:=maxf(viewport_size.x/main_texture_size.x,viewport_size.y/main_texture_size.y);var main_display_size:=main_texture_size*main_scale;var main_base:=Vector2((viewport_size.x-main_display_size.x)*.5,(viewport_size.y-main_display_size.y)*.5)
 	var original_limit:=maxf(0.0,(main_display_size.x-viewport_size.x)*.5);assert(is_equal_approx(game.greenhouse_pan_limit,original_limit))
