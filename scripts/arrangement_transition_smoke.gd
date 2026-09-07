@@ -13,7 +13,7 @@ func _ready()->void:
 	assert(is_equal_approx(game.GREENHOUSE_PAN_FOLLOW_SECONDS,0.075))
 	assert(game.greenhouse_backdrop.texture.resource_path=="res://assets/greenhouse-main.jpg")
 	assert(game.arrangement_backdrop.texture.resource_path=="res://assets/arrangement/greenhouse-arrangement-area.jpg")
-	assert(game.arrangement_backdrop.texture.get_size()==Vector2(790,971))
+	assert(game.arrangement_backdrop.texture.get_size()==Vector2(960,1280))
 	assert(game.greenhouse_backdrop.material==null)
 	var color_material:=game.arrangement_backdrop.material as ShaderMaterial
 	assert(color_material!=null and color_material.shader!=null)
