@@ -14,6 +14,9 @@ func _ready()->void:
 	assert(game.greenhouse_backdrop.texture.resource_path=="res://assets/greenhouse-main.jpg")
 	assert(game.arrangement_backdrop.texture.resource_path=="res://assets/arrangement/greenhouse-arrangement-area.jpg")
 	assert(game.arrangement_backdrop.texture.get_size()==Vector2(960,1280))
+	assert(game.arrangement_boundary_foreground.texture.resource_path=="res://assets/arrangement/greenhouse-boundary-foreground.png")
+	assert(game.arrangement_boundary_foreground.texture.get_size()==Vector2(340,1285))
+	assert(game.arrangement_foreground_layer.layer==5 and game.arrangement_boundary_foreground.mouse_filter==Control.MOUSE_FILTER_IGNORE)
 	assert(game.greenhouse_backdrop.material==null)
 	var color_material:=game.arrangement_backdrop.material as ShaderMaterial
 	assert(color_material!=null and color_material.shader!=null)
@@ -28,12 +31,22 @@ func _ready()->void:
 	var viewport_size:Vector2=get_viewport().get_visible_rect().size
 	var main_texture_size:Vector2=game.greenhouse_backdrop.texture.get_size();var main_scale:=maxf(viewport_size.x/main_texture_size.x,viewport_size.y/main_texture_size.y);var main_display_size:=main_texture_size*main_scale;var main_base:=Vector2((viewport_size.x-main_display_size.x)*.5,(viewport_size.y-main_display_size.y)*.5)
 	var original_limit:=maxf(0.0,(main_display_size.x-viewport_size.x)*.5);assert(is_equal_approx(game.greenhouse_pan_limit,original_limit))
+	game.greenhouse_pan_x=0.0;game.greenhouse_pan_target_x=0.0;game.arrangement_transition_x=0.0;game._update_greenhouse_pan()
+	var arrangement_right:float=game.arrangement_backdrop.position.x+game.arrangement_backdrop.size.x
+	var greenhouse_left:float=game.greenhouse_backdrop.position.x
+	var boundary_visible_rect:Rect2=game._arrangement_boundary_visible_rect();var boundary_right:float=boundary_visible_rect.end.x
+	assert(is_equal_approx(greenhouse_left-arrangement_right,game.ARRANGEMENT_BOUNDARY_GAP_PX-game.ARRANGEMENT_BACKDROP_OVERLAP_PX))
+	assert(boundary_visible_rect.position.x<=arrangement_right and boundary_right>=greenhouse_left)
+	assert(boundary_right>0.0 and boundary_right<=viewport_size.x*.03)
+	assert(absf(game.arrangement_boundary_foreground.size.y-viewport_size.y)<EPSILON)
+	assert(game.arrangement_backdrop.size.x>viewport_size.x and absf(game.arrangement_backdrop.size.y-viewport_size.y)<EPSILON)
 	for pan_x in [-original_limit,0.0,original_limit]:
 		game.greenhouse_pan_x=pan_x;game.greenhouse_pan_target_x=pan_x;game.arrangement_transition_x=0.0;game._update_greenhouse_pan()
 		assert(game.greenhouse_backdrop.position.is_equal_approx(main_base+Vector2(pan_x,0.0)))
 		var focus_x:float=game._arrangement_focus_transition_for_pan(pan_x);game.arrangement_transition_x=focus_x;game._update_greenhouse_pan()
 		var arrangement_scale:float=game._arrangement_backdrop_scale(viewport_size);var displayed_table_center:Vector2=game.arrangement_backdrop.position+game.ARRANGEMENT_TABLE_SOURCE_CENTER*arrangement_scale
 		assert(displayed_table_center.distance_to(viewport_size*game.ARRANGEMENT_TABLE_SCREEN_TARGET_RATIO)<EPSILON)
+		assert(game._arrangement_boundary_visible_rect().position.x>=viewport_size.x-EPSILON)
 	game.arrangement_transition_x=0.0;game.greenhouse_pan_x=0.0;game.greenhouse_pan_target_x=0.0;game._update_greenhouse_pan()
 	var idle_target_before:float=game.greenhouse_pan_target_x
 	var idle_touch:=InputEventScreenTouch.new();idle_touch.pressed=true;idle_touch.position=Vector2(280,520);game._input(idle_touch)
@@ -45,16 +58,18 @@ func _ready()->void:
 	var before_follow:float=float(game.greenhouse_pan_x);game._update_greenhouse_pan_follow(game.GREENHOUSE_PAN_FOLLOW_SECONDS)
 	assert(game.greenhouse_pan_x>before_follow and game.greenhouse_pan_x<game.greenhouse_pan_target_x)
 	game.play_active=false;game.pointer_down=false;game.greenhouse_pan_target_x=game.greenhouse_pan_x;var stopped_pan:float=game.greenhouse_pan_x;game._input(idle_touch);game._input(idle_drag);assert(is_equal_approx(game.greenhouse_pan_x,stopped_pan) and is_equal_approx(game.greenhouse_pan_target_x,stopped_pan))
-	game._spawn_specific_plant("colorata");var plant=game.plants[0];game._resolve_crowding(0.0);game._update_labels();var plant_screen_before:Vector2=game.camera.unproject_position(plant.global_position);var backdrop_x_before:float=game.greenhouse_backdrop.position.x
+	game._spawn_specific_plant("colorata");var plant=game.plants[0];game._resolve_crowding(0.0);game._update_labels();var plant_screen_before:Vector2=game.camera.unproject_position(plant.global_position);var backdrop_x_before:float=game.greenhouse_backdrop.position.x;var boundary_x_before:float=game.arrangement_boundary_foreground.position.x
 	game._update_play_ui();assert(game.arrangement_button.visible)
 	game._open_arrangements();assert(game.arrangement_scene_active and game.arrangement_transitioning and not game.arrangement_ui.visible and is_equal_approx(game.saved_greenhouse_pan_x,stopped_pan) and is_equal_approx(game.greenhouse_pan_target_x,stopped_pan))
 	await get_tree().create_timer(.24).timeout
 	game._resolve_crowding(0.0);game._update_labels();var backdrop_delta:float=game.greenhouse_backdrop.position.x-backdrop_x_before;var plant_delta:float=game.camera.unproject_position(plant.global_position).x-plant_screen_before.x
 	assert(absf(backdrop_delta-plant_delta)<EPSILON and backdrop_delta>0.0)
+	assert(absf((game.arrangement_boundary_foreground.position.x-boundary_x_before)-backdrop_delta)<EPSILON)
 	await get_tree().create_timer(.48).timeout
 	assert(game.arrangement_scene_active and not game.arrangement_transitioning and game.arrangement_ui.visible and game.arrangement_ui.home_page.visible)
 	var arrangement_scale:float=game._arrangement_backdrop_scale(viewport_size);var table_center:Vector2=game.arrangement_backdrop.position+game.ARRANGEMENT_TABLE_SOURCE_CENTER*arrangement_scale;var expected_anchor:Vector2=viewport_size*game.ARRANGEMENT_POT_ANCHOR
-	assert(table_center.distance_to(viewport_size*game.ARRANGEMENT_TABLE_SCREEN_TARGET_RATIO)<EPSILON and table_center.y>viewport_size.y*.60 and table_center.y<viewport_size.y*.63)
+	assert(table_center.distance_to(viewport_size*game.ARRANGEMENT_TABLE_SCREEN_TARGET_RATIO)<EPSILON and table_center.y>viewport_size.y*.65 and table_center.y<viewport_size.y*.68)
+	assert(game._arrangement_boundary_visible_rect().position.x>=viewport_size.x-EPSILON)
 	assert(game.arrangement_ui.world_backdrop_enabled and game.arrangement_ui.world_pot_anchor_screen.is_equal_approx(expected_anchor) and game.arrangement_ui.backdrop_shade.color.a<.3)
 	game.arrangement_ui._start_new_arrangement();game.arrangement_ui._select_editor_pot("starter_terracotta")
 	var pot_holder:Control=game.arrangement_ui.editor_pot_layer.get_child(1);var holder_anchor:Vector2=game.arrangement_ui.editor_canvas.position+pot_holder.position+Vector2(pot_holder.size.x*.5,pot_holder.size.y*.94)

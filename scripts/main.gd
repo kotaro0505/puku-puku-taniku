@@ -29,26 +29,28 @@ const GREENHOUSE_DRAG_DEAD_ZONE := 3.0
 const GREENHOUSE_PAN_FOLLOW_SECONDS := 0.075
 const ARRANGEMENT_TRANSITION_SECONDS := 0.65
 const ARRANGEMENT_BACKDROP_OVERLAP_PX := 8.0
-const ARRANGEMENT_TABLE_SOURCE_CENTER := Vector2(416.0,695.0)
-const ARRANGEMENT_TABLE_SCREEN_TARGET_RATIO := Vector2(0.50,0.615)
-const ARRANGEMENT_POT_ANCHOR := Vector2(0.50,0.615)
-const ARRANGEMENT_COLOR_EXPOSURE := -0.12
-const ARRANGEMENT_COLOR_CONTRAST := 1.04
-const ARRANGEMENT_COLOR_SATURATION := 0.90
-const ARRANGEMENT_COLOR_TEMPERATURE := -0.025
+const ARRANGEMENT_BOUNDARY_GAP_PX := 140.0
+const ARRANGEMENT_BOUNDARY_SOURCE_VISIBLE_X := Vector2(11.0,328.0)
+const ARRANGEMENT_TABLE_SOURCE_CENTER := Vector2(480.0,850.0)
+const ARRANGEMENT_TABLE_SCREEN_TARGET_RATIO := Vector2(0.50,0.6640625)
+const ARRANGEMENT_POT_ANCHOR := Vector2(0.50,0.6640625)
+const ARRANGEMENT_COLOR_EXPOSURE := 0.04
+const ARRANGEMENT_COLOR_CONTRAST := 1.01
+const ARRANGEMENT_COLOR_SATURATION := 0.92
+const ARRANGEMENT_COLOR_TEMPERATURE := -0.015
 const ARRANGEMENT_COLOR_GREEN := 0.0
 const ARRANGEMENT_EDGE_BLEND_START := 0.72
-const ARRANGEMENT_EDGE_BLEND_STRENGTH := 0.65
+const ARRANGEMENT_EDGE_BLEND_STRENGTH := 0.35
 const ARRANGEMENT_COLOR_SHADER := """
 shader_type canvas_item;
 
-uniform float color_exposure = -0.12;
-uniform float color_contrast = 1.04;
-uniform float color_saturation = 0.90;
-uniform float color_temperature = -0.025;
+uniform float color_exposure = 0.04;
+uniform float color_contrast = 1.01;
+uniform float color_saturation = 0.92;
+uniform float color_temperature = -0.015;
 uniform float color_green = 0.0;
 uniform float edge_blend_start = 0.72;
-uniform float edge_blend_strength = 0.65;
+uniform float edge_blend_strength = 0.35;
 
 vec3 correct_color(vec3 color, float amount) {
 	color *= exp2(color_exposure * amount);
@@ -146,8 +148,10 @@ var camera: Camera3D
 var world_root: Node3D
 var pot_root: Node3D
 var greenhouse_layer: CanvasLayer
+var arrangement_foreground_layer: CanvasLayer
 var arrangement_backdrop: TextureRect
 var greenhouse_backdrop: TextureRect
+var arrangement_boundary_foreground: TextureRect
 var greenhouse_pan_x := 0.0
 var greenhouse_pan_target_x := 0.0
 var greenhouse_pan_limit := 0.0
@@ -696,6 +700,8 @@ func _build_world() -> void:
 	greenhouse_layer=CanvasLayer.new();greenhouse_layer.layer=-10;add_child(greenhouse_layer)
 	arrangement_backdrop=TextureRect.new();arrangement_backdrop.name="ArrangementBackdrop";arrangement_backdrop.texture=load("res://assets/arrangement/greenhouse-arrangement-area.jpg");arrangement_backdrop.material=_create_arrangement_color_material();arrangement_backdrop.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;arrangement_backdrop.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT;arrangement_backdrop.mouse_filter=Control.MOUSE_FILTER_IGNORE;greenhouse_layer.add_child(arrangement_backdrop)
 	greenhouse_backdrop=TextureRect.new();greenhouse_backdrop.texture=load("res://assets/greenhouse-main.jpg");greenhouse_backdrop.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;greenhouse_backdrop.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT;greenhouse_backdrop.mouse_filter=Control.MOUSE_FILTER_IGNORE;greenhouse_layer.add_child(greenhouse_backdrop)
+	arrangement_foreground_layer=CanvasLayer.new();arrangement_foreground_layer.name="ArrangementBoundaryForegroundLayer";arrangement_foreground_layer.layer=5;add_child(arrangement_foreground_layer)
+	arrangement_boundary_foreground=TextureRect.new();arrangement_boundary_foreground.name="ArrangementBoundaryForeground";arrangement_boundary_foreground.texture=load("res://assets/arrangement/greenhouse-boundary-foreground.png");arrangement_boundary_foreground.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;arrangement_boundary_foreground.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT;arrangement_boundary_foreground.mouse_filter=Control.MOUSE_FILTER_IGNORE;arrangement_foreground_layer.add_child(arrangement_boundary_foreground)
 	world_root = Node3D.new(); add_child(world_root)
 	habitat_env=WorldEnvironment.new(); var env:=Environment.new()
 	_build_habitat_background(env)
@@ -2639,6 +2645,7 @@ func _update_greenhouse_pan()->void:
 	var greenhouse_base_position:=Vector2((viewport_size.x-display_size.x)*.5,(viewport_size.y-display_size.y)*.5)
 	greenhouse_backdrop.position=greenhouse_base_position+Vector2(greenhouse_pan_x+arrangement_transition_x,0.0)
 	_update_arrangement_backdrop_layout(viewport_size,greenhouse_base_position.x)
+	_update_arrangement_boundary_layout(viewport_size,greenhouse_base_position.x)
 	if play_open_button:play_open_button.position=Vector2(198.0+greenhouse_pan_x,499.0)
 	greenhouse_world_pan_x=0.0
 	arrangement_world_transition_x=0.0
@@ -2659,12 +2666,31 @@ func _update_arrangement_backdrop_layout(viewport_size:Vector2,greenhouse_base_x
 	if arrangement_backdrop==null or arrangement_backdrop.texture==null:return
 	var scale_factor:=_arrangement_backdrop_scale(viewport_size);var display_size:=arrangement_backdrop.texture.get_size()*scale_factor;var table_target:=viewport_size*ARRANGEMENT_TABLE_SCREEN_TARGET_RATIO
 	arrangement_backdrop.size=display_size
-	arrangement_backdrop.position=Vector2(greenhouse_base_x+greenhouse_pan_x+arrangement_transition_x-display_size.x+ARRANGEMENT_BACKDROP_OVERLAP_PX,table_target.y-ARRANGEMENT_TABLE_SOURCE_CENTER.y*scale_factor)
+	arrangement_backdrop.position=Vector2(greenhouse_base_x+greenhouse_pan_x+arrangement_transition_x-display_size.x-ARRANGEMENT_BOUNDARY_GAP_PX+ARRANGEMENT_BACKDROP_OVERLAP_PX,table_target.y-ARRANGEMENT_TABLE_SOURCE_CENTER.y*scale_factor)
+
+func _update_arrangement_boundary_layout(viewport_size:Vector2,greenhouse_base_x:float)->void:
+	if arrangement_boundary_foreground==null or arrangement_boundary_foreground.texture==null:return
+	# This foreground is fixed over the gap between the two background photos.
+	# It receives the same world/view offset, so the camera appears to pass it.
+	var scale_factor:=viewport_size.y/arrangement_boundary_foreground.texture.get_height()
+	var display_size:=arrangement_boundary_foreground.texture.get_size()*scale_factor
+	var greenhouse_left_x:=greenhouse_base_x+greenhouse_pan_x+arrangement_transition_x
+	var arrangement_right_x:=greenhouse_left_x-ARRANGEMENT_BOUNDARY_GAP_PX+ARRANGEMENT_BACKDROP_OVERLAP_PX
+	var boundary_center_x:=(greenhouse_left_x+arrangement_right_x)*0.5
+	arrangement_boundary_foreground.size=display_size
+	arrangement_boundary_foreground.position=Vector2(boundary_center_x-display_size.x*.5,(viewport_size.y-display_size.y)*.5)
+
+func _arrangement_boundary_visible_rect()->Rect2:
+	if arrangement_boundary_foreground==null or arrangement_boundary_foreground.texture==null:return Rect2()
+	var scale_factor:=arrangement_boundary_foreground.size.x/arrangement_boundary_foreground.texture.get_width()
+	var visible_left:=arrangement_boundary_foreground.position.x+ARRANGEMENT_BOUNDARY_SOURCE_VISIBLE_X.x*scale_factor
+	var visible_right:=arrangement_boundary_foreground.position.x+ARRANGEMENT_BOUNDARY_SOURCE_VISIBLE_X.y*scale_factor
+	return Rect2(visible_left,arrangement_boundary_foreground.position.y,visible_right-visible_left,arrangement_boundary_foreground.size.y)
 
 func _arrangement_focus_transition_for_pan(pan_x:float)->float:
 	if greenhouse_backdrop==null or greenhouse_backdrop.texture==null or arrangement_backdrop==null or arrangement_backdrop.texture==null:return 0.0
 	var viewport_size:=get_viewport().get_visible_rect().size;var greenhouse_texture_size:=greenhouse_backdrop.texture.get_size();var greenhouse_scale:=maxf(viewport_size.x/greenhouse_texture_size.x,viewport_size.y/greenhouse_texture_size.y);var greenhouse_base_x:=(viewport_size.x-greenhouse_texture_size.x*greenhouse_scale)*.5
-	var arrangement_scale:=_arrangement_backdrop_scale(viewport_size);var arrangement_width:=arrangement_backdrop.texture.get_width()*arrangement_scale;var table_x_without_transition:=greenhouse_base_x+pan_x-arrangement_width+ARRANGEMENT_BACKDROP_OVERLAP_PX+ARRANGEMENT_TABLE_SOURCE_CENTER.x*arrangement_scale
+	var arrangement_scale:=_arrangement_backdrop_scale(viewport_size);var arrangement_width:=arrangement_backdrop.texture.get_width()*arrangement_scale;var table_x_without_transition:=greenhouse_base_x+pan_x-arrangement_width-ARRANGEMENT_BOUNDARY_GAP_PX+ARRANGEMENT_BACKDROP_OVERLAP_PX+ARRANGEMENT_TABLE_SOURCE_CENTER.x*arrangement_scale
 	return viewport_size.x*ARRANGEMENT_TABLE_SCREEN_TARGET_RATIO.x-table_x_without_transition
 
 func _arrangement_pot_anchor_screen()->Vector2:
@@ -3003,6 +3029,7 @@ func _apply_mode()->void:
 		_clear_habitat_items()
 		_print_habitat_memory_snapshot("exit_after")
 	greenhouse_layer.visible=greenhouse_mode
+	arrangement_foreground_layer.visible=greenhouse_mode
 	habitat_items_root.visible=not greenhouse_mode
 	if habitat_status_label:habitat_status_label.visible=not greenhouse_mode and rain_bonus_active
 	# The official greenhouse artwork already contains the finished pot and soil.
