@@ -9,6 +9,12 @@ func _ready()->void:
 	game.intro_story_complete=true;game.total_play_count=3;game.habitat_unlocked=true;game.encyclopedia_unlocked=true;game.buyback_unlocked=true
 	game.tutorial_steps["habitat_scroll_dialog"]=true;game.tutorial_steps["habitat_get_dialog"]=true;game.tutorial_steps["play1_dialog"]=true
 	game._update_play_ui();assert(game.shop_button.visible)
+	game._open_shop();assert(game.shop_overlay.visible and game.shop_current_page=="categories" and game.shop_category_controls[0].is_visible_in_tree() and not game.shop_wallet_label.is_visible_in_tree())
+	game._open_shop_seed_category();assert(game.shop_current_page=="seeds" and game.shop_wallet_label.is_visible_in_tree() and game.shop_category_back_button.is_visible_in_tree())
+	game._show_shop_categories();assert(game.shop_current_page=="categories" and game.shop_category_controls[0].is_visible_in_tree())
+	game._open_shop_catalog_category();assert(game.shop_current_page=="catalog" and game.shop_catalog_message.is_visible_in_tree() and "準備中" in game.shop_catalog_message.text)
+	game._show_shop_categories();game._open_shop_pot_category();assert(game.arrangement_ui.visible and game.arrangement_ui.shop_page.visible and game.arrangement_ui.return_context=="shop")
+	game.arrangement_ui.close();assert(not game.arrangement_ui.visible and game.shop_current_page=="categories" and game.shop_category_controls[0].is_visible_in_tree())
 
 	game.volume_seed_unlocked=true;game.volume_seed_intro_seen=false;game.tutorial_steps["volume_intro_step"]=0
 	game.shop_overlay.visible=true;game._prepare_shop_visit(false)

@@ -6,9 +6,12 @@ func _ready()->void:
 	game._reset_progression_state();game.intro_story_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.buyback_unlocked=true;game.total_play_count=3;game.formal_play_count=3
 	game.discovered={"colorata":true,"laui":false};game.species_get_counts={"colorata":4};game.bests={"colorata":62.5};game.coins=2000;game._sync_arrangement_ui();game._update_play_ui()
 	var ui=game.arrangement_ui
-	assert(game.pot_catalog.size()>=3 and bool(game.owned_pots.get("starter_terracotta",false)))
+	assert(game.pot_catalog.size()==11 and bool(game.owned_pots.get("starter_terracotta",false)))
 	for pot_value in game.pot_catalog:
 		for required_key in ["pot_id","display_name","image_path","price","unlock_condition","iap_product_id","placement_area","sort_order"]:assert(pot_value.has(required_key))
+		if str(pot_value.pot_id)!="starter_terracotta":assert(int(pot_value.price)==1000)
+	for added_pot_id in ["shallow_terracotta","classic_terracotta","black_ceramic","white_ceramic","clear_crystal","amethyst_crystal","glass_bowl","tin_bucket"]:
+		var added_pot:Dictionary=game._pot_entry(added_pot_id);assert(not added_pot.is_empty() and ResourceLoader.exists(str(added_pot.image_path)))
 	assert(game.arrangement_button.visible)
 	var available:Array=ui._available_species_entries("all");assert(available.size()==1 and str(available[0].species_id)=="colorata")
 	ui.open_home();ui._start_new_arrangement();assert(ui.pot_select_page.visible)
@@ -33,7 +36,9 @@ func _ready()->void:
 	for plant_key in ["species_id","x","y","scale","rotation","z_index"]:assert(saved.plants[0].has(plant_key))
 	var saved_id:=str(saved.arrangement_id);game._save();game.saved_arrangements.clear();game._load_save();assert(game.saved_arrangements.size()==1 and str(game.saved_arrangements[0].arrangement_id)==saved_id)
 	game._sync_arrangement_ui();ui._edit_arrangement(game.saved_arrangements[0]);ui.editor_name.text="春の寄せ植え・改";ui._save_current_arrangement();assert(game.saved_arrangements.size()==1 and str(game.saved_arrangements[0].name)=="春の寄せ植え・改")
-	var coins_before:int=game.coins;game._on_pot_purchase_requested("cream_ceramic");assert(bool(game.owned_pots.get("cream_ceramic",false)) and game.coins==coins_before-900);game._on_pot_purchase_requested("cream_ceramic");assert(game.coins==coins_before-900)
+	var coins_before:int=game.coins;game._on_pot_purchase_requested("shallow_terracotta");assert(bool(game.owned_pots.get("shallow_terracotta",false)) and game.coins==coins_before-1000);game._on_pot_purchase_requested("shallow_terracotta");assert(game.coins==coins_before-1000)
+	game._save();game.owned_pots.erase("shallow_terracotta");game._load_save();assert(bool(game.owned_pots.get("shallow_terracotta",false)))
+	game._sync_arrangement_ui();ui.open_home();ui._start_new_arrangement();ui._select_editor_pot("shallow_terracotta");assert(ui.editor_page.visible and str(ui.current_arrangement.pot_id)=="shallow_terracotta")
 	assert(game.species_get_counts==get_before and game.bests==best_before and game.discovered==discovered_before)
 	ui.current_arrangement={"arrangement_id":"limit_test","name":"上限テスト","pot_id":"starter_terracotta","created_at":"test","plants":[]};ui._load_editor_from_current()
 	for plant_index in range(ui.MAX_PLANTS_PER_ARRANGEMENT+3):ui._add_species_to_editor("colorata")

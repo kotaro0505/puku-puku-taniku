@@ -267,6 +267,12 @@ var shop_buy_glow: Panel
 var shop_selected_seed_type := "normal"
 var shop_buy_pulse_tween: Tween
 var shop_purchase_controls: Array[Control] = []
+var shop_category_controls: Array[Control] = []
+var shop_catalog_controls: Array[Control] = []
+var shop_category_back_button: Button
+var shop_catalog_message: Label
+var shop_current_page := "categories"
+var shop_purchase_ui_enabled := true
 var shop_chatter_bubble: PanelContainer
 var shop_chatter_portrait: TextureRect
 var shop_chatter_label: Label
@@ -865,9 +871,21 @@ func _build_shop(hud:Control)->void:
 	shop_buy_glow=Panel.new();shop_buy_glow.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);shop_buy_glow.offset_left=-8;shop_buy_glow.offset_top=-8;shop_buy_glow.offset_right=8;shop_buy_glow.offset_bottom=8;shop_buy_glow.mouse_filter=Control.MOUSE_FILTER_IGNORE;shop_buy_glow.show_behind_parent=true
 	var glow_style:=StyleBoxFlat.new();glow_style.bg_color=Color(1.0,.80,.35,.05);glow_style.border_color=Color(1.0,.84,.48,.42);glow_style.set_border_width_all(2);glow_style.set_corner_radius_all(23);glow_style.shadow_color=Color(1.0,.72,.25,.72);glow_style.shadow_size=12;glow_style.shadow_offset=Vector2.ZERO;shop_buy_glow.add_theme_stylebox_override("panel",glow_style);shop_buy_glow.visible=false;shop_selected_buy_button.add_child(shop_buy_glow)
 	shop_message=Label.new();shop_message.position=Vector2(48,775);shop_message.size=Vector2(480,25);shop_message.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;shop_message.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;shop_message.add_theme_font_size_override("font_size",14);shop_message.add_theme_color_override("font_color",UI_CREAM);shop_overlay.add_child(shop_message)
-	shop_pot_button=Button.new();shop_pot_button.text="寄せ植え鉢";shop_pot_button.position=Vector2(28,735);shop_pot_button.size=Vector2(154,48);_skin_button(shop_pot_button,Color("#fff0cf"),15);shop_pot_button.pressed.connect(_open_pot_shop);shop_overlay.add_child(shop_pot_button)
-	shop_purchase_controls=[purchase_panel,shop_wallet_label,shop_bag_label,shop_product_detail_label,shop_selected_buy_button,shop_message,shop_pot_button]
+	shop_category_back_button=Button.new();shop_category_back_button.text="＜ カテゴリ";shop_category_back_button.position=Vector2(28,735);shop_category_back_button.size=Vector2(154,48);_skin_button(shop_category_back_button,Color("#fff0cf"),15);shop_category_back_button.pressed.connect(_show_shop_categories);shop_overlay.add_child(shop_category_back_button)
+	shop_purchase_controls=[purchase_panel,shop_wallet_label,shop_bag_label,shop_product_detail_label,shop_selected_buy_button,shop_message,shop_category_back_button]
 	for tab in shop_product_tabs.values():shop_purchase_controls.append(tab)
+	var category_panel:=PanelContainer.new();category_panel.position=Vector2(28,735);category_panel.size=Vector2(520,265);category_panel.add_theme_stylebox_override("panel",_box(Color(0.22,0.12,0.07,.94),Color("#d7aa64"),20,3));shop_overlay.add_child(category_panel)
+	var category_content:=Control.new();category_content.custom_minimum_size=Vector2(500,245);category_panel.add_child(category_content)
+	var category_title:=Label.new();category_title.text="なにを見ますか？";category_title.position=Vector2(10,8);category_title.size=Vector2(480,42);category_title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;category_title.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;category_title.add_theme_font_size_override("font_size",22);category_title.add_theme_color_override("font_color",UI_CREAM);category_content.add_child(category_title)
+	var category_seed:=Button.new();category_seed.text="たね\nたね袋を買う";category_seed.position=Vector2(10,58);category_seed.size=Vector2(150,160);_skin_button(category_seed,Color("#d8b56b"),18);category_seed.pressed.connect(_open_shop_seed_category);category_content.add_child(category_seed)
+	shop_pot_button=Button.new();shop_pot_button.text="鉢\n寄せ植え用";shop_pot_button.position=Vector2(175,58);shop_pot_button.size=Vector2(150,160);_skin_button(shop_pot_button,Color("#c99d72"),18);shop_pot_button.pressed.connect(_open_shop_pot_category);category_content.add_child(shop_pot_button)
+	var category_catalog:=Button.new();category_catalog.text="図鑑\n新シリーズ";category_catalog.position=Vector2(340,58);category_catalog.size=Vector2(150,160);_skin_button(category_catalog,Color("#b69572"),18);category_catalog.pressed.connect(_open_shop_catalog_category);category_content.add_child(category_catalog)
+	shop_category_controls=[category_panel]
+	var catalog_panel:=PanelContainer.new();catalog_panel.position=Vector2(28,735);catalog_panel.size=Vector2(520,265);catalog_panel.add_theme_stylebox_override("panel",_box(Color(0.22,0.12,0.07,.94),Color("#d7aa64"),20,3));shop_overlay.add_child(catalog_panel)
+	var catalog_content:=Control.new();catalog_content.custom_minimum_size=Vector2(500,245);catalog_panel.add_child(catalog_content)
+	shop_catalog_message=Label.new();shop_catalog_message.text="図鑑の新シリーズは\n準備中です";shop_catalog_message.position=Vector2(30,36);shop_catalog_message.size=Vector2(440,100);shop_catalog_message.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;shop_catalog_message.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;shop_catalog_message.add_theme_font_size_override("font_size",24);shop_catalog_message.add_theme_color_override("font_color",UI_CREAM);catalog_content.add_child(shop_catalog_message)
+	var catalog_back:=Button.new();catalog_back.text="カテゴリへもどる";catalog_back.position=Vector2(125,158);catalog_back.size=Vector2(250,62);_skin_button(catalog_back,Color("#ead8b1"),17);catalog_back.pressed.connect(_show_shop_categories);catalog_content.add_child(catalog_back)
+	shop_catalog_controls=[catalog_panel]
 	shop_chatter_bubble=PanelContainer.new();shop_chatter_bubble.position=Vector2(88,276);shop_chatter_bubble.size=Vector2(400,108);shop_chatter_bubble.mouse_filter=Control.MOUSE_FILTER_STOP;shop_chatter_bubble.gui_input.connect(_on_shop_chatter_gui_input);shop_chatter_bubble.add_theme_stylebox_override("panel",_box(Color(1.0,.95,.82,.97),Color("#9b6739"),24,3));shop_chatter_bubble.visible=false;shop_overlay.add_child(shop_chatter_bubble)
 	var chatter_content:=VBoxContainer.new();chatter_content.alignment=BoxContainer.ALIGNMENT_CENTER;chatter_content.add_theme_constant_override("separation",9);chatter_content.mouse_filter=Control.MOUSE_FILTER_PASS;shop_chatter_bubble.add_child(chatter_content)
 	var chatter_row:=HBoxContainer.new();chatter_row.alignment=BoxContainer.ALIGNMENT_CENTER;chatter_row.add_theme_constant_override("separation",10);chatter_row.mouse_filter=Control.MOUSE_FILTER_PASS;chatter_content.add_child(chatter_row)
@@ -879,8 +897,30 @@ func _build_shop(hud:Control)->void:
 	shop_transfer_notice=Label.new();shop_transfer_notice.custom_minimum_size=Vector2(300,42);shop_transfer_notice.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;shop_transfer_notice.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;shop_transfer_notice.add_theme_font_size_override("font_size",19);shop_transfer_notice.add_theme_color_override("font_color",Color("#6a3d20"));shop_transfer_notice.add_theme_stylebox_override("normal",_box(Color(0.96,0.84,0.60,.92),Color("#c58b48"),12,1));shop_transfer_notice.mouse_filter=Control.MOUSE_FILTER_IGNORE;shop_transfer_notice.visible=false;chatter_content.add_child(shop_transfer_notice)
 
 func _set_shop_purchase_visible(is_visible:bool)->void:
-	for control in shop_purchase_controls:
-		if is_instance_valid(control):control.visible=is_visible
+	shop_purchase_ui_enabled=is_visible
+	_refresh_shop_page_visibility()
+
+func _refresh_shop_page_visibility()->void:
+	for control in shop_purchase_controls+shop_category_controls+shop_catalog_controls:
+		if is_instance_valid(control):control.visible=false
+	if not shop_purchase_ui_enabled:return
+	var visible_controls:Array[Control]=shop_category_controls
+	if shop_current_page=="seeds":visible_controls=shop_purchase_controls
+	elif shop_current_page=="catalog":visible_controls=shop_catalog_controls
+	for control in visible_controls:
+		if is_instance_valid(control):control.visible=true
+
+func _show_shop_categories()->void:
+	shop_current_page="categories";_refresh_shop_page_visibility()
+
+func _open_shop_seed_category()->void:
+	shop_current_page="seeds";shop_message.text="たね袋を1袋ずつ購入できます";_update_shop_ui();_refresh_shop_page_visibility()
+
+func _open_shop_pot_category()->void:
+	shop_current_page="categories";_refresh_shop_page_visibility();_open_pot_shop()
+
+func _open_shop_catalog_category()->void:
+	shop_current_page="catalog";_refresh_shop_page_visibility()
 
 func _build_arrangement_ui(hud:Control)->void:
 	arrangement_ui=ArrangementUIClass.new();hud.add_child(arrangement_ui)
@@ -1790,7 +1830,7 @@ func _open_shop()->void:
 	if catalog_preview_mode_active:return
 	if not _tutorial_fully_complete():
 		shop_overlay.visible=false;_set_shop_purchase_visible(false);_update_play_ui();return
-	play_modal_open=false;_set_shop_purchase_visible(true);_update_shop_ui();shop_message.text="たね袋を1袋ずつ購入できます";play_overlay.visible=false;shop_chatter_bubble.visible=false;shop_overlay.visible=true;audio_manager.play_bgm("shop");_prepare_shop_visit();_update_play_ui()
+	play_modal_open=false;shop_current_page="categories";_set_shop_purchase_visible(true);_update_shop_ui();shop_message.text="たね袋を1袋ずつ購入できます";play_overlay.visible=false;shop_chatter_bubble.visible=false;shop_overlay.visible=true;audio_manager.play_bgm("shop");_prepare_shop_visit();_update_play_ui()
 
 func _prepare_shop_visit(force_armadillo:Variant=null)->void:
 	_refresh_seed_pack_unlocks()
@@ -1894,7 +1934,7 @@ func _grant_hidden_species(species_id:String)->bool:
 	return true
 
 func _close_shop()->void:
-	_hide_shop_chatter(true);shop_overlay.visible=false;shop_background.texture=null
+	_hide_shop_chatter(true);shop_current_page="categories";shop_overlay.visible=false;shop_background.texture=null
 	if shop_buy_pulse_tween and shop_buy_pulse_tween.is_valid():shop_buy_pulse_tween.kill()
 	shop_buy_pulse_tween=null;audio_manager.play_bgm("greenhouse" if current_mode=="greenhouse" else "habitat");_update_play_ui()
 
