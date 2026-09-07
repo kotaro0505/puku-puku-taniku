@@ -91,7 +91,7 @@
     "display_name": "グミ多肉",
     "subtitle": "品種画像登録済み・開放条件準備中",
     "description": "ぷにっとカラフルなグミ多肉のシリーズです。開放条件は今後追加予定です。",
-    "cover_image_path": "res://assets/series_covers/gummy.png",
+    "cover_image_path": "res://assets/series_covers/gummy.jpg",
     "species_ids": [
       "gummy_peach_milk",
       "gummy_melon_milk",

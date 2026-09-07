@@ -93,7 +93,7 @@ func _ready() -> void:
 		var card_image: TextureRect = game.encyclopedia_card_images[card_index]
 		assert(card_image.expand_mode == TextureRect.EXPAND_IGNORE_SIZE)
 		assert(card_image.stretch_mode == TextureRect.STRETCH_KEEP_ASPECT_CENTERED)
-		assert(card_image.modulate.is_equal_approx(Color(0.12, 0.09, 0.08, 0.82)))
+		assert(card_image.modulate.is_equal_approx(Color.WHITE) and card_image.material is ShaderMaterial and (card_image.material as ShaderMaterial).shader==game.encyclopedia_silhouette_shader)
 
 		var plant := SucculentClass.new()
 		game.add_child(plant)

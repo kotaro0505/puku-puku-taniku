@@ -23,12 +23,14 @@ func _ready()->void:
 	for gummy_entry in game._series_species_entries("gummy"):
 		var gummy_id:=str(gummy_entry.get("species_id",""));var image_path:=str(gummy_entry.get("image_path",""));gummy_ids[gummy_id]=true
 		assert(str(gummy_entry.get("series_id",""))=="gummy" and bool(gummy_entry.get("catalog_only",false)) and is_zero_approx(float(gummy_entry.get("spawn_weight",-1.0))))
-		assert(not bool(game.greenhouse_available.get(gummy_id,false)) and gummy_entry not in game.species and not image_path.is_empty() and ResourceLoader.exists(image_path))
-		var gummy_texture:=load(image_path) as Texture2D;assert(gummy_texture!=null and gummy_texture.get_size()==Vector2(1254,1254))
+		assert(not bool(game.greenhouse_available.get(gummy_id,false)) and gummy_entry not in game.species and image_path.ends_with(".png") and ResourceLoader.exists(image_path))
+		assert(str(game.SucculentClass.SPRITES.get(str(gummy_entry.get("visual_variant","")),""))==image_path)
+		var gummy_texture:=load(image_path) as Texture2D;var gummy_source:=gummy_texture.get_image();var gummy_used:=gummy_source.get_used_rect();assert(gummy_texture.get_size()==Vector2(1254,1254) and gummy_source.detect_alpha()!=Image.ALPHA_NONE and gummy_source.get_pixel(0,0).a<.01 and gummy_used.position.x>0 and gummy_used.position.y>0 and gummy_used.end.x<1254 and gummy_used.end.y<1254)
 	assert(gummy_ids.size()==8)
+	var base_style:=TextureRect.new();var gummy_style:=TextureRect.new();game._apply_encyclopedia_image_style(base_style,game._series_species_entries("base")[0],false);game._apply_encyclopedia_image_style(gummy_style,game._series_species_entries("gummy")[0],false);var base_material:=base_style.material as ShaderMaterial;var gummy_material:=gummy_style.material as ShaderMaterial;assert(base_material!=null and gummy_material!=null and base_material.shader==gummy_material.shader and "remove_white_background" not in base_material.shader.code)
 	game.pending_habitat_species.clear();game._queue_random_species("シリーズ未解禁");assert(game.pending_habitat_species.is_empty())
 	game.greenhouse_available["gummy_peach_milk"]=true;game.discovered["gummy_peach_milk"]=true;game._apply_saved_unlocks();assert(game.species.all(func(entry):return str(entry.species_id)!="gummy_peach_milk"));game.greenhouse_available.erase("gummy_peach_milk");game.discovered.erase("gummy_peach_milk");game._apply_saved_unlocks()
-	game.selected_series_index=5;game._open_encyclopedia();assert(not game.series_open_button.disabled and game.series_lock_label.visible and game.series_open_button.text=="シルエット図鑑をみる");game._open_selected_series_encyclopedia();await get_tree().process_frame
+	game.selected_series_index=5;game._open_encyclopedia();assert(not game.series_open_button.disabled and game.series_lock_label.visible and game.series_open_button.text=="シルエット図鑑をみる" and not game.series_cover_placeholder.visible and game.series_cover_image.texture.resource_path=="res://assets/series_covers/gummy.jpg" and game.series_cover_image.texture.get_size()==Vector2(1158,1280) and game.series_cover_image.stretch_mode==TextureRect.STRETCH_KEEP_ASPECT_CENTERED);game._open_selected_series_encyclopedia();await get_tree().process_frame
 	assert(game.encyclopedia_list_page.visible and game.encyclopedia_list_title.text=="グミ多肉" and game.encyclopedia_grid.get_child_count()==8 and game.encyclopedia_list_progress.text=="0 / 8種" and game.encyclopedia_field_button.disabled)
 	for gummy_card in game.encyclopedia_grid.get_children():
 		assert(not gummy_card.disabled and gummy_card.pressed.get_connections().size()>0)
@@ -37,8 +39,9 @@ func _ready()->void:
 		assert("？？？" in card_texts and "未開放" in card_texts and "GET 0" in card_texts)
 	game._update_encyclopedia_visible_textures()
 	for gummy_image in game.encyclopedia_card_images:
-		assert(gummy_image.material is ShaderMaterial and is_equal_approx(float(gummy_image.material.get_shader_parameter("remove_white_background")),1.0))
-		if gummy_image.texture!=null:assert(str(gummy_image.texture.resource_path).begins_with("res://assets/plants/gummy/"))
+		assert(gummy_image.material is ShaderMaterial and (gummy_image.material as ShaderMaterial).shader==base_material.shader and gummy_image.stretch_mode==TextureRect.STRETCH_KEEP_ASPECT_CENTERED)
+		if gummy_image.texture!=null:assert(str(gummy_image.texture.resource_path).begins_with("res://assets/plants/gummy/") and str(gummy_image.texture.resource_path).ends_with(".png"))
+	base_style.free();gummy_style.free();base_material=null;gummy_material=null
 	var first_gummy_card:Button=game.encyclopedia_grid.get_child(0);first_gummy_card.pressed.emit();assert(game.encyclopedia_detail_page.visible)
 	assert(game.encyclopedia_detail_page.find_child("SpeciesName",true,false).text=="？？？" and game.encyclopedia_detail_page.find_child("SpeciesDescription",true,false).text=="未開放" and game.encyclopedia_detail_page.find_child("SpeciesGetCount",true,false).text=="GET 0")
 	assert(game.encyclopedia_detail_page.find_child("SpeciesImage",true,false).material is ShaderMaterial)

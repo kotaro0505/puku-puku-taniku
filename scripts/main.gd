@@ -1923,25 +1923,19 @@ func _refresh_encyclopedia_cards()->void:
 func _encyclopedia_unfound_status(series_id:String)->String:
 	return "未開放" if not _is_series_unlocked(_series_entry(series_id)) else "未発見"
 
-func _apply_encyclopedia_image_style(image:TextureRect,entry:Dictionary,found:bool)->void:
+func _apply_encyclopedia_image_style(image:TextureRect,_entry:Dictionary,found:bool)->void:
 	image.modulate=Color.WHITE;image.material=null
 	if found:return
 	if encyclopedia_silhouette_shader==null:
 		encyclopedia_silhouette_shader=Shader.new();encyclopedia_silhouette_shader.code="""
 shader_type canvas_item;
 uniform vec4 silhouette_color : source_color = vec4(0.12, 0.09, 0.08, 0.82);
-uniform float remove_white_background = 0.0;
 void fragment() {
 	vec4 source = texture(TEXTURE, UV);
-	float lightest = max(source.r, max(source.g, source.b));
-	float darkest = min(source.r, min(source.g, source.b));
-	float near_white = smoothstep(0.965, 0.995, darkest);
-	float neutral = 1.0 - smoothstep(0.02, 0.10, lightest - darkest);
-	float background_mask = near_white * neutral * remove_white_background;
-	COLOR = vec4(silhouette_color.rgb, source.a * (1.0 - background_mask) * silhouette_color.a);
+	COLOR = vec4(silhouette_color.rgb, source.a * silhouette_color.a);
 }
 """
-	var silhouette_material:=ShaderMaterial.new();silhouette_material.shader=encyclopedia_silhouette_shader;silhouette_material.set_shader_parameter("remove_white_background",1.0 if bool(entry.get("silhouette_remove_white_background",false)) else 0.0);image.material=silhouette_material
+	var silhouette_material:=ShaderMaterial.new();silhouette_material.shader=encyclopedia_silhouette_shader;image.material=silhouette_material
 
 func _update_encyclopedia_visible_textures()->void:
 	if not encyclopedia_overlay.visible or not encyclopedia_list_page.visible:return
