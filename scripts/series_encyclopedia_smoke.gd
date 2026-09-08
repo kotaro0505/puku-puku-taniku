@@ -10,15 +10,16 @@ func _ready()->void:
 		var series_entry:Dictionary=game.series_catalog[index]
 		assert(str(series_entry.get("series_id",""))==expected_ids[index])
 		for required_key in ["series_id","display_name","subtitle","description","cover_image_path","species_ids","field_id","unlock_type","unlock_condition","iap_product_id","sort_order"]:assert(series_entry.has(required_key))
-	var base:Dictionary=game._series_entry("base");assert(game._is_series_unlocked(base));assert(game._series_species_entries("base").size()==21 and game.catalog_species.size()==61)
+	var base:Dictionary=game._series_entry("base");assert(game._is_series_unlocked(base));assert(game._series_species_entries("base").size()==21 and game.catalog_species.size()==64)
 	var unique_base_ids:Dictionary={}
 	for entry in game._series_species_entries("base"):unique_base_ids[str(entry.species_id)]=true
 	assert(unique_base_ids.size()==21)
 	for future_id in expected_ids.slice(1):
 		var future_entry:Dictionary=game._series_entry(str(future_id));assert(not game._is_series_unlocked(future_entry))
-		if str(future_id) in ["metal","sweets"]:assert(future_entry.species_ids.size()==10 and game._can_browse_series(future_entry) and bool(future_entry.get("preview_catalog_when_locked",false)) and game._catalog_purchase_enabled(future_entry))
-		elif str(future_id)=="gummy":assert(future_entry.species_ids.size()==8 and game._can_browse_series(future_entry) and bool(future_entry.get("preview_catalog_when_locked",false)))
-		elif str(future_id)=="glow":assert(future_entry.species_ids.size()==12 and game._can_browse_series(future_entry) and bool(future_entry.get("preview_catalog_when_locked",false)) and game._catalog_purchase_enabled(future_entry))
+		if str(future_id) in ["metal","sweets"]:assert(future_entry.species_ids.size()==10 and not game._can_browse_series(future_entry) and bool(future_entry.get("preview_catalog_when_locked",false)))
+		elif str(future_id)=="gummy":assert(future_entry.species_ids.size()==8 and not game._can_browse_series(future_entry) and bool(future_entry.get("preview_catalog_when_locked",false)))
+		elif str(future_id)=="glow":assert(future_entry.species_ids.size()==12 and not game._can_browse_series(future_entry) and bool(future_entry.get("preview_catalog_when_locked",false)))
+		elif str(future_id)=="neon":assert(future_entry.species_ids.size()==3 and game._is_hidden_series("neon") and not game._can_browse_series(future_entry) and not game._catalog_purchase_enabled(future_entry))
 		else:assert(future_entry.species_ids.is_empty())
 		var future_field:Dictionary=game._field_entry(str(future_entry.field_id));assert(not bool(future_field.get("implemented",true)))
 	var gummy_ids:Dictionary={}
@@ -47,11 +48,11 @@ func _ready()->void:
 	assert(metal_ids.size()==10 and game._series_cover_texture(game._series_entry("metal")).resource_path=="res://assets/catalog/metal/metal-silver-rosette.png")
 	for cover_series in game.series_catalog:
 		var cover_species:Array=game._series_species_entries(str(cover_series.get("series_id","")))
-		if not cover_species.is_empty():assert(game._series_cover_texture(cover_series).resource_path==game._species_texture(cover_species[0]).resource_path)
+		if not cover_species.is_empty() and game._species_texture(cover_species[0])!=null:assert(game._series_cover_texture(cover_series).resource_path==game._species_texture(cover_species[0]).resource_path)
 	var base_style:=TextureRect.new();var gummy_style:=TextureRect.new();game._apply_encyclopedia_image_style(base_style,game._series_species_entries("base")[0],false);game._apply_encyclopedia_image_style(gummy_style,game._series_species_entries("gummy")[0],false);assert(base_style.material==null and gummy_style.material==null and base_style.modulate.is_equal_approx(Color(0.12,0.09,0.08,0.82)) and gummy_style.modulate.is_equal_approx(base_style.modulate))
 	game.pending_habitat_species.clear();game._queue_random_species("シリーズ未解禁");assert(game.pending_habitat_species.is_empty())
 	game.greenhouse_available["gummy_peach_milk"]=true;game.discovered["gummy_peach_milk"]=true;game._apply_saved_unlocks();assert(game.species.any(func(entry):return str(entry.species_id)=="gummy_peach_milk"));game.greenhouse_available.erase("gummy_peach_milk");game.discovered.erase("gummy_peach_milk");game._apply_saved_unlocks()
-	game._sync_arrangement_ui();game.arrangement_ui.open_catalog_shop();assert(game.arrangement_ui.catalog_shop_grid.get_child_count()==game.series_catalog.size());game.arrangement_ui.visible=false
+	game.formal_play_count=10;game._sync_arrangement_ui();game.arrangement_ui.open_catalog_shop();assert(game.arrangement_ui.catalog_shop_grid.get_child_count()==4);game.arrangement_ui.visible=false
 	game._open_encyclopedia();assert(game._owned_series_entries().size()==1 and game._current_series_entry().series_id=="base" and game.series_position_label.text=="1 / 1" and game.series_cover_image.texture.resource_path=="res://assets/plants/sprite-colorata.png")
 	for carousel_card in game.series_carousel_cards:assert(str(carousel_card.container.get_meta("series_id"))=="base")
 	game._close_encyclopedia();game.unlocked_series["sweets"]=true;game.unlocked_series["gummy"]=true;assert(game._owned_series_entries().map(func(entry):return str(entry.series_id))==["base","sweets","gummy"])

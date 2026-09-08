@@ -11,8 +11,6 @@
     ],
     "main_play_pod_chance": 0.20,
     "habitat_pod_chance": 0.05,
-    "armadillo_pod_bonus_chance": 0.08,
-    "armadillo_pod_bonus_count": 1,
     "completed_series_weight_multiplier": 0.20,
     "discovered_species_weight_multiplier": 0.10,
     "default_catalog_price_yen": 10000,

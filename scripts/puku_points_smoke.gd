@@ -37,7 +37,7 @@ func _test_harvest_integration(game)->void:
 	game.play_active=false;game._clear_greenhouse_plants()
 
 func _test_catalog_purchase(game)->void:
-	var gummy:Dictionary=game._series_entry("gummy");game.unlocked_series.erase("gummy");game.current_encyclopedia_series_id="gummy";game.puku_points=2;game.coins=10000;game.mystery_pod_count=10
+	var gummy:Dictionary=game._series_entry("gummy");game.formal_play_count=1;game.unlocked_series.erase("gummy");game.current_encyclopedia_series_id="gummy";game.puku_points=2;game.coins=10000;game.mystery_pod_count=10
 	game._refresh_encyclopedia_header();assert(game.encyclopedia_unlock_panel.visible and game.encyclopedia_unlock_puku_button.disabled and "必要 3ぷくコイン" in game.encyclopedia_unlock_status.text)
 	game.add_puku_points(1,false,false);game._refresh_encyclopedia_header();assert(not game.encyclopedia_unlock_puku_button.disabled)
 	game._acquire_current_catalog("puku");assert(game._is_series_unlocked(gummy) and game.puku_points==0 and game.coins==10000 and game.mystery_pod_count==10)

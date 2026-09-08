@@ -21,7 +21,8 @@ func _ready()->void:
 	game.encyclopedia_unlocked=true;game.unlocked_series={"base":true};game.discovered.clear();game.species_get_counts.clear()
 	var glow:Dictionary=game._series_entry("glow")
 	assert(str(glow.get("display_name",""))=="蓄光多肉")
-	assert(game._can_browse_series(glow) and not game._is_series_unlocked(glow) and game._catalog_purchase_enabled(glow))
+	game.formal_play_count=10
+	assert(not game._can_browse_series(glow) and not game._is_series_unlocked(glow) and game._catalog_purchase_enabled(glow))
 	var entries:Array[Dictionary]=game._series_species_entries("glow")
 	assert(entries.size()==12 and glow.get("species_ids",[])==EXPECTED.keys())
 	var seen:Dictionary={}
@@ -45,10 +46,10 @@ func _ready()->void:
 		plant.queue_free()
 		assert(entry not in game.species and not bool(game.greenhouse_available.get(species_id,false)))
 	assert(seen.size()==12 and game.mystery_pod_system.eligible_species_for_series("glow").is_empty())
-	game._open_encyclopedia();assert(game._owned_series_entries().size()==1)
+	game.unlocked_series["glow"]=true;game._open_encyclopedia();assert(game._owned_series_entries().size()==2)
 	game.current_encyclopedia_series_id="glow";game.encyclopedia_series_page.visible=false;game.encyclopedia_list_page.visible=true;game._refresh_encyclopedia_header();game._refresh_encyclopedia_cards();await get_tree().process_frame;game._update_encyclopedia_visible_textures()
 	assert(game.encyclopedia_list_title.text=="蓄光多肉" and game.encyclopedia_list_progress.text=="0 / 12種" and game.encyclopedia_grid.get_child_count()==12)
-	assert(game.encyclopedia_unlock_panel.visible and "この図鑑を入手すると" in game.encyclopedia_unlock_status.text and game.encyclopedia_unlock_puku_button.disabled)
+	assert(not game.encyclopedia_unlock_panel.visible)
 	for card in game.encyclopedia_grid.get_children():
 		assert(card.disabled)
 		var texts:Array[String]=[]

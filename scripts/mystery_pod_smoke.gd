@@ -71,7 +71,7 @@ func _test_game_loop()->void:
 	assert(game.mystery_pod_dev!=null and game.mystery_pod_settings_button!=null)
 	game._open_mystery_pod_dev();assert(game.mystery_pod_dev.visible);game.mystery_pod_dev.visible=false
 	game._reset_progression_state();game.intro_story_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.buyback_unlocked=true;game.total_play_count=3
-	var gummy:Dictionary=game._series_entry("gummy");assert(not game._is_series_unlocked(gummy) and game._can_browse_series(gummy))
+	game.formal_play_count=1;var gummy:Dictionary=game._series_entry("gummy");assert(not game._is_series_unlocked(gummy) and not game._can_browse_series(gummy) and game._catalog_purchase_enabled(gummy))
 	game.current_encyclopedia_series_id="gummy";game.coins=10000;game.mystery_pod_count=10;game.puku_points=3;game._acquire_current_catalog("puku")
 	assert(game._is_series_unlocked(gummy) and game.puku_points==0 and game.coins==10000 and game.mystery_pod_count==10 and game._series_found_count("gummy")==0)
 	game.series_seed_inventory["gummy"]=1;game._start_greenhouse_play("series:gummy")
