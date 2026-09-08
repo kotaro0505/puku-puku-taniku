@@ -10,13 +10,13 @@ func _ready()->void:
 		var series_entry:Dictionary=game.series_catalog[index]
 		assert(str(series_entry.get("series_id",""))==expected_ids[index])
 		for required_key in ["series_id","display_name","subtitle","description","cover_image_path","species_ids","field_id","unlock_type","unlock_condition","iap_product_id","sort_order"]:assert(series_entry.has(required_key))
-	var base:Dictionary=game._series_entry("base");assert(game._is_series_unlocked(base));assert(game._series_species_entries("base").size()==21 and game.catalog_species.size()==51)
+	var base:Dictionary=game._series_entry("base");assert(game._is_series_unlocked(base));assert(game._series_species_entries("base").size()==21 and game.catalog_species.size()==61)
 	var unique_base_ids:Dictionary={}
 	for entry in game._series_species_entries("base"):unique_base_ids[str(entry.species_id)]=true
 	assert(unique_base_ids.size()==21)
 	for future_id in expected_ids.slice(1):
 		var future_entry:Dictionary=game._series_entry(str(future_id));assert(not game._is_series_unlocked(future_entry))
-		if str(future_id)=="sweets":assert(future_entry.species_ids.size()==10 and game._can_browse_series(future_entry) and bool(future_entry.get("preview_catalog_when_locked",false)) and game._catalog_purchase_enabled(future_entry))
+		if str(future_id) in ["metal","sweets"]:assert(future_entry.species_ids.size()==10 and game._can_browse_series(future_entry) and bool(future_entry.get("preview_catalog_when_locked",false)) and game._catalog_purchase_enabled(future_entry))
 		elif str(future_id)=="gummy":assert(future_entry.species_ids.size()==8 and game._can_browse_series(future_entry) and bool(future_entry.get("preview_catalog_when_locked",false)))
 		elif str(future_id)=="glow":assert(future_entry.species_ids.size()==12 and game._can_browse_series(future_entry) and bool(future_entry.get("preview_catalog_when_locked",false)) and game._catalog_purchase_enabled(future_entry))
 		else:assert(future_entry.species_ids.is_empty())
@@ -37,6 +37,14 @@ func _ready()->void:
 		assert(str(game.SucculentClass.SPRITES.get(str(sweets_entry.get("visual_variant","")),""))==image_path)
 		var sweets_texture:=load(image_path) as Texture2D;var sweets_source:=sweets_texture.get_image();var sweets_used:=sweets_source.get_used_rect();assert(sweets_texture.get_size()==Vector2(1254,1254) and sweets_source.detect_alpha()!=Image.ALPHA_NONE and sweets_source.get_pixel(0,0).a<.01 and sweets_used.position.x>0 and sweets_used.position.y>0 and sweets_used.end.x<1254 and sweets_used.end.y<1254)
 	assert(sweets_ids.size()==10)
+	var metal_ids:Dictionary={}
+	for metal_entry in game._series_species_entries("metal"):
+		var metal_id:=str(metal_entry.get("species_id",""));var image_path:=str(metal_entry.get("image_path",""));metal_ids[metal_id]=true
+		assert(str(metal_entry.get("series_id",""))=="metal" and bool(metal_entry.get("catalog_only",false)) and is_zero_approx(float(metal_entry.get("spawn_weight",-1.0))))
+		assert(not bool(game.greenhouse_available.get(metal_id,false)) and metal_entry not in game.species and image_path.begins_with("res://assets/plants/metal/") and ResourceLoader.exists(image_path))
+		assert(str(game.SucculentClass.SPRITES.get(str(metal_entry.get("visual_variant","")),""))==image_path)
+		var metal_texture:=load(image_path) as Texture2D;var metal_source:=metal_texture.get_image();var metal_used:=metal_source.get_used_rect();var metal_w:=metal_source.get_width();var metal_h:=metal_source.get_height();assert(metal_w>=900 and metal_h>=900 and metal_source.detect_alpha()!=Image.ALPHA_NONE and metal_source.get_pixel(0,0).a<.01 and metal_source.get_pixel(metal_w-1,0).a<.01 and metal_source.get_pixel(0,metal_h-1).a<.01 and metal_source.get_pixel(metal_w-1,metal_h-1).a<.01 and metal_used.size.x*metal_used.size.y<metal_w*metal_h, "%s size=%s alpha=%s used=%s" % [metal_id,metal_texture.get_size(),metal_source.detect_alpha(),metal_used])
+	assert(metal_ids.size()==10 and game._series_cover_texture(game._series_entry("metal")).resource_path=="res://assets/plants/metal/metal-silver-rosette.png")
 	for cover_series in game.series_catalog:
 		var cover_species:Array=game._series_species_entries(str(cover_series.get("series_id","")))
 		if not cover_species.is_empty():assert(game._series_cover_texture(cover_series).resource_path==game._species_texture(cover_species[0]).resource_path)

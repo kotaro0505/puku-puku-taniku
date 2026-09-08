@@ -37,12 +37,19 @@
   {
     "series_id": "metal",
     "display_name": "金属多肉",
-    "subtitle": "今後追加予定",
-    "description": "このシリーズは準備中です。",
-    "cover_image_path": "res://assets/series_covers/metal.png",
-    "species_ids": [],
+    "subtitle": "品種画像登録済み・開放条件準備中",
+    "description": "銀、銅、金、虹色の金属光沢をまとった金属多肉のシリーズです。開放条件は今後追加予定です。",
+    "cover_image_path": "res://assets/plants/metal/metal-silver-rosette.png",
+    "species_ids": [
+      "metal_silver_rosette", "metal_cobalt_cluster", "metal_rose_copper",
+      "metal_gold_cluster", "metal_gunmetal_rosette", "metal_iridescent_star",
+      "metal_silver_branch", "metal_obsidian_spike", "metal_sage_silver",
+      "metal_patina_copper"
+    ],
     "field_id": "metal_field",
     "unlock_type": "future",
+    "preview_catalog_when_locked": true,
+    "catalog_purchase_enabled": true,
     "unlock_condition": {"display_text": "今後追加予定"},
     "iap_product_id": "",
     "sort_order": 10

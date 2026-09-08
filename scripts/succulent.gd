@@ -44,6 +44,16 @@ const SPRITES := {
 	"sweets_fairy_sugar": "res://assets/plants/sweets/sweets-fairy-sugar.png",
 	"sweets_caramel_cherry": "res://assets/plants/sweets/sweets-caramel-cherry.png",
 	"sweets_mint_chocolate": "res://assets/plants/sweets/sweets-mint-chocolate.png",
+	"metal_silver_rosette": "res://assets/plants/metal/metal-silver-rosette.png",
+	"metal_cobalt_cluster": "res://assets/plants/metal/metal-cobalt-cluster.png",
+	"metal_rose_copper": "res://assets/plants/metal/metal-rose-copper.png",
+	"metal_gold_cluster": "res://assets/plants/metal/metal-gold-cluster.png",
+	"metal_gunmetal_rosette": "res://assets/plants/metal/metal-gunmetal-rosette.png",
+	"metal_iridescent_star": "res://assets/plants/metal/metal-iridescent-star.png",
+	"metal_silver_branch": "res://assets/plants/metal/metal-silver-branch.png",
+	"metal_obsidian_spike": "res://assets/plants/metal/metal-obsidian-spike.png",
+	"metal_sage_silver": "res://assets/plants/metal/metal-sage-silver.png",
+	"metal_patina_copper": "res://assets/plants/metal/metal-patina-copper.png",
 	"gold_kannte": "res://assets/plants/sprite-golden-laui.png"
 }
 
