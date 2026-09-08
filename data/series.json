@@ -4,7 +4,7 @@
     "display_name": "基本図鑑",
     "subtitle": "ぷくぷく多肉の基本シリーズ",
     "description": "これまでに出会った多肉をまとめた図鑑です。",
-    "cover_image_path": "res://assets/series_covers/base.png",
+    "cover_image_path": "res://assets/plants/sprite-colorata.png",
     "species_ids": [
       "colorata",
       "lutea",
@@ -78,7 +78,7 @@
     "display_name": "スイーツ多肉",
     "subtitle": "品種画像登録済み・開放条件準備中",
     "description": "ケーキや果実、お菓子の彩りをまとったスイーツ多肉のシリーズです。開放条件は今後追加予定です。",
-    "cover_image_path": "res://assets/series_covers/sweets.png",
+    "cover_image_path": "res://assets/plants/sweets/sweets-strawberry-shortcake.png",
     "species_ids": [
       "sweets_strawberry_shortcake", "sweets_blueberry_galaxy", "sweets_citrus_mint",
       "sweets_chocolate_gold", "sweets_matcha_wafer", "sweets_mango_mint",
@@ -88,7 +88,7 @@
     "field_id": "sweets_field",
     "unlock_type": "future",
     "preview_catalog_when_locked": true,
-    "catalog_purchase_enabled": false,
+    "catalog_purchase_enabled": true,
     "unlock_condition": {"display_text": "今後追加予定"},
     "iap_product_id": "",
     "sort_order": 40
@@ -98,7 +98,7 @@
     "display_name": "グミ多肉",
     "subtitle": "3ぷくポイントで解放",
     "description": "ぷにっとカラフルなグミ多肉のシリーズです。3ぷくポイントで図鑑を解放できます。",
-    "cover_image_path": "res://assets/series_covers/gummy.jpg",
+    "cover_image_path": "res://assets/plants/gummy/gummy-peach-milk.png",
     "species_ids": [
       "gummy_peach_milk",
       "gummy_melon_milk",
@@ -136,7 +136,7 @@
     "display_name": "蓄光多肉",
     "subtitle": "品種画像登録済み・開放条件準備中",
     "description": "やわらかな光をまとった蓄光多肉のシリーズです。開放条件は今後追加予定です。",
-    "cover_image_path": "res://assets/series_covers/glow.png",
+    "cover_image_path": "res://assets/plants/glow/glow-emerald-rosette.png",
     "species_ids": [
       "glow_emerald_rosette",
       "glow_aqua_drops",
@@ -154,7 +154,7 @@
     "field_id": "glow_field",
     "unlock_type": "future",
     "preview_catalog_when_locked": true,
-    "catalog_purchase_enabled": false,
+    "catalog_purchase_enabled": true,
     "unlock_condition": {"display_text": "今後追加予定"},
     "iap_product_id": "",
     "sort_order": 70

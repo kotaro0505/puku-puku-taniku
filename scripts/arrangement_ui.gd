@@ -4,6 +4,7 @@ extends Control
 signal close_requested(context:String)
 signal save_requested(arrangement:Dictionary)
 signal pot_purchase_requested(pot_id:String)
+signal catalog_purchase_requested(series_id:String)
 signal world_scroll_input(event:InputEvent)
 
 const PotPlaceholderClass = preload("res://scripts/arrangement_pot_placeholder.gd")
@@ -21,6 +22,8 @@ var series_catalog:Array=[]
 var pot_catalog:Array=[]
 var discovered:Dictionary={}
 var owned_pots:Dictionary={}
+var owned_catalogs:Dictionary={"base":true}
+var wallet_puku_points:=0
 var saved_arrangements:Array=[]
 var save_capacity:=20
 var wallet_coins:=0
@@ -58,6 +61,10 @@ var shop_page:Control
 var shop_wallet:Label
 var shop_message:Label
 var shop_grid:VBoxContainer
+var catalog_shop_page:Control
+var catalog_shop_wallet:Label
+var catalog_shop_message:Label
+var catalog_shop_grid:VBoxContainer
 
 var current_arrangement:Dictionary={}
 var editor_plants:Array=[]
@@ -88,17 +95,27 @@ func sync_state(purchased_pots:Dictionary,arrangements:Array,capacity:int,coins:
 	if visible and shop_page.visible:_refresh_pot_shop()
 	if visible and home_page.visible:_refresh_home()
 
+func sync_catalog_state(purchased_catalogs:Dictionary,puku_points:int)->void:
+	owned_catalogs=purchased_catalogs;wallet_puku_points=maxi(0,puku_points)
+	if visible and catalog_shop_page.visible:_refresh_catalog_shop()
+
 func open_home()->void:
 	return_context="greenhouse";visible=true;_show_page(home_page);_refresh_home()
 
 func open_pot_shop()->void:
 	set_world_backdrop_mode(false,world_pot_anchor_screen);return_context="shop";visible=true;_show_page(shop_page);_refresh_pot_shop()
 
+func open_catalog_shop()->void:
+	set_world_backdrop_mode(false,world_pot_anchor_screen);return_context="shop";visible=true;_show_page(catalog_shop_page);_refresh_catalog_shop()
+
 func close()->void:
 	drag_active=false;visible=false;close_requested.emit(return_context)
 
 func show_pot_shop_message(message:String)->void:
 	shop_message.text=message;_refresh_pot_shop_cards()
+
+func show_catalog_shop_message(message:String)->void:
+	catalog_shop_message.text=message;_refresh_catalog_shop()
 
 func set_world_backdrop_mode(enabled:bool,pot_anchor_screen:Vector2)->void:
 	var changed:=world_backdrop_enabled!=enabled or not world_pot_anchor_screen.is_equal_approx(pot_anchor_screen)
@@ -120,12 +137,13 @@ func _build_ui()->void:
 	picker_page=_page();_build_picker_page()
 	viewer_page=_page();_build_viewer_page()
 	shop_page=_page();_build_shop_page()
+	catalog_shop_page=_page();_build_catalog_shop_page()
 
 func _page()->Control:
 	var page:=Control.new();page.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);page.mouse_filter=Control.MOUSE_FILTER_STOP;page.visible=false;add_child(page);return page
 
 func _show_page(page:Control)->void:
-	for candidate in [home_page,pot_select_page,editor_page,picker_page,viewer_page,shop_page]:
+	for candidate in [home_page,pot_select_page,editor_page,picker_page,viewer_page,shop_page,catalog_shop_page]:
 		if candidate:candidate.visible=candidate==page
 
 func _on_home_world_scroll_input(event:InputEvent)->void:
@@ -451,6 +469,40 @@ func _refresh_pot_shop_cards()->void:
 
 func _request_pot_purchase(pot_id:String)->void:
 	pot_purchase_requested.emit(pot_id)
+
+func _build_catalog_shop_page()->void:
+	_build_header(catalog_shop_page,"シリーズ図鑑",close)
+	catalog_shop_wallet=Label.new();catalog_shop_wallet.position=Vector2(30,92);catalog_shop_wallet.size=Vector2(516,38);catalog_shop_wallet.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;catalog_shop_wallet.add_theme_font_size_override("font_size",20);catalog_shop_wallet.add_theme_color_override("font_color",Color("#f5d36d"));catalog_shop_page.add_child(catalog_shop_wallet)
+	catalog_shop_message=Label.new();catalog_shop_message.position=Vector2(30,132);catalog_shop_message.size=Vector2(516,52);catalog_shop_message.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;catalog_shop_message.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;catalog_shop_message.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;catalog_shop_message.add_theme_font_size_override("font_size",16);catalog_shop_message.add_theme_color_override("font_color",UI_CREAM);catalog_shop_page.add_child(catalog_shop_message)
+	var scroll:=ScrollContainer.new();scroll.position=Vector2(26,194);scroll.size=Vector2(524,790);scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;catalog_shop_page.add_child(scroll)
+	catalog_shop_grid=VBoxContainer.new();catalog_shop_grid.custom_minimum_size=Vector2(504,0);catalog_shop_grid.add_theme_constant_override("separation",14);scroll.add_child(catalog_shop_grid)
+
+func _refresh_catalog_shop()->void:
+	catalog_shop_wallet.text="所持　%dぷくポイント"%wallet_puku_points
+	if catalog_shop_message.text.is_empty():catalog_shop_message.text="図鑑は一度購入すると、メイン画面からいつでも見られます"
+	_clear_children(catalog_shop_grid)
+	for series_value in series_catalog:
+		if not series_value is Dictionary:continue
+		var series:Dictionary=series_value;var series_id:=str(series.get("series_id",""));var owned:=bool(owned_catalogs.get(series_id,false)) or str(series.get("unlock_type","future"))=="default";var price:=maxi(0,int(series.get("unlock_price_puku",3)))
+		var card:=PanelContainer.new();card.custom_minimum_size=Vector2(504,204);card.add_theme_stylebox_override("panel",_box(Color("#f4e1bc"),Color("#b77c48"),20,3));catalog_shop_grid.add_child(card)
+		var content:=Control.new();content.custom_minimum_size=Vector2(484,184);card.add_child(content)
+		var preview:=TextureRect.new();preview.position=Vector2(2,2);preview.size=Vector2(214,176);preview.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;preview.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;preview.mouse_filter=Control.MOUSE_FILTER_IGNORE;preview.texture=_series_preview_texture(series);content.add_child(preview)
+		if preview.texture==null:
+			var placeholder:=Label.new();placeholder.text="商品画像\n準備中";placeholder.position=preview.position;placeholder.size=preview.size;placeholder.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;placeholder.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;placeholder.add_theme_font_size_override("font_size",18);placeholder.add_theme_color_override("font_color",Color("#79543a"));content.add_child(placeholder)
+		var name:=Label.new();name.text=str(series.get("display_name","シリーズ図鑑"));name.position=Vector2(220,12);name.size=Vector2(258,45);name.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name.add_theme_font_size_override("font_size",19);name.add_theme_color_override("font_color",UI_BROWN);content.add_child(name)
+		var condition:=Label.new();condition.text="シリーズ図鑑ページ";condition.position=Vector2(220,55);condition.size=Vector2(258,34);condition.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;condition.add_theme_font_size_override("font_size",13);condition.add_theme_color_override("font_color",Color("#79543a"));content.add_child(condition)
+		var buy:=_button("購入済み" if owned else ("買う　%dぷく"%price),Vector2(248,102),Vector2(204,58),Color("#b9a17d") if owned else Color("#d7aa64"),17);buy.disabled=owned or wallet_puku_points<price;buy.pressed.connect(_request_catalog_purchase.bind(series_id));content.add_child(buy)
+
+func _request_catalog_purchase(series_id:String)->void:
+	catalog_purchase_requested.emit(series_id)
+
+func _series_preview_texture(series:Dictionary)->Texture2D:
+	var ids=series.get("species_ids",[])
+	if ids is Array and not ids.is_empty():
+		var first:=_species_entry(str(ids[0]));var first_texture:=_resolve_texture(first)
+		if first_texture!=null:return first_texture
+	var path:=str(series.get("cover_image_path",""))
+	return load(path) as Texture2D if not path.is_empty() and ResourceLoader.exists(path) else null
 
 func _render_pot(container:Control,pot:Dictionary,compact:bool)->void:
 	_clear_children(container)

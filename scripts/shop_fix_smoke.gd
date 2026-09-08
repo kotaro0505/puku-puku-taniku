@@ -12,8 +12,11 @@ func _ready()->void:
 	game._open_shop();assert(game.shop_overlay.visible and game.shop_current_page=="categories" and game.shop_category_controls[0].is_visible_in_tree() and not game.shop_wallet_label.is_visible_in_tree())
 	game._open_shop_seed_category();assert(game.shop_current_page=="seeds" and game.shop_wallet_label.is_visible_in_tree() and game.shop_category_back_button.is_visible_in_tree())
 	game._show_shop_categories();assert(game.shop_current_page=="categories" and game.shop_category_controls[0].is_visible_in_tree())
-	game._open_shop_catalog_category();assert(game.shop_current_page=="catalog" and game.shop_catalog_message.is_visible_in_tree() and "準備中" in game.shop_catalog_message.text)
-	game._show_shop_categories();game._open_shop_pot_category();assert(game.arrangement_ui.visible and game.arrangement_ui.shop_page.visible and game.arrangement_ui.return_context=="shop")
+	game.puku_points=6;game._open_shop_catalog_category();assert(game.arrangement_ui.visible and game.arrangement_ui.catalog_shop_page.visible and game.arrangement_ui.return_context=="shop" and game.arrangement_ui.catalog_shop_grid.get_child_count()==14)
+	assert(game.arrangement_ui.catalog_shop_page.position==game.arrangement_ui.shop_page.position and game.arrangement_ui.catalog_shop_grid.custom_minimum_size==game.arrangement_ui.shop_grid.custom_minimum_size and game.arrangement_ui._series_preview_texture(game._series_entry("sweets")).resource_path=="res://assets/plants/sweets/sweets-strawberry-shortcake.png")
+	game.arrangement_ui._request_catalog_purchase("metal");assert(bool(game.unlocked_series.get("metal",false)) and game.puku_points==3 and game.arrangement_ui.catalog_shop_grid.get_child_count()==14)
+	game.arrangement_ui._request_catalog_purchase("sweets");assert(bool(game.unlocked_series.get("sweets",false)) and game.puku_points==0 and "スイーツ多肉を購入しました" in game.arrangement_ui.catalog_shop_message.text)
+	game.arrangement_ui.close();game._show_shop_categories();game._open_shop_pot_category();assert(game.arrangement_ui.visible and game.arrangement_ui.shop_page.visible and game.arrangement_ui.return_context=="shop")
 	game.arrangement_ui.close();assert(not game.arrangement_ui.visible and game.shop_current_page=="categories" and game.shop_category_controls[0].is_visible_in_tree())
 
 	game.volume_seed_unlocked=true;game.volume_seed_intro_seen=false;game.tutorial_steps["volume_intro_step"]=0

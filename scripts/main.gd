@@ -897,19 +897,21 @@ func _open_shop_pot_category()->void:
 	shop_current_page="categories";_refresh_shop_page_visibility();_open_pot_shop()
 
 func _open_shop_catalog_category()->void:
-	shop_current_page="catalog";_refresh_shop_page_visibility()
+	shop_current_page="categories";_refresh_shop_page_visibility();_hide_shop_chatter(true);_sync_arrangement_ui();arrangement_ui.open_catalog_shop()
 
 func _build_arrangement_ui(hud:Control)->void:
 	arrangement_ui=ArrangementUIClass.new();hud.add_child(arrangement_ui)
 	arrangement_ui.close_requested.connect(_on_arrangement_close_requested)
 	arrangement_ui.save_requested.connect(_on_arrangement_save_requested)
 	arrangement_ui.pot_purchase_requested.connect(_on_pot_purchase_requested)
+	arrangement_ui.catalog_purchase_requested.connect(_on_catalog_purchase_requested)
 	arrangement_ui.world_scroll_input.connect(_on_arrangement_world_scroll_input)
 	_sync_arrangement_ui()
 
 func _sync_arrangement_ui()->void:
 	if arrangement_ui==null:return
 	arrangement_ui.configure(catalog_species,series_catalog,pot_catalog,discovered,owned_pots,saved_arrangements,arrangement_save_capacity,coins,_species_texture)
+	arrangement_ui.sync_catalog_state(unlocked_series,puku_points)
 
 func _open_arrangements()->void:
 	if not _tutorial_fully_complete() or current_mode!="greenhouse" or play_active or catalog_preview_mode_active or arrangement_scene_active or arrangement_transitioning:return
@@ -979,6 +981,13 @@ func _on_pot_purchase_requested(pot_id:String)->void:
 	if coins<price:arrangement_ui.show_pot_shop_message("所持金が足りません");return
 	coins-=price;owned_pots[pot_id]=true;_save();_update_currency_ui();arrangement_ui.sync_state(owned_pots,saved_arrangements,arrangement_save_capacity,coins);arrangement_ui.show_pot_shop_message("%sを購入しました"%str(pot.get("display_name","鉢")))
 	audio_manager.notify_user_gesture();audio_manager.play_se("purchase",1.0)
+
+func _on_catalog_purchase_requested(series_id:String)->void:
+	var entry:=_series_entry(series_id)
+	if entry.is_empty() or _is_series_unlocked(entry):return
+	var price:=_catalog_price_puku(entry)
+	if puku_points<price:return
+	puku_points-=price;unlocked_series[series_id]=true;_save();_update_currency_ui();_sync_mystery_pod_ui();arrangement_ui.sync_catalog_state(unlocked_series,puku_points);arrangement_ui.show_catalog_shop_message("%sを購入しました"%str(entry.get("display_name","シリーズ図鑑")));audio_manager.notify_user_gesture();audio_manager.play_se("purchase",1.0)
 
 func _pot_entry(pot_id:String)->Dictionary:
 	for value in pot_catalog:
@@ -2167,9 +2176,16 @@ func _close_encyclopedia()->void:
 	_update_play_ui()
 
 func _current_series_entry()->Dictionary:
-	if series_catalog.is_empty():return {}
-	selected_series_index=clampi(selected_series_index,0,series_catalog.size()-1)
-	return series_catalog[selected_series_index]
+	var owned:=_owned_series_entries()
+	if owned.is_empty():return {}
+	selected_series_index=clampi(selected_series_index,0,owned.size()-1)
+	return owned[selected_series_index]
+
+func _owned_series_entries()->Array[Dictionary]:
+	var owned:Array[Dictionary]=[]
+	for entry in series_catalog:
+		if entry is Dictionary and _is_series_unlocked(entry):owned.append(entry)
+	return owned
 
 func _series_entry(series_id:String)->Dictionary:
 	for entry in series_catalog:
@@ -2192,7 +2208,7 @@ func _can_browse_series(entry:Dictionary)->bool:
 	return _is_series_unlocked(entry) or bool(entry.get("preview_catalog_when_locked",false)) or not _series_species_entries(str(entry.get("series_id",""))).is_empty()
 
 func _catalog_purchase_enabled(entry:Dictionary)->bool:
-	return bool(entry.get("catalog_purchase_enabled",true)) and not _series_species_entries(str(entry.get("series_id",""))).is_empty()
+	return bool(entry.get("catalog_purchase_enabled",true))
 
 func _catalog_price_puku(entry:Dictionary)->int:
 	return maxi(0,int(entry.get("unlock_price_puku",ENCYCLOPEDIA_UNLOCK_PUKU_COST)))
@@ -2248,32 +2264,42 @@ func _series_found_count(series_id:String)->int:
 func _refresh_series_selection()->void:
 	var entry:=_current_series_entry()
 	if entry.is_empty():return
+	var owned:=_owned_series_entries()
 	_refresh_series_carousel_cards()
 	all_series_get_label.text="全シリーズ総GET %d"%_all_series_get_count()
-	series_position_label.text="%d / %d"%[selected_series_index+1,series_catalog.size()]
-	series_previous_button.disabled=series_catalog.size()<2;series_next_button.disabled=series_catalog.size()<2
+	series_position_label.text="%d / %d"%[selected_series_index+1,owned.size()]
+	series_previous_button.disabled=owned.size()<2;series_next_button.disabled=owned.size()<2
 
 func _refresh_series_carousel_cards()->void:
-	if series_catalog.is_empty():return
+	var owned:=_owned_series_entries()
+	if owned.is_empty():return
 	for card in series_carousel_cards:
-		var relative_index:=int(card.get("relative_index",0));var series_index:=wrapi(selected_series_index+relative_index,0,series_catalog.size())
-		_populate_series_card(card,series_index)
+		var relative_index:=int(card.get("relative_index",0));var series_index:=wrapi(selected_series_index+relative_index,0,owned.size())
+		_populate_series_card(card,series_index,owned)
 	_set_series_carousel_offset(series_carousel_offset)
 
-func _populate_series_card(card:Dictionary,series_index:int)->void:
-	var entry:Dictionary=series_catalog[series_index];var series_id:=str(entry.get("series_id",""));var entries:=_series_species_entries(series_id);var unlocked:=_is_series_unlocked(entry)
-	var container:Control=card.container;var cover_image:TextureRect=card.cover_image;var cover_path:=str(entry.get("cover_image_path",""))
+func _populate_series_card(card:Dictionary,series_index:int,owned:Array[Dictionary])->void:
+	var entry:Dictionary=owned[series_index];var series_id:=str(entry.get("series_id",""));var entries:=_series_species_entries(series_id);var unlocked:=_is_series_unlocked(entry)
+	var container:Control=card.container;var cover_image:TextureRect=card.cover_image
 	card.title.text=str(entry.get("display_name","シリーズ図鑑"));card.subtitle.text=str(entry.get("subtitle",""));card.description.text=str(entry.get("description",""));card.progress.text="%d / %d種"%[_series_found_count(series_id),entries.size()];card.get_label.text="総GET %d"%_series_get_count(series_id)
-	cover_image.texture=load(cover_path) as Texture2D if not cover_path.is_empty() and ResourceLoader.exists(cover_path) else null
+	cover_image.texture=_series_cover_texture(entry)
 	card.cover_placeholder.visible=cover_image.texture==null and unlocked;card.lock_label.visible=not unlocked;card.lock_label.text="🔒\n未開放\n表紙画像 準備中" if cover_image.texture==null else "🔒\n未開放"
 	var browsable:=_can_browse_series(entry);card.open_button.disabled=not browsable
 	if unlocked:card.open_button.text="図鑑をひらく"
 	elif browsable:card.open_button.text="シルエット図鑑をみる"
 	else:card.open_button.text="🔒  未開放　%s"%_series_unlock_text(entry)
-	container.visible=series_catalog.size()>1 or int(card.relative_index)==0;container.set_meta("series_index",series_index);container.set_meta("series_id",series_id)
+	container.visible=owned.size()>1 or int(card.relative_index)==0;container.set_meta("series_index",series_index);container.set_meta("series_id",series_id)
+
+func _series_cover_texture(entry:Dictionary)->Texture2D:
+	var ids=entry.get("species_ids",[])
+	if ids is Array and not ids.is_empty():
+		var first:=_catalog_entry(str(ids[0]));var first_texture:=_species_texture(first)
+		if first_texture!=null:return first_texture
+	var cover_path:=str(entry.get("cover_image_path",""))
+	return load(cover_path) as Texture2D if not cover_path.is_empty() and ResourceLoader.exists(cover_path) else null
 
 func _change_series_selection(direction:int)->void:
-	if series_catalog.size()<2 or direction==0 or series_carousel_animating:return
+	if _owned_series_entries().size()<2 or direction==0 or series_carousel_animating:return
 	_animate_series_selection(signi(direction))
 
 func _on_series_swipe_input(event:InputEvent)->void:
@@ -2314,13 +2340,13 @@ func _set_series_carousel_offset(value:float)->void:
 		for detail_node in card.detail_nodes:detail_node.self_modulate.a=detail_alpha
 
 func _animate_series_selection(direction:int)->void:
-	if series_catalog.size()<2 or series_carousel_animating:return
+	if _owned_series_entries().size()<2 or series_carousel_animating:return
 	series_swipe_tracking=false;series_carousel_animating=true
 	if series_carousel_tween and series_carousel_tween.is_valid():series_carousel_tween.kill()
 	series_carousel_tween=create_tween();series_carousel_tween.tween_method(_set_series_carousel_offset,series_carousel_offset,-direction*SERIES_CAROUSEL_SPACING,SERIES_CAROUSEL_SLIDE_SECONDS).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT);series_carousel_tween.tween_callback(_finish_series_transition.bind(direction))
 
 func _finish_series_transition(direction:int)->void:
-	selected_series_index=wrapi(selected_series_index+direction,0,series_catalog.size());_refresh_series_carousel_cards();_set_series_carousel_offset(0.0);series_position_label.text="%d / %d"%[selected_series_index+1,series_catalog.size()];series_carousel_animating=false
+	var owned:=_owned_series_entries();selected_series_index=wrapi(selected_series_index+direction,0,owned.size());_refresh_series_carousel_cards();_set_series_carousel_offset(0.0);series_position_label.text="%d / %d"%[selected_series_index+1,owned.size()];series_carousel_animating=false
 
 func _animate_series_snap_back()->void:
 	if is_zero_approx(series_carousel_offset):_set_series_carousel_offset(0.0);return
