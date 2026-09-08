@@ -758,12 +758,12 @@ func _build_ui() -> void:
 	best_label=Label.new(); best_label.text="最高記録\n0.0 cm"; best_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; best_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; best_label.add_theme_font_size_override("font_size",17); best_label.add_theme_color_override("font_color",Color.WHITE); best_panel.add_child(best_label)
 	var coin_panel:=PanelContainer.new(); coin_panel.position=Vector2(398,54); coin_panel.size=Vector2(153,53); coin_panel.add_theme_stylebox_override("panel",_box(Color("#55301d"),Color("#f1d19c"),22,2)); hud.add_child(coin_panel)
 	coin_label=Label.new(); coin_label.text=" ¥%s" % _comma(coins); coin_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; coin_label.add_theme_font_size_override("font_size",20); coin_label.add_theme_color_override("font_color",Color("#ffd85b")); coin_panel.add_child(coin_label)
-	var puku_panel:=PanelContainer.new();puku_panel.position=Vector2(42,158);puku_panel.size=Vector2(158,92);puku_panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_panel.add_theme_stylebox_override("panel",_box(Color("#3f6b4b"),Color("#d9ed9b"),17,2));hud.add_child(puku_panel)
-	var puku_content:=VBoxContainer.new();puku_content.alignment=BoxContainer.ALIGNMENT_CENTER;puku_content.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_content.add_theme_constant_override("separation",2);puku_panel.add_child(puku_content)
-	puku_gauge_label=Label.new();puku_gauge_label.text="ぷくゲージ";puku_gauge_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;puku_gauge_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_gauge_label.add_theme_font_size_override("font_size",13);puku_gauge_label.add_theme_color_override("font_color",Color("#fff9d9"));puku_content.add_child(puku_gauge_label)
-	puku_gauge_meter=ProgressBar.new();puku_gauge_meter.custom_minimum_size=Vector2(132,16);puku_gauge_meter.max_value=PUKU_GAUGE_TARGET_CM;puku_gauge_meter.show_percentage=false;puku_gauge_meter.mouse_filter=Control.MOUSE_FILTER_IGNORE;var meter_bg:=StyleBoxFlat.new();meter_bg.bg_color=Color("#294735");meter_bg.set_corner_radius_all(8);meter_bg.border_color=Color("#d9ed9b");meter_bg.set_border_width_all(1);puku_gauge_fill_style=StyleBoxFlat.new();puku_gauge_fill_style.bg_color=Color("#f6d95e");puku_gauge_fill_style.set_corner_radius_all(8);puku_gauge_meter.add_theme_stylebox_override("background",meter_bg);puku_gauge_meter.add_theme_stylebox_override("fill",puku_gauge_fill_style);puku_content.add_child(puku_gauge_meter)
-	puku_gauge_glow=Panel.new();puku_gauge_glow.name="PukuGaugeGlow";puku_gauge_glow.show_behind_parent=true;puku_gauge_glow.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_gauge_glow.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);puku_gauge_glow.offset_left=-7;puku_gauge_glow.offset_top=-7;puku_gauge_glow.offset_right=7;puku_gauge_glow.offset_bottom=7;puku_gauge_glow_style=StyleBoxFlat.new();puku_gauge_glow_style.bg_color=Color(1.0,.88,.32,.16);puku_gauge_glow_style.border_color=Color(1.0,.95,.48,.44);puku_gauge_glow_style.set_border_width_all(2);puku_gauge_glow_style.set_corner_radius_all(12);puku_gauge_glow_style.shadow_color=Color(1.0,.78,.18,.55);puku_gauge_glow_style.shadow_size=5;puku_gauge_glow.add_theme_stylebox_override("panel",puku_gauge_glow_style);puku_gauge_meter.add_child(puku_gauge_glow);call_deferred("_start_puku_gauge_glow")
-	puku_point_label=Label.new();puku_point_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;puku_point_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_point_label.add_theme_font_size_override("font_size",15);puku_point_label.add_theme_color_override("font_color",Color("#fff0a0"));puku_content.add_child(puku_point_label)
+	var puku_area:=Control.new();puku_area.name="PukuGaugeArea";puku_area.position=Vector2(42,158);puku_area.size=Vector2(158,82);puku_area.mouse_filter=Control.MOUSE_FILTER_IGNORE;hud.add_child(puku_area)
+	var puku_content:=VBoxContainer.new();puku_content.position=Vector2(13,0);puku_content.size=Vector2(132,82);puku_content.alignment=BoxContainer.ALIGNMENT_CENTER;puku_content.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_content.add_theme_constant_override("separation",4);puku_area.add_child(puku_content)
+	puku_gauge_label=Label.new();puku_gauge_label.text="ぷくゲージ";puku_gauge_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;puku_gauge_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_gauge_label.add_theme_font_size_override("font_size",13);puku_gauge_label.add_theme_color_override("font_color",Color("#d9fbff"));puku_content.add_child(puku_gauge_label)
+	puku_gauge_meter=ProgressBar.new();puku_gauge_meter.custom_minimum_size=Vector2(132,10);puku_gauge_meter.max_value=PUKU_GAUGE_TARGET_CM;puku_gauge_meter.show_percentage=false;puku_gauge_meter.mouse_filter=Control.MOUSE_FILTER_IGNORE;var meter_bg:=StyleBoxFlat.new();meter_bg.bg_color=Color(0.035,.12,.15,.88);meter_bg.set_corner_radius_all(5);meter_bg.border_color=Color(0.18,.38,.43,.72);meter_bg.set_border_width_all(1);puku_gauge_fill_style=StyleBoxFlat.new();puku_gauge_fill_style.bg_color=Color(0.31,.86,.94,.92);puku_gauge_fill_style.border_color=Color(0.80,1.0,1.0,.94);puku_gauge_fill_style.set_border_width_all(1);puku_gauge_fill_style.set_corner_radius_all(5);puku_gauge_meter.add_theme_stylebox_override("background",meter_bg);puku_gauge_meter.add_theme_stylebox_override("fill",puku_gauge_fill_style);puku_content.add_child(puku_gauge_meter)
+	puku_gauge_glow=Panel.new();puku_gauge_glow.name="PukuGaugeGlow";puku_gauge_glow.show_behind_parent=true;puku_gauge_glow.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_gauge_glow.position=Vector2(1,1);puku_gauge_glow.size=Vector2(2,8);puku_gauge_glow_style=StyleBoxFlat.new();puku_gauge_glow_style.bg_color=Color(0,0,0,0);puku_gauge_glow_style.border_color=Color(0.35,.93,1.0,.48);puku_gauge_glow_style.set_border_width_all(1);puku_gauge_glow_style.set_corner_radius_all(5);puku_gauge_glow_style.shadow_color=Color(0.05,.78,1.0,.22);puku_gauge_glow_style.shadow_size=3;puku_gauge_glow.add_theme_stylebox_override("panel",puku_gauge_glow_style);puku_gauge_meter.add_child(puku_gauge_glow);call_deferred("_start_puku_gauge_glow");call_deferred("_update_puku_ui")
+	puku_point_label=Label.new();puku_point_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;puku_point_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_point_label.add_theme_font_size_override("font_size",15);puku_point_label.add_theme_color_override("font_color",Color("#bdeff4"));puku_content.add_child(puku_point_label)
 	puku_gain_label=Label.new();puku_gain_label.position=Vector2(138,246);puku_gain_label.size=Vector2(300,60);puku_gain_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;puku_gain_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;puku_gain_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_gain_label.add_theme_font_size_override("font_size",27);puku_gain_label.add_theme_color_override("font_color",Color("#fff49a"));puku_gain_label.add_theme_color_override("font_outline_color",Color("#31553c"));puku_gain_label.add_theme_constant_override("outline_size",7);puku_gain_label.visible=false;effects_layer.add_child(puku_gain_label)
 	for entry in [{"x":398,"t":"図鑑"},{"x":483,"t":"設定"}]:
 		var b:=Button.new(); b.text=entry.t; b.position=Vector2(entry.x,116); b.size=Vector2(68,73); _skin_button(b,Color("#fff0cf"),17); hud.add_child(b)
@@ -2058,23 +2058,28 @@ func _puku_gauge_text()->String:
 func _update_puku_ui()->void:
 	if puku_gauge_label:puku_gauge_label.text="ぷくゲージ"
 	var ratio:=clampf(puku_gauge_cm/PUKU_GAUGE_TARGET_CM,0.0,1.0)
-	var glow_strength:=pow(ratio,1.65)
+	var glow_strength:=pow(ratio,1.45)
 	if puku_gauge_meter:puku_gauge_meter.value=clampf(puku_gauge_cm,0.0,PUKU_GAUGE_TARGET_CM)
 	if puku_gauge_glow:
 		puku_gauge_glow.visible=ratio>.001
-		puku_gauge_glow.self_modulate=Color(1.0,1.0,1.0,lerpf(.08,1.0,glow_strength))
+		var meter_width:=maxf(puku_gauge_meter.size.x,puku_gauge_meter.custom_minimum_size.x)
+		var meter_height:=maxf(puku_gauge_meter.size.y,puku_gauge_meter.custom_minimum_size.y)
+		puku_gauge_glow.position=Vector2(1,1);puku_gauge_glow.size=Vector2(maxf(2.0,(meter_width-2.0)*ratio),maxf(4.0,meter_height-2.0))
+		puku_gauge_glow.self_modulate=Color(1.0,1.0,1.0,lerpf(.22,.72,glow_strength))
 	if puku_gauge_glow_style:
-		puku_gauge_glow_style.shadow_size=roundi(4.0+14.0*glow_strength)
-		puku_gauge_glow_style.shadow_color=Color(1.0,.78,.18,lerpf(.12,.82,glow_strength))
-		puku_gauge_glow_style.border_color=Color(1.0,.95,.48,lerpf(.18,.72,glow_strength))
-	if puku_gauge_fill_style:puku_gauge_fill_style.bg_color=Color("#f6d95e").lerp(Color("#fff8b0"),glow_strength*.58)
+		puku_gauge_glow_style.shadow_size=roundi(2.0+5.0*glow_strength)
+		puku_gauge_glow_style.shadow_color=Color(.04,.78,1.0,lerpf(.12,.42,glow_strength))
+		puku_gauge_glow_style.border_color=Color(.42,.95,1.0,lerpf(.28,.68,glow_strength))
+	if puku_gauge_fill_style:
+		puku_gauge_fill_style.bg_color=Color("#4ed9ec").lerp(Color("#bdfaff"),.18+glow_strength*.32)
+		puku_gauge_fill_style.border_color=Color(.80,1.0,1.0,lerpf(.72,.98,glow_strength))
 	if puku_point_label:puku_point_label.text="ぷくコイン ×%d"%puku_points
 
 func _start_puku_gauge_glow()->void:
 	if not puku_gauge_glow:return
 	if puku_gauge_glow_tween and puku_gauge_glow_tween.is_valid():puku_gauge_glow_tween.kill()
-	puku_gauge_glow.modulate=Color(1.0,1.0,1.0,.72)
-	puku_gauge_glow_tween=create_tween().bind_node(puku_gauge_glow).set_loops();puku_gauge_glow_tween.tween_property(puku_gauge_glow,"modulate:a",1.0,1.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT);puku_gauge_glow_tween.tween_property(puku_gauge_glow,"modulate:a",.72,1.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	puku_gauge_glow.modulate=Color(1.0,1.0,1.0,.82)
+	puku_gauge_glow_tween=create_tween().bind_node(puku_gauge_glow).set_loops();puku_gauge_glow_tween.tween_property(puku_gauge_glow,"modulate:a",1.0,1.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT);puku_gauge_glow_tween.tween_property(puku_gauge_glow,"modulate:a",.82,1.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 func _show_puku_point_gain(amount:int)->void:
 	if not puku_gain_label:return
