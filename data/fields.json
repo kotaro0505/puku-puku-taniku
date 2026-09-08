@@ -12,5 +12,6 @@
   {"field_id":"sea_field","display_name":"海の多肉の原生地","implemented":false,"field_type":"series_field","scene_path":"","background_image_path":"res://assets/series_fields/sea.jpg"},
   {"field_id":"halloween_field","display_name":"ハロウィンおばけ多肉の原生地","implemented":false,"field_type":"series_field","scene_path":"","background_image_path":"res://assets/series_fields/halloween.jpg"},
   {"field_id":"christmas_field","display_name":"クリスマス多肉の原生地","implemented":false,"field_type":"series_field","scene_path":"","background_image_path":"res://assets/series_fields/christmas.jpg"},
-  {"field_id":"yumekawa_field","display_name":"ゆめかわ多肉の原生地","implemented":false,"field_type":"series_field","scene_path":"","background_image_path":"res://assets/series_fields/yumekawa.jpg"}
+  {"field_id":"yumekawa_field","display_name":"ゆめかわ多肉の原生地","implemented":false,"field_type":"series_field","scene_path":"","background_image_path":"res://assets/series_fields/yumekawa.jpg"},
+  {"field_id":"forest_amber_field","display_name":"森と琥珀の原生地","implemented":false,"field_type":"series_field","scene_path":"","background_image_path":"res://assets/series_fields/forest-amber.jpg"}
 ]

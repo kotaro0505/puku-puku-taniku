@@ -54,6 +54,16 @@ const SPRITES := {
 	"metal_obsidian_spike": "res://assets/catalog/metal/metal-obsidian-spike.png",
 	"metal_sage_silver": "res://assets/catalog/metal/metal-sage-silver.png",
 	"metal_patina_copper": "res://assets/catalog/metal/metal-patina-copper.png",
+	"forest_amber_insect_rosette": "res://assets/catalog/forest-amber/forest-amber-insect-rosette.png",
+	"forest_amber_capsules": "res://assets/catalog/forest-amber/forest-amber-capsules.png",
+	"forest_amber_stag_rosette": "res://assets/catalog/forest-amber/forest-amber-stag-rosette.png",
+	"forest_amber_moss_orbs": "res://assets/catalog/forest-amber/forest-amber-moss-orbs.png",
+	"forest_amber_fly_rosette": "res://assets/catalog/forest-amber/forest-amber-fly-rosette.png",
+	"forest_amber_moss_fingers": "res://assets/catalog/forest-amber/forest-amber-moss-fingers.png",
+	"forest_amber_dragonfly_rosette": "res://assets/catalog/forest-amber/forest-amber-dragonfly-rosette.png",
+	"forest_amber_aqua_rosette": "res://assets/catalog/forest-amber/forest-amber-aqua-rosette.png",
+	"forest_amber_lavender_rosette": "res://assets/catalog/forest-amber/forest-amber-lavender-rosette.png",
+	"forest_amber_owl_rosette": "res://assets/catalog/forest-amber/forest-amber-owl-rosette.png",
 	"gold_kannte": "res://assets/plants/sprite-golden-laui.png"
 }
 

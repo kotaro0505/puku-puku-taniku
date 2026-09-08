@@ -4,19 +4,19 @@ func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
 	game._reset_progression_state();game.intro_story_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.tutorial_steps["habitat_scroll_dialog"]=true;game.tutorial_steps["habitat_get_dialog"]=true
-	assert(game.series_catalog.size()==14)
-	var expected_ids:=["base","metal","jewel","jelly","sweets","gummy","stardust","glow","neon","stone","sea","halloween","christmas","yumekawa"]
+	assert(game.series_catalog.size()==15)
+	var expected_ids:=["base","metal","jewel","jelly","sweets","gummy","stardust","glow","neon","stone","sea","halloween","christmas","yumekawa","forest_amber"]
 	for index in range(expected_ids.size()):
 		var series_entry:Dictionary=game.series_catalog[index]
 		assert(str(series_entry.get("series_id",""))==expected_ids[index])
 		for required_key in ["series_id","display_name","subtitle","description","cover_image_path","species_ids","field_id","unlock_type","unlock_condition","iap_product_id","sort_order"]:assert(series_entry.has(required_key))
-	var base:Dictionary=game._series_entry("base");assert(game._is_series_unlocked(base));assert(game._series_species_entries("base").size()==21 and game.catalog_species.size()==64)
+	var base:Dictionary=game._series_entry("base");assert(game._is_series_unlocked(base));assert(game._series_species_entries("base").size()==21 and game.catalog_species.size()==74)
 	var unique_base_ids:Dictionary={}
 	for entry in game._series_species_entries("base"):unique_base_ids[str(entry.species_id)]=true
 	assert(unique_base_ids.size()==21)
 	for future_id in expected_ids.slice(1):
 		var future_entry:Dictionary=game._series_entry(str(future_id));assert(not game._is_series_unlocked(future_entry))
-		if str(future_id) in ["metal","sweets"]:assert(future_entry.species_ids.size()==10 and not game._can_browse_series(future_entry) and bool(future_entry.get("preview_catalog_when_locked",false)))
+		if str(future_id) in ["metal","sweets","forest_amber"]:assert(future_entry.species_ids.size()==10 and not game._can_browse_series(future_entry) and bool(future_entry.get("preview_catalog_when_locked",false)))
 		elif str(future_id)=="gummy":assert(future_entry.species_ids.size()==8 and not game._can_browse_series(future_entry) and bool(future_entry.get("preview_catalog_when_locked",false)))
 		elif str(future_id)=="glow":assert(future_entry.species_ids.size()==12 and not game._can_browse_series(future_entry) and bool(future_entry.get("preview_catalog_when_locked",false)))
 		elif str(future_id)=="neon":assert(future_entry.species_ids.size()==3 and game._is_hidden_series("neon") and not game._can_browse_series(future_entry) and not game._catalog_purchase_enabled(future_entry))
@@ -46,6 +46,14 @@ func _ready()->void:
 		assert(str(game.SucculentClass.SPRITES.get(str(metal_entry.get("visual_variant","")),""))==image_path)
 		var metal_texture:=load(image_path) as Texture2D;var metal_source:=metal_texture.get_image();var metal_used:=metal_source.get_used_rect();var metal_w:=metal_source.get_width();var metal_h:=metal_source.get_height();assert(metal_w>=900 and metal_h>=900 and metal_source.detect_alpha()!=Image.ALPHA_NONE and metal_source.get_pixel(0,0).a<.01 and metal_source.get_pixel(metal_w-1,0).a<.01 and metal_source.get_pixel(0,metal_h-1).a<.01 and metal_source.get_pixel(metal_w-1,metal_h-1).a<.01 and metal_used.size.x*metal_used.size.y<metal_w*metal_h, "%s size=%s alpha=%s used=%s" % [metal_id,metal_texture.get_size(),metal_source.detect_alpha(),metal_used])
 	assert(metal_ids.size()==10 and game._series_cover_texture(game._series_entry("metal")).resource_path=="res://assets/catalog/metal/metal-silver-rosette.png")
+	var forest_amber_ids:Dictionary={}
+	for amber_entry in game._series_species_entries("forest_amber"):
+		var amber_id:=str(amber_entry.get("species_id",""));var image_path:=str(amber_entry.get("image_path",""));forest_amber_ids[amber_id]=true
+		assert(str(amber_entry.get("series_id",""))=="forest_amber" and bool(amber_entry.get("catalog_only",false)) and image_path.begins_with("res://assets/catalog/forest-amber/") and ResourceLoader.exists(image_path))
+		assert(str(game.SucculentClass.SPRITES.get(str(amber_entry.get("visual_variant","")),""))==image_path)
+		var amber_image:Image=(load(image_path) as Texture2D).get_image();var amber_used:=amber_image.get_used_rect();var amber_w:=amber_image.get_width();var amber_h:=amber_image.get_height()
+		assert(amber_w>=900 and amber_h>=900 and amber_image.detect_alpha()!=Image.ALPHA_NONE and amber_image.get_pixel(0,0).a<.01 and amber_image.get_pixel(amber_w-1,amber_h-1).a<.01 and amber_used.size.x*amber_used.size.y<amber_w*amber_h)
+	assert(forest_amber_ids.size()==10 and game._series_cover_texture(game._series_entry("forest_amber")).resource_path=="res://assets/catalog/forest-amber/forest-amber-insect-rosette.png")
 	for cover_series in game.series_catalog:
 		var cover_species:Array=game._series_species_entries(str(cover_series.get("series_id","")))
 		if not cover_species.is_empty() and game._species_texture(cover_species[0])!=null:assert(game._series_cover_texture(cover_series).resource_path==game._species_texture(cover_species[0]).resource_path)

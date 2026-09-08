@@ -11,7 +11,8 @@
     {"series_id":"sea","stock_condition":{"type":"formal_play_count","value":30},"price_puku":3},
     {"series_id":"halloween","stock_condition":{"type":"formal_play_count","value":34},"price_puku":3},
     {"series_id":"christmas","stock_condition":{"type":"formal_play_count","value":38},"price_puku":3},
-    {"series_id":"yumekawa","stock_condition":{"type":"formal_play_count","value":42},"price_puku":3}
+    {"series_id":"yumekawa","stock_condition":{"type":"formal_play_count","value":42},"price_puku":3},
+    {"series_id":"forest_amber","stock_condition":{"type":"formal_play_count","value":46},"price_puku":3}
   ],
   "hidden_series": [
     {

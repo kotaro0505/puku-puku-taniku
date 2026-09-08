@@ -244,5 +244,31 @@
     "unlock_condition": {"display_text": "今後追加予定"},
     "iap_product_id": "",
     "sort_order": 130
+  },
+  {
+    "series_id": "forest_amber",
+    "display_name": "森と琥珀",
+    "subtitle": "琥珀に眠る小さな森",
+    "description": "森の記憶や小さな生きものを、透き通る琥珀の葉に閉じ込めた多肉たちです。",
+    "cover_image_path": "res://assets/catalog/forest-amber/forest-amber-insect-rosette.png",
+    "species_ids": [
+      "forest_amber_insect_rosette",
+      "forest_amber_capsules",
+      "forest_amber_stag_rosette",
+      "forest_amber_moss_orbs",
+      "forest_amber_fly_rosette",
+      "forest_amber_moss_fingers",
+      "forest_amber_dragonfly_rosette",
+      "forest_amber_aqua_rosette",
+      "forest_amber_lavender_rosette",
+      "forest_amber_owl_rosette"
+    ],
+    "field_id": "forest_amber_field",
+    "unlock_type": "future",
+    "preview_catalog_when_locked": true,
+    "catalog_purchase_enabled": true,
+    "unlock_condition": {"display_text": "ゲームを進めると入荷"},
+    "iap_product_id": "",
+    "sort_order": 140
   }
 ]

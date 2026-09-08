@@ -10,8 +10,9 @@ func _ready()->void:
 	assert(game._shop_series_catalog().is_empty())
 	game.formal_play_count=1;assert(game._shop_series_catalog().map(func(entry):return str(entry.series_id))==["gummy"])
 	game.formal_play_count=10;assert(game._shop_series_catalog().map(func(entry):return str(entry.series_id))==["metal","sweets","gummy","glow"])
+	game.formal_play_count=46;assert(game._shop_series_catalog().any(func(entry):return str(entry.series_id)=="forest_amber") and game._is_normal_series("forest_amber"))
 	assert(not game._shop_series_catalog().any(func(entry):return str(entry.series_id)=="neon"))
-	game._sync_arrangement_ui();game.arrangement_ui.open_catalog_shop();assert(game.arrangement_ui.catalog_shop_grid.get_child_count()==4);game.arrangement_ui.visible=false
+	game._sync_arrangement_ui();game.arrangement_ui.open_catalog_shop();assert(game.arrangement_ui.catalog_shop_grid.get_child_count()==game._shop_series_catalog().size());game.arrangement_ui.visible=false
 	game._grant_old_catalog_page(1,true);assert(game.old_catalog_pages==1 and game.old_catalog_intro_pending)
 	game.puku_points=2;game._accept_hidden_catalog_restoration();assert(game.old_catalog_pages==1 and not bool(game.unlocked_series.get("neon",false)))
 	game.puku_points=3;game._accept_hidden_catalog_restoration();assert(game.old_catalog_pages==0 and game.puku_points==0 and bool(game.unlocked_series.get("neon",false)))
