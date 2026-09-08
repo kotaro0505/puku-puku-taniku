@@ -34,6 +34,16 @@ const SPRITES := {
 	"gummy_orange": "res://assets/plants/gummy/gummy-orange.png",
 	"gummy_rainbow": "res://assets/plants/gummy/gummy-rainbow.png",
 	"gummy_soda": "res://assets/plants/gummy/gummy-soda.png",
+	"sweets_strawberry_shortcake": "res://assets/plants/sweets/sweets-strawberry-shortcake.png",
+	"sweets_blueberry_galaxy": "res://assets/plants/sweets/sweets-blueberry-galaxy.png",
+	"sweets_citrus_mint": "res://assets/plants/sweets/sweets-citrus-mint.png",
+	"sweets_chocolate_gold": "res://assets/plants/sweets/sweets-chocolate-gold.png",
+	"sweets_matcha_wafer": "res://assets/plants/sweets/sweets-matcha-wafer.png",
+	"sweets_mango_mint": "res://assets/plants/sweets/sweets-mango-mint.png",
+	"sweets_raspberry_jewel": "res://assets/plants/sweets/sweets-raspberry-jewel.png",
+	"sweets_fairy_sugar": "res://assets/plants/sweets/sweets-fairy-sugar.png",
+	"sweets_caramel_cherry": "res://assets/plants/sweets/sweets-caramel-cherry.png",
+	"sweets_mint_chocolate": "res://assets/plants/sweets/sweets-mint-chocolate.png",
 	"gold_kannte": "res://assets/plants/sprite-golden-laui.png"
 }
 
