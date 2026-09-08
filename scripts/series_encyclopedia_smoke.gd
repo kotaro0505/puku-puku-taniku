@@ -61,12 +61,12 @@ func _ready()->void:
 	game.pending_habitat_species.clear();game._queue_random_species("シリーズ未解禁");assert(game.pending_habitat_species.is_empty())
 	game.greenhouse_available["gummy_peach_milk"]=true;game.discovered["gummy_peach_milk"]=true;game._apply_saved_unlocks();assert(game.species.any(func(entry):return str(entry.species_id)=="gummy_peach_milk"));game.greenhouse_available.erase("gummy_peach_milk");game.discovered.erase("gummy_peach_milk");game._apply_saved_unlocks()
 	game.formal_play_count=0;game._sync_arrangement_ui();game.arrangement_ui.open_catalog_shop();assert(game.arrangement_ui.catalog_shop_grid.get_child_count()==13);game.arrangement_ui.visible=false
-	game._open_encyclopedia();assert(game._owned_series_entries().size()==1 and game._current_series_entry().series_id=="base" and game.series_position_label.text=="1 / 1" and game.series_cover_image.texture.resource_path=="res://assets/plants/sprite-colorata.png")
+	game._open_encyclopedia();assert(game._owned_series_entries().size()==1 and game._current_series_entry().series_id=="base" and not game.series_position_label.visible and not game.all_series_get_label.visible and game.series_cover_image.texture.resource_path=="res://assets/plants/sprite-colorata.png")
 	for carousel_card in game.series_carousel_cards:assert(str(carousel_card.container.get_meta("series_id"))=="base")
 	game._close_encyclopedia();game.unlocked_series["sweets"]=true;game.unlocked_series["gummy"]=true;assert(game._owned_series_entries().map(func(entry):return str(entry.series_id))==["base","sweets","gummy"])
 	assert(game._series_cover_texture(game._series_entry("sweets")).resource_path=="res://assets/catalog/sweets/sweets-strawberry-shortcake.png" and game._series_cover_texture(game._series_entry("gummy")).resource_path=="res://assets/catalog/gummy/gummy-peach-milk.png")
 	game.selected_series_index=2;game._open_encyclopedia();assert(not game.series_lock_label.visible and game.series_cover_image.texture.resource_path=="res://assets/catalog/gummy/gummy-peach-milk.png");await get_tree().process_frame
-	assert(game.encyclopedia_list_page.visible and game.encyclopedia_list_title.text=="グミ多肉" and game.encyclopedia_grid.get_child_count()==8 and game.encyclopedia_list_progress.text=="0 / 8種" and game.encyclopedia_field_button.disabled)
+	assert(game.encyclopedia_list_page.visible and game.encyclopedia_list_title.text=="グミ多肉" and game.encyclopedia_grid.get_child_count()==8 and not game.encyclopedia_list_progress.visible and not game.encyclopedia_list_get.visible and not game.encyclopedia_field_button.visible)
 	for gummy_card in game.encyclopedia_grid.get_children():
 		assert(gummy_card.disabled)
 		var card_texts:Array[String]=[]
@@ -85,7 +85,7 @@ func _ready()->void:
 	found_card.pressed.emit();assert(game.encyclopedia_detail_page.find_child("SpeciesName",true,false).text=="ももミルクグミ" and not game.encyclopedia_detail_page.find_child("SpeciesDescription",true,false).text.is_empty() and game.encyclopedia_detail_page.find_child("SpeciesGetCount",true,false).text=="GET 3" and game.encyclopedia_detail_page.find_child("SpeciesImage",true,false).material==null)
 	game._close_encyclopedia();game.discovered.erase("gummy_peach_milk");game.species_get_counts.erase("gummy_peach_milk");game.selected_series_index=0
 	game.selected_series_index=1;game._open_encyclopedia();assert(game.series_cover_image.texture.resource_path=="res://assets/catalog/sweets/sweets-strawberry-shortcake.png");await get_tree().process_frame
-	assert(game.encyclopedia_list_page.visible and game.encyclopedia_list_title.text=="スイーツ多肉" and game.encyclopedia_grid.get_child_count()==10 and game.encyclopedia_list_progress.text=="0 / 10種" and game.encyclopedia_field_button.disabled)
+	assert(game.encyclopedia_list_page.visible and game.encyclopedia_list_title.text=="スイーツ多肉" and game.encyclopedia_grid.get_child_count()==10 and not game.encyclopedia_list_progress.visible and not game.encyclopedia_list_get.visible and not game.encyclopedia_field_button.visible)
 	game.discovered["sweets_strawberry_shortcake"]=true;game.species_get_counts["sweets_strawberry_shortcake"]=1;game._refresh_encyclopedia_header();game._refresh_encyclopedia_cards();await get_tree().process_frame;game._update_encyclopedia_visible_textures()
 	var first_sweets_card:Button=game.encyclopedia_grid.get_child(0);assert(not first_sweets_card.disabled);first_sweets_card.pressed.emit();assert(game.encyclopedia_detail_page.find_child("SpeciesName",true,false).text=="いちごショート多肉" and game.encyclopedia_detail_page.find_child("SpeciesImage",true,false).texture.resource_path=="res://assets/catalog/sweets/sweets-strawberry-shortcake.png")
 	game._close_encyclopedia();game.discovered.erase("sweets_strawberry_shortcake");game.species_get_counts.erase("sweets_strawberry_shortcake");game.selected_series_index=0
@@ -119,8 +119,8 @@ func _ready()->void:
 	assert(game._species_get_count("colorata")==2 and game._series_get_count("base")==3 and game._all_series_get_count()==3 and game._series_found_count("base")==2)
 	game._save();game.species_get_counts.clear();game._load_save();assert(game._species_get_count("colorata")==2 and game._species_get_count("pinwheel")==1)
 	game._open_encyclopedia();await get_tree().process_frame
-	assert(game.encyclopedia_list_page.visible and game.encyclopedia_grid.get_child_count()==game._series_species_entries("base").size() and game.encyclopedia_list_title.text=="基本図鑑" and game.encyclopedia_list_get.text=="シリーズ総GET 3")
-	assert(not game.encyclopedia_field_button.disabled and game.encyclopedia_field_button.text=="このシリーズの原生地へ")
+	assert(game.encyclopedia_list_page.visible and game.encyclopedia_grid.get_child_count()==game._series_species_entries("base").size() and game.encyclopedia_list_title.text=="基本図鑑" and not game.encyclopedia_list_get.visible)
+	assert(game.encyclopedia_field_button.visible and not game.encyclopedia_field_button.disabled and game.encyclopedia_field_button.text=="このシリーズの原生地へ")
 	game._open_current_series_field();assert(not game.encyclopedia_overlay.visible and game.current_mode=="habitat")
 	game._toggle_mode();assert(game.current_mode=="greenhouse")
 	print("SERIES_ENCYCLOPEDIA_SMOKE_OK series=",game.series_catalog.size()," base_species=",game._series_species_entries("base").size()," total_get=",game._all_series_get_count())

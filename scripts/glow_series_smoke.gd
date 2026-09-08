@@ -48,7 +48,7 @@ func _ready()->void:
 	assert(seen.size()==12 and game.mystery_pod_system.eligible_species_for_series("glow").is_empty())
 	game.unlocked_series["glow"]=true;game._open_encyclopedia();assert(game._owned_series_entries().size()==2)
 	game.current_encyclopedia_series_id="glow";game.encyclopedia_series_page.visible=false;game.encyclopedia_list_page.visible=true;game._refresh_encyclopedia_header();game._refresh_encyclopedia_cards();await get_tree().process_frame;game._update_encyclopedia_visible_textures()
-	assert(game.encyclopedia_list_title.text=="蓄光多肉" and game.encyclopedia_list_progress.text=="0 / 12種" and game.encyclopedia_grid.get_child_count()==12)
+	assert(game.encyclopedia_list_title.text=="蓄光多肉" and not game.encyclopedia_list_progress.visible and not game.encyclopedia_list_get.visible and not game.encyclopedia_field_button.visible and game.encyclopedia_grid.get_child_count()==12)
 	assert(not game.encyclopedia_unlock_panel.visible)
 	for card in game.encyclopedia_grid.get_children():
 		assert(card.disabled)
