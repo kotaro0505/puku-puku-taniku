@@ -89,8 +89,8 @@
   {
     "series_id": "gummy",
     "display_name": "グミ多肉",
-    "subtitle": "品種画像登録済み・開放条件準備中",
-    "description": "ぷにっとカラフルなグミ多肉のシリーズです。開放条件は今後追加予定です。",
+    "subtitle": "3ぷくポイントで解放",
+    "description": "ぷにっとカラフルなグミ多肉のシリーズです。3ぷくポイントで図鑑を解放できます。",
     "cover_image_path": "res://assets/series_covers/gummy.jpg",
     "species_ids": [
       "gummy_peach_milk",
@@ -105,10 +105,9 @@
     "field_id": "gummy_field",
     "unlock_type": "future",
     "preview_catalog_when_locked": true,
-    "unlock_condition": {"display_text": "開放条件は今後追加予定"},
+    "unlock_condition": {"display_text": "3ぷくポイントで解放"},
     "iap_product_id": "",
-    "unlock_price_yen": 10000,
-    "unlock_price_pods": 10,
+    "unlock_price_puku": 3,
     "pod_seed_weight": 1.0,
     "sort_order": 50
   },

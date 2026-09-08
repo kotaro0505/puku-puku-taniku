@@ -13,7 +13,9 @@ const MysteryPodDevClass = preload("res://scripts/mystery_pod_dev.gd")
 const ConsumableIAPServiceClass = preload("res://scripts/consumable_iap_service.gd")
 const DEVELOPMENT_CATALOG_PREVIEW_ENABLED := true
 const DEVELOPMENT_MYSTERY_POD_TOOLS_ENABLED := true
-const PROGRESSION_VERSION := 9
+const PROGRESSION_VERSION := 10
+const PUKU_GAUGE_TARGET_CM := 1000.0
+const ENCYCLOPEDIA_UNLOCK_PUKU_COST := 3
 const NORMAL_GERMINATION_COUNT := 24
 const VOLUME_GERMINATION_COUNT := 36
 const PREMIUM_GERMINATION_COUNT := 24
@@ -167,6 +169,10 @@ var labels_layer: Control
 var effects_layer: Control
 var best_label: Label
 var coin_label: Label
+var puku_gauge_label: Label
+var puku_point_label: Label
+var puku_gain_label: Label
+var puku_gain_tween: Tween
 var record_card: PanelContainer
 var record_text: Label
 var encyclopedia_overlay: Control
@@ -208,8 +214,7 @@ var encyclopedia_field_button: Button
 var encyclopedia_field_status: Label
 var encyclopedia_unlock_panel: PanelContainer
 var encyclopedia_unlock_status: Label
-var encyclopedia_unlock_yen_button: Button
-var encyclopedia_unlock_pod_button: Button
+var encyclopedia_unlock_puku_button: Button
 var habitat_status_label: Label
 var seed_bag_panel: PanelContainer
 var play_timer_label: Label
@@ -331,6 +336,8 @@ var encyclopedia_icon_button: Button
 var external_navigation_controls: Array[Control] = []
 var encyclopedia_navigation_controls: Array[Control] = []
 var coins := 1000
+var puku_gauge_cm := 0.0
+var puku_points := 0
 var bests: Dictionary = {}
 var discovered: Dictionary = {}
 var species_get_counts: Dictionary = {}
@@ -494,7 +501,8 @@ func _load_save() -> void:
 	if FileAccess.file_exists("user://records.json"):
 		var value = JSON.parse_string(FileAccess.get_file_as_string("user://records.json"))
 		if value is Dictionary:
-			bests = value.get("bests",{}); coins = int(value.get("yen",value.get("coins",1000))); discovered=value.get("discovered",{"colorata":true});habitat_seed_date=str(value.get("habitat_seed_date",""));habitat_seeds_collected=int(value.get("habitat_seeds_collected",0))
+			bests = value.get("bests",{}); coins = int(value.get("yen",value.get("coins",1000)));puku_gauge_cm=maxf(0.0,float(value.get("puku_gauge_cm",0.0)));puku_points=maxi(0,int(value.get("puku_points",0)));discovered=value.get("discovered",{"colorata":true});habitat_seed_date=str(value.get("habitat_seed_date",""));habitat_seeds_collected=int(value.get("habitat_seeds_collected",0))
+			var carried_puku_points:=floori(puku_gauge_cm/PUKU_GAUGE_TARGET_CM);puku_points+=carried_puku_points;puku_gauge_cm-=carried_puku_points*PUKU_GAUGE_TARGET_CM
 			species_get_counts=value.get("species_get_counts",{});unlocked_series=value.get("unlocked_series",{"base":true})
 			owned_pots=value.get("owned_pots",{"starter_terracotta":true});saved_arrangements=value.get("saved_arrangements",[]);arrangement_save_capacity=maxi(1,int(value.get("arrangement_save_capacity",20)))
 			if not species_get_counts is Dictionary:species_get_counts={}
@@ -568,7 +576,7 @@ func _load_save() -> void:
 func _save() -> void:
 	var f := FileAccess.open("user://records.json",FileAccess.WRITE)
 	if audio_manager:audio_settings=audio_manager.settings_dictionary()
-	f.store_string(JSON.stringify({"progression_version":PROGRESSION_VERSION,"bests":bests,"discovered":discovered,"species_get_counts":species_get_counts,"unlocked_series":unlocked_series,"owned_pots":owned_pots,"saved_arrangements":saved_arrangements,"arrangement_save_capacity":arrangement_save_capacity,"unlocked_species":unlocked_species,"greenhouse_available":greenhouse_available,"completed_unlock_conditions":completed_unlock_conditions,"pending_habitat_species":pending_habitat_species,"total_play_count":total_play_count,"normal_play_count":normal_play_count,"formal_play_count":formal_play_count,"shop_visit_count":shop_visit_count,"hidden_species_acquired":hidden_species_acquired,"tovar_next_play":tovar_next_play,"tovar_attempt_count":tovar_attempt_count,"intro_story_complete":intro_story_complete,"encyclopedia_unlocked":encyclopedia_unlocked,"habitat_unlocked":habitat_unlocked,"tutorial_steps":tutorial_steps,"old_seed_bags":old_seed_bags,"buyback_unlocked":buyback_unlocked,"habitat_seed_date":habitat_seed_date,"habitat_seeds_collected":habitat_seeds_collected,"habitat_mystery_seeds_pending":habitat_mystery_seeds_pending,"mystery_seed_count":mystery_seed_count,"armadillo_research_total":armadillo_research_total,"armadillo_research_rewards":armadillo_research_rewards,"armadillo_research_intro_seen":armadillo_research_intro_seen,"normal_seed_bags":normal_seed_bags,"volume_seed_bags":volume_seed_bags,"premium_seed_bags":premium_seed_bags,"mystery_seed_bags":mystery_seed_bags,"volume_seed_unlocked":volume_seed_unlocked,"volume_seed_intro_seen":volume_seed_intro_seen,"premium_seed_unlocked":premium_seed_unlocked,"mystery_seed_pack_unlocked":mystery_seed_pack_unlocked,"mystery_route_assignments":mystery_route_assignments,"mystery_route_completed":mystery_route_completed,"mystery_route_dialog_seen":mystery_route_dialog_seen,"rain_completion_count":rain_completion_count,"best_100_achieved":best_100_achieved,"normal_habitat_complete":normal_habitat_complete,"login_bonus_date":login_bonus_date,"audio_settings":audio_settings,"rain_bag_count":rain_bag_count,"rain_event_pending":rain_event_pending,"rain_bonus_in_progress":rain_bonus_in_progress,"rain_time_remaining":rain_time_remaining,"rain_intro_normal_bags":rain_intro_normal_bags,"rain_draws_unlocked":rain_draws_unlocked,"mystery_pod_count":mystery_pod_count,"series_seed_inventory":series_seed_inventory,"processed_iap_transactions":processed_iap_transactions,"main_pod_pending":main_pod_pending,"habitat_pod_roll_date":habitat_pod_roll_date,"habitat_pod_pending":habitat_pod_pending,"habitat_pod_point_x":habitat_pod_point.x,"habitat_pod_point_y":habitat_pod_point.y,"yen":coins}))
+	f.store_string(JSON.stringify({"progression_version":PROGRESSION_VERSION,"bests":bests,"discovered":discovered,"species_get_counts":species_get_counts,"unlocked_series":unlocked_series,"owned_pots":owned_pots,"saved_arrangements":saved_arrangements,"arrangement_save_capacity":arrangement_save_capacity,"unlocked_species":unlocked_species,"greenhouse_available":greenhouse_available,"completed_unlock_conditions":completed_unlock_conditions,"pending_habitat_species":pending_habitat_species,"total_play_count":total_play_count,"normal_play_count":normal_play_count,"formal_play_count":formal_play_count,"shop_visit_count":shop_visit_count,"hidden_species_acquired":hidden_species_acquired,"tovar_next_play":tovar_next_play,"tovar_attempt_count":tovar_attempt_count,"intro_story_complete":intro_story_complete,"encyclopedia_unlocked":encyclopedia_unlocked,"habitat_unlocked":habitat_unlocked,"tutorial_steps":tutorial_steps,"old_seed_bags":old_seed_bags,"buyback_unlocked":buyback_unlocked,"habitat_seed_date":habitat_seed_date,"habitat_seeds_collected":habitat_seeds_collected,"habitat_mystery_seeds_pending":habitat_mystery_seeds_pending,"mystery_seed_count":mystery_seed_count,"armadillo_research_total":armadillo_research_total,"armadillo_research_rewards":armadillo_research_rewards,"armadillo_research_intro_seen":armadillo_research_intro_seen,"normal_seed_bags":normal_seed_bags,"volume_seed_bags":volume_seed_bags,"premium_seed_bags":premium_seed_bags,"mystery_seed_bags":mystery_seed_bags,"volume_seed_unlocked":volume_seed_unlocked,"volume_seed_intro_seen":volume_seed_intro_seen,"premium_seed_unlocked":premium_seed_unlocked,"mystery_seed_pack_unlocked":mystery_seed_pack_unlocked,"mystery_route_assignments":mystery_route_assignments,"mystery_route_completed":mystery_route_completed,"mystery_route_dialog_seen":mystery_route_dialog_seen,"rain_completion_count":rain_completion_count,"best_100_achieved":best_100_achieved,"normal_habitat_complete":normal_habitat_complete,"login_bonus_date":login_bonus_date,"audio_settings":audio_settings,"rain_bag_count":rain_bag_count,"rain_event_pending":rain_event_pending,"rain_bonus_in_progress":rain_bonus_in_progress,"rain_time_remaining":rain_time_remaining,"rain_intro_normal_bags":rain_intro_normal_bags,"rain_draws_unlocked":rain_draws_unlocked,"mystery_pod_count":mystery_pod_count,"series_seed_inventory":series_seed_inventory,"processed_iap_transactions":processed_iap_transactions,"main_pod_pending":main_pod_pending,"habitat_pod_roll_date":habitat_pod_roll_date,"habitat_pod_pending":habitat_pod_pending,"habitat_pod_point_x":habitat_pod_point.x,"habitat_pod_point_y":habitat_pod_point.y,"puku_gauge_cm":puku_gauge_cm,"puku_points":puku_points,"yen":coins}))
 
 func _daily_seed_gift_due()->bool:
 	if not intro_story_complete:return false
@@ -743,6 +751,11 @@ func _build_ui() -> void:
 	best_label=Label.new(); best_label.text="最高記録\n0.0 cm"; best_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; best_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; best_label.add_theme_font_size_override("font_size",17); best_label.add_theme_color_override("font_color",Color.WHITE); best_panel.add_child(best_label)
 	var coin_panel:=PanelContainer.new(); coin_panel.position=Vector2(398,54); coin_panel.size=Vector2(153,53); coin_panel.add_theme_stylebox_override("panel",_box(Color("#55301d"),Color("#f1d19c"),22,2)); hud.add_child(coin_panel)
 	coin_label=Label.new(); coin_label.text=" ¥%s" % _comma(coins); coin_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; coin_label.add_theme_font_size_override("font_size",20); coin_label.add_theme_color_override("font_color",Color("#ffd85b")); coin_panel.add_child(coin_label)
+	var puku_panel:=PanelContainer.new();puku_panel.position=Vector2(22,165);puku_panel.size=Vector2(226,72);puku_panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_panel.add_theme_stylebox_override("panel",_box(Color("#3f6b4b"),Color("#d9ed9b"),17,2));hud.add_child(puku_panel)
+	var puku_content:=VBoxContainer.new();puku_content.alignment=BoxContainer.ALIGNMENT_CENTER;puku_content.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_content.add_theme_constant_override("separation",0);puku_panel.add_child(puku_content)
+	puku_gauge_label=Label.new();puku_gauge_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;puku_gauge_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_gauge_label.add_theme_font_size_override("font_size",15);puku_gauge_label.add_theme_color_override("font_color",Color("#fff9d9"));puku_content.add_child(puku_gauge_label)
+	puku_point_label=Label.new();puku_point_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;puku_point_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_point_label.add_theme_font_size_override("font_size",16);puku_point_label.add_theme_color_override("font_color",Color("#fff0a0"));puku_content.add_child(puku_point_label)
+	puku_gain_label=Label.new();puku_gain_label.position=Vector2(138,246);puku_gain_label.size=Vector2(300,60);puku_gain_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;puku_gain_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;puku_gain_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_gain_label.add_theme_font_size_override("font_size",27);puku_gain_label.add_theme_color_override("font_color",Color("#fff49a"));puku_gain_label.add_theme_color_override("font_outline_color",Color("#31553c"));puku_gain_label.add_theme_constant_override("outline_size",7);puku_gain_label.visible=false;effects_layer.add_child(puku_gain_label)
 	for entry in [{"x":398,"t":"図鑑"},{"x":483,"t":"設定"}]:
 		var b:=Button.new(); b.text=entry.t; b.position=Vector2(entry.x,116); b.size=Vector2(68,73); _skin_button(b,Color("#fff0cf"),17); hud.add_child(b)
 		external_navigation_controls.append(b)
@@ -777,6 +790,7 @@ func _build_ui() -> void:
 	_build_tutorial_guide(hud)
 	_build_opening_screen(hud)
 	_update_best_ui()
+	_update_puku_ui()
 	_update_play_ui()
 
 func _build_opening_screen(hud:Control)->void:
@@ -1604,7 +1618,7 @@ func _reset_progression_state()->void:
 	JellyBalanceClass.reset_formal();jelly_trait_display_enabled=false;dev_jelly_test_active=false;last_jelly_claim_msec=-1000000000
 	if mystery_pod_system:mystery_pod_system.reset_formal()
 	mystery_route_assignments.clear();mystery_route_completed.clear();mystery_route_dialog_seen.clear();rain_completion_count=0;best_100_achieved=false;normal_habitat_complete=false;shop_selected_seed_type="normal"
-	coins=1000;bests.clear();discovered.clear();species_get_counts.clear();unlocked_series={"base":true};mystery_pod_count=0;series_seed_inventory.clear();main_pod_pending=false;main_pod_visible=false;habitat_pod_roll_date="";habitat_pod_pending=false;active_series_seed_id="";owned_pots={"starter_terracotta":true};saved_arrangements.clear();arrangement_save_capacity=20;greenhouse_available={"colorata":true};unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;buyback_unlocked=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;mystery_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;mystery_seed_pack_unlocked=false;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;habitat_mystery_seeds_pending=0;mystery_seed_count=0;armadillo_research_total=0;armadillo_research_rewards.clear();armadillo_research_intro_seen=false;armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();shop_chatter_acquired_species.clear();play_active=false;play_time_remaining=0.0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_scroll_tutorial_active=false;habitat_best_link_dialog_step=0;tutorial_habitat_item.clear();_stop_rain_visual();if main_pod_pickup_button:main_pod_pickup_button.visible=false;_apply_saved_unlocks();_clear_greenhouse_plants();_build_habitat_items();_save();_sync_mystery_pod_ui();_update_currency_ui();_update_play_ui()
+	coins=1000;puku_gauge_cm=0.0;puku_points=0;bests.clear();discovered.clear();species_get_counts.clear();unlocked_series={"base":true};mystery_pod_count=0;series_seed_inventory.clear();main_pod_pending=false;main_pod_visible=false;habitat_pod_roll_date="";habitat_pod_pending=false;active_series_seed_id="";owned_pots={"starter_terracotta":true};saved_arrangements.clear();arrangement_save_capacity=20;greenhouse_available={"colorata":true};unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;buyback_unlocked=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;mystery_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;mystery_seed_pack_unlocked=false;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;habitat_mystery_seeds_pending=0;mystery_seed_count=0;armadillo_research_total=0;armadillo_research_rewards.clear();armadillo_research_intro_seen=false;armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();shop_chatter_acquired_species.clear();play_active=false;play_time_remaining=0.0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_scroll_tutorial_active=false;habitat_best_link_dialog_step=0;tutorial_habitat_item.clear();_stop_rain_visual();if main_pod_pickup_button:main_pod_pickup_button.visible=false;_apply_saved_unlocks();_clear_greenhouse_plants();_build_habitat_items();_save();_sync_mystery_pod_ui();_update_currency_ui();_update_play_ui()
 	normal_play_count=0;shop_visit_count=0;hidden_species_acquired.clear();tovar_next_play=TOVAR_FIRST_PLAY;tovar_attempt_count=0;tovar_event_active=false;tovar_harvested_this_play=false;armadillo_present=false;_save()
 
 func _reset_progression_for_development(button:Button)->void:
@@ -1986,8 +2000,41 @@ func _mystery_seed_pack_unlocked()->bool:
 	_refresh_seed_pack_unlocks()
 	return mystery_seed_pack_unlocked
 
+func add_puku_gauge_cm(amount_cm:float,save_immediately:=true,show_effect:=true)->int:
+	if amount_cm<=0.0:return 0
+	puku_gauge_cm+=amount_cm
+	var earned_points:=floori(puku_gauge_cm/PUKU_GAUGE_TARGET_CM)
+	if earned_points>0:
+		puku_gauge_cm-=earned_points*PUKU_GAUGE_TARGET_CM
+		add_puku_points(earned_points,false,show_effect)
+	_update_puku_ui()
+	if save_immediately:_save()
+	return earned_points
+
+func add_puku_points(amount:int,save_immediately:=true,show_effect:=true)->void:
+	if amount<=0:return
+	puku_points+=amount
+	_update_puku_ui()
+	if show_effect:_show_puku_point_gain(amount)
+	if save_immediately:_save()
+
+func _puku_gauge_text()->String:
+	var rounded:=snappedf(puku_gauge_cm,0.1)
+	return str(int(roundf(rounded))) if is_equal_approx(rounded,roundf(rounded)) else "%.1f"%rounded
+
+func _update_puku_ui()->void:
+	if puku_gauge_label:puku_gauge_label.text="ぷくゲージ　%s / 1000cm"%_puku_gauge_text()
+	if puku_point_label:puku_point_label.text="所持ぷくポイント　%d"%puku_points
+
+func _show_puku_point_gain(amount:int)->void:
+	if not puku_gain_label:return
+	if puku_gain_tween and puku_gain_tween.is_valid():puku_gain_tween.kill()
+	puku_gain_label.text="ぷくポイント +%d"%amount;puku_gain_label.position=Vector2(138,246);puku_gain_label.scale=Vector2(.82,.82);puku_gain_label.modulate=Color.WHITE;puku_gain_label.visible=true
+	puku_gain_tween=create_tween().bind_node(puku_gain_label);puku_gain_tween.tween_property(puku_gain_label,"scale",Vector2.ONE,.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT);puku_gain_tween.parallel().tween_property(puku_gain_label,"position:y",226.0,.8).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT);puku_gain_tween.tween_interval(.6);puku_gain_tween.tween_property(puku_gain_label,"modulate:a",0.0,.25);puku_gain_tween.tween_callback(func():puku_gain_label.visible=false;puku_gain_label.modulate=Color.WHITE)
+
 func _update_currency_ui()->void:
 	if coin_label:coin_label.text=" ¥%s"%_comma(coins)
+	_update_puku_ui()
 
 func _show_play_result()->void:
 	result_total_label.visible=buyback_unlocked
@@ -2064,8 +2111,7 @@ func _build_encyclopedia(hud:Control)->void:
 	var unlock_content:=VBoxContainer.new();unlock_content.alignment=BoxContainer.ALIGNMENT_CENTER;unlock_content.add_theme_constant_override("separation",8);encyclopedia_unlock_panel.add_child(unlock_content)
 	encyclopedia_unlock_status=Label.new();encyclopedia_unlock_status.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;encyclopedia_unlock_status.add_theme_font_size_override("font_size",16);encyclopedia_unlock_status.add_theme_color_override("font_color",UI_BROWN);unlock_content.add_child(encyclopedia_unlock_status)
 	var unlock_actions:=HBoxContainer.new();unlock_actions.alignment=BoxContainer.ALIGNMENT_CENTER;unlock_actions.add_theme_constant_override("separation",8);unlock_content.add_child(unlock_actions)
-	encyclopedia_unlock_yen_button=Button.new();encyclopedia_unlock_yen_button.custom_minimum_size=Vector2(236,54);_skin_button(encyclopedia_unlock_yen_button,Color("#dca85e"),15);encyclopedia_unlock_yen_button.pressed.connect(_acquire_current_catalog.bind("yen"));unlock_actions.add_child(encyclopedia_unlock_yen_button)
-	encyclopedia_unlock_pod_button=Button.new();encyclopedia_unlock_pod_button.custom_minimum_size=Vector2(236,54);_skin_button(encyclopedia_unlock_pod_button,Color("#d7bf7d"),15);encyclopedia_unlock_pod_button.pressed.connect(_acquire_current_catalog.bind("pods"));unlock_actions.add_child(encyclopedia_unlock_pod_button)
+	encyclopedia_unlock_puku_button=Button.new();encyclopedia_unlock_puku_button.custom_minimum_size=Vector2(360,54);_skin_button(encyclopedia_unlock_puku_button,Color("#9fbd69"),16);encyclopedia_unlock_puku_button.pressed.connect(_acquire_current_catalog.bind("puku"));unlock_actions.add_child(encyclopedia_unlock_puku_button)
 	encyclopedia_scroll=ScrollContainer.new();encyclopedia_scroll.position=Vector2(20,230);encyclopedia_scroll.size=Vector2(536,765);encyclopedia_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;encyclopedia_scroll.vertical_scroll_mode=ScrollContainer.SCROLL_MODE_AUTO;encyclopedia_scroll.scroll_deadzone=8;encyclopedia_scroll.mouse_filter=Control.MOUSE_FILTER_STOP;encyclopedia_list_page.add_child(encyclopedia_scroll)
 	encyclopedia_list_page.move_child(encyclopedia_unlock_panel,encyclopedia_list_page.get_child_count()-1)
 	encyclopedia_scroll.get_v_scroll_bar().value_changed.connect(func(_value:float):call_deferred("_update_encyclopedia_visible_textures"))
@@ -2147,6 +2193,9 @@ func _can_browse_series(entry:Dictionary)->bool:
 
 func _catalog_purchase_enabled(entry:Dictionary)->bool:
 	return bool(entry.get("catalog_purchase_enabled",true)) and not _series_species_entries(str(entry.get("series_id",""))).is_empty()
+
+func _catalog_price_puku(entry:Dictionary)->int:
+	return maxi(0,int(entry.get("unlock_price_puku",ENCYCLOPEDIA_UNLOCK_PUKU_COST)))
 
 func _series_unlock_text(entry:Dictionary)->String:
 	if _is_series_unlocked(entry):return ""
@@ -2311,23 +2360,16 @@ func _refresh_encyclopedia_header()->void:
 	encyclopedia_field_status.text=str(field.get("display_name","専用原生地")) if available else "専用原生地は未開放または準備中です"
 	encyclopedia_unlock_panel.visible=not unlocked
 	if not unlocked:
-		var yen_price:int=mystery_pod_system.catalog_price_yen(entry);var pod_price:int=mystery_pod_system.catalog_price_pods(entry);var available_for_purchase:=_catalog_purchase_enabled(entry)
-		encyclopedia_unlock_status.text="この図鑑を入手すると、シリーズ種と出会えるようになります\n所持 ¥%s　／　さや %d個"%[_comma(coins),mystery_pod_count] if available_for_purchase else "このシリーズは準備中です"
-		encyclopedia_unlock_yen_button.text="¥%sで入手"%_comma(yen_price);encyclopedia_unlock_yen_button.disabled=not available_for_purchase or coins<yen_price
-		encyclopedia_unlock_pod_button.text="さや%d個で入手"%pod_price;encyclopedia_unlock_pod_button.disabled=not available_for_purchase or mystery_pod_count<pod_price
+		var puku_price:=_catalog_price_puku(entry);var available_for_purchase:=_catalog_purchase_enabled(entry)
+		encyclopedia_unlock_status.text="この図鑑を入手すると、シリーズ種と出会えるようになります\n所持 %dぷくポイント　／　必要 %dぷくポイント"%[puku_points,puku_price] if available_for_purchase else "このシリーズは準備中です"
+		encyclopedia_unlock_puku_button.text="%dぷくポイントで入手"%puku_price;encyclopedia_unlock_puku_button.disabled=not available_for_purchase or puku_points<puku_price
 
 func _acquire_current_catalog(method:String)->void:
 	var entry:=_series_entry(current_encyclopedia_series_id)
-	if entry.is_empty() or _is_series_unlocked(entry) or not _catalog_purchase_enabled(entry):return
-	if method=="yen":
-		var yen_price:int=mystery_pod_system.catalog_price_yen(entry)
-		if coins<yen_price:return
-		coins-=yen_price
-	elif method=="pods":
-		var pod_price:int=mystery_pod_system.catalog_price_pods(entry)
-		if mystery_pod_count<pod_price:return
-		mystery_pod_count-=pod_price
-	else:return
+	if method!="puku" or entry.is_empty() or _is_series_unlocked(entry) or not _catalog_purchase_enabled(entry):return
+	var puku_price:=_catalog_price_puku(entry)
+	if puku_points<puku_price:return
+	puku_points-=puku_price
 	unlocked_series[current_encyclopedia_series_id]=true
 	_save();_update_currency_ui();_sync_mystery_pod_ui();_refresh_encyclopedia_header();_refresh_encyclopedia_cards();_refresh_series_selection();audio_manager.play_se("purchase",.8)
 
@@ -3261,6 +3303,7 @@ func _on_harvested(p)->void:
 	if is_record:_evaluate_best_spawn_unlocks()
 	if not best_100_achieved and p.diameter_cm>=100.0 and _tutorial_fully_complete() and active_seed_type in ["normal","volume","premium","mystery"]:
 		best_100_achieved=true;_assign_mystery_route(MYSTERY_ROUTE_BEST_100,true)
+	if play_active:add_puku_gauge_cm(p.diameter_cm,false,true)
 	var reward:=harvest_reward_yen(p.diameter_cm) if buyback_unlocked else 0;coins+=reward;_evaluate_unlock_rules("harvest_size",p.diameter_cm);_save();_update_best_ui();_update_currency_ui();audio_manager.play_se("harvest",.55)
 	if reward>0:audio_manager.play_se("payment",.25)
 	if play_active:

@@ -48,7 +48,7 @@ func _ready()->void:
 	game.selected_series_index=7;game._open_encyclopedia();assert(game.series_open_button.text=="シルエット図鑑をみる")
 	game._open_selected_series_encyclopedia();await get_tree().process_frame;game._update_encyclopedia_visible_textures()
 	assert(game.encyclopedia_list_title.text=="蓄光多肉" and game.encyclopedia_list_progress.text=="0 / 12種" and game.encyclopedia_grid.get_child_count()==12)
-	assert(game.encyclopedia_unlock_panel.visible and game.encyclopedia_unlock_status.text=="このシリーズは準備中です" and game.encyclopedia_unlock_yen_button.disabled and game.encyclopedia_unlock_pod_button.disabled)
+	assert(game.encyclopedia_unlock_panel.visible and game.encyclopedia_unlock_status.text=="このシリーズは準備中です" and game.encyclopedia_unlock_puku_button.disabled)
 	for card in game.encyclopedia_grid.get_children():
 		assert(card.disabled)
 		var texts:Array[String]=[]
