@@ -87,6 +87,10 @@ func _test_game_loop()->void:
 	for choice in range(12):assert(str(game._select_species_for_seed("normal").species_id)==grown_id)
 	game.intro_story_complete=true;game.habitat_unlocked=true;game.buyback_unlocked=true;game.total_play_count=3;game.active_seed_type="normal";game.play_active=true;game.main_pod_pending=false
 	game.mystery_pod_system.set_setting("main_play_pod_chance",1.0);game._prepare_main_pod_for_play();assert(game.main_pod_pending)
+	var main_pods_before:int=game.mystery_pod_count;game._update_main_pod(99.0);game._show_main_pod_pickup();game._collect_main_pod();assert(game.main_pod_pending and not game.main_pod_visible and not game.main_pod_pickup_button.visible and game.mystery_pod_count==main_pods_before)
+	game._clear_greenhouse_plants();game.play_seeds_remaining=0;game.play_spawn_queue=0;game.play_seed_animations_pending=0;game._finish_greenhouse_play()
+	var result_min_height:float=game.result_card.get_combined_minimum_size().y;print("RESULT_CARD_LAYOUT min_height=",result_min_height," card_height=",game.result_card.size.y)
+	assert(game.result_overlay.visible and game.result_mystery_pod_label.visible and game.result_mystery_pod_label.text=="袋の底にふしぎなさやが入っていた" and game.mystery_pod_count==main_pods_before+1 and not game.main_pod_pending and not game.play_result_mystery_pod_found and result_min_height<=game.result_card.size.y);game._close_result()
 	var control_rng:=RandomNumberGenerator.new();control_rng.seed=43210;var expected:=control_rng.randi()
 	game.rng.seed=43210;game.main_pod_pending=false;game._prepare_main_pod_for_play();assert(game.rng.randi()==expected)
 	game.mystery_pod_system.set_setting("habitat_pod_chance",0.0);game.habitat_pod_roll_date="";game.habitat_pod_pending=false;game._ensure_habitat_pod_daily_roll();assert(not game.habitat_pod_pending)

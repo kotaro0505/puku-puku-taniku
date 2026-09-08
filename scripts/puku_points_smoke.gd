@@ -14,6 +14,10 @@ func _ready()->void:
 
 func _test_thresholds(game)->void:
 	game.puku_gauge_cm=0.0;game.puku_points=0
+	game._update_puku_ui();assert(not game.puku_gauge_glow.visible)
+	game.puku_gauge_cm=100.0;game._update_puku_ui();var low_alpha:float=game.puku_gauge_glow.self_modulate.a;var low_shadow:int=game.puku_gauge_glow_style.shadow_size
+	game.puku_gauge_cm=900.0;game._update_puku_ui();assert(game.puku_gauge_glow.visible and game.puku_gauge_glow.self_modulate.a>low_alpha and game.puku_gauge_glow_style.shadow_size>low_shadow and game.puku_gauge_glow_style.shadow_color.a>.6 and game.puku_gauge_glow_tween!=null)
+	game.puku_gauge_cm=0.0;game._update_puku_ui()
 	assert(game.add_puku_gauge_cm(999.0,false,false)==0 and is_equal_approx(game.puku_gauge_cm,999.0) and game.puku_points==0 and game.puku_gauge_label.text=="ぷくゲージ" and is_equal_approx(game.puku_gauge_meter.value,999.0) and not game.puku_gauge_meter.show_percentage)
 	var gauge_panel:PanelContainer=game.puku_gauge_meter.get_parent().get_parent();assert(gauge_panel.size.x>=150.0 and gauge_panel.size.x<=160.0 and gauge_panel.position.x<200.0 and gauge_panel.visible)
 	game.puku_gauge_cm=0.0;game.puku_points=0

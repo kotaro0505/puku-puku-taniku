@@ -171,6 +171,10 @@ var best_label: Label
 var coin_label: Label
 var puku_gauge_label: Label
 var puku_gauge_meter: ProgressBar
+var puku_gauge_glow: Panel
+var puku_gauge_glow_style: StyleBoxFlat
+var puku_gauge_fill_style: StyleBoxFlat
+var puku_gauge_glow_tween: Tween
 var puku_point_label: Label
 var puku_gain_label: Label
 var puku_gain_tween: Tween
@@ -329,6 +333,7 @@ var result_total_label: Label
 var result_count_label: Label
 var result_max_label: Label
 var result_notable_label: Label
+var result_mystery_pod_label: Label
 var result_new_species_label: Label
 var result_new_species_pulse_tween: Tween
 var result_confetti_layer: Control
@@ -365,6 +370,7 @@ var volume_seed_intro_seen := false
 var premium_seed_unlocked := false
 var mystery_seed_pack_unlocked := false
 var result_new_species_queue: Array[String] = []
+var play_result_mystery_pod_found := false
 var shop_chatter_acquired_species: Array[String] = []
 var mystery_route_assignments: Dictionary = {}
 var mystery_route_completed: Dictionary = {}
@@ -755,7 +761,8 @@ func _build_ui() -> void:
 	var puku_panel:=PanelContainer.new();puku_panel.position=Vector2(42,158);puku_panel.size=Vector2(158,92);puku_panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_panel.add_theme_stylebox_override("panel",_box(Color("#3f6b4b"),Color("#d9ed9b"),17,2));hud.add_child(puku_panel)
 	var puku_content:=VBoxContainer.new();puku_content.alignment=BoxContainer.ALIGNMENT_CENTER;puku_content.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_content.add_theme_constant_override("separation",2);puku_panel.add_child(puku_content)
 	puku_gauge_label=Label.new();puku_gauge_label.text="ぷくゲージ";puku_gauge_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;puku_gauge_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_gauge_label.add_theme_font_size_override("font_size",13);puku_gauge_label.add_theme_color_override("font_color",Color("#fff9d9"));puku_content.add_child(puku_gauge_label)
-	puku_gauge_meter=ProgressBar.new();puku_gauge_meter.custom_minimum_size=Vector2(132,16);puku_gauge_meter.max_value=PUKU_GAUGE_TARGET_CM;puku_gauge_meter.show_percentage=false;puku_gauge_meter.mouse_filter=Control.MOUSE_FILTER_IGNORE;var meter_bg:=StyleBoxFlat.new();meter_bg.bg_color=Color("#294735");meter_bg.set_corner_radius_all(8);meter_bg.border_color=Color("#d9ed9b");meter_bg.set_border_width_all(1);var meter_fill:=StyleBoxFlat.new();meter_fill.bg_color=Color("#f6d95e");meter_fill.set_corner_radius_all(8);puku_gauge_meter.add_theme_stylebox_override("background",meter_bg);puku_gauge_meter.add_theme_stylebox_override("fill",meter_fill);puku_content.add_child(puku_gauge_meter)
+	puku_gauge_meter=ProgressBar.new();puku_gauge_meter.custom_minimum_size=Vector2(132,16);puku_gauge_meter.max_value=PUKU_GAUGE_TARGET_CM;puku_gauge_meter.show_percentage=false;puku_gauge_meter.mouse_filter=Control.MOUSE_FILTER_IGNORE;var meter_bg:=StyleBoxFlat.new();meter_bg.bg_color=Color("#294735");meter_bg.set_corner_radius_all(8);meter_bg.border_color=Color("#d9ed9b");meter_bg.set_border_width_all(1);puku_gauge_fill_style=StyleBoxFlat.new();puku_gauge_fill_style.bg_color=Color("#f6d95e");puku_gauge_fill_style.set_corner_radius_all(8);puku_gauge_meter.add_theme_stylebox_override("background",meter_bg);puku_gauge_meter.add_theme_stylebox_override("fill",puku_gauge_fill_style);puku_content.add_child(puku_gauge_meter)
+	puku_gauge_glow=Panel.new();puku_gauge_glow.name="PukuGaugeGlow";puku_gauge_glow.show_behind_parent=true;puku_gauge_glow.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_gauge_glow.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);puku_gauge_glow.offset_left=-7;puku_gauge_glow.offset_top=-7;puku_gauge_glow.offset_right=7;puku_gauge_glow.offset_bottom=7;puku_gauge_glow_style=StyleBoxFlat.new();puku_gauge_glow_style.bg_color=Color(1.0,.88,.32,.16);puku_gauge_glow_style.border_color=Color(1.0,.95,.48,.44);puku_gauge_glow_style.set_border_width_all(2);puku_gauge_glow_style.set_corner_radius_all(12);puku_gauge_glow_style.shadow_color=Color(1.0,.78,.18,.55);puku_gauge_glow_style.shadow_size=5;puku_gauge_glow.add_theme_stylebox_override("panel",puku_gauge_glow_style);puku_gauge_meter.add_child(puku_gauge_glow);call_deferred("_start_puku_gauge_glow")
 	puku_point_label=Label.new();puku_point_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;puku_point_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_point_label.add_theme_font_size_override("font_size",15);puku_point_label.add_theme_color_override("font_color",Color("#fff0a0"));puku_content.add_child(puku_point_label)
 	puku_gain_label=Label.new();puku_gain_label.position=Vector2(138,246);puku_gain_label.size=Vector2(300,60);puku_gain_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;puku_gain_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;puku_gain_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_gain_label.add_theme_font_size_override("font_size",27);puku_gain_label.add_theme_color_override("font_color",Color("#fff49a"));puku_gain_label.add_theme_color_override("font_outline_color",Color("#31553c"));puku_gain_label.add_theme_constant_override("outline_size",7);puku_gain_label.visible=false;effects_layer.add_child(puku_gain_label)
 	for entry in [{"x":398,"t":"図鑑"},{"x":483,"t":"設定"}]:
@@ -1611,7 +1618,9 @@ func _dev_add_mystery_pods(amount:int)->void:
 	mystery_pod_count+=maxi(0,amount);_save();_sync_mystery_pod_ui();mystery_pod_dev.set_status("不思議なさやを%d個追加しました"%amount)
 
 func _dev_force_main_pod()->void:
-	main_pod_pending=true;main_pod_spawn_delay=0.0;_show_main_pod_pickup();_save();mystery_pod_dev.set_status("温室へ不思議なさやを出しました")
+	main_pod_pending=true;main_pod_visible=false
+	if main_pod_pickup_button:main_pod_pickup_button.visible=false
+	_save();mystery_pod_dev.set_status("次の収穫結果に不思議なさやを仕込みました")
 
 func _dev_force_habitat_pod()->void:
 	habitat_pod_pending=true;habitat_pod_roll_date=Time.get_date_string_from_system();habitat_pod_point=Vector2(1030,445);_save()
@@ -1636,6 +1645,7 @@ func _change_audio_volume(value:float,is_bgm:bool)->void:
 	audio_settings["bgm_volume" if is_bgm else "se_volume"]=value/100.0;audio_manager.apply_settings(audio_settings);_save()
 
 func _reset_progression_state()->void:
+	play_result_mystery_pod_found=false
 	JellyBalanceClass.reset_formal();jelly_trait_display_enabled=false;dev_jelly_test_active=false;last_jelly_claim_msec=-1000000000
 	if mystery_pod_system:mystery_pod_system.reset_formal()
 	mystery_route_assignments.clear();mystery_route_completed.clear();mystery_route_dialog_seen.clear();rain_completion_count=0;best_100_achieved=false;normal_habitat_complete=false;shop_selected_seed_type="normal"
@@ -1657,6 +1667,7 @@ func _build_result_overlay(hud:Control)->void:
 	var divider:=HSeparator.new();divider.custom_minimum_size=Vector2(380,10);content.add_child(divider)
 	var notable_title:=Label.new();notable_title.text="目立った収穫株";notable_title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;notable_title.add_theme_font_size_override("font_size",19);notable_title.add_theme_color_override("font_color",Color("#725039"));content.add_child(notable_title)
 	result_notable_label=Label.new();result_notable_label.custom_minimum_size=Vector2(390,112);result_notable_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;result_notable_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;result_notable_label.add_theme_font_size_override("font_size",18);result_notable_label.add_theme_color_override("font_color",UI_BROWN);content.add_child(result_notable_label)
+	result_mystery_pod_label=Label.new();result_mystery_pod_label.custom_minimum_size=Vector2(400,42);result_mystery_pod_label.text="袋の底にふしぎなさやが入っていた";result_mystery_pod_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;result_mystery_pod_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;result_mystery_pod_label.add_theme_font_size_override("font_size",18);result_mystery_pod_label.add_theme_color_override("font_color",Color("#9a621f"));result_mystery_pod_label.add_theme_color_override("font_outline_color",Color("#fff4c4"));result_mystery_pod_label.add_theme_constant_override("outline_size",4);result_mystery_pod_label.visible=false;content.add_child(result_mystery_pod_label)
 	result_new_species_label=Label.new();result_new_species_label.custom_minimum_size=Vector2(400,52);result_new_species_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;result_new_species_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;result_new_species_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;result_new_species_label.add_theme_font_size_override("font_size",23);result_new_species_label.add_theme_color_override("font_color",Color("#b75432"));result_new_species_label.add_theme_color_override("font_outline_color",Color("#fff6c7"));result_new_species_label.add_theme_constant_override("outline_size",5);result_new_species_label.visible=false;content.add_child(result_new_species_label)
 	var close:=Button.new();close.text="閉じる / 戻る";close.custom_minimum_size=Vector2(350,54);_skin_button(close,Color("#ead8b1"),17);close.pressed.connect(_close_result);content.add_child(close)
 	result_confetti_layer=Control.new();result_confetti_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);result_confetti_layer.mouse_filter=Control.MOUSE_FILTER_IGNORE;result_overlay.add_child(result_confetti_layer)
@@ -1715,7 +1726,7 @@ func _start_greenhouse_play(seed_type:String)->void:
 	else:
 		if normal_seed_bags<1:return
 		normal_seed_bags-=1;current_target_count=NORMAL_GERMINATION_COUNT
-	active_seed_type=seed_type;play_time_remaining=0.0;play_active=true;play_modal_open=false;play_earnings_total=0;play_harvest_count=0;play_max_size=0.0;play_previous_global_best=_global_best_size();play_updated_global_best=false;play_notable_species.clear();play_hidden_species_unlocked="";result_new_species_queue.clear();opening_species.clear();play_seeds_remaining=current_target_count;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=1 if seed_type.begins_with("series:") else (OLD_SEED_GERMINATION_COUNT if seed_type=="old" else mini(current_target_count,rng.randi_range(PLAY_INITIAL_MIN_PLANTS,PLAY_INITIAL_MAX_PLANTS)));_clear_greenhouse_plants()
+	active_seed_type=seed_type;play_time_remaining=0.0;play_active=true;play_modal_open=false;play_earnings_total=0;play_harvest_count=0;play_max_size=0.0;play_previous_global_best=_global_best_size();play_updated_global_best=false;play_notable_species.clear();play_hidden_species_unlocked="";result_new_species_queue.clear();play_result_mystery_pod_found=false;opening_species.clear();play_seeds_remaining=current_target_count;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=1 if seed_type.begins_with("series:") else (OLD_SEED_GERMINATION_COUNT if seed_type=="old" else mini(current_target_count,rng.randi_range(PLAY_INITIAL_MIN_PLANTS,PLAY_INITIAL_MAX_PLANTS)));_clear_greenhouse_plants()
 	if result_overlay:result_overlay.visible=false
 	for i in range(play_concurrent_target):_spawn_greenhouse_seed()
 	_prepare_tovar_event_for_play()
@@ -1727,7 +1738,7 @@ func _start_greenhouse_play(seed_type:String)->void:
 func _finish_greenhouse_play()->void:
 	if not play_active or rain_bonus_active or play_seeds_remaining>0 or play_spawn_queue>0 or play_seed_animations_pending>0 or not plants.is_empty():return
 	play_active=false;play_time_remaining=0.0;play_spawn_timer=0.0;total_play_count+=1
-	main_pod_visible=false
+	play_result_mystery_pod_found=main_pod_pending;main_pod_pending=false;main_pod_visible=false
 	if main_pod_pickup_button:main_pod_pickup_button.visible=false
 	var formal_play:=_tutorial_fully_complete() and active_seed_type!="old"
 	if formal_play:
@@ -1748,23 +1759,19 @@ func _prepare_main_pod_for_play()->void:
 	if not _tutorial_fully_complete() or active_seed_type=="old":return
 	if not main_pod_pending:
 		main_pod_pending=mystery_pod_rng.randf()<mystery_pod_system.setting_float("main_play_pod_chance")
-	if main_pod_pending:main_pod_spawn_delay=mystery_pod_rng.randf_range(1.2,5.5)
 
-func _update_main_pod(delta:float)->void:
-	if not play_active or not main_pod_pending or main_pod_visible:return
-	main_pod_spawn_delay-=delta
-	if main_pod_spawn_delay<=0.0:_show_main_pod_pickup()
+func _update_main_pod(_delta:float)->void:
+	# メインゲームで見つかったさやは、収穫結果まで伏せておく。
+	if main_pod_pickup_button and main_pod_pickup_button.visible:main_pod_pickup_button.visible=false
 
 func _show_main_pod_pickup()->void:
-	if main_pod_pickup_button==null:return
-	main_pod_visible=true;main_pod_pickup_button.position=Vector2(mystery_pod_rng.randf_range(45.0,399.0),mystery_pod_rng.randf_range(470.0,735.0));main_pod_pickup_button.visible=true;main_pod_pickup_button.modulate=Color.WHITE;main_pod_pickup_button.scale=Vector2(.82,.82);main_pod_pickup_button.pivot_offset=main_pod_pickup_button.size*.5
-	var tween:=create_tween().bind_node(main_pod_pickup_button);tween.tween_property(main_pod_pickup_button,"scale",Vector2(1.08,1.08),.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT);tween.tween_property(main_pod_pickup_button,"scale",Vector2.ONE,.25).set_trans(Tween.TRANS_SINE)
+	main_pod_visible=false
+	if main_pod_pickup_button:main_pod_pickup_button.visible=false
 
 func _collect_main_pod()->void:
-	if not main_pod_pending:return
-	main_pod_pending=false;main_pod_visible=false;mystery_pod_count+=1;main_pod_pickup_button.visible=false;_save();_sync_mystery_pod_ui();audio_manager.play_se("new_species",.52)
-	var notice:=Label.new();notice.text="不思議なさや GET!";notice.position=Vector2(138,430);notice.size=Vector2(300,70);notice.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;notice.add_theme_font_size_override("font_size",25);notice.add_theme_color_override("font_color",Color("#ffe59a"));notice.add_theme_color_override("font_outline_color",UI_BROWN);notice.add_theme_constant_override("outline_size",7);effects_layer.add_child(notice)
-	var tween:=create_tween().bind_node(notice);tween.tween_property(notice,"position:y",notice.position.y-65.0,.65);tween.parallel().tween_property(notice,"modulate:a",0.0,.65).set_delay(.25);tween.tween_callback(notice.queue_free)
+	# 旧セーブや開発用ボタンから呼ばれても、その場では付与しない。
+	if main_pod_pickup_button:main_pod_pickup_button.visible=false
+	main_pod_visible=false
 
 func _prepare_tovar_event_for_play()->void:
 	tovar_event_active=false;tovar_harvested_this_play=false
@@ -2050,8 +2057,24 @@ func _puku_gauge_text()->String:
 
 func _update_puku_ui()->void:
 	if puku_gauge_label:puku_gauge_label.text="ぷくゲージ"
+	var ratio:=clampf(puku_gauge_cm/PUKU_GAUGE_TARGET_CM,0.0,1.0)
+	var glow_strength:=pow(ratio,1.65)
 	if puku_gauge_meter:puku_gauge_meter.value=clampf(puku_gauge_cm,0.0,PUKU_GAUGE_TARGET_CM)
+	if puku_gauge_glow:
+		puku_gauge_glow.visible=ratio>.001
+		puku_gauge_glow.self_modulate=Color(1.0,1.0,1.0,lerpf(.08,1.0,glow_strength))
+	if puku_gauge_glow_style:
+		puku_gauge_glow_style.shadow_size=roundi(4.0+14.0*glow_strength)
+		puku_gauge_glow_style.shadow_color=Color(1.0,.78,.18,lerpf(.12,.82,glow_strength))
+		puku_gauge_glow_style.border_color=Color(1.0,.95,.48,lerpf(.18,.72,glow_strength))
+	if puku_gauge_fill_style:puku_gauge_fill_style.bg_color=Color("#f6d95e").lerp(Color("#fff8b0"),glow_strength*.58)
 	if puku_point_label:puku_point_label.text="ぷくコイン ×%d"%puku_points
+
+func _start_puku_gauge_glow()->void:
+	if not puku_gauge_glow:return
+	if puku_gauge_glow_tween and puku_gauge_glow_tween.is_valid():puku_gauge_glow_tween.kill()
+	puku_gauge_glow.modulate=Color(1.0,1.0,1.0,.72)
+	puku_gauge_glow_tween=create_tween().bind_node(puku_gauge_glow).set_loops();puku_gauge_glow_tween.tween_property(puku_gauge_glow,"modulate:a",1.0,1.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT);puku_gauge_glow_tween.tween_property(puku_gauge_glow,"modulate:a",.72,1.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 func _show_puku_point_gain(amount:int)->void:
 	if not puku_gain_label:return
@@ -2064,6 +2087,9 @@ func _update_currency_ui()->void:
 	_update_puku_ui()
 
 func _show_play_result()->void:
+	result_mystery_pod_label.visible=play_result_mystery_pod_found
+	if play_result_mystery_pod_found:
+		mystery_pod_count+=1;play_result_mystery_pod_found=false;_save();_sync_mystery_pod_ui();audio_manager.play_se("new_species",.52)
 	result_total_label.visible=buyback_unlocked
 	result_total_label.text="合計  ＋¥%s"%_comma(play_earnings_total);result_count_label.text="収穫株数　%d株"%play_harvest_count
 	result_max_label.remove_theme_color_override("font_outline_color");result_max_label.remove_theme_constant_override("outline_size")
