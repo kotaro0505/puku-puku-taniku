@@ -60,12 +60,12 @@ func _ready()->void:
 	var base_style:=TextureRect.new();var gummy_style:=TextureRect.new();game._apply_encyclopedia_image_style(base_style,game._series_species_entries("base")[0],false);game._apply_encyclopedia_image_style(gummy_style,game._series_species_entries("gummy")[0],false);assert(base_style.material==null and gummy_style.material==null and base_style.modulate.is_equal_approx(Color(0.12,0.09,0.08,0.82)) and gummy_style.modulate.is_equal_approx(base_style.modulate))
 	game.pending_habitat_species.clear();game._queue_random_species("シリーズ未解禁");assert(game.pending_habitat_species.is_empty())
 	game.greenhouse_available["gummy_peach_milk"]=true;game.discovered["gummy_peach_milk"]=true;game._apply_saved_unlocks();assert(game.species.any(func(entry):return str(entry.species_id)=="gummy_peach_milk"));game.greenhouse_available.erase("gummy_peach_milk");game.discovered.erase("gummy_peach_milk");game._apply_saved_unlocks()
-	game.formal_play_count=10;game._sync_arrangement_ui();game.arrangement_ui.open_catalog_shop();assert(game.arrangement_ui.catalog_shop_grid.get_child_count()==4);game.arrangement_ui.visible=false
+	game.formal_play_count=0;game._sync_arrangement_ui();game.arrangement_ui.open_catalog_shop();assert(game.arrangement_ui.catalog_shop_grid.get_child_count()==13);game.arrangement_ui.visible=false
 	game._open_encyclopedia();assert(game._owned_series_entries().size()==1 and game._current_series_entry().series_id=="base" and game.series_position_label.text=="1 / 1" and game.series_cover_image.texture.resource_path=="res://assets/plants/sprite-colorata.png")
 	for carousel_card in game.series_carousel_cards:assert(str(carousel_card.container.get_meta("series_id"))=="base")
 	game._close_encyclopedia();game.unlocked_series["sweets"]=true;game.unlocked_series["gummy"]=true;assert(game._owned_series_entries().map(func(entry):return str(entry.series_id))==["base","sweets","gummy"])
 	assert(game._series_cover_texture(game._series_entry("sweets")).resource_path=="res://assets/catalog/sweets/sweets-strawberry-shortcake.png" and game._series_cover_texture(game._series_entry("gummy")).resource_path=="res://assets/catalog/gummy/gummy-peach-milk.png")
-	game.selected_series_index=2;game._open_encyclopedia();assert(game.series_open_button.text=="図鑑をひらく" and not game.series_lock_label.visible and game.series_cover_image.texture.resource_path=="res://assets/catalog/gummy/gummy-peach-milk.png");game._open_selected_series_encyclopedia();await get_tree().process_frame
+	game.selected_series_index=2;game._open_encyclopedia();assert(not game.series_lock_label.visible and game.series_cover_image.texture.resource_path=="res://assets/catalog/gummy/gummy-peach-milk.png");await get_tree().process_frame
 	assert(game.encyclopedia_list_page.visible and game.encyclopedia_list_title.text=="グミ多肉" and game.encyclopedia_grid.get_child_count()==8 and game.encyclopedia_list_progress.text=="0 / 8種" and game.encyclopedia_field_button.disabled)
 	for gummy_card in game.encyclopedia_grid.get_children():
 		assert(gummy_card.disabled)
@@ -84,12 +84,14 @@ func _ready()->void:
 	assert(not found_card.disabled and "ももミルクグミ" in found_texts and "GET 3" in found_texts and game.encyclopedia_card_images[0].material==null and game.encyclopedia_card_images[0].modulate.is_equal_approx(Color.WHITE))
 	found_card.pressed.emit();assert(game.encyclopedia_detail_page.find_child("SpeciesName",true,false).text=="ももミルクグミ" and not game.encyclopedia_detail_page.find_child("SpeciesDescription",true,false).text.is_empty() and game.encyclopedia_detail_page.find_child("SpeciesGetCount",true,false).text=="GET 3" and game.encyclopedia_detail_page.find_child("SpeciesImage",true,false).material==null)
 	game._close_encyclopedia();game.discovered.erase("gummy_peach_milk");game.species_get_counts.erase("gummy_peach_milk");game.selected_series_index=0
-	game.selected_series_index=1;game._open_encyclopedia();assert(game.series_open_button.text=="図鑑をひらく" and game.series_cover_image.texture.resource_path=="res://assets/catalog/sweets/sweets-strawberry-shortcake.png");game._open_selected_series_encyclopedia();await get_tree().process_frame
+	game.selected_series_index=1;game._open_encyclopedia();assert(game.series_cover_image.texture.resource_path=="res://assets/catalog/sweets/sweets-strawberry-shortcake.png");await get_tree().process_frame
 	assert(game.encyclopedia_list_page.visible and game.encyclopedia_list_title.text=="スイーツ多肉" and game.encyclopedia_grid.get_child_count()==10 and game.encyclopedia_list_progress.text=="0 / 10種" and game.encyclopedia_field_button.disabled)
 	game.discovered["sweets_strawberry_shortcake"]=true;game.species_get_counts["sweets_strawberry_shortcake"]=1;game._refresh_encyclopedia_header();game._refresh_encyclopedia_cards();await get_tree().process_frame;game._update_encyclopedia_visible_textures()
 	var first_sweets_card:Button=game.encyclopedia_grid.get_child(0);assert(not first_sweets_card.disabled);first_sweets_card.pressed.emit();assert(game.encyclopedia_detail_page.find_child("SpeciesName",true,false).text=="いちごショート多肉" and game.encyclopedia_detail_page.find_child("SpeciesImage",true,false).texture.resource_path=="res://assets/catalog/sweets/sweets-strawberry-shortcake.png")
 	game._close_encyclopedia();game.discovered.erase("sweets_strawberry_shortcake");game.species_get_counts.erase("sweets_strawberry_shortcake");game.selected_series_index=0
-	game._open_encyclopedia();assert(game.encyclopedia_series_page.visible and not game.encyclopedia_list_page.visible and game.series_title_label.text=="基本図鑑" and not game.series_cover_placeholder.visible and game.series_cover_image.texture.resource_path=="res://assets/plants/sprite-colorata.png")
+	game._open_encyclopedia();assert(game.encyclopedia_series_page.visible and game.encyclopedia_list_page==game.encyclopedia_series_page and game.series_title_label.text=="基本図鑑" and not game.series_cover_placeholder.visible and game.series_cover_image.texture.resource_path=="res://assets/plants/sprite-colorata.png")
+	assert(game.encyclopedia_scroll.get_child(0).get_child(0).name=="SeriesCoverSection" and game.encyclopedia_scroll.get_child(0).get_child(1).name=="SpeciesListHeader" and game.encyclopedia_grid.get_parent()==game.encyclopedia_scroll.get_child(0))
+	assert(game.encyclopedia_series_page.find_children("*","Button",true,false).all(func(button):return button.text!="図鑑をひらく"))
 	assert(game.series_carousel_cards.size()==3)
 	var previous_card:Dictionary=game.series_carousel_cards[0];var current_card:Dictionary=game.series_carousel_cards[1];var next_card:Dictionary=game.series_carousel_cards[2]
 	assert(str(previous_card.container.get_meta("series_id"))=="gummy" and str(current_card.container.get_meta("series_id"))=="base" and str(next_card.container.get_meta("series_id"))=="sweets")
@@ -101,19 +103,22 @@ func _ready()->void:
 	assert(game.series_carousel_offset==-140.0 and game.series_carousel_track.position.x<game.SERIES_CAROUSEL_TRACK_ORIGIN.x and next_card.title.self_modulate.a>0.0)
 	var swipe_end:=InputEventScreenTouch.new();swipe_end.pressed=false;swipe_end.position=Vector2(210,202);game._on_series_swipe_input(swipe_end);assert(game.series_carousel_animating)
 	await get_tree().create_timer(.36).timeout
-	assert(game._current_series_entry().series_id=="sweets" and not game.series_open_button.disabled and not game.series_lock_label.visible)
+	assert(game._current_series_entry().series_id=="sweets" and not game.series_lock_label.visible and game.current_encyclopedia_series_id=="sweets" and game.encyclopedia_grid.get_child_count()==10 and game.encyclopedia_scroll.scroll_vertical==0)
 	assert(is_zero_approx(game.series_carousel_offset) and str(previous_card.container.get_meta("series_id"))=="base" and str(next_card.container.get_meta("series_id"))=="gummy")
 	var short_start:=InputEventScreenTouch.new();short_start.pressed=true;short_start.position=Vector2(300,200);game._on_series_swipe_input(short_start)
 	var short_drag:=InputEventScreenDrag.new();short_drag.position=Vector2(270,200);game._on_series_swipe_input(short_drag)
 	var short_end:=InputEventScreenTouch.new();short_end.pressed=false;short_end.position=Vector2(270,200);game._on_series_swipe_input(short_end);await get_tree().create_timer(.28).timeout
 	assert(game._current_series_entry().series_id=="sweets" and is_zero_approx(game.series_carousel_offset))
+	var vertical_start:=InputEventScreenTouch.new();vertical_start.pressed=true;vertical_start.position=Vector2(300,420);game._on_series_swipe_input(vertical_start)
+	var vertical_drag:=InputEventScreenDrag.new();vertical_drag.position=Vector2(302,300);game._on_series_swipe_input(vertical_drag);assert(game.series_swipe_axis==2 and is_zero_approx(game.series_carousel_offset))
+	var vertical_end:=InputEventScreenTouch.new();vertical_end.pressed=false;vertical_end.position=Vector2(302,300);game._on_series_swipe_input(vertical_end);assert(not game.series_carousel_animating)
 	game._change_series_selection(-1);assert(game.series_carousel_animating);await get_tree().create_timer(.36).timeout;assert(game._current_series_entry().series_id=="base" and is_zero_approx(game.series_carousel_offset))
 	for repeat in range(2):
 		game._spawn_specific_plant("colorata");var harvested=game.plants.back();harvested.diameter_cm=12.0+repeat;harvested.harvest()
 	assert(game._grant_hidden_species("pinwheel") and not game._grant_hidden_species("pinwheel"))
 	assert(game._species_get_count("colorata")==2 and game._series_get_count("base")==3 and game._all_series_get_count()==3 and game._series_found_count("base")==2)
 	game._save();game.species_get_counts.clear();game._load_save();assert(game._species_get_count("colorata")==2 and game._species_get_count("pinwheel")==1)
-	game._open_encyclopedia();game._open_selected_series_encyclopedia();await get_tree().process_frame
+	game._open_encyclopedia();await get_tree().process_frame
 	assert(game.encyclopedia_list_page.visible and game.encyclopedia_grid.get_child_count()==game._series_species_entries("base").size() and game.encyclopedia_list_title.text=="基本図鑑" and game.encyclopedia_list_get.text=="シリーズ総GET 3")
 	assert(not game.encyclopedia_field_button.disabled and game.encyclopedia_field_button.text=="このシリーズの原生地へ")
 	game._open_current_series_field();assert(not game.encyclopedia_overlay.visible and game.current_mode=="habitat")

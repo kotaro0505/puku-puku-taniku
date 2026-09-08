@@ -1,18 +1,18 @@
 {
   "normal_series": [
-    {"series_id":"gummy","stock_condition":{"type":"formal_play_count","value":1},"price_puku":3},
-    {"series_id":"metal","stock_condition":{"type":"formal_play_count","value":3},"price_puku":3},
-    {"series_id":"sweets","stock_condition":{"type":"formal_play_count","value":6},"price_puku":3},
-    {"series_id":"glow","stock_condition":{"type":"formal_play_count","value":10},"price_puku":3},
-    {"series_id":"jewel","stock_condition":{"type":"formal_play_count","value":14},"price_puku":3},
-    {"series_id":"jelly","stock_condition":{"type":"formal_play_count","value":18},"price_puku":3},
-    {"series_id":"stardust","stock_condition":{"type":"formal_play_count","value":22},"price_puku":3},
-    {"series_id":"stone","stock_condition":{"type":"formal_play_count","value":26},"price_puku":3},
-    {"series_id":"sea","stock_condition":{"type":"formal_play_count","value":30},"price_puku":3},
-    {"series_id":"halloween","stock_condition":{"type":"formal_play_count","value":34},"price_puku":3},
-    {"series_id":"christmas","stock_condition":{"type":"formal_play_count","value":38},"price_puku":3},
-    {"series_id":"yumekawa","stock_condition":{"type":"formal_play_count","value":42},"price_puku":3},
-    {"series_id":"forest_amber","stock_condition":{"type":"formal_play_count","value":46},"price_puku":3}
+    {"series_id":"gummy","price_puku":3},
+    {"series_id":"metal","price_puku":3},
+    {"series_id":"sweets","price_puku":3},
+    {"series_id":"glow","price_puku":3},
+    {"series_id":"jewel","price_puku":3},
+    {"series_id":"jelly","price_puku":3},
+    {"series_id":"stardust","price_puku":3},
+    {"series_id":"stone","price_puku":3},
+    {"series_id":"sea","price_puku":3},
+    {"series_id":"halloween","price_puku":3},
+    {"series_id":"christmas","price_puku":3},
+    {"series_id":"yumekawa","price_puku":3},
+    {"series_id":"forest_amber","price_puku":3}
   ],
   "hidden_series": [
     {

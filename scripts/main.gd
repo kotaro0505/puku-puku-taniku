@@ -100,8 +100,8 @@ const TUTORIAL_FINGER_SIZE := Vector2(58,64)
 const TUTORIAL_FINGER_TIP_LOCAL := Vector2(27,5)
 const TUTORIAL_FINGER_PRESS_RATIO := Vector2(.58,.30)
 const TUTORIAL_FINGER_RELEASE_OFFSET := Vector2(-3,-7)
-const SERIES_CAROUSEL_TRACK_ORIGIN := Vector2(48,123)
-const SERIES_CAROUSEL_CARD_SIZE := Vector2(480,740)
+const SERIES_CAROUSEL_TRACK_ORIGIN := Vector2(48,0)
+const SERIES_CAROUSEL_CARD_SIZE := Vector2(480,658)
 const SERIES_CAROUSEL_SPACING := 420.0
 const SERIES_CAROUSEL_SWIPE_THRESHOLD := 78.0
 const SERIES_CAROUSEL_SLIDE_SECONDS := 0.28
@@ -212,11 +212,11 @@ var series_progress_label: Label
 var series_get_label: Label
 var all_series_get_label: Label
 var series_position_label: Label
-var series_open_button: Button
 var series_previous_button: Button
 var series_next_button: Button
 var series_swipe_start := Vector2.ZERO
 var series_swipe_tracking := false
+var series_swipe_axis := 0
 var encyclopedia_list_title: Label
 var encyclopedia_list_progress: Label
 var encyclopedia_list_get: Label
@@ -2311,40 +2311,38 @@ func _build_encyclopedia(hud:Control)->void:
 	encyclopedia_overlay=Control.new();encyclopedia_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);encyclopedia_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;encyclopedia_overlay.visible=false;hud.add_child(encyclopedia_overlay)
 	var background:=ColorRect.new();background.color=Color("#3d2419");background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);background.mouse_filter=Control.MOUSE_FILTER_STOP;encyclopedia_overlay.add_child(background)
 	_build_series_selection_page()
-	encyclopedia_list_page=Control.new();encyclopedia_list_page.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);encyclopedia_list_page.visible=false;encyclopedia_overlay.add_child(encyclopedia_list_page)
-	var back_to_series:=Button.new();back_to_series.name="BackToSeries";back_to_series.text="もどる";back_to_series.position=Vector2(20,25);back_to_series.size=Vector2(105,55);_skin_button(back_to_series,Color("#fff0cf"),17);back_to_series.pressed.connect(_return_to_series_selection);encyclopedia_list_page.add_child(back_to_series)
-	encyclopedia_list_title=Label.new();encyclopedia_list_title.position=Vector2(132,20);encyclopedia_list_title.size=Vector2(424,48);encyclopedia_list_title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;encyclopedia_list_title.add_theme_font_size_override("font_size",28);encyclopedia_list_title.add_theme_color_override("font_color",UI_CREAM);encyclopedia_list_page.add_child(encyclopedia_list_title)
-	encyclopedia_list_progress=Label.new();encyclopedia_list_progress.position=Vector2(132,67);encyclopedia_list_progress.size=Vector2(424,29);encyclopedia_list_progress.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;encyclopedia_list_progress.add_theme_font_size_override("font_size",18);encyclopedia_list_progress.add_theme_color_override("font_color",Color("#f3cf8a"));encyclopedia_list_page.add_child(encyclopedia_list_progress)
-	encyclopedia_list_get=Label.new();encyclopedia_list_get.position=Vector2(132,95);encyclopedia_list_get.size=Vector2(424,28);encyclopedia_list_get.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;encyclopedia_list_get.add_theme_font_size_override("font_size",16);encyclopedia_list_get.add_theme_color_override("font_color",UI_CREAM);encyclopedia_list_page.add_child(encyclopedia_list_get)
-	encyclopedia_field_button=Button.new();encyclopedia_field_button.position=Vector2(104,130);encyclopedia_field_button.size=Vector2(368,58);_skin_button(encyclopedia_field_button,Color("#dca85e"),18);encyclopedia_field_button.pressed.connect(_open_current_series_field);encyclopedia_list_page.add_child(encyclopedia_field_button)
-	encyclopedia_field_status=Label.new();encyclopedia_field_status.position=Vector2(38,191);encyclopedia_field_status.size=Vector2(500,34);encyclopedia_field_status.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;encyclopedia_field_status.add_theme_font_size_override("font_size",15);encyclopedia_field_status.add_theme_color_override("font_color",Color("#e9cda3"));encyclopedia_list_page.add_child(encyclopedia_field_status)
-	encyclopedia_unlock_panel=PanelContainer.new();encyclopedia_unlock_panel.position=Vector2(28,226);encyclopedia_unlock_panel.size=Vector2(520,160);encyclopedia_unlock_panel.add_theme_stylebox_override("panel",_box(Color("#f1dfb9"),Color("#c48c4b"),20,3));encyclopedia_list_page.add_child(encyclopedia_unlock_panel)
-	var unlock_content:=VBoxContainer.new();unlock_content.alignment=BoxContainer.ALIGNMENT_CENTER;unlock_content.add_theme_constant_override("separation",8);encyclopedia_unlock_panel.add_child(unlock_content)
-	encyclopedia_unlock_status=Label.new();encyclopedia_unlock_status.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;encyclopedia_unlock_status.add_theme_font_size_override("font_size",16);encyclopedia_unlock_status.add_theme_color_override("font_color",UI_BROWN);unlock_content.add_child(encyclopedia_unlock_status)
-	var unlock_actions:=HBoxContainer.new();unlock_actions.alignment=BoxContainer.ALIGNMENT_CENTER;unlock_actions.add_theme_constant_override("separation",8);unlock_content.add_child(unlock_actions)
-	encyclopedia_unlock_puku_button=Button.new();encyclopedia_unlock_puku_button.custom_minimum_size=Vector2(360,54);_skin_button(encyclopedia_unlock_puku_button,Color("#9fbd69"),16);encyclopedia_unlock_puku_button.pressed.connect(_acquire_current_catalog.bind("puku"));unlock_actions.add_child(encyclopedia_unlock_puku_button)
-	encyclopedia_scroll=ScrollContainer.new();encyclopedia_scroll.position=Vector2(20,230);encyclopedia_scroll.size=Vector2(536,765);encyclopedia_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;encyclopedia_scroll.vertical_scroll_mode=ScrollContainer.SCROLL_MODE_AUTO;encyclopedia_scroll.scroll_deadzone=8;encyclopedia_scroll.mouse_filter=Control.MOUSE_FILTER_STOP;encyclopedia_list_page.add_child(encyclopedia_scroll)
-	encyclopedia_list_page.move_child(encyclopedia_unlock_panel,encyclopedia_list_page.get_child_count()-1)
-	encyclopedia_scroll.get_v_scroll_bar().value_changed.connect(func(_value:float):call_deferred("_update_encyclopedia_visible_textures"))
-	var scroll_content:=VBoxContainer.new();scroll_content.custom_minimum_size=Vector2(516,0);scroll_content.mouse_filter=Control.MOUSE_FILTER_PASS;encyclopedia_scroll.add_child(scroll_content)
-	encyclopedia_grid=GridContainer.new();encyclopedia_grid.columns=2;encyclopedia_grid.custom_minimum_size=Vector2(516,0);encyclopedia_grid.size_flags_horizontal=Control.SIZE_EXPAND_FILL;encyclopedia_grid.mouse_filter=Control.MOUSE_FILTER_PASS;encyclopedia_grid.add_theme_constant_override("h_separation",12);encyclopedia_grid.add_theme_constant_override("v_separation",14);scroll_content.add_child(encyclopedia_grid)
-	var bottom_space:=Control.new();bottom_space.custom_minimum_size=Vector2(516,54);bottom_space.mouse_filter=Control.MOUSE_FILTER_PASS;scroll_content.add_child(bottom_space)
 	encyclopedia_detail_page=Control.new();encyclopedia_detail_page.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);encyclopedia_detail_page.visible=false;encyclopedia_overlay.add_child(encyclopedia_detail_page)
 
 func _build_series_selection_page()->void:
 	encyclopedia_series_page=Control.new();encyclopedia_series_page.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);encyclopedia_overlay.add_child(encyclopedia_series_page)
+	encyclopedia_list_page=encyclopedia_series_page
 	var title:=Label.new();title.text="ぷくぷく図鑑";title.position=Vector2(28,25);title.size=Vector2(390,55);title.add_theme_font_size_override("font_size",31);title.add_theme_color_override("font_color",UI_CREAM);encyclopedia_series_page.add_child(title)
 	var close:=Button.new();close.text="もどる";close.position=Vector2(447,27);close.size=Vector2(105,55);_skin_button(close,Color("#fff0cf"),17);close.pressed.connect(_close_encyclopedia);encyclopedia_series_page.add_child(close)
 	all_series_get_label=Label.new();all_series_get_label.position=Vector2(28,82);all_series_get_label.size=Vector2(520,35);all_series_get_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;all_series_get_label.add_theme_font_size_override("font_size",18);all_series_get_label.add_theme_color_override("font_color",Color("#f3cf8a"));encyclopedia_series_page.add_child(all_series_get_label)
-	series_carousel_track=Control.new();series_carousel_track.name="SeriesCarouselTrack";series_carousel_track.position=SERIES_CAROUSEL_TRACK_ORIGIN;series_carousel_track.size=SERIES_CAROUSEL_CARD_SIZE;series_carousel_track.mouse_filter=Control.MOUSE_FILTER_IGNORE;encyclopedia_series_page.add_child(series_carousel_track)
+	encyclopedia_scroll=ScrollContainer.new();encyclopedia_scroll.position=Vector2(0,120);encyclopedia_scroll.size=Vector2(576,875);encyclopedia_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;encyclopedia_scroll.vertical_scroll_mode=ScrollContainer.SCROLL_MODE_AUTO;encyclopedia_scroll.scroll_deadzone=12;encyclopedia_scroll.mouse_filter=Control.MOUSE_FILTER_STOP;encyclopedia_series_page.add_child(encyclopedia_scroll)
+	encyclopedia_scroll.get_v_scroll_bar().value_changed.connect(func(_value:float):call_deferred("_update_encyclopedia_visible_textures"))
+	var scroll_content:=VBoxContainer.new();scroll_content.custom_minimum_size=Vector2(576,0);scroll_content.mouse_filter=Control.MOUSE_FILTER_PASS;scroll_content.add_theme_constant_override("separation",12);encyclopedia_scroll.add_child(scroll_content)
+	var cover_section:=Control.new();cover_section.name="SeriesCoverSection";cover_section.custom_minimum_size=Vector2(576,708);cover_section.mouse_filter=Control.MOUSE_FILTER_PASS;scroll_content.add_child(cover_section)
+	series_carousel_track=Control.new();series_carousel_track.name="SeriesCarouselTrack";series_carousel_track.position=SERIES_CAROUSEL_TRACK_ORIGIN;series_carousel_track.size=SERIES_CAROUSEL_CARD_SIZE;series_carousel_track.mouse_filter=Control.MOUSE_FILTER_IGNORE;cover_section.add_child(series_carousel_track)
 	series_carousel_cards.clear()
 	for relative_index in [-1,0,1]:series_carousel_cards.append(_build_series_card(series_carousel_track,relative_index))
 	var center_card:Dictionary=series_carousel_cards[1]
-	series_title_label=center_card.title;series_subtitle_label=center_card.subtitle;series_description_label=center_card.description;series_cover_image=center_card.cover_image;series_cover_placeholder=center_card.cover_placeholder;series_lock_label=center_card.lock_label;series_progress_label=center_card.progress;series_get_label=center_card.get_label;series_open_button=center_card.open_button
-	var swipe_area:=Control.new();swipe_area.name="SeriesSwipeArea";swipe_area.position=Vector2(0,123);swipe_area.size=Vector2(576,650);swipe_area.mouse_filter=Control.MOUSE_FILTER_STOP;swipe_area.gui_input.connect(_on_series_swipe_input);encyclopedia_series_page.add_child(swipe_area)
-	series_previous_button=Button.new();series_previous_button.text="＜";series_previous_button.position=Vector2(16,382);series_previous_button.size=Vector2(58,64);_skin_button(series_previous_button,Color("#f3dfb9"),25);series_previous_button.pressed.connect(_change_series_selection.bind(-1));encyclopedia_series_page.add_child(series_previous_button)
-	series_next_button=Button.new();series_next_button.text="＞";series_next_button.position=Vector2(502,382);series_next_button.size=Vector2(58,64);_skin_button(series_next_button,Color("#f3dfb9"),25);series_next_button.pressed.connect(_change_series_selection.bind(1));encyclopedia_series_page.add_child(series_next_button)
-	series_position_label=Label.new();series_position_label.position=Vector2(48,885);series_position_label.size=Vector2(480,32);series_position_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;series_position_label.add_theme_font_size_override("font_size",17);series_position_label.add_theme_color_override("font_color",Color("#dcbf91"));encyclopedia_series_page.add_child(series_position_label)
+	series_title_label=center_card.title;series_subtitle_label=center_card.subtitle;series_description_label=center_card.description;series_cover_image=center_card.cover_image;series_cover_placeholder=center_card.cover_placeholder;series_lock_label=center_card.lock_label;series_progress_label=center_card.progress;series_get_label=center_card.get_label
+	var swipe_area:=Control.new();swipe_area.name="SeriesSwipeArea";swipe_area.position=Vector2.ZERO;swipe_area.size=Vector2(576,658);swipe_area.mouse_filter=Control.MOUSE_FILTER_PASS;swipe_area.mouse_force_pass_scroll_events=true;swipe_area.gui_input.connect(_on_series_swipe_input);cover_section.add_child(swipe_area)
+	series_previous_button=Button.new();series_previous_button.text="＜";series_previous_button.position=Vector2(16,275);series_previous_button.size=Vector2(58,64);series_previous_button.mouse_force_pass_scroll_events=true;_skin_button(series_previous_button,Color("#f3dfb9"),25);series_previous_button.pressed.connect(_change_series_selection.bind(-1));cover_section.add_child(series_previous_button)
+	series_next_button=Button.new();series_next_button.text="＞";series_next_button.position=Vector2(502,275);series_next_button.size=Vector2(58,64);series_next_button.mouse_force_pass_scroll_events=true;_skin_button(series_next_button,Color("#f3dfb9"),25);series_next_button.pressed.connect(_change_series_selection.bind(1));cover_section.add_child(series_next_button)
+	series_position_label=Label.new();series_position_label.position=Vector2(48,668);series_position_label.size=Vector2(480,32);series_position_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;series_position_label.add_theme_font_size_override("font_size",17);series_position_label.add_theme_color_override("font_color",Color("#dcbf91"));series_position_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;cover_section.add_child(series_position_label)
+	var species_header:=Control.new();species_header.name="SpeciesListHeader";species_header.custom_minimum_size=Vector2(576,205);species_header.mouse_filter=Control.MOUSE_FILTER_PASS;scroll_content.add_child(species_header)
+	encyclopedia_list_title=Label.new();encyclopedia_list_title.position=Vector2(28,0);encyclopedia_list_title.size=Vector2(520,42);encyclopedia_list_title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;encyclopedia_list_title.add_theme_font_size_override("font_size",27);encyclopedia_list_title.add_theme_color_override("font_color",UI_CREAM);species_header.add_child(encyclopedia_list_title)
+	encyclopedia_list_progress=Label.new();encyclopedia_list_progress.position=Vector2(28,43);encyclopedia_list_progress.size=Vector2(520,29);encyclopedia_list_progress.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;encyclopedia_list_progress.add_theme_font_size_override("font_size",18);encyclopedia_list_progress.add_theme_color_override("font_color",Color("#f3cf8a"));species_header.add_child(encyclopedia_list_progress)
+	encyclopedia_list_get=Label.new();encyclopedia_list_get.position=Vector2(28,71);encyclopedia_list_get.size=Vector2(520,28);encyclopedia_list_get.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;encyclopedia_list_get.add_theme_font_size_override("font_size",16);encyclopedia_list_get.add_theme_color_override("font_color",UI_CREAM);species_header.add_child(encyclopedia_list_get)
+	encyclopedia_field_button=Button.new();encyclopedia_field_button.position=Vector2(104,103);encyclopedia_field_button.size=Vector2(368,58);encyclopedia_field_button.mouse_force_pass_scroll_events=true;_skin_button(encyclopedia_field_button,Color("#dca85e"),18);encyclopedia_field_button.pressed.connect(_open_current_series_field);species_header.add_child(encyclopedia_field_button)
+	encyclopedia_field_status=Label.new();encyclopedia_field_status.position=Vector2(38,165);encyclopedia_field_status.size=Vector2(500,34);encyclopedia_field_status.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;encyclopedia_field_status.add_theme_font_size_override("font_size",15);encyclopedia_field_status.add_theme_color_override("font_color",Color("#e9cda3"));species_header.add_child(encyclopedia_field_status)
+	encyclopedia_unlock_panel=PanelContainer.new();encyclopedia_unlock_panel.visible=false;species_header.add_child(encyclopedia_unlock_panel)
+	encyclopedia_unlock_status=Label.new();encyclopedia_unlock_panel.add_child(encyclopedia_unlock_status)
+	encyclopedia_unlock_puku_button=Button.new();encyclopedia_unlock_puku_button.visible=false;species_header.add_child(encyclopedia_unlock_puku_button)
+	encyclopedia_grid=GridContainer.new();encyclopedia_grid.columns=2;encyclopedia_grid.custom_minimum_size=Vector2(536,0);encyclopedia_grid.size_flags_horizontal=Control.SIZE_SHRINK_CENTER;encyclopedia_grid.mouse_filter=Control.MOUSE_FILTER_PASS;encyclopedia_grid.add_theme_constant_override("h_separation",12);encyclopedia_grid.add_theme_constant_override("v_separation",14);scroll_content.add_child(encyclopedia_grid)
+	var bottom_space:=Control.new();bottom_space.custom_minimum_size=Vector2(536,54);bottom_space.mouse_filter=Control.MOUSE_FILTER_PASS;scroll_content.add_child(bottom_space)
 
 func _build_series_card(parent:Control,relative_index:int)->Dictionary:
 	var card:=Control.new();card.name="SeriesCard%d"%relative_index;card.position=Vector2(relative_index*SERIES_CAROUSEL_SPACING,0);card.size=SERIES_CAROUSEL_CARD_SIZE;card.mouse_filter=Control.MOUSE_FILTER_IGNORE;parent.add_child(card)
@@ -2358,14 +2356,12 @@ func _build_series_card(parent:Control,relative_index:int)->Dictionary:
 	var description:=Label.new();description.position=Vector2(-6,523);description.size=Vector2(492,61);description.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;description.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;description.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;description.add_theme_font_size_override("font_size",17);description.add_theme_color_override("font_color",UI_CREAM);description.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(description)
 	var progress:=Label.new();progress.position=Vector2(0,591);progress.size=Vector2(480,34);progress.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;progress.add_theme_font_size_override("font_size",22);progress.add_theme_color_override("font_color",Color("#f4d27d"));progress.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(progress)
 	var get_label:=Label.new();get_label.position=Vector2(0,627);get_label.size=Vector2(480,31);get_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;get_label.add_theme_font_size_override("font_size",18);get_label.add_theme_color_override("font_color",UI_CREAM);get_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(get_label)
-	var open_button:=Button.new();open_button.position=Vector2(78,678);open_button.size=Vector2(324,62);_skin_button(open_button,Color("#dca85e"),21);open_button.add_theme_stylebox_override("disabled",_box(Color("#6a4939"),Color("#876552"),20,3));open_button.add_theme_color_override("font_disabled_color",Color("#d8c4b3"));open_button.mouse_filter=Control.MOUSE_FILTER_STOP if relative_index==0 else Control.MOUSE_FILTER_IGNORE;card.add_child(open_button)
-	if relative_index==0:open_button.pressed.connect(_open_selected_series_encyclopedia)
-	return {"relative_index":relative_index,"container":card,"title":title,"subtitle":subtitle,"cover_image":cover_image,"cover_placeholder":cover_placeholder,"lock_label":lock_label,"description":description,"progress":progress,"get_label":get_label,"open_button":open_button,"detail_nodes":[title,subtitle,description,progress,get_label,open_button]}
+	return {"relative_index":relative_index,"container":card,"title":title,"subtitle":subtitle,"cover_image":cover_image,"cover_placeholder":cover_placeholder,"lock_label":lock_label,"description":description,"progress":progress,"get_label":get_label,"detail_nodes":[title,subtitle,description,progress,get_label]}
 
 func _open_encyclopedia()->void:
 	if catalog_preview_mode_active:return
 	if not encyclopedia_unlocked:return
-	play_modal_open=false;encyclopedia_detail_page.visible=false;encyclopedia_list_page.visible=false;encyclopedia_series_page.visible=true;play_overlay.visible=false;encyclopedia_overlay.visible=true;_refresh_series_selection();_update_play_ui()
+	play_modal_open=false;encyclopedia_detail_page.visible=false;encyclopedia_series_page.visible=true;play_overlay.visible=false;encyclopedia_overlay.visible=true;encyclopedia_scroll.scroll_vertical=0;_refresh_series_selection();_update_play_ui()
 
 func _close_encyclopedia()->void:
 	_cancel_series_carousel_motion()
@@ -2470,7 +2466,7 @@ func _condition_met(condition:Dictionary)->bool:
 
 func _is_series_stocked(series_id:String)->bool:
 	var rule:=_normal_series_rule(series_id)
-	return not rule.is_empty() and _condition_met(rule.get("stock_condition",{}))
+	return not rule.is_empty()
 
 func _shop_series_catalog()->Array:
 	var visible:Array=[]
@@ -2557,6 +2553,14 @@ func _refresh_series_selection()->void:
 	all_series_get_label.text="全シリーズ総GET %d"%_all_series_get_count()
 	series_position_label.text="%d / %d"%[selected_series_index+1,owned.size()]
 	series_previous_button.disabled=owned.size()<2;series_next_button.disabled=owned.size()<2
+	_refresh_unified_series_contents(false)
+
+func _refresh_unified_series_contents(reset_scroll:bool)->void:
+	var entry:=_current_series_entry()
+	if entry.is_empty():return
+	current_encyclopedia_series_id=str(entry.get("series_id","base"))
+	_refresh_encyclopedia_header();_refresh_encyclopedia_cards()
+	if reset_scroll:encyclopedia_scroll.scroll_vertical=0
 
 func _refresh_series_carousel_cards()->void:
 	var owned:=_owned_series_entries()
@@ -2573,10 +2577,6 @@ func _populate_series_card(card:Dictionary,series_index:int,owned:Array[Dictiona
 	cover_image.texture=_series_cover_texture(entry)
 	if not entries.is_empty():_request_species_texture(entries[0],cover_image,true)
 	card.cover_placeholder.visible=cover_image.texture==null and unlocked;card.lock_label.visible=not unlocked;card.lock_label.text="🔒\n未開放\n表紙画像 準備中" if cover_image.texture==null else "🔒\n未開放"
-	var browsable:=_can_browse_series(entry);card.open_button.disabled=not browsable
-	if unlocked:card.open_button.text="図鑑をひらく"
-	elif browsable:card.open_button.text="シルエット図鑑をみる"
-	else:card.open_button.text="🔒  未開放　%s"%_series_unlock_text(entry)
 	container.visible=owned.size()>1 or int(card.relative_index)==0;container.set_meta("series_index",series_index);container.set_meta("series_id",series_id)
 
 func _series_cover_texture(entry:Dictionary)->Texture2D:
@@ -2593,23 +2593,26 @@ func _change_series_selection(direction:int)->void:
 
 func _on_series_swipe_input(event:InputEvent)->void:
 	if event is InputEventScreenTouch:
-		if event.pressed and not series_carousel_animating:series_swipe_start=event.position;series_swipe_tracking=true
+		if event.pressed and not series_carousel_animating:series_swipe_start=event.position;series_swipe_tracking=true;series_swipe_axis=0
 		elif series_swipe_tracking:_finish_series_swipe(event.position)
 	elif event is InputEventScreenDrag and series_swipe_tracking:
 		_update_series_swipe(event.position)
 	elif event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT:
-		if event.pressed and not series_carousel_animating:series_swipe_start=event.position;series_swipe_tracking=true
+		if event.pressed and not series_carousel_animating:series_swipe_start=event.position;series_swipe_tracking=true;series_swipe_axis=0
 		elif series_swipe_tracking:_finish_series_swipe(event.position)
 	elif event is InputEventMouseMotion and series_swipe_tracking and event.button_mask&MOUSE_BUTTON_MASK_LEFT:
 		_update_series_swipe(event.position)
 
 func _update_series_swipe(position:Vector2)->void:
 	var delta:=position-series_swipe_start
-	if absf(delta.y)>absf(delta.x)*1.25:return
+	if series_swipe_axis==0 and maxf(absf(delta.x),absf(delta.y))>=12.0:series_swipe_axis=1 if absf(delta.x)>absf(delta.y)*1.15 else 2
+	if series_swipe_axis!=1:return
 	_set_series_carousel_offset(clampf(delta.x,-SERIES_CAROUSEL_SPACING,SERIES_CAROUSEL_SPACING))
 
 func _finish_series_swipe(end_position:Vector2)->void:
-	_update_series_swipe(end_position);series_swipe_tracking=false;var delta:=end_position-series_swipe_start
+	_update_series_swipe(end_position);series_swipe_tracking=false
+	if series_swipe_axis==2:series_swipe_axis=0;_set_series_carousel_offset(0.0);return
+	var delta:=end_position-series_swipe_start;series_swipe_axis=0
 	if absf(delta.x)>=SERIES_CAROUSEL_SWIPE_THRESHOLD and absf(delta.x)>absf(delta.y):_animate_series_selection(1 if delta.x<0.0 else -1)
 	else:_animate_series_snap_back()
 
@@ -2635,7 +2638,7 @@ func _animate_series_selection(direction:int)->void:
 	series_carousel_tween=create_tween();series_carousel_tween.tween_method(_set_series_carousel_offset,series_carousel_offset,-direction*SERIES_CAROUSEL_SPACING,SERIES_CAROUSEL_SLIDE_SECONDS).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT);series_carousel_tween.tween_callback(_finish_series_transition.bind(direction))
 
 func _finish_series_transition(direction:int)->void:
-	var owned:=_owned_series_entries();selected_series_index=wrapi(selected_series_index+direction,0,owned.size());_refresh_series_carousel_cards();_set_series_carousel_offset(0.0);series_position_label.text="%d / %d"%[selected_series_index+1,owned.size()];series_carousel_animating=false
+	var owned:=_owned_series_entries();selected_series_index=wrapi(selected_series_index+direction,0,owned.size());_refresh_series_carousel_cards();_set_series_carousel_offset(0.0);series_position_label.text="%d / %d"%[selected_series_index+1,owned.size()];series_carousel_animating=false;_refresh_unified_series_contents(true)
 
 func _animate_series_snap_back()->void:
 	if is_zero_approx(series_carousel_offset):_set_series_carousel_offset(0.0);return
@@ -2645,17 +2648,17 @@ func _animate_series_snap_back()->void:
 
 func _cancel_series_carousel_motion()->void:
 	if series_carousel_tween and series_carousel_tween.is_valid():series_carousel_tween.kill()
-	series_carousel_animating=false;series_swipe_tracking=false;_set_series_carousel_offset(0.0)
+	series_carousel_animating=false;series_swipe_tracking=false;series_swipe_axis=0;_set_series_carousel_offset(0.0)
 
 func _open_selected_series_encyclopedia()->void:
 	var entry:=_current_series_entry()
 	if series_carousel_animating or series_swipe_tracking or entry.is_empty() or not _can_browse_series(entry):return
-	current_encyclopedia_series_id=str(entry.get("series_id","base"));encyclopedia_series_page.visible=false;encyclopedia_detail_page.visible=false;encyclopedia_list_page.visible=true;_refresh_encyclopedia_header();_refresh_encyclopedia_cards()
+	encyclopedia_detail_page.visible=false;encyclopedia_series_page.visible=true;_refresh_unified_series_contents(false)
 
 func _return_to_series_selection()->void:
 	_release_encyclopedia_textures()
 	for child in encyclopedia_detail_page.get_children():child.free()
-	encyclopedia_detail_page.visible=false;encyclopedia_list_page.visible=false;encyclopedia_series_page.visible=true;_refresh_series_selection()
+	encyclopedia_detail_page.visible=false;encyclopedia_series_page.visible=true;_refresh_series_selection()
 
 func _field_entry(field_id:String)->Dictionary:
 	var entry=field_catalog.get(field_id,{})
@@ -2729,8 +2732,12 @@ func _update_encyclopedia_visible_textures()->void:
 		var image:=encyclopedia_card_images[i]
 		if not is_instance_valid(image):continue
 		var card:=image.get_parent().get_parent().get_parent() as Control
-		var visible_now:=card.position.y+card.size.y>=visible_top and card.position.y<=visible_bottom
-		var should_prefetch:=card.position.y+card.size.y>=prefetch_top and card.position.y<=prefetch_bottom
+		# The cards now follow the cover in one tall scroll document. Convert the
+		# displayed global position back to content coordinates before deciding
+		# which external catalog images should be requested or prefetched.
+		var card_top:=card.global_position.y-encyclopedia_scroll.global_position.y+visible_top
+		var visible_now:=card_top+card.size.y>=visible_top and card_top<=visible_bottom
+		var should_prefetch:=card_top+card.size.y>=prefetch_top and card_top<=prefetch_bottom
 		var entry:=encyclopedia_card_entries[i];var path:=_species_image_path(entry)
 		if should_prefetch:
 			if str(image.get_meta("catalog_loaded_path",""))!=path and str(image.get_meta("catalog_request_path",""))!=path:_request_species_texture(entry,image,visible_now)
