@@ -170,6 +170,7 @@ var effects_layer: Control
 var best_label: Label
 var coin_label: Label
 var puku_gauge_label: Label
+var puku_gauge_meter: ProgressBar
 var puku_point_label: Label
 var puku_gain_label: Label
 var puku_gain_tween: Tween
@@ -751,10 +752,11 @@ func _build_ui() -> void:
 	best_label=Label.new(); best_label.text="最高記録\n0.0 cm"; best_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; best_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; best_label.add_theme_font_size_override("font_size",17); best_label.add_theme_color_override("font_color",Color.WHITE); best_panel.add_child(best_label)
 	var coin_panel:=PanelContainer.new(); coin_panel.position=Vector2(398,54); coin_panel.size=Vector2(153,53); coin_panel.add_theme_stylebox_override("panel",_box(Color("#55301d"),Color("#f1d19c"),22,2)); hud.add_child(coin_panel)
 	coin_label=Label.new(); coin_label.text=" ¥%s" % _comma(coins); coin_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; coin_label.add_theme_font_size_override("font_size",20); coin_label.add_theme_color_override("font_color",Color("#ffd85b")); coin_panel.add_child(coin_label)
-	var puku_panel:=PanelContainer.new();puku_panel.position=Vector2(22,165);puku_panel.size=Vector2(226,72);puku_panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_panel.add_theme_stylebox_override("panel",_box(Color("#3f6b4b"),Color("#d9ed9b"),17,2));hud.add_child(puku_panel)
-	var puku_content:=VBoxContainer.new();puku_content.alignment=BoxContainer.ALIGNMENT_CENTER;puku_content.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_content.add_theme_constant_override("separation",0);puku_panel.add_child(puku_content)
-	puku_gauge_label=Label.new();puku_gauge_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;puku_gauge_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_gauge_label.add_theme_font_size_override("font_size",15);puku_gauge_label.add_theme_color_override("font_color",Color("#fff9d9"));puku_content.add_child(puku_gauge_label)
-	puku_point_label=Label.new();puku_point_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;puku_point_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_point_label.add_theme_font_size_override("font_size",16);puku_point_label.add_theme_color_override("font_color",Color("#fff0a0"));puku_content.add_child(puku_point_label)
+	var puku_panel:=PanelContainer.new();puku_panel.position=Vector2(42,158);puku_panel.size=Vector2(158,92);puku_panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_panel.add_theme_stylebox_override("panel",_box(Color("#3f6b4b"),Color("#d9ed9b"),17,2));hud.add_child(puku_panel)
+	var puku_content:=VBoxContainer.new();puku_content.alignment=BoxContainer.ALIGNMENT_CENTER;puku_content.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_content.add_theme_constant_override("separation",2);puku_panel.add_child(puku_content)
+	puku_gauge_label=Label.new();puku_gauge_label.text="ぷくゲージ";puku_gauge_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;puku_gauge_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_gauge_label.add_theme_font_size_override("font_size",13);puku_gauge_label.add_theme_color_override("font_color",Color("#fff9d9"));puku_content.add_child(puku_gauge_label)
+	puku_gauge_meter=ProgressBar.new();puku_gauge_meter.custom_minimum_size=Vector2(132,16);puku_gauge_meter.max_value=PUKU_GAUGE_TARGET_CM;puku_gauge_meter.show_percentage=false;puku_gauge_meter.mouse_filter=Control.MOUSE_FILTER_IGNORE;var meter_bg:=StyleBoxFlat.new();meter_bg.bg_color=Color("#294735");meter_bg.set_corner_radius_all(8);meter_bg.border_color=Color("#d9ed9b");meter_bg.set_border_width_all(1);var meter_fill:=StyleBoxFlat.new();meter_fill.bg_color=Color("#f6d95e");meter_fill.set_corner_radius_all(8);puku_gauge_meter.add_theme_stylebox_override("background",meter_bg);puku_gauge_meter.add_theme_stylebox_override("fill",meter_fill);puku_content.add_child(puku_gauge_meter)
+	puku_point_label=Label.new();puku_point_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;puku_point_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_point_label.add_theme_font_size_override("font_size",15);puku_point_label.add_theme_color_override("font_color",Color("#fff0a0"));puku_content.add_child(puku_point_label)
 	puku_gain_label=Label.new();puku_gain_label.position=Vector2(138,246);puku_gain_label.size=Vector2(300,60);puku_gain_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;puku_gain_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;puku_gain_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_gain_label.add_theme_font_size_override("font_size",27);puku_gain_label.add_theme_color_override("font_color",Color("#fff49a"));puku_gain_label.add_theme_color_override("font_outline_color",Color("#31553c"));puku_gain_label.add_theme_constant_override("outline_size",7);puku_gain_label.visible=false;effects_layer.add_child(puku_gain_label)
 	for entry in [{"x":398,"t":"図鑑"},{"x":483,"t":"設定"}]:
 		var b:=Button.new(); b.text=entry.t; b.position=Vector2(entry.x,116); b.size=Vector2(68,73); _skin_button(b,Color("#fff0cf"),17); hud.add_child(b)
@@ -891,7 +893,7 @@ func _show_shop_categories()->void:
 	shop_current_page="categories";_refresh_shop_page_visibility()
 
 func _open_shop_seed_category()->void:
-	shop_current_page="seeds";shop_message.text="たね袋を1袋ずつ購入できます";_update_shop_ui();_refresh_shop_page_visibility()
+	shop_current_page="categories";_refresh_shop_page_visibility();_hide_shop_chatter(true);_sync_arrangement_ui();arrangement_ui.open_seed_shop()
 
 func _open_shop_pot_category()->void:
 	shop_current_page="categories";_refresh_shop_page_visibility();_open_pot_shop()
@@ -905,6 +907,7 @@ func _build_arrangement_ui(hud:Control)->void:
 	arrangement_ui.save_requested.connect(_on_arrangement_save_requested)
 	arrangement_ui.pot_purchase_requested.connect(_on_pot_purchase_requested)
 	arrangement_ui.catalog_purchase_requested.connect(_on_catalog_purchase_requested)
+	arrangement_ui.seed_purchase_requested.connect(_buy_seed_bag)
 	arrangement_ui.world_scroll_input.connect(_on_arrangement_world_scroll_input)
 	_sync_arrangement_ui()
 
@@ -912,6 +915,15 @@ func _sync_arrangement_ui()->void:
 	if arrangement_ui==null:return
 	arrangement_ui.configure(catalog_species,series_catalog,pot_catalog,discovered,owned_pots,saved_arrangements,arrangement_save_capacity,coins,_species_texture)
 	arrangement_ui.sync_catalog_state(unlocked_series,puku_points)
+	arrangement_ui.sync_seed_shop_state(_seed_shop_products(),coins)
+
+func _seed_shop_products()->Array:
+	return [
+		{"seed_type":"normal","display_name":"普通のたね","count":NORMAL_GERMINATION_COUNT,"price":NORMAL_SEED_BAG_PRICE_YEN,"unlocked":true,"description":"24粒入り・所持 %d袋\n基本の多肉が育つたね袋"%normal_seed_bags,"accent":"#d8b56b"},
+		{"seed_type":"volume","display_name":"ボリュームパック","count":VOLUME_GERMINATION_COUNT,"price":VOLUME_SEED_BAG_PRICE_YEN,"unlocked":_volume_seed_unlocked(),"description":"36粒入り・所持 %d袋\n%s"%[volume_seed_bags,"大容量でじっくり育成" if _volume_seed_unlocked() else "あと%d回プレイで解禁"%maxi(0,3-formal_play_count)],"accent":"#c99d57"},
+		{"seed_type":"premium","display_name":"プレミアムたね","count":PREMIUM_GERMINATION_COUNT,"price":PREMIUM_SEED_BAG_PRICE_YEN,"unlocked":_premium_seed_unlocked(),"description":"24粒入り・所持 %d袋\n%s"%[premium_seed_bags,"レアや新種を狙いやすい" if _premium_seed_unlocked() else "あと%d回プレイで解禁"%maxi(0,13-formal_play_count)],"accent":"#d18a55"},
+		{"seed_type":"mystery","display_name":"謎種パック","count":MYSTERY_GERMINATION_COUNT,"price":MYSTERY_SEED_BAG_PRICE_YEN,"unlocked":_mystery_seed_pack_unlocked(),"description":"5粒入り・所持 %d袋\n%s"%[mystery_seed_bags,"発見済みの謎品種が育つ" if _mystery_seed_pack_unlocked() else "謎品種を1種発見で解禁"],"accent":"#8d755f"}
+	]
 
 func _open_arrangements()->void:
 	if not _tutorial_fully_complete() or current_mode!="greenhouse" or play_active or catalog_preview_mode_active or arrangement_scene_active or arrangement_transitioning:return
@@ -1943,20 +1955,25 @@ func _close_shop()->void:
 
 func _buy_seed_bag(seed_type:String)->void:
 	if not _tutorial_fully_complete():return
-	if seed_type=="volume" and not _volume_seed_unlocked():shop_message.text="あと%d回プレイで解禁"%maxi(0,3-formal_play_count);return
-	if seed_type=="premium" and not _premium_seed_unlocked():shop_message.text="あと%d回プレイで解禁"%maxi(0,13-formal_play_count);return
-	if seed_type=="mystery" and not _mystery_seed_pack_unlocked():shop_message.text="謎品種を1種発見で解禁";return
+	if seed_type=="volume" and not _volume_seed_unlocked():_show_seed_shop_message("あと%d回プレイで解禁"%maxi(0,3-formal_play_count));return
+	if seed_type=="premium" and not _premium_seed_unlocked():_show_seed_shop_message("あと%d回プレイで解禁"%maxi(0,13-formal_play_count));return
+	if seed_type=="mystery" and not _mystery_seed_pack_unlocked():_show_seed_shop_message("謎品種を1種発見で解禁");return
 	var price:=NORMAL_SEED_BAG_PRICE_YEN
 	if seed_type=="volume":price=VOLUME_SEED_BAG_PRICE_YEN
 	elif seed_type=="premium":price=PREMIUM_SEED_BAG_PRICE_YEN
 	elif seed_type=="mystery":price=MYSTERY_SEED_BAG_PRICE_YEN
-	if coins<price:shop_message.text="所持金が足りません";return
+	if coins<price:_show_seed_shop_message("所持金が足りません");return
 	coins-=price
-	if seed_type=="volume":volume_seed_bags+=1;shop_message.text="ボリュームパックを1袋購入しました"
-	elif seed_type=="premium":premium_seed_bags+=1;shop_message.text="プレミアムたねを1袋購入しました"
-	elif seed_type=="mystery":mystery_seed_bags+=1;shop_message.text="謎種パックを1袋購入しました"
-	else:normal_seed_bags+=1;shop_message.text="たねを1袋購入しました"
-	audio_manager.notify_user_gesture();audio_manager.play_se("purchase",1.0);_save();_update_currency_ui();_update_shop_ui();_update_play_ui()
+	var purchase_message:="たねを1袋購入しました"
+	if seed_type=="volume":volume_seed_bags+=1;purchase_message="ボリュームパックを1袋購入しました"
+	elif seed_type=="premium":premium_seed_bags+=1;purchase_message="プレミアムたねを1袋購入しました"
+	elif seed_type=="mystery":mystery_seed_bags+=1;purchase_message="謎種パックを1袋購入しました"
+	else:normal_seed_bags+=1
+	audio_manager.notify_user_gesture();audio_manager.play_se("purchase",1.0);_save();_update_currency_ui();_update_shop_ui();_update_play_ui();_sync_arrangement_ui();_show_seed_shop_message(purchase_message)
+
+func _show_seed_shop_message(message:String)->void:
+	if shop_message:shop_message.text=message
+	if arrangement_ui and arrangement_ui.seed_shop_page.visible:arrangement_ui.show_seed_shop_message(message)
 
 func _select_shop_product(seed_type:String)->void:
 	shop_selected_seed_type=seed_type;shop_message.text="";_update_shop_ui()
@@ -2032,13 +2049,14 @@ func _puku_gauge_text()->String:
 	return str(int(roundf(rounded))) if is_equal_approx(rounded,roundf(rounded)) else "%.1f"%rounded
 
 func _update_puku_ui()->void:
-	if puku_gauge_label:puku_gauge_label.text="ぷくゲージ　%s / 1000cm"%_puku_gauge_text()
-	if puku_point_label:puku_point_label.text="所持ぷくポイント　%d"%puku_points
+	if puku_gauge_label:puku_gauge_label.text="ぷくゲージ"
+	if puku_gauge_meter:puku_gauge_meter.value=clampf(puku_gauge_cm,0.0,PUKU_GAUGE_TARGET_CM)
+	if puku_point_label:puku_point_label.text="ぷくコイン ×%d"%puku_points
 
 func _show_puku_point_gain(amount:int)->void:
 	if not puku_gain_label:return
 	if puku_gain_tween and puku_gain_tween.is_valid():puku_gain_tween.kill()
-	puku_gain_label.text="ぷくポイント +%d"%amount;puku_gain_label.position=Vector2(138,246);puku_gain_label.scale=Vector2(.82,.82);puku_gain_label.modulate=Color.WHITE;puku_gain_label.visible=true
+	puku_gain_label.text="ぷくコイン +%d"%amount;puku_gain_label.position=Vector2(24,250);puku_gain_label.size=Vector2(220,60);puku_gain_label.scale=Vector2(.82,.82);puku_gain_label.modulate=Color.WHITE;puku_gain_label.visible=true
 	puku_gain_tween=create_tween().bind_node(puku_gain_label);puku_gain_tween.tween_property(puku_gain_label,"scale",Vector2.ONE,.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT);puku_gain_tween.parallel().tween_property(puku_gain_label,"position:y",226.0,.8).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT);puku_gain_tween.tween_interval(.6);puku_gain_tween.tween_property(puku_gain_label,"modulate:a",0.0,.25);puku_gain_tween.tween_callback(func():puku_gain_label.visible=false;puku_gain_label.modulate=Color.WHITE)
 
 func _update_currency_ui()->void:
@@ -2387,8 +2405,8 @@ func _refresh_encyclopedia_header()->void:
 	encyclopedia_unlock_panel.visible=not unlocked
 	if not unlocked:
 		var puku_price:=_catalog_price_puku(entry);var available_for_purchase:=_catalog_purchase_enabled(entry)
-		encyclopedia_unlock_status.text="この図鑑を入手すると、シリーズ種と出会えるようになります\n所持 %dぷくポイント　／　必要 %dぷくポイント"%[puku_points,puku_price] if available_for_purchase else "このシリーズは準備中です"
-		encyclopedia_unlock_puku_button.text="%dぷくポイントで入手"%puku_price;encyclopedia_unlock_puku_button.disabled=not available_for_purchase or puku_points<puku_price
+		encyclopedia_unlock_status.text="この図鑑を入手すると、シリーズ種と出会えるようになります\n所持 %dぷくコイン　／　必要 %dぷくコイン"%[puku_points,puku_price] if available_for_purchase else "このシリーズは準備中です"
+		encyclopedia_unlock_puku_button.text="%dぷくコインで入手"%puku_price;encyclopedia_unlock_puku_button.disabled=not available_for_purchase or puku_points<puku_price
 
 func _acquire_current_catalog(method:String)->void:
 	var entry:=_series_entry(current_encyclopedia_series_id)

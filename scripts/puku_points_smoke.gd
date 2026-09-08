@@ -14,15 +14,16 @@ func _ready()->void:
 
 func _test_thresholds(game)->void:
 	game.puku_gauge_cm=0.0;game.puku_points=0
-	assert(game.add_puku_gauge_cm(999.0,false,false)==0 and is_equal_approx(game.puku_gauge_cm,999.0) and game.puku_points==0 and game.puku_gauge_label.text=="ぷくゲージ　999 / 1000cm")
+	assert(game.add_puku_gauge_cm(999.0,false,false)==0 and is_equal_approx(game.puku_gauge_cm,999.0) and game.puku_points==0 and game.puku_gauge_label.text=="ぷくゲージ" and is_equal_approx(game.puku_gauge_meter.value,999.0) and not game.puku_gauge_meter.show_percentage)
+	var gauge_panel:PanelContainer=game.puku_gauge_meter.get_parent().get_parent();assert(gauge_panel.size.x>=150.0 and gauge_panel.size.x<=160.0 and gauge_panel.position.x<200.0 and gauge_panel.visible)
 	game.puku_gauge_cm=0.0;game.puku_points=0
 	assert(game.add_puku_gauge_cm(1000.0,false,false)==1 and is_zero_approx(game.puku_gauge_cm) and game.puku_points==1)
 	game.puku_gauge_cm=0.0;game.puku_points=0
 	assert(game.add_puku_gauge_cm(1250.0,false,false)==1 and is_equal_approx(game.puku_gauge_cm,250.0) and game.puku_points==1)
 	game.puku_gauge_cm=0.0;game.puku_points=0
-	assert(game.add_puku_gauge_cm(2150.0,false,false)==2 and is_equal_approx(game.puku_gauge_cm,150.0) and game.puku_points==2 and game.puku_point_label.text=="所持ぷくポイント　2")
+	assert(game.add_puku_gauge_cm(2150.0,false,false)==2 and is_equal_approx(game.puku_gauge_cm,150.0) and game.puku_points==2 and game.puku_point_label.text=="ぷくコイン ×2" and is_equal_approx(game.puku_gauge_meter.value,150.0))
 	game.puku_gauge_cm=999.0;game.puku_points=0
-	assert(game.add_puku_gauge_cm(1.0,false,true)==1 and game.puku_gain_label.visible and game.puku_gain_label.text=="ぷくポイント +1")
+	assert(game.add_puku_gauge_cm(1.0,false,true)==1 and game.puku_gain_label.visible and game.puku_gain_label.text=="ぷくコイン +1")
 	game.add_puku_points(2,false,false);assert(game.puku_points==3)
 
 func _test_harvest_integration(game)->void:
@@ -33,7 +34,7 @@ func _test_harvest_integration(game)->void:
 
 func _test_catalog_purchase(game)->void:
 	var gummy:Dictionary=game._series_entry("gummy");game.unlocked_series.erase("gummy");game.current_encyclopedia_series_id="gummy";game.puku_points=2;game.coins=10000;game.mystery_pod_count=10
-	game._refresh_encyclopedia_header();assert(game.encyclopedia_unlock_panel.visible and game.encyclopedia_unlock_puku_button.disabled and "必要 3ぷくポイント" in game.encyclopedia_unlock_status.text)
+	game._refresh_encyclopedia_header();assert(game.encyclopedia_unlock_panel.visible and game.encyclopedia_unlock_puku_button.disabled and "必要 3ぷくコイン" in game.encyclopedia_unlock_status.text)
 	game.add_puku_points(1,false,false);game._refresh_encyclopedia_header();assert(not game.encyclopedia_unlock_puku_button.disabled)
 	game._acquire_current_catalog("puku");assert(game._is_series_unlocked(gummy) and game.puku_points==0 and game.coins==10000 and game.mystery_pod_count==10)
 

@@ -5,6 +5,7 @@ signal close_requested(context:String)
 signal save_requested(arrangement:Dictionary)
 signal pot_purchase_requested(pot_id:String)
 signal catalog_purchase_requested(series_id:String)
+signal seed_purchase_requested(seed_type:String)
 signal world_scroll_input(event:InputEvent)
 
 const PotPlaceholderClass = preload("res://scripts/arrangement_pot_placeholder.gd")
@@ -24,6 +25,7 @@ var discovered:Dictionary={}
 var owned_pots:Dictionary={}
 var owned_catalogs:Dictionary={"base":true}
 var wallet_puku_points:=0
+var seed_shop_products:Array=[]
 var saved_arrangements:Array=[]
 var save_capacity:=20
 var wallet_coins:=0
@@ -65,6 +67,10 @@ var catalog_shop_page:Control
 var catalog_shop_wallet:Label
 var catalog_shop_message:Label
 var catalog_shop_grid:VBoxContainer
+var seed_shop_page:Control
+var seed_shop_wallet:Label
+var seed_shop_message:Label
+var seed_shop_grid:VBoxContainer
 
 var current_arrangement:Dictionary={}
 var editor_plants:Array=[]
@@ -99,6 +105,10 @@ func sync_catalog_state(purchased_catalogs:Dictionary,puku_points:int)->void:
 	owned_catalogs=purchased_catalogs;wallet_puku_points=maxi(0,puku_points)
 	if visible and catalog_shop_page.visible:_refresh_catalog_shop()
 
+func sync_seed_shop_state(products:Array,coins:int)->void:
+	seed_shop_products=products;wallet_coins=maxi(0,coins)
+	if visible and seed_shop_page.visible:_refresh_seed_shop()
+
 func open_home()->void:
 	return_context="greenhouse";visible=true;_show_page(home_page);_refresh_home()
 
@@ -108,6 +118,9 @@ func open_pot_shop()->void:
 func open_catalog_shop()->void:
 	set_world_backdrop_mode(false,world_pot_anchor_screen);return_context="shop";visible=true;_show_page(catalog_shop_page);_refresh_catalog_shop()
 
+func open_seed_shop()->void:
+	set_world_backdrop_mode(false,world_pot_anchor_screen);return_context="shop";visible=true;_show_page(seed_shop_page);_refresh_seed_shop()
+
 func close()->void:
 	drag_active=false;visible=false;close_requested.emit(return_context)
 
@@ -116,6 +129,9 @@ func show_pot_shop_message(message:String)->void:
 
 func show_catalog_shop_message(message:String)->void:
 	catalog_shop_message.text=message;_refresh_catalog_shop()
+
+func show_seed_shop_message(message:String)->void:
+	seed_shop_message.text=message;_refresh_seed_shop()
 
 func set_world_backdrop_mode(enabled:bool,pot_anchor_screen:Vector2)->void:
 	var changed:=world_backdrop_enabled!=enabled or not world_pot_anchor_screen.is_equal_approx(pot_anchor_screen)
@@ -138,12 +154,13 @@ func _build_ui()->void:
 	viewer_page=_page();_build_viewer_page()
 	shop_page=_page();_build_shop_page()
 	catalog_shop_page=_page();_build_catalog_shop_page()
+	seed_shop_page=_page();_build_seed_shop_page()
 
 func _page()->Control:
 	var page:=Control.new();page.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);page.mouse_filter=Control.MOUSE_FILTER_STOP;page.visible=false;add_child(page);return page
 
 func _show_page(page:Control)->void:
-	for candidate in [home_page,pot_select_page,editor_page,picker_page,viewer_page,shop_page,catalog_shop_page]:
+	for candidate in [home_page,pot_select_page,editor_page,picker_page,viewer_page,shop_page,catalog_shop_page,seed_shop_page]:
 		if candidate:candidate.visible=candidate==page
 
 func _on_home_world_scroll_input(event:InputEvent)->void:
@@ -447,8 +464,8 @@ func _build_shop_page()->void:
 	_build_header(shop_page,"寄せ植え用の鉢",close)
 	shop_wallet=Label.new();shop_wallet.position=Vector2(30,92);shop_wallet.size=Vector2(516,38);shop_wallet.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;shop_wallet.add_theme_font_size_override("font_size",20);shop_wallet.add_theme_color_override("font_color",Color("#f5d36d"));shop_page.add_child(shop_wallet)
 	shop_message=Label.new();shop_message.position=Vector2(30,132);shop_message.size=Vector2(516,52);shop_message.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;shop_message.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;shop_message.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;shop_message.add_theme_font_size_override("font_size",16);shop_message.add_theme_color_override("font_color",UI_CREAM);shop_page.add_child(shop_message)
-	var scroll:=ScrollContainer.new();scroll.position=Vector2(26,194);scroll.size=Vector2(524,790);scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;shop_page.add_child(scroll)
-	shop_grid=VBoxContainer.new();shop_grid.custom_minimum_size=Vector2(504,0);shop_grid.add_theme_constant_override("separation",14);scroll.add_child(shop_grid)
+	var scroll:=_shop_scroll(Vector2(26,194),Vector2(524,790));shop_page.add_child(scroll)
+	shop_grid=VBoxContainer.new();shop_grid.custom_minimum_size=Vector2(504,0);shop_grid.mouse_filter=Control.MOUSE_FILTER_PASS;shop_grid.add_theme_constant_override("separation",14);scroll.add_child(shop_grid)
 
 func _refresh_pot_shop()->void:
 	shop_wallet.text="所持金　¥%s"%_comma(wallet_coins)
@@ -460,12 +477,12 @@ func _refresh_pot_shop_cards()->void:
 	for pot_value in pot_catalog:
 		if not pot_value is Dictionary:continue
 		var pot:Dictionary=pot_value;var pot_id:=str(pot.get("pot_id",""));var owned:=bool(owned_pots.get(pot_id,false));var price:=maxi(0,int(pot.get("price",0)))
-		var card:=PanelContainer.new();card.custom_minimum_size=Vector2(504,204);card.add_theme_stylebox_override("panel",_box(Color("#f4e1bc"),Color("#b77c48"),20,3));shop_grid.add_child(card)
-		var content:=Control.new();content.custom_minimum_size=Vector2(484,184);card.add_child(content)
+		var card:=PanelContainer.new();card.custom_minimum_size=Vector2(504,204);card.mouse_filter=Control.MOUSE_FILTER_PASS;card.add_theme_stylebox_override("panel",_box(Color("#f4e1bc"),Color("#b77c48"),20,3));shop_grid.add_child(card)
+		var content:=Control.new();content.custom_minimum_size=Vector2(484,184);content.mouse_filter=Control.MOUSE_FILTER_PASS;card.add_child(content)
 		var preview:=Control.new();preview.position=Vector2(2,2);preview.size=Vector2(214,176);preview.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.add_child(preview);_render_pot(preview,pot,true)
-		var name:=Label.new();name.text=str(pot.get("display_name","鉢"));name.position=Vector2(220,12);name.size=Vector2(258,45);name.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name.add_theme_font_size_override("font_size",19);name.add_theme_color_override("font_color",UI_BROWN);content.add_child(name)
-		var condition:=Label.new();condition.text=str(pot.get("unlock_condition",{}).get("display_text",""));condition.position=Vector2(220,55);condition.size=Vector2(258,34);condition.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;condition.add_theme_font_size_override("font_size",13);condition.add_theme_color_override("font_color",Color("#79543a"));content.add_child(condition)
-		var buy:=_button("購入済み" if owned else ("買う　¥%s"%_comma(price)),Vector2(248,102),Vector2(204,58),Color("#b9a17d") if owned else Color("#d7aa64"),17);buy.disabled=owned or wallet_coins<price;buy.pressed.connect(_request_pot_purchase.bind(pot_id));content.add_child(buy)
+		var name:=Label.new();name.text=str(pot.get("display_name","鉢"));name.position=Vector2(220,12);name.size=Vector2(258,45);name.mouse_filter=Control.MOUSE_FILTER_IGNORE;name.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name.add_theme_font_size_override("font_size",19);name.add_theme_color_override("font_color",UI_BROWN);content.add_child(name)
+		var condition:=Label.new();condition.text=str(pot.get("unlock_condition",{}).get("display_text",""));condition.position=Vector2(220,55);condition.size=Vector2(258,34);condition.mouse_filter=Control.MOUSE_FILTER_IGNORE;condition.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;condition.add_theme_font_size_override("font_size",13);condition.add_theme_color_override("font_color",Color("#79543a"));content.add_child(condition)
+		var buy:=_button("購入済み" if owned else ("買う　¥%s"%_comma(price)),Vector2(248,102),Vector2(204,58),Color("#b9a17d") if owned else Color("#d7aa64"),17);_prepare_scroll_button(buy);buy.disabled=owned or wallet_coins<price;buy.pressed.connect(_request_pot_purchase.bind(pot_id));content.add_child(buy)
 
 func _request_pot_purchase(pot_id:String)->void:
 	pot_purchase_requested.emit(pot_id)
@@ -474,27 +491,52 @@ func _build_catalog_shop_page()->void:
 	_build_header(catalog_shop_page,"シリーズ図鑑",close)
 	catalog_shop_wallet=Label.new();catalog_shop_wallet.position=Vector2(30,92);catalog_shop_wallet.size=Vector2(516,38);catalog_shop_wallet.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;catalog_shop_wallet.add_theme_font_size_override("font_size",20);catalog_shop_wallet.add_theme_color_override("font_color",Color("#f5d36d"));catalog_shop_page.add_child(catalog_shop_wallet)
 	catalog_shop_message=Label.new();catalog_shop_message.position=Vector2(30,132);catalog_shop_message.size=Vector2(516,52);catalog_shop_message.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;catalog_shop_message.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;catalog_shop_message.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;catalog_shop_message.add_theme_font_size_override("font_size",16);catalog_shop_message.add_theme_color_override("font_color",UI_CREAM);catalog_shop_page.add_child(catalog_shop_message)
-	var scroll:=ScrollContainer.new();scroll.position=Vector2(26,194);scroll.size=Vector2(524,790);scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;catalog_shop_page.add_child(scroll)
-	catalog_shop_grid=VBoxContainer.new();catalog_shop_grid.custom_minimum_size=Vector2(504,0);catalog_shop_grid.add_theme_constant_override("separation",14);scroll.add_child(catalog_shop_grid)
+	var scroll:=_shop_scroll(Vector2(26,194),Vector2(524,790));catalog_shop_page.add_child(scroll)
+	catalog_shop_grid=VBoxContainer.new();catalog_shop_grid.custom_minimum_size=Vector2(504,0);catalog_shop_grid.mouse_filter=Control.MOUSE_FILTER_PASS;catalog_shop_grid.add_theme_constant_override("separation",14);scroll.add_child(catalog_shop_grid)
 
 func _refresh_catalog_shop()->void:
-	catalog_shop_wallet.text="所持　%dぷくポイント"%wallet_puku_points
+	catalog_shop_wallet.text="所持　%dぷくコイン"%wallet_puku_points
 	if catalog_shop_message.text.is_empty():catalog_shop_message.text="図鑑は一度購入すると、メイン画面からいつでも見られます"
 	_clear_children(catalog_shop_grid)
 	for series_value in series_catalog:
 		if not series_value is Dictionary:continue
 		var series:Dictionary=series_value;var series_id:=str(series.get("series_id",""));var owned:=bool(owned_catalogs.get(series_id,false)) or str(series.get("unlock_type","future"))=="default";var price:=maxi(0,int(series.get("unlock_price_puku",3)))
-		var card:=PanelContainer.new();card.custom_minimum_size=Vector2(504,204);card.add_theme_stylebox_override("panel",_box(Color("#f4e1bc"),Color("#b77c48"),20,3));catalog_shop_grid.add_child(card)
-		var content:=Control.new();content.custom_minimum_size=Vector2(484,184);card.add_child(content)
+		var card:=PanelContainer.new();card.custom_minimum_size=Vector2(504,204);card.mouse_filter=Control.MOUSE_FILTER_PASS;card.add_theme_stylebox_override("panel",_box(Color("#f4e1bc"),Color("#b77c48"),20,3));catalog_shop_grid.add_child(card)
+		var content:=Control.new();content.custom_minimum_size=Vector2(484,184);content.mouse_filter=Control.MOUSE_FILTER_PASS;card.add_child(content)
 		var preview:=TextureRect.new();preview.position=Vector2(2,2);preview.size=Vector2(214,176);preview.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;preview.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;preview.mouse_filter=Control.MOUSE_FILTER_IGNORE;preview.texture=_series_preview_texture(series);content.add_child(preview)
 		if preview.texture==null:
 			var placeholder:=Label.new();placeholder.text="商品画像\n準備中";placeholder.position=preview.position;placeholder.size=preview.size;placeholder.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;placeholder.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;placeholder.add_theme_font_size_override("font_size",18);placeholder.add_theme_color_override("font_color",Color("#79543a"));content.add_child(placeholder)
-		var name:=Label.new();name.text=str(series.get("display_name","シリーズ図鑑"));name.position=Vector2(220,12);name.size=Vector2(258,45);name.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name.add_theme_font_size_override("font_size",19);name.add_theme_color_override("font_color",UI_BROWN);content.add_child(name)
-		var condition:=Label.new();condition.text="シリーズ図鑑ページ";condition.position=Vector2(220,55);condition.size=Vector2(258,34);condition.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;condition.add_theme_font_size_override("font_size",13);condition.add_theme_color_override("font_color",Color("#79543a"));content.add_child(condition)
-		var buy:=_button("購入済み" if owned else ("買う　%dぷく"%price),Vector2(248,102),Vector2(204,58),Color("#b9a17d") if owned else Color("#d7aa64"),17);buy.disabled=owned or wallet_puku_points<price;buy.pressed.connect(_request_catalog_purchase.bind(series_id));content.add_child(buy)
+		var name:=Label.new();name.text=str(series.get("display_name","シリーズ図鑑"));name.position=Vector2(220,12);name.size=Vector2(258,45);name.mouse_filter=Control.MOUSE_FILTER_IGNORE;name.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name.add_theme_font_size_override("font_size",19);name.add_theme_color_override("font_color",UI_BROWN);content.add_child(name)
+		var condition:=Label.new();condition.text="シリーズ図鑑ページ";condition.position=Vector2(220,55);condition.size=Vector2(258,34);condition.mouse_filter=Control.MOUSE_FILTER_IGNORE;condition.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;condition.add_theme_font_size_override("font_size",13);condition.add_theme_color_override("font_color",Color("#79543a"));content.add_child(condition)
+		var buy:=_button("購入済み" if owned else ("買う　%dぷくコイン"%price),Vector2(248,102),Vector2(204,58),Color("#b9a17d") if owned else Color("#d7aa64"),17);_prepare_scroll_button(buy);buy.disabled=owned or wallet_puku_points<price;buy.pressed.connect(_request_catalog_purchase.bind(series_id));content.add_child(buy)
 
 func _request_catalog_purchase(series_id:String)->void:
 	catalog_purchase_requested.emit(series_id)
+
+func _build_seed_shop_page()->void:
+	_build_header(seed_shop_page,"たね袋",close)
+	seed_shop_wallet=Label.new();seed_shop_wallet.position=Vector2(30,92);seed_shop_wallet.size=Vector2(516,38);seed_shop_wallet.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;seed_shop_wallet.add_theme_font_size_override("font_size",20);seed_shop_wallet.add_theme_color_override("font_color",Color("#f5d36d"));seed_shop_page.add_child(seed_shop_wallet)
+	seed_shop_message=Label.new();seed_shop_message.position=Vector2(30,132);seed_shop_message.size=Vector2(516,52);seed_shop_message.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;seed_shop_message.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;seed_shop_message.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;seed_shop_message.add_theme_font_size_override("font_size",16);seed_shop_message.add_theme_color_override("font_color",UI_CREAM);seed_shop_page.add_child(seed_shop_message)
+	var scroll:=_shop_scroll(Vector2(26,194),Vector2(524,790));seed_shop_page.add_child(scroll)
+	seed_shop_grid=VBoxContainer.new();seed_shop_grid.custom_minimum_size=Vector2(504,0);seed_shop_grid.mouse_filter=Control.MOUSE_FILTER_PASS;seed_shop_grid.add_theme_constant_override("separation",14);scroll.add_child(seed_shop_grid)
+
+func _refresh_seed_shop()->void:
+	seed_shop_wallet.text="所持金　¥%s"%_comma(wallet_coins)
+	if seed_shop_message.text.is_empty():seed_shop_message.text="たね袋を1袋ずつ購入できます"
+	_clear_children(seed_shop_grid)
+	for product_value in seed_shop_products:
+		if not product_value is Dictionary:continue
+		var product:Dictionary=product_value;var seed_type:=str(product.get("seed_type","normal"));var price:=maxi(0,int(product.get("price",0)));var unlocked:=bool(product.get("unlocked",false));var accent:=Color(str(product.get("accent","#d8b56b")))
+		var card:=PanelContainer.new();card.custom_minimum_size=Vector2(504,204);card.mouse_filter=Control.MOUSE_FILTER_PASS;card.add_theme_stylebox_override("panel",_box(Color("#f4e1bc"),Color("#b77c48"),20,3));seed_shop_grid.add_child(card)
+		var content:=Control.new();content.custom_minimum_size=Vector2(484,184);content.mouse_filter=Control.MOUSE_FILTER_PASS;card.add_child(content)
+		var preview:=PanelContainer.new();preview.position=Vector2(2,2);preview.size=Vector2(214,176);preview.mouse_filter=Control.MOUSE_FILTER_IGNORE;preview.add_theme_stylebox_override("panel",_box(accent.lightened(.16),accent.darkened(.18),24,3));content.add_child(preview)
+		var preview_label:=Label.new();preview_label.text="たね袋\n%d粒"%int(product.get("count",0));preview_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;preview_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;preview_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;preview_label.add_theme_font_size_override("font_size",24);preview_label.add_theme_color_override("font_color",UI_BROWN);preview.add_child(preview_label)
+		var name:=Label.new();name.text=str(product.get("display_name","たね袋"));name.position=Vector2(220,7);name.size=Vector2(258,40);name.mouse_filter=Control.MOUSE_FILTER_IGNORE;name.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name.add_theme_font_size_override("font_size",19);name.add_theme_color_override("font_color",UI_BROWN);content.add_child(name)
+		var detail:=Label.new();detail.text=str(product.get("description",""));detail.position=Vector2(220,45);detail.size=Vector2(258,66);detail.mouse_filter=Control.MOUSE_FILTER_IGNORE;detail.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;detail.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;detail.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;detail.add_theme_font_size_override("font_size",13);detail.add_theme_color_override("font_color",Color("#79543a"));content.add_child(detail)
+		var buy:=_button("買う　¥%s"%_comma(price) if unlocked else "未解禁",Vector2(248,116),Vector2(204,54),accent,17);_prepare_scroll_button(buy);buy.disabled=not unlocked or wallet_coins<price;buy.pressed.connect(_request_seed_purchase.bind(seed_type));content.add_child(buy)
+
+func _request_seed_purchase(seed_type:String)->void:
+	seed_purchase_requested.emit(seed_type)
 
 func _series_preview_texture(series:Dictionary)->Texture2D:
 	var ids=series.get("species_ids",[])
@@ -503,6 +545,12 @@ func _series_preview_texture(series:Dictionary)->Texture2D:
 		if first_texture!=null:return first_texture
 	var path:=str(series.get("cover_image_path",""))
 	return load(path) as Texture2D if not path.is_empty() and ResourceLoader.exists(path) else null
+
+func _shop_scroll(position_value:Vector2,size_value:Vector2)->ScrollContainer:
+	var scroll:=ScrollContainer.new();scroll.position=position_value;scroll.size=size_value;scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;scroll.vertical_scroll_mode=ScrollContainer.SCROLL_MODE_AUTO;scroll.scroll_deadzone=12;scroll.mouse_filter=Control.MOUSE_FILTER_STOP;return scroll
+
+func _prepare_scroll_button(button:Button)->void:
+	button.action_mode=BaseButton.ACTION_MODE_BUTTON_RELEASE;button.mouse_filter=Control.MOUSE_FILTER_PASS;button.mouse_force_pass_scroll_events=true
 
 func _render_pot(container:Control,pot:Dictionary,compact:bool)->void:
 	_clear_children(container)

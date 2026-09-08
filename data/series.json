@@ -96,8 +96,8 @@
   {
     "series_id": "gummy",
     "display_name": "グミ多肉",
-    "subtitle": "3ぷくポイントで解放",
-    "description": "ぷにっとカラフルなグミ多肉のシリーズです。3ぷくポイントで図鑑を解放できます。",
+    "subtitle": "3ぷくコインで解放",
+    "description": "ぷにっとカラフルなグミ多肉のシリーズです。3ぷくコインで図鑑を解放できます。",
     "cover_image_path": "res://assets/plants/gummy/gummy-peach-milk.png",
     "species_ids": [
       "gummy_peach_milk",
@@ -112,7 +112,7 @@
     "field_id": "gummy_field",
     "unlock_type": "future",
     "preview_catalog_when_locked": true,
-    "unlock_condition": {"display_text": "3ぷくポイントで解放"},
+    "unlock_condition": {"display_text": "3ぷくコインで解放"},
     "iap_product_id": "",
     "unlock_price_puku": 3,
     "pod_seed_weight": 1.0,
