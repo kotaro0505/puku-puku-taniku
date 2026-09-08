@@ -30,6 +30,7 @@ var saved_arrangements:Array=[]
 var save_capacity:=20
 var wallet_coins:=0
 var texture_resolver:Callable
+var texture_requester:Callable
 var return_context:="greenhouse"
 var world_backdrop_enabled:=false
 var world_pot_anchor_screen:=Vector2(288,630)
@@ -85,7 +86,7 @@ func _ready()->void:
 	visible=false
 	_build_ui()
 
-func configure(species_data:Array,series_data:Array,pots_data:Array,discovery:Dictionary,purchased_pots:Dictionary,arrangements:Array,capacity:int,coins:int,resolver:Callable)->void:
+func configure(species_data:Array,series_data:Array,pots_data:Array,discovery:Dictionary,purchased_pots:Dictionary,arrangements:Array,capacity:int,coins:int,resolver:Callable,requester:Callable=Callable())->void:
 	catalog_species=species_data
 	series_catalog=series_data
 	pot_catalog=pots_data
@@ -95,6 +96,7 @@ func configure(species_data:Array,series_data:Array,pots_data:Array,discovery:Di
 	save_capacity=maxi(1,capacity)
 	wallet_coins=maxi(0,coins)
 	texture_resolver=resolver
+	texture_requester=requester
 
 func sync_state(purchased_pots:Dictionary,arrangements:Array,capacity:int,coins:int)->void:
 	owned_pots=purchased_pots;saved_arrangements=arrangements;save_capacity=maxi(1,capacity);wallet_coins=maxi(0,coins)
@@ -268,7 +270,7 @@ func _create_editor_plant(index:int)->void:
 	var plant:Dictionary=editor_plants[index];var entry:=_species_entry(str(plant.get("species_id","")));var texture:=_resolve_texture(entry)
 	if texture==null:editor_plant_nodes.append(null);return
 	var root:=Control.new();root.size=PLANT_CONTROL_SIZE;root.pivot_offset=PLANT_CONTROL_SIZE*.5;root.position=Vector2(float(plant.get("x",editor_canvas.size.x*.5)),float(plant.get("y",editor_canvas.size.y*.42)))-PLANT_CONTROL_SIZE*.5;root.scale=Vector2.ONE*clampf(float(plant.get("scale",1.0)),PLANT_SCALE_MIN,PLANT_SCALE_MAX);root.rotation_degrees=fposmod(float(plant.get("rotation",0.0)),360.0);root.z_index=int(plant.get("z_index",index));root.mouse_filter=Control.MOUSE_FILTER_STOP;root.mouse_default_cursor_shape=Control.CURSOR_MOVE;root.gui_input.connect(_on_plant_gui_input.bind(index,root));editor_plant_layer.add_child(root)
-	var image:=TextureRect.new();image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.texture=texture;image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.mouse_filter=Control.MOUSE_FILTER_IGNORE;root.add_child(image)
+	var image:=TextureRect.new();image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.texture=texture;image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.mouse_filter=Control.MOUSE_FILTER_IGNORE;root.add_child(image);_request_texture(entry,image,true)
 	var border:=Panel.new();border.name="SelectionBorder";border.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);border.mouse_filter=Control.MOUSE_FILTER_IGNORE;border.add_theme_stylebox_override("panel",_box(Color(1,1,1,.02),Color("#f1b942"),18,3));root.add_child(border)
 	editor_plant_nodes.append(root)
 
@@ -385,7 +387,7 @@ func _refresh_species_picker()->void:
 		var species_id:=str(entry.get("species_id",""));var texture:=_resolve_texture(entry)
 		var card:=Button.new();card.custom_minimum_size=Vector2(248,150);_skin_button(card,Color("#f4e1bc"),15);card.disabled=texture==null;picker_grid.add_child(card)
 		var image_frame:=Control.new();image_frame.position=Vector2(8,12);image_frame.size=Vector2(112,112);image_frame.clip_contents=true;image_frame.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(image_frame)
-		var image:=TextureRect.new();image.texture=texture;image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.mouse_filter=Control.MOUSE_FILTER_IGNORE;image_frame.add_child(image)
+		var image:=TextureRect.new();image.texture=texture;image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.mouse_filter=Control.MOUSE_FILTER_IGNORE;image_frame.add_child(image);_request_texture(entry,image,false)
 		var label:=Label.new();label.text=str(entry.get("name_ja","多肉"))+("\n画像準備中" if texture==null else "\n追加する");label.position=Vector2(121,18);label.size=Vector2(117,112);label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;label.add_theme_font_size_override("font_size",14);label.add_theme_color_override("font_color",UI_BROWN);label.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(label)
 		if texture!=null:card.pressed.connect(_add_species_to_editor.bind(species_id))
 
@@ -448,7 +450,7 @@ func _render_readonly_arrangement(arrangement:Dictionary)->void:
 		var plant:Dictionary=plant_value;var texture:=_resolve_texture(_species_entry(str(plant.get("species_id",""))))
 		if texture==null:continue
 		var root:=Control.new();root.size=PLANT_CONTROL_SIZE;root.pivot_offset=PLANT_CONTROL_SIZE*.5;root.position=Vector2(float(plant.get("x",0.0)),float(plant.get("y",0.0)))-PLANT_CONTROL_SIZE*.5;root.scale=Vector2.ONE*clampf(float(plant.get("scale",1.0)),PLANT_SCALE_MIN,PLANT_SCALE_MAX);root.rotation_degrees=fposmod(float(plant.get("rotation",0.0)),360.0);root.z_index=int(plant.get("z_index",0));root.mouse_filter=Control.MOUSE_FILTER_IGNORE;viewer_plant_layer.add_child(root)
-		var image:=TextureRect.new();image.texture=texture;image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.mouse_filter=Control.MOUSE_FILTER_IGNORE;root.add_child(image)
+		var image:=TextureRect.new();image.texture=texture;image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.mouse_filter=Control.MOUSE_FILTER_IGNORE;root.add_child(image);_request_texture(_species_entry(str(plant.get("species_id",""))),image,true)
 
 func _pot_holder_position(canvas:Control,holder_size:Vector2)->Vector2:
 	if not world_backdrop_enabled:return Vector2(52,294)
@@ -504,6 +506,8 @@ func _refresh_catalog_shop()->void:
 		var card:=PanelContainer.new();card.custom_minimum_size=Vector2(504,204);card.mouse_filter=Control.MOUSE_FILTER_PASS;card.add_theme_stylebox_override("panel",_box(Color("#f4e1bc"),Color("#b77c48"),20,3));catalog_shop_grid.add_child(card)
 		var content:=Control.new();content.custom_minimum_size=Vector2(484,184);content.mouse_filter=Control.MOUSE_FILTER_PASS;card.add_child(content)
 		var preview:=TextureRect.new();preview.position=Vector2(2,2);preview.size=Vector2(214,176);preview.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;preview.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;preview.mouse_filter=Control.MOUSE_FILTER_IGNORE;preview.texture=_series_preview_texture(series);content.add_child(preview)
+		var preview_ids=series.get("species_ids",[])
+		if preview_ids is Array and not preview_ids.is_empty():_request_texture(_species_entry(str(preview_ids[0])),preview,false)
 		if preview.texture==null:
 			var placeholder:=Label.new();placeholder.text="商品画像\n準備中";placeholder.position=preview.position;placeholder.size=preview.size;placeholder.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;placeholder.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;placeholder.add_theme_font_size_override("font_size",18);placeholder.add_theme_color_override("font_color",Color("#79543a"));content.add_child(placeholder)
 		var name:=Label.new();name.text=str(series.get("display_name","シリーズ図鑑"));name.position=Vector2(220,12);name.size=Vector2(258,45);name.mouse_filter=Control.MOUSE_FILTER_IGNORE;name.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name.add_theme_font_size_override("font_size",19);name.add_theme_color_override("font_color",UI_BROWN);content.add_child(name)
@@ -581,6 +585,10 @@ func _species_entry(species_id:String)->Dictionary:
 func _resolve_texture(entry:Dictionary)->Texture2D:
 	if entry.is_empty() or not texture_resolver.is_valid():return null
 	return texture_resolver.call(entry) as Texture2D
+
+func _request_texture(entry:Dictionary,target:TextureRect,high_priority:bool)->void:
+	if entry.is_empty() or not is_instance_valid(target) or not texture_requester.is_valid():return
+	texture_requester.call(entry,target,high_priority)
 
 func _plant_array(arrangement:Dictionary)->Array:
 	var value=arrangement.get("plants",[])

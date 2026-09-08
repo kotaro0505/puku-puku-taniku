@@ -39,7 +39,7 @@
     "display_name": "金属多肉",
     "subtitle": "品種画像登録済み・開放条件準備中",
     "description": "銀、銅、金、虹色の金属光沢をまとった金属多肉のシリーズです。開放条件は今後追加予定です。",
-    "cover_image_path": "res://assets/plants/metal/metal-silver-rosette.png",
+    "cover_image_path": "res://assets/catalog/metal/metal-silver-rosette.png",
     "species_ids": [
       "metal_silver_rosette", "metal_cobalt_cluster", "metal_rose_copper",
       "metal_gold_cluster", "metal_gunmetal_rosette", "metal_iridescent_star",
@@ -85,7 +85,7 @@
     "display_name": "スイーツ多肉",
     "subtitle": "品種画像登録済み・開放条件準備中",
     "description": "ケーキや果実、お菓子の彩りをまとったスイーツ多肉のシリーズです。開放条件は今後追加予定です。",
-    "cover_image_path": "res://assets/plants/sweets/sweets-strawberry-shortcake.png",
+    "cover_image_path": "res://assets/catalog/sweets/sweets-strawberry-shortcake.png",
     "species_ids": [
       "sweets_strawberry_shortcake", "sweets_blueberry_galaxy", "sweets_citrus_mint",
       "sweets_chocolate_gold", "sweets_matcha_wafer", "sweets_mango_mint",
@@ -105,7 +105,7 @@
     "display_name": "グミ多肉",
     "subtitle": "3ぷくコインで解放",
     "description": "ぷにっとカラフルなグミ多肉のシリーズです。3ぷくコインで図鑑を解放できます。",
-    "cover_image_path": "res://assets/plants/gummy/gummy-peach-milk.png",
+    "cover_image_path": "res://assets/catalog/gummy/gummy-peach-milk.png",
     "species_ids": [
       "gummy_peach_milk",
       "gummy_melon_milk",
@@ -143,7 +143,7 @@
     "display_name": "蓄光多肉",
     "subtitle": "品種画像登録済み・開放条件準備中",
     "description": "やわらかな光をまとった蓄光多肉のシリーズです。開放条件は今後追加予定です。",
-    "cover_image_path": "res://assets/plants/glow/glow-emerald-rosette.png",
+    "cover_image_path": "res://assets/catalog/glow/glow-emerald-rosette.png",
     "species_ids": [
       "glow_emerald_rosette",
       "glow_aqua_drops",

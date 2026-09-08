@@ -924,7 +924,7 @@ func _build_arrangement_ui(hud:Control)->void:
 
 func _sync_arrangement_ui()->void:
 	if arrangement_ui==null:return
-	arrangement_ui.configure(catalog_species,series_catalog,pot_catalog,discovered,owned_pots,saved_arrangements,arrangement_save_capacity,coins,_species_texture)
+	arrangement_ui.configure(catalog_species,series_catalog,pot_catalog,discovered,owned_pots,saved_arrangements,arrangement_save_capacity,coins,_species_texture,_request_species_texture)
 	arrangement_ui.sync_catalog_state(unlocked_series,puku_points)
 	arrangement_ui.sync_seed_shop_state(_seed_shop_products(),coins)
 
@@ -2382,6 +2382,7 @@ func _populate_series_card(card:Dictionary,series_index:int,owned:Array[Dictiona
 	var container:Control=card.container;var cover_image:TextureRect=card.cover_image
 	card.title.text=str(entry.get("display_name","シリーズ図鑑"));card.subtitle.text=str(entry.get("subtitle",""));card.description.text=str(entry.get("description",""));card.progress.text="%d / %d種"%[_series_found_count(series_id),entries.size()];card.get_label.text="総GET %d"%_series_get_count(series_id)
 	cover_image.texture=_series_cover_texture(entry)
+	if not entries.is_empty():_request_species_texture(entries[0],cover_image,true)
 	card.cover_placeholder.visible=cover_image.texture==null and unlocked;card.lock_label.visible=not unlocked;card.lock_label.text="🔒\n未開放\n表紙画像 準備中" if cover_image.texture==null else "🔒\n未開放"
 	var browsable:=_can_browse_series(entry);card.open_button.disabled=not browsable
 	if unlocked:card.open_button.text="図鑑をひらく"
@@ -2513,7 +2514,7 @@ func _refresh_encyclopedia_cards()->void:
 		var card:=Button.new();card.custom_minimum_size=Vector2(252,236);card.mouse_filter=Control.MOUSE_FILTER_PASS;card.mouse_force_pass_scroll_events=true;card.action_mode=BaseButton.ACTION_MODE_BUTTON_RELEASE;_skin_button(card,Color("#f6e7c5"),16);card.disabled=not found;encyclopedia_grid.add_child(card)
 		var content:=VBoxContainer.new();content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);content.offset_left=10;content.offset_top=8;content.offset_right=-10;content.offset_bottom=-8;content.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.alignment=BoxContainer.ALIGNMENT_CENTER;card.add_child(content)
 		var image_frame:=MarginContainer.new();image_frame.name="SpeciesCardImageFrame";image_frame.custom_minimum_size=Vector2(210,137);image_frame.add_theme_constant_override("margin_left",10);image_frame.add_theme_constant_override("margin_top",8);image_frame.add_theme_constant_override("margin_right",10);image_frame.add_theme_constant_override("margin_bottom",8);image_frame.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.add_child(image_frame)
-		var image:=TextureRect.new();image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.mouse_filter=Control.MOUSE_FILTER_IGNORE
+		var image:=TextureRect.new();image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.mouse_filter=Control.MOUSE_FILTER_IGNORE;image.texture=_species_loading_texture(entry)
 		_apply_encyclopedia_image_style(image,entry,found)
 		image_frame.add_child(image);encyclopedia_card_images.append(image);encyclopedia_card_entries.append(entry)
 		var name_label:=Label.new();name_label.text=str(entry.get("name_ja","？？？")) if found else "？？？";name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name_label.add_theme_font_size_override("font_size",18);name_label.add_theme_color_override("font_color",UI_BROWN);content.add_child(name_label)
@@ -2531,26 +2532,57 @@ func _apply_encyclopedia_image_style(image:TextureRect,_entry:Dictionary,found:b
 
 func _update_encyclopedia_visible_textures()->void:
 	if not encyclopedia_overlay.visible or not encyclopedia_list_page.visible:return
-	var view_top:=float(encyclopedia_scroll.scroll_vertical)-240.0
-	var view_bottom:=float(encyclopedia_scroll.scroll_vertical)+encyclopedia_scroll.size.y+240.0
+	var visible_top:=float(encyclopedia_scroll.scroll_vertical)
+	var visible_bottom:=visible_top+encyclopedia_scroll.size.y
+	var prefetch_top:=visible_top-280.0
+	var prefetch_bottom:=visible_bottom+360.0
 	for i in range(encyclopedia_card_images.size()):
 		var image:=encyclopedia_card_images[i]
 		if not is_instance_valid(image):continue
 		var card:=image.get_parent().get_parent().get_parent() as Control
-		var should_load:=card.position.y+card.size.y>=view_top and card.position.y<=view_bottom
-		if should_load and image.texture==null:image.texture=_species_texture(encyclopedia_card_entries[i])
-		elif not should_load and image.texture!=null:image.texture=null
+		var visible_now:=card.position.y+card.size.y>=visible_top and card.position.y<=visible_bottom
+		var should_prefetch:=card.position.y+card.size.y>=prefetch_top and card.position.y<=prefetch_bottom
+		var entry:=encyclopedia_card_entries[i];var path:=_species_image_path(entry)
+		if should_prefetch:
+			if str(image.get_meta("catalog_loaded_path",""))!=path and str(image.get_meta("catalog_request_path",""))!=path:_request_species_texture(entry,image,visible_now)
+		else:
+			image.set_meta("catalog_loaded_path","");image.set_meta("catalog_request_path","");image.texture=_species_loading_texture(entry)
 
 func _release_encyclopedia_textures()->void:
 	for image in encyclopedia_card_images:
-		if is_instance_valid(image):image.texture=null
+		if is_instance_valid(image):image.texture=null;image.set_meta("catalog_loaded_path","");image.set_meta("catalog_request_path","")
+
+func _species_image_path(entry:Dictionary)->String:
+	if entry.has("image_path"):
+		return str(entry.get("image_path",""))
+	var variant:=str(entry.get("visual_variant","laui"))
+	return str(SucculentClass.SPRITES.get(variant,SucculentClass.SPRITES.laui))
+
+func _species_loading_texture(entry:Dictionary)->Texture2D:
+	var path:=_species_image_path(entry)
+	return CatalogImageLoader.placeholder_texture if CatalogImageLoader.is_external_path(path) else null
+
+func _request_species_texture(entry:Dictionary,target:TextureRect,high_priority:bool=true)->void:
+	if not is_instance_valid(target):return
+	var path:=_species_image_path(entry)
+	if path.is_empty():return
+	target.set_meta("catalog_request_path",path)
+	var immediate:=CatalogImageLoader.get_texture(path)
+	if immediate!=null:target.texture=immediate
+	if not CatalogImageLoader.is_external_path(path):
+		target.set_meta("catalog_loaded_path",path);target.set_meta("catalog_request_path","");return
+	if CatalogImageLoader.is_cached(path):
+		target.set_meta("catalog_loaded_path",path);target.set_meta("catalog_request_path","");return
+	CatalogImageLoader.request_texture(path,_apply_requested_species_texture.bind(target,path),high_priority)
+
+func _apply_requested_species_texture(texture:Texture2D,target:TextureRect,path:String)->void:
+	if not is_instance_valid(target) or str(target.get_meta("catalog_request_path",""))!=path:return
+	target.texture=texture if texture!=null else CatalogImageLoader.placeholder_texture
+	target.set_meta("catalog_loaded_path",path if CatalogImageLoader.is_cached(path) else "")
+	target.set_meta("catalog_request_path","")
 
 func _species_texture(entry:Dictionary)->Texture2D:
-	if entry.has("image_path"):
-		var explicit_path:=str(entry.get("image_path",""))
-		if explicit_path.is_empty() or not ResourceLoader.exists(explicit_path):return null
-		return load(explicit_path) as Texture2D
-	var variant:=str(entry.get("visual_variant","laui"));var path:=str(SucculentClass.SPRITES.get(variant,SucculentClass.SPRITES.laui));return load(path) as Texture2D
+	return CatalogImageLoader.get_texture(_species_image_path(entry))
 
 func _habitat_species_texture(entry:Dictionary)->Texture2D:
 	if habitat_texture_mode!="thumb":
@@ -2750,7 +2782,7 @@ func _open_species_detail(entry:Dictionary)->void:
 	var content:=VBoxContainer.new();content.alignment=BoxContainer.ALIGNMENT_CENTER;content.add_theme_constant_override("separation",18);panel.add_child(content)
 	var image_frame:=MarginContainer.new();image_frame.name="SpeciesImageFrame";image_frame.custom_minimum_size=Vector2(450,470);image_frame.add_theme_constant_override("margin_left",22);image_frame.add_theme_constant_override("margin_top",22);image_frame.add_theme_constant_override("margin_right",22);image_frame.add_theme_constant_override("margin_bottom",22);content.add_child(image_frame)
 	var species_id:=str(entry.get("species_id",""));var found:=bool(discovered.get(species_id,false))
-	var image:=TextureRect.new();image.name="SpeciesImage";image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.texture=_species_texture(entry);image.mouse_filter=Control.MOUSE_FILTER_IGNORE;_apply_encyclopedia_image_style(image,entry,found);image_frame.add_child(image)
+	var image:=TextureRect.new();image.name="SpeciesImage";image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.texture=_species_texture(entry);image.mouse_filter=Control.MOUSE_FILTER_IGNORE;_apply_encyclopedia_image_style(image,entry,found);image_frame.add_child(image);_request_species_texture(entry,image,true)
 	var name_label:=Label.new();name_label.name="SpeciesName";name_label.text=str(entry.get("name_ja","")) if found else "？？？";name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name_label.add_theme_font_size_override("font_size",31);name_label.add_theme_color_override("font_color",UI_BROWN);content.add_child(name_label)
 	var description_text:=str(entry.get("description_ja","")) if found else _encyclopedia_unfound_status(current_encyclopedia_series_id)
 	if not description_text.is_empty():

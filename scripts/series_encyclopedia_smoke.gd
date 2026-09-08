@@ -33,7 +33,7 @@ func _ready()->void:
 	for sweets_entry in game._series_species_entries("sweets"):
 		var sweets_id:=str(sweets_entry.get("species_id",""));var image_path:=str(sweets_entry.get("image_path",""));sweets_ids[sweets_id]=true
 		assert(str(sweets_entry.get("series_id",""))=="sweets" and bool(sweets_entry.get("catalog_only",false)) and is_zero_approx(float(sweets_entry.get("spawn_weight",-1.0))))
-		assert(not bool(game.greenhouse_available.get(sweets_id,false)) and sweets_entry not in game.species and image_path.begins_with("res://assets/plants/sweets/") and ResourceLoader.exists(image_path))
+		assert(not bool(game.greenhouse_available.get(sweets_id,false)) and sweets_entry not in game.species and image_path.begins_with("res://assets/catalog/sweets/") and ResourceLoader.exists(image_path))
 		assert(str(game.SucculentClass.SPRITES.get(str(sweets_entry.get("visual_variant","")),""))==image_path)
 		var sweets_texture:=load(image_path) as Texture2D;var sweets_source:=sweets_texture.get_image();var sweets_used:=sweets_source.get_used_rect();assert(sweets_texture.get_size()==Vector2(1254,1254) and sweets_source.detect_alpha()!=Image.ALPHA_NONE and sweets_source.get_pixel(0,0).a<.01 and sweets_used.position.x>0 and sweets_used.position.y>0 and sweets_used.end.x<1254 and sweets_used.end.y<1254)
 	assert(sweets_ids.size()==10)
@@ -41,10 +41,10 @@ func _ready()->void:
 	for metal_entry in game._series_species_entries("metal"):
 		var metal_id:=str(metal_entry.get("species_id",""));var image_path:=str(metal_entry.get("image_path",""));metal_ids[metal_id]=true
 		assert(str(metal_entry.get("series_id",""))=="metal" and bool(metal_entry.get("catalog_only",false)) and is_zero_approx(float(metal_entry.get("spawn_weight",-1.0))))
-		assert(not bool(game.greenhouse_available.get(metal_id,false)) and metal_entry not in game.species and image_path.begins_with("res://assets/plants/metal/") and ResourceLoader.exists(image_path))
+		assert(not bool(game.greenhouse_available.get(metal_id,false)) and metal_entry not in game.species and image_path.begins_with("res://assets/catalog/metal/") and ResourceLoader.exists(image_path))
 		assert(str(game.SucculentClass.SPRITES.get(str(metal_entry.get("visual_variant","")),""))==image_path)
 		var metal_texture:=load(image_path) as Texture2D;var metal_source:=metal_texture.get_image();var metal_used:=metal_source.get_used_rect();var metal_w:=metal_source.get_width();var metal_h:=metal_source.get_height();assert(metal_w>=900 and metal_h>=900 and metal_source.detect_alpha()!=Image.ALPHA_NONE and metal_source.get_pixel(0,0).a<.01 and metal_source.get_pixel(metal_w-1,0).a<.01 and metal_source.get_pixel(0,metal_h-1).a<.01 and metal_source.get_pixel(metal_w-1,metal_h-1).a<.01 and metal_used.size.x*metal_used.size.y<metal_w*metal_h, "%s size=%s alpha=%s used=%s" % [metal_id,metal_texture.get_size(),metal_source.detect_alpha(),metal_used])
-	assert(metal_ids.size()==10 and game._series_cover_texture(game._series_entry("metal")).resource_path=="res://assets/plants/metal/metal-silver-rosette.png")
+	assert(metal_ids.size()==10 and game._series_cover_texture(game._series_entry("metal")).resource_path=="res://assets/catalog/metal/metal-silver-rosette.png")
 	for cover_series in game.series_catalog:
 		var cover_species:Array=game._series_species_entries(str(cover_series.get("series_id","")))
 		if not cover_species.is_empty():assert(game._series_cover_texture(cover_series).resource_path==game._species_texture(cover_species[0]).resource_path)
@@ -55,8 +55,8 @@ func _ready()->void:
 	game._open_encyclopedia();assert(game._owned_series_entries().size()==1 and game._current_series_entry().series_id=="base" and game.series_position_label.text=="1 / 1" and game.series_cover_image.texture.resource_path=="res://assets/plants/sprite-colorata.png")
 	for carousel_card in game.series_carousel_cards:assert(str(carousel_card.container.get_meta("series_id"))=="base")
 	game._close_encyclopedia();game.unlocked_series["sweets"]=true;game.unlocked_series["gummy"]=true;assert(game._owned_series_entries().map(func(entry):return str(entry.series_id))==["base","sweets","gummy"])
-	assert(game._series_cover_texture(game._series_entry("sweets")).resource_path=="res://assets/plants/sweets/sweets-strawberry-shortcake.png" and game._series_cover_texture(game._series_entry("gummy")).resource_path=="res://assets/plants/gummy/gummy-peach-milk.png")
-	game.selected_series_index=2;game._open_encyclopedia();assert(game.series_open_button.text=="図鑑をひらく" and not game.series_lock_label.visible and game.series_cover_image.texture.resource_path=="res://assets/plants/gummy/gummy-peach-milk.png");game._open_selected_series_encyclopedia();await get_tree().process_frame
+	assert(game._series_cover_texture(game._series_entry("sweets")).resource_path=="res://assets/catalog/sweets/sweets-strawberry-shortcake.png" and game._series_cover_texture(game._series_entry("gummy")).resource_path=="res://assets/catalog/gummy/gummy-peach-milk.png")
+	game.selected_series_index=2;game._open_encyclopedia();assert(game.series_open_button.text=="図鑑をひらく" and not game.series_lock_label.visible and game.series_cover_image.texture.resource_path=="res://assets/catalog/gummy/gummy-peach-milk.png");game._open_selected_series_encyclopedia();await get_tree().process_frame
 	assert(game.encyclopedia_list_page.visible and game.encyclopedia_list_title.text=="グミ多肉" and game.encyclopedia_grid.get_child_count()==8 and game.encyclopedia_list_progress.text=="0 / 8種" and game.encyclopedia_field_button.disabled)
 	for gummy_card in game.encyclopedia_grid.get_children():
 		assert(gummy_card.disabled)
@@ -66,7 +66,7 @@ func _ready()->void:
 	game._update_encyclopedia_visible_textures()
 	for gummy_image in game.encyclopedia_card_images:
 		assert(gummy_image.material==null and gummy_image.modulate.is_equal_approx(Color(0.12,0.09,0.08,0.82)) and gummy_image.stretch_mode==TextureRect.STRETCH_KEEP_ASPECT_CENTERED)
-		if gummy_image.texture!=null:assert(str(gummy_image.texture.resource_path).begins_with("res://assets/plants/gummy/") and str(gummy_image.texture.resource_path).ends_with(".png"))
+		if gummy_image.texture!=null:assert(str(gummy_image.texture.resource_path).begins_with("res://assets/catalog/gummy/") and str(gummy_image.texture.resource_path).ends_with(".png"))
 	base_style.free();gummy_style.free()
 	var first_gummy_card:Button=game.encyclopedia_grid.get_child(0);first_gummy_card.pressed.emit();assert(not game.encyclopedia_detail_page.visible and game.encyclopedia_list_page.visible)
 	game.discovered["gummy_peach_milk"]=true;game.species_get_counts["gummy_peach_milk"]=3;game._refresh_encyclopedia_header();game._refresh_encyclopedia_cards();await get_tree().process_frame;game._update_encyclopedia_visible_textures()
@@ -75,10 +75,10 @@ func _ready()->void:
 	assert(not found_card.disabled and "ももミルクグミ" in found_texts and "GET 3" in found_texts and game.encyclopedia_card_images[0].material==null and game.encyclopedia_card_images[0].modulate.is_equal_approx(Color.WHITE))
 	found_card.pressed.emit();assert(game.encyclopedia_detail_page.find_child("SpeciesName",true,false).text=="ももミルクグミ" and not game.encyclopedia_detail_page.find_child("SpeciesDescription",true,false).text.is_empty() and game.encyclopedia_detail_page.find_child("SpeciesGetCount",true,false).text=="GET 3" and game.encyclopedia_detail_page.find_child("SpeciesImage",true,false).material==null)
 	game._close_encyclopedia();game.discovered.erase("gummy_peach_milk");game.species_get_counts.erase("gummy_peach_milk");game.selected_series_index=0
-	game.selected_series_index=1;game._open_encyclopedia();assert(game.series_open_button.text=="図鑑をひらく" and game.series_cover_image.texture.resource_path=="res://assets/plants/sweets/sweets-strawberry-shortcake.png");game._open_selected_series_encyclopedia();await get_tree().process_frame
+	game.selected_series_index=1;game._open_encyclopedia();assert(game.series_open_button.text=="図鑑をひらく" and game.series_cover_image.texture.resource_path=="res://assets/catalog/sweets/sweets-strawberry-shortcake.png");game._open_selected_series_encyclopedia();await get_tree().process_frame
 	assert(game.encyclopedia_list_page.visible and game.encyclopedia_list_title.text=="スイーツ多肉" and game.encyclopedia_grid.get_child_count()==10 and game.encyclopedia_list_progress.text=="0 / 10種" and game.encyclopedia_field_button.disabled)
 	game.discovered["sweets_strawberry_shortcake"]=true;game.species_get_counts["sweets_strawberry_shortcake"]=1;game._refresh_encyclopedia_header();game._refresh_encyclopedia_cards();await get_tree().process_frame;game._update_encyclopedia_visible_textures()
-	var first_sweets_card:Button=game.encyclopedia_grid.get_child(0);assert(not first_sweets_card.disabled);first_sweets_card.pressed.emit();assert(game.encyclopedia_detail_page.find_child("SpeciesName",true,false).text=="いちごショート多肉" and game.encyclopedia_detail_page.find_child("SpeciesImage",true,false).texture.resource_path=="res://assets/plants/sweets/sweets-strawberry-shortcake.png")
+	var first_sweets_card:Button=game.encyclopedia_grid.get_child(0);assert(not first_sweets_card.disabled);first_sweets_card.pressed.emit();assert(game.encyclopedia_detail_page.find_child("SpeciesName",true,false).text=="いちごショート多肉" and game.encyclopedia_detail_page.find_child("SpeciesImage",true,false).texture.resource_path=="res://assets/catalog/sweets/sweets-strawberry-shortcake.png")
 	game._close_encyclopedia();game.discovered.erase("sweets_strawberry_shortcake");game.species_get_counts.erase("sweets_strawberry_shortcake");game.selected_series_index=0
 	game._open_encyclopedia();assert(game.encyclopedia_series_page.visible and not game.encyclopedia_list_page.visible and game.series_title_label.text=="基本図鑑" and not game.series_cover_placeholder.visible and game.series_cover_image.texture.resource_path=="res://assets/plants/sprite-colorata.png")
 	assert(game.series_carousel_cards.size()==3)

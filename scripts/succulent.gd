@@ -26,34 +26,34 @@ const SPRITES := {
 	"mystery_amber_agavoides": "res://assets/plants/mystery-amber-agavoides.png",
 	"mystery_yumefuwa_jelly": "res://assets/plants/mystery-yumefuwa-jelly.png",
 	"mystery_peach_jelly": "res://assets/plants/mystery-peach-jelly.png",
-	"gummy_peach_milk": "res://assets/plants/gummy/gummy-peach-milk.png",
-	"gummy_melon_milk": "res://assets/plants/gummy/gummy-melon-milk.png",
-	"gummy_fruit_punch": "res://assets/plants/gummy/gummy-fruit-punch.png",
-	"gummy_grape_milk": "res://assets/plants/gummy/gummy-grape-milk.png",
-	"gummy_strawberry": "res://assets/plants/gummy/gummy-strawberry.png",
-	"gummy_orange": "res://assets/plants/gummy/gummy-orange.png",
-	"gummy_rainbow": "res://assets/plants/gummy/gummy-rainbow.png",
-	"gummy_soda": "res://assets/plants/gummy/gummy-soda.png",
-	"sweets_strawberry_shortcake": "res://assets/plants/sweets/sweets-strawberry-shortcake.png",
-	"sweets_blueberry_galaxy": "res://assets/plants/sweets/sweets-blueberry-galaxy.png",
-	"sweets_citrus_mint": "res://assets/plants/sweets/sweets-citrus-mint.png",
-	"sweets_chocolate_gold": "res://assets/plants/sweets/sweets-chocolate-gold.png",
-	"sweets_matcha_wafer": "res://assets/plants/sweets/sweets-matcha-wafer.png",
-	"sweets_mango_mint": "res://assets/plants/sweets/sweets-mango-mint.png",
-	"sweets_raspberry_jewel": "res://assets/plants/sweets/sweets-raspberry-jewel.png",
-	"sweets_fairy_sugar": "res://assets/plants/sweets/sweets-fairy-sugar.png",
-	"sweets_caramel_cherry": "res://assets/plants/sweets/sweets-caramel-cherry.png",
-	"sweets_mint_chocolate": "res://assets/plants/sweets/sweets-mint-chocolate.png",
-	"metal_silver_rosette": "res://assets/plants/metal/metal-silver-rosette.png",
-	"metal_cobalt_cluster": "res://assets/plants/metal/metal-cobalt-cluster.png",
-	"metal_rose_copper": "res://assets/plants/metal/metal-rose-copper.png",
-	"metal_gold_cluster": "res://assets/plants/metal/metal-gold-cluster.png",
-	"metal_gunmetal_rosette": "res://assets/plants/metal/metal-gunmetal-rosette.png",
-	"metal_iridescent_star": "res://assets/plants/metal/metal-iridescent-star.png",
-	"metal_silver_branch": "res://assets/plants/metal/metal-silver-branch.png",
-	"metal_obsidian_spike": "res://assets/plants/metal/metal-obsidian-spike.png",
-	"metal_sage_silver": "res://assets/plants/metal/metal-sage-silver.png",
-	"metal_patina_copper": "res://assets/plants/metal/metal-patina-copper.png",
+	"gummy_peach_milk": "res://assets/catalog/gummy/gummy-peach-milk.png",
+	"gummy_melon_milk": "res://assets/catalog/gummy/gummy-melon-milk.png",
+	"gummy_fruit_punch": "res://assets/catalog/gummy/gummy-fruit-punch.png",
+	"gummy_grape_milk": "res://assets/catalog/gummy/gummy-grape-milk.png",
+	"gummy_strawberry": "res://assets/catalog/gummy/gummy-strawberry.png",
+	"gummy_orange": "res://assets/catalog/gummy/gummy-orange.png",
+	"gummy_rainbow": "res://assets/catalog/gummy/gummy-rainbow.png",
+	"gummy_soda": "res://assets/catalog/gummy/gummy-soda.png",
+	"sweets_strawberry_shortcake": "res://assets/catalog/sweets/sweets-strawberry-shortcake.png",
+	"sweets_blueberry_galaxy": "res://assets/catalog/sweets/sweets-blueberry-galaxy.png",
+	"sweets_citrus_mint": "res://assets/catalog/sweets/sweets-citrus-mint.png",
+	"sweets_chocolate_gold": "res://assets/catalog/sweets/sweets-chocolate-gold.png",
+	"sweets_matcha_wafer": "res://assets/catalog/sweets/sweets-matcha-wafer.png",
+	"sweets_mango_mint": "res://assets/catalog/sweets/sweets-mango-mint.png",
+	"sweets_raspberry_jewel": "res://assets/catalog/sweets/sweets-raspberry-jewel.png",
+	"sweets_fairy_sugar": "res://assets/catalog/sweets/sweets-fairy-sugar.png",
+	"sweets_caramel_cherry": "res://assets/catalog/sweets/sweets-caramel-cherry.png",
+	"sweets_mint_chocolate": "res://assets/catalog/sweets/sweets-mint-chocolate.png",
+	"metal_silver_rosette": "res://assets/catalog/metal/metal-silver-rosette.png",
+	"metal_cobalt_cluster": "res://assets/catalog/metal/metal-cobalt-cluster.png",
+	"metal_rose_copper": "res://assets/catalog/metal/metal-rose-copper.png",
+	"metal_gold_cluster": "res://assets/catalog/metal/metal-gold-cluster.png",
+	"metal_gunmetal_rosette": "res://assets/catalog/metal/metal-gunmetal-rosette.png",
+	"metal_iridescent_star": "res://assets/catalog/metal/metal-iridescent-star.png",
+	"metal_silver_branch": "res://assets/catalog/metal/metal-silver-branch.png",
+	"metal_obsidian_spike": "res://assets/catalog/metal/metal-obsidian-spike.png",
+	"metal_sage_silver": "res://assets/catalog/metal/metal-sage-silver.png",
+	"metal_patina_copper": "res://assets/catalog/metal/metal-patina-copper.png",
 	"gold_kannte": "res://assets/plants/sprite-golden-laui.png"
 }
 
@@ -128,8 +128,8 @@ func setup(species: Dictionary, seed_value: int, screen_label: Label, _danger: L
 	plant_sprite = Sprite3D.new()
 	var variant := str(data.get("visual_variant", "laui"))
 	var configured_image_path:=str(data.get("image_path",""))
-	var texture_path:=configured_image_path if not configured_image_path.is_empty() and ResourceLoader.exists(configured_image_path) else str(SPRITES.get(variant, SPRITES.laui))
-	plant_sprite.texture = load(texture_path)
+	var texture_path:=configured_image_path if not configured_image_path.is_empty() and (CatalogImageLoader.is_external_path(configured_image_path) or ResourceLoader.exists(configured_image_path)) else str(SPRITES.get(variant, SPRITES.laui))
+	plant_sprite.texture = CatalogImageLoader.get_texture(texture_path)
 	plant_sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	plant_sprite.no_depth_test = false
 	plant_sprite.alpha_cut = SpriteBase3D.ALPHA_CUT_DISABLED
@@ -140,8 +140,15 @@ func setup(species: Dictionary, seed_value: int, screen_label: Label, _danger: L
 	plant_sprite.offset.y = -float(plant_sprite.texture.get_height()) * .18
 	plant_sprite.pixel_size = 1.42 / maxf(1.0, float(plant_sprite.texture.get_width()))
 	add_child(plant_sprite)
+	if CatalogImageLoader.is_external_path(texture_path):CatalogImageLoader.request_texture(texture_path,_apply_external_plant_texture,true)
 	_update_visual(0.0)
 	if is_special: _play_special_birth_glow()
+
+func _apply_external_plant_texture(texture:Texture2D)->void:
+	if not is_instance_valid(plant_sprite) or texture==null:return
+	plant_sprite.texture=texture
+	plant_sprite.offset.y=-float(texture.get_height())*.18
+	plant_sprite.pixel_size=1.42/maxf(1.0,float(texture.get_width()))
 
 func _play_special_birth_glow() -> void:
 	# A brief warm bloom announces the 10% roll without leaving a permanent mark.

@@ -3,6 +3,9 @@ config/name="ぷくぷく多肉"
 config/version="1.0.0"
 run/main_scene="res://main.tscn"
 
+[autoload]
+CatalogImageLoader="*res://scripts/catalog_image_loader.gd"
+
 [display]
 window/size/viewport_width=576
 window/size/viewport_height=1024
