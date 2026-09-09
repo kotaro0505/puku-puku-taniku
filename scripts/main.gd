@@ -313,6 +313,7 @@ var first_play_tutorial_message_index := 0
 var first_play_tutorial_wait_remaining := 0.0
 var first_play_tutorial_sequence_complete := false
 var first_play_harvest_guide_active := false
+var first_play_has_harvested := false
 var first_play_harvest_spotlight_material: ShaderMaterial
 var habitat_scroll_tutorial_active := false
 var buyback_unlocked := false
@@ -1406,7 +1407,7 @@ func _complete_tutorial_guide()->void:
 	elif target=="habitat_species" and not tutorial_habitat_item.is_empty():_collect_habitat_species(tutorial_habitat_item)
 
 func _begin_first_play_tutorial()->void:
-	first_play_tutorial_active=true;first_play_tutorial_dialog_visible=false;first_play_tutorial_message_index=0;first_play_tutorial_wait_remaining=FIRST_PLAY_TUTORIAL_INITIAL_DELAY;first_play_tutorial_sequence_complete=false;first_play_harvest_guide_active=false;tutorial_harvest_plant=null
+	first_play_tutorial_active=true;first_play_tutorial_dialog_visible=false;first_play_tutorial_message_index=0;first_play_tutorial_wait_remaining=FIRST_PLAY_TUTORIAL_INITIAL_DELAY;first_play_tutorial_sequence_complete=false;first_play_harvest_guide_active=false;first_play_has_harvested=false;tutorial_harvest_plant=null
 	_hide_first_play_tutorial_overlay()
 
 func _update_first_play_tutorial(delta:float)->bool:
@@ -1461,7 +1462,7 @@ func _first_play_growing_plants()->Array:
 	return growing
 
 func _maybe_activate_first_play_harvest_guide()->bool:
-	if not first_play_tutorial_active or not first_play_tutorial_sequence_complete or first_play_harvest_guide_active or bool(tutorial_steps.get("first_harvest_guide",false)) or not play_active or rain_bonus_active:return false
+	if not first_play_tutorial_active or not first_play_tutorial_sequence_complete or first_play_harvest_guide_active or first_play_has_harvested or bool(tutorial_steps.get("first_harvest_guide",false)) or not play_active or rain_bonus_active:return false
 	if play_seeds_remaining>0 or play_spawn_queue>0 or play_seed_animations_pending>0:return false
 	var growing:=_first_play_growing_plants()
 	if growing.is_empty() or growing.size()>3:return false
@@ -3833,6 +3834,7 @@ func _on_harvested(p)->void:
 	if bool(p.get_meta("catalog_preview",false)):_on_catalog_preview_harvested(p);return
 	if dev_jelly_test_active:
 		plants.erase(p);var tween:=create_tween().bind_node(p);tween.tween_property(p,"scale",Vector3.ONE*.01,.2);_cleanup_later(p,.25);return
+	if first_play_tutorial_active:first_play_has_harvested=true
 	if first_play_harvest_guide_active:
 		first_play_harvest_guide_active=false;tutorial_steps["first_harvest_guide"]=true;tutorial_harvest_plant=null;_hide_first_play_tutorial_overlay();_save()
 	else:_maybe_activate_first_play_harvest_guide()
