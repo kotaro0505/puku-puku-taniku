@@ -3478,7 +3478,9 @@ func _select_species_for_seed(seed_type:String)->Dictionary:
 		var species_id:=str(entry.get("species_id",""))
 		var is_found:=bool(discovered.get(species_id,false))
 		if bool(entry.get("catalog_only",false)) and not is_found:continue
-		if bool(entry.get("special_route_only",false)) and not is_found:continue
+		# Route-only species stay exclusive to their dedicated acquisition route,
+		# even after they have been discovered and added to the greenhouse.
+		if bool(entry.get("special_route_only",false)):continue
 		if not bool(greenhouse_available.get(species_id,false)):continue
 		if not is_found:
 			if not _seed_new_species_blocked(species_id):new_candidates.append(entry)
