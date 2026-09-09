@@ -100,6 +100,14 @@ const TUTORIAL_FINGER_SIZE := Vector2(58,64)
 const TUTORIAL_FINGER_TIP_LOCAL := Vector2(27,5)
 const TUTORIAL_FINGER_PRESS_RATIO := Vector2(.58,.30)
 const TUTORIAL_FINGER_RELEASE_OFFSET := Vector2(-3,-7)
+const FIRST_PLAY_TUTORIAL_MESSAGES := [
+	"発芽したよ！\nここからどんどん大きくなるよ！",
+	"まだまだ大きくなるよ。\nどこまで育つかな？",
+	"多肉はタップすると、\nいつでも収穫できるよ！",
+	"でも、いつか突然\nジュレて消えちゃうんだ。",
+	"どれだけ大きく\n育てられるかな？"
+]
+const FIRST_PLAY_TUTORIAL_DELAYS := [2.0,3.0,2.0,2.0,1.0]
 const SERIES_CAROUSEL_TRACK_ORIGIN := Vector2(48,0)
 const SERIES_CAROUSEL_CARD_SIZE := Vector2(480,590)
 const SERIES_CAROUSEL_SPACING := 420.0
@@ -290,6 +298,7 @@ var intro_story_step := 0
 var intro_is_daily_gift := false
 var tutorial_dialog_kind := ""
 var tutorial_guide_overlay: Control
+var tutorial_guide_shade: ColorRect
 var tutorial_guide_button: Button
 var tutorial_guide_finger: Label
 var tutorial_finger_tween: Tween
@@ -298,6 +307,14 @@ var tutorial_panda_portrait: TextureRect
 var tutorial_dialog_panel: PanelContainer
 var tutorial_habitat_item: Dictionary = {}
 var tutorial_harvest_plant: Node
+var first_play_tutorial_active := false
+var first_play_tutorial_dialog_visible := false
+var first_play_tutorial_message_index := 0
+var first_play_tutorial_wait_remaining := 0.0
+var first_play_tutorial_sequence_complete := false
+var first_play_rescue_active := false
+var first_play_rescue_plant: Node
+var first_play_rescue_spotlight_material: ShaderMaterial
 var habitat_scroll_tutorial_active := false
 var buyback_unlocked := false
 var habitat_best_link_dialog_step := 0
@@ -1309,7 +1326,17 @@ func _start_buyback_after_greenhouse_frame()->void:
 
 func _build_tutorial_guide(hud:Control)->void:
 	tutorial_guide_overlay=Control.new();tutorial_guide_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);tutorial_guide_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_overlay.visible=false;hud.add_child(tutorial_guide_overlay)
-	var shade:=ColorRect.new();shade.color=Color(0.05,0.035,0.025,.72);shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);shade.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_overlay.add_child(shade)
+	tutorial_guide_shade=ColorRect.new();tutorial_guide_shade.color=Color(0.05,0.035,0.025,.72);tutorial_guide_shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);tutorial_guide_shade.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_overlay.add_child(tutorial_guide_shade)
+	var spotlight_shader:=Shader.new();spotlight_shader.code="""shader_type canvas_item;
+uniform vec2 focus_uv = vec2(0.5, 0.5);
+uniform float focus_radius = 0.11;
+uniform float viewport_aspect = 0.5625;
+void fragment(){
+	vec2 offset=UV-focus_uv;
+	float distance_from_focus=length(vec2(offset.x*viewport_aspect,offset.y));
+	float shade_alpha=COLOR.a*smoothstep(focus_radius*0.58,focus_radius,distance_from_focus);
+	COLOR=vec4(COLOR.rgb,shade_alpha);
+}""";first_play_rescue_spotlight_material=ShaderMaterial.new();first_play_rescue_spotlight_material.shader=spotlight_shader
 	tutorial_guide_button=Button.new();tutorial_guide_button.pivot_offset=Vector2(50,35);tutorial_guide_overlay.add_child(tutorial_guide_button)
 	tutorial_guide_finger=Label.new();tutorial_guide_finger.text="☝";tutorial_guide_finger.size=TUTORIAL_FINGER_SIZE;tutorial_guide_finger.rotation_degrees=28.0;tutorial_guide_finger.pivot_offset=TUTORIAL_FINGER_SIZE*.5;tutorial_guide_finger.add_theme_font_size_override("font_size",44);tutorial_guide_finger.add_theme_color_override("font_color",Color("#fff1b0"));tutorial_guide_finger.add_theme_color_override("font_outline_color",UI_BROWN);tutorial_guide_finger.add_theme_constant_override("outline_size",6);tutorial_guide_finger.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_guide_overlay.add_child(tutorial_guide_finger)
 	tutorial_dialog_panel=PanelContainer.new();tutorial_dialog_panel.position=Vector2(40,790);tutorial_dialog_panel.size=Vector2(496,190);tutorial_dialog_panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_dialog_panel.add_theme_stylebox_override("panel",_box(Color(0.97,0.90,0.75,.97),Color("#a86f36"),24,4));tutorial_dialog_panel.visible=false;tutorial_guide_overlay.add_child(tutorial_dialog_panel)
@@ -1324,11 +1351,15 @@ func _show_tutorial_guide(target:String)->void:
 	elif target=="play_open":source=play_open_button
 	elif target=="old_seed":source=old_seed_play_button
 	else:return
-	tutorial_guide_button.icon=null;tutorial_guide_button.expand_icon=false;tutorial_dialog_panel.visible=false
+	_prepare_standard_tutorial_guide();tutorial_guide_button.icon=null;tutorial_guide_button.expand_icon=false;tutorial_dialog_panel.visible=false
 	tutorial_guide_button.position=source.global_position;tutorial_guide_button.size=source.size;tutorial_guide_button.text=source.text;tutorial_guide_button.set_meta("target",target);_skin_button(tutorial_guide_button,Color("#fff0cf"),17 if target=="encyclopedia" else 15)
 	for connection in tutorial_guide_button.pressed.get_connections():tutorial_guide_button.pressed.disconnect(connection.callable)
 	tutorial_guide_button.pressed.connect(_complete_tutorial_guide)
 	tutorial_guide_overlay.visible=true;_start_tutorial_finger_press(tutorial_guide_button,Color(1.25,1.18,.7,1))
+
+func _prepare_standard_tutorial_guide()->void:
+	tutorial_guide_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_shade.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_shade.material=null;tutorial_guide_shade.color=Color(0.05,0.035,0.025,.72)
+	tutorial_guide_button.visible=true;tutorial_guide_button.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_button.flat=false;tutorial_guide_button.focus_mode=Control.FOCUS_ALL;tutorial_guide_finger.visible=true
 
 func _tutorial_finger_position_for(target:Control,pressed:bool)->Vector2:
 	var contact_point:=target.global_position+target.size*TUTORIAL_FINGER_PRESS_RATIO
@@ -1356,27 +1387,84 @@ func _complete_tutorial_guide()->void:
 	elif target=="habitat":_toggle_mode()
 	elif target=="play_open":_open_play_modal();call_deferred("_show_tutorial_guide","old_seed")
 	elif target=="old_seed":_start_greenhouse_play("old")
-	elif target=="first_harvest" and is_instance_valid(tutorial_harvest_plant):tutorial_harvest_plant.harvest()
 	elif target=="habitat_species" and not tutorial_habitat_item.is_empty():_collect_habitat_species(tutorial_habitat_item)
 
-func _show_first_harvest_guide_when_ready()->void:
-	if bool(tutorial_steps.get("first_harvest_guide",false)):return
-	for frame in range(120):
-		await get_tree().process_frame
-		if not play_active:return
-		for plant in plants:
-			if is_instance_valid(plant) and plant.state=="growing":
-				_show_first_harvest_guide(plant)
-				return
+func _begin_first_play_tutorial()->void:
+	first_play_tutorial_active=true;first_play_tutorial_dialog_visible=false;first_play_tutorial_message_index=0;first_play_tutorial_wait_remaining=float(FIRST_PLAY_TUTORIAL_DELAYS[0]);first_play_tutorial_sequence_complete=false;first_play_rescue_active=false;first_play_rescue_plant=null;tutorial_harvest_plant=null
+	_hide_first_play_tutorial_overlay()
 
-func _show_first_harvest_guide(plant)->void:
-	tutorial_harvest_plant=plant
-	var screen:=camera.unproject_position(plant.global_position)
-	tutorial_guide_button.position=screen-Vector2(66,66);tutorial_guide_button.size=Vector2(132,132);tutorial_guide_button.text="";tutorial_guide_button.icon=plant.plant_sprite.texture;tutorial_guide_button.expand_icon=true;tutorial_guide_button.set_meta("target","first_harvest");_skin_button(tutorial_guide_button,Color(0.25,0.18,0.08,.35),16)
+func _update_first_play_tutorial(delta:float)->bool:
+	if not first_play_tutorial_active or not play_active:return false
+	if first_play_rescue_active:
+		_update_first_play_rescue_focus()
+		return true
+	if first_play_tutorial_dialog_visible:return true
+	if first_play_tutorial_sequence_complete:return false
+	first_play_tutorial_wait_remaining=maxf(0.0,first_play_tutorial_wait_remaining-delta)
+	if first_play_tutorial_wait_remaining<=0.0:
+		_show_first_play_tutorial_dialog()
+		return true
+	return false
+
+func _show_first_play_tutorial_dialog()->void:
+	if first_play_tutorial_message_index<0 or first_play_tutorial_message_index>=FIRST_PLAY_TUTORIAL_MESSAGES.size():return
+	first_play_tutorial_dialog_visible=true;tutorial_harvest_plant=null
+	if tutorial_finger_tween and tutorial_finger_tween.is_valid():tutorial_finger_tween.kill()
+	tutorial_finger_tween=null;tutorial_guide_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_shade.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_shade.material=null;tutorial_guide_shade.color=Color(0.035,0.025,0.02,.34)
+	tutorial_guide_button.visible=true;tutorial_guide_button.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_button.position=Vector2.ZERO;tutorial_guide_button.size=get_viewport().get_visible_rect().size;tutorial_guide_button.text="";tutorial_guide_button.icon=null;tutorial_guide_button.expand_icon=false;tutorial_guide_button.flat=true;tutorial_guide_button.focus_mode=Control.FOCUS_NONE;tutorial_guide_button.set_meta("target","first_play_dialog")
+	var empty_style:=StyleBoxEmpty.new()
+	for state in ["normal","hover","pressed","disabled","focus"]:tutorial_guide_button.add_theme_stylebox_override(state,empty_style)
 	for connection in tutorial_guide_button.pressed.get_connections():tutorial_guide_button.pressed.disconnect(connection.callable)
-	tutorial_guide_button.pressed.connect(_complete_tutorial_guide);tutorial_guide_message.text="育った多肉をタップして収穫しよう";tutorial_dialog_panel.visible=true;_position_tutorial_dialog(Rect2(tutorial_guide_button.position,tutorial_guide_button.size));tutorial_guide_overlay.visible=true;_start_tutorial_finger_press(tutorial_guide_button,Color(1.3,1.18,.72,1))
+	tutorial_guide_button.pressed.connect(_dismiss_first_play_tutorial_dialog);tutorial_guide_finger.visible=false;tutorial_guide_message.text=str(FIRST_PLAY_TUTORIAL_MESSAGES[first_play_tutorial_message_index]);tutorial_dialog_panel.visible=true;tutorial_dialog_panel.position=Vector2(40,790);tutorial_guide_overlay.visible=true
+
+func _dismiss_first_play_tutorial_dialog()->void:
+	if not first_play_tutorial_dialog_visible:return
+	first_play_tutorial_dialog_visible=false;first_play_tutorial_message_index+=1;_hide_first_play_tutorial_overlay()
+	if first_play_tutorial_message_index>=FIRST_PLAY_TUTORIAL_MESSAGES.size():
+		first_play_tutorial_sequence_complete=true;tutorial_steps["first_play_growth_dialogs"]=true;tutorial_steps["first_harvest_guide"]=true
+		for plant in plants:
+			if is_instance_valid(plant) and plant.state=="growing":plant.jelly_checks_enabled=true
+		_save()
+		if play_active and play_seeds_remaining==0 and play_spawn_queue==0 and play_seed_animations_pending==0 and plants.is_empty():call_deferred("_finish_greenhouse_play")
+	else:first_play_tutorial_wait_remaining=float(FIRST_PLAY_TUTORIAL_DELAYS[first_play_tutorial_message_index])
+
+func _hide_first_play_tutorial_overlay()->void:
+	if tutorial_guide_overlay==null:return
+	tutorial_guide_overlay.visible=false;tutorial_dialog_panel.visible=false;tutorial_guide_button.visible=false;tutorial_guide_finger.visible=false;tutorial_guide_shade.material=null
+
+func _should_trigger_first_play_rescue(plant)->bool:
+	if not first_play_tutorial_active or not first_play_tutorial_sequence_complete or first_play_rescue_active or play_harvest_count>0 or not play_active or rain_bonus_active:return false
+	if play_seeds_remaining>0 or play_spawn_queue>0 or play_seed_animations_pending>0:return false
+	var growing:Array=[]
+	for candidate in plants:
+		if is_instance_valid(candidate) and candidate.state=="growing":growing.append(candidate)
+	return growing.size()==1 and growing[0]==plant
+
+func _allow_plant_jelly(plant)->bool:
+	if _should_trigger_first_play_rescue(plant):
+		if not _try_claim_jelly():return false
+		_activate_first_play_rescue(plant)
+		return false
+	return _try_claim_jelly()
+
+func _activate_first_play_rescue(plant)->void:
+	first_play_rescue_active=true;first_play_rescue_plant=plant;tutorial_harvest_plant=plant
+	if tutorial_finger_tween and tutorial_finger_tween.is_valid():tutorial_finger_tween.kill()
+	tutorial_finger_tween=null;tutorial_guide_overlay.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_guide_shade.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_guide_shade.material=first_play_rescue_spotlight_material;tutorial_guide_shade.color=Color(0.025,0.035,0.045,.82)
+	tutorial_guide_button.visible=false;tutorial_guide_button.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_guide_finger.visible=true;tutorial_guide_message.text="よし、いまだ！\n多肉をタップして収穫してみて！";tutorial_dialog_panel.visible=true;tutorial_guide_overlay.visible=true;_update_first_play_rescue_focus()
+
+func _update_first_play_rescue_focus()->void:
+	if not first_play_rescue_active or not is_instance_valid(first_play_rescue_plant):return
+	var viewport_size:=get_viewport().get_visible_rect().size
+	var center:=camera.unproject_position(first_play_rescue_plant.global_position+Vector3(0,first_play_rescue_plant.visual_scale*.48,0));var top:=camera.unproject_position(first_play_rescue_plant.global_position+Vector3(0,first_play_rescue_plant.visual_scale*1.25,0));var radius:=clampf(center.distance_to(top)*1.42,64.0,180.0)
+	first_play_rescue_spotlight_material.set_shader_parameter("focus_uv",center/viewport_size);first_play_rescue_spotlight_material.set_shader_parameter("focus_radius",radius/viewport_size.y);first_play_rescue_spotlight_material.set_shader_parameter("viewport_aspect",viewport_size.x/viewport_size.y)
+	tutorial_guide_finger.position=center+Vector2(radius*.20,-radius*.72)-tutorial_guide_finger.size*.5;_position_tutorial_dialog(Rect2(center-Vector2(radius,radius),Vector2(radius*2.0,radius*2.0)))
+
+func _end_first_play_tutorial_context()->void:
+	first_play_tutorial_active=false;first_play_tutorial_dialog_visible=false;first_play_rescue_active=false;first_play_rescue_plant=null;tutorial_harvest_plant=null;_hide_first_play_tutorial_overlay()
 
 func _show_habitat_species_guide(item:Dictionary,species_name:String)->void:
+	_prepare_standard_tutorial_guide()
 	tutorial_habitat_item=item;var node:Node3D=item.node;var screen:=camera.unproject_position(node.global_position)
 	tutorial_guide_button.position=screen-Vector2(66,66);tutorial_guide_button.size=Vector2(132,132);tutorial_guide_button.text="";tutorial_guide_button.icon=node.texture;tutorial_guide_button.expand_icon=true;tutorial_guide_button.set_meta("target","habitat_species");_skin_button(tutorial_guide_button,Color(0.25,0.18,0.08,.35),16)
 	for connection in tutorial_guide_button.pressed.get_connections():tutorial_guide_button.pressed.disconnect(connection.callable)
@@ -1739,6 +1827,7 @@ func _change_audio_volume(value:float,is_bgm:bool)->void:
 	audio_settings["bgm_volume" if is_bgm else "se_volume"]=value/100.0;audio_manager.apply_settings(audio_settings);_save()
 
 func _reset_progression_state()->void:
+	_end_first_play_tutorial_context()
 	play_result_mystery_pod_found=false
 	old_catalog_pages=0;old_catalog_page_inventory.clear();old_catalog_intro_seen=false;old_catalog_intro_pending=false;habitat_old_catalog_page_pending=false;habitat_old_catalog_page_series_id="";old_catalog_page_roll_play_count=-1;research_catalog_reward_pending=false
 	JellyBalanceClass.reset_formal();jelly_trait_display_enabled=false;dev_jelly_test_active=false;last_jelly_claim_msec=-1000000000
@@ -1826,13 +1915,14 @@ func _start_greenhouse_play(seed_type:String)->void:
 	for i in range(play_concurrent_target):_spawn_greenhouse_seed()
 	_prepare_tovar_event_for_play()
 	_prepare_main_pod_for_play()
-	if total_play_count==0 and not bool(tutorial_steps.get("first_harvest_guide",false)):call_deferred("_show_first_harvest_guide_when_ready")
+	if total_play_count==0 and not bool(tutorial_steps.get("first_play_growth_dialogs",false)):_begin_first_play_tutorial()
 	audio_manager.play_se("rare_seed" if seed_type in ["premium","mystery"] or seed_type.begins_with("series:") else "seed_bag",.72)
 	_save();_update_play_ui()
 
 func _finish_greenhouse_play()->void:
+	if first_play_tutorial_active and not first_play_tutorial_sequence_complete:return
 	if not play_active or rain_bonus_active or play_seeds_remaining>0 or play_spawn_queue>0 or play_seed_animations_pending>0 or not plants.is_empty():return
-	play_active=false;play_time_remaining=0.0;play_spawn_timer=0.0;total_play_count+=1
+	play_active=false;play_time_remaining=0.0;play_spawn_timer=0.0;_end_first_play_tutorial_context();total_play_count+=1
 	play_result_mystery_pod_found=main_pod_pending;main_pod_pending=false;main_pod_visible=false
 	if main_pod_pickup_button:main_pod_pickup_button.visible=false
 	var formal_play:=_tutorial_fully_complete() and active_seed_type!="old"
@@ -1902,7 +1992,7 @@ func _spawn_specific_plant(species_id:String,is_catalog_preview:=false)->void:
 	if is_catalog_preview:
 		p.harvested.connect(_on_catalog_preview_harvested);p.jellied.connect(_on_catalog_preview_jellied)
 	else:
-		p.jelly_permission=Callable(self,"_try_claim_jelly");p.harvested.connect(_on_harvested);p.jellied.connect(_on_jellied)
+		p.jelly_permission=Callable(self,"_allow_plant_jelly").bind(p);p.harvested.connect(_on_harvested);p.jellied.connect(_on_jellied)
 	plants.append(p)
 	if audio_manager:audio_manager.play_se("sprout",.28)
 
@@ -3105,7 +3195,8 @@ func spawn_plant(force_golden := false,spawn_position:Variant=null) -> void:
 	var pos:Vector3=_find_spawn_position() if spawn_position==null else spawn_position
 	var label:=_plant_label(); labels_layer.add_child(label)
 	var p = SucculentClass.new()
-	p.original_pos=pos; p.position=pos; world_root.add_child(p); p.setup(chosen,rng.randi(),label,null);p.jelly_permission=Callable(self,"_try_claim_jelly")
+	p.original_pos=pos; p.position=pos; world_root.add_child(p); p.setup(chosen,rng.randi(),label,null);p.jelly_permission=Callable(self,"_allow_plant_jelly").bind(p)
+	if first_play_tutorial_active and not first_play_tutorial_sequence_complete:p.jelly_checks_enabled=false
 	p.harvested.connect(_on_harvested); p.jellied.connect(_on_jellied)
 	plants.append(p)
 	if audio_manager:audio_manager.play_se("sprout",.28)
@@ -3145,7 +3236,7 @@ func _spawn_rain_plant()->void:
 	var chosen:Dictionary=_choose_rain_species(pool)
 	var pos:=_find_rain_spawn_position()
 	var label:=_plant_label();labels_layer.add_child(label)
-	var p=SucculentClass.new();p.original_pos=pos;p.position=pos;world_root.add_child(p);p.setup(chosen,rng.randi(),label,null);p.jelly_permission=Callable(self,"_try_claim_jelly");p.harvested.connect(_on_harvested);p.jellied.connect(_on_jellied);plants.append(p)
+	var p=SucculentClass.new();p.original_pos=pos;p.position=pos;world_root.add_child(p);p.setup(chosen,rng.randi(),label,null);p.jelly_permission=Callable(self,"_allow_plant_jelly").bind(p);p.harvested.connect(_on_harvested);p.jellied.connect(_on_jellied);plants.append(p)
 	if audio_manager:audio_manager.play_se("sprout",.22)
 
 func _rain_species_pool()->Array:
@@ -3342,6 +3433,9 @@ func _process(delta:float)->void:
 	_update_habitat_view_follow(delta)
 	_update_habitat_scroll_tutorial()
 	_update_rain_visual(delta)
+	if _update_first_play_tutorial(delta):
+		_update_labels()
+		return
 	if rain_bonus_active:
 		if tutorial_dialog_kind=="rain_first":
 			_update_labels()
@@ -3360,6 +3454,10 @@ func _process(delta:float)->void:
 	elif current_mode=="greenhouse" and (play_active or dev_jelly_test_active or catalog_preview_mode_active):
 		for p in plants:
 			if is_instance_valid(p):p.simulate(delta)
+			if first_play_rescue_active:break
+		if first_play_rescue_active:
+			_update_first_play_rescue_focus();_update_labels()
+			return
 		if play_spawn_queue>0:
 			play_spawn_timer-=delta
 			if play_spawn_timer<=0.0:
@@ -3563,7 +3661,7 @@ func _cancel_greenhouse_area_drag(update_ui:=true)->void:
 func _input(event:InputEvent)->void:
 	if audio_manager and (event is InputEventScreenTouch or event is InputEventMouseButton or event is InputEventKey):audio_manager.notify_user_gesture()
 	if arrangement_scene_active or arrangement_transitioning:return
-	if (tutorial_guide_overlay and tutorial_guide_overlay.visible) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (mystery_pod_ui and mystery_pod_ui.visible) or (mystery_pod_dev and mystery_pod_dev.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible):return
+	if (tutorial_guide_overlay and tutorial_guide_overlay.visible and not first_play_rescue_active) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (mystery_pod_ui and mystery_pod_ui.visible) or (mystery_pod_dev and mystery_pod_dev.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible):return
 	if current_mode=="greenhouse" and not play_active and not catalog_preview_mode_active:return
 	if event is InputEventScreenTouch:
 		if event.pressed:
@@ -3619,6 +3717,11 @@ func _apply_view_rotation()->void:
 
 func _try_harvest(screen_pos:Vector2)->void:
 	# label-aware screen selection favors small visible plants when overlap occurs
+	if first_play_rescue_active:
+		if not is_instance_valid(first_play_rescue_plant) or first_play_rescue_plant.state!="growing":return
+		var rescue_center:=camera.unproject_position(first_play_rescue_plant.global_position+Vector3(0,first_play_rescue_plant.visual_scale*.48,0));var rescue_top:=camera.unproject_position(first_play_rescue_plant.global_position+Vector3(0,first_play_rescue_plant.visual_scale*1.25,0));var rescue_radius:=clampf(rescue_center.distance_to(rescue_top)*1.15,30.0,180.0)
+		if rescue_center.distance_to(screen_pos)<rescue_radius:first_play_rescue_plant.harvest()
+		return
 	var candidates:Array=[]
 	for p in plants:
 		if not is_instance_valid(p) or p.state!="growing" or camera.is_position_behind(p.global_position):continue
@@ -3703,6 +3806,8 @@ func _on_harvested(p)->void:
 	if bool(p.get_meta("catalog_preview",false)):_on_catalog_preview_harvested(p);return
 	if dev_jelly_test_active:
 		plants.erase(p);var tween:=create_tween().bind_node(p);tween.tween_property(p,"scale",Vector3.ONE*.01,.2);_cleanup_later(p,.25);return
+	if first_play_rescue_active and p==first_play_rescue_plant:
+		first_play_rescue_active=false;first_play_rescue_plant=null;tutorial_harvest_plant=null;_hide_first_play_tutorial_overlay()
 	var deferred_tovar:=tovar_event_active and str(p.data.species_id)==HIDDEN_TOVAR_ID
 	if deferred_tovar:tovar_harvested_this_play=true
 	var old:=float(bests.get(p.data.species_id,0.0));var is_record:bool=not deferred_tovar and p.diameter_cm>old
