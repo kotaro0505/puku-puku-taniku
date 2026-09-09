@@ -11,6 +11,7 @@ const MysteryPodSystemClass = preload("res://scripts/mystery_pod_system.gd")
 const MysteryPodUIClass = preload("res://scripts/mystery_pod_ui.gd")
 const MysteryPodDevClass = preload("res://scripts/mystery_pod_dev.gd")
 const ConsumableIAPServiceClass = preload("res://scripts/consumable_iap_service.gd")
+const SlotMachineScene = preload("res://scenes/slot_machine.tscn")
 const DEVELOPMENT_CATALOG_PREVIEW_ENABLED := true
 const DEVELOPMENT_MYSTERY_POD_TOOLS_ENABLED := true
 const PROGRESSION_VERSION := 11
@@ -465,6 +466,12 @@ var opening_prompt_tween: Tween
 var opening_finished := false
 
 func _ready() -> void:
+	if _slot_preview_requested():
+		set_process(false)
+		set_process_input(false)
+		set_process_unhandled_input(false)
+		add_child(SlotMachineScene.instantiate())
+		return
 	_configure_habitat_texture_ab()
 	_configure_habitat_background_ab()
 	rng.randomize()
@@ -486,6 +493,12 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_layout)
 	_layout()
 	_wire_ui_sounds(self)
+
+func _slot_preview_requested() -> bool:
+	if OS.has_feature("web"):
+		var requested = JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('screen')", true)
+		return str(requested) == "slot"
+	return "--slot-preview" in OS.get_cmdline_user_args()
 
 func _configure_habitat_texture_ab()->void:
 	if OS.has_feature("web"):
