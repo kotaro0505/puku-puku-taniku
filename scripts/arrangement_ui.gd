@@ -48,7 +48,6 @@ var home_list:VBoxContainer
 var home_new_button:Button
 var pot_select_page:Control
 var pot_select_grid:GridContainer
-var pot_select_mode:="new"
 var editor_page:Control
 var editor_name:LineEdit
 var editor_canvas:Panel
@@ -268,17 +267,14 @@ func _refresh_pot_selection()->void:
 
 func _start_new_arrangement()->void:
 	if saved_arrangements.size()>=save_capacity:return
-	pot_select_mode="new";current_arrangement={};editor_plants.clear();selected_plant_index=-1;_show_page(pot_select_page);_refresh_pot_selection()
+	current_arrangement={};editor_plants.clear();selected_plant_index=-1;_show_page(pot_select_page);_refresh_pot_selection()
 
 func _return_from_pot_selection()->void:
-	if pot_select_mode=="edit" and not current_arrangement.is_empty():_show_page(editor_page);_rebuild_editor_scene()
-	else:_show_page(home_page);_refresh_home()
+	_show_page(home_page);_refresh_home()
 
 func _select_editor_pot(pot_id:String)->void:
 	if not bool(owned_pots.get(pot_id,false)):return
-	if pot_select_mode=="new":
-		current_arrangement={"arrangement_id":_new_arrangement_id(),"name":_default_arrangement_name(),"pot_id":pot_id,"created_at":Time.get_datetime_string_from_system(false,true),"completed":false,"plants":[]}
-	else:current_arrangement["pot_id"]=pot_id
+	current_arrangement={"arrangement_id":_new_arrangement_id(),"name":_default_arrangement_name(),"pot_id":pot_id,"created_at":Time.get_datetime_string_from_system(false,true),"completed":false,"plants":[]}
 	_show_page(editor_page);_load_editor_from_current()
 
 func _build_editor_page()->void:
@@ -300,7 +296,6 @@ func _build_editor_page()->void:
 	var back_depth:=_button("奥へ",Vector2(42,876),Vector2(140,58),Color("#c8ae88"),17);back_depth.pressed.connect(_change_selected_depth.bind(-1));editor_page.add_child(back_depth);selected_controls.append(back_depth)
 	var front_depth:=_button("手前へ",Vector2(218,876),Vector2(140,58),Color("#d7aa64"),17);front_depth.pressed.connect(_change_selected_depth.bind(1));editor_page.add_child(front_depth);selected_controls.append(front_depth)
 	var delete:=_button("削除",Vector2(394,876),Vector2(140,58),Color("#b87962"),17);delete.pressed.connect(_delete_selected_plant);editor_page.add_child(delete);selected_controls.append(delete)
-	var change_pot:=_button("鉢を変更",Vector2(188,944),Vector2(200,48),Color("#8a6752"),15);change_pot.pressed.connect(_change_editor_pot);editor_page.add_child(change_pot)
 
 func _load_editor_from_current()->void:
 	if bool(current_arrangement.get("completed",false)):_open_viewer(current_arrangement);return
@@ -485,10 +480,6 @@ func _change_selected_depth(direction:int)->void:
 func _delete_selected_plant()->void:
 	if bool(current_arrangement.get("completed",false)) or selected_plant_index<0 or selected_plant_index>=editor_plants.size():return
 	editor_plants.remove_at(selected_plant_index);selected_plant_index=-1;editor_message.text="株を削除しました";_rebuild_editor_scene()
-
-func _change_editor_pot()->void:
-	if bool(current_arrangement.get("completed",false)):return
-	pot_select_mode="edit";_show_page(pot_select_page);_refresh_pot_selection()
 
 func _return_home_from_editor()->void:
 	drag_active=false;_show_page(home_page);_refresh_home()

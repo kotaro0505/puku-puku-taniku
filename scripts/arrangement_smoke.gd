@@ -17,6 +17,7 @@ func _ready()->void:
 	var available:Array=ui._available_species_entries("all");assert(available.size()==1 and str(available[0].species_id)=="colorata")
 	ui.open_home();ui._start_new_arrangement();assert(ui.pot_select_page.visible and ui.pot_select_grid.get_child_count()==1)
 	ui._select_editor_pot("starter_terracotta");assert(ui.editor_page.visible and str(ui.current_arrangement.pot_id)=="starter_terracotta")
+	assert(not _has_button_text(ui.editor_page,"鉢を変更") and not ui.has_method("_change_editor_pot"))
 	ui._add_species_to_editor("laui");assert(ui.editor_plants.is_empty())
 	ui._add_species_to_editor("colorata");assert(ui.editor_plants.size()==1 and ui.selected_plant_index==0)
 	assert(ui._placement_rect({},ui.editor_canvas.size)==Rect2(Vector2.ZERO,ui.editor_canvas.size) and ui.editor_pot_layer.get_child_count()==1 and ui.editor_plant_layer.z_index==ui.PLANT_LAYER_Z)
