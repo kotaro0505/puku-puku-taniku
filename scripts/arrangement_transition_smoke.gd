@@ -75,7 +75,8 @@ func _ready()->void:
 	assert(game.arrangement_ui.editor_pot_layer.get_child_count()==1)
 	var pot_holder:Control=game.arrangement_ui.editor_pot_layer.get_child(0)
 	var holder_anchor:Vector2=game.arrangement_ui.editor_canvas.position+pot_holder.position+Vector2(pot_holder.size.x*.5,pot_holder.size.y*.94)
-	assert(holder_anchor.distance_to(expected_anchor)<EPSILON)
+	var lowered_anchor:=expected_anchor+Vector2(0,game.arrangement_ui.POT_VERTICAL_OFFSET)
+	assert(game.arrangement_ui.POT_VERTICAL_OFFSET>0.0 and holder_anchor.distance_to(lowered_anchor)<EPSILON)
 	game.arrangement_ui._return_home_from_editor()
 
 	game._begin_greenhouse_area_drag(Vector2(520,450),true)

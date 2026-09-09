@@ -963,6 +963,7 @@ func _build_arrangement_ui(hud:Control)->void:
 	arrangement_ui.catalog_purchase_requested.connect(_on_catalog_purchase_requested)
 	arrangement_ui.seed_purchase_requested.connect(_buy_seed_bag)
 	arrangement_ui.world_scroll_input.connect(_on_arrangement_world_scroll_input)
+	arrangement_ui.completion_confetti_requested.connect(_on_arrangement_completion_confetti_requested)
 	_sync_arrangement_ui()
 
 func _sync_arrangement_ui()->void:
@@ -1091,7 +1092,7 @@ func _normalize_arrangement(source:Dictionary)->Dictionary:
 	if arrangement_id.is_empty():arrangement_id="arrangement_%d_%d"%[Time.get_unix_time_from_system(),Time.get_ticks_msec()%100000]
 	var arrangement_name:=str(source.get("name","")).strip_edges()
 	if arrangement_name.is_empty():arrangement_name="寄せ植え %d"%(saved_arrangements.size()+1)
-	return {"arrangement_id":arrangement_id,"name":arrangement_name,"pot_id":pot_id,"created_at":str(source.get("created_at",Time.get_datetime_string_from_system(false,true))),"plants":plants_data}
+	return {"arrangement_id":arrangement_id,"name":arrangement_name,"pot_id":pot_id,"created_at":str(source.get("created_at",Time.get_datetime_string_from_system(false,true))),"completed":true,"plants":plants_data}
 
 func _on_shop_panda_tapped()->void:
 	if shop_chatter_bubble.visible:_dismiss_or_advance_shop_chatter();return
@@ -1868,9 +1869,17 @@ func _clear_result_confetti()->void:
 
 func _play_result_confetti()->void:
 	_clear_result_confetti()
+	_spawn_confetti(result_confetti_layer)
+
+func _on_arrangement_completion_confetti_requested(layer:Control)->void:
+	_spawn_confetti(layer)
+
+func _spawn_confetti(layer:Control)->void:
+	if layer==null:return
+	for existing_piece in layer.get_children():existing_piece.queue_free()
 	var colors:=[Color("#c98758"),Color("#d8b66a"),Color("#91a982"),Color("#c98b83"),Color("#e5d3a1")]
 	for i in range(40):
-		var piece:=ColorRect.new();piece.color=colors[rng.randi_range(0,colors.size()-1)];piece.color.a=.88;piece.size=Vector2(rng.randf_range(4.0,7.0),rng.randf_range(8.0,13.0));piece.position=Vector2(rng.randf_range(64.0,512.0),rng.randf_range(-65.0,115.0));piece.rotation=rng.randf_range(-1.0,1.0);piece.mouse_filter=Control.MOUSE_FILTER_IGNORE;result_confetti_layer.add_child(piece)
+		var piece:=ColorRect.new();piece.color=colors[rng.randi_range(0,colors.size()-1)];piece.color.a=.88;piece.size=Vector2(rng.randf_range(4.0,7.0),rng.randf_range(8.0,13.0));piece.position=Vector2(rng.randf_range(64.0,512.0),rng.randf_range(-65.0,115.0));piece.rotation=rng.randf_range(-1.0,1.0);piece.mouse_filter=Control.MOUSE_FILTER_IGNORE;layer.add_child(piece)
 		var destination:=piece.position+Vector2(rng.randf_range(-34.0,34.0),rng.randf_range(500.0,710.0));var duration:=rng.randf_range(2.8,4.0)
 		var tween:=create_tween().bind_node(piece).set_parallel();tween.tween_property(piece,"position",destination,duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN);tween.tween_property(piece,"rotation",piece.rotation+rng.randf_range(2.0,5.0),duration);tween.tween_property(piece,"modulate:a",0.0,.7).set_delay(duration-.7);tween.chain().tween_callback(piece.queue_free)
 
