@@ -15,6 +15,8 @@ const PLANT_SCALE_MIN := 0.45
 const PLANT_SCALE_MAX := 1.80
 const PLANT_SCALE_STEP := 0.10
 const PLANT_ROTATION_STEP := 15.0
+const PLANT_LONG_PRESS_SECONDS := 0.38
+const PLANT_GESTURE_MOVE_THRESHOLD := 12.0
 const UI_CREAM := Color("#fff1d2")
 const UI_BROWN := Color("#4a2618")
 
@@ -79,12 +81,33 @@ var editor_plant_nodes:Array=[]
 var selected_plant_index:=-1
 var drag_active:=false
 var drag_pointer_offset:=Vector2.ZERO
+var selection_move_ready:=false
+var hold_candidate_index:=-1
+var hold_pointer_id:=-999
+var hold_pointer_down:=false
+var hold_started_msec:=0
+var hold_start_position:=Vector2.ZERO
+var hold_current_position:=Vector2.ZERO
+var touch_positions:Dictionary={}
+var pinch_active:=false
+var pinch_touch_ids:Array[int]=[]
+var pinch_start_distance:=1.0
+var pinch_start_scale:=1.0
+var background_gesture_pointer:=-999
 
 func _ready()->void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter=Control.MOUSE_FILTER_STOP
 	visible=false
 	_build_ui()
+
+func _process(_delta:float)->void:
+	if not visible or editor_page==null or not editor_page.visible:
+		if hold_pointer_down or drag_active or pinch_active:_cancel_editor_gesture()
+		return
+	if hold_pointer_down and hold_candidate_index>=0 and not drag_active and not pinch_active:
+		var held_seconds:=float(Time.get_ticks_msec()-hold_started_msec)/1000.0
+		if held_seconds>=PLANT_LONG_PRESS_SECONDS:_activate_held_plant()
 
 func configure(species_data:Array,series_data:Array,pots_data:Array,discovery:Dictionary,purchased_pots:Dictionary,arrangements:Array,capacity:int,coins:int,resolver:Callable,requester:Callable=Callable())->void:
 	catalog_species=species_data
@@ -102,6 +125,7 @@ func sync_state(purchased_pots:Dictionary,arrangements:Array,capacity:int,coins:
 	owned_pots=purchased_pots;saved_arrangements=arrangements;save_capacity=maxi(1,capacity);wallet_coins=maxi(0,coins)
 	if visible and shop_page.visible:_refresh_pot_shop()
 	if visible and home_page.visible:_refresh_home()
+	if visible and pot_select_page.visible:_refresh_pot_selection()
 
 func sync_catalog_state(purchased_catalogs:Dictionary,puku_points:int)->void:
 	owned_catalogs=purchased_catalogs;wallet_puku_points=maxi(0,puku_points)
@@ -124,7 +148,7 @@ func open_seed_shop()->void:
 	set_world_backdrop_mode(false,world_pot_anchor_screen);return_context="shop";visible=true;_show_page(seed_shop_page);_refresh_seed_shop()
 
 func close()->void:
-	drag_active=false;visible=false;close_requested.emit(return_context)
+	_cancel_editor_gesture();visible=false;close_requested.emit(return_context)
 
 func show_pot_shop_message(message:String)->void:
 	shop_message.text=message;_refresh_pot_shop_cards()
@@ -141,7 +165,7 @@ func set_world_backdrop_mode(enabled:bool,pot_anchor_screen:Vector2)->void:
 	if backdrop_shade==null:return
 	backdrop_shade.color=Color(0.16,0.09,0.05,.22) if enabled else Color("#43281f")
 	if editor_canvas:
-		editor_canvas.add_theme_stylebox_override("panel",_box(Color(0.12,0.07,0.04,.12),Color(0.96,0.79,0.52,.62),24,3) if enabled else _box(Color("#f8e9c9"),Color("#c58b50"),24,4))
+		editor_canvas.add_theme_stylebox_override("panel",StyleBoxEmpty.new())
 	if viewer_canvas:
 		viewer_canvas.add_theme_stylebox_override("panel",_box(Color(0.12,0.07,0.04,.08),Color(0.96,0.79,0.52,.50),24,3) if enabled else _box(Color("#f8e9c9"),Color("#c58b50"),24,4))
 	if changed and visible and editor_page and editor_page.visible and not current_arrangement.is_empty():_rebuild_editor_scene()
@@ -162,6 +186,7 @@ func _page()->Control:
 	var page:=Control.new();page.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);page.mouse_filter=Control.MOUSE_FILTER_STOP;page.visible=false;add_child(page);return page
 
 func _show_page(page:Control)->void:
+	if editor_page and editor_page.visible and page!=editor_page:_cancel_editor_gesture()
 	for candidate in [home_page,pot_select_page,editor_page,picker_page,viewer_page,shop_page,catalog_shop_page,seed_shop_page]:
 		if candidate:candidate.visible=candidate==page
 
@@ -209,10 +234,11 @@ func _refresh_pot_selection()->void:
 	for pot_value in pot_catalog:
 		if not pot_value is Dictionary:continue
 		var pot:Dictionary=pot_value;var pot_id:=str(pot.get("pot_id",""));var owned:=bool(owned_pots.get(pot_id,false))
-		var card:=Button.new();card.custom_minimum_size=Vector2(248,230);card.disabled=not owned;_skin_button(card,Color("#f4e1bc") if owned else Color("#705142"),15);pot_select_grid.add_child(card)
+		if not owned:continue
+		var card:=Button.new();card.custom_minimum_size=Vector2(248,230);_skin_button(card,Color("#f4e1bc"),15);pot_select_grid.add_child(card)
 		var preview:=Control.new();preview.position=Vector2(14,10);preview.size=Vector2(220,150);preview.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(preview);_render_pot(preview,pot,true)
-		var label:=Label.new();label.text=str(pot.get("display_name","鉢"))+("\n選ぶ" if owned else "\n🔒 たねやで購入");label.position=Vector2(10,164);label.size=Vector2(228,56);label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.add_theme_font_size_override("font_size",16);label.add_theme_color_override("font_color",UI_BROWN if owned else UI_CREAM);label.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(label)
-		if owned:card.pressed.connect(_select_editor_pot.bind(pot_id))
+		var label:=Label.new();label.text=str(pot.get("display_name","鉢"))+"\n選ぶ";label.position=Vector2(10,164);label.size=Vector2(228,56);label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.add_theme_font_size_override("font_size",16);label.add_theme_color_override("font_color",UI_BROWN);label.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(label)
+		card.pressed.connect(_select_editor_pot.bind(pot_id))
 
 func _start_new_arrangement()->void:
 	if saved_arrangements.size()>=save_capacity:return
@@ -233,7 +259,7 @@ func _build_editor_page()->void:
 	var back:=_button("もどる",Vector2(18,20),Vector2(98,50),Color("#f4dfb8"),15);back.pressed.connect(_return_home_from_editor);editor_page.add_child(back)
 	editor_name=LineEdit.new();editor_name.placeholder_text="寄せ植えの名前";editor_name.position=Vector2(124,20);editor_name.size=Vector2(286,50);editor_name.add_theme_font_size_override("font_size",18);editor_name.add_theme_color_override("font_color",UI_BROWN);editor_name.add_theme_stylebox_override("normal",_box(Color("#fff3d8"),Color("#b47d49"),16,2));editor_page.add_child(editor_name)
 	var save:=_button("完成 / 保存",Vector2(418,20),Vector2(140,50),Color("#d7aa64"),15);save.pressed.connect(_save_current_arrangement);editor_page.add_child(save)
-	editor_canvas=Panel.new();editor_canvas.position=Vector2(20,88);editor_canvas.size=Vector2(536,552);editor_canvas.clip_contents=false;editor_canvas.add_theme_stylebox_override("panel",_box(Color("#f8e9c9"),Color("#c58b50"),24,4));editor_page.add_child(editor_canvas)
+	editor_canvas=Panel.new();editor_canvas.position=Vector2(20,88);editor_canvas.size=Vector2(536,552);editor_canvas.clip_contents=false;editor_canvas.mouse_filter=Control.MOUSE_FILTER_STOP;editor_canvas.add_theme_stylebox_override("panel",StyleBoxEmpty.new());editor_canvas.gui_input.connect(_on_editor_canvas_gui_input);editor_page.add_child(editor_canvas)
 	editor_pot_layer=Control.new();editor_pot_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);editor_pot_layer.mouse_filter=Control.MOUSE_FILTER_IGNORE;editor_canvas.add_child(editor_pot_layer)
 	editor_plant_layer=Control.new();editor_plant_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);editor_plant_layer.mouse_filter=Control.MOUSE_FILTER_IGNORE;editor_canvas.add_child(editor_plant_layer)
 	editor_message=Label.new();editor_message.position=Vector2(28,648);editor_message.size=Vector2(520,31);editor_message.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;editor_message.add_theme_font_size_override("font_size",15);editor_message.add_theme_color_override("font_color",Color("#f5d48c"));editor_page.add_child(editor_message)
@@ -253,7 +279,7 @@ func _build_editor_page()->void:
 func _load_editor_from_current()->void:
 	editor_name.text=str(current_arrangement.get("name",_default_arrangement_name()))
 	editor_plants=_plant_array(current_arrangement).duplicate(true)
-	selected_plant_index=-1;editor_message.text="株をタップして選び、ドラッグで動かせます";_rebuild_editor_scene()
+	_cancel_editor_gesture();selected_plant_index=-1;selection_move_ready=false;editor_message.text="長押しでつかむ・ドラッグで移動・2本指で大きさ調整";_rebuild_editor_scene()
 
 func _rebuild_editor_scene()->void:
 	_clear_children(editor_pot_layer);_clear_children(editor_plant_layer);editor_plant_nodes.clear()
@@ -263,38 +289,111 @@ func _rebuild_editor_scene()->void:
 
 func _render_editor_pot(pot:Dictionary)->void:
 	if pot.is_empty():return
-	var placement:=Panel.new();var placement_rect:=_placement_rect(pot,editor_canvas.size);placement.position=placement_rect.position;placement.size=placement_rect.size;placement.mouse_filter=Control.MOUSE_FILTER_IGNORE;placement.add_theme_stylebox_override("panel",_box(Color(1,.92,.68,.08),Color(0.58,.36,.20,.34),20,2));editor_pot_layer.add_child(placement)
 	var holder:=Control.new();holder.size=Vector2(432,244);holder.position=_pot_holder_position(editor_canvas,holder.size);holder.mouse_filter=Control.MOUSE_FILTER_IGNORE;editor_pot_layer.add_child(holder);_render_pot(holder,pot,false)
 
 func _create_editor_plant(index:int)->void:
 	var plant:Dictionary=editor_plants[index];var entry:=_species_entry(str(plant.get("species_id","")));var texture:=_resolve_texture(entry)
 	if texture==null:editor_plant_nodes.append(null);return
-	var root:=Control.new();root.size=PLANT_CONTROL_SIZE;root.pivot_offset=PLANT_CONTROL_SIZE*.5;root.position=Vector2(float(plant.get("x",editor_canvas.size.x*.5)),float(plant.get("y",editor_canvas.size.y*.42)))-PLANT_CONTROL_SIZE*.5;root.scale=Vector2.ONE*clampf(float(plant.get("scale",1.0)),PLANT_SCALE_MIN,PLANT_SCALE_MAX);root.rotation_degrees=fposmod(float(plant.get("rotation",0.0)),360.0);root.z_index=int(plant.get("z_index",index));root.mouse_filter=Control.MOUSE_FILTER_STOP;root.mouse_default_cursor_shape=Control.CURSOR_MOVE;root.gui_input.connect(_on_plant_gui_input.bind(index,root));editor_plant_layer.add_child(root)
+	var root:=Control.new();root.size=PLANT_CONTROL_SIZE;root.pivot_offset=PLANT_CONTROL_SIZE*.5;root.position=Vector2(float(plant.get("x",editor_canvas.size.x*.5)),float(plant.get("y",editor_canvas.size.y*.42)))-PLANT_CONTROL_SIZE*.5;root.scale=Vector2.ONE*clampf(float(plant.get("scale",1.0)),PLANT_SCALE_MIN,PLANT_SCALE_MAX);root.rotation_degrees=fposmod(float(plant.get("rotation",0.0)),360.0);root.z_index=int(plant.get("z_index",index));root.mouse_filter=Control.MOUSE_FILTER_IGNORE;editor_plant_layer.add_child(root)
 	var image:=TextureRect.new();image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.texture=texture;image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.mouse_filter=Control.MOUSE_FILTER_IGNORE;root.add_child(image);_request_texture(entry,image,true)
-	var border:=Panel.new();border.name="SelectionBorder";border.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);border.mouse_filter=Control.MOUSE_FILTER_IGNORE;border.add_theme_stylebox_override("panel",_box(Color(1,1,1,.02),Color("#f1b942"),18,3));root.add_child(border)
+	var marker:=Label.new();marker.name="SelectionMark";marker.text="✦";marker.position=Vector2(58,-24);marker.size=Vector2(34,34);marker.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;marker.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;marker.add_theme_font_size_override("font_size",23);marker.add_theme_color_override("font_color",Color("#fff0a3"));marker.add_theme_color_override("font_outline_color",Color("#6b3f22"));marker.add_theme_constant_override("outline_size",5);marker.mouse_filter=Control.MOUSE_FILTER_IGNORE;root.add_child(marker)
 	editor_plant_nodes.append(root)
 
-func _on_plant_gui_input(event:InputEvent,index:int,node:Control)->void:
+func _on_editor_canvas_gui_input(event:InputEvent)->void:
 	if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT:
-		if event.pressed:_begin_plant_drag(index,_event_canvas_position(node,event.position))
-		else:drag_active=false
+		if event.pressed:_begin_canvas_pointer(-1,event.position,event)
+		else:_end_canvas_pointer(-1,event.position,event)
 		accept_event()
-	elif event is InputEventMouseMotion and drag_active and selected_plant_index==index:
-		_drag_selected_to(_event_canvas_position(node,event.position));accept_event()
+	elif event is InputEventMouseMotion:
+		_update_canvas_pointer(-1,event.position,event);accept_event()
 	elif event is InputEventScreenTouch:
-		if event.pressed:_begin_plant_drag(index,_event_canvas_position(node,event.position))
-		else:drag_active=false
+		if event.pressed:
+			touch_positions[event.index]=event.position;_begin_canvas_pointer(event.index,event.position,event)
+		else:
+			_end_canvas_pointer(event.index,event.position,event);touch_positions.erase(event.index)
 		accept_event()
-	elif event is InputEventScreenDrag and drag_active and selected_plant_index==index:
-		_drag_selected_to(_event_canvas_position(node,event.position));accept_event()
+	elif event is InputEventScreenDrag:
+		touch_positions[event.index]=event.position;_update_canvas_pointer(event.index,event.position,event);accept_event()
 
-func _event_canvas_position(node:Control,local_position:Vector2)->Vector2:
-	var global_position:=node.get_global_transform_with_canvas()*local_position
-	return editor_canvas.get_global_transform_with_canvas().affine_inverse()*global_position
+func _begin_canvas_pointer(pointer_id:int,pointer_position:Vector2,event:InputEvent)->void:
+	if pointer_id>=0 and touch_positions.size()>=2 and selected_plant_index>=0:
+		_begin_pinch()
+		return
+	var hit_index:=_plant_index_at(pointer_position)
+	if hit_index>=0:
+		if hit_index==selected_plant_index and selection_move_ready:_begin_plant_drag(hit_index,pointer_position,pointer_id)
+		else:_begin_plant_hold(hit_index,pointer_position,pointer_id)
+		return
+	if selected_plant_index>=0 and selection_move_ready:
+		_move_selected_center(pointer_position);_finish_selected_gesture("ここに固定しました")
+		return
+	selected_plant_index=-1;selection_move_ready=false;_update_editor_selection();background_gesture_pointer=pointer_id;world_scroll_input.emit(event)
 
-func _begin_plant_drag(index:int,pointer_position:Vector2)->void:
-	_select_plant(index);drag_active=true
+func _update_canvas_pointer(pointer_id:int,pointer_position:Vector2,event:InputEvent)->void:
+	if pinch_active:
+		_update_pinch_scale()
+		return
+	if drag_active and hold_pointer_id==pointer_id:
+		_drag_selected_to(pointer_position)
+		return
+	if hold_pointer_down and hold_pointer_id==pointer_id:
+		hold_current_position=pointer_position
+		if hold_start_position.distance_to(pointer_position)>PLANT_GESTURE_MOVE_THRESHOLD:_cancel_hold_candidate()
+		return
+	if background_gesture_pointer==pointer_id:world_scroll_input.emit(event)
+
+func _end_canvas_pointer(pointer_id:int,_pointer_position:Vector2,event:InputEvent)->void:
+	if pinch_active and pointer_id in pinch_touch_ids:
+		pinch_active=false;pinch_touch_ids.clear();_finish_selected_gesture("大きさを固定しました")
+	elif drag_active and hold_pointer_id==pointer_id:_finish_selected_gesture("ここに固定しました")
+	elif hold_pointer_down and hold_pointer_id==pointer_id:_cancel_hold_candidate()
+	if background_gesture_pointer==pointer_id:
+		world_scroll_input.emit(event);background_gesture_pointer=-999
+
+func _begin_plant_hold(index:int,pointer_position:Vector2,pointer_id:int)->void:
+	_cancel_hold_candidate();hold_candidate_index=index;hold_pointer_id=pointer_id;hold_pointer_down=true;hold_started_msec=Time.get_ticks_msec();hold_start_position=pointer_position;hold_current_position=pointer_position
+
+func _activate_held_plant()->void:
+	if hold_candidate_index<0 or hold_candidate_index>=editor_plants.size():_cancel_hold_candidate();return
+	var index:=hold_candidate_index;var pointer_id:=hold_pointer_id;var pointer_position:=hold_current_position
+	_begin_plant_drag(index,pointer_position,pointer_id);editor_message.text="つかみました。そのまま動かして、指を離すと固定します"
+
+func _begin_plant_drag(index:int,pointer_position:Vector2,pointer_id:=-1)->void:
+	_cancel_hold_candidate();_select_plant(index,true);drag_active=true;hold_pointer_id=pointer_id
 	var plant:Dictionary=editor_plants[index];drag_pointer_offset=Vector2(float(plant.get("x",0.0)),float(plant.get("y",0.0)))-pointer_position
+
+func _begin_pinch()->void:
+	if selected_plant_index<0 or selected_plant_index>=editor_plants.size() or touch_positions.size()<2:return
+	_cancel_hold_candidate();drag_active=false;pinch_active=true;pinch_touch_ids.clear()
+	for pointer_value in touch_positions.keys():
+		pinch_touch_ids.append(int(pointer_value))
+		if pinch_touch_ids.size()>=2:break
+	var first:Vector2=touch_positions.get(pinch_touch_ids[0],Vector2.ZERO);var second:Vector2=touch_positions.get(pinch_touch_ids[1],Vector2.ZERO)
+	pinch_start_distance=maxf(first.distance_to(second),1.0);pinch_start_scale=float(editor_plants[selected_plant_index].get("scale",1.0));editor_message.text="2本指の動きに合わせて大きさを調整できます"
+
+func _update_pinch_scale()->void:
+	if not pinch_active or pinch_touch_ids.size()<2 or selected_plant_index<0:return
+	if not touch_positions.has(pinch_touch_ids[0]) or not touch_positions.has(pinch_touch_ids[1]):return
+	var first:Vector2=touch_positions[pinch_touch_ids[0]];var second:Vector2=touch_positions[pinch_touch_ids[1]];var distance:=maxf(first.distance_to(second),1.0)
+	var plant:Dictionary=editor_plants[selected_plant_index];plant["scale"]=clampf(pinch_start_scale*distance/pinch_start_distance,PLANT_SCALE_MIN,PLANT_SCALE_MAX);editor_plants[selected_plant_index]=plant;_apply_plant_transform(selected_plant_index)
+
+func _finish_selected_gesture(message:String)->void:
+	drag_active=false;pinch_active=false;pinch_touch_ids.clear();selection_move_ready=false;hold_pointer_id=-999;_cancel_hold_candidate();editor_message.text=message;_update_editor_selection()
+
+func _cancel_hold_candidate()->void:
+	hold_candidate_index=-1;hold_pointer_down=false;hold_started_msec=0;hold_start_position=Vector2.ZERO;hold_current_position=Vector2.ZERO
+
+func _cancel_editor_gesture()->void:
+	drag_active=false;pinch_active=false;pinch_touch_ids.clear();touch_positions.clear();background_gesture_pointer=-999;hold_pointer_id=-999;_cancel_hold_candidate()
+
+func _plant_index_at(canvas_position:Vector2)->int:
+	var canvas_global:=editor_canvas.get_global_transform_with_canvas()*canvas_position;var selected_index:=-1;var selected_z:=-1000000
+	for index in range(editor_plant_nodes.size()):
+		var node=editor_plant_nodes[index]
+		if not is_instance_valid(node):continue
+		var local_position:Vector2=node.get_global_transform_with_canvas().affine_inverse()*canvas_global
+		if Rect2(Vector2.ZERO,node.size).has_point(local_position) and node.z_index>=selected_z:selected_index=index;selected_z=node.z_index
+	return selected_index
 
 func _drag_selected_to(pointer_position:Vector2)->void:
 	if selected_plant_index<0 or selected_plant_index>=editor_plants.size():return
@@ -306,17 +405,19 @@ func _move_selected_center(center:Vector2)->void:
 	center.x=clampf(center.x,allowed.position.x,allowed.end.x);center.y=clampf(center.y,allowed.position.y,allowed.end.y)
 	var plant:Dictionary=editor_plants[selected_plant_index];plant["x"]=center.x;plant["y"]=center.y;editor_plants[selected_plant_index]=plant;_apply_plant_transform(selected_plant_index)
 
-func _select_plant(index:int)->void:
+func _select_plant(index:int,move_ready:=false)->void:
 	if index<0 or index>=editor_plants.size():return
-	selected_plant_index=index;_update_editor_selection()
+	selected_plant_index=index;selection_move_ready=move_ready;_update_editor_selection()
 
 func _update_editor_selection()->void:
 	for index in range(editor_plant_nodes.size()):
 		var node=editor_plant_nodes[index]
-		if is_instance_valid(node):node.get_node("SelectionBorder").visible=index==selected_plant_index
+		if is_instance_valid(node):
+			node.get_node("SelectionMark").visible=index==selected_plant_index
+			node.modulate=Color(1.0,1.0,.93,1.0) if index==selected_plant_index else Color.WHITE
 	var has_selection:=selected_plant_index>=0 and selected_plant_index<editor_plants.size()
 	for control in selected_controls:control.disabled=not has_selection
-	if not has_selection:editor_selection_label.text="株を選ぶと、大きさ・回転・前後を調整できます";return
+	if not has_selection:editor_selection_label.text="多肉を長押しすると、つかんで動かせます";return
 	var plant:Dictionary=editor_plants[selected_plant_index];var entry:=_species_entry(str(plant.get("species_id","")))
 	editor_selection_label.text="%s　大きさ ×%.2f　回転 %d°"%[str(entry.get("name_ja","多肉")),float(plant.get("scale",1.0)),roundi(float(plant.get("rotation",0.0)))]
 
@@ -345,7 +446,7 @@ func _change_selected_depth(direction:int)->void:
 
 func _delete_selected_plant()->void:
 	if selected_plant_index<0 or selected_plant_index>=editor_plants.size():return
-	editor_plants.remove_at(selected_plant_index);selected_plant_index=-1;editor_message.text="株を削除しました";_rebuild_editor_scene()
+	editor_plants.remove_at(selected_plant_index);selected_plant_index=-1;selection_move_ready=false;editor_message.text="株を削除しました";_rebuild_editor_scene()
 
 func _change_editor_pot()->void:
 	pot_select_mode="edit";_show_page(pot_select_page);_refresh_pot_selection()
@@ -415,7 +516,7 @@ func _add_species_to_editor(species_id:String)->void:
 	var center:=Vector2(allowed.get_center().x+column*34.0,allowed.end.y-48.0-row*27.0)
 	center.x=clampf(center.x,allowed.position.x,allowed.end.x);center.y=clampf(center.y,allowed.position.y,allowed.end.y)
 	editor_plants.append({"species_id":species_id,"x":center.x,"y":center.y,"scale":1.0,"rotation":0.0,"z_index":index})
-	_show_page(editor_page);_rebuild_editor_scene();_select_plant(editor_plants.size()-1);editor_message.text="%sを追加しました"%str(entry.get("name_ja","多肉"))
+	_show_page(editor_page);_rebuild_editor_scene();_select_plant(editor_plants.size()-1,true);editor_message.text="%sを追加しました。ドラッグ、または置きたい場所をタップ"%str(entry.get("name_ja","多肉"))
 
 func _return_to_editor()->void:
 	_show_page(editor_page);_rebuild_editor_scene()
@@ -560,14 +661,12 @@ func _render_pot(container:Control,pot:Dictionary,compact:bool)->void:
 	_clear_children(container)
 	var path:=str(pot.get("image_path",""))
 	if not path.is_empty() and ResourceLoader.exists(path):
-		var image:=TextureRect.new();image.texture=load(path) as Texture2D;image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.mouse_filter=Control.MOUSE_FILTER_IGNORE;container.add_child(image)
+		var image:=TextureRect.new();image.texture=load(path) as Texture2D;image.anchor_left=.035;image.anchor_top=.035;image.anchor_right=.965;image.anchor_bottom=.965;image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.mouse_filter=Control.MOUSE_FILTER_IGNORE;container.add_child(image)
 	else:
 		var placeholder:=PotPlaceholderClass.new();placeholder.display_name=str(pot.get("display_name","鉢")) if not compact else "鉢画像 準備中";placeholder.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);placeholder.mouse_filter=Control.MOUSE_FILTER_IGNORE;container.add_child(placeholder)
 
-func _placement_rect(pot:Dictionary,canvas_size:Vector2)->Rect2:
-	var area=pot.get("placement_area",{})
-	if not area is Dictionary:return Rect2(canvas_size*Vector2(.08,.12),canvas_size*Vector2(.84,.60))
-	return Rect2(Vector2(float(area.get("x",.08))*canvas_size.x,float(area.get("y",.12))*canvas_size.y),Vector2(float(area.get("width",.84))*canvas_size.x,float(area.get("height",.60))*canvas_size.y))
+func _placement_rect(_pot:Dictionary,canvas_size:Vector2)->Rect2:
+	return Rect2(Vector2.ZERO,canvas_size)
 
 func _pot_entry(pot_id:String)->Dictionary:
 	for value in pot_catalog:

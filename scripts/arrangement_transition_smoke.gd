@@ -71,7 +71,9 @@ func _ready()->void:
 	var table_center:Vector2=game.greenhouse_backdrop.position+game.ARRANGEMENT_TABLE_SOURCE_CENTER*backdrop_scale
 	assert(table_center.distance_to(viewport_size*game.ARRANGEMENT_TABLE_SCREEN_TARGET_RATIO)<EPSILON)
 	game.arrangement_ui._start_new_arrangement();game.arrangement_ui._select_editor_pot("starter_terracotta")
-	var pot_holder:Control=game.arrangement_ui.editor_pot_layer.get_child(1)
+	# The placement guide was intentionally removed; the pot holder is now the only layer child.
+	assert(game.arrangement_ui.editor_pot_layer.get_child_count()==1)
+	var pot_holder:Control=game.arrangement_ui.editor_pot_layer.get_child(0)
 	var holder_anchor:Vector2=game.arrangement_ui.editor_canvas.position+pot_holder.position+Vector2(pot_holder.size.x*.5,pot_holder.size.y*.94)
 	assert(holder_anchor.distance_to(expected_anchor)<EPSILON)
 	game.arrangement_ui._return_home_from_editor()
@@ -95,6 +97,7 @@ func _ready()->void:
 	else:
 		var screenshot_dir_absolute:=ProjectSettings.globalize_path(SCREENSHOT_DIR)
 		DirAccess.make_dir_recursive_absolute(screenshot_dir_absolute)
+		game.owned_pots["classic_terracotta"]=true;game._sync_arrangement_ui()
 		game.arrangement_ui.visible=false
 		for shot in [{"ratio":0.0,"name":"00-main.png"},{"ratio":.25,"name":"25-percent.png"},{"ratio":.50,"name":"50-percent.png"},{"ratio":.75,"name":"75-percent.png"},{"ratio":1.0,"name":"100-arrangement.png"}]:
 			game.arrangement_transition_x=expected_arrangement_transition*float(shot.ratio);game._update_greenhouse_pan();game._resolve_crowding(0.0);game._update_labels()
@@ -102,7 +105,7 @@ func _ready()->void:
 			var image:=get_viewport().get_texture().get_image()
 			assert(image!=null and image.get_size()==Vector2i(576,1024))
 			assert(image.save_png(screenshot_dir_absolute.path_join(str(shot.name)))==OK)
-		game.arrangement_scene_active=true;game.arrangement_ui.set_world_backdrop_mode(true,expected_anchor);game.arrangement_ui.open_home();game.arrangement_ui._start_new_arrangement();game.arrangement_ui._select_editor_pot("starter_terracotta")
+		game.arrangement_scene_active=true;game.arrangement_ui.set_world_backdrop_mode(true,expected_anchor);game.arrangement_ui.open_home();game.arrangement_ui._start_new_arrangement();game.arrangement_ui._select_editor_pot("classic_terracotta")
 		await get_tree().process_frame;RenderingServer.force_draw()
 		var anchor_image:=get_viewport().get_texture().get_image()
 		assert(anchor_image!=null and anchor_image.save_png(screenshot_dir_absolute.path_join("100-arrangement-pot-anchor.png"))==OK)
