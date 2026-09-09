@@ -94,6 +94,16 @@ const SPRITES := {
 	"stone_silver_gneiss_rosette": "res://assets/catalog/stone/stone-silver-gneiss-rosette.png",
 	"stone_obsidian_rosette": "res://assets/catalog/stone/stone-obsidian-rosette.png",
 	"stone_white_marble_rosette": "res://assets/catalog/stone/stone-white-marble-rosette.png",
+	"yumekawa_milky_dream": "res://assets/catalog/yumekawa/yumekawa-milky-dream.png",
+	"yumekawa_pastel_drops": "res://assets/catalog/yumekawa/yumekawa-pastel-drops.png",
+	"yumekawa_fairy_branch": "res://assets/catalog/yumekawa/yumekawa-fairy-branch.png",
+	"yumekawa_moonlight_rosette": "res://assets/catalog/yumekawa/yumekawa-moonlight-rosette.png",
+	"yumekawa_bubble_candy": "res://assets/catalog/yumekawa/yumekawa-bubble-candy.png",
+	"yumekawa_mint_milk": "res://assets/catalog/yumekawa/yumekawa-mint-milk.png",
+	"yumekawa_lavender_frill": "res://assets/catalog/yumekawa/yumekawa-lavender-frill.png",
+	"yumekawa_dream_bouquet": "res://assets/catalog/yumekawa/yumekawa-dream-bouquet.png",
+	"yumekawa_princess_rose": "res://assets/catalog/yumekawa/yumekawa-princess-rose.png",
+	"yumekawa_tricolor_rosettes": "res://assets/catalog/yumekawa/yumekawa-tricolor-rosettes.png",
 	"gold_kannte": "res://assets/plants/sprite-golden-laui.png"
 }
 
