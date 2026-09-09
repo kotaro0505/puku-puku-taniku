@@ -3,7 +3,7 @@ extends Node
 func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
-	game._reset_progression_state();game.intro_story_complete=true;game.total_play_count=3;game.formal_play_count=3;game.habitat_unlocked=true;game.buyback_unlocked=true;game.encyclopedia_unlocked=true
+	game._reset_progression_state();game.intro_story_complete=true;game.total_play_count=3;game.formal_play_count=3;game.habitat_unlocked=true;game.puku_gauge_intro_complete=true;game.encyclopedia_unlocked=true
 	game._start_post_play_dialog("play1");assert(game.intro_dialogue_label.text=="コロラータのたねだったんだね！\n図鑑に登録したよ。見てみよう。")
 	game.intro_overlay.visible=false;game.tutorial_dialog_kind="";game._start_post_play_dialog("play2");assert(game.intro_dialogue_label.text=="センスいいね！そうだ、今度一緒に多肉の原生地へ行こうよ。\n準備してくるから少し待ってね。")
 	game.intro_overlay.visible=false;game.tutorial_dialog_kind="";assert(game.play_open_button.text=="たねをまく")
@@ -24,7 +24,7 @@ func _ready()->void:
 	game._advance_intro_story();assert(bool(game.tutorial_steps.get("rain_first_dialog",false)) and not game.intro_overlay.visible)
 	game._clear_greenhouse_plants();game.rain_bonus_active=false;game.rain_event_pending=true;game._start_rain_bonus();await get_tree().process_frame;assert(not game.intro_overlay.visible)
 	game.rain_bonus_active=false;game.rain_event_pending=false;game._clear_greenhouse_plants()
-	game.play_earnings_total=0;game.play_harvest_count=1;game.play_max_size=12.0;game.play_updated_global_best=false;game.play_notable_species={"colorata":{"name":"コロラータ","size":12.0}};game.result_new_species_queue.clear();game.result_new_species_queue.append("colorata");game._show_play_result();await get_tree().process_frame
+	game.play_harvest_cm_total=12.0;game.play_puku_earned_total=0;game.play_harvest_count=1;game.play_max_size=12.0;game.play_updated_global_best=false;game.play_notable_species={"colorata":{"name":"コロラータ","size":12.0}};game.result_new_species_queue.clear();game.result_new_species_queue.append("colorata");game._show_play_result();await get_tree().process_frame
 	assert(game.result_new_species_label.visible and game.result_new_species_label.text=="コロラータを図鑑登録！" and game.result_new_species_label.get_theme_font_size("font_size")>=23 and game.result_new_species_pulse_tween!=null)
 	game.result_overlay.visible=false;game.result_new_species_queue.clear();game._show_play_result();assert(not game.result_new_species_label.visible)
 	print("TUTORIAL_RAIN_UI_SMOKE_OK range_y=",max_y-min_y)

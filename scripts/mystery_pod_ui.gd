@@ -51,9 +51,9 @@ func show_open_results(results:Array[Dictionary])->void:
 			var result_label:=placeholder.get_child(0) as Label
 			result_label.text="ポン！　%sの種"%str(result.get("display_name","シリーズ"))
 			placeholder.add_theme_stylebox_override("panel",_box(Color("#e6d5a4"),Color("#b77c3e"),18,3))
-		else:
+		elif str(result.get("kind",""))=="normal_seed_bag":
 			var result_label:=placeholder.get_child(0) as Label
-			result_label.text="ポン！　%sゲーム円"%_comma(int(result.get("amount",1000)))
+			result_label.text="ポン！　普通のたね袋 ×%d"%maxi(1,int(result.get("amount",1)))
 			placeholder.add_theme_stylebox_override("panel",_box(Color("#efd78c"),Color("#c28a2c"),18,3))
 	opening_animation_active=false
 	message_label.text="3つの中身を受け取りました"
@@ -121,10 +121,3 @@ func _box(bg:Color,border:Color,radius:int,width:int)->StyleBoxFlat:
 
 func _clear_children(parent:Node)->void:
 	for child in parent.get_children():child.queue_free()
-
-func _comma(value:int)->String:
-	var source:=str(value);var output:=""
-	for index in range(source.length()):
-		if index>0 and (source.length()-index)%3==0:output+=","
-		output+=source[index]
-	return output

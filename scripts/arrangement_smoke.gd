@@ -3,13 +3,13 @@ extends Node
 func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
-	game._reset_progression_state();game.intro_story_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.buyback_unlocked=true;game.total_play_count=3;game.formal_play_count=3
-	game.discovered={"colorata":true,"laui":false};game.species_get_counts={"colorata":4};game.bests={"colorata":62.5};game.coins=2000;game._sync_arrangement_ui();game._update_play_ui()
+	game._reset_progression_state();game.intro_story_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.puku_gauge_intro_complete=true;game.total_play_count=3;game.formal_play_count=3
+	game.discovered={"colorata":true,"laui":false};game.species_get_counts={"colorata":4};game.bests={"colorata":62.5};game.puku_points=12;game._sync_arrangement_ui();game._update_play_ui()
 	var ui=game.arrangement_ui
 	assert(game.pot_catalog.size()==11 and bool(game.owned_pots.get("starter_terracotta",false)))
 	for pot_value in game.pot_catalog:
-		for required_key in ["pot_id","display_name","image_path","price","unlock_condition","iap_product_id","placement_area","sort_order"]:assert(pot_value.has(required_key))
-		if str(pot_value.pot_id)!="starter_terracotta":assert(int(pot_value.price)==1000)
+		for required_key in ["pot_id","display_name","image_path","price_puku","unlock_condition","iap_product_id","placement_area","sort_order"]:assert(pot_value.has(required_key))
+		assert(pot_value.price_puku==null)
 	for added_pot_id in ["shallow_terracotta","classic_terracotta","black_ceramic","white_ceramic","clear_crystal","amethyst_crystal","glass_bowl","tin_bucket"]:
 		var added_pot:Dictionary=game._pot_entry(added_pot_id);assert(not added_pot.is_empty() and ResourceLoader.exists(str(added_pot.image_path)))
 		var pot_image:Image=(load(str(added_pot.image_path)) as Texture2D).get_image();assert(pot_image.get_pixel(0,0).a<.05 and pot_image.get_pixel(pot_image.get_width()-1,pot_image.get_height()-1).a<.05)
@@ -70,8 +70,8 @@ func _ready()->void:
 	assert(Vector2(float(game.saved_arrangements[0].plants[0].x),float(game.saved_arrangements[0].plants[0].y)).is_equal_approx(saved_position) and is_equal_approx(float(game.saved_arrangements[0].plants[0].scale),saved_scale))
 	game._sync_arrangement_ui();ui.open_home();assert(not _has_button_text(ui.home_page,"編集"));ui._open_viewer(game.saved_arrangements[0]);assert(not _has_button_text(ui.viewer_page,"編集") and not ui.has_method("_edit_arrangement"))
 	ui.selected_plant_index=0;var locked_scale:=float(ui.editor_plants[0].scale);ui._adjust_selected_scale(.1);assert(is_equal_approx(float(ui.editor_plants[0].scale),locked_scale))
-	var coins_before:int=game.coins;game._on_pot_purchase_requested("shallow_terracotta");assert(bool(game.owned_pots.get("shallow_terracotta",false)) and game.coins==coins_before-1000);game._on_pot_purchase_requested("shallow_terracotta");assert(game.coins==coins_before-1000)
-	game._save();game.owned_pots.erase("shallow_terracotta");game._load_save();assert(bool(game.owned_pots.get("shallow_terracotta",false)))
+	var puku_before:int=game.puku_points;game._on_pot_purchase_requested("shallow_terracotta");assert(not bool(game.owned_pots.get("shallow_terracotta",false)) and game.puku_points==puku_before and "価格は準備中" in ui.shop_message.text)
+	game.owned_pots["shallow_terracotta"]=true;game._save();game.owned_pots.erase("shallow_terracotta");game._load_save();assert(bool(game.owned_pots.get("shallow_terracotta",false)))
 	game._sync_arrangement_ui();ui.open_home();ui._start_new_arrangement();assert(ui.pot_select_grid.get_child_count()==2);ui._select_editor_pot("shallow_terracotta");assert(ui.editor_page.visible and str(ui.current_arrangement.pot_id)=="shallow_terracotta")
 	assert(game.species_get_counts==get_before and game.bests==best_before and game.discovered==discovered_before)
 	ui.current_arrangement={"arrangement_id":"limit_test","name":"上限テスト","pot_id":"starter_terracotta","created_at":"test","plants":[]};ui._load_editor_from_current()

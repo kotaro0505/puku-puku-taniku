@@ -3,7 +3,7 @@ extends Node
 func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
-	game._reset_progression_state();game.intro_story_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.buyback_unlocked=true;game.total_play_count=3
+	game._reset_progression_state();game.intro_story_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.puku_gauge_intro_complete=true;game.total_play_count=3
 	game.unlocked_series["sweets"]=true
 	assert(game.RAIN_TRIGGER_CHANCES==[0.01,0.02,0.03,0.05,0.08,0.12,0.20])
 	var candidates:Array[Dictionary]=game._habitat_new_species_candidates()
@@ -15,9 +15,9 @@ func _ready()->void:
 	var products:Array=game._seed_shop_products();var sweets_product:Dictionary={}
 	for product in products:
 		if str(product.get("seed_type",""))=="series:sweets":sweets_product=product;break
-	assert(not sweets_product.is_empty() and int(sweets_product.price)==3000 and int(sweets_product.count)==1)
-	game.coins=3000;game._buy_seed_bag("series:sweets")
-	assert(game.coins==0 and int(game.series_seed_inventory.get("sweets",0))==1)
+	assert(not sweets_product.is_empty() and sweets_product.price_puku==null and not bool(sweets_product.purchasable) and int(sweets_product.count)==1)
+	game.puku_points=10;game._buy_seed_bag("series:sweets")
+	assert(game.puku_points==10 and int(game.series_seed_inventory.get("sweets",0))==0)
 	var rain_pool:Array=game._rain_species_pool()
 	assert(rain_pool.any(func(entry):return str(entry.species_id)=="sweets_strawberry_shortcake"))
 	game.rain_bonus_active=true;game.play_active=true

@@ -34,7 +34,6 @@ var wallet_puku_points:=0
 var seed_shop_products:Array=[]
 var saved_arrangements:Array=[]
 var save_capacity:=20
-var wallet_coins:=0
 var texture_resolver:Callable
 var texture_requester:Callable
 var return_context:="greenhouse"
@@ -126,7 +125,7 @@ void fragment() {
 """
 	_build_ui()
 
-func configure(species_data:Array,series_data:Array,pots_data:Array,discovery:Dictionary,purchased_pots:Dictionary,arrangements:Array,capacity:int,coins:int,resolver:Callable,requester:Callable=Callable())->void:
+func configure(species_data:Array,series_data:Array,pots_data:Array,discovery:Dictionary,purchased_pots:Dictionary,arrangements:Array,capacity:int,puku_points:int,resolver:Callable,requester:Callable=Callable())->void:
 	catalog_species=species_data
 	series_catalog=series_data
 	pot_catalog=pots_data
@@ -134,12 +133,12 @@ func configure(species_data:Array,series_data:Array,pots_data:Array,discovery:Di
 	owned_pots=purchased_pots
 	saved_arrangements=arrangements
 	save_capacity=maxi(1,capacity)
-	wallet_coins=maxi(0,coins)
+	wallet_puku_points=maxi(0,puku_points)
 	texture_resolver=resolver
 	texture_requester=requester
 
-func sync_state(purchased_pots:Dictionary,arrangements:Array,capacity:int,coins:int)->void:
-	owned_pots=purchased_pots;saved_arrangements=arrangements;save_capacity=maxi(1,capacity);wallet_coins=maxi(0,coins)
+func sync_state(purchased_pots:Dictionary,arrangements:Array,capacity:int)->void:
+	owned_pots=purchased_pots;saved_arrangements=arrangements;save_capacity=maxi(1,capacity)
 	if visible and shop_page.visible:_refresh_pot_shop()
 	if visible and home_page.visible:_refresh_home()
 	if visible and pot_select_page.visible:_refresh_pot_selection()
@@ -148,8 +147,8 @@ func sync_catalog_state(purchased_catalogs:Dictionary,puku_points:int)->void:
 	owned_catalogs=purchased_catalogs;wallet_puku_points=maxi(0,puku_points)
 	if visible and catalog_shop_page.visible:_refresh_catalog_shop()
 
-func sync_seed_shop_state(products:Array,coins:int)->void:
-	seed_shop_products=products;wallet_coins=maxi(0,coins)
+func sync_seed_shop_state(products:Array,puku_points:int)->void:
+	seed_shop_products=products;wallet_puku_points=maxi(0,puku_points)
 	if visible and seed_shop_page.visible:_refresh_seed_shop()
 
 func open_home()->void:
@@ -616,21 +615,22 @@ func _build_shop_page()->void:
 	shop_grid=VBoxContainer.new();shop_grid.custom_minimum_size=Vector2(504,0);shop_grid.mouse_filter=Control.MOUSE_FILTER_PASS;shop_grid.add_theme_constant_override("separation",14);scroll.add_child(shop_grid)
 
 func _refresh_pot_shop()->void:
-	shop_wallet.text="所持金　¥%s"%_comma(wallet_coins)
-	if shop_message.text.is_empty():shop_message.text="鉢は一度購入すると、何作品でも使えます"
+	shop_wallet.text="所持　%dぷくコイン"%wallet_puku_points
+	if shop_message.text.is_empty():shop_message.text="鉢のぷく価格は準備中です"
 	_refresh_pot_shop_cards()
 
 func _refresh_pot_shop_cards()->void:
 	_clear_children(shop_grid)
 	for pot_value in pot_catalog:
 		if not pot_value is Dictionary:continue
-		var pot:Dictionary=pot_value;var pot_id:=str(pot.get("pot_id",""));var owned:=bool(owned_pots.get(pot_id,false));var price:=maxi(0,int(pot.get("price",0)))
+		var pot:Dictionary=pot_value;var pot_id:=str(pot.get("pot_id",""));var owned:=bool(owned_pots.get(pot_id,false));var price_value=pot.get("price_puku");var priced:=price_value is int or price_value is float;var price:=maxi(0,int(price_value)) if priced else 0
 		var card:=PanelContainer.new();card.custom_minimum_size=Vector2(504,204);card.mouse_filter=Control.MOUSE_FILTER_PASS;card.add_theme_stylebox_override("panel",_box(Color("#f4e1bc"),Color("#b77c48"),20,3));shop_grid.add_child(card)
 		var content:=Control.new();content.custom_minimum_size=Vector2(484,184);content.mouse_filter=Control.MOUSE_FILTER_PASS;card.add_child(content)
 		var preview:=Control.new();preview.position=Vector2(2,2);preview.size=Vector2(214,176);preview.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.add_child(preview);_render_pot(preview,pot,true)
 		var name:=Label.new();name.text=str(pot.get("display_name","鉢"));name.position=Vector2(220,12);name.size=Vector2(258,45);name.mouse_filter=Control.MOUSE_FILTER_IGNORE;name.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name.add_theme_font_size_override("font_size",19);name.add_theme_color_override("font_color",UI_BROWN);content.add_child(name)
 		var condition:=Label.new();condition.text=str(pot.get("unlock_condition",{}).get("display_text",""));condition.position=Vector2(220,55);condition.size=Vector2(258,34);condition.mouse_filter=Control.MOUSE_FILTER_IGNORE;condition.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;condition.add_theme_font_size_override("font_size",13);condition.add_theme_color_override("font_color",Color("#79543a"));content.add_child(condition)
-		var buy:=_button("購入済み" if owned else ("買う　¥%s"%_comma(price)),Vector2(248,102),Vector2(204,58),Color("#b9a17d") if owned else Color("#d7aa64"),17);_prepare_scroll_button(buy);buy.disabled=owned or wallet_coins<price;buy.pressed.connect(_request_pot_purchase.bind(pot_id));content.add_child(buy)
+		var buy_text:="購入済み" if owned else ("買う　%dぷくコイン"%price if priced else "価格準備中")
+		var buy:=_button(buy_text,Vector2(248,102),Vector2(204,58),Color("#b9a17d") if owned or not priced else Color("#d7aa64"),17);_prepare_scroll_button(buy);buy.disabled=owned or not priced or wallet_puku_points<price;buy.pressed.connect(_request_pot_purchase.bind(pot_id));content.add_child(buy)
 
 func _request_pot_purchase(pot_id:String)->void:
 	pot_purchase_requested.emit(pot_id)
@@ -648,7 +648,7 @@ func _refresh_catalog_shop()->void:
 	_clear_children(catalog_shop_grid)
 	for series_value in series_catalog:
 		if not series_value is Dictionary:continue
-		var series:Dictionary=series_value;var series_id:=str(series.get("series_id",""));var owned:=bool(owned_catalogs.get(series_id,false)) or str(series.get("unlock_type","future"))=="default";var price:=maxi(0,int(series.get("unlock_price_puku",3)))
+		var series:Dictionary=series_value;var series_id:=str(series.get("series_id",""));var owned:=bool(owned_catalogs.get(series_id,false)) or str(series.get("unlock_type","future"))=="default";var price:=maxi(0,int(series.get("unlock_price_puku",5)))
 		var card:=PanelContainer.new();card.custom_minimum_size=Vector2(504,204);card.mouse_filter=Control.MOUSE_FILTER_PASS;card.add_theme_stylebox_override("panel",_box(Color("#f4e1bc"),Color("#b77c48"),20,3));catalog_shop_grid.add_child(card)
 		var content:=Control.new();content.custom_minimum_size=Vector2(484,184);content.mouse_filter=Control.MOUSE_FILTER_PASS;card.add_child(content)
 		var preview:=TextureRect.new();preview.position=Vector2(2,2);preview.size=Vector2(214,176);preview.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;preview.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;preview.mouse_filter=Control.MOUSE_FILTER_IGNORE;preview.texture=_series_preview_texture(series);content.add_child(preview)
@@ -671,19 +671,20 @@ func _build_seed_shop_page()->void:
 	seed_shop_grid=VBoxContainer.new();seed_shop_grid.custom_minimum_size=Vector2(504,0);seed_shop_grid.mouse_filter=Control.MOUSE_FILTER_PASS;seed_shop_grid.add_theme_constant_override("separation",14);scroll.add_child(seed_shop_grid)
 
 func _refresh_seed_shop()->void:
-	seed_shop_wallet.text="所持金　¥%s"%_comma(wallet_coins)
-	if seed_shop_message.text.is_empty():seed_shop_message.text="たね袋を1袋ずつ購入できます"
+	seed_shop_wallet.text="所持　%dぷくコイン"%wallet_puku_points
+	if seed_shop_message.text.is_empty():seed_shop_message.text="普通のたねは1ぷくコインで3袋です"
 	_clear_children(seed_shop_grid)
 	for product_value in seed_shop_products:
 		if not product_value is Dictionary:continue
-		var product:Dictionary=product_value;var seed_type:=str(product.get("seed_type","normal"));var price:=maxi(0,int(product.get("price",0)));var unlocked:=bool(product.get("unlocked",false));var accent:=Color(str(product.get("accent","#d8b56b")))
+		var product:Dictionary=product_value;var seed_type:=str(product.get("seed_type","normal"));var price_value=product.get("price_puku");var priced:=price_value is int or price_value is float;var price:=maxi(0,int(price_value)) if priced else 0;var unlocked:=bool(product.get("unlocked",false));var purchasable:=bool(product.get("purchasable",priced));var accent:=Color(str(product.get("accent","#d8b56b")))
 		var card:=PanelContainer.new();card.custom_minimum_size=Vector2(504,204);card.mouse_filter=Control.MOUSE_FILTER_PASS;card.add_theme_stylebox_override("panel",_box(Color("#f4e1bc"),Color("#b77c48"),20,3));seed_shop_grid.add_child(card)
 		var content:=Control.new();content.custom_minimum_size=Vector2(484,184);content.mouse_filter=Control.MOUSE_FILTER_PASS;card.add_child(content)
 		var preview:=PanelContainer.new();preview.position=Vector2(2,2);preview.size=Vector2(214,176);preview.mouse_filter=Control.MOUSE_FILTER_IGNORE;preview.add_theme_stylebox_override("panel",_box(accent.lightened(.16),accent.darkened(.18),24,3));content.add_child(preview)
 		var preview_label:=Label.new();preview_label.text="たね袋\n%d粒"%int(product.get("count",0));preview_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;preview_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;preview_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;preview_label.add_theme_font_size_override("font_size",24);preview_label.add_theme_color_override("font_color",UI_BROWN);preview.add_child(preview_label)
 		var name:=Label.new();name.text=str(product.get("display_name","たね袋"));name.position=Vector2(220,7);name.size=Vector2(258,40);name.mouse_filter=Control.MOUSE_FILTER_IGNORE;name.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name.add_theme_font_size_override("font_size",19);name.add_theme_color_override("font_color",UI_BROWN);content.add_child(name)
 		var detail:=Label.new();detail.text=str(product.get("description",""));detail.position=Vector2(220,45);detail.size=Vector2(258,66);detail.mouse_filter=Control.MOUSE_FILTER_IGNORE;detail.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;detail.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;detail.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;detail.add_theme_font_size_override("font_size",13);detail.add_theme_color_override("font_color",Color("#79543a"));content.add_child(detail)
-		var buy:=_button("買う　¥%s"%_comma(price) if unlocked else "未解禁",Vector2(248,116),Vector2(204,54),accent,17);_prepare_scroll_button(buy);buy.disabled=not unlocked or wallet_coins<price;buy.pressed.connect(_request_seed_purchase.bind(seed_type));content.add_child(buy)
+		var buy_text:="未解禁" if not unlocked else ("買う　%dぷくコイン"%price if purchasable and priced else "価格準備中")
+		var buy:=_button(buy_text,Vector2(248,116),Vector2(204,54),accent,17);_prepare_scroll_button(buy);buy.disabled=not unlocked or not purchasable or not priced or wallet_puku_points<price;buy.pressed.connect(_request_seed_purchase.bind(seed_type));content.add_child(buy)
 
 func _request_seed_purchase(seed_type:String)->void:
 	seed_purchase_requested.emit(seed_type)
@@ -764,10 +765,3 @@ func _style_overlay_label(label:Label,color:=UI_CREAM,outline_size:=5)->void:
 
 func _box(bg:Color,border:Color,radius:int,width:int)->StyleBoxFlat:
 	var style:=StyleBoxFlat.new();style.bg_color=bg;style.border_color=border;style.set_border_width_all(width);style.set_corner_radius_all(radius);style.content_margin_left=10;style.content_margin_right=10;style.content_margin_top=7;style.content_margin_bottom=7;style.shadow_color=Color(0.15,.07,.03,.28);style.shadow_size=5;style.shadow_offset=Vector2(0,3);return style
-
-func _comma(value:int)->String:
-	var source:=str(value);var result:="";var count:=0
-	for index in range(source.length()-1,-1,-1):
-		if count>0 and count%3==0:result=","+result
-		result=source[index]+result;count+=1
-	return result

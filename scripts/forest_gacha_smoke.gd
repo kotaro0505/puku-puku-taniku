@@ -5,7 +5,7 @@ const FIRST_FIVE:=5
 func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
-	game._reset_progression_state();game.intro_story_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.buyback_unlocked=true;game.total_play_count=3;game.puku_points=20;game._update_play_ui()
+	game._reset_progression_state();game.intro_story_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.puku_gauge_intro_complete=true;game.total_play_count=3;game.puku_points=20;game._update_play_ui()
 	_test_assets_and_routes(game)
 	_test_draw_rules(game)
 	await _test_spin_capsule_and_reveal(game)

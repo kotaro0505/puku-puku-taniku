@@ -33,9 +33,6 @@ func setting_float(key:String)->float:
 func setting_int(key:String)->int:
 	return int(settings.get(key,formal_settings.get(key,0)))
 
-func catalog_price_yen(series_entry:Dictionary)->int:
-	return maxi(0,int(series_entry.get("unlock_price_yen",setting_int("default_catalog_price_yen"))))
-
 func catalog_price_pods(series_entry:Dictionary)->int:
 	return maxi(0,int(series_entry.get("unlock_price_pods",setting_int("default_catalog_price_pods"))))
 
@@ -56,14 +53,14 @@ func open_pod(unlocked_series:Dictionary,discovered:Dictionary,pod_rng:RandomNum
 	var results:Array[Dictionary]=[]
 	for slot_index in range(maxi(1,setting_int("slots_per_pod"))):
 		var seed_weight:=maxf(0.0,setting_float("series_seed_weight"))
-		var yen_weight:=maxf(0.0,setting_float("yen_weight"))
+		var normal_seed_weight:=maxf(0.0,setting_float("normal_seed_weight"))
 		var eligible:=eligible_series(unlocked_series,discovered)
-		var choose_seed:=not eligible.is_empty() and seed_weight>0.0 and (yen_weight<=0.0 or pod_rng.randf()*(seed_weight+yen_weight)<seed_weight)
+		var choose_seed:=not eligible.is_empty() and seed_weight>0.0 and (normal_seed_weight<=0.0 or pod_rng.randf()*(seed_weight+normal_seed_weight)<seed_weight)
 		if choose_seed:
 			var series_entry:=choose_series(unlocked_series,discovered,pod_rng)
 			results.append({"kind":"series_seed","series_id":str(series_entry.get("series_id","")),"display_name":str(series_entry.get("display_name","シリーズ"))})
 		else:
-			results.append({"kind":"yen","amount":choose_yen_amount(pod_rng)})
+			results.append({"kind":"normal_seed_bag","amount":maxi(1,setting_int("normal_seed_bag_count"))})
 	return results
 
 func eligible_series(unlocked_series:Dictionary,discovered:Dictionary)->Array[Dictionary]:
@@ -115,26 +112,15 @@ func species_weight_for_series(species_id:String,discovered:Dictionary)->float:
 	if bool(discovered.get(species_id,false)):weight*=maxf(0.0,setting_float("discovered_species_weight_multiplier"))
 	return maxf(0.0,weight)
 
-func choose_yen_amount(pod_rng:RandomNumberGenerator)->int:
-	var rewards=settings.get("yen_rewards",[])
-	if not rewards is Array or rewards.is_empty():return 1000
-	var chosen:=_weighted_dictionary(rewards,"weight",pod_rng)
-	return maxi(1000,int(chosen.get("amount",1000)))
-
 func probability_text(unlocked_series:Dictionary,discovered:Dictionary)->String:
-	var seed_weight:=maxf(0.0,setting_float("series_seed_weight"));var yen_weight:=maxf(0.0,setting_float("yen_weight"));var total:=seed_weight+yen_weight
+	var seed_weight:=maxf(0.0,setting_float("series_seed_weight"));var normal_seed_weight:=maxf(0.0,setting_float("normal_seed_weight"));var total:=seed_weight+normal_seed_weight
 	var eligible:=eligible_series(unlocked_series,discovered)
 	var seed_rate:=0.0 if eligible.is_empty() or total<=0.0 else seed_weight/total*100.0
-	var yen_rate:=100.0-seed_rate
-	var lines:Array[String]=["1枠ごとの提供割合","シリーズ種　%.1f%%"%seed_rate,"ゲーム円　%.1f%%"%yen_rate]
+	var normal_seed_rate:=100.0-seed_rate
+	var lines:Array[String]=["1枠ごとの提供割合","シリーズ種　%.1f%%"%seed_rate,"普通のたね袋　%.1f%%"%normal_seed_rate]
 	if not eligible.is_empty():lines.append("シリーズは開放済み図鑑から抽選（コンプ済みは重み×%.2f）"%setting_float("completed_series_weight_multiplier"))
-	else:lines.append("対象シリーズがない時はゲーム円になります")
-	lines.append("ゲーム円枠の内訳")
-	var rewards=settings.get("yen_rewards",[]);var reward_total:=0.0
-	for reward in rewards:reward_total+=maxf(0.0,float(reward.get("weight",0.0)))
-	for reward in rewards:
-		var rate:=0.0 if reward_total<=0.0 else maxf(0.0,float(reward.get("weight",0.0)))/reward_total*100.0
-		lines.append("%s円　%.1f%%"%[_comma(int(reward.get("amount",1000))),rate])
+	else:lines.append("対象シリーズがない時は普通のたね袋になります")
+	lines.append("普通のたね袋は1枠につき%d袋です"%maxi(1,setting_int("normal_seed_bag_count")))
 	lines.append("シリーズ種は品種未確定。発芽時に品種を抽選します。")
 	return "\n".join(lines)
 
@@ -164,10 +150,3 @@ func _weighted_dictionary(entries:Array,weight_key:String,pod_rng:RandomNumberGe
 		roll-=maxf(0.0,float(entry.get(weight_key,0.0)))
 		if roll<=0.0:return entry
 	return entries.back()
-
-func _comma(value:int)->String:
-	var source:=str(value);var output:=""
-	for i in range(source.length()):
-		if i>0 and (source.length()-i)%3==0:output+=","
-		output+=source[i]
-	return output

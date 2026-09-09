@@ -70,7 +70,7 @@
     "unlock_type": "future",
     "preview_catalog_when_locked": true,
     "catalog_purchase_enabled": true,
-    "unlock_condition": {"display_text": "3ぷくコインで交換"},
+    "unlock_condition": {"display_text": "5ぷくコインで交換"},
     "iap_product_id": "",
     "sort_order": 20
   },
@@ -123,8 +123,8 @@
   {
     "series_id": "gummy",
     "display_name": "グミ多肉",
-    "subtitle": "3ぷくコインで解放",
-    "description": "ぷにっとカラフルなグミ多肉のシリーズです。3ぷくコインで図鑑を解放できます。",
+    "subtitle": "5ぷくコインで解放",
+    "description": "ぷにっとカラフルなグミ多肉のシリーズです。5ぷくコインで図鑑を解放できます。",
     "cover_image_path": "res://assets/catalog/gummy/gummy-peach-milk.png",
     "species_ids": [
       "gummy_peach_milk",
@@ -139,9 +139,9 @@
     "field_id": "gummy_field",
     "unlock_type": "future",
     "preview_catalog_when_locked": true,
-    "unlock_condition": {"display_text": "3ぷくコインで解放"},
+    "unlock_condition": {"display_text": "5ぷくコインで解放"},
     "iap_product_id": "",
-    "unlock_price_puku": 3,
+    "unlock_price_puku": 5,
     "pod_seed_weight": 1.0,
     "sort_order": 50
   },

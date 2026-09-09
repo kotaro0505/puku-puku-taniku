@@ -2,18 +2,12 @@
   "formal": {
     "slots_per_pod": 3,
     "series_seed_weight": 85.0,
-    "yen_weight": 15.0,
-    "yen_rewards": [
-      {"amount": 1000, "weight": 60.0},
-      {"amount": 3000, "weight": 25.0},
-      {"amount": 5000, "weight": 12.0},
-      {"amount": 10000, "weight": 3.0}
-    ],
+    "normal_seed_weight": 15.0,
+    "normal_seed_bag_count": 1,
     "main_play_pod_chance": 0.20,
     "habitat_pod_chance": 0.05,
     "completed_series_weight_multiplier": 0.20,
     "discovered_species_weight_multiplier": 0.10,
-    "default_catalog_price_yen": 10000,
     "default_catalog_price_pods": 10
   },
   "iap_products": [

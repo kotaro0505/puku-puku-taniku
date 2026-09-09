@@ -15,7 +15,7 @@ func _ready()->void:
 	game._sync_arrangement_ui();game.arrangement_ui.open_catalog_shop();assert(game.arrangement_ui.catalog_shop_grid.get_child_count()==game._shop_series_catalog().size());game.arrangement_ui.visible=false
 	game._grant_old_catalog_page(1,true);assert(game.old_catalog_pages==1 and game.old_catalog_intro_pending)
 	game.puku_points=2;game._accept_hidden_catalog_restoration();assert(game.old_catalog_pages==1 and not bool(game.unlocked_series.get("neon",false)))
-	game.puku_points=3;game._accept_hidden_catalog_restoration();assert(game.old_catalog_pages==0 and game.puku_points==0 and bool(game.unlocked_series.get("neon",false)))
+	game.puku_points=5;game._accept_hidden_catalog_restoration();assert(game.old_catalog_pages==0 and game.puku_points==0 and bool(game.unlocked_series.get("neon",false)))
 	assert(game._owned_series_entries().map(func(entry):return str(entry.series_id))==["base","neon"] and game._series_species_entries("neon").size()==3)
 	game.unlocked_series.erase("neon");game.research_catalog_reward_pending=true;game.armadillo_research_rewards.erase("8");game.formal_play_count=10
 	game._claim_research_catalog_reward("sweets");assert(bool(game.unlocked_series.get("sweets",false)) and bool(game.armadillo_research_rewards.get("8",false)) and not game.research_catalog_reward_pending)

@@ -39,14 +39,14 @@ func _test_core_draws()->void:
 	system.configure_catalog(series_data,species_data)
 	var unlocked:Dictionary={"base":true,"gummy":true};var discovered:Dictionary={};var test_rng:=RandomNumberGenerator.new();test_rng.seed=77123
 	var sample:=system.open_pod(unlocked,discovered,test_rng);assert(sample.size()==3)
-	var seed_slots:=0;var yen_slots:=0
+	var seed_slots:=0;var normal_seed_slots:=0
 	for pod_index in range(12000):
 		for result in system.open_pod(unlocked,discovered,test_rng):
 			if str(result.get("kind",""))=="series_seed":
 				seed_slots+=1;assert(str(result.get("series_id","")) in ["base","gummy"] and not result.has("species_id"))
 			else:
-				yen_slots+=1;assert(int(result.get("amount",0))>=1000)
-	var seed_rate:=float(seed_slots)/float(seed_slots+yen_slots);assert(absf(seed_rate-.85)<.015)
+				normal_seed_slots+=1;assert(str(result.get("kind",""))=="normal_seed_bag" and int(result.get("amount",0))==1)
+	var seed_rate:=float(seed_slots)/float(seed_slots+normal_seed_slots);assert(absf(seed_rate-.85)<.015)
 	assert(system.eligible_series({"locked":true},{})[0].series_id=="locked")
 	assert(system.eligible_series(unlocked,{}).size()==2)
 	var incomplete:=system.eligible_series(unlocked,{})
@@ -70,10 +70,10 @@ func _test_game_loop()->void:
 	assert(not game._mystery_pod_dev_tools_allowed_for_environment(false,false,false))
 	assert(game.mystery_pod_dev!=null and game.mystery_pod_settings_button!=null)
 	game._open_mystery_pod_dev();assert(game.mystery_pod_dev.visible);game.mystery_pod_dev.visible=false
-	game._reset_progression_state();game.intro_story_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.buyback_unlocked=true;game.total_play_count=3
+	game._reset_progression_state();game.intro_story_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.puku_gauge_intro_complete=true;game.total_play_count=3
 	game.formal_play_count=1;var gummy:Dictionary=game._series_entry("gummy");assert(not game._is_series_unlocked(gummy) and not game._can_browse_series(gummy) and game._catalog_purchase_enabled(gummy))
-	game.current_encyclopedia_series_id="gummy";game.coins=10000;game.mystery_pod_count=10;game.puku_points=3;game._acquire_current_catalog("puku")
-	assert(game._is_series_unlocked(gummy) and game.puku_points==0 and game.coins==10000 and game.mystery_pod_count==10 and game._series_found_count("gummy")==0)
+	game.current_encyclopedia_series_id="gummy";game.mystery_pod_count=10;game.puku_points=5;game._acquire_current_catalog("puku")
+	assert(game._is_series_unlocked(gummy) and game.puku_points==0 and game.mystery_pod_count==10 and game._series_found_count("gummy")==0)
 	game.series_seed_inventory["gummy"]=1;game._start_greenhouse_play("series:gummy")
 	assert(game.play_active and game.current_target_count==1 and int(game.series_seed_inventory.gummy)==0)
 	await get_tree().create_timer(.45).timeout
@@ -85,7 +85,7 @@ func _test_game_loop()->void:
 	assert(game.species.any(func(entry):return str(entry.species_id)==grown_id) and game._species_get_count(grown_id)==1)
 	game._clear_greenhouse_plants();game.play_active=false;game.greenhouse_available={grown_id:true};game.discovered={grown_id:true}
 	for choice in range(12):assert(str(game._select_species_for_seed("normal").species_id)==grown_id)
-	game.intro_story_complete=true;game.habitat_unlocked=true;game.buyback_unlocked=true;game.total_play_count=3;game.active_seed_type="normal";game.play_active=true;game.main_pod_pending=false
+	game.intro_story_complete=true;game.habitat_unlocked=true;game.puku_gauge_intro_complete=true;game.total_play_count=3;game.active_seed_type="normal";game.play_active=true;game.main_pod_pending=false
 	game.mystery_pod_system.set_setting("main_play_pod_chance",1.0);game._prepare_main_pod_for_play();assert(game.main_pod_pending)
 	var main_pods_before:int=game.mystery_pod_count;game._update_main_pod(99.0);game._show_main_pod_pickup();game._collect_main_pod();assert(game.main_pod_pending and not game.main_pod_visible and not game.main_pod_pickup_button.visible and game.mystery_pod_count==main_pods_before)
 	game._clear_greenhouse_plants();game.play_seeds_remaining=0;game.play_spawn_queue=0;game.play_seed_animations_pending=0;game._finish_greenhouse_play()
@@ -99,7 +99,7 @@ func _test_game_loop()->void:
 	var pods_before:int=game.mystery_pod_count;game._on_mystery_pod_purchase_verified("com.ohanayanouen.pukupukutaniku.pods.6","txn-smoke-001");assert(game.mystery_pod_count==pods_before+6)
 	game._on_mystery_pod_purchase_verified("com.ohanayanouen.pukupukutaniku.pods.6","txn-smoke-001");assert(game.mystery_pod_count==pods_before+6 and game.processed_iap_transactions.has("txn-smoke-001"))
 	game._save();game.mystery_pod_count=0;game.processed_iap_transactions.clear();game._load_save();assert(game.mystery_pod_count==pods_before+6 and game.processed_iap_transactions.has("txn-smoke-001"))
-	var legacy:=FileAccess.open("user://records.json",FileAccess.WRITE);legacy.store_string(JSON.stringify({"yen":321,"discovered":{"colorata":true},"greenhouse_available":{"colorata":true}}));legacy.close();game.mystery_pod_count=99;game.series_seed_inventory={"gummy":4};game._load_save();assert(game.coins==321 and game.mystery_pod_count==0 and game.series_seed_inventory.is_empty())
+	var legacy:=FileAccess.open("user://records.json",FileAccess.WRITE);legacy.store_string(JSON.stringify({"yen":321,"money":654,"discovered":{"colorata":true},"greenhouse_available":{"colorata":true}}));legacy.close();game.mystery_pod_count=99;game.series_seed_inventory={"gummy":4};game.puku_points=7;game._load_save();assert(game.puku_points==0 and game.mystery_pod_count==0 and game.series_seed_inventory.is_empty())
 	game.queue_free()
 
 func _test_iap_event_routing()->void:

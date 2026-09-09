@@ -12,7 +12,6 @@ signal add_all_series_seeds_requested
 const UI_BROWN:=Color("#4a2618")
 var pod_system:Variant
 var controls:Dictionary={}
-var yen_controls:Dictionary={}
 var status_label:Label
 
 func _ready()->void:
@@ -42,15 +41,14 @@ func _build_ui()->void:
 	var content:=VBoxContainer.new();content.custom_minimum_size=Vector2(492,0);content.add_theme_constant_override("separation",6);scroll.add_child(content)
 	_add_setting(content,"slots_per_pod","1さやの枠数",1,10,1)
 	_add_setting(content,"series_seed_weight","種枠率（相対値）",0,100,1)
-	_add_setting(content,"yen_weight","ゲーム円枠率（相対値）",0,100,1)
-	for amount in [1000,3000,5000,10000]:_add_yen_setting(content,amount,"%s円の重み"%_comma(amount))
+	_add_setting(content,"normal_seed_weight","普通のたね袋枠率（相対値）",0,100,1)
+	_add_setting(content,"normal_seed_bag_count","普通のたね袋数 / 枠",1,10,1)
 	_add_setting(content,"main_play_pod_chance","メイン出現率",0,1,.01,true)
 	_add_setting(content,"habitat_pod_chance","原生地出現率",0,1,.01,true)
 	_add_setting(content,"armadillo_pod_bonus_chance","アルマジロ報酬率",0,1,.01,true)
 	_add_setting(content,"armadillo_pod_bonus_count","アルマジロ付与個数",1,20,1)
 	_add_setting(content,"completed_series_weight_multiplier","コンプ済み補正",0,1,.01)
 	_add_setting(content,"discovered_species_weight_multiplier","既出品種補正",0,1,.01)
-	_add_setting(content,"default_catalog_price_yen","図鑑ゲーム円価格",0,100000,500)
 	_add_setting(content,"default_catalog_price_pods","図鑑さや交換数",0,100,1)
 	var reset:=_button("正式値に戻す",Vector2(470,48),Color("#c7b4d9"),16);reset.pressed.connect(_reset_formal);content.add_child(reset)
 	var actions:=GridContainer.new();actions.columns=2;actions.add_theme_constant_override("h_separation",7);actions.add_theme_constant_override("v_separation",7);content.add_child(actions)
@@ -67,21 +65,9 @@ func _add_setting(parent:VBoxContainer,key:String,title:String,min_value:float,m
 	var label:=_label(title,15);label.custom_minimum_size=Vector2(292,42);label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;row.add_child(label)
 	var spin:=SpinBox.new();spin.custom_minimum_size=Vector2(180,42);spin.min_value=min_value*(100.0 if as_percent else 1.0);spin.max_value=max_value*(100.0 if as_percent else 1.0);spin.step=step*(100.0 if as_percent else 1.0);spin.suffix="%" if as_percent else "";spin.value_changed.connect(_on_setting_changed.bind(key,as_percent));row.add_child(spin);controls[key]=spin
 
-func _add_yen_setting(parent:VBoxContainer,amount:int,title:String)->void:
-	var row:=HBoxContainer.new();parent.add_child(row)
-	var label:=_label(title,15);label.custom_minimum_size=Vector2(292,42);label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;row.add_child(label)
-	var spin:=SpinBox.new();spin.custom_minimum_size=Vector2(180,42);spin.min_value=0;spin.max_value=100;spin.step=1;spin.value_changed.connect(_on_yen_weight_changed.bind(amount));row.add_child(spin);yen_controls[amount]=spin
-
 func _on_setting_changed(value:float,key:String,as_percent:bool)->void:
 	if pod_system==null:return
 	pod_system.set_setting(key,value/100.0 if as_percent else value);status_label.text="テストoverrideを使用中";state_changed.emit()
-
-func _on_yen_weight_changed(value:float,amount:int)->void:
-	if pod_system==null:return
-	var rewards:Array=pod_system.settings.get("yen_rewards",[]).duplicate(true)
-	for reward in rewards:
-		if int(reward.get("amount",0))==amount:reward["weight"]=value
-	pod_system.settings["yen_rewards"]=rewards;status_label.text="テストoverrideを使用中";state_changed.emit()
 
 func _reset_formal()->void:
 	if pod_system==null:return
@@ -91,11 +77,6 @@ func _sync_controls()->void:
 	if pod_system==null:return
 	for key in controls:
 		var spin:SpinBox=controls[key];spin.set_value_no_signal(float(pod_system.settings.get(key,0.0))*(100.0 if spin.suffix=="%" else 1.0))
-	for amount in yen_controls:
-		var weight:=0.0
-		for reward in pod_system.settings.get("yen_rewards",[]):
-			if int(reward.get("amount",0))==int(amount):weight=float(reward.get("weight",0.0));break
-		yen_controls[amount].set_value_no_signal(weight)
 
 func _add_action(parent:GridContainer,text_value:String,callback:Callable)->void:
 	var button:=_button(text_value,Vector2(238,48),Color("#d8b56b"),14);button.pressed.connect(callback);parent.add_child(button)
@@ -108,10 +89,3 @@ func _button(text_value:String,size_value:Vector2,bg:Color,font_size:int)->Butto
 
 func _box(bg:Color,border:Color,radius:int,width:int)->StyleBoxFlat:
 	var style:=StyleBoxFlat.new();style.bg_color=bg;style.border_color=border;style.set_border_width_all(width);style.set_corner_radius_all(radius);style.content_margin_left=10;style.content_margin_right=10;style.content_margin_top=7;style.content_margin_bottom=7;return style
-
-func _comma(value:int)->String:
-	var source:=str(value);var output:=""
-	for index in range(source.length()):
-		if index>0 and (source.length()-index)%3==0:output+=","
-		output+=source[index]
-	return output

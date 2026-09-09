@@ -36,7 +36,7 @@ func _ready()->void:
 	var get_counts_before:Dictionary=game.species_get_counts.duplicate(true)
 	var unlocked_before:Dictionary=game.unlocked_species.duplicate(true)
 	var greenhouse_before:Dictionary=game.greenhouse_available.duplicate(true)
-	var coins_before:int=game.coins
+	var puku_before:int=game.puku_points
 	var total_play_before:int=game.total_play_count
 	var formal_play_before:int=game.formal_play_count
 	var main_rng_state_before:int=game.rng.state
@@ -88,7 +88,7 @@ func _ready()->void:
 	assert(game.species_get_counts==get_counts_before)
 	assert(game.unlocked_species==unlocked_before)
 	assert(game.greenhouse_available==greenhouse_before)
-	assert(game.coins==coins_before)
+	assert(game.puku_points==puku_before)
 	assert(game.total_play_count==total_play_before)
 	assert(game.formal_play_count==formal_play_before)
 	assert(game.rng.state==main_rng_state_before)
