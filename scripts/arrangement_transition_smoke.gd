@@ -65,6 +65,7 @@ func _ready()->void:
 	game.greenhouse_area_drag_velocity_x=0.0;game._finish_greenhouse_area_drag(Vector2(40+expected_arrangement_transition*.75,450))
 	await get_tree().create_timer(game.ARRANGEMENT_TRANSITION_SECONDS+.08).timeout
 	assert(game.arrangement_scene_active and not game.arrangement_transitioning and game.arrangement_ui.visible and game.arrangement_ui.home_page.visible)
+	assert(not game.main_status_hud.visible and not game.labels_layer.visible)
 	assert(game.arrangement_ui.world_backdrop_enabled)
 	var expected_anchor:Vector2=viewport_size*game.ARRANGEMENT_POT_ANCHOR
 	assert(game.arrangement_ui.world_pot_anchor_screen.distance_to(expected_anchor)<EPSILON)
@@ -77,7 +78,17 @@ func _ready()->void:
 	var holder_anchor:Vector2=game.arrangement_ui.editor_canvas.position+pot_holder.position+Vector2(pot_holder.size.x*.5,pot_holder.size.y*.94)
 	var lowered_anchor:=expected_anchor+Vector2(0,game.arrangement_ui.POT_VERTICAL_OFFSET)
 	assert(game.arrangement_ui.POT_VERTICAL_OFFSET>0.0 and holder_anchor.distance_to(lowered_anchor)<EPSILON)
+	assert(game.arrangement_ui.is_editor_active() and not game._greenhouse_area_navigation_available())
+	game._begin_greenhouse_area_drag(Vector2(520,450),true)
+	game._update_greenhouse_area_drag(Vector2(300,450))
+	assert(not game.greenhouse_area_drag_tracking and not game.arrangement_transitioning)
 	game.arrangement_ui._return_home_from_editor()
+	assert(not game.arrangement_ui.is_editor_active() and game._greenhouse_area_navigation_available())
+	game.arrangement_ui._open_viewer({"arrangement_id":"gesture_viewer","name":"完成作品","pot_id":"starter_terracotta","completed":true,"plants":[]})
+	assert(game.arrangement_ui.viewer_page.visible and game._greenhouse_area_navigation_available())
+	var viewer_press:=InputEventScreenTouch.new();viewer_press.index=0;viewer_press.position=Vector2(520,450);viewer_press.pressed=true;game.arrangement_ui._on_viewer_world_scroll_input(viewer_press)
+	assert(game.greenhouse_area_drag_tracking)
+	game._cancel_greenhouse_area_drag();game.arrangement_ui._return_from_viewer()
 
 	game._begin_greenhouse_area_drag(Vector2(520,450),true)
 	game._update_greenhouse_area_drag(Vector2(520-expected_arrangement_transition*.20,450))
@@ -86,6 +97,7 @@ func _ready()->void:
 	await get_tree().create_timer(game.ARRANGEMENT_TRANSITION_SECONDS+.08).timeout
 	assert(not game.arrangement_scene_active and not game.arrangement_transitioning and absf(game.arrangement_transition_x)<EPSILON)
 	assert(absf(game.greenhouse_background_position_x-game.greenhouse_main_position_x)<EPSILON)
+	assert(game.main_status_hud.visible and game.labels_layer.visible)
 
 	game.play_active=true;game._update_play_ui()
 	var play_touch:=InputEventScreenTouch.new();play_touch.pressed=true;play_touch.position=Vector2(280,520);game._input(play_touch)
@@ -106,7 +118,7 @@ func _ready()->void:
 			var image:=get_viewport().get_texture().get_image()
 			assert(image!=null and image.get_size()==Vector2i(576,1024))
 			assert(image.save_png(screenshot_dir_absolute.path_join(str(shot.name)))==OK)
-		game.arrangement_scene_active=true;game.arrangement_ui.set_world_backdrop_mode(true,expected_anchor);game.arrangement_ui.open_home();game.arrangement_ui._start_new_arrangement();game.arrangement_ui._select_editor_pot("classic_terracotta")
+		game.arrangement_scene_active=true;game.arrangement_ui.set_world_backdrop_mode(true,expected_anchor);game.arrangement_ui.open_home();game.arrangement_ui._start_new_arrangement();game.arrangement_ui._select_editor_pot("classic_terracotta");game._update_play_ui()
 		await get_tree().process_frame;RenderingServer.force_draw()
 		var anchor_image:=get_viewport().get_texture().get_image()
 		assert(anchor_image!=null and anchor_image.save_png(screenshot_dir_absolute.path_join("100-arrangement-pot-anchor.png"))==OK)

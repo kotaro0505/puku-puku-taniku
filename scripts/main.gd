@@ -178,6 +178,7 @@ var arrangement_button: Button
 var mystery_pod_button: Button
 var current_mode := "greenhouse"
 var labels_layer: Control
+var main_status_hud: Control
 var effects_layer: Control
 var best_label: Label
 var coin_label: Label
@@ -794,17 +795,18 @@ func _build_ui() -> void:
 	var ui:=CanvasLayer.new(); ui.layer=10; add_child(ui)
 	labels_layer=Control.new(); labels_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); labels_layer.mouse_filter=Control.MOUSE_FILTER_IGNORE; ui.add_child(labels_layer)
 	var hud:=Control.new(); hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); hud.mouse_filter=Control.MOUSE_FILTER_IGNORE; ui.add_child(hud)
+	main_status_hud=Control.new();main_status_hud.name="MainStatusHUD";main_status_hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);main_status_hud.mouse_filter=Control.MOUSE_FILTER_IGNORE;hud.add_child(main_status_hud)
 	effects_layer=Control.new(); effects_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); effects_layer.mouse_filter=Control.MOUSE_FILTER_IGNORE; ui.add_child(effects_layer)
 	var game_theme:=Theme.new();game_theme.default_font=load("res://assets/fonts/ZenMaruGothic-Bold.ttf") as Font;game_theme.default_font_size=16
-	labels_layer.theme=game_theme;hud.theme=game_theme;effects_layer.theme=game_theme
+	labels_layer.theme=game_theme;hud.theme=game_theme;main_status_hud.theme=game_theme;effects_layer.theme=game_theme
 	# logo
-	var logo:=Label.new(); logo.text="ぷくぷく\n多 肉"; logo.position=Vector2(26,34); logo.size=Vector2(190,105); logo.add_theme_font_size_override("font_size",31); logo.add_theme_color_override("font_color",Color("#fff2d3")); logo.add_theme_color_override("font_outline_color",UI_BROWN); logo.add_theme_constant_override("outline_size",8); logo.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; hud.add_child(logo)
-	var ribbon:=Label.new(); ribbon.text=" PUKU PUKU TANIKU "; ribbon.position=Vector2(56,126); ribbon.add_theme_font_size_override("font_size",11); ribbon.add_theme_color_override("font_color",Color.WHITE); ribbon.add_theme_stylebox_override("normal",_box(Color("#d99a3c"),Color("#7b4a25"),12,2)); hud.add_child(ribbon)
-	var best_panel:=PanelContainer.new(); best_panel.position=Vector2(204,54); best_panel.size=Vector2(168,66); best_panel.add_theme_stylebox_override("panel",_box(Color("#47261b"),Color("#f5c985"),16,2)); hud.add_child(best_panel)
+	var logo:=Label.new(); logo.text="ぷくぷく\n多 肉"; logo.position=Vector2(26,34); logo.size=Vector2(190,105); logo.add_theme_font_size_override("font_size",31); logo.add_theme_color_override("font_color",Color("#fff2d3")); logo.add_theme_color_override("font_outline_color",UI_BROWN); logo.add_theme_constant_override("outline_size",8); logo.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; main_status_hud.add_child(logo)
+	var ribbon:=Label.new(); ribbon.text=" PUKU PUKU TANIKU "; ribbon.position=Vector2(56,126); ribbon.add_theme_font_size_override("font_size",11); ribbon.add_theme_color_override("font_color",Color.WHITE); ribbon.add_theme_stylebox_override("normal",_box(Color("#d99a3c"),Color("#7b4a25"),12,2)); main_status_hud.add_child(ribbon)
+	var best_panel:=PanelContainer.new(); best_panel.position=Vector2(204,54); best_panel.size=Vector2(168,66); best_panel.add_theme_stylebox_override("panel",_box(Color("#47261b"),Color("#f5c985"),16,2)); main_status_hud.add_child(best_panel)
 	best_label=Label.new(); best_label.text="最高記録\n0.0 cm"; best_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; best_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; best_label.add_theme_font_size_override("font_size",17); best_label.add_theme_color_override("font_color",Color.WHITE); best_panel.add_child(best_label)
-	var coin_panel:=PanelContainer.new(); coin_panel.position=Vector2(398,54); coin_panel.size=Vector2(153,53); coin_panel.add_theme_stylebox_override("panel",_box(Color("#55301d"),Color("#f1d19c"),22,2)); hud.add_child(coin_panel)
+	var coin_panel:=PanelContainer.new(); coin_panel.position=Vector2(398,54); coin_panel.size=Vector2(153,53); coin_panel.add_theme_stylebox_override("panel",_box(Color("#55301d"),Color("#f1d19c"),22,2)); main_status_hud.add_child(coin_panel)
 	coin_label=Label.new(); coin_label.text=" ¥%s" % _comma(coins); coin_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; coin_label.add_theme_font_size_override("font_size",20); coin_label.add_theme_color_override("font_color",Color("#ffd85b")); coin_panel.add_child(coin_label)
-	var puku_area:=Control.new();puku_area.name="PukuGaugeArea";puku_area.position=Vector2(42,158);puku_area.size=Vector2(158,82);puku_area.mouse_filter=Control.MOUSE_FILTER_IGNORE;hud.add_child(puku_area)
+	var puku_area:=Control.new();puku_area.name="PukuGaugeArea";puku_area.position=Vector2(42,158);puku_area.size=Vector2(158,82);puku_area.mouse_filter=Control.MOUSE_FILTER_IGNORE;main_status_hud.add_child(puku_area)
 	var puku_content:=VBoxContainer.new();puku_content.position=Vector2(13,0);puku_content.size=Vector2(132,82);puku_content.alignment=BoxContainer.ALIGNMENT_CENTER;puku_content.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_content.add_theme_constant_override("separation",4);puku_area.add_child(puku_content)
 	puku_gauge_label=Label.new();puku_gauge_label.text="ぷくゲージ";puku_gauge_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;puku_gauge_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_gauge_label.add_theme_font_size_override("font_size",16);puku_gauge_label.add_theme_color_override("font_color",Color("#f2fdff"));puku_gauge_label.add_theme_color_override("font_outline_color",Color("#123843"));puku_gauge_label.add_theme_constant_override("outline_size",4);puku_gauge_label.add_theme_color_override("font_shadow_color",Color(0.0,.08,.12,.82));puku_gauge_label.add_theme_constant_override("shadow_offset_x",1);puku_gauge_label.add_theme_constant_override("shadow_offset_y",2);puku_content.add_child(puku_gauge_label)
 	puku_gauge_meter=ProgressBar.new();puku_gauge_meter.custom_minimum_size=Vector2(132,10);puku_gauge_meter.max_value=PUKU_GAUGE_TARGET_CM;puku_gauge_meter.show_percentage=false;puku_gauge_meter.mouse_filter=Control.MOUSE_FILTER_IGNORE;var meter_bg:=StyleBoxFlat.new();meter_bg.bg_color=Color(0.035,.12,.15,.88);meter_bg.set_corner_radius_all(5);meter_bg.border_color=Color(0.18,.38,.43,.72);meter_bg.set_border_width_all(1);puku_gauge_fill_style=StyleBoxFlat.new();puku_gauge_fill_style.bg_color=Color(0.31,.86,.94,.92);puku_gauge_fill_style.border_color=Color(0.80,1.0,1.0,.94);puku_gauge_fill_style.set_border_width_all(1);puku_gauge_fill_style.set_corner_radius_all(5);puku_gauge_meter.add_theme_stylebox_override("background",meter_bg);puku_gauge_meter.add_theme_stylebox_override("fill",puku_gauge_fill_style);puku_content.add_child(puku_gauge_meter)
@@ -2044,6 +2046,9 @@ func _update_play_ui()->void:
 	if not play_overlay:return
 	var preview_overlay_open:bool=catalog_preview_ui!=null and catalog_preview_ui.is_overlay_open()
 	var arrangement_navigation_suspended:bool=arrangement_scene_active or arrangement_transitioning or catalog_preview_mode_active or preview_overlay_open
+	var arrangement_hud_hidden:bool=arrangement_scene_active or arrangement_transitioning
+	if main_status_hud:main_status_hud.visible=not arrangement_hud_hidden
+	if labels_layer:labels_layer.visible=not arrangement_hud_hidden
 	play_overlay.visible=current_mode=="greenhouse" and not play_active and play_modal_open
 	play_open_button.visible=current_mode=="greenhouse" and intro_story_complete and not play_active and not play_modal_open and not arrangement_navigation_suspended and (not result_overlay or not result_overlay.visible) and (not shop_overlay or not shop_overlay.visible) and (not encyclopedia_overlay or not encyclopedia_overlay.visible) and (not settings_overlay or not settings_overlay.visible) and (not arrangement_ui or not arrangement_ui.visible)
 	seed_bag_panel.visible=current_mode=="greenhouse" and play_active and not rain_bonus_active and active_seed_type!="old"
@@ -2054,7 +2059,7 @@ func _update_play_ui()->void:
 	if shop_button:shop_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete()
 	if arrangement_button:arrangement_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete()
 	if mystery_pod_button:mystery_pod_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete() and not mystery_pod_ui.visible
-	if main_pod_pickup_button:main_pod_pickup_button.visible=main_pod_visible and (play_active or DEVELOPMENT_MYSTERY_POD_TOOLS_ENABLED) and not play_modal_open and not (encyclopedia_overlay and encyclopedia_overlay.visible) and not (shop_overlay and shop_overlay.visible) and not (settings_overlay and settings_overlay.visible) and not (mystery_pod_ui and mystery_pod_ui.visible) and not (mystery_pod_dev and mystery_pod_dev.visible)
+	if main_pod_pickup_button:main_pod_pickup_button.visible=main_pod_visible and (play_active or DEVELOPMENT_MYSTERY_POD_TOOLS_ENABLED) and not arrangement_hud_hidden and not play_modal_open and not (encyclopedia_overlay and encyclopedia_overlay.visible) and not (shop_overlay and shop_overlay.visible) and not (settings_overlay and settings_overlay.visible) and not (mystery_pod_ui and mystery_pod_ui.visible) and not (mystery_pod_dev and mystery_pod_dev.visible)
 	play_timer_label.text=("● シリーズ種 ●\n残り %d粒" if active_seed_type.begins_with("series:") else "● たね袋 ●\n残り %d粒")%play_seeds_remaining if play_timer_label.visible else ""
 	var held:Array[String]=[]
 	if old_seed_bags>0:held.append("古いたね %d袋"%old_seed_bags)
@@ -3620,6 +3625,7 @@ func _update_labels()->void:
 
 func _greenhouse_area_navigation_available()->bool:
 	if not _tutorial_fully_complete() or current_mode!="greenhouse" or play_active or catalog_preview_mode_active or arrangement_transitioning:return false
+	if arrangement_scene_active and arrangement_ui and arrangement_ui.is_editor_active():return false
 	return not ((tutorial_guide_overlay and tutorial_guide_overlay.visible) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (mystery_pod_ui and mystery_pod_ui.visible) or (mystery_pod_dev and mystery_pod_dev.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible))
 
 func _unhandled_input(event:InputEvent)->void:
@@ -3627,6 +3633,9 @@ func _unhandled_input(event:InputEvent)->void:
 		_handle_greenhouse_area_scroll_input(event,false)
 
 func _on_arrangement_world_scroll_input(event:InputEvent)->void:
+	if arrangement_ui and arrangement_ui.is_editor_active():
+		if greenhouse_area_drag_tracking:_cancel_greenhouse_area_drag()
+		return
 	if greenhouse_area_drag_tracking or (arrangement_scene_active and _greenhouse_area_navigation_available()):
 		_handle_greenhouse_area_scroll_input(event,true)
 

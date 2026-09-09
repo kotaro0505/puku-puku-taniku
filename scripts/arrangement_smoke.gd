@@ -31,12 +31,14 @@ func _ready()->void:
 	# No long press is needed: pressing the real plant selects it and dragging moves it immediately.
 	var direct_down:=_mouse_button(moved_position,true);ui._on_editor_canvas_gui_input(direct_down);assert(ui.drag_active and ui.selected_plant_index==0)
 	ui._on_editor_canvas_gui_input(_mouse_motion(moved_position+Vector2(-31,19)));ui._on_editor_canvas_gui_input(_mouse_button(moved_position+Vector2(-31,19),false));var direct_move_position:=Vector2(float(ui.editor_plants[0].x),float(ui.editor_plants[0].y));assert(direct_move_position.distance_to(moved_position)>10.0 and not ui.drag_active)
-	# A pinch started on empty canvas space still scales the currently selected plant continuously.
+	# A two-finger gesture started on empty canvas space scales and rotates the
+	# currently selected plant at the same time.
 	var pinch_origin:=Vector2(30,40);ui._on_editor_canvas_gui_input(_screen_touch(0,pinch_origin,true))
 	ui._on_editor_canvas_gui_input(_screen_touch(1,pinch_origin+Vector2(30,0),true));assert(ui.pinch_active and ui.selected_plant_index==0)
-	ui._on_editor_canvas_gui_input(_screen_drag(1,pinch_origin+Vector2(41.1,0)));assert(is_equal_approx(float(ui.editor_plants[0].scale),1.37))
-	ui._on_editor_canvas_gui_input(_screen_touch(1,pinch_origin+Vector2(41.1,0),false));ui._on_editor_canvas_gui_input(_screen_touch(0,pinch_origin,false));assert(not ui.pinch_active and is_equal_approx(float(ui.editor_plants[0].scale),1.37))
-	for rotation_step in range(24):ui._adjust_selected_rotation(15.0)
+	ui._on_editor_canvas_gui_input(_screen_drag(1,pinch_origin+Vector2(41.1,0)));assert(is_equal_approx(float(ui.editor_plants[0].scale),1.37) and is_equal_approx(float(ui.editor_plants[0].rotation),0.0))
+	ui._on_editor_canvas_gui_input(_screen_drag(1,pinch_origin+Vector2(0,41.1)));assert(is_equal_approx(float(ui.editor_plants[0].scale),1.37) and is_equal_approx(float(ui.editor_plants[0].rotation),90.0))
+	ui._on_editor_canvas_gui_input(_screen_touch(1,pinch_origin+Vector2(0,41.1),false));ui._on_editor_canvas_gui_input(_screen_touch(0,pinch_origin,false));assert(not ui.pinch_active and is_equal_approx(float(ui.editor_plants[0].scale),1.37) and is_equal_approx(float(ui.editor_plants[0].rotation),90.0))
+	for rotation_step in range(18):ui._adjust_selected_rotation(15.0)
 	assert(is_equal_approx(float(ui.editor_plants[0].rotation),0.0))
 	ui._add_species_to_editor("colorata");assert(ui.editor_plants.size()==2)
 	# Empty space only clears the selection; it never jumps a plant to the tap position.
