@@ -10,13 +10,13 @@ func _ready()->void:
 		var series_entry:Dictionary=game.series_catalog[index]
 		assert(str(series_entry.get("series_id",""))==expected_ids[index])
 		for required_key in ["series_id","display_name","subtitle","description","cover_image_path","species_ids","field_id","unlock_type","unlock_condition","iap_product_id","sort_order"]:assert(series_entry.has(required_key))
-	var base:Dictionary=game._series_entry("base");assert(game._is_series_unlocked(base));assert(game._series_species_entries("base").size()==21 and game.catalog_species.size()==74)
+	var base:Dictionary=game._series_entry("base");assert(game._is_series_unlocked(base));assert(game._series_species_entries("base").size()==21 and game.catalog_species.size()==84)
 	var unique_base_ids:Dictionary={}
 	for entry in game._series_species_entries("base"):unique_base_ids[str(entry.species_id)]=true
 	assert(unique_base_ids.size()==21)
 	for future_id in expected_ids.slice(1):
 		var future_entry:Dictionary=game._series_entry(str(future_id));assert(not game._is_series_unlocked(future_entry))
-		if str(future_id) in ["metal","sweets","forest_amber"]:assert(future_entry.species_ids.size()==10 and not game._can_browse_series(future_entry) and bool(future_entry.get("preview_catalog_when_locked",false)))
+		if str(future_id) in ["metal","jelly","sweets","forest_amber"]:assert(future_entry.species_ids.size()==10 and not game._can_browse_series(future_entry) and bool(future_entry.get("preview_catalog_when_locked",false)))
 		elif str(future_id)=="gummy":assert(future_entry.species_ids.size()==8 and not game._can_browse_series(future_entry) and bool(future_entry.get("preview_catalog_when_locked",false)))
 		elif str(future_id)=="glow":assert(future_entry.species_ids.size()==12 and not game._can_browse_series(future_entry) and bool(future_entry.get("preview_catalog_when_locked",false)))
 		elif str(future_id)=="neon":assert(future_entry.species_ids.size()==3 and game._is_hidden_series("neon") and not game._can_browse_series(future_entry) and not game._catalog_purchase_enabled(future_entry))
@@ -38,6 +38,15 @@ func _ready()->void:
 		assert(str(game.SucculentClass.SPRITES.get(str(sweets_entry.get("visual_variant","")),""))==image_path)
 		var sweets_texture:=load(image_path) as Texture2D;var sweets_source:=sweets_texture.get_image();var sweets_used:=sweets_source.get_used_rect();assert(sweets_texture.get_size()==Vector2(1254,1254) and sweets_source.detect_alpha()!=Image.ALPHA_NONE and sweets_source.get_pixel(0,0).a<.01 and sweets_used.position.x>0 and sweets_used.position.y>0 and sweets_used.end.x<1254 and sweets_used.end.y<1254)
 	assert(sweets_ids.size()==10)
+	var jelly_ids:Dictionary={}
+	for jelly_entry in game._series_species_entries("jelly"):
+		var jelly_id:=str(jelly_entry.get("species_id",""));var image_path:=str(jelly_entry.get("image_path",""));jelly_ids[jelly_id]=true
+		assert(str(jelly_entry.get("series_id",""))=="jelly" and bool(jelly_entry.get("catalog_only",false)) and is_zero_approx(float(jelly_entry.get("spawn_weight",-1.0))))
+		assert(not bool(game.greenhouse_available.get(jelly_id,false)) and jelly_entry not in game.species and image_path.begins_with("res://assets/catalog/jelly/") and ResourceLoader.exists(image_path))
+		assert(str(game.SucculentClass.SPRITES.get(str(jelly_entry.get("visual_variant","")),""))==image_path)
+		var jelly_image:Image=(load(image_path) as Texture2D).get_image();var jelly_used:=jelly_image.get_used_rect();var jelly_w:=jelly_image.get_width();var jelly_h:=jelly_image.get_height()
+		assert(jelly_w>=1200 and jelly_h>=1200 and jelly_image.detect_alpha()!=Image.ALPHA_NONE and jelly_image.get_pixel(0,0).a<.01 and jelly_image.get_pixel(jelly_w-1,0).a<.01 and jelly_image.get_pixel(0,jelly_h-1).a<.01 and jelly_image.get_pixel(jelly_w-1,jelly_h-1).a<.01 and jelly_used.size.x*jelly_used.size.y<jelly_w*jelly_h, "%s size=%s alpha=%s used=%s" % [jelly_id,Vector2i(jelly_w,jelly_h),jelly_image.detect_alpha(),jelly_used])
+	assert(jelly_ids.size()==10 and game._series_cover_texture(game._series_entry("jelly")).resource_path=="res://assets/catalog/jelly/jelly-grape.png")
 	var metal_ids:Dictionary={}
 	for metal_entry in game._series_species_entries("metal"):
 		var metal_id:=str(metal_entry.get("species_id",""));var image_path:=str(metal_entry.get("image_path",""));metal_ids[metal_id]=true
@@ -89,6 +98,11 @@ func _ready()->void:
 	game.discovered["sweets_strawberry_shortcake"]=true;game.species_get_counts["sweets_strawberry_shortcake"]=1;game._refresh_encyclopedia_header();game._refresh_encyclopedia_cards();await get_tree().process_frame;game._update_encyclopedia_visible_textures()
 	var first_sweets_card:Button=game.encyclopedia_grid.get_child(0);assert(not first_sweets_card.disabled);first_sweets_card.pressed.emit();assert(game.encyclopedia_detail_page.find_child("SpeciesName",true,false).text=="いちごショート多肉" and game.encyclopedia_detail_page.find_child("SpeciesImage",true,false).texture.resource_path=="res://assets/catalog/sweets/sweets-strawberry-shortcake.png")
 	game._close_encyclopedia();game.discovered.erase("sweets_strawberry_shortcake");game.species_get_counts.erase("sweets_strawberry_shortcake");game.selected_series_index=0
+	game.unlocked_series["jelly"]=true;game.selected_series_index=1;game._open_encyclopedia();await get_tree().process_frame
+	assert(game.encyclopedia_list_page.visible and game.encyclopedia_list_title.text=="ゼリー" and game.encyclopedia_grid.get_child_count()==10 and game.series_cover_image.texture.resource_path=="res://assets/catalog/jelly/jelly-grape.png")
+	game.discovered["jelly_grape"]=true;game.species_get_counts["jelly_grape"]=2;game._refresh_encyclopedia_header();game._refresh_encyclopedia_cards();await get_tree().process_frame;game._update_encyclopedia_visible_textures()
+	var first_jelly_card:Button=game.encyclopedia_grid.get_child(0);assert(not first_jelly_card.disabled);first_jelly_card.pressed.emit();assert(game.encyclopedia_detail_page.find_child("SpeciesName",true,false).text=="ぶどうゼリー" and game.encyclopedia_detail_page.find_child("SpeciesGetCount",true,false).text=="GET 2" and game.encyclopedia_detail_page.find_child("SpeciesImage",true,false).texture.resource_path=="res://assets/catalog/jelly/jelly-grape.png")
+	game._close_encyclopedia();game.unlocked_series.erase("jelly");game.discovered.erase("jelly_grape");game.species_get_counts.erase("jelly_grape");game.selected_series_index=0
 	game._open_encyclopedia();assert(game.encyclopedia_series_page.visible and game.encyclopedia_list_page==game.encyclopedia_series_page and game.series_title_label.text=="基本図鑑" and not game.series_cover_placeholder.visible and game.series_cover_image.texture.resource_path=="res://assets/plants/sprite-colorata.png")
 	assert(game.encyclopedia_scroll.get_child(0).get_child(0).name=="SeriesCoverSection" and game.encyclopedia_scroll.get_child(0).get_child(1).name=="SpeciesListHeader" and game.encyclopedia_grid.get_parent()==game.encyclopedia_scroll.get_child(0))
 	assert(game.encyclopedia_series_page.find_children("*","Button",true,false).all(func(button):return button.text!="図鑑をひらく"))

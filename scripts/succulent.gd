@@ -64,6 +64,16 @@ const SPRITES := {
 	"forest_amber_aqua_rosette": "res://assets/catalog/forest-amber/forest-amber-aqua-rosette.png",
 	"forest_amber_lavender_rosette": "res://assets/catalog/forest-amber/forest-amber-lavender-rosette.png",
 	"forest_amber_owl_rosette": "res://assets/catalog/forest-amber/forest-amber-owl-rosette.png",
+	"jelly_grape": "res://assets/catalog/jelly/jelly-grape.png",
+	"jelly_orange": "res://assets/catalog/jelly/jelly-orange.png",
+	"jelly_muscat": "res://assets/catalog/jelly/jelly-muscat.png",
+	"jelly_green_apple": "res://assets/catalog/jelly/jelly-green-apple.png",
+	"jelly_soda": "res://assets/catalog/jelly/jelly-soda.png",
+	"jelly_peach_milk": "res://assets/catalog/jelly/jelly-peach-milk.png",
+	"jelly_lemon": "res://assets/catalog/jelly/jelly-lemon.png",
+	"jelly_strawberry": "res://assets/catalog/jelly/jelly-strawberry.png",
+	"jelly_mint": "res://assets/catalog/jelly/jelly-mint.png",
+	"jelly_fruit_mix": "res://assets/catalog/jelly/jelly-fruit-mix.png",
 	"gold_kannte": "res://assets/plants/sprite-golden-laui.png"
 }
 
