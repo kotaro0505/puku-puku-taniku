@@ -10,13 +10,13 @@ func _ready()->void:
 		var series_entry:Dictionary=game.series_catalog[index]
 		assert(str(series_entry.get("series_id",""))==expected_ids[index])
 		for required_key in ["series_id","display_name","subtitle","description","cover_image_path","species_ids","field_id","unlock_type","unlock_condition","iap_product_id","sort_order"]:assert(series_entry.has(required_key))
-	var base:Dictionary=game._series_entry("base");assert(game._is_series_unlocked(base));assert(game._series_species_entries("base").size()==21 and game.catalog_species.size()==94)
+	var base:Dictionary=game._series_entry("base");assert(game._is_series_unlocked(base));assert(game._series_species_entries("base").size()==21 and game.catalog_species.size()==104)
 	var unique_base_ids:Dictionary={}
 	for entry in game._series_species_entries("base"):unique_base_ids[str(entry.species_id)]=true
 	assert(unique_base_ids.size()==21)
 	for future_id in expected_ids.slice(1):
 		var future_entry:Dictionary=game._series_entry(str(future_id));assert(not game._is_series_unlocked(future_entry))
-		if str(future_id) in ["metal","jewel","jelly","sweets","forest_amber"]:assert(future_entry.species_ids.size()==10 and not game._can_browse_series(future_entry) and bool(future_entry.get("preview_catalog_when_locked",false)))
+		if str(future_id) in ["metal","jewel","jelly","sweets","stone","forest_amber"]:assert(future_entry.species_ids.size()==10 and not game._can_browse_series(future_entry) and bool(future_entry.get("preview_catalog_when_locked",false)))
 		elif str(future_id)=="gummy":assert(future_entry.species_ids.size()==8 and not game._can_browse_series(future_entry) and bool(future_entry.get("preview_catalog_when_locked",false)))
 		elif str(future_id)=="glow":assert(future_entry.species_ids.size()==12 and not game._can_browse_series(future_entry) and bool(future_entry.get("preview_catalog_when_locked",false)))
 		elif str(future_id)=="neon":assert(future_entry.species_ids.size()==3 and game._is_hidden_series("neon") and not game._can_browse_series(future_entry) and not game._catalog_purchase_enabled(future_entry))

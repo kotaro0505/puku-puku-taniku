@@ -84,6 +84,16 @@ const SPRITES := {
 	"jelly_strawberry": "res://assets/catalog/jelly/jelly-strawberry.png",
 	"jelly_mint": "res://assets/catalog/jelly/jelly-mint.png",
 	"jelly_fruit_mix": "res://assets/catalog/jelly/jelly-fruit-mix.png",
+	"stone_black_lava_rosette": "res://assets/catalog/stone/stone-black-lava-rosette.png",
+	"stone_serpentine_rosette": "res://assets/catalog/stone/stone-serpentine-rosette.png",
+	"stone_granite_rosette": "res://assets/catalog/stone/stone-granite-rosette.png",
+	"stone_red_lava_rosette": "res://assets/catalog/stone/stone-red-lava-rosette.png",
+	"stone_sandstone_rosette": "res://assets/catalog/stone/stone-sandstone-rosette.png",
+	"stone_slate_rosette": "res://assets/catalog/stone/stone-slate-rosette.png",
+	"stone_green_schist_rosette": "res://assets/catalog/stone/stone-green-schist-rosette.png",
+	"stone_silver_gneiss_rosette": "res://assets/catalog/stone/stone-silver-gneiss-rosette.png",
+	"stone_obsidian_rosette": "res://assets/catalog/stone/stone-obsidian-rosette.png",
+	"stone_white_marble_rosette": "res://assets/catalog/stone/stone-white-marble-rosette.png",
 	"gold_kannte": "res://assets/plants/sprite-golden-laui.png"
 }
 
