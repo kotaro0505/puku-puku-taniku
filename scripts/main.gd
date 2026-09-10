@@ -23,6 +23,7 @@ const PUKU_GAUGE_TARGET_CM := 600.0
 const ENCYCLOPEDIA_UNLOCK_PUKU_COST := 5
 const NORMAL_SEED_BUNDLE_COST_PUKU := 1
 const NORMAL_SEED_BUNDLE_BAGS := 3
+const DEFAULT_POT_ID := "shallow_terracotta"
 const NORMAL_GERMINATION_COUNT := 24
 const VOLUME_GERMINATION_COUNT := 36
 const PREMIUM_GERMINATION_COUNT := 24
@@ -404,7 +405,7 @@ var species_get_counts: Dictionary = {}
 var unlocked_series: Dictionary = {"base":true}
 var get_counts_migration_dirty := false
 var pot_catalog: Array = []
-var owned_pots: Dictionary = {"starter_terracotta":true}
+var owned_pots: Dictionary = {DEFAULT_POT_ID:true}
 var saved_arrangements: Array = []
 var arrangement_save_capacity := 20
 var arrangement_ui
@@ -582,7 +583,7 @@ func _load_pot_data()->void:
 		for raw_pot in parsed_pots:
 			if raw_pot is Dictionary and not str(raw_pot.get("pot_id","")).is_empty():pot_catalog.append(raw_pot.duplicate(true))
 	pot_catalog.sort_custom(func(a:Dictionary,b:Dictionary)->bool:return int(a.get("sort_order",0))<int(b.get("sort_order",0)))
-	if pot_catalog.is_empty():pot_catalog.append({"pot_id":"starter_terracotta","display_name":"はじめての素焼き鉢","image_path":"","price_puku":null,"unlock_condition":{"type":"default"},"iap_product_id":"","placement_area":{"x":.08,"y":.12,"width":.84,"height":.60},"sort_order":0})
+	if pot_catalog.is_empty():pot_catalog.append({"pot_id":DEFAULT_POT_ID,"display_name":"浅型素焼き鉢","image_path":"","price_puku":1,"unlock_condition":{"type":"default"},"iap_product_id":"","placement_area":{"x":.06,"y":.10,"width":.88,"height":.56},"sort_order":0})
 
 func _load_save() -> void:
 	_cancel_puku_gauge_animations()
@@ -594,13 +595,16 @@ func _load_save() -> void:
 			bests=value.get("bests",{});puku_gauge_cm=maxf(0.0,float(value.get("puku_gauge_cm",0.0)));puku_points=maxi(0,int(value.get("puku_points",0)));discovered=value.get("discovered",{"colorata":true});habitat_seed_date=str(value.get("habitat_seed_date",""));habitat_seeds_collected=int(value.get("habitat_seeds_collected",0))
 			var carried_puku_points:=floori(puku_gauge_cm/PUKU_GAUGE_TARGET_CM);puku_points+=carried_puku_points;puku_gauge_cm-=carried_puku_points*PUKU_GAUGE_TARGET_CM
 			species_get_counts=value.get("species_get_counts",{});unlocked_series=value.get("unlocked_series",{"base":true})
-			owned_pots=value.get("owned_pots",{"starter_terracotta":true});saved_arrangements=value.get("saved_arrangements",[]);arrangement_save_capacity=maxi(1,int(value.get("arrangement_save_capacity",20)))
+			owned_pots=value.get("owned_pots",{DEFAULT_POT_ID:true});saved_arrangements=value.get("saved_arrangements",[]);arrangement_save_capacity=maxi(1,int(value.get("arrangement_save_capacity",20)))
 			if not species_get_counts is Dictionary:species_get_counts={}
 			if not unlocked_series is Dictionary:unlocked_series={"base":true}
-			if not owned_pots is Dictionary:owned_pots={"starter_terracotta":true}
+			if not owned_pots is Dictionary:owned_pots={DEFAULT_POT_ID:true}
 			if not saved_arrangements is Array:saved_arrangements=[]
 			unlocked_series["base"]=true
-			owned_pots["starter_terracotta"]=true
+			# The first three legacy pots were retired. Old saves and arrangements are
+			# migrated to the new default without discarding the arrangement itself.
+			owned_pots[DEFAULT_POT_ID]=true
+			for retired_pot_id in ["starter_terracotta","cream_ceramic","wooden_box"]:owned_pots.erase(retired_pot_id)
 			var normalized_arrangements:Array=[]
 			for saved_arrangement in saved_arrangements:
 				if saved_arrangement is Dictionary:
@@ -1131,8 +1135,8 @@ func _pot_unlocked(pot:Dictionary)->bool:
 		_:return false
 
 func _normalize_arrangement(source:Dictionary)->Dictionary:
-	var pot_id:=str(source.get("pot_id","starter_terracotta"))
-	if _pot_entry(pot_id).is_empty() or not bool(owned_pots.get(pot_id,false)):pot_id="starter_terracotta"
+	var pot_id:=str(source.get("pot_id",DEFAULT_POT_ID))
+	if _pot_entry(pot_id).is_empty() or not bool(owned_pots.get(pot_id,false)):pot_id=DEFAULT_POT_ID
 	var source_plants=source.get("plants",[]);var plants_data:Array=[]
 	if source_plants is Array:
 		for plant_value in source_plants:
@@ -1982,7 +1986,7 @@ func _reset_progression_state()->void:
 	JellyBalanceClass.reset_formal();jelly_trait_display_enabled=false;dev_jelly_test_active=false;last_jelly_claim_msec=-1000000000
 	if mystery_pod_system:mystery_pod_system.reset_formal()
 	mystery_route_assignments.clear();mystery_route_completed.clear();mystery_route_dialog_seen.clear();rain_completion_count=0;best_100_achieved=false;normal_habitat_complete=false;shop_selected_seed_type="normal"
-	_cancel_puku_gauge_animations();puku_gauge_cm=0.0;puku_points=0;bests.clear();discovered.clear();species_get_counts.clear();unlocked_series={"base":true};mystery_pod_count=0;series_seed_inventory.clear();forest_gacha_draw_count=0;forest_gacha_encountered.clear();main_pod_pending=false;main_pod_visible=false;habitat_pod_roll_date="";habitat_pod_pending=false;active_series_seed_id="";owned_pots={"starter_terracotta":true};saved_arrangements.clear();arrangement_save_capacity=20;greenhouse_available={"colorata":true};unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;puku_gauge_intro_complete=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;mystery_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;mystery_seed_pack_unlocked=false;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;habitat_mystery_seeds_pending=0;mystery_seed_count=0;armadillo_research_total=0;armadillo_research_rewards.clear();armadillo_research_intro_seen=false;armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();shop_chatter_acquired_species.clear();play_active=false;play_time_remaining=0.0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_scroll_tutorial_active=false;habitat_best_link_dialog_step=0;tutorial_habitat_item.clear();_stop_rain_visual();if main_pod_pickup_button:main_pod_pickup_button.visible=false;_apply_saved_unlocks();_clear_greenhouse_plants();_build_habitat_items();_save();_sync_mystery_pod_ui();_update_currency_ui();_update_play_ui()
+	_cancel_puku_gauge_animations();puku_gauge_cm=0.0;puku_points=0;bests.clear();discovered.clear();species_get_counts.clear();unlocked_series={"base":true};mystery_pod_count=0;series_seed_inventory.clear();forest_gacha_draw_count=0;forest_gacha_encountered.clear();main_pod_pending=false;main_pod_visible=false;habitat_pod_roll_date="";habitat_pod_pending=false;active_series_seed_id="";owned_pots={DEFAULT_POT_ID:true};saved_arrangements.clear();arrangement_save_capacity=20;greenhouse_available={"colorata":true};unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;puku_gauge_intro_complete=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;mystery_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;mystery_seed_pack_unlocked=false;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;habitat_mystery_seeds_pending=0;mystery_seed_count=0;armadillo_research_total=0;armadillo_research_rewards.clear();armadillo_research_intro_seen=false;armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();shop_chatter_acquired_species.clear();play_active=false;play_time_remaining=0.0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_scroll_tutorial_active=false;habitat_best_link_dialog_step=0;tutorial_habitat_item.clear();_stop_rain_visual();if main_pod_pickup_button:main_pod_pickup_button.visible=false;_apply_saved_unlocks();_clear_greenhouse_plants();_build_habitat_items();_save();_sync_mystery_pod_ui();_update_currency_ui();_update_play_ui()
 	normal_play_count=0;shop_visit_count=0;hidden_species_acquired.clear();tovar_next_play=TOVAR_FIRST_PLAY;tovar_attempt_count=0;tovar_event_active=false;tovar_harvested_this_play=false;armadillo_present=false;_save()
 
 func _reset_progression_for_development(button:Button)->void:

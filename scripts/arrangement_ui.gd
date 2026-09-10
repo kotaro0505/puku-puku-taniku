@@ -21,6 +21,7 @@ const ARRANGEMENT_CANVAS_POSITION := Vector2(20,150)
 const POT_VERTICAL_OFFSET := 62.0
 const PLANT_LAYER_Z := 200
 const COMPLETION_DISPLAY_SECONDS := 1.65
+const DEFAULT_POT_ID := "shallow_terracotta"
 const UI_CREAM := Color("#fff1d2")
 const UI_BROWN := Color("#4a2618")
 
@@ -58,6 +59,7 @@ var add_plant_button:Button
 var selected_controls:Array[Button]=[]
 var picker_page:Control
 var picker_filter:OptionButton
+var picker_scroll:ScrollContainer
 var picker_grid:GridContainer
 var viewer_page:Control
 var viewer_name:Label
@@ -500,13 +502,13 @@ func _build_picker_page()->void:
 	_build_header(picker_page,"多肉を選ぶ",_return_to_editor,"編集へ")
 	picker_filter=OptionButton.new();picker_filter.position=Vector2(145,91);picker_filter.size=Vector2(286,52);picker_filter.add_theme_font_size_override("font_size",17);picker_filter.item_selected.connect(_on_picker_filter_changed);picker_page.add_child(picker_filter)
 	var hint:=Label.new();hint.text="図鑑登録済みの品種は何度でも使えます";hint.position=Vector2(26,151);hint.size=Vector2(524,32);hint.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;hint.add_theme_font_size_override("font_size",15);_style_overlay_label(hint,Color("#ffe0a0"),4);picker_page.add_child(hint)
-	var scroll:=ScrollContainer.new();scroll.position=Vector2(24,194);scroll.size=Vector2(528,790);scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;picker_page.add_child(scroll)
-	picker_grid=GridContainer.new();picker_grid.columns=2;picker_grid.custom_minimum_size=Vector2(510,0);picker_grid.add_theme_constant_override("h_separation",10);picker_grid.add_theme_constant_override("v_separation",10);scroll.add_child(picker_grid)
+	picker_scroll=ScrollContainer.new();picker_scroll.position=Vector2(24,194);picker_scroll.size=Vector2(528,790);picker_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;picker_scroll.vertical_scroll_mode=ScrollContainer.SCROLL_MODE_AUTO;picker_scroll.scroll_deadzone=12;picker_scroll.mouse_filter=Control.MOUSE_FILTER_STOP;picker_page.add_child(picker_scroll)
+	picker_grid=GridContainer.new();picker_grid.columns=2;picker_grid.custom_minimum_size=Vector2(510,0);picker_grid.mouse_filter=Control.MOUSE_FILTER_PASS;picker_grid.add_theme_constant_override("h_separation",10);picker_grid.add_theme_constant_override("v_separation",10);picker_scroll.add_child(picker_grid)
 
 func _open_species_picker()->void:
 	if bool(current_arrangement.get("completed",false)):return
 	if editor_plants.size()>=MAX_PLANTS_PER_ARRANGEMENT:editor_message.text="1作品には最大%d株まで置けます"%MAX_PLANTS_PER_ARRANGEMENT;return
-	_show_page(picker_page);_refresh_picker_filters();_refresh_species_picker()
+	_show_page(picker_page);_refresh_picker_filters();_refresh_species_picker();picker_scroll.scroll_vertical=0
 
 func _refresh_picker_filters()->void:
 	picker_filter.clear();picker_filter.add_item("すべて");picker_filter.set_item_metadata(0,"all")
@@ -529,7 +531,7 @@ func _refresh_species_picker()->void:
 		var empty:=Label.new();empty.text="このシリーズには、まだ使える多肉がありません";empty.custom_minimum_size=Vector2(500,100);empty.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;empty.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;empty.add_theme_color_override("font_color",UI_CREAM);picker_grid.add_child(empty);return
 	for entry in available:
 		var species_id:=str(entry.get("species_id",""));var texture:=_resolve_texture(entry)
-		var card:=Button.new();card.custom_minimum_size=Vector2(248,150);_skin_button(card,Color("#f4e1bc"),15);card.disabled=texture==null;picker_grid.add_child(card)
+		var card:=Button.new();card.custom_minimum_size=Vector2(248,150);_skin_button(card,Color("#f4e1bc"),15);_prepare_scroll_button(card);card.disabled=texture==null;picker_grid.add_child(card)
 		var image_frame:=Control.new();image_frame.position=Vector2(8,12);image_frame.size=Vector2(112,112);image_frame.clip_contents=true;image_frame.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(image_frame)
 		var image:=TextureRect.new();image.texture=texture;image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.mouse_filter=Control.MOUSE_FILTER_IGNORE;image_frame.add_child(image);_request_texture(entry,image,false)
 		var label:=Label.new();label.text=str(entry.get("name_ja","多肉"))+("\n画像準備中" if texture==null else "\n追加する");label.position=Vector2(121,18);label.size=Vector2(117,112);label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;label.add_theme_font_size_override("font_size",14);label.add_theme_color_override("font_color",UI_BROWN);label.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(label)
@@ -569,7 +571,7 @@ func _save_current_arrangement()->void:
 	var name:=editor_name.text.strip_edges()
 	if name.is_empty():name=_default_arrangement_name();editor_name.text=name
 	_cancel_editor_gesture();selected_plant_index=-1;_update_editor_selection()
-	var saved:={"arrangement_id":str(current_arrangement.get("arrangement_id",_new_arrangement_id())),"name":name,"pot_id":str(current_arrangement.get("pot_id","starter_terracotta")),"created_at":str(current_arrangement.get("created_at",Time.get_datetime_string_from_system(false,true))),"completed":true,"plants":editor_plants.duplicate(true)}
+	var saved:={"arrangement_id":str(current_arrangement.get("arrangement_id",_new_arrangement_id())),"name":name,"pot_id":str(current_arrangement.get("pot_id",DEFAULT_POT_ID)),"created_at":str(current_arrangement.get("created_at",Time.get_datetime_string_from_system(false,true))),"completed":true,"plants":editor_plants.duplicate(true)}
 	current_arrangement=saved.duplicate(true);save_requested.emit(saved.duplicate(true))
 	completion_overlay.visible=true;completion_confetti_requested.emit(completion_confetti_layer)
 	await get_tree().create_timer(COMPLETION_DISPLAY_SECONDS).timeout

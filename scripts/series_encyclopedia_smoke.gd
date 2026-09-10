@@ -4,8 +4,8 @@ func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
 	game._reset_progression_state();game.intro_story_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.tutorial_steps["habitat_scroll_dialog"]=true;game.tutorial_steps["habitat_get_dialog"]=true
-	assert(game.series_catalog.size()==15)
-	var expected_ids:=["base","metal","jewel","jelly","sweets","gummy","stardust","glow","neon","stone","sea","halloween","christmas","yumekawa","forest_amber"]
+	assert(game.series_catalog.size()==13)
+	var expected_ids:=["base","metal","jewel","jelly","sweets","gummy","stardust","glow","neon","stone","sea","yumekawa","forest_amber"]
 	for index in range(expected_ids.size()):
 		var series_entry:Dictionary=game.series_catalog[index]
 		assert(str(series_entry.get("series_id",""))==expected_ids[index])
@@ -69,7 +69,7 @@ func _ready()->void:
 	var base_style:=TextureRect.new();var gummy_style:=TextureRect.new();game._apply_encyclopedia_image_style(base_style,game._series_species_entries("base")[0],false);game._apply_encyclopedia_image_style(gummy_style,game._series_species_entries("gummy")[0],false);assert(base_style.material==null and gummy_style.material==null and base_style.modulate.is_equal_approx(Color(0.12,0.09,0.08,0.82)) and gummy_style.modulate.is_equal_approx(base_style.modulate))
 	game.pending_habitat_species.clear();game._queue_random_species("シリーズ未解禁");assert(game.pending_habitat_species.is_empty())
 	game.greenhouse_available["gummy_peach_milk"]=true;game.discovered["gummy_peach_milk"]=true;game._apply_saved_unlocks();assert(game.species.any(func(entry):return str(entry.species_id)=="gummy_peach_milk"));game.greenhouse_available.erase("gummy_peach_milk");game.discovered.erase("gummy_peach_milk");game._apply_saved_unlocks()
-	game.formal_play_count=0;game._sync_arrangement_ui();game.arrangement_ui.open_catalog_shop();assert(game.arrangement_ui.catalog_shop_grid.get_child_count()==13);game.arrangement_ui.visible=false
+	game.formal_play_count=0;game._sync_arrangement_ui();game.arrangement_ui.open_catalog_shop();assert(game.arrangement_ui.catalog_shop_grid.get_child_count()==11);game.arrangement_ui.visible=false
 	game._open_encyclopedia();assert(game._owned_series_entries().size()==1 and game._current_series_entry().series_id=="base" and not game.series_position_label.visible and not game.all_series_get_label.visible and game.series_cover_image.texture.resource_path=="res://assets/plants/sprite-colorata.png")
 	for carousel_card in game.series_carousel_cards:assert(str(carousel_card.container.get_meta("series_id"))=="base")
 	game._close_encyclopedia();game.unlocked_series["sweets"]=true;game.unlocked_series["gummy"]=true;assert(game._owned_series_entries().map(func(entry):return str(entry.series_id))==["base","sweets","gummy"])

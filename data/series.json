@@ -253,32 +253,6 @@
     "sort_order": 100
   },
   {
-    "series_id": "halloween",
-    "display_name": "ハロウィンおばけ多肉",
-    "subtitle": "今後追加予定",
-    "description": "このシリーズは準備中です。",
-    "cover_image_path": "res://assets/series_covers/halloween.png",
-    "species_ids": [],
-    "field_id": "halloween_field",
-    "unlock_type": "future",
-    "unlock_condition": {"display_text": "今後追加予定"},
-    "iap_product_id": "",
-    "sort_order": 110
-  },
-  {
-    "series_id": "christmas",
-    "display_name": "クリスマス多肉",
-    "subtitle": "今後追加予定",
-    "description": "このシリーズは準備中です。",
-    "cover_image_path": "res://assets/series_covers/christmas.png",
-    "species_ids": [],
-    "field_id": "christmas_field",
-    "unlock_type": "future",
-    "unlock_condition": {"display_text": "今後追加予定"},
-    "iap_product_id": "",
-    "sort_order": 120
-  },
-  {
     "series_id": "yumekawa",
     "display_name": "ゆめふわ",
     "subtitle": "夢色の光をまとう、ふんわり多肉",
@@ -302,7 +276,7 @@
     "catalog_purchase_enabled": true,
     "unlock_condition": {"display_text": "5ぷくコインで交換"},
     "iap_product_id": "",
-    "sort_order": 130
+    "sort_order": 110
   },
   {
     "series_id": "forest_amber",
@@ -328,6 +302,6 @@
     "catalog_purchase_enabled": true,
     "unlock_condition": {"display_text": "ゲームを進めると入荷"},
     "iap_product_id": "",
-    "sort_order": 140
+    "sort_order": 120
   }
 ]

@@ -71,7 +71,7 @@ func _ready()->void:
 	assert(game.arrangement_ui.world_pot_anchor_screen.distance_to(expected_anchor)<EPSILON)
 	var table_center:Vector2=game.greenhouse_backdrop.position+game.ARRANGEMENT_TABLE_SOURCE_CENTER*backdrop_scale
 	assert(table_center.distance_to(viewport_size*game.ARRANGEMENT_TABLE_SCREEN_TARGET_RATIO)<EPSILON)
-	game.arrangement_ui._start_new_arrangement();game.arrangement_ui._select_editor_pot("starter_terracotta")
+	game.arrangement_ui._start_new_arrangement();game.arrangement_ui._select_editor_pot("shallow_terracotta")
 	# The placement guide was intentionally removed; the pot holder is now the only layer child.
 	assert(game.arrangement_ui.editor_pot_layer.get_child_count()==1)
 	var pot_holder:Control=game.arrangement_ui.editor_pot_layer.get_child(0)
@@ -84,7 +84,7 @@ func _ready()->void:
 	assert(not game.greenhouse_area_drag_tracking and not game.arrangement_transitioning)
 	game.arrangement_ui._return_home_from_editor()
 	assert(not game.arrangement_ui.is_editor_active() and game._greenhouse_area_navigation_available())
-	game.arrangement_ui._open_viewer({"arrangement_id":"gesture_viewer","name":"完成作品","pot_id":"starter_terracotta","completed":true,"plants":[]})
+	game.arrangement_ui._open_viewer({"arrangement_id":"gesture_viewer","name":"完成作品","pot_id":"shallow_terracotta","completed":true,"plants":[]})
 	assert(game.arrangement_ui.viewer_page.visible and game._greenhouse_area_navigation_available())
 	var viewer_press:=InputEventScreenTouch.new();viewer_press.index=0;viewer_press.position=Vector2(520,450);viewer_press.pressed=true;game.arrangement_ui._on_viewer_world_scroll_input(viewer_press)
 	assert(game.greenhouse_area_drag_tracking)

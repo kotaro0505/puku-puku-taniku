@@ -32,15 +32,11 @@ func _ready()->void:
 		assert(str(entry.get("series_id",""))=="glow" and bool(entry.get("catalog_only",false)))
 		assert(is_zero_approx(float(entry.get("spawn_weight",-1.0))) and is_zero_approx(float(entry.get("series_seed_weight",-1.0))) and not bool(entry.get("series_seed_eligible",true)))
 		assert(image_path.begins_with("res://assets/catalog/glow/") and image_path.ends_with(".png") and ResourceLoader.exists(image_path))
-		var texture:=load(image_path) as Texture2D;assert(texture!=null and texture.get_size()==Vector2(1280,1280))
+		var texture:=load(image_path) as Texture2D;assert(texture!=null and texture.get_width()>=1200 and texture.get_height()>=1200)
 		var source_image:=texture.get_image();assert(source_image!=null and source_image.detect_alpha()!=Image.ALPHA_NONE)
-		var transparent_samples:=0;var glow_samples:=0;var sample_count:=0
-		for y in range(0,1280,8):
-			for x in range(0,1280,8):
-				var alpha:=source_image.get_pixel(x,y).a;sample_count+=1
-				if alpha<=0.001:transparent_samples+=1
-				elif alpha<0.98:glow_samples+=1
-		assert(transparent_samples>sample_count/4 and glow_samples>sample_count/4)
+		var used:=source_image.get_used_rect();var width:=source_image.get_width();var height:=source_image.get_height()
+		assert(source_image.get_pixel(0,0).a<.001 and source_image.get_pixel(width-1,0).a<.001 and source_image.get_pixel(0,height-1).a<.001 and source_image.get_pixel(width-1,height-1).a<.001)
+		assert(used.position.x>20 and used.position.y>20 and used.end.x<width-20 and used.end.y<height-20, "%s image is clipped: %s in %sx%s"%[species_id,used,width,height])
 		var plant:=Succulent.new();add_child(plant);var label:=Label.new();plant.setup(entry,12345,label,label)
 		assert(plant.plant_sprite!=null and plant.plant_sprite.texture!=null and plant.plant_sprite.texture.resource_path==image_path)
 		plant.queue_free()

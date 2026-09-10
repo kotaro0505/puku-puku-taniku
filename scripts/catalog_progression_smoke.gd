@@ -7,7 +7,7 @@ func _ready()->void:
 	assert(game._owned_series_entries().map(func(entry):return str(entry.series_id))==["base"])
 	assert(game._is_hidden_series("neon") and not game._is_normal_series("neon"))
 	assert(game._series_cover_texture(game._series_entry("neon"))!=null)
-	var all_normal_ids:=["metal","jewel","jelly","sweets","gummy","stardust","glow","stone","sea","halloween","christmas","yumekawa","forest_amber"]
+	var all_normal_ids:=["metal","jewel","jelly","sweets","gummy","stardust","glow","stone","sea","yumekawa","forest_amber"]
 	assert(game._shop_series_catalog().map(func(entry):return str(entry.series_id))==all_normal_ids)
 	game.formal_play_count=1;assert(game._shop_series_catalog().map(func(entry):return str(entry.series_id))==all_normal_ids)
 	game.formal_play_count=46;assert(game._shop_series_catalog().map(func(entry):return str(entry.series_id))==all_normal_ids and game._is_normal_series("forest_amber"))
