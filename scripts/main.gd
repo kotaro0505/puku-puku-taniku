@@ -454,6 +454,10 @@ var play_spawn_queue := 0
 var play_seed_animations_pending := 0
 var play_spawn_timer := 0.0
 var play_concurrent_target := PLAY_INITIAL_MAX_PLANTS
+var greenhouse_finish_attempt_count := 0
+var greenhouse_finish_completed_count := 0
+var greenhouse_finish_last_block_reason := ""
+var greenhouse_finish_last_snapshot:Dictionary={}
 var rain_bag_count := 0
 var rain_event_pending := false
 var rain_bonus_in_progress := false
@@ -2283,7 +2287,7 @@ func _start_greenhouse_play(seed_type:String)->void:
 		if normal_seed_bags<1:return
 		normal_seed_bags-=1;current_target_count=NORMAL_GERMINATION_COUNT
 	if seed_type=="old" and total_play_count==0:_ensure_first_tutorial_species()
-	active_seed_type=seed_type;play_time_remaining=0.0;play_active=true;play_modal_open=false;play_harvest_cm_total=0.0;play_puku_earned_total=0;play_harvest_count=0;play_max_size=0.0;play_previous_global_best=_global_best_size();play_updated_global_best=false;play_share_record.clear();play_notable_species.clear();play_hidden_species_unlocked="";result_new_species_queue.clear();opening_species.clear();play_seeds_remaining=current_target_count;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=1 if seed_type.begins_with("series:") else (OLD_SEED_GERMINATION_COUNT if seed_type=="old" else mini(current_target_count,rng.randi_range(PLAY_INITIAL_MIN_PLANTS,PLAY_INITIAL_MAX_PLANTS)));_clear_greenhouse_plants()
+	active_seed_type=seed_type;play_time_remaining=0.0;play_active=true;play_modal_open=false;play_harvest_cm_total=0.0;play_puku_earned_total=0;play_harvest_count=0;play_max_size=0.0;play_previous_global_best=_global_best_size();play_updated_global_best=false;play_share_record.clear();play_notable_species.clear();play_hidden_species_unlocked="";result_new_species_queue.clear();opening_species.clear();play_seeds_remaining=current_target_count;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=1 if seed_type.begins_with("series:") else (OLD_SEED_GERMINATION_COUNT if seed_type=="old" else mini(current_target_count,rng.randi_range(PLAY_INITIAL_MIN_PLANTS,PLAY_INITIAL_MAX_PLANTS)));greenhouse_finish_attempt_count=0;greenhouse_finish_completed_count=0;greenhouse_finish_last_block_reason="";greenhouse_finish_last_snapshot.clear();_clear_greenhouse_plants()
 	if result_overlay:result_overlay.visible=false
 	for i in range(play_concurrent_target):_spawn_greenhouse_seed()
 	_prepare_tovar_event_for_play()
@@ -2298,8 +2302,11 @@ func _ensure_first_tutorial_species()->String:
 	return first_tutorial_species_id
 
 func _finish_greenhouse_play()->void:
-	if first_play_tutorial_active and not first_play_tutorial_sequence_complete:return
-	if not play_active or rain_bonus_active or play_seeds_remaining>0 or play_spawn_queue>0 or play_seed_animations_pending>0 or not plants.is_empty():return
+	greenhouse_finish_attempt_count+=1
+	greenhouse_finish_last_snapshot={"play_active":play_active,"plants_size":plants.size(),"play_seeds_remaining":play_seeds_remaining,"play_spawn_queue":play_spawn_queue,"play_seed_animations_pending":play_seed_animations_pending,"first_play_tutorial_active":first_play_tutorial_active,"first_play_tutorial_sequence_complete":first_play_tutorial_sequence_complete,"result_overlay_visible":result_overlay.visible if result_overlay else false}
+	greenhouse_finish_last_block_reason=_greenhouse_finish_block_reason()
+	if not greenhouse_finish_last_block_reason.is_empty():return
+	greenhouse_finish_completed_count+=1
 	play_active=false;play_time_remaining=0.0;play_spawn_timer=0.0;_end_first_play_tutorial_context();total_play_count+=1
 	var formal_play:=_tutorial_fully_complete() and active_seed_type!="old"
 	if formal_play:
@@ -2320,6 +2327,21 @@ func _finish_greenhouse_play()->void:
 	if formal_play:
 		_maybe_activate_secret_gacha()
 	_clear_greenhouse_plants();_save();_update_play_ui();_show_play_result();audio_manager.play_se("result",.7)
+
+func _greenhouse_finish_block_reason()->String:
+	if first_play_tutorial_active and not first_play_tutorial_sequence_complete:return "first_play_tutorial_sequence_incomplete"
+	if not play_active:return "play_inactive"
+	if rain_bonus_active:return "rain_bonus_active"
+	if play_seeds_remaining>0:return "play_seeds_remaining"
+	if play_spawn_queue>0:return "play_spawn_queue"
+	if play_seed_animations_pending>0:return "play_seed_animations_pending"
+	if not plants.is_empty():return "plants_remaining"
+	return ""
+
+func _poll_greenhouse_play_completion()->void:
+	if current_mode!="greenhouse" or not play_active or dev_jelly_test_active or catalog_preview_mode_active:return
+	greenhouse_finish_last_block_reason=_greenhouse_finish_block_reason()
+	if greenhouse_finish_last_block_reason.is_empty():_finish_greenhouse_play()
 
 func _prepare_tovar_event_for_play()->void:
 	tovar_event_active=false;tovar_harvested_this_play=false
@@ -4046,6 +4068,7 @@ func _process(delta:float)->void:
 			if play_spawn_timer<=0.0:
 				play_spawn_queue-=1;_spawn_greenhouse_seed()
 				if play_spawn_queue>0:play_spawn_timer=_next_greenhouse_spawn_interval()
+	_poll_greenhouse_play_completion()
 	if not rain_bonus_active:_resolve_crowding(delta)
 	_update_labels()
 
