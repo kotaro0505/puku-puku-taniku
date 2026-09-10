@@ -99,9 +99,10 @@ func _test_language_and_symbol_safety(game)->void:
 			var args:Array=[5] if str(key) in numeric_format_keys else (["TEST"] if str(key) in string_format_keys else [])
 			assert(not Localizer.text(language,str(key),args).is_empty())
 		for key in game.SHOP_CHATTER_KEYS:assert(not Localizer.text(language,str(key)).is_empty())
-	game._set_language("en");assert(game.language_code=="en" and game.settings_button.text=="Settings" and game.secret_gacha_ui.language=="en")
+	game._set_language("en");assert(game.language_code=="en" and game.settings_button.text=="Settings" and game.secret_gacha_ui.language=="en" and game.opening_prompt_localized.visible and not game.opening_prompt.visible and game.opening_prompt_localized_label.text=="Tap to Start")
 	assert(game.find_child("SeToggle",true,false).text==Localizer.text("en","audio_se_on"))
-	game._set_language("hiragana");assert(game.language_code=="hiragana" and "ひみつ" in game.secret_gacha_button.text)
+	game._set_language("hiragana");assert(game.language_code=="hiragana" and "ひみつ" in game.secret_gacha_button.text and game.opening_prompt_localized.visible and game.opening_prompt_localized_label.text=="タップして はじめる")
+	game._set_language("ja");assert(game.opening_prompt.visible and not game.opening_prompt_localized.visible)
 	game._set_language("ja")
 	for path in ["res://scripts/main.gd","res://scripts/arrangement_ui.gd","res://scripts/forest_gacha_ui.gd","res://scripts/secret_gacha_ui.gd","res://scripts/species_get_overlay.gd"]:
 		var source:=FileAccess.get_file_as_string(path)

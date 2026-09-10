@@ -489,6 +489,8 @@ var greenhouse_drag_accumulator := 0.0
 var greenhouse_drag_started := false
 var opening_overlay: Control
 var opening_prompt: TextureRect
+var opening_prompt_localized: PanelContainer
+var opening_prompt_localized_label: Label
 var opening_prompt_tween: Tween
 var opening_finished := false
 
@@ -986,14 +988,23 @@ func _build_opening_screen(hud:Control)->void:
 	opening_overlay=Control.new();opening_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);opening_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;hud.add_child(opening_overlay)
 	var background:=TextureRect.new();background.texture=load("res://assets/opening-background.jpg");background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);background.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;background.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_COVERED;background.mouse_filter=Control.MOUSE_FILTER_IGNORE;opening_overlay.add_child(background)
 	opening_prompt=TextureRect.new();opening_prompt.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;opening_prompt.texture=load("res://assets/opening-tap.png");opening_prompt.position=Vector2(86,820);opening_prompt.size=Vector2(404,136);opening_prompt.pivot_offset=opening_prompt.size*.5;opening_prompt.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;opening_prompt.mouse_filter=Control.MOUSE_FILTER_IGNORE;opening_overlay.add_child(opening_prompt)
+	opening_prompt_localized=PanelContainer.new();opening_prompt_localized.position=Vector2(86,834);opening_prompt_localized.size=Vector2(404,108);opening_prompt_localized.pivot_offset=opening_prompt_localized.size*.5;opening_prompt_localized.mouse_filter=Control.MOUSE_FILTER_IGNORE;opening_prompt_localized.add_theme_stylebox_override("panel",_box(Color("#b86e2d"),Color("#ffe18a"),38,5));opening_overlay.add_child(opening_prompt_localized)
+	opening_prompt_localized_label=Label.new();opening_prompt_localized_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;opening_prompt_localized_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;opening_prompt_localized_label.add_theme_font_size_override("font_size",30);opening_prompt_localized_label.add_theme_color_override("font_color",Color("#fff8df"));opening_prompt_localized_label.add_theme_color_override("font_outline_color",Color("#63331c"));opening_prompt_localized_label.add_theme_constant_override("outline_size",7);opening_prompt_localized_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;opening_prompt_localized.add_child(opening_prompt_localized_label)
 	var tap_area:=Button.new();tap_area.flat=true;tap_area.focus_mode=Control.FOCUS_NONE;tap_area.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);tap_area.mouse_default_cursor_shape=Control.CURSOR_POINTING_HAND;tap_area.pressed.connect(_finish_opening);opening_overlay.add_child(tap_area)
 	_show_opening()
 
 func _show_opening()->void:
-	opening_finished=false;opening_overlay.visible=true;opening_prompt.scale=Vector2.ONE
+	opening_finished=false;opening_overlay.visible=true;_refresh_opening_prompt();opening_prompt.scale=Vector2.ONE;opening_prompt_localized.scale=Vector2.ONE
 	if opening_prompt_tween and opening_prompt_tween.is_valid():opening_prompt_tween.kill()
-	opening_prompt_tween=create_tween().set_loops();opening_prompt_tween.tween_property(opening_prompt,"scale",Vector2(1.035,1.035),1.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT);opening_prompt_tween.tween_property(opening_prompt,"scale",Vector2.ONE,1.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	var prompt_control:Control=opening_prompt if opening_prompt.visible else opening_prompt_localized
+	opening_prompt_tween=create_tween().set_loops();opening_prompt_tween.tween_property(prompt_control,"scale",Vector2(1.035,1.035),1.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT);opening_prompt_tween.tween_property(prompt_control,"scale",Vector2.ONE,1.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	if audio_manager:audio_manager.play_bgm("opening")
+
+func _refresh_opening_prompt()->void:
+	if opening_prompt==null or opening_prompt_localized==null:return
+	var use_art_prompt:=language_code=="ja"
+	opening_prompt.visible=use_art_prompt;opening_prompt_localized.visible=not use_art_prompt
+	if opening_prompt_localized_label:opening_prompt_localized_label.text=Localizer.text(language_code,"opening_tap")
 
 func _finish_opening()->void:
 	if opening_finished:return
@@ -1937,6 +1948,7 @@ func _set_language(value:String)->void:
 	if settings_language_status:settings_language_status.text=Localizer.text(language_code,"language_saved")
 
 func _apply_language_to_ui()->void:
+	_refresh_opening_prompt()
 	if puku_gauge_label:puku_gauge_label.text=Localizer.text(language_code,"puku_gauge")
 	if play_open_button:play_open_button.text=Localizer.text(language_code,"main_play")
 	if shop_button:shop_button.text=Localizer.text(language_code,"main_shop")

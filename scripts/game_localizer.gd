@@ -10,6 +10,7 @@ const TEXT := {
 	"ja": {
 		"language_name": "日本語",
 		"game_title": "ぷくぷく多肉",
+		"opening_tap": "タップしてはじめる",
 		"panda_shop_name": "パンダのたねや",
 		"armadillo_name": "アルマジロ",
 		"next": "つぎへ",
@@ -333,6 +334,7 @@ const TEXT := {
 	"hiragana": {
 		"language_name": "ひらがな",
 		"game_title": "ぷくぷくたにく",
+		"opening_tap": "タップして はじめる",
 		"panda_shop_name": "ぱんだの たねや",
 		"armadillo_name": "あるまじろ",
 		"next": "つぎへ",
@@ -656,6 +658,7 @@ const TEXT := {
 	"en": {
 		"language_name": "English",
 		"game_title": "Puku Puku Taniku",
+		"opening_tap": "Tap to Start",
 		"panda_shop_name": "Panda's Seed Shop",
 		"armadillo_name": "Armadillo",
 		"next": "Next",
