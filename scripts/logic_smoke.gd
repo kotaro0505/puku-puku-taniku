@@ -132,7 +132,7 @@ func _ready()->void:
 	assert(game.play_harvest_count>=1 and game.play_harvest_cm_total>=21.7 and game.play_max_size>=21.7)
 	assert(game.play_updated_global_best and "最大サイズ更新" in game.result_max_label.text and game.result_confetti_layer.get_child_count()>0)
 	assert(not game.play_open_button.visible)
-	game._close_result()
+	game.secret_gacha_active=false;game.secret_gacha_draws_remaining=0;game._close_result()
 	assert(game.play_open_button.visible)
 	for control in game.external_navigation_controls:
 		if control==game.secret_gacha_button:assert(not control.visible)

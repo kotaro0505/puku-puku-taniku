@@ -49,5 +49,15 @@ func _ready()->void:
 	assert(self_harvest_target.state=="harvested" and game.first_play_has_harvested and game.play_harvest_count==1 and not game.first_play_harvest_guide_active and not game.tutorial_guide_overlay.visible)
 	for jelly_index in range(3):game._first_play_growing_plants()[0].jelly()
 	assert(game._first_play_growing_plants().size()==3 and not game._maybe_activate_first_play_harvest_guide() and not game.first_play_harvest_guide_active and not game.tutorial_guide_overlay.visible)
+	game._reset_progression_state();game.intro_story_complete=true;game.old_seed_bags=1;game.total_play_count=0;game.intro_overlay.visible=false;game.shop_overlay.visible=false
+	game._start_greenhouse_play("old");await get_tree().create_timer(.4).timeout;game.set_process(false);game._process(3.01)
+	for message_index in range(game.FIRST_PLAY_TUTORIAL_MESSAGE_KEYS.size()):game.tutorial_guide_button.pressed.emit()
+	assert(game.first_play_tutorial_sequence_complete and game.play_seeds_remaining==0 and game.play_spawn_queue==0 and game.play_seed_animations_pending==0 and game.plants.size()==game.OLD_SEED_GERMINATION_COUNT)
+	for plant in game.plants.duplicate():plant.harvest()
+	await get_tree().process_frame;await get_tree().process_frame
+	assert(game.play_seeds_remaining==0 and game.play_spawn_queue==0 and game.play_seed_animations_pending==0 and game.plants.is_empty() and game.first_play_tutorial_sequence_complete)
+	assert(not game.play_active and game.total_play_count==1 and game.result_overlay.visible)
+	game.result_overlay.find_child("ResultCloseButton",true,false).pressed.emit()
+	assert(game.intro_overlay.visible and game.shop_overlay.visible and game.tutorial_dialog_kind=="play1")
 	print("FIRST_PLAY_TUTORIAL_SMOKE_OK messages=",game.FIRST_PLAY_TUTORIAL_MESSAGE_KEYS.size()," languages=",Localizer.SUPPORTED_LANGUAGES.size())
 	get_tree().quit()

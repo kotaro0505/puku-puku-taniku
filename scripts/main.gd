@@ -2316,7 +2316,10 @@ func _finish_greenhouse_play()->void:
 		tutorial_steps["habitat_species_queued"]=true
 	_evaluate_unlock_rules("play_count",float(total_play_count))
 	if formal_play and not tutorial_habitat_queued:_roll_habitat_new_species()
-	_roll_rain_event();if formal_play:_maybe_activate_secret_gacha();_clear_greenhouse_plants();_save();_update_play_ui();_show_play_result();audio_manager.play_se("result",.7)
+	_roll_rain_event()
+	if formal_play:
+		_maybe_activate_secret_gacha()
+	_clear_greenhouse_plants();_save();_update_play_ui();_show_play_result();audio_manager.play_se("result",.7)
 
 func _prepare_tovar_event_for_play()->void:
 	tovar_event_active=false;tovar_harvested_this_play=false

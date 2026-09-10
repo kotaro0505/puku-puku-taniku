@@ -125,6 +125,7 @@ workflows:
           run_scene_smoke res://scripts/mystery_routes_smoke.tscn MYSTERY_ROUTES_SMOKE_OK
           run_scene_smoke res://scripts/shop_fix_smoke.tscn SHOP_FIX_SMOKE_OK
           run_scene_smoke res://scripts/tutorial_rain_ui_smoke.tscn TUTORIAL_RAIN_UI_SMOKE_OK
+          run_scene_smoke res://scripts/first_play_tutorial_smoke.tscn FIRST_PLAY_TUTORIAL_SMOKE_OK
           run_scene_smoke res://scripts/integrated_features_smoke.tscn INTEGRATED_FEATURES_SMOKE_OK
           run_script_smoke res://scripts/jelly_dev_smoke.gd JELLY_DEV_SMOKE_OK
           run_script_smoke res://scripts/ios_native_smoke.gd IOS_NATIVE_SMOKE_OK
