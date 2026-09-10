@@ -18,7 +18,7 @@ const EXPECTED := {
 func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
-	game.encyclopedia_unlocked=true;game.unlocked_series={"base":true};game.discovered.clear();game.species_get_counts.clear()
+	game.encyclopedia_unlocked=true;game.unlocked_series={"common":true};game.discovered.clear();game.species_get_counts.clear()
 	var glow:Dictionary=game._series_entry("glow")
 	assert(str(glow.get("display_name",""))=="蓄光多肉")
 	game.formal_play_count=10

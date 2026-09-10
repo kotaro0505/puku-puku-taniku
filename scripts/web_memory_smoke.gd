@@ -9,8 +9,11 @@ func _ready()->void:
 	game._reset_progression_state()
 	game.intro_story_complete=true
 	game.habitat_unlocked=true
+	game.habitat_tutorial_complete=true
 	game.encyclopedia_unlocked=true
-	game.discovered["colorata"]=true
+	game.unlocked_series["base"]=true
+	game.selected_series_index=1
+	game.discovered["nijinotama"]=true
 	for cycle in range(12):
 		if game.current_mode!="greenhouse":game._toggle_mode()
 		game._toggle_mode()

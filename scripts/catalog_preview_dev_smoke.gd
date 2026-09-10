@@ -79,8 +79,8 @@ func _ready()->void:
 	for plant in game._catalog_preview_plants():spawned_ids[str(plant.data.get("species_id",""))]=true
 	for species_id_value in gummy_ids:assert(spawned_ids.has(str(species_id_value)))
 	game.catalog_preview_ui._preview_next_series_batch()
-	var base_ids:Array=game.catalog_preview_ui.species_ids_for_series("base")
-	assert(game._catalog_preview_plants().size()==mini(base_ids.size(),game.catalog_preview_ui.MAX_PLANTS_PER_BATCH))
+	var common_ids:Array=game.catalog_preview_ui.species_ids_for_series("common")
+	assert(game._catalog_preview_plants().size()==mini(common_ids.size(),game.catalog_preview_ui.MAX_PLANTS_PER_BATCH))
 	game._clear_catalog_preview_plants()
 	assert(not game.catalog_preview_mode_active and game._catalog_preview_plants().is_empty())
 	assert(game.bests==bests_before)
@@ -93,5 +93,5 @@ func _ready()->void:
 	assert(game.formal_play_count==formal_play_before)
 	assert(game.rng.state==main_rng_state_before)
 	if FileAccess.file_exists("user://records.json"):assert(FileAccess.get_file_as_string("user://records.json")==saved_before)
-	print("CATALOG_PREVIEW_DEV_SMOKE_OK series=",game.catalog_preview_ui.group_count()," gummy=",gummy_ids.size()," base_batch=",mini(base_ids.size(),game.catalog_preview_ui.MAX_PLANTS_PER_BATCH)," save_unchanged=true rng_isolated=true")
+	print("CATALOG_PREVIEW_DEV_SMOKE_OK series=",game.catalog_preview_ui.group_count()," gummy=",gummy_ids.size()," common_batch=",mini(common_ids.size(),game.catalog_preview_ui.MAX_PLANTS_PER_BATCH)," save_unchanged=true rng_isolated=true")
 	get_tree().quit()

@@ -5,7 +5,7 @@ const FIRST_FIVE:=5
 func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
-	game._reset_progression_state();game.intro_story_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.puku_gauge_intro_complete=true;game.total_play_count=3;game.puku_points=20;game._update_play_ui()
+	game._reset_progression_state();game.intro_story_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.habitat_tutorial_complete=true;game.puku_gauge_intro_complete=true;game.total_play_count=3;game.puku_points=20;game._update_play_ui()
 	_test_assets_and_routes(game)
 	_test_draw_rules(game)
 	await _test_spin_capsule_and_reveal(game)
@@ -26,9 +26,9 @@ func _test_assets_and_routes(game)->void:
 
 func _test_draw_rules(game)->void:
 	var test_rng:=RandomNumberGenerator.new();test_rng.seed=20260909
-	var unlocked:Dictionary={"base":true};var encountered:Dictionary={};var known:Dictionary={"colorata":true}
+	var unlocked:Dictionary={"common":true};var encountered:Dictionary={};var known:Dictionary={"nijinotama":true}
 	for draw_number in range(1,FIRST_FIVE+1):
-		var first_result:Dictionary=game.forest_gacha_system.draw(draw_number,unlocked,known,encountered,test_rng,0.0);assert(first_result.source=="unlocked" and str(first_result.series_id)=="base")
+		var first_result:Dictionary=game.forest_gacha_system.draw(draw_number,unlocked,known,encountered,test_rng,0.0);assert(first_result.source=="unlocked" and str(first_result.series_id)=="common")
 	var locked_result:Dictionary=game.forest_gacha_system.draw(6,unlocked,known,encountered,test_rng,0.0);assert(locked_result.source=="locked" and str(locked_result.series_id)!="neon" and not game._is_hidden_series(str(locked_result.series_id)))
 	var normal_result:Dictionary=game.forest_gacha_system.draw(6,unlocked,known,encountered,test_rng,.99);assert(normal_result.source=="unlocked")
 	var locked_count:=0
@@ -36,11 +36,11 @@ func _test_draw_rules(game)->void:
 		if str(game.forest_gacha_system.draw(6,unlocked,known,encountered,test_rng).source)=="locked":locked_count+=1
 	var locked_ratio:=float(locked_count)/5000.0;assert(locked_ratio>.15 and locked_ratio<.21)
 	for locked_series in game.forest_gacha_system.eligible_series(false,unlocked):assert(not game._is_hidden_series(str(locked_series.get("series_id",""))))
-	var all_known:Dictionary={};for species_entry in game.forest_gacha_system.eligible_species("base"):all_known[str(species_entry.species_id)]=true
-	all_known.erase("lutea");var preferred:Dictionary=game.forest_gacha_system.draw(1,unlocked,all_known,{},test_rng,.99);assert(str(preferred.species_id)=="lutea")
+	var all_known:Dictionary={};for species_entry in game.forest_gacha_system.eligible_species("common"):all_known[str(species_entry.species_id)]=true
+	all_known.erase("lola");var preferred:Dictionary=game.forest_gacha_system.draw(1,unlocked,all_known,{},test_rng,.99);assert(str(preferred.species_id)=="lola")
 
 func _test_spin_capsule_and_reveal(game)->void:
-	game.puku_points=2;game.forest_gacha_draw_count=0;game.forest_gacha_encountered.clear();game.discovered={"colorata":true};game.greenhouse_available={"colorata":true};game.unlocked_species=game.greenhouse_available.duplicate(true);game.unlocked_series={"base":true};game._apply_saved_unlocks();game.forest_gacha_ui.animation_time_scale=.02;game._open_forest_gacha()
+	game.puku_points=2;game.forest_gacha_draw_count=0;game.forest_gacha_encountered.clear();game.discovered={"nijinotama":true};game.greenhouse_available={"nijinotama":true};game.unlocked_species=game.greenhouse_available.duplicate(true);game.unlocked_series={"common":true};game._apply_saved_unlocks();game.forest_gacha_ui.animation_time_scale=.02;game._open_forest_gacha()
 	game._spin_forest_gacha();await get_tree().create_timer(.45).timeout
 	assert(game.puku_points==1 and game.forest_gacha_draw_count==1 and game.forest_gacha_ui.capsule_ready and game.forest_gacha_ui.capsule.visible and absf(game.forest_gacha_ui.dial_texture.rotation)>1.0)
 	var species_id:=str(game.forest_gacha_ui.pending_result.get("species_id",""));assert(not species_id.is_empty() and bool(game.discovered.get(species_id,false)) and bool(game.greenhouse_available.get(species_id,false)))

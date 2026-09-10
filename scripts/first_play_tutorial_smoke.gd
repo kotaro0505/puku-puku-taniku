@@ -6,7 +6,8 @@ func _ready()->void:
 	game._reset_progression_state();game.intro_story_complete=true;game.old_seed_bags=1;game.total_play_count=0;game.intro_overlay.visible=false;game.shop_overlay.visible=false
 	game._start_greenhouse_play("old");await get_tree().create_timer(.4).timeout;game.set_process(false);game._begin_first_play_tutorial()
 	assert(game.play_active and game.first_play_tutorial_active and game.plants.size()==game.OLD_SEED_GERMINATION_COUNT)
-	for plant in game.plants:assert(not plant.jelly_checks_enabled)
+	assert(game.first_tutorial_species_id in game.COMMON_SPECIES_IDS)
+	for plant in game.plants:assert(not plant.jelly_checks_enabled and str(plant.data.species_id)==game.first_tutorial_species_id)
 	var tracked=game.plants[0];var age_before_first:float=tracked.age
 	var tracked_center:Vector2=game.camera.unproject_position(tracked.global_position+Vector3(0,tracked.visual_scale*.48,0));game._try_harvest(tracked_center);assert(tracked.state=="growing")
 	game._process(2.99);assert(not game.first_play_tutorial_dialog_visible and tracked.age>age_before_first)
@@ -34,6 +35,7 @@ func _ready()->void:
 	var guide_age:float=growing[0].age;game._process(3.0);assert(is_equal_approx(growing[0].age,guide_age))
 	var harvest_target=growing[1];var harvest_center:Vector2=game.camera.unproject_position(harvest_target.global_position+Vector3(0,harvest_target.visual_scale*.48,0));game._try_harvest(harvest_center)
 	assert(harvest_target.state=="harvested" and game.first_play_has_harvested and not game.first_play_harvest_guide_active and game.play_harvest_count==1 and not game.tutorial_guide_overlay.visible and bool(game.tutorial_steps.get("first_harvest_guide",false)))
+	assert(bool(game.discovered.get(game.first_tutorial_species_id,false)))
 	game._reset_progression_state();game.intro_story_complete=true;game.old_seed_bags=1;game.total_play_count=0;game.intro_overlay.visible=false;game.shop_overlay.visible=false
 	game._start_greenhouse_play("old");await get_tree().create_timer(.4).timeout;game.set_process(false);game._begin_first_play_tutorial();game._process(3.01)
 	for message_index in range(game.FIRST_PLAY_TUTORIAL_MESSAGES.size()):game.tutorial_guide_button.pressed.emit()

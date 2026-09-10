@@ -66,9 +66,6 @@ func _ready() -> void:
 	game.encyclopedia_unlocked = true
 	for species_id in EXPECTED:
 		game.discovered.erase(species_id)
-	game._refresh_encyclopedia_cards()
-	await get_tree().process_frame
-
 	for species_id in EXPECTED:
 		var expected: Dictionary = EXPECTED[species_id]
 		var entry: Dictionary = game._catalog_entry(species_id)
@@ -84,9 +81,11 @@ func _ready() -> void:
 		_assert_padded_texture(habitat_texture, expected.habitat_size, 14)
 		_assert_card_fit(full_texture)
 
+		game.current_encyclopedia_series_id = game._series_id_for_species(species_id)
+		game._refresh_encyclopedia_cards()
 		var card_index := -1
-		for i in range(game.catalog_species.size()):
-			if str(game.catalog_species[i].get("species_id", "")) == species_id:
+		for i in range(game.encyclopedia_card_entries.size()):
+			if str(game.encyclopedia_card_entries[i].get("species_id", "")) == species_id:
 				card_index = i
 				break
 		assert(card_index >= 0)
@@ -123,11 +122,11 @@ func _ready() -> void:
 
 	for species_id in EXPECTED:
 		game.discovered[species_id] = true
-	game._refresh_encyclopedia_cards()
-	await get_tree().process_frame
 	for species_id in EXPECTED:
-		for i in range(game.catalog_species.size()):
-			if str(game.catalog_species[i].get("species_id", "")) == species_id:
+		game.current_encyclopedia_series_id = game._series_id_for_species(species_id)
+		game._refresh_encyclopedia_cards()
+		for i in range(game.encyclopedia_card_entries.size()):
+			if str(game.encyclopedia_card_entries[i].get("species_id", "")) == species_id:
 				var found_image: TextureRect = game.encyclopedia_card_images[i]
 				assert(found_image.modulate.is_equal_approx(Color.WHITE))
 				assert(found_image.stretch_mode == TextureRect.STRETCH_KEEP_ASPECT_CENTERED)

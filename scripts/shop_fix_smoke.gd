@@ -7,7 +7,7 @@ func _ready()->void:
 	game._update_play_ui();assert(not game.shop_button.visible)
 	var visits_before:int=game.shop_visit_count;game._open_shop();assert(not game.shop_overlay.visible and game.shop_visit_count==visits_before)
 	game.intro_story_complete=true;game.total_play_count=3;game.habitat_unlocked=true;game.encyclopedia_unlocked=true;game.puku_gauge_intro_complete=true
-	game.tutorial_steps["habitat_scroll_dialog"]=true;game.tutorial_steps["habitat_get_dialog"]=true;game.tutorial_steps["play1_dialog"]=true
+	game.habitat_tutorial_complete=true;game.tutorial_steps["play1_dialog"]=true
 	game._update_play_ui();assert(game.shop_button.visible)
 	game._open_shop();assert(game.shop_overlay.visible and game.shop_current_page=="categories" and game.shop_category_controls[0].is_visible_in_tree() and not game.shop_wallet_label.is_visible_in_tree())
 	game.puku_points=1;var bags_at_seed_shop:int=game.normal_seed_bags;game._open_shop_seed_category();assert(game.arrangement_ui.visible and game.arrangement_ui.seed_shop_page.visible and game.arrangement_ui.return_context=="shop" and game.arrangement_ui.seed_shop_grid.get_child_count()>=5)

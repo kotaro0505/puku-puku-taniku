@@ -4,7 +4,7 @@ func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
 	game._reset_progression_state();game.intro_story_complete=true;game.total_play_count=3;game.formal_play_count=1;game.habitat_unlocked=true;game.puku_gauge_intro_complete=true
-	game.tutorial_steps["habitat_scroll_dialog"]=true;game.tutorial_steps["habitat_get_dialog"]=true;game.tutorial_steps["play1_dialog"]=true
+	game.habitat_tutorial_complete=true;game.tutorial_steps["play1_dialog"]=true
 	# First rain completion has no route reward; the second assigns one pending plant.
 	game.rain_bonus_active=true;game._finish_rain_bonus();assert(game.rain_completion_count==1 and not game.mystery_route_assignments.has(game.MYSTERY_ROUTE_RAIN))
 	game.rain_bonus_active=true;game._finish_rain_bonus();var mystery_ids:Array[String]=game._mystery_event_species_ids();var rain_id:=str(game.mystery_route_assignments.get(game.MYSTERY_ROUTE_RAIN,""));assert(mystery_ids.size()==6 and rain_id in mystery_ids and rain_id in game.pending_habitat_species and not bool(game.discovered.get(rain_id,false)))

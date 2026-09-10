@@ -3,25 +3,27 @@ extends Node
 func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
-	game._reset_progression_state();game.intro_story_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.tutorial_steps["habitat_scroll_dialog"]=true;game.tutorial_steps["habitat_get_dialog"]=true
-	assert(game.series_catalog.size()==13)
-	var expected_ids:=["base","metal","jewel","jelly","sweets","gummy","stardust","glow","neon","stone","sea","yumekawa","forest_amber"]
+	game._reset_progression_state();game.intro_story_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.habitat_tutorial_complete=true
+	assert(game.series_catalog.size()==14)
+	var expected_ids:=["common","base","metal","jewel","jelly","sweets","gummy","stardust","glow","neon","stone","sea","yumekawa","forest_amber"]
 	for index in range(expected_ids.size()):
 		var series_entry:Dictionary=game.series_catalog[index]
 		assert(str(series_entry.get("series_id",""))==expected_ids[index])
 		for required_key in ["series_id","display_name","subtitle","description","cover_image_path","species_ids","field_id","unlock_type","unlock_condition","iap_product_id","sort_order"]:assert(series_entry.has(required_key))
-	var base:Dictionary=game._series_entry("base");assert(game._is_series_unlocked(base));assert(game._series_species_entries("base").size()==21 and game.catalog_species.size()==124)
+	var common:Dictionary=game._series_entry("common");assert(game._is_series_unlocked(common));assert(game._series_species_entries("common").size()==10)
+	var base:Dictionary=game._series_entry("base");assert(not game._is_series_unlocked(base));assert(str(base.get("display_name",""))=="原種図鑑" and game._series_species_entries("base").size()==21 and game.catalog_species.size()==134)
 	var unique_base_ids:Dictionary={}
 	for entry in game._series_species_entries("base"):unique_base_ids[str(entry.species_id)]=true
 	assert(unique_base_ids.size()==21)
 	for future_id in expected_ids.slice(1):
 		var future_entry:Dictionary=game._series_entry(str(future_id));assert(not game._is_series_unlocked(future_entry))
-		if str(future_id) in ["metal","jewel","jelly","sweets","stone","sea","yumekawa","forest_amber"]:assert(future_entry.species_ids.size()==10 and not game._can_browse_series(future_entry) and bool(future_entry.get("preview_catalog_when_locked",false)))
+		if str(future_id)=="base":assert(future_entry.species_ids.size()==21 and not game._can_browse_series(future_entry))
+		elif str(future_id) in ["metal","jewel","jelly","sweets","stone","sea","yumekawa","forest_amber"]:assert(future_entry.species_ids.size()==10 and not game._can_browse_series(future_entry) and bool(future_entry.get("preview_catalog_when_locked",false)))
 		elif str(future_id)=="gummy":assert(future_entry.species_ids.size()==8 and not game._can_browse_series(future_entry) and bool(future_entry.get("preview_catalog_when_locked",false)))
 		elif str(future_id)=="glow":assert(future_entry.species_ids.size()==12 and not game._can_browse_series(future_entry) and bool(future_entry.get("preview_catalog_when_locked",false)))
 		elif str(future_id)=="neon":assert(future_entry.species_ids.size()==3 and game._is_hidden_series("neon") and not game._can_browse_series(future_entry) and not game._catalog_purchase_enabled(future_entry))
 		else:assert(future_entry.species_ids.is_empty())
-		var future_field:Dictionary=game._field_entry(str(future_entry.field_id));assert(not bool(future_field.get("implemented",true)))
+		var future_field:Dictionary=game._field_entry(str(future_entry.field_id));assert(bool(future_field.get("implemented",false)) if str(future_id)=="base" else not bool(future_field.get("implemented",true)))
 	var gummy_ids:Dictionary={}
 	for gummy_entry in game._series_species_entries("gummy"):
 		var gummy_id:=str(gummy_entry.get("species_id",""));var image_path:=str(gummy_entry.get("image_path",""));gummy_ids[gummy_id]=true
@@ -70,9 +72,9 @@ func _ready()->void:
 	game.pending_habitat_species.clear();game._queue_random_species("シリーズ未解禁");assert(game.pending_habitat_species.is_empty())
 	game.greenhouse_available["gummy_peach_milk"]=true;game.discovered["gummy_peach_milk"]=true;game._apply_saved_unlocks();assert(game.species.any(func(entry):return str(entry.species_id)=="gummy_peach_milk"));game.greenhouse_available.erase("gummy_peach_milk");game.discovered.erase("gummy_peach_milk");game._apply_saved_unlocks()
 	game.formal_play_count=0;game._sync_arrangement_ui();game.arrangement_ui.open_catalog_shop();assert(game.arrangement_ui.catalog_shop_grid.get_child_count()==11);game.arrangement_ui.visible=false
-	game._open_encyclopedia();assert(game._owned_series_entries().size()==1 and game._current_series_entry().series_id=="base" and not game.series_position_label.visible and not game.all_series_get_label.visible and game.series_cover_image.texture.resource_path=="res://assets/plants/sprite-colorata.png")
-	for carousel_card in game.series_carousel_cards:assert(str(carousel_card.container.get_meta("series_id"))=="base")
-	game._close_encyclopedia();game.unlocked_series["sweets"]=true;game.unlocked_series["gummy"]=true;assert(game._owned_series_entries().map(func(entry):return str(entry.series_id))==["base","sweets","gummy"])
+	game._open_encyclopedia();assert(game._owned_series_entries().size()==1 and game._current_series_entry().series_id=="common" and not game.series_position_label.visible and not game.all_series_get_label.visible and game.series_cover_image.texture.resource_path=="res://assets/catalog/common/common-nijinotama.png")
+	for carousel_card in game.series_carousel_cards:assert(str(carousel_card.container.get_meta("series_id"))=="common")
+	game._close_encyclopedia();game.unlocked_series["sweets"]=true;game.unlocked_series["gummy"]=true;assert(game._owned_series_entries().map(func(entry):return str(entry.series_id))==["common","sweets","gummy"])
 	assert(game._series_cover_texture(game._series_entry("sweets")).resource_path=="res://assets/catalog/sweets/sweets-strawberry-shortcake.png" and game._series_cover_texture(game._series_entry("gummy")).resource_path=="res://assets/catalog/gummy/gummy-peach-milk.png")
 	game.selected_series_index=2;game._open_encyclopedia();assert(not game.series_lock_label.visible and game.series_cover_image.texture.resource_path=="res://assets/catalog/gummy/gummy-peach-milk.png");await get_tree().process_frame
 	assert(game.encyclopedia_list_page.visible and game.encyclopedia_list_title.text=="グミ多肉" and game.encyclopedia_grid.get_child_count()==8 and not game.encyclopedia_list_progress.visible and not game.encyclopedia_list_get.visible and not game.encyclopedia_field_button.visible)
@@ -103,12 +105,12 @@ func _ready()->void:
 	game.discovered["jelly_grape"]=true;game.species_get_counts["jelly_grape"]=2;game._refresh_encyclopedia_header();game._refresh_encyclopedia_cards();await get_tree().process_frame;game._update_encyclopedia_visible_textures()
 	var first_jelly_card:Button=game.encyclopedia_grid.get_child(0);assert(not first_jelly_card.disabled);first_jelly_card.pressed.emit();assert(game.encyclopedia_detail_page.find_child("SpeciesName",true,false).text=="ぶどうゼリー" and game.encyclopedia_detail_page.find_child("SpeciesGetCount",true,false).text=="GET 2" and game.encyclopedia_detail_page.find_child("SpeciesImage",true,false).texture.resource_path=="res://assets/catalog/jelly/jelly-grape.png")
 	game._close_encyclopedia();game.unlocked_series.erase("jelly");game.discovered.erase("jelly_grape");game.species_get_counts.erase("jelly_grape");game.selected_series_index=0
-	game._open_encyclopedia();assert(game.encyclopedia_series_page.visible and game.encyclopedia_list_page==game.encyclopedia_series_page and game.series_title_label.text=="基本図鑑" and not game.series_cover_placeholder.visible and game.series_cover_image.texture.resource_path=="res://assets/plants/sprite-colorata.png")
+	game._open_encyclopedia();assert(game.encyclopedia_series_page.visible and game.encyclopedia_list_page==game.encyclopedia_series_page and game.series_title_label.text=="普及種図鑑" and not game.series_cover_placeholder.visible and game.series_cover_image.texture.resource_path=="res://assets/catalog/common/common-nijinotama.png")
 	assert(game.encyclopedia_scroll.get_child(0).get_child(0).name=="SeriesCoverSection" and game.encyclopedia_scroll.get_child(0).get_child(1).name=="SpeciesListHeader" and game.encyclopedia_grid.get_parent()==game.encyclopedia_scroll.get_child(0))
 	assert(game.encyclopedia_series_page.find_children("*","Button",true,false).all(func(button):return button.text!="図鑑をひらく"))
 	assert(game.series_carousel_cards.size()==3)
 	var previous_card:Dictionary=game.series_carousel_cards[0];var current_card:Dictionary=game.series_carousel_cards[1];var next_card:Dictionary=game.series_carousel_cards[2]
-	assert(str(previous_card.container.get_meta("series_id"))=="gummy" and str(current_card.container.get_meta("series_id"))=="base" and str(next_card.container.get_meta("series_id"))=="sweets")
+	assert(str(previous_card.container.get_meta("series_id"))=="gummy" and str(current_card.container.get_meta("series_id"))=="common" and str(next_card.container.get_meta("series_id"))=="sweets")
 	assert(previous_card.container.position.x<0.0 and next_card.container.position.x>0.0)
 	for detail_node in current_card.detail_nodes:assert(detail_node.get_parent()==current_card.container)
 	var counts_before:Dictionary=game.species_get_counts.duplicate(true);game._refresh_series_selection();game._refresh_series_selection();assert(game.species_get_counts==counts_before)
@@ -118,7 +120,7 @@ func _ready()->void:
 	var swipe_end:=InputEventScreenTouch.new();swipe_end.pressed=false;swipe_end.position=Vector2(210,202);game._on_series_swipe_input(swipe_end);assert(game.series_carousel_animating)
 	await get_tree().create_timer(.36).timeout
 	assert(game._current_series_entry().series_id=="sweets" and not game.series_lock_label.visible and game.current_encyclopedia_series_id=="sweets" and game.encyclopedia_grid.get_child_count()==10 and game.encyclopedia_scroll.scroll_vertical==0)
-	assert(is_zero_approx(game.series_carousel_offset) and str(previous_card.container.get_meta("series_id"))=="base" and str(next_card.container.get_meta("series_id"))=="gummy")
+	assert(is_zero_approx(game.series_carousel_offset) and str(previous_card.container.get_meta("series_id"))=="common" and str(next_card.container.get_meta("series_id"))=="gummy")
 	var short_start:=InputEventScreenTouch.new();short_start.pressed=true;short_start.position=Vector2(300,200);game._on_series_swipe_input(short_start)
 	var short_drag:=InputEventScreenDrag.new();short_drag.position=Vector2(270,200);game._on_series_swipe_input(short_drag)
 	var short_end:=InputEventScreenTouch.new();short_end.pressed=false;short_end.position=Vector2(270,200);game._on_series_swipe_input(short_end);await get_tree().create_timer(.28).timeout
@@ -126,14 +128,15 @@ func _ready()->void:
 	var vertical_start:=InputEventScreenTouch.new();vertical_start.pressed=true;vertical_start.position=Vector2(300,420);game._on_series_swipe_input(vertical_start)
 	var vertical_drag:=InputEventScreenDrag.new();vertical_drag.position=Vector2(302,300);game._on_series_swipe_input(vertical_drag);assert(game.series_swipe_axis==2 and is_zero_approx(game.series_carousel_offset))
 	var vertical_end:=InputEventScreenTouch.new();vertical_end.pressed=false;vertical_end.position=Vector2(302,300);game._on_series_swipe_input(vertical_end);assert(not game.series_carousel_animating)
-	game._change_series_selection(-1);assert(game.series_carousel_animating);await get_tree().create_timer(.36).timeout;assert(game._current_series_entry().series_id=="base" and is_zero_approx(game.series_carousel_offset))
+	game._change_series_selection(-1);assert(game.series_carousel_animating);await get_tree().create_timer(.36).timeout;assert(game._current_series_entry().series_id=="common" and is_zero_approx(game.series_carousel_offset))
 	for repeat in range(2):
 		game._spawn_specific_plant("colorata");var harvested=game.plants.back();harvested.diameter_cm=12.0+repeat;harvested.harvest()
 	assert(game._grant_hidden_species("pinwheel") and not game._grant_hidden_species("pinwheel"))
 	assert(game._species_get_count("colorata")==2 and game._series_get_count("base")==3 and game._all_series_get_count()==3 and game._series_found_count("base")==2)
 	game._save();game.species_get_counts.clear();game._load_save();assert(game._species_get_count("colorata")==2 and game._species_get_count("pinwheel")==1)
+	game.unlocked_series["base"]=true;game.selected_series_index=1
 	game._open_encyclopedia();await get_tree().process_frame
-	assert(game.encyclopedia_list_page.visible and game.encyclopedia_grid.get_child_count()==game._series_species_entries("base").size() and game.encyclopedia_list_title.text=="基本図鑑" and not game.encyclopedia_list_get.visible)
+	assert(game.encyclopedia_list_page.visible and game.encyclopedia_grid.get_child_count()==game._series_species_entries("base").size() and game.encyclopedia_list_title.text=="原種図鑑" and not game.encyclopedia_list_get.visible)
 	assert(game.encyclopedia_field_button.visible and not game.encyclopedia_field_button.disabled and game.encyclopedia_field_button.text=="このシリーズの原生地へ")
 	game._open_current_series_field();assert(not game.encyclopedia_overlay.visible and game.current_mode=="habitat")
 	game._toggle_mode();assert(game.current_mode=="greenhouse")

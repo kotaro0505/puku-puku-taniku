@@ -188,8 +188,8 @@ func setup(species: Dictionary, seed_value: int, screen_label: Label, _danger: L
 	plant_sprite = Sprite3D.new()
 	var variant := str(data.get("visual_variant", "laui"))
 	var configured_image_path:=str(data.get("image_path",""))
-	var texture_path:=configured_image_path if not configured_image_path.is_empty() and (CatalogImageLoader.is_external_path(configured_image_path) or ResourceLoader.exists(configured_image_path)) else str(SPRITES.get(variant, SPRITES.laui))
-	plant_sprite.texture = CatalogImageLoader.get_texture(texture_path)
+	var texture_path:=configured_image_path if not configured_image_path.is_empty() and (CatalogImageLoader.is_external_path(configured_image_path) or ResourceLoader.exists(configured_image_path)) else str(SPRITES.get(variant, ""))
+	plant_sprite.texture = CatalogImageLoader.get_texture(texture_path) if not texture_path.is_empty() else CatalogImageLoader.placeholder_texture
 	plant_sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	plant_sprite.no_depth_test = false
 	plant_sprite.alpha_cut = SpriteBase3D.ALPHA_CUT_DISABLED

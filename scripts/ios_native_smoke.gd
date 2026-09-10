@@ -24,11 +24,14 @@ func _ready() -> void:
 	assert(game.audio_manager._stream_for("bgm", "greenhouse") is AudioStreamOggVorbis)
 	assert(game.arrangement_ui!=null and game.pot_catalog.size()>=1)
 	assert(bool(game.owned_pots.get("shallow_terracotta",false)))
-	# Keep this scale check independent from saves written by earlier smoke tests.
-	game.bests.erase("colorata")
-	assert(is_equal_approx(game._habitat_best_visual_scale("colorata"), 1.0))
+	# Habitat plants have their own persistent size; greenhouse records do not alter them.
+	game.habitat_tutorial_complete=true
+	game._build_habitat_items(true)
+	assert(game.habitat_wild_plants.size()==game.HabitatWildSystemClass.TARGET_POPULATION)
+	var first_wild_scale:Vector3=game.habitat_pickups.filter(func(item):return str(item.kind)=="wild_plant")[0].node.scale
 	game.bests["colorata"] = 100.0
-	assert(is_equal_approx(game._habitat_best_visual_scale("colorata"), 3.25))
+	game._build_habitat_items(true)
+	assert(game.habitat_pickups.filter(func(item):return str(item.kind)=="wild_plant")[0].node.scale.is_equal_approx(first_wild_scale))
 
 	var save_probe_path := "user://ios-native-save-probe.tmp"
 	var probe := FileAccess.open(save_probe_path, FileAccess.WRITE)

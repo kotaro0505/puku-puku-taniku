@@ -4,7 +4,8 @@ func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
 	game._reset_progression_state();game.intro_story_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true
-	assert(game._owned_series_entries().map(func(entry):return str(entry.series_id))==["base"])
+	assert(game._owned_series_entries().map(func(entry):return str(entry.series_id))==["common"])
+	assert(not game._is_series_unlocked(game._series_entry("base")))
 	assert(game._is_hidden_series("neon") and not game._is_normal_series("neon"))
 	assert(game._series_cover_texture(game._series_entry("neon"))!=null)
 	var all_normal_ids:=["metal","jewel","jelly","sweets","gummy","stardust","glow","stone","sea","yumekawa","forest_amber"]
@@ -16,7 +17,7 @@ func _ready()->void:
 	game._grant_old_catalog_page(1,true);assert(game.old_catalog_pages==1 and game.old_catalog_intro_pending)
 	game.puku_points=2;game._accept_hidden_catalog_restoration();assert(game.old_catalog_pages==1 and not bool(game.unlocked_series.get("neon",false)))
 	game.puku_points=5;game._accept_hidden_catalog_restoration();assert(game.old_catalog_pages==0 and game.puku_points==0 and bool(game.unlocked_series.get("neon",false)))
-	assert(game._owned_series_entries().map(func(entry):return str(entry.series_id))==["base","neon"] and game._series_species_entries("neon").size()==3)
+	assert(game._owned_series_entries().map(func(entry):return str(entry.series_id))==["common","neon"] and game._series_species_entries("neon").size()==3)
 	game.unlocked_series.erase("neon");game.research_catalog_reward_pending=true;game.armadillo_research_rewards.erase("8");game.formal_play_count=10
 	game._claim_research_catalog_reward("sweets");assert(bool(game.unlocked_series.get("sweets",false)) and bool(game.armadillo_research_rewards.get("8",false)) and not game.research_catalog_reward_pending)
 	var pod_count_before:int=int(game.mystery_pod_count);game.mystery_seed_count=1;game.armadillo_research_total=0;game.armadillo_research_rewards.clear();game._accept_armadillo_research();assert(game.mystery_pod_count==pod_count_before)

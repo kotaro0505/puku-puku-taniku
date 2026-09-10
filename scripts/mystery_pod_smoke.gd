@@ -70,7 +70,7 @@ func _test_game_loop()->void:
 	assert(not game._mystery_pod_dev_tools_allowed_for_environment(false,false,false))
 	assert(game.mystery_pod_dev!=null and game.mystery_pod_settings_button!=null)
 	game._open_mystery_pod_dev();assert(game.mystery_pod_dev.visible);game.mystery_pod_dev.visible=false
-	game._reset_progression_state();game.intro_story_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.puku_gauge_intro_complete=true;game.total_play_count=3
+	game._reset_progression_state();game.intro_story_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.habitat_tutorial_complete=true;game.puku_gauge_intro_complete=true;game.total_play_count=3
 	game.formal_play_count=1;var gummy:Dictionary=game._series_entry("gummy");assert(not game._is_series_unlocked(gummy) and not game._can_browse_series(gummy) and game._catalog_purchase_enabled(gummy))
 	game.current_encyclopedia_series_id="gummy";game.mystery_pod_count=10;game.puku_points=5;game._acquire_current_catalog("puku")
 	assert(game._is_series_unlocked(gummy) and game.puku_points==0 and game.mystery_pod_count==10 and game._series_found_count("gummy")==0)
@@ -83,9 +83,15 @@ func _test_game_loop()->void:
 	grown.jelly_checks_enabled=false;grown.diameter_cm=18.0;grown.harvest()
 	assert(bool(game.discovered.get(grown_id,false)) and bool(game.greenhouse_available.get(grown_id,false)) and bool(game.unlocked_species.get(grown_id,false)))
 	assert(game.species.any(func(entry):return str(entry.species_id)==grown_id) and game._species_get_count(grown_id)==1)
-	game._clear_greenhouse_plants();game.play_active=false;game.greenhouse_available={grown_id:true};game.discovered={grown_id:true}
-	for choice in range(12):assert(str(game._select_species_for_seed("normal").species_id)==grown_id)
-	game.intro_story_complete=true;game.habitat_unlocked=true;game.puku_gauge_intro_complete=true;game.total_play_count=3;game.active_seed_type="normal";game.play_active=true;game.main_pod_pending=false
+	game._clear_greenhouse_plants();game.play_active=false;game.greenhouse_available={grown_id:true};game.discovered={grown_id:true};game.rng.seed=77124
+	var registered_draws:=0
+	for choice in range(120):
+		var chosen_id:=str(game._select_species_for_seed("normal").species_id)
+		assert(not chosen_id.is_empty() and game._species_is_in_unlocked_series(chosen_id) and not game._seed_new_species_blocked(chosen_id))
+		if chosen_id==grown_id:registered_draws+=1
+		else:assert(not bool(game.discovered.get(chosen_id,false)))
+	assert(registered_draws>=100)
+	game.intro_story_complete=true;game.habitat_unlocked=true;game.habitat_tutorial_complete=true;game.puku_gauge_intro_complete=true;game.total_play_count=3;game.active_seed_type="normal";game.play_active=true;game.main_pod_pending=false
 	game.mystery_pod_system.set_setting("main_play_pod_chance",1.0);game._prepare_main_pod_for_play();assert(game.main_pod_pending)
 	var main_pods_before:int=game.mystery_pod_count;game._update_main_pod(99.0);game._show_main_pod_pickup();game._collect_main_pod();assert(game.main_pod_pending and not game.main_pod_visible and not game.main_pod_pickup_button.visible and game.mystery_pod_count==main_pods_before)
 	game._clear_greenhouse_plants();game.play_seeds_remaining=0;game.play_spawn_queue=0;game.play_seed_animations_pending=0;game._finish_greenhouse_play()

@@ -13,7 +13,9 @@ func configure(series_catalog:Array,species_catalog:Array,catalog_progression:Di
 	for raw_series in series_catalog:
 		if raw_series is Dictionary:
 			var series_id:=str(raw_series.get("series_id",""))
-			if not series_id.is_empty():series_by_id[series_id]=raw_series
+			if not series_id.is_empty():
+				series_by_id[series_id]=raw_series
+				if str(raw_series.get("unlock_type","future"))=="default":normal_series_ids[series_id]=true
 	for raw_species in species_catalog:
 		if raw_species is Dictionary:
 			var species_id:=str(raw_species.get("species_id",""))

@@ -3,8 +3,8 @@ extends Node
 func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
-	game._reset_progression_state();game.intro_story_complete=true;game.total_play_count=3;game.formal_play_count=3;game.habitat_unlocked=true;game.puku_gauge_intro_complete=true;game.encyclopedia_unlocked=true
-	game._start_post_play_dialog("play1");assert(game.intro_dialogue_label.text=="コロラータのたねだったんだね！\n図鑑に登録したよ。見てみよう。")
+	game._reset_progression_state();game.intro_story_complete=true;game.total_play_count=3;game.formal_play_count=3;game.habitat_unlocked=true;game.habitat_tutorial_complete=true;game.puku_gauge_intro_complete=true;game.encyclopedia_unlocked=true;game.first_tutorial_species_id="nijinotama"
+	game._start_post_play_dialog("play1");assert(game.intro_dialogue_label.text=="虹の玉のたねだったんだね！\n普及種図鑑に登録したよ。見てみよう。")
 	game.intro_overlay.visible=false;game.tutorial_dialog_kind="";game._start_post_play_dialog("play2");assert(game.intro_dialogue_label.text=="センスいいね！そうだ、今度一緒に多肉の原生地へ行こうよ。\n準備してくるから少し待ってね。")
 	game.intro_overlay.visible=false;game.tutorial_dialog_kind="";assert(game.play_open_button.text=="たねをまく")
 	for guide_target in ["play_open","encyclopedia","habitat","old_seed"]:
@@ -20,7 +20,9 @@ func _ready()->void:
 		var point:Vector3=game._find_rain_spawn_position();assert(point.length()>10.0 and point.length()<10.3);min_y=minf(min_y,point.y);max_y=maxf(max_y,point.y);longitudes.append(atan2(point.x,-point.z))
 	assert(max_y-min_y>.35 and longitudes.max()-longitudes.min()>5.0)
 	game.current_mode="habitat";game.rain_event_pending=true;game.rain_time_remaining=10.0;game.tutorial_steps.erase("rain_first_dialog");game._start_rain_bonus();await get_tree().process_frame
-	assert(game.intro_overlay.visible and game.tutorial_dialog_kind=="rain_first" and game.intro_dialogue_label.text=="この雨で多肉のたねが一斉に発芽するよ。\nまさに恵みの雨だね。")
+	assert(game.intro_overlay.visible and game.scripted_dialog_kind=="rain_first" and game.intro_dialogue_label.text=="原生地ではときどき雨が降るんだ。")
+	game._advance_intro_story();assert(game.intro_dialogue_label.text=="恵みの雨によって、たくさんの多肉が育つよ！")
+	game._advance_intro_story();assert(game.intro_dialogue_label.text=="新種をまとめてゲットできるといいね！")
 	game._advance_intro_story();assert(bool(game.tutorial_steps.get("rain_first_dialog",false)) and not game.intro_overlay.visible)
 	game._clear_greenhouse_plants();game.rain_bonus_active=false;game.rain_event_pending=true;game._start_rain_bonus();await get_tree().process_frame;assert(not game.intro_overlay.visible)
 	game.rain_bonus_active=false;game.rain_event_pending=false;game._clear_greenhouse_plants()

@@ -6,7 +6,7 @@ const SCREENSHOT_DIR := "res://artifacts/greenhouse-master-scroll"
 func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
-	game._reset_progression_state();game.intro_story_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.puku_gauge_intro_complete=true;game.total_play_count=3;game.formal_play_count=3
+	game._reset_progression_state();game.intro_story_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.habitat_tutorial_complete=true;game.puku_gauge_intro_complete=true;game.total_play_count=3;game.formal_play_count=3
 	game.opening_overlay.visible=false;game.intro_overlay.visible=false;game.result_overlay.visible=false;game.shop_overlay.visible=false;game.settings_overlay.visible=false;game.encyclopedia_overlay.visible=false;game.play_overlay.visible=false
 	game.greenhouse_pan_x=0.0;game.greenhouse_pan_target_x=0.0;game.arrangement_transition_x=0.0;game.arrangement_transition_target_x=0.0
 	game._update_play_ui();game._update_greenhouse_pan()

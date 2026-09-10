@@ -5,7 +5,7 @@ func _ready()->void:
 	assert(mode in ["current","no_sky","panorama_mesh"])
 	var game=load("res://main.tscn").instantiate();game.habitat_texture_mode="thumb";game.habitat_background_mode=mode;add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
-	game._finish_opening();game.audio_manager.apply_settings({"bgm_enabled":false,"se_enabled":false});game.intro_story_complete=true;game.habitat_unlocked=true
+	game._finish_opening();game.audio_manager.apply_settings({"bgm_enabled":false,"se_enabled":false});game.intro_story_complete=true;game.habitat_unlocked=true;game.habitat_tutorial_complete=true
 	game.discovered={"colorata":true};game.pending_habitat_species.clear();game.habitat_mystery_seeds_pending=0
 	game.current_mode="habitat";game._apply_mode()
 	assert(game.habitat_texture_mode=="thumb" and game.habitat_full_texture_loads_during_build==0)

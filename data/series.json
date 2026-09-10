@@ -1,9 +1,33 @@
 [
   {
+    "series_id": "common",
+    "display_name": "普及種図鑑",
+    "subtitle": "はじめて出会う身近な多肉たち",
+    "description": "育てやすく親しまれている、ぷくぷく多肉の入口になる10品種です。",
+    "cover_image_path": "res://assets/catalog/common/common-nijinotama.png",
+    "species_ids": [
+      "momotaro",
+      "lola",
+      "black_prince",
+      "perle_von_nurnberg",
+      "shirobotan",
+      "shurei",
+      "bronze_hime",
+      "nijinotama",
+      "pink_pretty",
+      "prolidety"
+    ],
+    "field_id": "",
+    "unlock_type": "default",
+    "unlock_condition": {},
+    "iap_product_id": "",
+    "sort_order": 0
+  },
+  {
     "series_id": "base",
-    "display_name": "基本図鑑",
-    "subtitle": "ぷくぷく多肉の基本シリーズ",
-    "description": "これまでに出会った多肉をまとめた図鑑です。",
+    "display_name": "原種図鑑",
+    "subtitle": "自然の中で生き続けてきた多肉たち",
+    "description": "原生地で育つ原種と、そこにまつわる特別な多肉をまとめた図鑑です。",
     "cover_image_path": "res://assets/plants/sprite-colorata.png",
     "species_ids": [
       "colorata",
@@ -29,10 +53,10 @@
       "strictiflora_bustamante"
     ],
     "field_id": "base_field",
-    "unlock_type": "default",
-    "unlock_condition": {},
+    "unlock_type": "event",
+    "unlock_condition": {"display_text": "初めての原生地で原種を収穫すると解放"},
     "iap_product_id": "",
-    "sort_order": 0
+    "sort_order": 5
   },
   {
     "series_id": "metal",

@@ -58,7 +58,7 @@ func _ready() -> void:
 	game.unlocked_series["jewel"] = true
 	var habitat_candidates: Array[Dictionary] = game._habitat_new_species_candidates()
 	for species_id in JEWEL_IDS:
-		assert(habitat_candidates.any(func(entry): return str(entry.get("species_id", "")) == species_id))
+		assert(not habitat_candidates.any(func(entry): return str(entry.get("species_id", "")) == species_id))
 
 	game.selected_series_index = 1
 	game._open_encyclopedia()
@@ -88,8 +88,14 @@ func _ready() -> void:
 	game.species.clear()
 	assert(game._select_species_for_seed("normal").is_empty())
 	assert(game._register_species_discovery(JEWEL_IDS[0], false))
-	for draw in range(12):
-		assert(str(game._select_species_for_seed("normal").get("species_id", "")) == JEWEL_IDS[0])
+	game.rng.seed=20260913
+	var registered_draws:=0
+	for draw in range(120):
+		var chosen_id:=str(game._select_species_for_seed("normal").get("species_id", ""))
+		assert(chosen_id in JEWEL_IDS and not game._seed_new_species_blocked(chosen_id))
+		if chosen_id==JEWEL_IDS[0]:registered_draws+=1
+		else:assert(not bool(game.discovered.get(chosen_id,false)))
+	assert(registered_draws>=100)
 
 	print("JEWEL_SERIES_SMOKE_OK species=", jewel_entries.size(), " habitat_candidates=", habitat_candidates.size())
 	get_tree().quit()
