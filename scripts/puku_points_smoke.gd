@@ -47,10 +47,10 @@ func _test_harvest_integration(game)->void:
 	game.result_overlay.visible=false;game.play_active=false;game._clear_greenhouse_plants();game._cancel_puku_gauge_animations()
 
 func _test_catalog_purchase(game)->void:
-	var gummy:Dictionary=game._series_entry("gummy");game.formal_play_count=1;game.unlocked_series.erase("gummy");game.current_encyclopedia_series_id="gummy";game.puku_points=4;game.mystery_pod_count=10
+	var gummy:Dictionary=game._series_entry("gummy");game.formal_play_count=1;game.unlocked_series.erase("gummy");game.current_encyclopedia_series_id="gummy";game.puku_points=4
 	game._refresh_encyclopedia_header();assert(game.encyclopedia_unlock_panel.visible and game.encyclopedia_unlock_puku_button.disabled and "必要 5ぷくコイン" in game.encyclopedia_unlock_status.text)
 	game.add_puku_points(1,false,false);game._refresh_encyclopedia_header();assert(not game.encyclopedia_unlock_puku_button.disabled)
-	game._acquire_current_catalog("puku");assert(game._is_series_unlocked(gummy) and game.puku_points==0 and game.mystery_pod_count==10)
+	game._acquire_current_catalog("puku");assert(game._is_series_unlocked(gummy) and game.puku_points==0)
 
 func _test_save_and_legacy_load(game)->void:
 	game.puku_gauge_cm=250.5;game.puku_points=4;game._save();var current=JSON.parse_string(FileAccess.get_file_as_string("user://records.json"));assert(current is Dictionary and not current.has("yen") and not current.has("money") and not current.has("coins"));game.puku_gauge_cm=0.0;game.puku_points=0;game._load_save()

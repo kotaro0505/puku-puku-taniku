@@ -1,7 +1,7 @@
 extends Node
 
 const SlotMachineScene = preload("res://scenes/slot_machine.tscn")
-const EXPECTED_SYMBOLS := ["succulent", "seed_bag", "pot", "panda", "mystery_pod", "puku_coin"]
+const EXPECTED_SYMBOLS := ["succulent", "seed_bag", "pot", "panda", "catalog_page", "puku_coin"]
 
 func _ready() -> void:
 	var slot = SlotMachineScene.instantiate()

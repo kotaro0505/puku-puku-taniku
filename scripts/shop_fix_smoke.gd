@@ -31,7 +31,7 @@ func _ready()->void:
 	game._dismiss_or_advance_shop_chatter();assert("君も多肉" in game.shop_chatter_label.text and not bool(game.discovered.get("pinwheel",false)))
 	game._dismiss_or_advance_shop_chatter();assert("ピンウィールという品種" in game.shop_chatter_label.text and not bool(game.discovered.get("pinwheel",false)))
 	game._dismiss_or_advance_shop_chatter();assert(bool(game.discovered.get("pinwheel",false)) and not game.shop_chatter_bubble.visible)
-	await get_tree().process_frame
+	await get_tree().process_frame;assert(game.species_get_overlay.visible and game.species_get_overlay.name_label.text=="ピンウィール");game.species_get_overlay.busy=false;game.species_get_overlay.close_overlay();await get_tree().create_timer(.2).timeout;assert(game.scripted_dialog_kind=="armadillo_mystery_intro");game._finish_scripted_dialog()
 	game._show_shop_chatter("いらっしゃい！",false,"normal","panda");assert(game.shop_chatter_acquired_species.is_empty())
 	game._hide_shop_chatter(true);await get_tree().process_frame;assert(game.shop_chatter_acquired_species.is_empty())
 
@@ -48,12 +48,10 @@ func _ready()->void:
 	assert(game.shop_buy_glow.visible)
 	game._select_shop_product("volume");assert("あと1回プレイで解禁" in game.shop_product_detail_label.text and "お得な大容量。じっくり大物を狙えます。" in game.shop_product_detail_label.text and not "36粒入りのお得" in game.shop_product_detail_label.text and not game.shop_buy_glow.visible)
 	game._select_shop_product("premium");assert("あと11回プレイで解禁" in game.shop_product_detail_label.text and "24粒 / 袋" in game.shop_product_detail_label.text)
+	game.audio_manager.se_enabled=true
 	game._select_shop_product("normal");var bags_before:int=game.normal_seed_bags;game._buy_seed_bag("normal")
 	assert(game.puku_points==0 and game.normal_seed_bags==bags_before+3 and not game.shop_buy_glow.visible)
-	var purchase_stream=game.audio_manager._stream_for("se","purchase");var purchase_heard:=false
-	for player in game.audio_manager.se_players:
-		if player.playing and player.stream==purchase_stream:purchase_heard=true
-	assert(purchase_heard)
+	assert(game.audio_manager.last_se_key=="purchase")
 	for player in game.audio_manager.se_players:player.stop()
 	game._buy_seed_bag("normal");assert(game.puku_points==0 and game.normal_seed_bags==bags_before+3)
 	for player in game.audio_manager.se_players:assert(not player.playing)

@@ -1,0 +1,15 @@
+{
+  "common": {"two_star":"nijinotama", "one_star":["momotaro","black_prince"]},
+  "base": {"two_star":"golden_laui", "one_star":["golden_kannte","laui"]},
+  "metal": {"two_star":"metal_gold_cluster", "one_star":["metal_iridescent_star","metal_obsidian_spike"]},
+  "jewel": {"two_star":"jewel_diamond_rosette", "one_star":["jewel_sapphire_star","jewel_opal_rosette"]},
+  "jelly": {"two_star":"jelly_fruit_mix", "one_star":["jelly_grape","jelly_soda"]},
+  "sweets": {"two_star":"sweets_strawberry_shortcake", "one_star":["sweets_blueberry_galaxy","sweets_chocolate_gold"]},
+  "gummy": {"two_star":"gummy_rainbow", "one_star":["gummy_soda","gummy_fruit_punch"]},
+  "glow": {"two_star":"glow_aurora_rosette", "one_star":["glow_ruby_star","glow_lime_heart"]},
+  "neon": {"two_star":"neon_magenta_spike", "one_star":["neon_cyan_rosette","neon_lime_cluster"]},
+  "stone": {"two_star":"stone_obsidian_rosette", "one_star":["stone_black_lava_rosette","stone_silver_gneiss_rosette"]},
+  "sea": {"two_star":"sea_neon_coral", "one_star":["sea_starlight_lagoon","sea_pearl_shell"]},
+  "yumekawa": {"two_star":"yumekawa_princess_rose", "one_star":["yumekawa_lavender_frill","yumekawa_tricolor_rosettes"]},
+  "forest_amber": {"two_star":"forest_amber_owl_rosette", "one_star":["forest_amber_stag_rosette","forest_amber_dragonfly_rosette"]}
+}

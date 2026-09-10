@@ -5,15 +5,18 @@ signal close_requested
 signal spin_requested
 signal unlock_requested(series_id:String,species_id:String)
 signal later_requested(series_id:String,species_id:String)
+signal species_reveal_requested(result:Dictionary)
 
 const CapsuleClass=preload("res://scripts/forest_gacha_capsule.gd")
 const BACKGROUND_TEXTURE=preload("res://assets/forest_gacha/forest-gacha-background.jpg")
 const DIAL_TEXTURE=preload("res://assets/forest_gacha/temporary-dial.png")
 const BACKGROUND_SHADER=preload("res://shaders/forest_gacha_background.gdshader")
+const Localizer=preload("res://scripts/game_localizer.gd")
 const UI_CREAM:=Color("#fff1d2")
 const UI_BROWN:=Color("#4a2618")
 
 var wallet_label:Label
+var title_label:Label
 var draw_count_label:Label
 var close_button:Button
 var spin_button:Button
@@ -43,6 +46,7 @@ var current_puku_points:=0
 var current_draw_count:=0
 var _dial_dragging:=false
 var _dial_drag_origin:=Vector2.ZERO
+var language:="ja"
 
 func _ready()->void:
 	name="ForestGachaUI";set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);mouse_filter=Control.MOUSE_FILTER_STOP;visible=false
@@ -55,7 +59,7 @@ func _build_background()->void:
 	var warm_shade:=ColorRect.new();warm_shade.color=Color(0.12,.06,.01,.07);warm_shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);warm_shade.mouse_filter=Control.MOUSE_FILTER_IGNORE;background_stage.add_child(warm_shade)
 
 func _build_header()->void:
-	var title:=Label.new();title.text="森のガチャ";title.position=Vector2(138,24);title.size=Vector2(300,66);title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;title.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;title.add_theme_font_size_override("font_size",31);title.add_theme_color_override("font_color",Color("#fff5d6"));title.add_theme_color_override("font_outline_color",Color("#45220f"));title.add_theme_constant_override("outline_size",8);add_child(title)
+	title_label=Label.new();title_label.text="森のガチャ";title_label.position=Vector2(138,24);title_label.size=Vector2(300,66);title_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;title_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;title_label.add_theme_font_size_override("font_size",31);title_label.add_theme_color_override("font_color",Color("#fff5d6"));title_label.add_theme_color_override("font_outline_color",Color("#45220f"));title_label.add_theme_constant_override("outline_size",8);add_child(title_label)
 	wallet_label=Label.new();wallet_label.name="WalletLabel";wallet_label.position=Vector2(22,92);wallet_label.size=Vector2(238,48);wallet_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;wallet_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;wallet_label.add_theme_font_size_override("font_size",18);wallet_label.add_theme_color_override("font_color",Color("#fff4ba"));wallet_label.add_theme_stylebox_override("normal",_box(Color(0.18,.09,.035,.82),Color("#d7ad63"),18,2));add_child(wallet_label)
 	draw_count_label=Label.new();draw_count_label.position=Vector2(276,96);draw_count_label.size=Vector2(136,40);draw_count_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;draw_count_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;draw_count_label.add_theme_font_size_override("font_size",14);draw_count_label.add_theme_color_override("font_color",UI_CREAM);draw_count_label.add_theme_color_override("font_outline_color",Color("#45220f"));draw_count_label.add_theme_constant_override("outline_size",5);add_child(draw_count_label)
 	close_button=Button.new();close_button.name="CloseButton";close_button.text="もどる";close_button.position=Vector2(448,28);close_button.size=Vector2(106,54);_skin_button(close_button,Color("#fff0cf"),17);close_button.pressed.connect(_request_close);add_child(close_button)
@@ -91,17 +95,24 @@ func _build_result_overlay()->void:
 
 func open_gacha(puku_points:int,draw_count:int)->void:
 	visible=true;pending_result.clear();busy=false;capsule_ready=false;capsule.visible=false;capsule_hit_area.visible=false;result_overlay.visible=false;set_wallet(puku_points,draw_count);hint_label.text="ダイヤルをタップして回そう";close_button.disabled=false
+	set_language(language)
+
+func set_language(value:String)->void:
+	language=Localizer.normalize_language(value)
+	if not is_node_ready():return
+	title_label.text=Localizer.text(language,"forest_gacha");close_button.text=Localizer.text(language,"back");spin_button.text=Localizer.text(language,"gacha_spin");hint_label.text=Localizer.text(language,"gacha_dial_hint")
+	wallet_label.text=Localizer.text(language,"wallet",[current_puku_points]);result_close_button.text=Localizer.text(language,"gacha_return");unlock_button.text=Localizer.text(language,"unlock_action");later_button.text=Localizer.text(language,"later")
 
 func close_gacha()->void:
 	visible=false;pending_result.clear();busy=false;capsule_ready=false
 
 func set_wallet(puku_points:int,draw_count:int)->void:
 	current_puku_points=puku_points;current_draw_count=draw_count
-	wallet_label.text="所持　%dぷくコイン"%puku_points;draw_count_label.text="ガチャ %d回"%draw_count;spin_button.disabled=busy or capsule_ready or result_overlay.visible or puku_points<1;dial_hit_area.disabled=spin_button.disabled
+	wallet_label.text=Localizer.text(language,"wallet",[puku_points]);draw_count_label.text=Localizer.text(language,"gacha_draw_count",[draw_count]);spin_button.disabled=busy or capsule_ready or result_overlay.visible or puku_points<1;dial_hit_area.disabled=spin_button.disabled
 
 func play_spin(result:Dictionary,texture:Texture2D)->void:
 	if busy:return
-	pending_result=result.duplicate(true);busy=true;capsule_ready=false;close_button.disabled=true;spin_button.disabled=true;dial_hit_area.disabled=true;hint_label.text="森の実りを選んでいます…";result_image.texture=texture
+	pending_result=result.duplicate(true);busy=true;capsule_ready=false;close_button.disabled=true;spin_button.disabled=true;dial_hit_area.disabled=true;hint_label.text=Localizer.text(language,"gacha_selecting");result_image.texture=texture
 	dial_texture.rotation=0.0;background_stage.position=Vector2.ZERO
 	var turn:=create_tween().set_parallel(true)
 	turn.tween_property(dial_texture,"rotation",TAU*3.4,.92*animation_time_scale).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
@@ -110,16 +121,16 @@ func play_spin(result:Dictionary,texture:Texture2D)->void:
 	capsule.set_seed(str(result.get("species_id","")).hash());capsule.position=Vector2(244,726);capsule.scale=Vector2(.35,.35);capsule.rotation=-.35;capsule.modulate=Color(1,1,1,0);capsule.visible=true
 	var drop:=create_tween().set_parallel(true);drop.tween_property(capsule,"position",Vector2(244,784),.46*animation_time_scale).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT);drop.tween_property(capsule,"scale",Vector2.ONE,.34*animation_time_scale).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT);drop.tween_property(capsule,"rotation",.14,.46*animation_time_scale).set_trans(Tween.TRANS_CUBIC);drop.tween_property(capsule,"modulate:a",1.0,.16*animation_time_scale)
 	await drop.finished
-	busy=false;capsule_ready=true;capsule_hit_area.visible=true;hint_label.text="カプセルをタップ！";close_button.disabled=true
+	busy=false;capsule_ready=true;capsule_hit_area.visible=true;hint_label.text=Localizer.text(language,"gacha_capsule_hint");close_button.disabled=true
 
 func show_unlock_complete(message:String,puku_points:int,draw_count:int)->void:
-	offer_panel.visible=false;result_message.text=message;result_badge.text="NEW!";result_close_button.visible=true;set_wallet(puku_points,draw_count)
+	offer_panel.visible=false;result_message.text=message;result_badge.text=Localizer.text(language,"new");result_close_button.visible=true;set_wallet(puku_points,draw_count)
 
 func show_unlock_error(message:String)->void:
 	result_message.text=message;unlock_button.disabled=false;later_button.disabled=false
 
 func show_later_message(message:String,puku_points:int,draw_count:int)->void:
-	offer_panel.visible=false;result_message.text=message;result_badge.text="遭遇済み";result_close_button.visible=true;set_wallet(puku_points,draw_count)
+	offer_panel.visible=false;result_message.text=message;result_badge.text=Localizer.text(language,"encountered");result_close_button.visible=true;set_wallet(puku_points,draw_count)
 
 func _on_dial_input(event:InputEvent)->void:
 	if event is InputEventScreenTouch:
@@ -139,12 +150,19 @@ func _request_spin()->void:
 
 func _reveal_result()->void:
 	if not capsule_ready or pending_result.is_empty():return
-	capsule_ready=false;capsule.visible=false;capsule_hit_area.visible=false;result_overlay.visible=true;result_panel.scale=Vector2(.72,.72);result_flash.color.a=.86
-	var entry:Dictionary=pending_result.get("species_entry",{});var is_locked:=str(pending_result.get("source",""))=="locked"
-	result_name.text=str(entry.get("name_ja","？？？"));result_series.text="『%s』"%str(pending_result.get("series_name","シリーズ図鑑"));result_badge.text="未解放シリーズ" if is_locked else ("NEW!" if not bool(pending_result.get("was_discovered",false)) else "GET!")
-	result_message.text=("未解放の『%s図鑑』の品種のようです。\n5ぷくコインで図鑑を解放しますか？"%str(pending_result.get("series_name","シリーズ"))) if is_locked else "図鑑に登録されました！"
-	offer_panel.visible=is_locked;result_close_button.visible=not is_locked;unlock_button.disabled=false;later_button.disabled=false
-	var reveal:=create_tween().set_parallel(true);reveal.tween_property(result_flash,"color:a",0.0,.42*animation_time_scale);reveal.tween_property(result_panel,"scale",Vector2.ONE,.36*animation_time_scale).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	capsule_ready=false;capsule.visible=false;capsule_hit_area.visible=false;busy=true;species_reveal_requested.emit(pending_result.duplicate(true))
+
+func resume_after_species_reveal()->void:
+	busy=false
+	if pending_result.is_empty():return
+	var is_locked:=str(pending_result.get("source",""))=="locked"
+	if not is_locked:_close_result();return
+	result_overlay.visible=true;result_panel.scale=Vector2(.86,.86);result_flash.color.a=.72;result_image.get_parent().visible=false
+	var entry:Dictionary=pending_result.get("species_entry",{});var series_entry:Dictionary=pending_result.get("series_entry",{});var series_name:=Localizer.series_name(language,series_entry) if not series_entry.is_empty() else str(pending_result.get("series_name","Catalog"))
+	result_name.text=Localizer.species_name(language,entry);result_series.text="『%s』"%series_name;result_badge.text=Localizer.text(language,"locked_series")
+	result_message.text=Localizer.text(language,"locked_offer",[series_name])
+	offer_panel.visible=true;result_close_button.visible=false;unlock_button.disabled=false;later_button.disabled=false
+	var reveal:=create_tween().set_parallel(true);reveal.tween_property(result_flash,"color:a",0.0,.36*animation_time_scale);reveal.tween_property(result_panel,"scale",Vector2.ONE,.30*animation_time_scale).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 func _request_unlock()->void:
 	if pending_result.is_empty():return
@@ -155,7 +173,7 @@ func _request_later()->void:
 	unlock_button.disabled=true;later_button.disabled=true;later_requested.emit(str(pending_result.get("series_id","")),str(pending_result.get("species_id","")))
 
 func _close_result()->void:
-	result_overlay.visible=false;pending_result.clear();result_image.texture=null;close_button.disabled=false;hint_label.text="ダイヤルをタップして回そう";capsule_ready=false;set_wallet(current_puku_points,current_draw_count)
+	result_overlay.visible=false;pending_result.clear();result_image.texture=null;result_image.get_parent().visible=true;close_button.disabled=false;hint_label.text=Localizer.text(language,"gacha_dial_hint");capsule_ready=false;busy=false;set_wallet(current_puku_points,current_draw_count)
 
 func _request_close()->void:
 	if busy or capsule_ready or result_overlay.visible:return

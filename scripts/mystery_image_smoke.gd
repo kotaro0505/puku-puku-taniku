@@ -108,17 +108,13 @@ func _ready() -> void:
 		var detail_image: TextureRect = game.encyclopedia_detail_page.find_child("SpeciesImage", true, false)
 		assert(detail_image.texture.resource_path == full_path)
 		assert(detail_image.stretch_mode == TextureRect.STRETCH_KEEP_ASPECT_CENTERED)
-		var acquisition_layer := Control.new()
-		game.add_child(acquisition_layer)
-		game._animate_species_to_encyclopedia(species_id, Vector2(180.0, 320.0), acquisition_layer)
-		await get_tree().process_frame
-		assert(acquisition_layer.get_child_count() == 1)
-		var flying: TextureRect = acquisition_layer.get_child(0)
-		assert(flying.texture.resource_path == full_path)
-		assert(flying.stretch_mode == TextureRect.STRETCH_KEEP_ASPECT_CENTERED)
-		await get_tree().create_timer(0.65).timeout
-		await get_tree().process_frame
-		acquisition_layer.free()
+		await game.species_get_overlay.show_species(entry,game._species_texture(entry),true,"image_smoke",game.language_code)
+		assert(game.species_get_overlay.visible)
+		assert(game.species_get_overlay.result_image.texture.resource_path == full_path)
+		assert(game.species_get_overlay.result_image.stretch_mode == TextureRect.STRETCH_KEEP_ASPECT_CENTERED)
+		assert(game.species_get_overlay.name_label.text == str(entry.get("name_ja","")))
+		await game.species_get_overlay.close_overlay()
+		assert(not game.species_get_overlay.visible)
 
 	for species_id in EXPECTED:
 		game.discovered[species_id] = true
@@ -132,7 +128,7 @@ func _ready() -> void:
 				assert(found_image.stretch_mode == TextureRect.STRETCH_KEEP_ASPECT_CENTERED)
 				break
 
-	print("MYSTERY_IMAGE_SMOKE_OK species=6 full=6 habitat=6 silhouette=fit discovered=fit greenhouse=fit detail=fit acquisition=fit")
+	print("MYSTERY_IMAGE_SMOKE_OK species=6 full=6 habitat=6 silhouette=fit discovered=fit greenhouse=fit detail=fit common_get=fit")
 	game.free()
 	await get_tree().process_frame
 	get_tree().quit()

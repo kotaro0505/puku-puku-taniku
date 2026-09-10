@@ -4,7 +4,7 @@ func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
 	game._reset_progression_state();game.intro_story_complete=true;game.total_play_count=3;game.formal_play_count=3;game.habitat_unlocked=true;game.habitat_tutorial_complete=true;game.puku_gauge_intro_complete=true;game.encyclopedia_unlocked=true;game.first_tutorial_species_id="nijinotama"
-	game._start_post_play_dialog("play1");assert(game.intro_dialogue_label.text=="虹の玉のたねだったんだね！\n普及種図鑑に登録したよ。見てみよう。")
+	game._start_post_play_dialog("play1");assert(game.intro_dialogue_label.text=="虹の玉のたねだったんだね！\nおなじみ多肉図鑑に登録したよ。見てみよう。")
 	game.intro_overlay.visible=false;game.tutorial_dialog_kind="";game._start_post_play_dialog("play2");assert(game.intro_dialogue_label.text=="センスいいね！そうだ、今度一緒に多肉の原生地へ行こうよ。\n準備してくるから少し待ってね。")
 	game.intro_overlay.visible=false;game.tutorial_dialog_kind="";assert(game.play_open_button.text=="たねをまく")
 	for guide_target in ["play_open","encyclopedia","habitat","old_seed"]:

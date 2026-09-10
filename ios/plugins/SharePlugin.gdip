@@ -1,0 +1,18 @@
+; Godot Mobile Plugins Share v6.0 (MIT)
+
+[config]
+name="SharePlugin"
+binary="SharePlugin.xcframework"
+initialization="share_plugin_init"
+deinitialization="share_plugin_deinit"
+use_swift_runtime=true
+
+[dependencies]
+linked=[]
+embedded=[]
+system=["Foundation.framework", "AudioToolbox.framework", "UIKit.framework"]
+capabilities=[]
+files=[]
+linker_flags=["-ObjC"]
+
+[plist]

@@ -9,7 +9,7 @@ const SYMBOLS := [
 	{"id":"seed_bag", "label":"たね", "color":Color("d39a45")},
 	{"id":"pot", "label":"鉢", "color":Color("bb7043")},
 	{"id":"panda", "label":"パンダ", "color":Color("3e3934")},
-	{"id":"mystery_pod", "label":"さや", "color":Color("64a86c")},
+	{"id":"catalog_page", "label":"図鑑", "color":Color("9b7652")},
 	{"id":"puku_coin", "label":"ぷく", "color":Color("f2bf35")},
 ]
 
@@ -117,7 +117,7 @@ func _draw_symbol(symbol: Dictionary, center: Vector2) -> void:
 		"seed_bag": _draw_seed_bag(icon_center, color)
 		"pot": _draw_pot(icon_center, color)
 		"panda": _draw_panda(icon_center)
-		"mystery_pod": _draw_pod(icon_center, color)
+		"catalog_page": _draw_catalog_page(icon_center, color)
 		"puku_coin": _draw_coin(icon_center, color)
 	draw_string(SLOT_FONT, Vector2(4.0, center.y + 30.0), str(symbol.label), HORIZONTAL_ALIGNMENT_CENTER, size.x - 8.0, 13, Color(0.20, 0.12, 0.07, 0.92))
 
@@ -150,10 +150,16 @@ func _draw_panda(center: Vector2) -> void:
 	draw_circle(center + Vector2(7,-4), 2.0, Color.WHITE)
 	draw_circle(center + Vector2(0,7), 3.0, Color("3a302a"))
 
-func _draw_pod(center: Vector2, color: Color) -> void:
-	draw_colored_polygon(_leaf_points(center, 44.0, 18.0, 0.28), Color(color.lightened(0.12), 0.98))
-	for offset in [-11.0, 0.0, 11.0]:
-		draw_circle(center + Vector2(offset, offset * 0.28), 3.2, Color("e9d16c"))
+func _draw_catalog_page(center: Vector2, color: Color) -> void:
+	var page_rect:=Rect2(center+Vector2(-17.0,-21.0),Vector2(34.0,42.0))
+	draw_style_box(_page_style(color),page_rect)
+	draw_line(center+Vector2(-10.0,-9.0),center+Vector2(10.0,-9.0),Color("5d3b25"),2.0)
+	draw_line(center+Vector2(-10.0,-1.0),center+Vector2(8.0,-1.0),Color("5d3b25"),2.0)
+	draw_line(center+Vector2(-10.0,7.0),center+Vector2(5.0,7.0),Color("5d3b25"),2.0)
+
+func _page_style(color:Color)->StyleBoxFlat:
+	var style:=StyleBoxFlat.new();style.bg_color=color.lightened(.48);style.border_color=color;style.set_border_width_all(2);style.set_corner_radius_all(3)
+	return style
 
 func _draw_coin(center: Vector2, color: Color) -> void:
 	draw_circle(center, 21.0, color)

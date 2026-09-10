@@ -25,7 +25,7 @@ func _ready()->void:
 	assert(not bool(game.discovered.get("sweets_strawberry_shortcake",false)))
 	game._spawn_specific_plant("sweets_strawberry_shortcake");var large=game.plants.back();large.jelly_checks_enabled=false;large.diameter_cm=30.0;large.harvest()
 	assert(bool(game.discovered.get("sweets_strawberry_shortcake",false)) and bool(game.greenhouse_available.get("sweets_strawberry_shortcake",false)))
-	game._sync_mystery_pod_ui();assert(game.mystery_pod_ui.rates_button.text=="提供割合を見る" and not game.mystery_pod_ui.rates_label.visible and game.mystery_pod_ui.open_button.size.x>=300.0)
+	assert(not game.get_property_list().any(func(property:Dictionary)->bool:return str(property.get("name",""))=="mystery_pod_count"))
 	game._reset_progression_state();game.queue_free()
 	print("DISCOVERY_FLOW_SMOKE_OK")
 	get_tree().quit()

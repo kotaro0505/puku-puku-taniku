@@ -86,7 +86,14 @@ func _ready() -> void:
 	game.greenhouse_available.clear()
 	game.unlocked_species.clear()
 	game.species.clear()
-	assert(game._select_species_for_seed("normal").is_empty())
+	game.rng.seed=20260911
+	var new_species_draws:=0
+	for draw in range(1000):
+		var new_choice:Dictionary=game._select_species_for_seed("normal")
+		if new_choice.is_empty():continue
+		new_species_draws+=1
+		assert(str(new_choice.get("species_id","")) in JEWEL_IDS)
+	assert(new_species_draws>=15 and new_species_draws<=45)
 	assert(game._register_species_discovery(JEWEL_IDS[0], false))
 	game.rng.seed=20260913
 	var registered_draws:=0

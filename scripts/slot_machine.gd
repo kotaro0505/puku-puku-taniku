@@ -134,7 +134,7 @@ func _build_controls() -> void:
 		stop_button.pressed.connect(stop_reel.bind(index))
 		stop_buttons.append(stop_button)
 
-	var back_button := _make_text_button("BackButton", Rect2(18, 20, 150, 54), "← ゲームへ")
+	var back_button := _make_text_button("BackButton", Rect2(18, 20, 150, 54), "ゲームへ戻る")
 	back_button.pressed.connect(_leave_preview)
 	lamp_test_button = _make_text_button("LampTestButton", Rect2(536, 20, 166, 54), "ペカリ確認")
 	lamp_test_button.pressed.connect(_toggle_test_lamp)

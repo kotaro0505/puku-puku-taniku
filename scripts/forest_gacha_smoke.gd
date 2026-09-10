@@ -15,7 +15,7 @@ func _ready()->void:
 	get_tree().quit()
 
 func _test_assets_and_routes(game)->void:
-	assert(game.forest_gacha_button!=null and game.forest_gacha_button.position.y>game.mystery_pod_button.position.y and game.forest_gacha_button.size==game.mystery_pod_button.size)
+	assert(game.forest_gacha_button!=null and game.forest_gacha_button.position.y<game.secret_gacha_button.position.y and game.forest_gacha_button.size==game.secret_gacha_button.size)
 	var shop_route:=game.shop_overlay.find_child("ShopForestGachaButton",true,false) as Button;assert(shop_route!=null and shop_route.text.contains("ガチャ"))
 	var background:=game.forest_gacha_ui.find_child("Background",true,false) as TextureRect;assert(background!=null and background.texture.resource_path=="res://assets/forest_gacha/forest-gacha-background.jpg")
 	assert(background.material is ShaderMaterial and (background.material as ShaderMaterial).shader.code.contains("color.a *= opaque_mask"))
@@ -44,8 +44,8 @@ func _test_spin_capsule_and_reveal(game)->void:
 	game._spin_forest_gacha();await get_tree().create_timer(.45).timeout
 	assert(game.puku_points==1 and game.forest_gacha_draw_count==1 and game.forest_gacha_ui.capsule_ready and game.forest_gacha_ui.capsule.visible and absf(game.forest_gacha_ui.dial_texture.rotation)>1.0)
 	var species_id:=str(game.forest_gacha_ui.pending_result.get("species_id",""));assert(not species_id.is_empty() and bool(game.discovered.get(species_id,false)) and bool(game.greenhouse_available.get(species_id,false)))
-	game.forest_gacha_ui._reveal_result();assert(game.forest_gacha_ui.result_overlay.visible and game.forest_gacha_ui.result_image.texture!=null and game.forest_gacha_ui.result_name.text==str(game._catalog_entry(species_id).get("name_ja","")))
-	game.forest_gacha_ui._close_result();assert(not game.forest_gacha_ui.result_overlay.visible);game._close_forest_gacha()
+	game.forest_gacha_ui._reveal_result();await get_tree().process_frame;assert(game.species_get_overlay.visible and game.species_get_overlay.result_image.texture!=null and game.species_get_overlay.name_label.text==str(game._catalog_entry(species_id).get("name_ja","")))
+	game.species_get_overlay.busy=false;game.species_get_overlay.close_overlay();await get_tree().create_timer(.2).timeout;assert(not game.species_get_overlay.visible);game._close_forest_gacha()
 	game.puku_points=0;var previous_count:int=game.forest_gacha_draw_count;game._open_forest_gacha();game._spin_forest_gacha();assert(game.forest_gacha_draw_count==previous_count and game.puku_points==0);game._close_forest_gacha()
 
 func _test_encounter_save_and_unlock(game)->void:

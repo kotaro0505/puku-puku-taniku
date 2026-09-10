@@ -35,6 +35,9 @@ workflows:
           grep -Fq 'application/targeted_device_family=0' export_presets.cfg
           grep -Fq 'entitlements/game_center=false' export_presets.cfg
           grep -Fq 'entitlements/push_notifications="Disabled"' export_presets.cfg
+          grep -Fq 'plugins/SharePlugin=true' export_presets.cfg
+          test -f ios/plugins/SharePlugin.gdip
+          test -f ios/plugins/SharePlugin.release.xcframework/ios-arm64/SharePlugin.a
           grep -Fq 'textures/vram_compression/import_etc2_astc=true' project.godot
           python3 - <<'PY'
           import struct
@@ -122,6 +125,7 @@ workflows:
           run_scene_smoke res://scripts/mystery_routes_smoke.tscn MYSTERY_ROUTES_SMOKE_OK
           run_scene_smoke res://scripts/shop_fix_smoke.tscn SHOP_FIX_SMOKE_OK
           run_scene_smoke res://scripts/tutorial_rain_ui_smoke.tscn TUTORIAL_RAIN_UI_SMOKE_OK
+          run_scene_smoke res://scripts/integrated_features_smoke.tscn INTEGRATED_FEATURES_SMOKE_OK
           run_script_smoke res://scripts/jelly_dev_smoke.gd JELLY_DEV_SMOKE_OK
           run_script_smoke res://scripts/ios_native_smoke.gd IOS_NATIVE_SMOKE_OK
 
@@ -161,6 +165,7 @@ workflows:
           grep -Fq "MARKETING_VERSION = $APP_VERSION;" "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
           grep -Fq "CURRENT_PROJECT_VERSION = $IOS_BUILD_NUMBER;" "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
           grep -Fq 'INFOPLIST_KEY_CFBundleDisplayName = "ぷくぷく多肉";' "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
+          grep -Fq 'SharePlugin' "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
           test -f "$CM_BUILD_DIR/build/ios/puku_puku_taniku/Images.xcassets/AppIcon.appiconset/Icon-1024.png"
           test "$(grep -c '<key>ITSAppUsesNonExemptEncryption</key>' "$CM_BUILD_DIR/build/ios/puku_puku_taniku/puku_puku_taniku-Info.plist")" = "1"
           echo "GODOT_IOS_EXPORT_OK project=$XCODE_PROJECT"

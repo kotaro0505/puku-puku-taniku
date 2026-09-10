@@ -20,7 +20,7 @@ func _ready()->void:
 	assert(game._owned_series_entries().map(func(entry):return str(entry.series_id))==["common","neon"] and game._series_species_entries("neon").size()==3)
 	game.unlocked_series.erase("neon");game.research_catalog_reward_pending=true;game.armadillo_research_rewards.erase("8");game.formal_play_count=10
 	game._claim_research_catalog_reward("sweets");assert(bool(game.unlocked_series.get("sweets",false)) and bool(game.armadillo_research_rewards.get("8",false)) and not game.research_catalog_reward_pending)
-	var pod_count_before:int=int(game.mystery_pod_count);game.mystery_seed_count=1;game.armadillo_research_total=0;game.armadillo_research_rewards.clear();game._accept_armadillo_research();assert(game.mystery_pod_count==pod_count_before)
+	game.mystery_seed_count=1;game.armadillo_research_total=0;game.armadillo_research_rewards.clear();game._accept_armadillo_research();assert(game.mystery_seed_count==0 and game.armadillo_research_total==1)
 	game.armadillo_research_total=7;game.mystery_seed_count=1;game._accept_armadillo_research();assert(game.research_catalog_reward_pending and not bool(game.armadillo_research_rewards.get("8",false)))
 	for hidden_rule in game.catalog_progression.get("hidden_series",[]):assert(not bool(hidden_rule.get("old_page_spawn",{}).get("enabled",true)))
 	game.old_catalog_pages=0;game._adjust_progression_dev_value("old_page",-1);game.puku_points=0;game._adjust_progression_dev_value("puku_coin",-1);assert(game.old_catalog_pages==0 and game.puku_points==0)

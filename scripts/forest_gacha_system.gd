@@ -48,6 +48,7 @@ func draw(draw_number:int,unlocked_series:Dictionary,discovered:Dictionary,encou
 		"source":"locked" if use_locked else "unlocked",
 		"series_id":series_id,
 		"series_name":str(series_entry.get("display_name","シリーズ")),
+		"series_entry":series_entry.duplicate(true),
 		"species_id":str(species_entry.get("species_id","")),
 		"species_entry":species_entry.duplicate(true),
 		"was_discovered":bool(discovered.get(str(species_entry.get("species_id","")),false)),

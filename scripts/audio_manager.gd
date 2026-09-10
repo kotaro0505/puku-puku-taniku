@@ -12,6 +12,7 @@ var se_volume := 0.62
 var config: Dictionary = {"bgm": {}, "se": {}}
 var bgm_players: Array[AudioStreamPlayer] = []
 var se_players: Array[AudioStreamPlayer] = []
+var last_se_key := ""
 var active_bgm := 0
 var current_bgm_key := ""
 var fallback_se_cache: Dictionary = {}
@@ -177,6 +178,7 @@ func play_se(key: String, gain := 1.0) -> void:
 	if not se_enabled: return
 	var stream := _stream_for("se", key)
 	if stream == null: return
+	last_se_key = key
 	var player: AudioStreamPlayer = se_players[0]
 	for candidate in se_players:
 		if not candidate.playing:
