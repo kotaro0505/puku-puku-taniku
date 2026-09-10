@@ -104,6 +104,16 @@ const SPRITES := {
 	"yumekawa_dream_bouquet": "res://assets/catalog/yumekawa/yumekawa-dream-bouquet.png",
 	"yumekawa_princess_rose": "res://assets/catalog/yumekawa/yumekawa-princess-rose.png",
 	"yumekawa_tricolor_rosettes": "res://assets/catalog/yumekawa/yumekawa-tricolor-rosettes.png",
+	"sea_coralline_drops": "res://assets/catalog/sea/sea-coralline-drops.png",
+	"sea_sandy_tide": "res://assets/catalog/sea/sea-sandy-tide.png",
+	"sea_coral_fingers": "res://assets/catalog/sea/sea-coral-fingers.png",
+	"sea_jellyfish_rosette": "res://assets/catalog/sea/sea-jellyfish-rosette.png",
+	"sea_seafoam_bubbles": "res://assets/catalog/sea/sea-seafoam-bubbles.png",
+	"sea_starlight_lagoon": "res://assets/catalog/sea/sea-starlight-lagoon.png",
+	"sea_sandy_lagoon": "res://assets/catalog/sea/sea-sandy-lagoon.png",
+	"sea_neon_coral": "res://assets/catalog/sea/sea-neon-coral.png",
+	"sea_pearl_shell": "res://assets/catalog/sea/sea-pearl-shell.png",
+	"sea_tropical_bubbles": "res://assets/catalog/sea/sea-tropical-bubbles.png",
 	"gold_kannte": "res://assets/plants/sprite-golden-laui.png"
 }
 
