@@ -12,7 +12,7 @@ func _ready()->void:
 	_test_one_time_gift_arrangement_and_share(game)
 	_test_removed_mystery_pod()
 	game._reset_progression_state();game.queue_free();await get_tree().process_frame
-	print("INTEGRATED_FEATURES_SMOKE_OK rarity=1x2+2x1 secret=3draws localization=3 gift=once arrangement=record share=record-only mystery_pod=removed")
+	print("INTEGRATED_FEATURES_SMOKE_OK rarity=1x2+2x1 secret=always-playable localization=3 gift=once arrangement=record share=record-only mystery_pod=removed")
 	get_tree().quit()
 
 func _test_catalog_and_collection_rarity(game)->void:
@@ -62,9 +62,7 @@ func _test_secret_gacha(game)->void:
 	assert(game.forest_gacha_button.position.y<game.secret_gacha_button.position.y and game.forest_gacha_button.size==game.secret_gacha_button.size)
 	assert(game.shop_overlay.find_child("SecretGachaButton",true,false)==null)
 	game.secret_gacha_active=false;game.secret_gacha_draws_remaining=0;game._update_secret_gacha_button_state()
-	assert(game.secret_gacha_button.disabled and "今は見つからない" in game.secret_gacha_button.text)
-	game.secret_gacha_active=true;game.secret_gacha_draws_remaining=3;game._update_secret_gacha_button_state()
-	assert(not game.secret_gacha_button.disabled and game.secret_gacha_button.text==Localizer.text(game.language_code,"main_secret_gacha"))
+	assert(game._secret_gacha_is_playable() and not game.secret_gacha_button.disabled and game.secret_gacha_button.text==Localizer.text(game.language_code,"main_secret_gacha"))
 	var background:=game.secret_gacha_ui.find_child("SecretGachaBackground",true,false) as TextureRect
 	var dial:=game.secret_gacha_ui.find_child("ReplaceableTemporaryDial",true,false) as TextureRect
 	assert(background!=null and background.texture.resource_path=="res://assets/secret_gacha/secret-gacha-background.png")
@@ -83,13 +81,21 @@ func _test_secret_gacha(game)->void:
 	assert(game.secret_gacha_ui.capsule_ready and game.secret_gacha_ui.capsule.visible and game.secret_gacha_ui.dial_texture.rotation>TAU)
 	await game.secret_gacha_ui._reveal_result();assert(game.secret_gacha_ui.result_overlay.visible and not game.secret_gacha_ui.busy)
 	game.secret_gacha_ui._close_result();game.secret_gacha_ui.close_gacha();game.secret_gacha_ui.animation_time_scale=1.0
+	game.intro_story_complete=true;game.habitat_unlocked=true;game.habitat_tutorial_complete=true;game.puku_gauge_intro_complete=true;game.total_play_count=3;game.current_mode="greenhouse";game.play_active=false;game.puku_points=2;game._update_play_ui()
+	assert(game.secret_gacha_button.visible and not game.secret_gacha_button.disabled)
+	game.secret_gacha_ui.animation_time_scale=.01;game.secret_gacha_button.pressed.emit();assert(game.secret_gacha_ui.visible and game.secret_gacha_ui.unlimited_play)
+	var points_before_actual_spin:int=game.puku_points;game.secret_gacha_ui.spin_button.pressed.emit()
+	var spin_guard:=0
+	while not game.secret_gacha_ui.capsule_ready and spin_guard<120:await get_tree().process_frame;spin_guard+=1
+	assert(game.secret_gacha_ui.capsule_ready and game.puku_points==points_before_actual_spin-1 and game.secret_gacha_draws_remaining==0 and not game.secret_gacha_active)
+	game.secret_gacha_ui.close_gacha();game.secret_gacha_ui.animation_time_scale=1.0
 	game.secret_gacha_active=false;game.secret_gacha_draws_remaining=0;game.secret_gacha_last_roll_play_count=-1;game.formal_play_count=5;game.habitat_tutorial_complete=true
 	assert(game._maybe_activate_secret_gacha(0.0) and game.secret_gacha_draws_remaining==3)
 	var saved=JSON.parse_string(FileAccess.get_file_as_string("user://records.json"));assert(saved is Dictionary and bool(saved.get("secret_gacha_active",false)) and int(saved.get("secret_gacha_draws_remaining",0))==3)
 
 func _test_language_and_symbol_safety(game)->void:
 	var major_runtime_keys:=[
-		"main_secret_gacha","main_secret_gacha_unavailable","habitat_intro_1","research_reward_title","shop_rescue_offer","shop_chatter_touch",
+		"main_secret_gacha","main_secret_gacha_unavailable","secret_unlimited","habitat_intro_1","research_reward_title","shop_rescue_offer","shop_chatter_touch",
 		"shop_season_new_year","old_page_intro_1","volume_intro_1","bustamante_gift","pinwheel_intro_1",
 		"armadillo_idle_1","research_intro_1","research_return_offer","restore_offer","restore_success",
 		"research_status_sprouted","research_status_first","research_milestone_catalog","research_milestone_species",

@@ -34,6 +34,7 @@ var pending_result:Dictionary={}
 var pending_texture:Texture2D
 var current_puku_points:=0
 var current_remaining:=0
+var unlimited_play:=false
 var busy:=false
 var capsule_ready:=false
 var animation_time_scale:=1.0
@@ -88,8 +89,8 @@ func set_language(value:String)->void:
 func configure_timings(dial_seconds:float,shake_seconds:float)->void:
 	dial_duration_seconds=clampf(dial_seconds,1.8,2.2);shake_duration_seconds=clampf(shake_seconds,1.2,1.6)
 
-func open_gacha(puku_points:int,remaining:int)->void:
-	visible=true;pending_result.clear();pending_texture=null;busy=false;capsule_ready=false;capsule.visible=false;capsule_hit_area.visible=false;result_overlay.visible=false;close_button.disabled=false;hint_label.text=Localizer.text(language,"secret_gacha_dial_hint");set_wallet(puku_points,remaining)
+func open_gacha(puku_points:int,remaining:int,unlimited:bool=false)->void:
+	unlimited_play=unlimited;visible=true;pending_result.clear();pending_texture=null;busy=false;capsule_ready=false;capsule.visible=false;capsule_hit_area.visible=false;result_overlay.visible=false;close_button.disabled=false;hint_label.text=Localizer.text(language,"secret_gacha_dial_hint");set_wallet(puku_points,remaining)
 
 func close_gacha()->void:
 	visible=false;pending_result.clear();pending_texture=null;busy=false;capsule_ready=false
@@ -97,9 +98,9 @@ func close_gacha()->void:
 func set_wallet(puku_points:int,remaining:int)->void:
 	current_puku_points=maxi(0,puku_points);current_remaining=maxi(0,remaining)
 	if wallet_label:wallet_label.text=Localizer.text(language,"wallet",[current_puku_points])
-	if remaining_label:remaining_label.text=Localizer.text(language,"secret_remaining",[current_remaining])
+	if remaining_label:remaining_label.text=Localizer.text(language,"secret_unlimited") if unlimited_play else Localizer.text(language,"secret_remaining",[current_remaining])
 	if spin_button:
-		spin_button.disabled=busy or capsule_ready or result_overlay.visible or current_puku_points<1 or current_remaining<=0
+		spin_button.disabled=busy or capsule_ready or result_overlay.visible or current_puku_points<1 or (not unlimited_play and current_remaining<=0)
 		dial_hit_area.disabled=spin_button.disabled
 
 func play_spin(result:Dictionary,texture:Texture2D)->void:

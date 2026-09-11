@@ -18,6 +18,7 @@ const UISymbolIconClass = preload("res://scripts/ui_symbol_icon.gd")
 const HabitatWildSystemClass = preload("res://scripts/habitat_wild_system.gd")
 const SlotMachineScene = preload("res://scenes/slot_machine.tscn")
 const DEVELOPMENT_CATALOG_PREVIEW_ENABLED := true
+const SECRET_GACHA_ALWAYS_PLAYABLE := true
 const PROGRESSION_VERSION := 15
 const INITIAL_SERIES_ID := "common"
 const ORIGINAL_SERIES_ID := "base"
@@ -2048,7 +2049,7 @@ func _open_secret_gacha_preview()->void:
 	if intro_overlay:intro_overlay.visible=false
 	if shop_overlay:shop_overlay.visible=false
 	if play_overlay:play_overlay.visible=false
-	secret_gacha_ui.open_gacha(puku_points,secret_gacha_draws_remaining);audio_manager.play_bgm("shop");_update_play_ui()
+	secret_gacha_ui.open_gacha(puku_points,secret_gacha_draws_remaining,SECRET_GACHA_ALWAYS_PLAYABLE);audio_manager.play_bgm("shop");_update_play_ui()
 
 func _close_forest_gacha()->void:
 	if forest_gacha_ui:forest_gacha_ui.close_gacha()
@@ -2139,23 +2140,24 @@ func _on_species_get_overlay_closed(context:String)->void:
 	if not species_get_queue.is_empty():call_deferred("_show_next_species_get")
 
 func _open_secret_gacha()->void:
-	if secret_gacha_ui==null or not secret_gacha_active or secret_gacha_draws_remaining<=0 or play_active or rain_bonus_active or arrangement_scene_active or not _tutorial_fully_complete():return
+	if secret_gacha_ui==null or not _secret_gacha_is_playable() or play_active or rain_bonus_active or arrangement_scene_active or not _tutorial_fully_complete():return
 	if (encyclopedia_overlay and encyclopedia_overlay.visible) or (settings_overlay and settings_overlay.visible) or (forest_gacha_ui and forest_gacha_ui.visible):return
-	play_modal_open=false;play_overlay.visible=false;secret_gacha_ui.open_gacha(puku_points,secret_gacha_draws_remaining);audio_manager.play_bgm("shop");_update_play_ui()
+	play_modal_open=false;play_overlay.visible=false;secret_gacha_ui.open_gacha(puku_points,secret_gacha_draws_remaining,SECRET_GACHA_ALWAYS_PLAYABLE);audio_manager.play_bgm("shop");_update_play_ui()
 
 func _close_secret_gacha()->void:
 	if secret_gacha_ui:secret_gacha_ui.close_gacha()
 	audio_manager.play_bgm("greenhouse" if current_mode=="greenhouse" else "habitat");_update_play_ui()
 
 func _spin_secret_gacha()->void:
-	if secret_gacha_ui==null or not secret_gacha_ui.visible or secret_gacha_ui.is_busy() or not secret_gacha_active:return
+	if secret_gacha_ui==null or not secret_gacha_ui.visible or secret_gacha_ui.is_busy() or not _secret_gacha_is_playable():return
 	var cost:int=int(secret_gacha_system.setting_int("cost_puku",1))
-	if puku_points<cost or secret_gacha_draws_remaining<=0:secret_gacha_ui.set_wallet(puku_points,secret_gacha_draws_remaining);return
+	if puku_points<cost or (not SECRET_GACHA_ALWAYS_PLAYABLE and secret_gacha_draws_remaining<=0):secret_gacha_ui.set_wallet(puku_points,secret_gacha_draws_remaining);return
 	var result:Dictionary=secret_gacha_system.draw(unlocked_series,discovered,owned_pots,secret_gacha_rng)
 	if result.is_empty():return
-	puku_points-=cost;secret_gacha_draws_remaining=maxi(0,secret_gacha_draws_remaining-1)
+	puku_points-=cost
+	if not SECRET_GACHA_ALWAYS_PLAYABLE:secret_gacha_draws_remaining=maxi(0,secret_gacha_draws_remaining-1)
 	var texture:=_apply_secret_gacha_reward(result)
-	if secret_gacha_draws_remaining<=0:secret_gacha_active=false
+	if not SECRET_GACHA_ALWAYS_PLAYABLE and secret_gacha_draws_remaining<=0:secret_gacha_active=false
 	_save();_update_currency_ui();_sync_arrangement_ui();secret_gacha_ui.set_wallet(puku_points,secret_gacha_draws_remaining);secret_gacha_ui.play_spin(result,texture if texture!=null else CatalogImageLoader.placeholder_texture);_update_play_ui()
 
 func _apply_secret_gacha_reward(result:Dictionary)->Texture2D:
@@ -2177,6 +2179,9 @@ func _maybe_activate_secret_gacha(forced_roll:float=-1.0)->bool:
 	secret_gacha_last_roll_play_count=formal_play_count
 	if not secret_gacha_system.should_activate(formal_play_count,habitat_tutorial_complete,secret_gacha_rng,forced_roll):return false
 	secret_gacha_active=true;secret_gacha_draws_remaining=secret_gacha_system.setting_int("max_draws_per_event",3);_save();_update_play_ui();return true
+
+func _secret_gacha_is_playable()->bool:
+	return SECRET_GACHA_ALWAYS_PLAYABLE or (secret_gacha_active and secret_gacha_draws_remaining>0)
 
 func _continue_armadillo_mystery_intro()->void:
 	var pages:Array=[
@@ -3723,7 +3728,7 @@ func _set_intro_speaker(speaker_id:String)->void:
 
 func _update_secret_gacha_button_state()->void:
 	if secret_gacha_button==null:return
-	var available:=secret_gacha_active and secret_gacha_draws_remaining>0
+	var available:=_secret_gacha_is_playable()
 	secret_gacha_button.disabled=not available
 	secret_gacha_button.self_modulate=Color.WHITE if available else Color(0.58,0.58,0.58,0.88)
 	secret_gacha_button.text=Localizer.text(language_code,"main_secret_gacha" if available else "main_secret_gacha_unavailable")
