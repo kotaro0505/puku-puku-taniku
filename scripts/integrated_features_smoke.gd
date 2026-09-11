@@ -61,6 +61,10 @@ func _test_secret_gacha(game)->void:
 	assert(int(game.old_catalog_page_inventory.get(page_series_id,0))==pages_before+1)
 	assert(game.forest_gacha_button.position.y<game.secret_gacha_button.position.y and game.forest_gacha_button.size==game.secret_gacha_button.size)
 	assert(game.shop_overlay.find_child("SecretGachaButton",true,false)==null)
+	game.secret_gacha_active=false;game.secret_gacha_draws_remaining=0;game._update_secret_gacha_button_state()
+	assert(game.secret_gacha_button.disabled and "今は見つからない" in game.secret_gacha_button.text)
+	game.secret_gacha_active=true;game.secret_gacha_draws_remaining=3;game._update_secret_gacha_button_state()
+	assert(not game.secret_gacha_button.disabled and game.secret_gacha_button.text==Localizer.text(game.language_code,"main_secret_gacha"))
 	var background:=game.secret_gacha_ui.find_child("SecretGachaBackground",true,false) as TextureRect
 	var dial:=game.secret_gacha_ui.find_child("ReplaceableTemporaryDial",true,false) as TextureRect
 	assert(background!=null and background.texture.resource_path=="res://assets/secret_gacha/secret-gacha-background.png")
@@ -85,7 +89,7 @@ func _test_secret_gacha(game)->void:
 
 func _test_language_and_symbol_safety(game)->void:
 	var major_runtime_keys:=[
-		"main_secret_gacha","habitat_intro_1","research_reward_title","shop_rescue_offer","shop_chatter_touch",
+		"main_secret_gacha","main_secret_gacha_unavailable","habitat_intro_1","research_reward_title","shop_rescue_offer","shop_chatter_touch",
 		"shop_season_new_year","old_page_intro_1","volume_intro_1","bustamante_gift","pinwheel_intro_1",
 		"armadillo_idle_1","research_intro_1","research_return_offer","restore_offer","restore_success",
 		"research_status_sprouted","research_status_first","research_milestone_catalog","research_milestone_species",

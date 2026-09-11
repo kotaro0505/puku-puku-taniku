@@ -1958,7 +1958,7 @@ func _apply_language_to_ui()->void:
 	if shop_button:shop_button.text=Localizer.text(language_code,"main_shop")
 	if arrangement_button:arrangement_button.text=Localizer.text(language_code,"main_arrangement")
 	if forest_gacha_button:forest_gacha_button.text=Localizer.text(language_code,"main_forest_gacha")
-	if secret_gacha_button:secret_gacha_button.text=Localizer.text(language_code,"main_secret_gacha")
+	_update_secret_gacha_button_state()
 	if mode_button:mode_button.text=Localizer.text(language_code,"main_greenhouse" if current_mode=="habitat" else "main_habitat")
 	if settings_button:settings_button.text=Localizer.text(language_code,"settings")
 	if encyclopedia_icon_button:encyclopedia_icon_button.text=Localizer.text(language_code,"catalog")
@@ -2458,7 +2458,9 @@ func _update_play_ui()->void:
 	if shop_button:shop_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete()
 	if arrangement_button:arrangement_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete()
 	if forest_gacha_button:forest_gacha_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete()
-	if secret_gacha_button:secret_gacha_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete() and secret_gacha_active and secret_gacha_draws_remaining>0
+	if secret_gacha_button:
+		secret_gacha_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete()
+		_update_secret_gacha_button_state()
 	play_timer_label.text=Localizer.text(language_code,"series_seed_remaining" if active_seed_type.begins_with("series:") else "seed_remaining",[play_seeds_remaining]) if play_timer_label.visible else ""
 	var held:Array[String]=[]
 	if old_seed_bags>0:held.append(Localizer.text(language_code,"bags_held",[Localizer.text(language_code,"old_seed_name"),old_seed_bags]))
@@ -3718,6 +3720,13 @@ func _set_intro_speaker(speaker_id:String)->void:
 	intro_panda_portrait.visible=intro_panda_portrait.texture!=null
 	if intro_speaker_label:
 		intro_speaker_label.text=Localizer.text(language_code,"armadillo_name" if speaker_id=="armadillo" else "panda_shop_name")
+
+func _update_secret_gacha_button_state()->void:
+	if secret_gacha_button==null:return
+	var available:=secret_gacha_active and secret_gacha_draws_remaining>0
+	secret_gacha_button.disabled=not available
+	secret_gacha_button.self_modulate=Color.WHITE if available else Color(0.58,0.58,0.58,0.88)
+	secret_gacha_button.text=Localizer.text(language_code,"main_secret_gacha" if available else "main_secret_gacha_unavailable")
 
 func _skin_button(b:Button,bg:Color,font_size:int)->void:
 	b.add_theme_font_size_override("font_size",font_size); b.add_theme_color_override("font_color",UI_BROWN if bg.get_luminance()>.55 else Color.WHITE); b.add_theme_color_override("font_hover_color",UI_BROWN); b.add_theme_stylebox_override("normal",_box(bg,bg.lightened(.22),20,3)); b.add_theme_stylebox_override("hover",_box(bg.lightened(.08),Color.WHITE,20,3)); b.add_theme_stylebox_override("pressed",_box(bg.darkened(.08),bg.lightened(.2),20,3))

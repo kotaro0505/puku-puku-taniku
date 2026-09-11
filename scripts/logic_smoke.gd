@@ -135,8 +135,8 @@ func _ready()->void:
 	game.secret_gacha_active=false;game.secret_gacha_draws_remaining=0;game._close_result()
 	assert(game.play_open_button.visible)
 	for control in game.external_navigation_controls:
-		if control==game.secret_gacha_button:assert(not control.visible)
-		else:assert(control.visible)
+		assert(control.visible)
+	assert(game.secret_gacha_button.disabled and "今は見つからない" in game.secret_gacha_button.text)
 	var panorama_resource_id:=habitat_panorama.panorama.get_instance_id();game.habitat_tutorial_complete=true;game.tutorial_steps["rain_first_dialog"]=true;game.rain_event_pending=false
 	for transition_cycle in range(8):
 		if game.current_mode!="greenhouse":game._toggle_mode()
