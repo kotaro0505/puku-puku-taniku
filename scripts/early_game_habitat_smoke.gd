@@ -14,7 +14,7 @@ func _ready()->void:
 	_test_main_new_species(game)
 	_test_armadillo_events(game)
 	game._reset_progression_state()
-	print("EARLY_GAME_HABITAT_SMOKE_OK common=10 wild=15 threshold=30 offline=true armadillo=3,7")
+	print("EARLY_GAME_HABITAT_SMOKE_OK common=10 wild=variable threshold=30 offline=true armadillo=3,7")
 	game.free();await get_tree().process_frame;get_tree().quit()
 
 func _test_common_catalog(game:Node)->void:
@@ -42,8 +42,8 @@ func _test_uniform_tutorial_draw(game:Node)->void:
 
 func _test_persistent_habitat(game:Node)->void:
 	game._reset_progression_state();game.intro_story_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.total_play_count=3;game.current_mode="habitat";game._build_habitat_items(true)
-	assert(game.habitat_wild_plants.size()==game.HabitatWildSystemClass.TARGET_POPULATION)
-	assert(game.habitat_pickups.filter(func(item):return str(item.kind)=="wild_plant").size()==15)
+	assert(game.habitat_wild_plants.size()>=game.HabitatWildSystemClass.INITIAL_POPULATION_MIN and game.habitat_wild_plants.size()<=game.HabitatWildSystemClass.INITIAL_POPULATION_MAX)
+	assert(game.habitat_pickups.filter(func(item):return str(item.kind)=="wild_plant").size()==game.habitat_wild_plants.size())
 	assert(game.habitat_pickups.filter(func(item):return str(item.kind) in ["new_species","found_species"]).is_empty())
 	var tutorial_plants:Array=game.habitat_wild_plants.filter(func(plant):return bool(plant.tutorial));assert(tutorial_plants.size()==1)
 	var tutorial:Dictionary=tutorial_plants[0];assert(float(tutorial.diameter_cm)>=29.76 and float(tutorial.diameter_cm)<=29.84 and bool(tutorial.jelly_immune) and not bool(tutorial.jellied))
@@ -61,8 +61,8 @@ func _test_persistent_habitat(game:Node)->void:
 	assert(game.habitat_tutorial_complete and bool(game.discovered.get(tutorial_species,false)))
 	assert(not game.original_catalog_gifted and not bool(game.unlocked_series.get("base",false)))
 	game._show_next_species_get();assert(game.species_get_overlay.visible and game.species_get_active_context=="first_original")
-	game.species_get_overlay.visible=false;game._on_species_get_overlay_closed("first_original");await get_tree().process_frame;await get_tree().process_frame
-	assert(game.scripted_dialog_kind=="original_catalog_gift")
+	game.species_get_overlay.visible=false;game._on_species_get_overlay_closed("first_original");for frame in range(6):await get_tree().process_frame
+	assert(game.scripted_dialog_kind=="original_catalog_gift","unexpected dialog: %s"%game.scripted_dialog_kind)
 	while not game.scripted_dialog_kind.is_empty():game._advance_scripted_dialog()
 	assert(game.original_catalog_gifted and bool(game.unlocked_series.get("base",false)))
 	await get_tree().process_frame;await get_tree().process_frame;assert(game.scripted_dialog_kind=="puku_gauge_first_gift" and not game.first_habitat_gift_claimed)
@@ -71,17 +71,21 @@ func _test_persistent_habitat(game:Node)->void:
 	game._advance_scripted_dialog();assert(game.first_habitat_gift_claimed and game.puku_points==10 and game.normal_seed_bags==3)
 	while not game.scripted_dialog_kind.is_empty():game._advance_scripted_dialog()
 	assert(game.puku_gauge_intro_complete)
-	assert(game.habitat_wild_plants.size()==15 and game.HabitatWildSystemClass.tutorial_plant(game.habitat_wild_plants).is_empty())
+	assert(game.habitat_wild_plants.size()==population_before-1 and game.HabitatWildSystemClass.tutorial_plant(game.habitat_wild_plants).is_empty())
 	var saved_id:=str(game.habitat_wild_plants[0].individual_id);var saved_size:=float(game.habitat_wild_plants[0].diameter_cm);game._save();game.habitat_wild_plants.clear();game._load_save()
 	var restored:Dictionary=game._habitat_wild_plant_by_id(saved_id);assert(not restored.is_empty() and float(restored.diameter_cm)>=saved_size)
 
 func _test_main_new_species(game:Node)->void:
 	game.unlocked_series={"common":true};game.discovered={"nijinotama":true};game.greenhouse_available=game._initial_greenhouse_state();game.unlocked_species=game.greenhouse_available.duplicate(true);game.species=game._series_species_entries("common");game.rng.seed=881144
-	var new_draws:=0
-	for draw in range(2000):
-		var chosen:Dictionary=game._select_species_for_seed("normal");assert(str(chosen.species_id) in COMMON_IDS)
-		if str(chosen.species_id)!="nijinotama":new_draws+=1
-	var ratio:=float(new_draws)/2000.0;assert(ratio>.02 and ratio<.04)
+	var unlocked_new_draws:=0;var locked_new_draws:=0;var samples:=3000
+	for draw in range(samples):
+		var chosen:Dictionary=game._select_species_for_seed("normal")
+		if bool(chosen.get("_deferred_series_get",false)):locked_new_draws+=1
+		else:
+			assert(str(chosen.species_id) in COMMON_IDS)
+			if str(chosen.species_id)!="nijinotama":unlocked_new_draws+=1
+	var unlocked_ratio:=float(unlocked_new_draws)/samples;var locked_ratio:=float(locked_new_draws)/samples
+	assert(unlocked_ratio>.025 and unlocked_ratio<.055 and locked_ratio>.003 and locked_ratio<.020)
 	game.current_mode="greenhouse";game.active_seed_type="normal";game.opening_species=[game._catalog_entry("lola")];game._clear_greenhouse_plants();game.spawn_plant();game._update_labels();var plant=game.plants[0]
 	assert(bool(plant.get_meta("new_species_candidate",false)) and "NEW！" in plant.label.text)
 	plant.jelly_checks_enabled=false;plant.diameter_cm=2.0;plant.harvest();assert(bool(game.discovered.get("lola",false)))

@@ -61,8 +61,10 @@ const RAIN_TRIGGER_CHANCES := [0.01,0.02,0.03,0.05,0.08,0.12,0.20]
 const HABITAT_NEW_SPECIES_CHANCES := {"通常":0.08,"レア":0.025,"スーパーレア":0.005,"シリーズ未解禁":0.04}
 const RAIN_DISCOVERY_MIN_CM := 30.0
 const RAIN_UNDISCOVERED_SPAWN_CHANCE := 0.08
+const NORMAL_SEED_UNLOCKED_NEW_RATE := 0.04
+const NORMAL_SEED_LOCKED_NEW_RATE := 0.01
 const SEED_PACK_CONFIG := {
-	"normal":{"count":24,"rare":0.10,"super":0.05,"new":0.03},
+	"normal":{"count":24,"rare":0.10,"super":0.05,"new":NORMAL_SEED_UNLOCKED_NEW_RATE+NORMAL_SEED_LOCKED_NEW_RATE},
 	"volume":{"count":36,"rare":0.10,"super":0.05,"new":0.03},
 	"premium":{"count":24,"rare":0.30,"super":0.10,"new":0.03},
 	"mystery":{"count":5,"rare":0.0,"super":0.0,"new":0.0}
@@ -412,6 +414,8 @@ var habitat_seed_date := ""
 var habitat_seeds_collected := 0
 var habitat_mystery_seeds_pending := 0
 var habitat_wild_plants: Array[Dictionary] = []
+var habitat_wild_initialized := false
+var habitat_wild_next_spawn_unix := 0
 var habitat_tutorial_started := false
 var habitat_tutorial_complete := false
 var habitat_tutorial_species_id := ""
@@ -428,6 +432,7 @@ var volume_seed_intro_seen := false
 var premium_seed_unlocked := false
 var mystery_seed_pack_unlocked := false
 var result_new_species_queue: Array[String] = []
+var result_deferred_species_queue: Array[String] = []
 var shop_chatter_acquired_species: Array[String] = []
 var mystery_route_assignments: Dictionary = {}
 var mystery_route_completed: Dictionary = {}
@@ -680,6 +685,8 @@ func _load_save() -> void:
 			var valid_habitat_ids:Array[String]=[]
 			for habitat_entry in catalog_species:valid_habitat_ids.append(str(habitat_entry.get("species_id","")))
 			habitat_wild_plants=HabitatWildSystemClass.normalize_saved(value.get("habitat_wild_plants",[]),valid_habitat_ids,Time.get_unix_time_from_system())
+			habitat_wild_initialized=bool(value.get("habitat_wild_initialized",not habitat_wild_plants.is_empty() or habitat_tutorial_complete))
+			habitat_wild_next_spawn_unix=maxi(0,int(value.get("habitat_wild_next_spawn_unix",0)))
 			armadillo_intro_event_3_completed=bool(value.get("armadillo_intro_event_3_completed",false));armadillo_series_event_7_completed=bool(value.get("armadillo_series_event_7_completed",false));pending_armadillo_story_event=str(value.get("pending_armadillo_story_event",""));armadillo_gift_series_id=str(value.get("armadillo_gift_series_id",""));armadillo_gift_species_id=str(value.get("armadillo_gift_species_id",""))
 			language_code=Localizer.normalize_language(str(value.get("language_code","ja")))
 			first_habitat_gift_claimed=bool(value.get("first_habitat_gift_claimed",saved_progression_version<15 and habitat_tutorial_complete))
@@ -760,7 +767,8 @@ func _save() -> void:
 		"habitat_old_catalog_page_pending":habitat_old_catalog_page_pending,"habitat_old_catalog_page_series_id":habitat_old_catalog_page_series_id,
 		"habitat_old_catalog_page_point_x":habitat_old_catalog_page_point.x,"habitat_old_catalog_page_point_y":habitat_old_catalog_page_point.y,
 		"old_catalog_page_roll_play_count":old_catalog_page_roll_play_count,"first_tutorial_species_id":first_tutorial_species_id,
-		"habitat_wild_plants":habitat_wild_plants,"habitat_tutorial_started":habitat_tutorial_started,"habitat_tutorial_complete":habitat_tutorial_complete,
+		"habitat_wild_plants":habitat_wild_plants,"habitat_wild_initialized":habitat_wild_initialized,"habitat_wild_next_spawn_unix":habitat_wild_next_spawn_unix,
+		"habitat_tutorial_started":habitat_tutorial_started,"habitat_tutorial_complete":habitat_tutorial_complete,
 		"habitat_tutorial_species_id":habitat_tutorial_species_id,"original_catalog_gifted":original_catalog_gifted,
 		"armadillo_intro_event_3_completed":armadillo_intro_event_3_completed,"armadillo_series_event_7_completed":armadillo_series_event_7_completed,
 		"pending_armadillo_story_event":pending_armadillo_story_event,"armadillo_gift_series_id":armadillo_gift_series_id,"armadillo_gift_species_id":armadillo_gift_species_id,
@@ -2204,8 +2212,8 @@ func _reset_progression_state()->void:
 	old_catalog_pages=0;old_catalog_page_inventory.clear();old_catalog_intro_seen=false;old_catalog_intro_pending=false;habitat_old_catalog_page_pending=false;habitat_old_catalog_page_series_id="";old_catalog_page_roll_play_count=-1;research_catalog_reward_pending=false
 	JellyBalanceClass.reset_formal();jelly_trait_display_enabled=false;dev_jelly_test_active=false;last_jelly_claim_msec=-1000000000
 	mystery_route_assignments.clear();mystery_route_completed.clear();mystery_route_dialog_seen.clear();rain_completion_count=0;best_100_achieved=false;normal_habitat_complete=false;shop_selected_seed_type="normal"
-	first_tutorial_species_id="";habitat_wild_plants.clear();habitat_tutorial_started=false;habitat_tutorial_complete=false;habitat_tutorial_species_id="";original_catalog_gifted=false;first_habitat_gift_claimed=false;armadillo_intro_event_3_completed=false;armadillo_series_event_7_completed=false;pending_armadillo_story_event="";armadillo_gift_series_id="";armadillo_gift_species_id="";scripted_dialog_kind="";scripted_dialog_pages.clear();scripted_dialog_index=-1
-	_cancel_puku_gauge_animations();puku_gauge_cm=0.0;puku_points=0;bests.clear();discovered.clear();species_get_counts.clear();unlocked_series={INITIAL_SERIES_ID:true};series_seed_inventory.clear();forest_gacha_draw_count=0;forest_gacha_encountered.clear();secret_gacha_active=false;secret_gacha_draws_remaining=0;secret_gacha_last_roll_play_count=-1;active_series_seed_id="";owned_pots={DEFAULT_POT_ID:true};saved_arrangements.clear();arrangement_save_capacity=20;greenhouse_available=_initial_greenhouse_state();unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;puku_gauge_intro_complete=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;mystery_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;mystery_seed_pack_unlocked=false;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;habitat_mystery_seeds_pending=0;mystery_seed_count=0;armadillo_research_total=0;armadillo_research_rewards.clear();armadillo_research_intro_seen=false;armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();shop_chatter_acquired_species.clear();species_get_queue.clear();play_share_record.clear();play_active=false;play_time_remaining=0.0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_scroll_tutorial_active=false;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_clear_habitat_items();_save();_update_currency_ui();_update_play_ui()
+	first_tutorial_species_id="";habitat_wild_plants.clear();habitat_wild_initialized=false;habitat_wild_next_spawn_unix=0;habitat_tutorial_started=false;habitat_tutorial_complete=false;habitat_tutorial_species_id="";original_catalog_gifted=false;first_habitat_gift_claimed=false;armadillo_intro_event_3_completed=false;armadillo_series_event_7_completed=false;pending_armadillo_story_event="";armadillo_gift_series_id="";armadillo_gift_species_id="";scripted_dialog_kind="";scripted_dialog_pages.clear();scripted_dialog_index=-1
+	_cancel_puku_gauge_animations();puku_gauge_cm=0.0;puku_points=0;bests.clear();discovered.clear();species_get_counts.clear();unlocked_series={INITIAL_SERIES_ID:true};series_seed_inventory.clear();forest_gacha_draw_count=0;forest_gacha_encountered.clear();secret_gacha_active=false;secret_gacha_draws_remaining=0;secret_gacha_last_roll_play_count=-1;active_series_seed_id="";owned_pots={DEFAULT_POT_ID:true};saved_arrangements.clear();arrangement_save_capacity=20;greenhouse_available=_initial_greenhouse_state();unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;puku_gauge_intro_complete=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;mystery_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;mystery_seed_pack_unlocked=false;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;habitat_mystery_seeds_pending=0;mystery_seed_count=0;armadillo_research_total=0;armadillo_research_rewards.clear();armadillo_research_intro_seen=false;armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();result_deferred_species_queue.clear();shop_chatter_acquired_species.clear();species_get_queue.clear();play_share_record.clear();play_active=false;play_time_remaining=0.0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_scroll_tutorial_active=false;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_clear_habitat_items();_save();_update_currency_ui();_update_play_ui()
 	normal_play_count=0;shop_visit_count=0;hidden_species_acquired.clear();tovar_next_play=TOVAR_FIRST_PLAY;tovar_attempt_count=0;tovar_event_active=false;tovar_harvested_this_play=false;armadillo_present=false;_save()
 
 func _reset_progression_for_development(button:Button)->void:
@@ -2292,7 +2300,7 @@ func _start_greenhouse_play(seed_type:String)->void:
 		if normal_seed_bags<1:return
 		normal_seed_bags-=1;current_target_count=NORMAL_GERMINATION_COUNT
 	if seed_type=="old" and total_play_count==0:_ensure_first_tutorial_species()
-	active_seed_type=seed_type;play_time_remaining=0.0;play_active=true;play_modal_open=false;play_harvest_cm_total=0.0;play_puku_earned_total=0;play_harvest_count=0;play_max_size=0.0;play_previous_global_best=_global_best_size();play_updated_global_best=false;play_share_record.clear();play_notable_species.clear();play_hidden_species_unlocked="";result_new_species_queue.clear();opening_species.clear();play_seeds_remaining=current_target_count;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=1 if seed_type.begins_with("series:") else (OLD_SEED_GERMINATION_COUNT if seed_type=="old" else mini(current_target_count,rng.randi_range(PLAY_INITIAL_MIN_PLANTS,PLAY_INITIAL_MAX_PLANTS)));greenhouse_finish_attempt_count=0;greenhouse_finish_completed_count=0;greenhouse_finish_last_block_reason="";greenhouse_finish_last_snapshot.clear();_clear_greenhouse_plants()
+	active_seed_type=seed_type;play_time_remaining=0.0;play_active=true;play_modal_open=false;play_harvest_cm_total=0.0;play_puku_earned_total=0;play_harvest_count=0;play_max_size=0.0;play_previous_global_best=_global_best_size();play_updated_global_best=false;play_share_record.clear();play_notable_species.clear();play_hidden_species_unlocked="";result_new_species_queue.clear();result_deferred_species_queue.clear();opening_species.clear();play_seeds_remaining=current_target_count;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=1 if seed_type.begins_with("series:") else (OLD_SEED_GERMINATION_COUNT if seed_type=="old" else mini(current_target_count,rng.randi_range(PLAY_INITIAL_MIN_PLANTS,PLAY_INITIAL_MAX_PLANTS)));greenhouse_finish_attempt_count=0;greenhouse_finish_completed_count=0;greenhouse_finish_last_block_reason="";greenhouse_finish_last_snapshot.clear();_clear_greenhouse_plants()
 	if result_overlay:result_overlay.visible=false
 	for i in range(play_concurrent_target):_spawn_greenhouse_seed()
 	_prepare_tovar_event_for_play()
@@ -2857,11 +2865,12 @@ func _show_play_result()->void:
 	result_share_button.visible=not play_share_record.is_empty();result_share_button.disabled=false;result_share_button.text=Localizer.text(language_code,"share_prompt");result_share_status.visible=false;result_share_status.text=""
 	result_overlay.visible=true;result_overlay.modulate.a=0.0;result_card.position.y=170.0;play_open_button.visible=false
 	var tween:=create_tween().set_parallel();tween.tween_property(result_overlay,"modulate:a",1.0,.36).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT);tween.tween_property(result_card,"position:y",150.0,.42).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	if not result_new_species_queue.is_empty():call_deferred("_play_result_new_species_animations")
+	if not result_new_species_queue.is_empty() or not result_deferred_species_queue.is_empty():call_deferred("_play_result_new_species_animations")
 
 func _play_result_new_species_animations()->void:
 	await get_tree().create_timer(.48).timeout
 	var queue:=result_new_species_queue.duplicate();result_new_species_queue.clear()
+	queue.append_array(result_deferred_species_queue);result_deferred_species_queue.clear()
 	for species_id_value in queue:_queue_species_get_by_id(str(species_id_value),true,"main_result")
 
 func _start_result_new_species_pulse()->void:
@@ -3544,11 +3553,24 @@ func _habitat_population_candidate_ids()->Array[String]:
 func _ensure_habitat_wild_state()->void:
 	var now_unix:=int(Time.get_unix_time_from_system())
 	var originals:=_original_habitat_species_ids()
-	habitat_wild_plants=HabitatWildSystemClass.ensure_population(habitat_wild_plants,originals,originals,habitat_tutorial_complete,now_unix,rng)
-	for pending_id_value in pending_habitat_species:HabitatWildSystemClass.add_pending_species(habitat_wild_plants,str(pending_id_value),now_unix,rng)
+	if not habitat_wild_initialized:
+		HabitatWildSystemClass.initialize_population(habitat_wild_plants,originals,originals,habitat_tutorial_complete,now_unix,rng,HABITAT_SAFE_PLANT_POINTS)
+		habitat_wild_initialized=true
+	if habitat_wild_next_spawn_unix<=0:habitat_wild_next_spawn_unix=HabitatWildSystemClass.next_spawn_unix(now_unix,rng,habitat_wild_plants.size())
+	var spawn_guard:=0
+	while now_unix>=habitat_wild_next_spawn_unix and spawn_guard<HabitatWildSystemClass.MAX_POPULATION:
+		HabitatWildSystemClass.spawn_one(habitat_wild_plants,_habitat_population_candidate_ids(),habitat_wild_next_spawn_unix,rng,HABITAT_SAFE_PLANT_POINTS)
+		habitat_wild_next_spawn_unix=HabitatWildSystemClass.next_spawn_unix(habitat_wild_next_spawn_unix,rng,habitat_wild_plants.size())
+		spawn_guard+=1
+	if habitat_wild_plants.is_empty() and habitat_wild_next_spawn_unix>now_unix+HabitatWildSystemClass.MAX_EMPTY_INTERVAL_SECONDS:
+		habitat_wild_next_spawn_unix=now_unix+HabitatWildSystemClass.MAX_EMPTY_INTERVAL_SECONDS
+	for pending_id_value in pending_habitat_species:HabitatWildSystemClass.add_pending_species(habitat_wild_plants,str(pending_id_value),now_unix,rng,HABITAT_SAFE_PLANT_POINTS)
+	HabitatWildSystemClass.repair_unsafe_positions(habitat_wild_plants,HABITAT_SAFE_PLANT_POINTS,rng)
 	for plant in habitat_wild_plants:
 		var entry:=_catalog_entry(str(plant.get("species_id","")))
-		if not entry.is_empty():plant["base_growth_rate"]=maxf(.05,float(entry.get("base_growth_rate",1.0)))
+		if not entry.is_empty():
+			plant["base_growth_rate"]=maxf(.05,float(entry.get("base_growth_rate",1.0)))
+			plant["jelly_risk_curve"]=maxf(.05,float(entry.get("jelly_risk_curve",1.0)))
 	HabitatWildSystemClass.advance_time(habitat_wild_plants,now_unix)
 	var tutorial_plant:Dictionary=HabitatWildSystemClass.tutorial_plant(habitat_wild_plants)
 	if not tutorial_plant.is_empty():habitat_tutorial_species_id=str(tutorial_plant.get("species_id",""))
@@ -3562,18 +3584,22 @@ func _add_habitat_wild_plant(plant:Dictionary)->void:
 	var scale_value:=_habitat_wild_visual_scale(float(plant.get("diameter_cm",1.6)));sprite.scale=Vector3.ONE*scale_value
 	if bool(plant.get("jellied",false)):sprite.modulate=Color(.72,.62,.86,.72)
 	elif bool(plant.get("tutorial",false)):sprite.modulate=Color(1.15,1.10,.78,1.0)
-	var badge:=Label3D.new();badge.position.y=.74;badge.font_size=30;badge.outline_size=8;badge.modulate=Color("#ffe36d") if float(plant.get("diameter_cm",0.0))>=HabitatWildSystemClass.HARVEST_MIN_CM else Color("#f4eed7");sprite.add_child(badge)
+	var badge:=Label3D.new();badge.font_size=30;badge.outline_size=8;badge.pixel_size=.0045;badge.billboard=BaseMaterial3D.BILLBOARD_ENABLED;badge.fixed_size=true;badge.no_depth_test=true;badge.double_sided=true;badge.modulate=Color("#ffe36d") if float(plant.get("diameter_cm",0.0))>=HabitatWildSystemClass.HARVEST_MIN_CM else Color("#f4eed7");habitat_items_root.add_child(badge)
 	var item={"node":sprite,"kind":"wild_plant","species_id":str(plant.get("species_id","")),"individual_id":str(plant.get("individual_id","")),"status_label":badge};habitat_pickups.append(item);_refresh_habitat_wild_item(item,plant)
 
 func _habitat_wild_visual_scale(diameter_cm:float)->float:
-	return clampf(.18+(maxf(1.6,diameter_cm)-1.6)*.058,.32,2.15)
+	return maxf(.32,.18+(maxf(1.6,diameter_cm)-1.6)*.058)
 
 func _refresh_habitat_wild_item(item:Dictionary,plant:Dictionary)->void:
 	var node:Sprite3D=item.get("node");var badge:Label3D=item.get("status_label")
 	if not is_instance_valid(node):return
-	var diameter:=float(plant.get("diameter_cm",1.6));node.scale=Vector3.ONE*_habitat_wild_visual_scale(diameter)
+	var diameter:=float(plant.get("diameter_cm",1.6));var visual_scale:=_habitat_wild_visual_scale(diameter);node.scale=Vector3.ONE*visual_scale
+	if bool(plant.get("jellied",false)):node.modulate=Color(.72,.62,.86,.72)
+	elif bool(plant.get("tutorial",false)):node.modulate=Color(1.15,1.10,.78,1.0)
+	else:node.modulate=Color.WHITE
 	if is_instance_valid(badge):
 		var ready:=diameter>=HabitatWildSystemClass.HARVEST_MIN_CM and not bool(plant.get("jellied",false))
+		badge.position=node.position+Vector3.UP*minf(3.4,.58+visual_scale*.48)
 		badge.text=Localizer.text(language_code,"harvest_ready",[diameter]) if ready else "%.1fcm"%diameter;badge.modulate=Color("#ffe36d") if ready else Color("#f4eed7")
 
 func _add_habitat_seed(panorama_point:Vector2)->void:
@@ -3904,7 +3930,7 @@ func _weighted_species()->Dictionary:
 		if roll<=0:return s
 	return species[0]
 
-func _select_species_for_seed(seed_type:String)->Dictionary:
+func _select_species_for_seed(seed_type:String,forced_category_roll:float=-1.0)->Dictionary:
 	if seed_type=="mystery":
 		var mystery_pool:Array=[]
 		for entry in catalog_species:
@@ -3912,7 +3938,8 @@ func _select_species_for_seed(seed_type:String)->Dictionary:
 		if not mystery_pool.is_empty():return mystery_pool[rng.randi_range(0,mystery_pool.size()-1)]
 		return _catalog_entry("nijinotama")
 	var config:Dictionary=SEED_PACK_CONFIG.get(seed_type,SEED_PACK_CONFIG.normal)
-	var new_candidates:Array=[]
+	var unlocked_new_candidates:Array=[]
+	var locked_new_candidates:Array=[]
 	var normal_pool:Array=[];var rare_pool:Array=[];var super_pool:Array=[];var any_pool:Array=[]
 	for entry in catalog_species:
 		var species_id:=str(entry.get("species_id",""))
@@ -3921,7 +3948,9 @@ func _select_species_for_seed(seed_type:String)->Dictionary:
 		# even after they have been discovered and added to the greenhouse.
 		if bool(entry.get("special_route_only",false)):continue
 		if not is_found:
-			if _species_is_in_unlocked_series(species_id) and not _seed_new_species_blocked(species_id):new_candidates.append(entry)
+			if _seed_new_species_blocked(species_id) or str(entry.get("rarity","")) in ["隠し原種","謎品種"]:continue
+			if _species_is_in_unlocked_series(species_id):unlocked_new_candidates.append(entry)
+			elif seed_type=="normal" and _normal_seed_locked_series_eligible(species_id) and not bool(forest_gacha_encountered.get(species_id,false)):locked_new_candidates.append(entry)
 			continue
 		if not bool(greenhouse_available.get(species_id,false)):continue
 		any_pool.append(entry)
@@ -3929,10 +3958,19 @@ func _select_species_for_seed(seed_type:String)->Dictionary:
 			"レア":rare_pool.append(entry)
 			"スーパーレア":super_pool.append(entry)
 			_:normal_pool.append(entry)
-	var category_roll:=rng.randf();var new_rate:=float(config.get("new",0.0));var super_rate:=float(config.get("super",0.0));var rare_rate:=float(config.get("rare",0.0))
+	var category_roll:=rng.randf() if forced_category_roll<0.0 else forced_category_roll;var new_rate:=float(config.get("new",0.0));var super_rate:=float(config.get("super",0.0));var rare_rate:=float(config.get("rare",0.0))
 	var target_pool:Array
-	if category_roll<new_rate:
-		if not new_candidates.is_empty():return new_candidates[rng.randi_range(0,new_candidates.size()-1)]
+	if seed_type=="normal" and category_roll<NORMAL_SEED_UNLOCKED_NEW_RATE:
+		if not unlocked_new_candidates.is_empty():return unlocked_new_candidates[rng.randi_range(0,unlocked_new_candidates.size()-1)]
+		target_pool=normal_pool
+	elif seed_type=="normal" and category_roll<NORMAL_SEED_UNLOCKED_NEW_RATE+NORMAL_SEED_LOCKED_NEW_RATE:
+		if not locked_new_candidates.is_empty():
+			var locked_choice:Dictionary=locked_new_candidates[rng.randi_range(0,locked_new_candidates.size()-1)].duplicate(true)
+			locked_choice["_deferred_series_get"]=true
+			return locked_choice
+		target_pool=normal_pool
+	elif seed_type!="normal" and category_roll<new_rate:
+		if not unlocked_new_candidates.is_empty():return unlocked_new_candidates[rng.randi_range(0,unlocked_new_candidates.size()-1)]
 		target_pool=normal_pool
 	elif category_roll<new_rate+super_rate:target_pool=super_pool
 	elif category_roll<new_rate+super_rate+rare_rate:target_pool=rare_pool
@@ -3940,6 +3978,18 @@ func _select_species_for_seed(seed_type:String)->Dictionary:
 	if target_pool.is_empty():target_pool=normal_pool if not normal_pool.is_empty() else any_pool
 	if target_pool.is_empty():return _catalog_entry("nijinotama")
 	return _weighted_from_pool(target_pool)
+
+func _normal_seed_locked_series_eligible(species_id:String)->bool:
+	var series_id:=_series_id_for_species(species_id)
+	if series_id.is_empty() or not _is_normal_series(series_id):return false
+	var series_entry:=_series_entry(series_id)
+	return not series_entry.is_empty() and not _is_series_unlocked(series_entry)
+
+func _register_deferred_seed_get(species_id:String)->bool:
+	if species_id.is_empty() or bool(discovered.get(species_id,false)):return false
+	var first_get:=not bool(forest_gacha_encountered.get(species_id,false))
+	forest_gacha_encountered[species_id]=true
+	return first_get
 
 func _weighted_from_pool(pool:Array)->Dictionary:
 	var total:=0.0
@@ -4087,11 +4137,12 @@ func _process(delta:float)->void:
 	_update_labels()
 
 func _update_habitat_wild_growth(delta:float)->void:
-	if current_mode!="habitat" or rain_bonus_active or habitat_wild_plants.is_empty():return
+	if current_mode!="habitat" or rain_bonus_active:return
 	habitat_wild_update_accumulator+=delta;habitat_wild_save_accumulator+=delta
 	if habitat_wild_update_accumulator<1.0:return
 	habitat_wild_update_accumulator=0.0
-	if not HabitatWildSystemClass.advance_time(habitat_wild_plants,int(Time.get_unix_time_from_system())):return
+	var population_before:=habitat_wild_plants.size();_ensure_habitat_wild_state()
+	if habitat_wild_plants.size()!=population_before:_build_habitat_items(true);habitat_wild_save_accumulator=0.0;return
 	for item in habitat_pickups:
 		if str(item.get("kind",""))!="wild_plant":continue
 		var plant:=_habitat_wild_plant_by_id(str(item.get("individual_id","")))
@@ -4432,10 +4483,13 @@ func _on_harvested(p)->void:
 	else:_maybe_activate_first_play_harvest_guide()
 	var deferred_tovar:=tovar_event_active and str(p.data.species_id)==HIDDEN_TOVAR_ID
 	if deferred_tovar:tovar_harvested_this_play=true
-	var old:=float(bests.get(p.data.species_id,0.0));var is_record:bool=not deferred_tovar and p.diameter_cm>old
+	var deferred_series_get:=active_seed_type=="normal" and bool(p.data.get("_deferred_series_get",false)) and not _species_is_in_unlocked_series(str(p.data.species_id))
+	var old:=float(bests.get(p.data.species_id,0.0));var is_record:bool=not deferred_tovar and not deferred_series_get and p.diameter_cm>old
 	var first_discovery:=not deferred_tovar and not bool(discovered.get(str(p.data.species_id),false))
 	var rain_discovery_ready:bool=not rain_bonus_active or not first_discovery or p.diameter_cm>=RAIN_DISCOVERY_MIN_CM
-	if not deferred_tovar and rain_discovery_ready:
+	if deferred_series_get:
+		if _register_deferred_seed_get(str(p.data.species_id)):result_deferred_species_queue.append(str(p.data.species_id))
+	elif not deferred_tovar and rain_discovery_ready:
 		var harvested_species_id:=str(p.data.species_id);_register_species_discovery(harvested_species_id,true)
 		if first_discovery:result_new_species_queue.append(str(p.data.species_id))
 	if is_record:

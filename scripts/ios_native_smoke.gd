@@ -36,10 +36,12 @@ func _ready() -> void:
 	assert(bool(game.owned_pots.get("shallow_terracotta",false)))
 	# Habitat plants have their own persistent size; greenhouse records do not alter them.
 	game.habitat_wild_plants.clear()
+	game.habitat_wild_initialized=false
+	game.habitat_wild_next_spawn_unix=0
 	game.pending_habitat_species.clear()
 	game.habitat_tutorial_complete=true
 	game._build_habitat_items(true)
-	assert(game.habitat_wild_plants.size()==game.HabitatWildSystemClass.TARGET_POPULATION)
+	assert(game.habitat_wild_plants.size()>=game.HabitatWildSystemClass.INITIAL_POPULATION_MIN and game.habitat_wild_plants.size()<=game.HabitatWildSystemClass.INITIAL_POPULATION_MAX)
 	var first_wild_item:Dictionary=game.habitat_pickups.filter(func(item):return str(item.kind)=="wild_plant")[0]
 	var first_wild_id:=str(first_wild_item.individual_id)
 	var first_wild_scale:Vector3=first_wild_item.node.scale

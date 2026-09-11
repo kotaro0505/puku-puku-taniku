@@ -6,7 +6,7 @@ func _ready()->void:
 	game._finish_opening();game.audio_manager.apply_settings({"bgm_enabled":false,"se_enabled":false})
 	game._reset_progression_state();game.intro_story_complete=true;game.habitat_unlocked=true;game.encyclopedia_unlocked=true
 	game.current_mode="habitat";game.pending_habitat_species.clear();game.habitat_mystery_seeds_pending=0
-	game._ensure_habitat_wild_state();assert(game.habitat_wild_plants.size()==game.HabitatWildSystemClass.TARGET_POPULATION)
+	game._ensure_habitat_wild_state();assert(game.habitat_wild_plants.size()>=game.HabitatWildSystemClass.INITIAL_POPULATION_MIN and game.habitat_wild_plants.size()<=game.HabitatWildSystemClass.INITIAL_POPULATION_MAX)
 	# Keep A/B captures deterministic: persistent habitat plants normally keep
 	# growing between the two builds, which would legitimately change scale.
 	var frozen_update:=int(Time.get_unix_time_from_system())+3600
@@ -30,7 +30,7 @@ func _ready()->void:
 	game.bests[str(first_plant.species_id)]=100.0;game._build_habitat_items(true)
 	assert(is_equal_approx(float(_capture_visuals(game)[first_id].scale),scale_before))
 	game.pending_habitat_species=["transparent_succulent"];game.habitat_mystery_seeds_pending=2;game._build_habitat_items(true)
-	assert(game.habitat_pickups.filter(func(item):return str(item.kind)=="wild_plant").size()>=game.HabitatWildSystemClass.TARGET_POPULATION)
+	assert(game.habitat_pickups.filter(func(item):return str(item.kind)=="wild_plant").size()>=game.HabitatWildSystemClass.INITIAL_POPULATION_MIN)
 	assert(game.habitat_pickups.filter(func(item):return str(item.kind) in ["new_species","found_species"]).is_empty())
 	assert(game.habitat_pickups.filter(func(item):return str(item.kind)=="seed").size()==2)
 	var bgm=game.audio_manager._stream_for("bgm","greenhouse");assert(bgm is AudioStreamOggVorbis)
