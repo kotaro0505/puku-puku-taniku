@@ -85,7 +85,7 @@ func _test_main_new_species(game:Node)->void:
 			assert(str(chosen.species_id) in COMMON_IDS)
 			if str(chosen.species_id)!="nijinotama":unlocked_new_draws+=1
 	var unlocked_ratio:=float(unlocked_new_draws)/samples;var locked_ratio:=float(locked_new_draws)/samples
-	assert(unlocked_ratio>.025 and unlocked_ratio<.055 and locked_ratio>.003 and locked_ratio<.020)
+	assert(unlocked_ratio>.018 and unlocked_ratio<.045 and locked_ratio>.003 and locked_ratio<.020)
 	game.current_mode="greenhouse";game.active_seed_type="normal";game.opening_species=[game._catalog_entry("lola")];game._clear_greenhouse_plants();game.spawn_plant();game._update_labels();var plant=game.plants[0]
 	assert(bool(plant.get_meta("new_species_candidate",false)) and "NEW！" in plant.label.text)
 	plant.jelly_checks_enabled=false;plant.diameter_cm=2.0;plant.harvest();assert(bool(game.discovered.get("lola",false)))

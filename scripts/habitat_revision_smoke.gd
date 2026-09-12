@@ -13,18 +13,18 @@ func _ready()->void:
 	_test_giant_visual_and_label(game)
 	await _test_save_persistence(game)
 	game._reset_progression_state();game.free();await get_tree().process_frame
-	print("HABITAT_REVISION_SMOKE_OK seed_new=4+1 growth=1/100 offline=true tutorial=true population=variable jelly=true giant=100 label=fixed safe_spawn=true")
+	print("HABITAT_REVISION_SMOKE_OK seed_new=3+1 growth=1/100 offline=true tutorial=true population=variable jelly=true giant=100 label=fixed safe_spawn=true")
 	get_tree().quit()
 
 func _test_normal_seed_routes(game:Node)->void:
-	assert(is_equal_approx(game.NORMAL_SEED_UNLOCKED_NEW_RATE,.04))
+	assert(is_equal_approx(game.NORMAL_SEED_UNLOCKED_NEW_RATE,.03))
 	assert(is_equal_approx(game.NORMAL_SEED_LOCKED_NEW_RATE,.01))
 	game.rng.seed=20260911
 	var unlocked_choice:Dictionary=game._select_species_for_seed("normal",.02)
 	var unlocked_id:=str(unlocked_choice.get("species_id",""))
 	assert(not unlocked_id.is_empty() and game._species_is_in_unlocked_series(unlocked_id))
 	assert(not bool(unlocked_choice.get("_deferred_series_get",false)))
-	var locked_choice:Dictionary=game._select_species_for_seed("normal",.045)
+	var locked_choice:Dictionary=game._select_species_for_seed("normal",.035)
 	var locked_id:=str(locked_choice.get("species_id",""));var locked_series:String=game._series_id_for_species(locked_id)
 	assert(not locked_id.is_empty() and not locked_series.is_empty())
 	assert(bool(locked_choice.get("_deferred_series_get",false)))

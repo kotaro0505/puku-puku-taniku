@@ -129,6 +129,7 @@ workflows:
           run_scene_smoke res://scripts/integrated_features_smoke.tscn INTEGRATED_FEATURES_SMOKE_OK
           run_script_smoke res://scripts/jelly_dev_smoke.gd JELLY_DEV_SMOKE_OK
           run_script_smoke res://scripts/habitat_revision_smoke.gd HABITAT_REVISION_SMOKE_OK
+          run_script_smoke res://scripts/normal_seed_distribution_smoke.gd NORMAL_SEED_DISTRIBUTION_SMOKE_OK
           run_script_smoke res://scripts/ios_native_smoke.gd IOS_NATIVE_SMOKE_OK
 
       - name: Set unique iOS build number

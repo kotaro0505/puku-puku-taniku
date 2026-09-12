@@ -61,8 +61,13 @@ const RAIN_TRIGGER_CHANCES := [0.01,0.02,0.03,0.05,0.08,0.12,0.20]
 const HABITAT_NEW_SPECIES_CHANCES := {"通常":0.08,"レア":0.025,"スーパーレア":0.005,"シリーズ未解禁":0.04}
 const RAIN_DISCOVERY_MIN_CM := 30.0
 const RAIN_UNDISCOVERED_SPAWN_CHANCE := 0.08
-const NORMAL_SEED_UNLOCKED_NEW_RATE := 0.04
+const NORMAL_SEED_UNLOCKED_NEW_RATE := 0.03
 const NORMAL_SEED_LOCKED_NEW_RATE := 0.01
+const NORMAL_SEED_NO_STAR_RATE := 0.81
+const NORMAL_SEED_ONE_STAR_RATE := 0.10
+const NORMAL_SEED_TWO_STAR_RATE := 0.05
+const NORMAL_SEED_ONE_STAR_START := 0.85
+const NORMAL_SEED_TWO_STAR_START := 0.95
 const SEED_PACK_CONFIG := {
 	"normal":{"count":24,"rare":0.10,"super":0.05,"new":NORMAL_SEED_UNLOCKED_NEW_RATE+NORMAL_SEED_LOCKED_NEW_RATE},
 	"volume":{"count":36,"rare":0.10,"super":0.05,"new":0.03},
@@ -3937,6 +3942,7 @@ func _select_species_for_seed(seed_type:String,forced_category_roll:float=-1.0)-
 			if bool(entry.get("mystery_pack_eligible",false)) and bool(discovered.get(str(entry.get("species_id","")),false)):mystery_pool.append(entry)
 		if not mystery_pool.is_empty():return mystery_pool[rng.randi_range(0,mystery_pool.size()-1)]
 		return _catalog_entry("nijinotama")
+	if seed_type=="normal":return _select_normal_seed_species(forced_category_roll)
 	var config:Dictionary=SEED_PACK_CONFIG.get(seed_type,SEED_PACK_CONFIG.normal)
 	var unlocked_new_candidates:Array=[]
 	var locked_new_candidates:Array=[]
@@ -3978,6 +3984,49 @@ func _select_species_for_seed(seed_type:String,forced_category_roll:float=-1.0)-
 	if target_pool.is_empty():target_pool=normal_pool if not normal_pool.is_empty() else any_pool
 	if target_pool.is_empty():return _catalog_entry("nijinotama")
 	return _weighted_from_pool(target_pool)
+
+func _select_normal_seed_species(forced_category_roll:float=-1.0)->Dictionary:
+	var unlocked_new_candidates:Array=[]
+	var locked_new_candidates:Array=[]
+	var known_by_stars:Array=[[],[],[]]
+	var all_known:Array=[]
+	for entry in catalog_species:
+		var species_id:=str(entry.get("species_id",""))
+		if species_id.is_empty() or bool(entry.get("special_route_only",false)):continue
+		# Legacy rarity is consulted only for the established exclusion rule. The
+		# normal-seed rarity category itself comes exclusively from gold_star_count.
+		if str(entry.get("rarity","")) in ["隠し原種","謎品種"]:continue
+		if not bool(discovered.get(species_id,false)):
+			if _seed_new_species_blocked(species_id):continue
+			if _species_is_in_unlocked_series(species_id):unlocked_new_candidates.append(entry)
+			elif _normal_seed_locked_series_eligible(species_id) and not bool(forest_gacha_encountered.get(species_id,false)):locked_new_candidates.append(entry)
+			continue
+		if not bool(greenhouse_available.get(species_id,false)):continue
+		var stars:=clampi(int(entry.get("gold_star_count",0)),0,2)
+		known_by_stars[stars].append(entry)
+		all_known.append(entry)
+	var category_roll:=rng.randf() if forced_category_roll<0.0 else clampf(forced_category_roll,0.0,.999999)
+	if category_roll<NORMAL_SEED_UNLOCKED_NEW_RATE:
+		if not unlocked_new_candidates.is_empty():return unlocked_new_candidates[rng.randi_range(0,unlocked_new_candidates.size()-1)]
+		return _uniform_normal_seed_fallback(all_known)
+	if category_roll<NORMAL_SEED_UNLOCKED_NEW_RATE+NORMAL_SEED_LOCKED_NEW_RATE:
+		if not locked_new_candidates.is_empty():
+			var locked_choice:Dictionary=locked_new_candidates[rng.randi_range(0,locked_new_candidates.size()-1)].duplicate(true)
+			locked_choice["_deferred_series_get"]=true
+			return locked_choice
+		return _uniform_normal_seed_fallback(all_known)
+	var target_stars:=0
+	# Explicit cumulative boundaries avoid floating-point addition moving the
+	# exact 85% and 95% category edges.
+	if category_roll>=NORMAL_SEED_TWO_STAR_START:target_stars=2
+	elif category_roll>=NORMAL_SEED_ONE_STAR_START:target_stars=1
+	var target_pool:Array=known_by_stars[target_stars]
+	if target_pool.is_empty():return _uniform_normal_seed_fallback(all_known)
+	return target_pool[rng.randi_range(0,target_pool.size()-1)]
+
+func _uniform_normal_seed_fallback(all_known:Array)->Dictionary:
+	if all_known.is_empty():return _catalog_entry("nijinotama")
+	return all_known[rng.randi_range(0,all_known.size()-1)]
 
 func _normal_seed_locked_series_eligible(species_id:String)->bool:
 	var series_id:=_series_id_for_species(species_id)
