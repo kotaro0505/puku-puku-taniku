@@ -4,7 +4,7 @@ const EXTERNAL_ROOT := "res://assets/catalog/"
 const MAX_PARALLEL_REQUESTS := 4
 const MAX_TEXTURE_CACHE_ITEMS := 48
 const CACHE_VERSION_BY_PREFIX := {
-	"assets/catalog/glow/": "glow-20260915-1",
+	"assets/catalog/glow/": "glow-20260915-2",
 }
 
 var placeholder_texture: ImageTexture

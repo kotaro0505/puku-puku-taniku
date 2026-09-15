@@ -26,7 +26,7 @@ func _ready()->void:
 	game.encyclopedia_unlocked=true;game.unlocked_series={"common":true};game.discovered.clear();game.species_get_counts.clear()
 	var glow:Dictionary=game._series_entry("glow")
 	assert(str(glow.get("display_name",""))=="蓄光多肉")
-	assert(CatalogImageLoader._versioned_relative_path("assets/catalog/glow/glow-lime-heart.png")=="assets/catalog/glow/glow-lime-heart.png?v=glow-20260915-1")
+	assert(CatalogImageLoader._versioned_relative_path("assets/catalog/glow/glow-lime-heart.png")=="assets/catalog/glow/glow-lime-heart.png?v=glow-20260915-2")
 	assert(CatalogImageLoader._versioned_relative_path("assets/catalog/jewel/jewel-opal-rosette.png")=="assets/catalog/jewel/jewel-opal-rosette.png")
 	game.formal_play_count=10
 	assert(not game._can_browse_series(glow) and not game._is_series_unlocked(glow) and game._catalog_purchase_enabled(glow))
@@ -84,10 +84,13 @@ func _ready()->void:
 	assert(arrangement_image!=null and arrangement_image.texture!=null and arrangement_image.material is ShaderMaterial)
 	assert(str(arrangement_image.texture.resource_path)=="res://assets/catalog/glow/glow-aurora-rosette.png")
 	_assert_soft_glow(arrangement_image.texture.get_image(),"arrangement_editor")
-	print("GLOW_SERIES_SMOKE_OK species=",entries.size()," images=",seen.size()," alpha_gradient=true subject_padding=",SUBJECT_PADDING," transparent_edge=",TRANSPARENT_EDGE_MARGIN," encyclopedia=true arrangement=true seed_pool=0 purchase=true")
+	print("GLOW_SERIES_SMOKE_OK species=",entries.size()," images=",seen.size()," structural_alpha_guard=true visual_acceptance=manual_web_comparison subject_padding=",SUBJECT_PADDING," transparent_edge=",TRANSPARENT_EDGE_MARGIN," encyclopedia=true arrangement=true seed_pool=0 purchase=true")
 	get_tree().quit()
 
 func _assert_soft_glow(image:Image,context:String)->void:
+	# This is only a structural regression guard. Alpha statistics cannot decide
+	# whether a glow looks soft, so release acceptance comes from the Web-rendered
+	# cream/brown/dark comparison against the unchanged sunlight reference.
 	assert(image!=null and image.get_size()==Vector2i(EXPECTED_IMAGE_SIZE,EXPECTED_IMAGE_SIZE),context)
 	var transparent_samples:=0;var body_samples:=0;var glow_samples:=0;var soft_glow_samples:=0;var sample_count:=0;var alpha_levels:Dictionary={}
 	var body_min:=Vector2i(image.get_width(),image.get_height());var body_max:=Vector2i.ZERO
