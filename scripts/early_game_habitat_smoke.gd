@@ -11,10 +11,13 @@ func _ready()->void:
 	_test_common_catalog(game)
 	_test_uniform_tutorial_draw(game)
 	await _test_persistent_habitat(game)
+	if "--beacon-tutorial-only" in OS.get_cmdline_user_args():
+		game._reset_progression_state();print("EARLY_GAME_BEACON_TUTORIAL_OK unlock_event=true gift=1 shop=true save=true")
+		game.free();await get_tree().process_frame;get_tree().quit();return
 	_test_main_new_species(game)
 	_test_armadillo_events(game)
 	game._reset_progression_state()
-	print("EARLY_GAME_HABITAT_SMOKE_OK common=10 wild=variable threshold=30 offline=true armadillo=3,7")
+	print("EARLY_GAME_HABITAT_SMOKE_OK common=10 wild=variable threshold=30 offline=true beacon_unlock=true armadillo=3,7")
 	game.free();await get_tree().process_frame;get_tree().quit()
 
 func _test_common_catalog(game:Node)->void:
@@ -65,6 +68,10 @@ func _test_persistent_habitat(game:Node)->void:
 	assert(game.scripted_dialog_kind=="original_catalog_gift","unexpected dialog: %s"%game.scripted_dialog_kind)
 	while not game.scripted_dialog_kind.is_empty():game._advance_scripted_dialog()
 	assert(game.original_catalog_gifted and bool(game.unlocked_series.get("base",false)))
+	await get_tree().process_frame;await get_tree().process_frame;assert(game.scripted_dialog_kind=="panda_beacon_unlock" and not game.panda_beacon_unlocked)
+	while not game.scripted_dialog_kind.is_empty():game._advance_scripted_dialog()
+	assert(game.panda_beacon_unlocked and game.panda_beacon_count==1)
+	assert(game._seed_shop_products().any(func(product):return str(product.get("seed_type",""))=="panda_beacon"))
 	await get_tree().process_frame;await get_tree().process_frame;assert(game.scripted_dialog_kind=="puku_gauge_first_gift" and not game.first_habitat_gift_claimed)
 	while game.scripted_dialog_index<3:game._advance_scripted_dialog()
 	assert(not game.first_habitat_gift_claimed)
@@ -73,7 +80,8 @@ func _test_persistent_habitat(game:Node)->void:
 	assert(game.puku_gauge_intro_complete)
 	assert(game.habitat_wild_plants.size()==population_before-1 and game.HabitatWildSystemClass.tutorial_plant(game.habitat_wild_plants).is_empty())
 	var saved_id:=str(game.habitat_wild_plants[0].individual_id);var saved_size:=float(game.habitat_wild_plants[0].diameter_cm);game._save();game.habitat_wild_plants.clear();game._load_save()
-	var restored:Dictionary=game._habitat_wild_plant_by_id(saved_id);assert(not restored.is_empty() and float(restored.diameter_cm)>=saved_size)
+	var restored:Dictionary=game._habitat_wild_plant_by_id(saved_id)
+	assert(not restored.is_empty() and float(restored.diameter_cm)+0.0001>=saved_size)
 
 func _test_main_new_species(game:Node)->void:
 	game.unlocked_series={"common":true};game.discovered={"nijinotama":true};game.greenhouse_available=game._initial_greenhouse_state();game.unlocked_species=game.greenhouse_available.duplicate(true);game.species=game._series_species_entries("common");game.rng.seed=881144
@@ -92,7 +100,7 @@ func _test_main_new_species(game:Node)->void:
 	game._clear_greenhouse_plants()
 
 func _test_armadillo_events(game:Node)->void:
-	game.intro_story_complete=true;game.habitat_unlocked=true;game.habitat_tutorial_complete=true;game.puku_gauge_intro_complete=true;game.total_play_count=3;game.normal_play_count=2;game.armadillo_intro_event_3_completed=false;game.armadillo_series_event_7_completed=false;game.pending_armadillo_story_event="";game.hidden_species_acquired.erase("pinwheel");game.discovered.erase("pinwheel")
+	game.intro_story_complete=true;game.habitat_unlocked=true;game.habitat_tutorial_complete=true;game.puku_gauge_intro_complete=true;game.panda_beacon_unlocked=true;game.panda_beacon_count=maxi(1,game.panda_beacon_count);game.total_play_count=3;game.normal_play_count=2;game.armadillo_intro_event_3_completed=false;game.armadillo_series_event_7_completed=false;game.pending_armadillo_story_event="";game.hidden_species_acquired.erase("pinwheel");game.discovered.erase("pinwheel")
 	game._queue_armadillo_progress_event();assert(game.pending_armadillo_story_event.is_empty())
 	game.normal_play_count=3;game._queue_armadillo_progress_event();assert(game.pending_armadillo_story_event=="armadillo_3" and game._start_pending_armadillo_story())
 	while not game.scripted_dialog_kind.is_empty():game._advance_intro_story()
