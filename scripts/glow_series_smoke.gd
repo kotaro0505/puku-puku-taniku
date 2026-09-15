@@ -26,6 +26,8 @@ func _ready()->void:
 	game.encyclopedia_unlocked=true;game.unlocked_series={"common":true};game.discovered.clear();game.species_get_counts.clear()
 	var glow:Dictionary=game._series_entry("glow")
 	assert(str(glow.get("display_name",""))=="蓄光多肉")
+	assert(CatalogImageLoader._versioned_relative_path("assets/catalog/glow/glow-lime-heart.png")=="assets/catalog/glow/glow-lime-heart.png?v=glow-20260915-1")
+	assert(CatalogImageLoader._versioned_relative_path("assets/catalog/jewel/jewel-opal-rosette.png")=="assets/catalog/jewel/jewel-opal-rosette.png")
 	game.formal_play_count=10
 	assert(not game._can_browse_series(glow) and not game._is_series_unlocked(glow) and game._catalog_purchase_enabled(glow))
 	var entries:Array[Dictionary]=game._series_species_entries("glow")
@@ -87,16 +89,23 @@ func _ready()->void:
 
 func _assert_soft_glow(image:Image,context:String)->void:
 	assert(image!=null and image.get_size()==Vector2i(EXPECTED_IMAGE_SIZE,EXPECTED_IMAGE_SIZE),context)
-	var transparent_samples:=0;var glow_samples:=0;var soft_glow_samples:=0;var sample_count:=0;var alpha_levels:Dictionary={}
+	var transparent_samples:=0;var body_samples:=0;var glow_samples:=0;var soft_glow_samples:=0;var sample_count:=0;var alpha_levels:Dictionary={}
+	var body_min:=Vector2i(image.get_width(),image.get_height());var body_max:=Vector2i.ZERO
+	var halo_min:=Vector2i(image.get_width(),image.get_height());var halo_max:=Vector2i.ZERO
 	for y in range(0,image.get_height(),8):
 		for x in range(0,image.get_width(),8):
 			var alpha:=image.get_pixel(x,y).a;sample_count+=1;alpha_levels[roundi(alpha*255.0)]=true
 			if alpha<=.001:transparent_samples+=1
 			elif alpha<.98:glow_samples+=1
-			if alpha>.001 and alpha<.75:soft_glow_samples+=1
+			if alpha>=.90:
+				body_samples+=1;body_min.x=mini(body_min.x,x);body_min.y=mini(body_min.y,y);body_max.x=maxi(body_max.x,x);body_max.y=maxi(body_max.y,y)
+			if alpha>.01 and alpha<.75:
+				soft_glow_samples+=1;halo_min.x=mini(halo_min.x,x);halo_min.y=mini(halo_min.y,y);halo_max.x=maxi(halo_max.x,x);halo_max.y=maxi(halo_max.y,y)
 	# The dedicated edge-margin assertion above is the clipping guard. Keep this
 	# threshold lower so a deliberately broad halo is not mistaken for a crop.
 	assert(transparent_samples>sample_count/10,"%s lacks transparent canvas"%context)
+	assert(body_samples>sample_count/8,"%s lacks a readable plant body"%context)
 	assert(glow_samples>sample_count/4,"%s lost the semi-transparent glow"%context)
 	assert(soft_glow_samples>sample_count/8,"%s lost the soft outer glow"%context)
+	assert(halo_min.x<body_min.x-80 and halo_min.y<body_min.y-80 and halo_max.x>body_max.x+80 and halo_max.y>body_max.y+80,"%s glow does not extend beyond the plant silhouette"%context)
 	assert(alpha_levels.size()>80,"%s alpha was quantized: %d levels"%[context,alpha_levels.size()])

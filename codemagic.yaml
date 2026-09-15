@@ -122,6 +122,7 @@ workflows:
           }
 
           run_scene_smoke res://logic_smoke.tscn SMOKE_OK
+          run_scene_smoke res://scripts/glow_series_smoke.tscn GLOW_SERIES_SMOKE_OK
           run_scene_smoke res://scripts/mystery_routes_smoke.tscn MYSTERY_ROUTES_SMOKE_OK
           run_scene_smoke res://scripts/shop_fix_smoke.tscn SHOP_FIX_SMOKE_OK
           run_scene_smoke res://scripts/tutorial_rain_ui_smoke.tscn TUTORIAL_RAIN_UI_SMOKE_OK

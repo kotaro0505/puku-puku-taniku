@@ -3,6 +3,9 @@ extends Node
 const EXTERNAL_ROOT := "res://assets/catalog/"
 const MAX_PARALLEL_REQUESTS := 4
 const MAX_TEXTURE_CACHE_ITEMS := 48
+const CACHE_VERSION_BY_PREFIX := {
+	"assets/catalog/glow/": "glow-20260915-1",
+}
 
 var placeholder_texture: ImageTexture
 var network_request_count := 0
@@ -118,11 +121,18 @@ func _finish_request(path: String, request: HTTPRequest, body: PackedByteArray, 
 	_pump_queue()
 
 func _external_url(path: String) -> String:
-	var relative_path := path.trim_prefix("res://")
+	var relative_path := _versioned_relative_path(path.trim_prefix("res://"))
 	if not OS.has_feature("web"):
 		return relative_path
 	var script := "new URL(%s, window.location.href).href" % JSON.stringify(relative_path)
 	return str(JavaScriptBridge.eval(script))
+
+func _versioned_relative_path(relative_path: String) -> String:
+	for prefix_value in CACHE_VERSION_BY_PREFIX:
+		var prefix := str(prefix_value)
+		if relative_path.begins_with(prefix):
+			return "%s?v=%s" % [relative_path, str(CACHE_VERSION_BY_PREFIX[prefix_value])]
+	return relative_path
 
 func _touch(path: String) -> void:
 	_access_serial += 1
