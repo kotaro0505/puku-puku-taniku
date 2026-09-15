@@ -22,7 +22,8 @@ const HabitatDevPanelClass = preload("res://scripts/habitat_dev_panel.gd")
 const SlotMachineScene = preload("res://scenes/slot_machine.tscn")
 const DEVELOPMENT_CATALOG_PREVIEW_ENABLED := true
 const SECRET_GACHA_ALWAYS_PLAYABLE := true
-const PROGRESSION_VERSION := 16
+const PROGRESSION_VERSION := 17
+const LEGACY_HABITAT_REGENERATION_VERSION := 17
 const INITIAL_SERIES_ID := "common"
 const ORIGINAL_SERIES_ID := "base"
 const COMMON_SPECIES_IDS := ["momotaro","lola","black_prince","perle_von_nurnberg","shirobotan","shurei","bronze_hime","nijinotama","pink_pretty","prolidety"]
@@ -426,6 +427,8 @@ var habitat_mystery_seeds_pending := 0
 var habitat_wild_plants: Array[Dictionary] = []
 var habitat_wild_initialized := false
 var habitat_wild_next_spawn_unix := 0.0
+var legacy_habitat_migration_dirty := false
+var legacy_habitat_notification_ids_to_cancel: Array[String] = []
 var habitat_tutorial_started := false
 var habitat_tutorial_complete := false
 var habitat_tutorial_species_id := ""
@@ -435,6 +438,7 @@ var panda_beacon_count := 0
 var habitat_notification_service
 var habitat_plant_panel
 var habitat_dev_panel
+var habitat_dev_open_button: Button
 var habitat_debug_enabled := false
 var habitat_time_multiplier := 1
 var habitat_simulation_unix := 0.0
@@ -549,10 +553,12 @@ func _ready() -> void:
 	_apply_saved_unlocks()
 	audio_manager=AudioManagerClass.new();add_child(audio_manager);audio_manager.apply_settings(audio_settings)
 	habitat_notification_service=HabitatNotificationServiceClass.new();add_child(habitat_notification_service);habitat_notification_service.native_ready.connect(_reconcile_beacon_notifications)
+	if not legacy_habitat_notification_ids_to_cancel.is_empty():habitat_notification_service.cancel_all(legacy_habitat_notification_ids_to_cancel);legacy_habitat_notification_ids_to_cancel.clear()
 	if best_spawn_unlocks_dirty or get_counts_migration_dirty or recovered_forest_encounters:_save();best_spawn_unlocks_dirty=false;get_counts_migration_dirty=false
 	_build_world()
 	_build_ui()
 	if habitat_wild_initialized or habitat_unlocked:_ensure_habitat_wild_state(Time.get_unix_time_from_system(),true)
+	if legacy_habitat_migration_dirty:_save();legacy_habitat_migration_dirty=false
 	_build_habitat_items()
 	_reconcile_beacon_notifications()
 	get_viewport().size_changed.connect(_layout)
@@ -674,6 +680,7 @@ func _load_pot_data()->void:
 
 func _load_save() -> void:
 	_cancel_puku_gauge_animations()
+	legacy_habitat_migration_dirty=false;legacy_habitat_notification_ids_to_cancel.clear()
 	if FileAccess.file_exists("user://records.json"):
 		var value = JSON.parse_string(FileAccess.get_file_as_string("user://records.json"))
 		if value is Dictionary:
@@ -725,9 +732,13 @@ func _load_save() -> void:
 			panda_beacon_unlocked=bool(value.get("panda_beacon_unlocked",false));panda_beacon_count=maxi(0,int(value.get("panda_beacon_count",0)))
 			var valid_habitat_ids:Array[String]=[]
 			for habitat_entry in catalog_species:valid_habitat_ids.append(str(habitat_entry.get("species_id","")))
-			habitat_wild_plants=HabitatWildSystemClass.normalize_saved(value.get("habitat_wild_plants",[]),valid_habitat_ids,Time.get_unix_time_from_system())
-			habitat_wild_initialized=bool(value.get("habitat_wild_initialized",not habitat_wild_plants.is_empty() or habitat_tutorial_complete))
-			habitat_wild_next_spawn_unix=maxf(0.0,float(value.get("habitat_wild_next_spawn_unix",0.0)))
+			var raw_habitat_population:Variant=value.get("habitat_wild_plants",[])
+			if saved_progression_version<LEGACY_HABITAT_REGENERATION_VERSION and _migrate_legacy_runaway_habitat(raw_habitat_population):
+				pass
+			else:
+				habitat_wild_plants=HabitatWildSystemClass.normalize_saved(raw_habitat_population,valid_habitat_ids,Time.get_unix_time_from_system())
+				habitat_wild_initialized=bool(value.get("habitat_wild_initialized",not habitat_wild_plants.is_empty() or habitat_tutorial_complete))
+				habitat_wild_next_spawn_unix=maxf(0.0,float(value.get("habitat_wild_next_spawn_unix",0.0)))
 			armadillo_intro_event_3_completed=bool(value.get("armadillo_intro_event_3_completed",false));armadillo_series_event_7_completed=bool(value.get("armadillo_series_event_7_completed",false));pending_armadillo_story_event=str(value.get("pending_armadillo_story_event",""));armadillo_gift_series_id=str(value.get("armadillo_gift_series_id",""));armadillo_gift_species_id=str(value.get("armadillo_gift_species_id",""))
 			language_code=Localizer.normalize_language(str(value.get("language_code","ja")))
 			first_habitat_gift_claimed=bool(value.get("first_habitat_gift_claimed",saved_progression_version<15 and habitat_tutorial_complete))
@@ -818,6 +829,17 @@ func _save() -> void:
 		"secret_gacha_active":secret_gacha_active,"secret_gacha_draws_remaining":secret_gacha_draws_remaining,"secret_gacha_last_roll_play_count":secret_gacha_last_roll_play_count
 	}
 	f.store_string(JSON.stringify(payload))
+
+func _migrate_legacy_runaway_habitat(raw_population:Variant)->bool:
+	if not HabitatWildSystemClass.has_legacy_runaway_population(raw_population):return false
+	legacy_habitat_notification_ids_to_cancel.clear()
+	if raw_population is Array:
+		for raw_value in raw_population:
+			if not raw_value is Dictionary:continue
+			var individual_id:=str(raw_value.get("individual_id",""))
+			if not individual_id.is_empty() and individual_id not in legacy_habitat_notification_ids_to_cancel:legacy_habitat_notification_ids_to_cancel.append(individual_id)
+	habitat_wild_plants.clear();habitat_wild_initialized=false;habitat_wild_next_spawn_unix=0.0;habitat_tutorial_species_id="";legacy_habitat_migration_dirty=true
+	return true
 
 func _daily_seed_gift_due()->bool:
 	if not intro_story_complete:return false
@@ -1005,6 +1027,8 @@ func _build_ui() -> void:
 		else:settings_button=b;b.pressed.connect(_open_settings)
 	mode_button=Button.new();mode_button.text="原生地";mode_button.position=Vector2(398,198);mode_button.size=Vector2(153,55);_skin_button(mode_button,Color("#fff0cf"),16);mode_button.mouse_filter=Control.MOUSE_FILTER_STOP;mode_button.pressed.connect(_toggle_mode);hud.add_child(mode_button)
 	external_navigation_controls.append(mode_button)
+	if habitat_debug_enabled:
+		habitat_dev_open_button=Button.new();habitat_dev_open_button.name="HabitatDevQuickOpen";habitat_dev_open_button.text="原生地テスト";habitat_dev_open_button.position=Vector2(398,262);habitat_dev_open_button.size=Vector2(153,55);_skin_button(habitat_dev_open_button,Color("#adcbb8"),15);habitat_dev_open_button.mouse_filter=Control.MOUSE_FILTER_STOP;habitat_dev_open_button.pressed.connect(_open_habitat_dev);hud.add_child(habitat_dev_open_button);external_navigation_controls.append(habitat_dev_open_button)
 	shop_button=Button.new();shop_button.text="おみせ";shop_button.position=Vector2(398,262);shop_button.size=Vector2(153,55);_skin_button(shop_button,Color("#fff0cf"),16);shop_button.mouse_filter=Control.MOUSE_FILTER_STOP;shop_button.pressed.connect(_open_shop);hud.add_child(shop_button)
 	external_navigation_controls.append(shop_button)
 	arrangement_button=Button.new();arrangement_button.text="寄せ植え";arrangement_button.position=Vector2(398,326);arrangement_button.size=Vector2(153,55);_skin_button(arrangement_button,Color("#fff0cf"),16);arrangement_button.mouse_filter=Control.MOUSE_FILTER_STOP;arrangement_button.pressed.connect(_open_arrangements);hud.add_child(arrangement_button)
@@ -2554,6 +2578,7 @@ func _update_play_ui()->void:
 	for control in external_navigation_controls:control.visible=not play_active and not arrangement_navigation_suspended
 	for control in encyclopedia_navigation_controls:control.visible=not play_active and not arrangement_navigation_suspended and encyclopedia_unlocked
 	if mode_button:mode_button.visible=not play_active and not arrangement_navigation_suspended and habitat_unlocked
+	if habitat_dev_open_button:habitat_dev_open_button.visible=current_mode=="habitat" and not play_active and not arrangement_navigation_suspended
 	if shop_button:shop_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete()
 	if arrangement_button:arrangement_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete()
 	if forest_gacha_button:forest_gacha_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete()

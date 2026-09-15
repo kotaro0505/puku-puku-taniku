@@ -11,10 +11,10 @@ func _ready()->void:
 	_test_growth_and_jelly()
 	_test_population_and_safe_positions(game)
 	_test_beacon_and_debug_tools(game)
-	_test_giant_visual_and_label(game)
+	_test_legacy_population_migration(game)
 	await _test_save_persistence(game)
 	game._reset_progression_state();game.free();await get_tree().process_frame
-	print("HABITAT_REVISION_SMOKE_OK growth=1/120000 safe_until=30 jelly=1/15000 offline=true independent=true beacon=true debug_time=true rain=production reset=scoped")
+	print("HABITAT_REVISION_SMOKE_OK growth=1/120000 safe_until=30 jelly=1/15000 offline=true independent=true beacon=true debug_time=true rain=production reset=scoped legacy_giants=migrated")
 	get_tree().quit()
 
 func _test_normal_seed_routes(game:Node)->void:
@@ -68,6 +68,7 @@ func _test_growth_and_jelly()->void:
 
 func _test_beacon_and_debug_tools(game:Node)->void:
 	game._reset_progression_state();game.intro_story_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.total_play_count=3;game.formal_play_count=1;game.habitat_tutorial_started=true;game.habitat_tutorial_complete=true;game.original_catalog_gifted=true;game.puku_gauge_intro_complete=true;game.panda_beacon_unlocked=true;game.panda_beacon_count=2;game.puku_points=10;game.current_mode="habitat";game._build_habitat_items(true)
+	game._update_play_ui();assert(game.habitat_dev_open_button!=null and game.habitat_dev_open_button.visible)
 	var wall_now:=Time.get_unix_time_from_system()
 	for plant in game.habitat_wild_plants:
 		plant.jellied=false;plant.jelly_threshold=999999.0;plant.jelly_hazard_accumulated=0.0;plant.last_updated_unix=wall_now;plant.spawned_unix=wall_now-3600.0
@@ -105,25 +106,37 @@ func _test_population_and_safe_positions(game:Node)->void:
 	HabitatWildSystemClass.initialize_population(plants,ids,ids,true,1001,test_rng,game.HABITAT_SAFE_PLANT_POINTS)
 	assert(plants.size()==initial_count-1)
 	assert(HabitatWildSystemClass.spawn_one(plants,ids,1002,test_rng,game.HABITAT_SAFE_PLANT_POINTS) and plants.size()==initial_count)
-	var legacy:=_plant("legacy",101.5,1.0,1000);legacy.panorama_x=640.0;legacy.panorama_y=100.0;legacy.position_validated=false
+	var legacy:=_plant("legacy",44.5,1.0,1000);legacy.panorama_x=640.0;legacy.panorama_y=100.0;legacy.position_validated=false
 	var legacy_plants:Array[Dictionary]=[legacy];assert(HabitatWildSystemClass.repair_unsafe_positions(legacy_plants,game.HABITAT_SAFE_PLANT_POINTS,test_rng))
-	assert(is_equal_approx(float(legacy.diameter_cm),101.5) and HabitatWildSystemClass.is_safe_ground_point(Vector2(float(legacy.panorama_x),float(legacy.panorama_y)),game.HABITAT_SAFE_PLANT_POINTS))
+	assert(is_equal_approx(float(legacy.diameter_cm),44.5) and HabitatWildSystemClass.is_safe_ground_point(Vector2(float(legacy.panorama_x),float(legacy.panorama_y)),game.HABITAT_SAFE_PLANT_POINTS))
 
-func _test_giant_visual_and_label(game:Node)->void:
-	var scales:Array[float]=[]
-	for diameter in [30.0,40.0,60.0,100.0]:scales.append(game._habitat_wild_visual_scale(diameter))
-	assert(scales[0]<scales[1] and scales[1]<scales[2] and scales[2]<scales[3] and scales[3]>5.0)
-	var normalized:=HabitatWildSystemClass.normalize_saved([_plant("giant",123.4,1.0,999999)], ["colorata"],999999)
-	normalized[0].species_id="colorata"
-	# Re-normalize with a valid id to prove no migration caps existing giants.
-	normalized=HabitatWildSystemClass.normalize_saved([normalized[0]], ["colorata"],999999)
-	assert(normalized.size()==1 and is_equal_approx(float(normalized[0].diameter_cm),123.4))
-	game.habitat_wild_plants.clear();game.habitat_wild_plants.append(normalized[0]);game.habitat_wild_initialized=true;game.habitat_wild_next_spawn_unix=9999999999;game.current_mode="habitat";game._build_habitat_items(true)
+func _test_legacy_population_migration(game:Node)->void:
+	game._reset_progression_state();game.intro_story_complete=true;game.habitat_unlocked=true;game.habitat_tutorial_started=true;game.habitat_tutorial_complete=true;game.original_catalog_gifted=true
+	game.puku_points=31;game.bests={"colorata":44.8};game.discovered={"colorata":true};game.species_get_counts={"colorata":7};game.panda_beacon_unlocked=true;game.panda_beacon_count=3
+	var small:=_plant("legacy_small",24.0,1.0,1000);small.panda_beacon_installed=true
+	var giant:=_plant("legacy_giant",16527.6,1.0,1000);giant.panda_beacon_installed=true
+	var old_population:Array[Dictionary]=[small,giant]
+	assert(HabitatWildSystemClass.has_legacy_runaway_population(old_population))
+	assert(not HabitatWildSystemClass.has_legacy_runaway_population([_plant("valid_ready",44.8,1.0,1000)]))
+	game.habitat_wild_plants=old_population.duplicate(true);game.habitat_wild_initialized=true;game.habitat_wild_next_spawn_unix=9999999999.0;game._save()
+	var payload=JSON.parse_string(FileAccess.get_file_as_string("user://records.json"));assert(payload is Dictionary);payload["progression_version"]=16
+	var file:=FileAccess.open("user://records.json",FileAccess.WRITE);file.store_string(JSON.stringify(payload));file.close()
+	game.puku_points=0;game.bests.clear();game.discovered.clear();game.species_get_counts.clear();game.panda_beacon_unlocked=false;game.panda_beacon_count=0;game.habitat_wild_plants.clear();game.habitat_wild_initialized=false
+	game._load_save()
+	assert(game.legacy_habitat_migration_dirty and game.habitat_wild_plants.is_empty() and not game.habitat_wild_initialized and is_zero_approx(game.habitat_wild_next_spawn_unix))
+	assert("legacy_small" in game.legacy_habitat_notification_ids_to_cancel and "legacy_giant" in game.legacy_habitat_notification_ids_to_cancel)
+	assert(game.puku_points==31 and is_equal_approx(float(game.bests.get("colorata",0.0)),44.8) and int(game.species_get_counts.get("colorata",0))==7)
+	assert(game.panda_beacon_unlocked and game.panda_beacon_count==3)
+	game.rng.seed=170917;game._ensure_habitat_wild_state(Time.get_unix_time_from_system(),false)
+	assert(game.habitat_wild_plants.size()>=HabitatWildSystemClass.INITIAL_POPULATION_MIN and game.habitat_wild_plants.size()<=HabitatWildSystemClass.INITIAL_POPULATION_MAX)
+	for plant in game.habitat_wild_plants:
+		assert(float(plant.diameter_cm)<30.0 and not bool(plant.panda_beacon_installed) and str(plant.individual_id) not in ["legacy_small","legacy_giant"])
+	game.current_mode="habitat";game._build_habitat_items(true)
 	var item:Dictionary=game.habitat_pickups.filter(func(value):return str(value.get("kind",""))=="wild_plant")[0]
 	var badge:Label3D=item.status_label
 	assert(badge.get_parent()==game.habitat_items_root and badge.get_parent()!=item.node)
-	assert(badge.billboard==BaseMaterial3D.BILLBOARD_ENABLED and badge.fixed_size and badge.no_depth_test)
-	assert(badge.scale==Vector3.ONE and item.node.scale.x>5.0 and not badge.text.is_empty())
+	assert(badge.billboard==BaseMaterial3D.BILLBOARD_ENABLED and badge.fixed_size and badge.no_depth_test and badge.scale==Vector3.ONE and not badge.text.is_empty())
+	game._save();var migrated=JSON.parse_string(FileAccess.get_file_as_string("user://records.json"));assert(int(migrated.get("progression_version",0))==17 and not HabitatWildSystemClass.has_legacy_runaway_population(migrated.get("habitat_wild_plants",[])))
 
 func _test_save_persistence(game:Node)->void:
 	var now:=int(Time.get_unix_time_from_system())

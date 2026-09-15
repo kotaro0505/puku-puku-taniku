@@ -12,6 +12,7 @@ var _plugin: Object
 var _initialized := false
 var _permission_requested := false
 var _scheduled: Dictionary = {}
+var _pending_cancellations: Dictionary = {}
 
 
 func _ready() -> void:
@@ -35,6 +36,7 @@ func schedule_at(individual_id: String, trigger_unix: float, title: String, cont
 	if individual_id.is_empty() or trigger_unix <= 0.0:
 		return false
 	var notification_id := notification_id_for(individual_id)
+	_pending_cancellations.erase(individual_id)
 	_scheduled[individual_id] = {
 		"notification_id": notification_id,
 		"trigger_unix": trigger_unix,
@@ -52,6 +54,12 @@ func cancel(individual_id: String) -> void:
 	_scheduled.erase(individual_id)
 	if _initialized and _plugin != null:
 		_plugin.cancel(notification_id)
+		_pending_cancellations.erase(individual_id)
+	else:
+		# A legacy-save migration can run before the native plugin finishes
+		# initializing. Keep the cancellation so an already scheduled OS alert is
+		# still removed once the plugin becomes available.
+		_pending_cancellations[individual_id] = notification_id
 
 
 func cancel_all(individual_ids: Array) -> void:
@@ -101,6 +109,9 @@ func _on_initialization_completed() -> void:
 		})
 	if _permission_requested:
 		request_permissions()
+	for individual_id_value in _pending_cancellations.keys():
+		_plugin.cancel(int(_pending_cancellations[individual_id_value]))
+	_pending_cancellations.clear()
 	for individual_id_value in _scheduled.keys():
 		_schedule_native(str(individual_id_value))
 	native_ready.emit()

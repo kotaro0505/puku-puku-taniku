@@ -19,11 +19,26 @@ const NORMAL_GROWTH_SCALE := NORMAL_HABITAT_GROWTH_SCALE
 const TUTORIAL_GROWTH_SCALE := 0.08
 const TIMING_VERSION := 2
 
+# v16 and older saves can contain runaway normal-habitat plants produced by
+# the former real-time growth loop. This is only a migration detector: normal
+# play is never clamped to this value, and valid post-migration saves keep their
+# exact diameters.
+const LEGACY_RUNAWAY_DIAMETER_CM := 100.0
+
 const MIN_SPAWN_INTERVAL_SECONDS := 45 * 60
 const MAX_SPAWN_INTERVAL_SECONDS := 4 * 60 * 60
 const MAX_EMPTY_INTERVAL_SECONDS := 2 * 60 * 60
 const SAFE_POINT_X_RADIUS := 46.0
 const SAFE_POINT_Y_RADIUS := 28.0
+
+
+static func has_legacy_runaway_population(source: Variant) -> bool:
+	if not source is Array:
+		return false
+	for raw_value in source:
+		if raw_value is Dictionary and float(raw_value.get("diameter_cm", 0.0)) > LEGACY_RUNAWAY_DIAMETER_CM:
+			return true
+	return false
 
 
 static func normalize_saved(source: Variant, valid_species_ids: Array[String], now_unix: float) -> Array[Dictionary]:
@@ -43,7 +58,8 @@ static func normalize_saved(source: Variant, valid_species_ids: Array[String], n
 		var plant := raw.duplicate(true)
 		plant["individual_id"] = str(plant.get("individual_id", "wild_%d" % normalized.size()))
 		plant["species_id"] = species_id
-		# Preserve saved giants; the new model fixes their cause instead of hiding records.
+		# Valid saved sizes are preserved exactly. Runaway legacy populations are
+		# detected and regenerated once by main.gd before normalization reaches here.
 		plant["diameter_cm"] = maxf(1.6, float(plant.get("diameter_cm", 1.6)))
 		plant["jellied"] = bool(plant.get("jellied", false))
 		plant["tutorial"] = bool(plant.get("tutorial", false))
