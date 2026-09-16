@@ -52,6 +52,10 @@ static func normalize_saved(source: Variant, valid_species_ids: Array[String], n
 		if not raw_value is Dictionary:
 			continue
 		var raw: Dictionary = raw_value
+		# Normal-habitat jelly is terminal. Older saves kept these entries so the
+		# player could tap them later; silently discard that legacy state now.
+		if bool(raw.get("jellied", false)):
+			continue
 		var species_id := str(raw.get("species_id", ""))
 		if species_id.is_empty() or not valid.has(species_id):
 			continue
@@ -61,7 +65,7 @@ static func normalize_saved(source: Variant, valid_species_ids: Array[String], n
 		# Valid saved sizes are preserved exactly. Runaway legacy populations are
 		# detected and regenerated once by main.gd before normalization reaches here.
 		plant["diameter_cm"] = maxf(1.6, float(plant.get("diameter_cm", 1.6)))
-		plant["jellied"] = bool(plant.get("jellied", false))
+		plant["jellied"] = false
 		plant["tutorial"] = bool(plant.get("tutorial", false))
 		plant["jelly_immune"] = bool(plant.get("jelly_immune", plant["tutorial"]))
 		plant["base_growth_rate"] = maxf(0.05, float(plant.get("base_growth_rate", 1.0)))
@@ -176,16 +180,52 @@ static func advance_time(plants: Array[Dictionary], now_unix: float) -> bool:
 
 
 static func advance_time_with_events(plants: Array[Dictionary], now_unix: float) -> Dictionary:
-	var result := {"changed": false, "ready": [], "jellied": []}
-	for plant in plants:
+	var result := {
+		"changed": false,
+		"ready": [],
+		"ready_details": [],
+		"jellied": [],
+		"jellied_details": [],
+		"removed": []
+	}
+	var removal_indexes: Array[int] = []
+	for index in range(plants.size()):
+		var plant: Dictionary = plants[index]
+		# A stale jellied entry can only come from an old save or inconsistent
+		# caller. Remove it quietly; it is not a new player-facing event.
+		if bool(plant.get("jellied", false)):
+			result["changed"] = true
+			result["removed"].append(str(plant.get("individual_id", "")))
+			removal_indexes.append(index)
+			continue
 		var events := _advance_plant(plant, now_unix)
 		if bool(events.get("changed", false)):
 			result["changed"] = true
 		if bool(events.get("became_ready", false)):
 			result["ready"].append(str(plant.get("individual_id", "")))
+			result["ready_details"].append(_event_snapshot(plant))
 		if bool(events.get("became_jellied", false)):
 			result["jellied"].append(str(plant.get("individual_id", "")))
+			result["jellied_details"].append(_event_snapshot(plant))
+			result["removed"].append(str(plant.get("individual_id", "")))
+			removal_indexes.append(index)
+	# Mutate only after every plant in the interval has been evaluated. Reverse
+	# removal keeps indexes stable when several plants jelly in one jump/tick.
+	removal_indexes.reverse()
+	for index in removal_indexes:
+		plants.remove_at(index)
 	return result
+
+
+static func _event_snapshot(plant: Dictionary) -> Dictionary:
+	return {
+		"individual_id": str(plant.get("individual_id", "")),
+		"species_id": str(plant.get("species_id", "")),
+		"diameter_cm": float(plant.get("diameter_cm", 0.0)),
+		"harvest_ready_reached_unix": float(plant.get("harvest_ready_reached_unix", 0.0)),
+		"jellied_unix": float(plant.get("jellied_unix", 0.0)),
+		"panda_beacon_installed": bool(plant.get("panda_beacon_installed", false))
+	}
 
 
 static func _advance_plant(plant: Dictionary, now_unix: float) -> Dictionary:

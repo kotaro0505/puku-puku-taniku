@@ -3,6 +3,7 @@ extends Control
 
 signal close_requested
 signal random_reset_requested
+signal label_preview_requested
 signal multiplier_requested(multiplier: int)
 signal time_jump_requested(seconds: int)
 signal rain_start_requested
@@ -114,9 +115,16 @@ func _build_ui() -> void:
 	summary_label.add_theme_stylebox_override("normal", _box(Color("#fff5d9"), Color("#c99d57"), 13, 2))
 	root.add_child(summary_label)
 
-	var reset_button := _button("原生地をランダムリセット", "HabitatRandomReset", Color("#d7c3a1"), Vector2(500, 48))
+	var reset_row := HBoxContainer.new()
+	reset_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	reset_row.add_theme_constant_override("separation", 8)
+	root.add_child(reset_row)
+	var reset_button := _button("ランダムリセット", "HabitatRandomReset", Color("#d7c3a1"), Vector2(246, 48))
 	reset_button.pressed.connect(func(): random_reset_requested.emit())
-	root.add_child(reset_button)
+	reset_row.add_child(reset_button)
+	var label_preview_button := _button("cm表示 10/30/60/100", "HabitatLabelPreview", Color("#c9d8c4"), Vector2(246, 48))
+	label_preview_button.pressed.connect(func(): label_preview_requested.emit())
+	reset_row.add_child(label_preview_button)
 
 	var multiplier_row := HBoxContainer.new()
 	multiplier_row.alignment = BoxContainer.ALIGNMENT_CENTER

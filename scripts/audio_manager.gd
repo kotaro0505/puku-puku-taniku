@@ -218,7 +218,8 @@ func _fallback_se(key: String) -> AudioStreamWAV:
 		"seed_bag":[190.0,520.0,.22,.20], "purchase":[660.0,990.0,.18,.20],
 		"payment":[880.0,1240.0,.12,.16], "rare_seed":[410.0,1080.0,.34,.22],
 		"daily":[620.0,1260.0,.38,.22], "result":[390.0,760.0,.36,.22],
-		"result_new_best":[700.0,1560.0,.52,.24]
+		"result_new_best":[700.0,1560.0,.52,.24],
+		"beacon_set":[720.0,1320.0,.18,.18], "beacon_remove":[980.0,420.0,.20,.17]
 	}
 	var spec:Array=specs.get(key,specs["ui_tap"])
 	var start_hz:float=spec[0];var end_hz:float=spec[1];var duration:float=spec[2];var amplitude:float=spec[3]

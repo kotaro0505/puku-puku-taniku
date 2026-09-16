@@ -23,6 +23,8 @@
     "rare_seed": "",
     "daily": "",
     "result": "",
-    "result_new_best": ""
+    "result_new_best": "",
+    "beacon_set": "",
+    "beacon_remove": ""
   }
 }

@@ -28,7 +28,12 @@ func open_for(plant: Dictionary, species_name: String, beacon_unlocked: bool, be
 	beacon_installed = installed
 	title_label.text = species_name
 	detail_label.text = str(texts.get("size", "現在 %.3fcm") % diameter) + "\n" + str(texts.get("growing", "30cmまでゆっくり成長中")) + "\n" + str(texts.get("eta", "30cm到達予定：%s") % eta_text)
-	message_label.text = str(texts.get("usage", "パンダビーコン %d個中 %d個使用中") % [beacon_total, beacon_used]) if beacon_unlocked else str(texts.get("locked", "パンダビーコンはまだ使えません"))
+	if not beacon_unlocked:
+		message_label.text = str(texts.get("locked", "パンダビーコンはまだ使えません"))
+	elif installed:
+		message_label.text = str(texts.get("installed", "パンダビーコン設置中")) + "\n" + str(texts.get("usage", "パンダビーコン %d個中 %d個使用中") % [beacon_total, beacon_used])
+	else:
+		message_label.text = str(texts.get("usage", "パンダビーコン %d個中 %d個使用中") % [beacon_total, beacon_used])
 	beacon_button.visible = beacon_unlocked
 	if installed:
 		beacon_button.text = str(texts.get("remove", "パンダビーコンを外す"))
