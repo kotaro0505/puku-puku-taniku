@@ -51,7 +51,7 @@ func _ready()->void:
 	assert(game._first_play_growing_plants().size()==3 and not game._maybe_activate_first_play_harvest_guide() and not game.first_play_harvest_guide_active and not game.tutorial_guide_overlay.visible)
 	game.queue_free();await get_tree().process_frame
 	game=load("res://main.tscn").instantiate();add_child(game);await get_tree().process_frame;await get_tree().process_frame
-	game._reset_progression_state();game._start_intro_story()
+	game._reset_progression_state();game.opening_story_complete=true;game.opening_overlay.visible=false;game._start_intro_story()
 	game.intro_continue_button.pressed.emit();game.intro_continue_button.pressed.emit()
 	assert(game.intro_story_complete and game.old_seed_bags==3 and game.tutorial_guide_overlay.visible and str(game.tutorial_guide_button.get_meta("target",""))=="play_open")
 	game.tutorial_guide_button.pressed.emit();await get_tree().process_frame

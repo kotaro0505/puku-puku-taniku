@@ -9,7 +9,7 @@ func _ready()->void:
 	# Isolate this smoke from records left by a previously executed suite before
 	# _finish_opening() can queue a saved-progress continuation event.
 	game._reset_progression_state()
-	game._finish_opening();game.audio_manager.apply_settings({"bgm_enabled":false,"se_enabled":false})
+	game.opening_story_complete=true;game._finish_opening();game.audio_manager.apply_settings({"bgm_enabled":false,"se_enabled":false})
 	_test_common_catalog(game)
 	_test_uniform_tutorial_draw(game)
 	await _test_persistent_habitat(game)

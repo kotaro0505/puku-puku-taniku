@@ -5,6 +5,7 @@ func _ready()->void:
 	add_child(game)
 	await get_tree().process_frame
 	await get_tree().process_frame
+	game.opening_story_complete=true
 	game._finish_opening()
 	game._reset_progression_state()
 	game.intro_story_complete=true

@@ -10,7 +10,7 @@ const EXCLUDED := ["pinwheel","glow_colorata","metal_laui"]
 func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
-	game._finish_opening();game.audio_manager.apply_settings({"bgm_enabled":false,"se_enabled":false})
+	game.opening_story_complete=true;game._finish_opening();game.audio_manager.apply_settings({"bgm_enabled":false,"se_enabled":false})
 	_configure_probe_catalog(game)
 	_test_exact_routes(game)
 	_test_uniform_known_category(game)

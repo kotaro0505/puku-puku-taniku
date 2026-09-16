@@ -95,6 +95,13 @@ func play_bgm(key: String, restart := false) -> void:
 	bgm_fade_tween.chain().tween_callback(_stop_and_release_bgm_player.bind(current))
 	active_bgm = next_index
 
+func stop_bgm() -> void:
+	current_bgm_key = ""
+	bgm_changed_while_paused = false
+	_cancel_bgm_fade()
+	for player in bgm_players:
+		_stop_and_release_bgm_player(player)
+
 func _bgm_target_db(key:String)->float:
 	var gains=config.get("bgm_gain",{})
 	var gain:=1.0

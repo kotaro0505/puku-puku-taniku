@@ -5,7 +5,7 @@ const HabitatWildSystemClass=preload("res://scripts/habitat_wild_system.gd")
 func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
-	game._finish_opening();game.audio_manager.apply_settings({"bgm_enabled":false,"se_enabled":false})
+	game.opening_story_complete=true;game._finish_opening();game.audio_manager.apply_settings({"bgm_enabled":false,"se_enabled":false})
 	game._reset_progression_state()
 	_test_normal_seed_routes(game)
 	_test_growth_and_jelly()
