@@ -253,6 +253,36 @@ func _show_page(page:Control)->void:
 func is_editor_active()->bool:
 	return visible and editor_page!=null and editor_page.visible
 
+func _input(event:InputEvent)->void:
+	# Web/mobile browsers do not reliably route the second finger of a
+	# multi-touch gesture through a Control's gui_input signal. Track touch
+	# events at viewport level while the editor is active so both fingers use
+	# the same path. Mouse input remains owned by editor_canvas.gui_input.
+	if not is_editor_active() or editor_canvas==null:return
+	if event is InputEventScreenTouch:
+		var touch:=event as InputEventScreenTouch
+		var local_position:=_editor_local_touch_position(touch.position)
+		if touch.pressed and not _editor_canvas_has_point(local_position):return
+		if not touch.pressed and not touch_positions.has(touch.index):return
+		var local_touch:=touch.duplicate() as InputEventScreenTouch
+		local_touch.position=local_position
+		_handle_editor_touch(local_touch)
+		get_viewport().set_input_as_handled()
+	elif event is InputEventScreenDrag:
+		var drag:=event as InputEventScreenDrag
+		var local_position:=_editor_local_touch_position(drag.position)
+		if not touch_positions.has(drag.index) and not _editor_canvas_has_point(local_position):return
+		var local_drag:=drag.duplicate() as InputEventScreenDrag
+		local_drag.position=local_position
+		_handle_editor_touch(local_drag)
+		get_viewport().set_input_as_handled()
+
+func _editor_local_touch_position(screen_position:Vector2)->Vector2:
+	return editor_canvas.get_global_transform_with_canvas().affine_inverse()*screen_position
+
+func _editor_canvas_has_point(local_position:Vector2)->bool:
+	return Rect2(Vector2.ZERO,editor_canvas.size).has_point(local_position)
+
 func _on_home_world_scroll_input(event:InputEvent)->void:
 	if world_backdrop_enabled and visible and home_page.visible:world_scroll_input.emit(event)
 
@@ -369,17 +399,20 @@ func _on_editor_canvas_gui_input(event:InputEvent)->void:
 		accept_event()
 	elif event is InputEventMouseMotion:
 		_update_canvas_pointer(-1,event.position,event);accept_event()
-	elif event is InputEventScreenTouch:
-		if event.pressed:
+
+func _handle_editor_touch(event:InputEvent)->void:
+	if event is InputEventScreenTouch:
+		var touch:=event as InputEventScreenTouch
+		if touch.pressed:
 			var is_first_touch:=touch_positions.is_empty()
-			touch_positions[event.index]=event.position;_begin_canvas_pointer(event.index,event.position,event)
+			touch_positions[touch.index]=touch.position;_begin_canvas_pointer(touch.index,touch.position,touch)
 			if is_first_touch:pinch_target_index=selected_plant_index
 		else:
-			_end_canvas_pointer(event.index,event.position,event);touch_positions.erase(event.index)
+			_end_canvas_pointer(touch.index,touch.position,touch);touch_positions.erase(touch.index)
 			if touch_positions.is_empty():pinch_target_index=-1
-		accept_event()
 	elif event is InputEventScreenDrag:
-		touch_positions[event.index]=event.position;_update_canvas_pointer(event.index,event.position,event);accept_event()
+		var drag:=event as InputEventScreenDrag
+		touch_positions[drag.index]=drag.position;_update_canvas_pointer(drag.index,drag.position,drag)
 
 func _begin_canvas_pointer(pointer_id:int,pointer_position:Vector2,event:InputEvent)->void:
 	if bool(current_arrangement.get("completed",false)):return

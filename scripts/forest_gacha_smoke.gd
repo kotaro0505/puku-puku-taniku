@@ -11,15 +11,16 @@ func _ready()->void:
 	await _test_spin_capsule_and_reveal(game)
 	_test_encounter_save_and_unlock(game)
 	game._reset_progression_state();game.queue_free()
-	print("FOREST_GACHA_SMOKE_OK routes=2 first5=unlocked locked=18% capsule=reveal encounter=save+autoregister checker=masked")
+	print("FOREST_GACHA_SMOKE_OK routes=2 first5=unlocked locked=18% capsule=reveal encounter=save+autoregister checker=backed")
 	get_tree().quit()
 
 func _test_assets_and_routes(game)->void:
 	assert(game.forest_gacha_button!=null and game.forest_gacha_button.position.y<game.secret_gacha_button.position.y and game.forest_gacha_button.size==game.secret_gacha_button.size)
 	var shop_route:=game.shop_overlay.find_child("ShopForestGachaButton",true,false) as Button;assert(shop_route!=null and shop_route.text.contains("ガチャ"))
 	var background:=game.forest_gacha_ui.find_child("Background",true,false) as TextureRect;assert(background!=null and background.texture.resource_path=="res://assets/forest_gacha/forest-gacha-background.jpg")
-	assert(background.material is ShaderMaterial and (background.material as ShaderMaterial).shader.code.contains("color.a *= opaque_mask"))
+	assert(background.material is ShaderMaterial and (background.material as ShaderMaterial).shader.code.contains("dial_backing_color"))
 	var dial:=game.forest_gacha_ui.find_child("TemporaryDial",true,false) as TextureRect;assert(dial!=null and dial.texture.resource_path=="res://assets/forest_gacha/temporary-dial.png")
+	assert(dial.size==game.forest_gacha_ui.DIAL_SIZE and (dial.position+dial.size*.5).is_equal_approx(game.forest_gacha_ui.DIAL_CENTER))
 	var dial_image:=dial.texture.get_image();assert(dial_image!=null and dial_image.detect_alpha()!=Image.ALPHA_NONE and dial_image.get_pixel(0,0).a<.01)
 	game._open_shop();assert(game.shop_overlay.visible);shop_route.pressed.emit();assert(game.forest_gacha_ui.visible and not game.shop_overlay.visible);game._close_forest_gacha()
 	game._open_forest_gacha();assert(game.forest_gacha_ui.visible);game._close_forest_gacha()

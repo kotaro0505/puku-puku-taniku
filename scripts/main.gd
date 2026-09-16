@@ -573,7 +573,8 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_layout)
 	_layout()
 	_wire_ui_sounds(self)
-	if _forest_gacha_preview_requested():call_deferred("_open_forest_gacha_preview")
+	if _arrangement_test_preview_requested():call_deferred("_open_arrangement_test_preview")
+	elif _forest_gacha_preview_requested():call_deferred("_open_forest_gacha_preview")
 	elif _secret_gacha_preview_requested():call_deferred("_open_secret_gacha_preview")
 	elif _habitat_test_preview_requested():call_deferred("_open_habitat_test_preview")
 
@@ -596,6 +597,12 @@ func _slot_preview_requested() -> bool:
 		var requested = JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('screen')", true)
 		return str(requested) == "slot"
 	return "--slot-preview" in OS.get_cmdline_user_args()
+
+func _arrangement_test_preview_requested()->bool:
+	if OS.has_feature("web"):
+		var requested=JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('screen')",true)
+		return str(requested)=="arrangement-test"
+	return "--arrangement-test-preview" in OS.get_cmdline_user_args()
 
 func _forest_gacha_preview_requested()->bool:
 	if OS.has_feature("web"):
@@ -2207,6 +2214,17 @@ func _open_forest_gacha_preview()->void:
 	if shop_overlay:shop_overlay.visible=false
 	if play_overlay:play_overlay.visible=false
 	forest_gacha_ui.open_gacha(forest_gacha_preview_puku_points,forest_gacha_preview_draw_count);audio_manager.play_bgm("shop");_update_play_ui()
+
+func _open_arrangement_test_preview()->void:
+	if opening_overlay:opening_overlay.visible=false
+	if intro_overlay:intro_overlay.visible=false
+	if shop_overlay:shop_overlay.visible=false
+	if play_overlay:play_overlay.visible=false
+	var preview_species_id:="colorata"
+	if _catalog_entry(preview_species_id).is_empty() and not catalog_species.is_empty():preview_species_id=str(catalog_species[0].get("species_id",""))
+	if preview_species_id.is_empty():return
+	discovered[preview_species_id]=true;bests[preview_species_id]=90.0;owned_pots["shallow_terracotta"]=true
+	_sync_arrangement_ui();arrangement_ui.set_world_backdrop_mode(false,_arrangement_pot_anchor_screen());arrangement_ui.open_home();arrangement_ui._start_new_arrangement();arrangement_ui._select_editor_pot("shallow_terracotta");arrangement_ui._add_species_to_editor(preview_species_id);_update_play_ui()
 
 func _open_secret_gacha_preview()->void:
 	secret_gacha_active=true;secret_gacha_draws_remaining=secret_gacha_system.setting_int("max_draws_per_event",3);puku_points=maxi(puku_points,10)

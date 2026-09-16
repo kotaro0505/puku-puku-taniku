@@ -33,11 +33,12 @@ func _ready()->void:
 	ui._on_editor_canvas_gui_input(_mouse_motion(moved_position+Vector2(-31,19)));ui._on_editor_canvas_gui_input(_mouse_button(moved_position+Vector2(-31,19),false));var direct_move_position:=Vector2(float(ui.editor_plants[0].x),float(ui.editor_plants[0].y));assert(direct_move_position.distance_to(moved_position)>10.0 and not ui.drag_active)
 	# A two-finger gesture started on empty canvas space scales and rotates the
 	# currently selected plant at the same time.
-	var pinch_origin:=Vector2(30,40);ui._on_editor_canvas_gui_input(_screen_touch(0,pinch_origin,true))
-	ui._on_editor_canvas_gui_input(_screen_touch(1,pinch_origin+Vector2(30,0),true));assert(ui.pinch_active and ui.selected_plant_index==0)
-	ui._on_editor_canvas_gui_input(_screen_drag(1,pinch_origin+Vector2(41.1,0)));assert(is_equal_approx(float(ui.editor_plants[0].scale),1.37) and is_equal_approx(float(ui.editor_plants[0].rotation),0.0))
-	ui._on_editor_canvas_gui_input(_screen_drag(1,pinch_origin+Vector2(0,41.1)));assert(is_equal_approx(float(ui.editor_plants[0].scale),1.37) and is_equal_approx(float(ui.editor_plants[0].rotation),90.0))
-	ui._on_editor_canvas_gui_input(_screen_touch(1,pinch_origin+Vector2(0,41.1),false));ui._on_editor_canvas_gui_input(_screen_touch(0,pinch_origin,false));assert(not ui.pinch_active and is_equal_approx(float(ui.editor_plants[0].scale),1.37) and is_equal_approx(float(ui.editor_plants[0].rotation),90.0))
+	var pinch_origin:=Vector2(30,40);_send_editor_touch(ui,_screen_touch(0,pinch_origin,true))
+	_send_editor_touch(ui,_screen_touch(1,pinch_origin+Vector2(30,0),true));assert(ui.pinch_active and ui.selected_plant_index==0)
+	_send_editor_touch(ui,_screen_drag(1,pinch_origin+Vector2(41.1,0)));assert(is_equal_approx(float(ui.editor_plants[0].scale),1.37) and is_equal_approx(float(ui.editor_plants[0].rotation),0.0))
+	_send_editor_touch(ui,_screen_drag(1,pinch_origin+Vector2(0,41.1)));assert(is_equal_approx(float(ui.editor_plants[0].scale),1.37) and is_equal_approx(float(ui.editor_plants[0].rotation),90.0))
+	_send_editor_touch(ui,_screen_touch(1,pinch_origin+Vector2(0,41.1),false));_send_editor_touch(ui,_screen_touch(0,pinch_origin,false));assert(not ui.pinch_active and is_equal_approx(float(ui.editor_plants[0].scale),1.37) and is_equal_approx(float(ui.editor_plants[0].rotation),90.0))
+	var tracked_before:int=ui.touch_positions.size();_send_editor_touch(ui,_screen_touch(3,Vector2(-12,-12),true));assert(ui.touch_positions.size()==tracked_before)
 	for rotation_step in range(18):ui._adjust_selected_rotation(15.0)
 	assert(is_equal_approx(float(ui.editor_plants[0].rotation),0.0))
 	ui._add_species_to_editor("colorata");assert(ui.editor_plants.size()==2)
@@ -99,6 +100,11 @@ func _screen_touch(index:int,position:Vector2,pressed:bool)->InputEventScreenTou
 
 func _screen_drag(index:int,position:Vector2)->InputEventScreenDrag:
 	var event:=InputEventScreenDrag.new();event.index=index;event.position=position;return event
+
+func _send_editor_touch(ui,event:InputEvent)->void:
+	var screen_event:=event.duplicate()
+	screen_event.position=ui.editor_canvas.get_global_transform_with_canvas()*event.position
+	ui._input(screen_event)
 
 func _has_button_text(root:Node,text:String)->bool:
 	for node in root.find_children("*","Button",true,false):
