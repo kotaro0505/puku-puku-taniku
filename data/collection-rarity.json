@@ -1,5 +1,4 @@
 {
-  "common": {"two_star":"nijinotama", "one_star":["momotaro","black_prince"]},
   "base": {"two_star":"golden_laui", "one_star":["golden_kannte","laui"]},
   "metal": {"two_star":"metal_gold_cluster", "one_star":["metal_iridescent_star","metal_obsidian_spike"]},
   "jewel": {"two_star":"jewel_diamond_rosette", "one_star":["jewel_sapphire_star","jewel_opal_rosette"]},

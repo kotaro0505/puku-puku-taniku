@@ -9,12 +9,22 @@ func _ready()->void:
 	game._finish_opening()
 	game._reset_progression_state()
 	game.intro_story_complete=true
+	game.first_colorata_confirmed=true
+	game.trio_originals_confirmed=true
 	game.habitat_unlocked=true
+	game.habitat_arrival_started=true
+	game.habitat_awakened=true
+	game.habitat_awakening_event_complete=true
+	game.habitat_tutorial_started=true
 	game.habitat_tutorial_complete=true
+	game.seed_shop_open=true
+	game.panda_beacon_unlocked=true
+	game.panda_beacon_count=1
+	game.puku_gauge_intro_complete=true
 	game.encyclopedia_unlocked=true
 	game.unlocked_series["base"]=true
-	game.selected_series_index=1
-	game.discovered["nijinotama"]=true
+	game.selected_series_index=0
+	game.discovered["colorata"]=true
 	for cycle in range(12):
 		if game.current_mode!="greenhouse":game._toggle_mode()
 		game._toggle_mode()

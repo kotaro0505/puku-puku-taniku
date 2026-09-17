@@ -3,18 +3,15 @@ extends Control
 
 signal story_finished(replay_mode: bool)
 
+const Localizer = preload("res://scripts/game_localizer.gd")
+
 const PAGE_TEXTURES: Array[Texture2D] = [
 	preload("res://assets/opening_story/page-1.jpg"),
 	preload("res://assets/opening_story/page-2.jpg"),
 	preload("res://assets/opening_story/page-3.jpg"),
 	preload("res://assets/opening_story/page-4.jpg")
 ]
-const PAGE_TEXTS: Array[String] = [
-	"ある日、女の子は\n古い倉庫のすみで、\nほこりをかぶった一冊の本を見つけました。\n\n「なんだろう、これ……」",
-	"ほこりを払い、\nみんなで本を見てみると——\n\n表紙には、\n\n「原種図鑑」\n\nと書かれていました。",
-	"ページを開くと、\nそこには見たことのない植物が\nたくさん描かれていました。\n\nぷっくりした葉。\n変わったかたち。\n不思議な色。\n\nそこには、\n「多肉植物」という言葉が。\n\n「こんな植物、本当にあったのかな……」",
-	"そこへパンダが、\n古い倉庫で見つけた\nタネの袋を持ってきました。\n\n「これ、なんのタネだろう？」\n\n図鑑と見くらべて、\n3人は顔を見合わせました。\n\n「もしかして……\nこの植物のタネかもしれない」\n\nそこで3人は、\nタネを分けて蒔いてみることにしました。\n\n「どんな植物が育つんだろう——」"
-]
+const PAGE_TEXT_KEYS := ["opening_story_1", "opening_story_2", "opening_story_3", "opening_story_4"]
 const PAGE_FONT_SIZES := [20, 20, 17, 14]
 
 var current_page_index := -1
@@ -26,6 +23,8 @@ var story_text: Label
 var page_count_label: Label
 var tap_area: Button
 var page_tween: Tween
+var tap_hint: Label
+var language_code := "ja"
 
 func _ready() -> void:
 	name = "OpeningStoryOverlay"
@@ -94,17 +93,16 @@ func _build_ui() -> void:
 	page_count_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(page_count_label)
 
-	var hint := Label.new()
-	hint.name = "StoryTapHint"
-	hint.text = "タップしてつぎへ"
-	hint.position = Vector2(148, 970)
-	hint.size = Vector2(280, 36)
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	hint.add_theme_font_size_override("font_size", 14)
-	hint.add_theme_color_override("font_color", Color("#d9c8aa"))
-	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(hint)
+	tap_hint = Label.new()
+	tap_hint.name = "StoryTapHint"
+	tap_hint.position = Vector2(148, 970)
+	tap_hint.size = Vector2(280, 36)
+	tap_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tap_hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	tap_hint.add_theme_font_size_override("font_size", 14)
+	tap_hint.add_theme_color_override("font_color", Color("#d9c8aa"))
+	tap_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(tap_hint)
 
 	tap_area = Button.new()
 	tap_area.name = "StoryTapArea"
@@ -115,10 +113,12 @@ func _build_ui() -> void:
 	tap_area.pressed.connect(advance_page)
 	add_child(tap_area)
 
-func start(as_replay := false, start_page := 0) -> void:
+func start(as_replay := false, start_page := 0, requested_language := "ja") -> void:
 	if page_tween and page_tween.is_valid():
 		page_tween.kill()
 	replay_mode = as_replay
+	language_code = Localizer.normalize_language(requested_language)
+	tap_hint.text = Localizer.text(language_code, "opening_story_tap")
 	transitioning = false
 	visible = true
 	move_to_front()
@@ -163,7 +163,7 @@ func _show_page(index: int) -> void:
 		text_panel.size.y=434
 		story_text.position.y=604
 		story_text.size.y=358
-	story_text.text = PAGE_TEXTS[index]
+	story_text.text = Localizer.text(language_code, PAGE_TEXT_KEYS[index])
 	story_text.add_theme_font_size_override("font_size", int(PAGE_FONT_SIZES[index]))
 	story_text.modulate = Color.WHITE
 	page_count_label.text = "%d / %d" % [index + 1, PAGE_TEXTURES.size()]

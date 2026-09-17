@@ -4,7 +4,7 @@ func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
 	game.opening_story_complete=true;game._finish_opening();game.audio_manager.apply_settings({"bgm_enabled":false,"se_enabled":false})
-	game._reset_progression_state();game.intro_story_complete=true;game.habitat_unlocked=true;game.encyclopedia_unlocked=true
+	game._reset_progression_state();game.intro_story_complete=true;game.habitat_unlocked=true;game.habitat_awakened=true;game.habitat_awakening_event_complete=true;game.encyclopedia_unlocked=true
 	game.current_mode="habitat";game.pending_habitat_species.clear();game.habitat_mystery_seeds_pending=0
 	game._ensure_habitat_wild_state();assert(game.habitat_wild_plants.size()>=game.HabitatWildSystemClass.INITIAL_POPULATION_MIN and game.habitat_wild_plants.size()<=game.HabitatWildSystemClass.INITIAL_POPULATION_MAX)
 	# Keep A/B captures deterministic: persistent habitat plants normally keep

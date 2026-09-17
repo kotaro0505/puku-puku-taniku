@@ -112,6 +112,19 @@ static func initialize_population(plants: Array[Dictionary], candidate_species_i
 		plants.append(_make_plant(species_id, false, rng.randf_range(3.5, 28.9), now_unix, plants, rng, safe_points))
 
 
+static func initialize_awakened_population(plants: Array[Dictionary], candidate_species_ids: Array[String], original_species_ids: Array[String], now_unix: float, rng: RandomNumberGenerator, safe_points: Array = []) -> void:
+	# The first sprouts belong to the awakening event. Start with only a few;
+	# ordinary timed spawning enriches the habitat after the story moment.
+	if not plants.is_empty() or candidate_species_ids.is_empty():
+		return
+	var tutorial_pool := original_species_ids if not original_species_ids.is_empty() else candidate_species_ids
+	var tutorial_id := tutorial_pool[rng.randi_range(0, tutorial_pool.size() - 1)]
+	plants.append(_make_plant(tutorial_id, true, rng.randf_range(29.99970, 29.99985), now_unix, plants, rng, safe_points))
+	while plants.size() < 3:
+		var species_id := candidate_species_ids[rng.randi_range(0, candidate_species_ids.size() - 1)]
+		plants.append(_make_plant(species_id, false, rng.randf_range(2.0, 5.5), now_unix, plants, rng, safe_points))
+
+
 static func add_pending_species(plants: Array[Dictionary], species_id: String, now_unix: float, rng: RandomNumberGenerator, safe_points: Array = []) -> void:
 	if species_id.is_empty() or plants.size() >= MAX_POPULATION:
 		return

@@ -6,7 +6,7 @@ func _ready()->void:
 	game._reset_progression_state()
 	game._update_play_ui();assert(not game.shop_button.visible)
 	var visits_before:int=game.shop_visit_count;game._open_shop();assert(not game.shop_overlay.visible and game.shop_visit_count==visits_before)
-	game.intro_story_complete=true;game.total_play_count=3;game.habitat_unlocked=true;game.encyclopedia_unlocked=true;game.puku_gauge_intro_complete=true
+	game.intro_story_complete=true;game.first_colorata_confirmed=true;game.trio_originals_confirmed=true;game.total_play_count=3;game.habitat_unlocked=true;game.habitat_awakened=true;game.habitat_awakening_event_complete=true;game.encyclopedia_unlocked=true;game.seed_shop_open=true;game.panda_beacon_unlocked=true;game.puku_gauge_intro_complete=true
 	game.habitat_tutorial_complete=true;game.tutorial_steps["play1_dialog"]=true
 	game._update_play_ui();assert(game.shop_button.visible)
 	game._open_shop();assert(game.shop_overlay.visible and game.shop_current_page=="categories" and game.shop_category_controls[0].is_visible_in_tree() and not game.shop_wallet_label.is_visible_in_tree())
@@ -28,8 +28,8 @@ func _ready()->void:
 	game._dismiss_or_advance_shop_chatter();assert(not game.shop_chatter_bubble.visible and game.volume_seed_intro_seen)
 
 	game._prepare_shop_visit(true);game._on_armadillo_tapped();assert(game.shop_chatter_sequence_kind=="pinwheel_intro" and not bool(game.discovered.get("pinwheel",false)))
-	game._dismiss_or_advance_shop_chatter();assert("君も多肉" in game.shop_chatter_label.text and not bool(game.discovered.get("pinwheel",false)))
-	game._dismiss_or_advance_shop_chatter();assert("ピンウィールという品種" in game.shop_chatter_label.text and not bool(game.discovered.get("pinwheel",false)))
+	game._dismiss_or_advance_shop_chatter();assert("また一株" in game.shop_chatter_label.text and not bool(game.discovered.get("pinwheel",false)))
+	game._dismiss_or_advance_shop_chatter();assert("ピンウィールという原種" in game.shop_chatter_label.text and not bool(game.discovered.get("pinwheel",false)))
 	game._dismiss_or_advance_shop_chatter();assert(bool(game.discovered.get("pinwheel",false)) and not game.shop_chatter_bubble.visible)
 	await get_tree().process_frame;assert(game.species_get_overlay.visible and game.species_get_overlay.name_label.text=="ピンウィール");game.species_get_overlay.busy=false;game.species_get_overlay.close_overlay();await get_tree().create_timer(.2).timeout;assert(game.scripted_dialog_kind=="armadillo_mystery_intro");game._finish_scripted_dialog()
 	game._show_shop_chatter("いらっしゃい！",false,"normal","panda");assert(game.shop_chatter_acquired_species.is_empty())
@@ -46,7 +46,7 @@ func _ready()->void:
 
 	game.formal_play_count=2;game.volume_seed_unlocked=false;game.premium_seed_unlocked=false;game.puku_points=1;game._select_shop_product("normal")
 	assert(game.shop_buy_glow.visible)
-	game._select_shop_product("volume");assert("あと1回プレイで解禁" in game.shop_product_detail_label.text and "お得な大容量。じっくり大物を狙えます。" in game.shop_product_detail_label.text and not "36粒入りのお得" in game.shop_product_detail_label.text and not game.shop_buy_glow.visible)
+	game._select_shop_product("volume");assert("あと1回プレイで解禁" in game.shop_product_detail_label.text and "原生地のたねをたっぷり袋詰め" in game.shop_product_detail_label.text and not "36粒入りのお得" in game.shop_product_detail_label.text and not game.shop_buy_glow.visible)
 	game._select_shop_product("premium");assert("あと11回プレイで解禁" in game.shop_product_detail_label.text and "24粒 / 袋" in game.shop_product_detail_label.text)
 	game.audio_manager.se_enabled=true
 	game._select_shop_product("normal");var bags_before:int=game.normal_seed_bags;game._buy_seed_bag("normal")

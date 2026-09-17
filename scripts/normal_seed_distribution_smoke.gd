@@ -1,9 +1,9 @@
 extends Node
 
-const KNOWN_ZERO := ["momotaro","lola"]
-const KNOWN_ONE := "black_prince"
-const KNOWN_TWO := "nijinotama"
-const UNLOCKED_NEW := "shirobotan"
+const KNOWN_ZERO := ["colorata","lutea"]
+const KNOWN_ONE := "golden_kannte"
+const KNOWN_TWO := "golden_laui"
+const UNLOCKED_NEW := "shaviana"
 const LOCKED_NEW := "gummy_peach_milk"
 const EXCLUDED := ["pinwheel","glow_colorata","metal_laui"]
 
@@ -37,7 +37,7 @@ func _configure_probe_catalog(game:Node)->void:
 	var mystery:Dictionary=game._catalog_entry("metal_laui");mystery["special_route_only"]=false
 	game.discovered={KNOWN_ZERO[0]:true,KNOWN_ZERO[1]:true,KNOWN_ONE:true,KNOWN_TWO:true,EXCLUDED[0]:true,EXCLUDED[1]:true}
 	game.greenhouse_available=game.discovered.duplicate(true)
-	game.unlocked_series={"common":true}
+	game.unlocked_series={"base":true}
 	game.forest_gacha_encountered.clear()
 	game.rng.seed=20260912
 

@@ -70,7 +70,7 @@ func _test_growth_and_jelly()->void:
 	assert(stale_plants.is_empty() and stale_events.jellied.is_empty() and stale_events.removed==["already_jellied"])
 
 func _test_beacon_jelly_log_and_visuals(game:Node)->void:
-	game._reset_progression_state();game.intro_story_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.total_play_count=3;game.formal_play_count=1;game.habitat_tutorial_started=true;game.habitat_tutorial_complete=true;game.original_catalog_gifted=true;game.puku_gauge_intro_complete=true;game.panda_beacon_unlocked=true;game.panda_beacon_count=3;game.puku_points=10;game.current_mode="habitat";game._apply_mode();game._build_habitat_items(true)
+	game._reset_progression_state();game.opening_story_complete=true;game.intro_story_complete=true;game.first_colorata_confirmed=true;game.trio_originals_confirmed=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.habitat_arrival_started=true;game.habitat_awakened=true;game.habitat_awakening_event_complete=true;game.total_play_count=3;game.formal_play_count=1;game.habitat_tutorial_started=true;game.habitat_tutorial_complete=true;game.seed_shop_open=true;game.original_catalog_gifted=true;game.puku_gauge_intro_complete=true;game.panda_beacon_unlocked=true;game.panda_beacon_count=3;game.puku_points=10;game.current_mode="habitat";game._apply_mode();game._build_habitat_items(true)
 	game._update_play_ui();assert(game.habitat_dev_open_button!=null and game.habitat_dev_open_button.visible)
 	var wall_now:=Time.get_unix_time_from_system()
 	for plant in game.habitat_wild_plants:
@@ -182,7 +182,7 @@ func _test_legacy_population_migration(game:Node)->void:
 	var badge:Label3D=item.status_label
 	assert(badge.get_parent()==game.habitat_items_root and badge.get_parent()!=item.node)
 	assert(badge.billboard==BaseMaterial3D.BILLBOARD_ENABLED and badge.fixed_size and badge.no_depth_test and badge.scale==Vector3.ONE and not badge.text.is_empty())
-	game._save();var migrated=JSON.parse_string(FileAccess.get_file_as_string("user://records.json"));assert(int(migrated.get("progression_version",0))==17 and not HabitatWildSystemClass.has_legacy_runaway_population(migrated.get("habitat_wild_plants",[])))
+	game._save();var migrated=JSON.parse_string(FileAccess.get_file_as_string("user://records.json"));assert(int(migrated.get("progression_version",0))==18 and not HabitatWildSystemClass.has_legacy_runaway_population(migrated.get("habitat_wild_plants",[])))
 
 func _test_save_persistence_and_stale_cleanup(game:Node)->void:
 	var now:=int(Time.get_unix_time_from_system())

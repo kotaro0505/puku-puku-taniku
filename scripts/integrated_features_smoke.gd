@@ -16,10 +16,9 @@ func _ready()->void:
 	get_tree().quit()
 
 func _test_catalog_and_collection_rarity(game)->void:
-	assert(Localizer.series_name("ja",game._series_entry("common"))=="おなじみ多肉図鑑")
-	var common:Array=game._series_species_entries("common");assert(common.size()==10)
-	var first_weight:=float(common[0].get("spawn_weight",0.0))
-	for entry in common:assert(is_equal_approx(float(entry.get("spawn_weight",0.0)),first_weight))
+	assert(game._series_entry("common").is_empty() and game._series_species_entries("common").is_empty())
+	assert(Localizer.series_name("ja",game._series_entry("base"))=="原種図鑑")
+	assert(game._series_species_entries("base").size()==21)
 	var rarity_data=JSON.parse_string(FileAccess.get_file_as_string("res://data/collection-rarity.json"));assert(rarity_data is Dictionary)
 	for series_value in game.series_catalog:
 		if not series_value is Dictionary:continue
@@ -32,8 +31,8 @@ func _test_catalog_and_collection_rarity(game)->void:
 			assert(stars in [0,1,2])
 		assert(two_star==1 and one_star==2)
 	# Collection rarity is metadata only; it must not overwrite spawn rarity.
-	assert(str(game._catalog_entry("nijinotama").get("rarity",""))=="通常")
-	assert(int(game._catalog_entry("nijinotama").get("gold_star_count",0))==2)
+	assert(str(game._catalog_entry("golden_laui").get("rarity",""))=="スーパーレア")
+	assert(int(game._catalog_entry("golden_laui").get("gold_star_count",0))==2)
 
 func _test_secret_gacha(game)->void:
 	var config:Dictionary=game.secret_gacha_system.config
@@ -48,10 +47,10 @@ func _test_secret_gacha(game)->void:
 	assert(game.secret_gacha_system.should_activate(5,true,test_rng,0.0))
 	assert(not game.secret_gacha_system.should_activate(5,true,test_rng,.999))
 	for sample in range(120):
-		var result:Dictionary=game.secret_gacha_system.draw({"common":true},{},{"shallow_terracotta":true},test_rng,"species")
+		var result:Dictionary=game.secret_gacha_system.draw({"base":true},{},{"shallow_terracotta":true},test_rng,"species")
 		var entry:Dictionary=result.get("species_entry",{});assert(str(result.get("category",""))=="species")
 		assert(int(entry.get("gold_star_count",0)) in [1,2]);assert(not bool(entry.get("special_route_only",false)))
-	var species_result:Dictionary=game.secret_gacha_system.draw({"common":true},{},{"shallow_terracotta":true},test_rng,"species")
+	var species_result:Dictionary=game.secret_gacha_system.draw({"base":true},{},{"shallow_terracotta":true},test_rng,"species")
 	var reward_species_id:=str(species_result.get("species_id",""));game.discovered.erase(reward_species_id);game._apply_secret_gacha_reward(species_result)
 	assert(bool(game.discovered.get(reward_species_id,false)))
 	var pot_result:Dictionary=game.secret_gacha_system.draw({}, {}, {"shallow_terracotta":true},test_rng,"pot");assert(str(pot_result.get("category",""))=="pot" and not str(pot_result.get("pot_id","")).is_empty())
@@ -81,7 +80,7 @@ func _test_secret_gacha(game)->void:
 	assert(game.secret_gacha_ui.capsule_ready and game.secret_gacha_ui.capsule.visible and game.secret_gacha_ui.dial_texture.rotation>TAU)
 	await game.secret_gacha_ui._reveal_result();assert(game.secret_gacha_ui.result_overlay.visible and not game.secret_gacha_ui.busy)
 	game.secret_gacha_ui._close_result();game.secret_gacha_ui.close_gacha();game.secret_gacha_ui.animation_time_scale=1.0
-	game.intro_story_complete=true;game.habitat_unlocked=true;game.habitat_tutorial_complete=true;game.puku_gauge_intro_complete=true;game.total_play_count=3;game.current_mode="greenhouse";game.play_active=false;game.puku_points=2;game._update_play_ui()
+	game.opening_story_complete=true;game.intro_story_complete=true;game.first_colorata_confirmed=true;game.trio_originals_confirmed=true;game.habitat_unlocked=true;game.habitat_arrival_started=true;game.habitat_awakened=true;game.habitat_awakening_event_complete=true;game.habitat_tutorial_started=true;game.habitat_tutorial_complete=true;game.seed_shop_open=true;game.panda_beacon_unlocked=true;game.panda_beacon_count=1;game.puku_gauge_intro_complete=true;game.total_play_count=3;game.current_mode="greenhouse";game.play_active=false;game.puku_points=2;game._update_play_ui()
 	assert(game.secret_gacha_button.visible and not game.secret_gacha_button.disabled)
 	game.secret_gacha_ui.animation_time_scale=.01;game.secret_gacha_button.pressed.emit();assert(game.secret_gacha_ui.visible and game.secret_gacha_ui.unlimited_play)
 	var points_before_actual_spin:int=game.puku_points;game.secret_gacha_ui.spin_button.pressed.emit()
@@ -99,10 +98,10 @@ func _test_language_and_symbol_safety(game)->void:
 		"shop_season_new_year","old_page_intro_1","volume_intro_1","bustamante_gift","pinwheel_intro_1",
 		"armadillo_idle_1","research_intro_1","research_return_offer","restore_offer","restore_success",
 		"research_status_sprouted","research_status_first","research_milestone_catalog","research_milestone_species",
-		"research_transfer","audio_se_on","unlock_original_catalog","jelly_float"
+		"research_transfer","audio_se_on","story_colorata_1","story_trio_1","awakening_memory","seed_origin_1","special_origin_1","objective_old_seed","story_complete_1","jelly_float"
 	]
 	var numeric_format_keys:=["restore_offer","research_status_first","research_transfer"]
-	var string_format_keys:=["restore_success","research_milestone_species"]
+	var string_format_keys:=["restore_success","research_milestone_species","story_trio_1"]
 	for language in ["ja","hiragana","en"]:
 		assert(Localizer.normalize_language(language)==language)
 		for key in major_runtime_keys:
@@ -129,7 +128,7 @@ func _test_one_time_gift_arrangement_and_share(game)->void:
 	assert(game.arrangement_ui.picker_scroll.vertical_scroll_mode==ScrollContainer.SCROLL_MODE_AUTO)
 	game.play_harvest_cm_total=10.0;game.play_harvest_count=1;game.play_max_size=10.0;game.play_puku_earned_total=0;game.play_notable_species.clear();game.result_new_species_queue.clear();game.play_updated_global_best=false
 	game.play_share_record.clear();game._show_play_result();assert(not game.result_share_button.visible)
-	game.play_share_record={"species_id":"nijinotama","size":32.1};game._show_play_result();assert(game.result_share_button.visible)
+	game.play_share_record={"species_id":"colorata","size":32.1};game._show_play_result();assert(game.result_share_button.visible)
 	var main_source:=FileAccess.get_file_as_string("res://scripts/main.gd")
 	assert(main_source.contains('Engine.has_singleton("SharePlugin")') and main_source.contains('has_method("share_image")') and main_source.contains("navigator.share") and main_source.contains("_queue_species_get"))
 	assert(not main_source.contains("原種として図鑑に登録したよ"))
