@@ -20,6 +20,7 @@ func _ready()->void:
 func _test_normal_seed_routes(game:Node)->void:
 	assert(is_equal_approx(game.NORMAL_SEED_UNLOCKED_NEW_RATE,.03))
 	assert(is_equal_approx(game.NORMAL_SEED_LOCKED_NEW_RATE,.01))
+	game.habitat_second_awakened=true
 	game.rng.seed=20260911
 	var unlocked_choice:Dictionary=game._select_species_for_seed("normal",.02)
 	var unlocked_id:=str(unlocked_choice.get("species_id",""))
@@ -182,7 +183,7 @@ func _test_legacy_population_migration(game:Node)->void:
 	var badge:Label3D=item.status_label
 	assert(badge.get_parent()==game.habitat_items_root and badge.get_parent()!=item.node)
 	assert(badge.billboard==BaseMaterial3D.BILLBOARD_ENABLED and badge.fixed_size and badge.no_depth_test and badge.scale==Vector3.ONE and not badge.text.is_empty())
-	game._save();var migrated=JSON.parse_string(FileAccess.get_file_as_string("user://records.json"));assert(int(migrated.get("progression_version",0))==18 and not HabitatWildSystemClass.has_legacy_runaway_population(migrated.get("habitat_wild_plants",[])))
+	game._save();var migrated=JSON.parse_string(FileAccess.get_file_as_string("user://records.json"));assert(int(migrated.get("progression_version",0))==game.PROGRESSION_VERSION and not HabitatWildSystemClass.has_legacy_runaway_population(migrated.get("habitat_wild_plants",[])))
 
 func _test_save_persistence_and_stale_cleanup(game:Node)->void:
 	var now:=int(Time.get_unix_time_from_system())

@@ -10,7 +10,8 @@ const STAGE_SIZE_50 := 5
 const STAGE_ORIGINALS_8 := 6
 const STAGE_SIZE_100 := 7
 const STAGE_ORIGINALS_12 := 8
-const STAGE_COMPLETE := 9
+const STAGE_SECOND_AWAKENING := 9
+const STAGE_COMPLETE := 10
 
 const REMOVED_COMMON_SPECIES_IDS := [
 	"momotaro", "lola", "black_prince", "perle_von_nurnberg", "shirobotan",
@@ -30,6 +31,9 @@ static func original_count(discovered: Dictionary) -> int:
 			count += 1
 	return count
 
+static func originals_complete(discovered: Dictionary) -> bool:
+	return original_count(discovered) >= MAIN_STORY_ORIGINAL_IDS.size()
+
 static func best_size(bests: Dictionary) -> float:
 	var result := 0.0
 	for value in bests.values():
@@ -40,10 +44,11 @@ static func infer_stage(
 		first_colorata_confirmed: bool,
 		trio_originals_confirmed: bool,
 		habitat_unlocked: bool,
-		habitat_arrival_started: bool,
-		habitat_awakened: bool,
-		discovered: Dictionary,
-		bests: Dictionary
+	habitat_arrival_started: bool,
+	habitat_awakened: bool,
+	discovered: Dictionary,
+	bests: Dictionary,
+	habitat_second_awakened: bool = false
 	) -> int:
 	if not first_colorata_confirmed:
 		return STAGE_OLD_SEED
@@ -65,6 +70,8 @@ static func infer_stage(
 		return STAGE_SIZE_100
 	if restored < MAIN_STORY_ORIGINAL_IDS.size():
 		return STAGE_ORIGINALS_12
+	if not habitat_second_awakened:
+		return STAGE_SECOND_AWAKENING
 	return STAGE_COMPLETE
 
 static func is_removed_species(species_id: String) -> bool:

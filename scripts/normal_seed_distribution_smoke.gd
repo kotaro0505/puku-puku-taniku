@@ -21,6 +21,7 @@ func _ready()->void:
 	get_tree().quit()
 
 func _configure_probe_catalog(game:Node)->void:
+	game.habitat_second_awakened=true
 	var ids:=KNOWN_ZERO+[KNOWN_ONE,KNOWN_TWO,UNLOCKED_NEW,LOCKED_NEW]+EXCLUDED
 	var probes:Array[Dictionary]=[]
 	for species_id in ids:

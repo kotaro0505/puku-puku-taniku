@@ -4,6 +4,9 @@ func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
 	game._reset_progression_state();game.intro_story_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.habitat_tutorial_complete=true;game.puku_gauge_intro_complete=true;game.total_play_count=3
+	# This regression test exercises the established creative-series flow, which
+	# is intentionally available only after the second awakening for new saves.
+	game.habitat_second_awakened=true
 	game.unlocked_series["sweets"]=true
 	assert(game.RAIN_TRIGGER_CHANCES==[0.01,0.02,0.03,0.05,0.08,0.12,0.20])
 	var candidates:Array[Dictionary]=game._habitat_new_species_candidates()

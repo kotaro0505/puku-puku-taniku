@@ -97,16 +97,13 @@ func _ready() -> void:
 	assert(game.puku_gauge_intro_complete and game._tutorial_fully_complete())
 	game._close_shop()
 
-	# Every first discovery is returned automatically. The first modern form
-	# queues one explanation and does not masquerade as a historical original.
+	# A legacy/direct modern discovery remains usable for save compatibility,
+	# but it does not run the old "creative era" explanation prematurely. New
+	# creative discoveries are still blocked at every normal acquisition route.
 	assert(game._register_species_discovery("jelly_grape", true))
 	assert(bool(game.habitat_returned_species.get("jelly_grape", false)))
-	assert(game.pending_special_series_explanation and not game.special_series_explanation_seen)
-	game._try_start_pending_story_event()
-	assert(game.scripted_dialog_kind == "special_origin")
-	while not game.scripted_dialog_kind.is_empty():
-		game._advance_scripted_dialog()
-	assert(game.special_series_explanation_seen and not game.pending_special_series_explanation)
+	assert(not game.pending_special_series_explanation and not game.special_series_explanation_seen)
+	assert("jelly_grape" in game._habitat_population_candidate_ids())
 
 	# Once awake, the shared offline/spawn engine resumes normally.
 	var population_before: int = game.habitat_wild_plants.size()

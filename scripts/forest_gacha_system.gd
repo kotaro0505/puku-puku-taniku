@@ -25,9 +25,9 @@ func configure(series_catalog:Array,species_catalog:Array,catalog_progression:Di
 			var series_id:=str(raw_rule.get("series_id",""))
 			if not series_id.is_empty():normal_series_ids[series_id]=true
 
-func draw(draw_number:int,unlocked_series:Dictionary,discovered:Dictionary,encountered:Dictionary,draw_rng:RandomNumberGenerator,forced_locked_roll:float=-1.0)->Dictionary:
-	var unlocked_candidates:=eligible_series(true,unlocked_series)
-	var locked_candidates:=eligible_series(false,unlocked_series)
+func draw(draw_number:int,unlocked_series:Dictionary,discovered:Dictionary,encountered:Dictionary,draw_rng:RandomNumberGenerator,forced_locked_roll:float=-1.0,creative_allowed:=true)->Dictionary:
+	var unlocked_candidates:=eligible_series(true,unlocked_series,creative_allowed)
+	var locked_candidates:=eligible_series(false,unlocked_series,creative_allowed)
 	if unlocked_candidates.is_empty() and locked_candidates.is_empty():return {}
 	var locked_roll:=forced_locked_roll if forced_locked_roll>=0.0 else draw_rng.randf()
 	var use_locked:=draw_number>GUARANTEED_UNLOCKED_DRAWS and not locked_candidates.is_empty() and (unlocked_candidates.is_empty() or locked_roll<LOCKED_SERIES_CHANCE)
@@ -35,7 +35,7 @@ func draw(draw_number:int,unlocked_series:Dictionary,discovered:Dictionary,encou
 	if series_candidates.is_empty():series_candidates=locked_candidates
 	var series_entry:Dictionary=series_candidates[draw_rng.randi_range(0,series_candidates.size()-1)]
 	var series_id:=str(series_entry.get("series_id",""))
-	var species_candidates:=eligible_species(series_id)
+	var species_candidates:=eligible_species(series_id,creative_allowed)
 	var preferred:Array[Dictionary]=[]
 	for species_entry in species_candidates:
 		var species_id:=str(species_entry.get("species_id",""))
@@ -55,22 +55,23 @@ func draw(draw_number:int,unlocked_series:Dictionary,discovered:Dictionary,encou
 		"was_encountered":bool(encountered.get(str(species_entry.get("species_id","")),false))
 	}
 
-func eligible_series(want_unlocked:bool,unlocked_series:Dictionary)->Array[Dictionary]:
+func eligible_series(want_unlocked:bool,unlocked_series:Dictionary,creative_allowed:=true)->Array[Dictionary]:
 	var result:Array[Dictionary]=[]
 	for series_id_value in normal_series_ids:
 		var series_id:=str(series_id_value)
 		var entry:Dictionary=series_by_id.get(series_id,{})
-		if entry.is_empty() or eligible_species(series_id).is_empty():continue
+		if entry.is_empty() or eligible_species(series_id,creative_allowed).is_empty():continue
 		var is_unlocked:=str(entry.get("unlock_type","future"))=="default" or bool(unlocked_series.get(series_id,false))
 		if is_unlocked==want_unlocked:result.append(entry)
 	return result
 
-func eligible_species(series_id:String)->Array[Dictionary]:
+func eligible_species(series_id:String,creative_allowed:=true)->Array[Dictionary]:
 	var result:Array[Dictionary]=[]
 	var series_entry:Dictionary=series_by_id.get(series_id,{})
 	for species_id_value in series_entry.get("species_ids",[]):
 		var entry:Dictionary=species_by_id.get(str(species_id_value),{})
 		if entry.is_empty() or bool(entry.get("special_route_only",false)):continue
+		if not creative_allowed and not bool(entry.get("main_story_original",false)):continue
 		if str(entry.get("rarity","")) in ["隠し原種","謎品種"]:continue
 		result.append(entry)
 	return result

@@ -30,7 +30,8 @@ func open(entries: Array, species_name_resolver: Callable, language_code: String
 		var entry: Dictionary = entry_value
 		var species_name := str(species_name_resolver.call(str(entry.get("species_id", ""))))
 		var diameter := float(entry.get("diameter_cm", 0.0))
-		var message := "%s jellied before collection." % species_name if language_code == "en" else ("%sは じゅれて しまいました。" % species_name if language_code == "hiragana" else "%sはジュレてしまいました。" % species_name)
+		var event_type := str(entry.get("event_type", "jellied"))
+		var message := _event_message(event_type, species_name, language_code)
 		var label := Label.new()
 		label.name = "PandaBeaconUnreadEntry"
 		label.text = "%s\n%.1fcm" % [message, diameter]
@@ -45,6 +46,29 @@ func open(entries: Array, species_name_resolver: Callable, language_code: String
 	confirm_button.text = "Confirm" if language_code == "en" else ("かくにん" if language_code == "hiragana" else "確認")
 	later_button.text = "Later" if language_code == "en" else ("あとで" if language_code == "hiragana" else "あとで")
 	visible = true
+
+
+func _event_message(event_type: String, species_name: String, language_code: String) -> String:
+	if language_code == "en":
+		match event_type:
+			"jurejure_targeted_small": return "The JureJure Gang is targeting %s!" % species_name
+			"jurejure_targeted_ready": return "The JureJure Gang is racing to harvest %s!" % species_name
+			"jurejure_taken_small": return "%s was taken by the JureJure Gang." % species_name
+			"jurejure_taken_ready": return "The JureJure Gang harvested %s first." % species_name
+			_: return "%s jellied before collection." % species_name
+	if language_code == "hiragana":
+		match event_type:
+			"jurejure_targeted_small": return "じゅれじゅれだんが%sを ねらっています！" % species_name
+			"jurejure_targeted_ready": return "じゅれじゅれだんが%sの しゅうかくを ねらっています！" % species_name
+			"jurejure_taken_small": return "%sは じゅれじゅれだんに とられてしまいました。" % species_name
+			"jurejure_taken_ready": return "%sは じゅれじゅれだんに さきに しゅうかくされました。" % species_name
+			_: return "%sは じゅれて しまいました。" % species_name
+	match event_type:
+		"jurejure_targeted_small": return "ジュレジュレ団が%sを狙っています！" % species_name
+		"jurejure_targeted_ready": return "ジュレジュレ団が%sの収穫を狙っています！" % species_name
+		"jurejure_taken_small": return "%sがジュレジュレ団に獲られてしまいました。" % species_name
+		"jurejure_taken_ready": return "%sはジュレジュレ団に先に収穫されました。" % species_name
+		_: return "%sはジュレてしまいました。" % species_name
 
 
 func close() -> void:

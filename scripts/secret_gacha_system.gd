@@ -28,12 +28,12 @@ func should_activate(formal_play_count:int,habitat_tutorial_complete:bool,draw_r
 	var roll:=forced_roll if forced_roll>=0.0 else draw_rng.randf()
 	return roll<float(config.get("activation_chance_per_formal_play",.012))
 
-func draw(unlocked_series:Dictionary,discovered:Dictionary,owned_pots:Dictionary,draw_rng:RandomNumberGenerator,forced_category:String="")->Dictionary:
+func draw(unlocked_series:Dictionary,discovered:Dictionary,owned_pots:Dictionary,draw_rng:RandomNumberGenerator,forced_category:String="",creative_allowed:=true)->Dictionary:
 	var category:=forced_category if forced_category in ["species","pot","catalog_page"] else _weighted_category(draw_rng)
-	var result:=_draw_category(category,unlocked_series,discovered,owned_pots,draw_rng)
+	var result:=_draw_category(category,unlocked_series,discovered,owned_pots,draw_rng,creative_allowed)
 	if not result.is_empty():return result
 	for fallback in ["species","pot","catalog_page"]:
-		result=_draw_category(fallback,unlocked_series,discovered,owned_pots,draw_rng)
+		result=_draw_category(fallback,unlocked_series,discovered,owned_pots,draw_rng,creative_allowed)
 		if not result.is_empty():return result
 	return {}
 
@@ -45,13 +45,14 @@ func _weighted_category(draw_rng:RandomNumberGenerator)->String:
 		if roll<=0.0:return category
 	return "species"
 
-func _draw_category(category:String,unlocked_series:Dictionary,discovered:Dictionary,owned_pots:Dictionary,draw_rng:RandomNumberGenerator)->Dictionary:
+func _draw_category(category:String,unlocked_series:Dictionary,discovered:Dictionary,owned_pots:Dictionary,draw_rng:RandomNumberGenerator,creative_allowed:=true)->Dictionary:
 	match category:
 		"species":
 			var candidates:Array[Dictionary]=[];var preferred:Array[Dictionary]=[]
 			for species_id_value in species_by_id:
 				var entry:Dictionary=species_by_id[species_id_value];var species_id:=str(species_id_value)
 				if int(entry.get("gold_star_count",0))<=0 or bool(entry.get("special_route_only",false)):continue
+				if not creative_allowed and not bool(entry.get("main_story_original",false)):continue
 				candidates.append(entry)
 				if not bool(discovered.get(species_id,false)):preferred.append(entry)
 			if not preferred.is_empty():candidates=preferred
@@ -66,6 +67,7 @@ func _draw_category(category:String,unlocked_series:Dictionary,discovered:Dictio
 			var chosen:Dictionary=candidates[draw_rng.randi_range(0,candidates.size()-1)]
 			return {"category":"pot","pot_id":str(chosen.get("pot_id","")),"pot_entry":chosen.duplicate(true),"image_path":str(chosen.get("image_path",""))}
 		"catalog_page":
+			if not creative_allowed:return {}
 			var candidates:Array[String]=[]
 			for series_id in hidden_series_ids:
 				if not bool(unlocked_series.get(series_id,false)):candidates.append(series_id)

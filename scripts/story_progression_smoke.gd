@@ -11,8 +11,9 @@ func _ready() -> void:
 	_test_catalog_contract(game)
 	_test_objective_sequence(game)
 	_test_legacy_migration(game)
+	_test_v18_completed_story_migration(game)
 	game._reset_progression_state()
-	print("STORY_PROGRESSION_SMOKE_OK originals=12 stages=9 completion=true common_migration=true preservation=true")
+	print("STORY_PROGRESSION_SMOKE_OK originals=12 stages=11 second_awakening=true common_migration=true v18_completion_migration=true preservation=true")
 	get_tree().quit()
 
 func _test_catalog_contract(game: Node) -> void:
@@ -71,17 +72,34 @@ func _test_objective_sequence(game: Node) -> void:
 	for species_id in StoryProgressionClass.MAIN_STORY_ORIGINAL_IDS:
 		game.discovered[species_id] = true
 	game._update_main_story_progress(false)
-	assert(game.main_story_stage == StoryProgressionClass.STAGE_COMPLETE and game.main_story_complete)
-	assert(not game.main_story_completion_seen)
-	game._start_main_story_complete_event()
-	assert(game.scripted_dialog_kind == "main_story_complete")
+	assert(game.main_story_stage == StoryProgressionClass.STAGE_SECOND_AWAKENING)
+	assert(not game.main_story_complete and not game.main_story_completion_seen)
+	game._start_original_catalog_complete_event()
+	assert(game.scripted_dialog_kind == "original_catalog_complete")
 	var completion_text := ""
 	for page in game.scripted_dialog_pages:
 		completion_text += str(page.get("text", ""))
 	assert("全部この世界に戻ってきた" in completion_text)
-	assert("まだ新しい多肉を生み続けている" in completion_text)
+	assert("今は多肉が生きている" in completion_text)
 	while not game.scripted_dialog_kind.is_empty():
 		game._advance_scripted_dialog()
+	assert(game.original_catalog_complete_event_seen and not game.main_story_complete)
+	game.current_mode = "habitat"
+	game.jurejure_intro_complete = true
+	game._start_jurejure_return_event()
+	assert(game.scripted_dialog_kind == "jurejure_return")
+	while not game.scripted_dialog_kind.is_empty():
+		game._advance_scripted_dialog()
+	assert(game.jurejure_return_event_complete and not game.main_story_complete)
+	game._start_habitat_second_awakening()
+	assert(game.habitat_second_awakening_overlay.visible)
+	var overlay_guard := 0
+	while game.habitat_second_awakening_overlay.visible and overlay_guard < 10:
+		game.habitat_second_awakening_overlay.advance()
+		overlay_guard += 1
+	assert(overlay_guard == 5)
+	assert(game.habitat_second_awakened and game.habitat_second_awakening_complete)
+	assert(game.main_story_stage == StoryProgressionClass.STAGE_COMPLETE)
 	assert(game.main_story_completion_seen and game.main_story_complete)
 
 func _test_legacy_migration(game: Node) -> void:
@@ -135,7 +153,7 @@ func _test_legacy_migration(game: Node) -> void:
 	var payload = JSON.parse_string(FileAccess.get_file_as_string("user://records.json"))
 	assert(payload is Dictionary)
 	payload["progression_version"] = 17
-	for new_key in ["first_colorata_confirmed", "trio_originals_confirmed", "habitat_arrival_started", "habitat_awakened", "habitat_awakening_event_complete", "seed_shop_open", "special_series_explanation_seen", "main_story_stage", "main_story_complete", "main_story_completion_seen"]:
+	for new_key in ["first_colorata_confirmed", "trio_originals_confirmed", "habitat_arrival_started", "habitat_awakened", "habitat_awakening_event_complete", "seed_shop_open", "special_series_explanation_seen", "main_story_stage", "main_story_complete", "main_story_completion_seen", "original_catalog_complete_event_seen", "jurejure_intro_complete", "habitat_second_awakened"]:
 		payload.erase(new_key)
 	var file := FileAccess.open("user://records.json", FileAccess.WRITE)
 	file.store_string(JSON.stringify(payload))
@@ -165,3 +183,32 @@ func _test_legacy_migration(game: Node) -> void:
 	var migrated = JSON.parse_string(FileAccess.get_file_as_string("user://records.json"))
 	assert(int(migrated.get("progression_version", 0)) == game.PROGRESSION_VERSION)
 	assert(bool(migrated.get("habitat_awakened", false)) and migrated.has("main_story_stage"))
+
+func _test_v18_completed_story_migration(game: Node) -> void:
+	game._reset_progression_state()
+	game.opening_story_complete = true
+	game.intro_story_complete = true
+	game.first_colorata_confirmed = true
+	game.trio_originals_confirmed = true
+	game.habitat_unlocked = true
+	game.habitat_arrival_started = true
+	game.habitat_awakened = true
+	game.habitat_awakening_event_complete = true
+	game.habitat_tutorial_started = true
+	game.habitat_tutorial_complete = true
+	game.habitat_tutorial_returned_to_greenhouse = true
+	game.puku_points = 91
+	game.panda_beacon_count = 3
+	game.bests["colorata"] = 100.0
+	for species_id in StoryProgressionClass.MAIN_STORY_ORIGINAL_IDS:
+		game.discovered[species_id] = true
+	game.main_story_stage = 9
+	game.main_story_complete = true
+	game.main_story_completion_seen = true
+	game._migrate_story_progress(18)
+	assert(game.original_catalog_complete_event_seen)
+	assert(game.main_story_stage == StoryProgressionClass.STAGE_SECOND_AWAKENING)
+	assert(not game.main_story_complete and not game.main_story_completion_seen)
+	assert(not game.habitat_second_awakened and not game.habitat_second_awakening_complete)
+	assert(not game.jurejure_return_event_complete)
+	assert(game.puku_points == 91 and game.panda_beacon_count == 3)

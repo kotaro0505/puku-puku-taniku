@@ -3,7 +3,7 @@ extends Node
 func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
-	game._reset_progression_state();game.intro_story_complete=true;game.first_colorata_confirmed=true;game.trio_originals_confirmed=true;game.total_play_count=3;game.formal_play_count=1;game.habitat_unlocked=true;game.habitat_awakened=true;game.habitat_awakening_event_complete=true;game.seed_shop_open=true;game.panda_beacon_unlocked=true;game.puku_gauge_intro_complete=true
+	game._reset_progression_state();game.intro_story_complete=true;game.first_colorata_confirmed=true;game.trio_originals_confirmed=true;game.total_play_count=3;game.formal_play_count=1;game.habitat_unlocked=true;game.habitat_awakened=true;game.habitat_awakening_event_complete=true;game.habitat_second_awakened=true;game.habitat_second_awakening_complete=true;game.seed_shop_open=true;game.panda_beacon_unlocked=true;game.puku_gauge_intro_complete=true
 	game.habitat_tutorial_complete=true;game.tutorial_steps["play1_dialog"]=true
 	# First rain completion has no route reward; the second assigns one pending plant.
 	game.rain_bonus_active=true;game._finish_rain_bonus();assert(game.rain_completion_count==1 and not game.mystery_route_assignments.has(game.MYSTERY_ROUTE_RAIN))
