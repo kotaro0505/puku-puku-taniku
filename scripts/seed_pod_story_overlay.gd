@@ -49,8 +49,7 @@ func _build_ui() -> void:
 	var story_image := TextureRect.new()
 	story_image.name = "StoryImage"
 	story_image.texture = STORY_TEXTURE
-	story_image.position = Vector2.ZERO
-	story_image.size = Vector2(576, 768)
+	story_image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	story_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	story_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	story_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
