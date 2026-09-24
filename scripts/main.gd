@@ -619,6 +619,7 @@ func _ready() -> void:
 	_wire_ui_sounds(self)
 	_update_main_story_progress(false)
 	if _opening_story_preview_requested():call_deferred("_open_opening_story_preview")
+	elif _seed_pod_story_preview_requested():call_deferred("_open_seed_pod_story_preview")
 	elif _arrangement_test_preview_requested():call_deferred("_open_arrangement_test_preview")
 	elif _forest_gacha_preview_requested():call_deferred("_open_forest_gacha_preview")
 	elif _secret_gacha_preview_requested():call_deferred("_open_secret_gacha_preview")
@@ -643,6 +644,12 @@ func _opening_story_preview_requested()->bool:
 		var requested=JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('screen')",true)
 		return str(requested)=="opening-story"
 	return "--opening-story-preview" in OS.get_cmdline_user_args()
+
+func _seed_pod_story_preview_requested()->bool:
+	if OS.has_feature("web"):
+		var requested=JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('screen')",true)
+		return str(requested)=="seed-pod-story"
+	return "--seed-pod-story-preview" in OS.get_cmdline_user_args()
 
 func _slot_preview_requested() -> bool:
 	if OS.has_feature("web"):
@@ -1325,6 +1332,15 @@ func _open_opening_story_preview()->void:
 	if shop_overlay:shop_overlay.visible=false
 	if play_overlay:play_overlay.visible=false
 	_start_opening_story(true)
+
+func _open_seed_pod_story_preview()->void:
+	if opening_overlay:opening_overlay.visible=false
+	if intro_overlay:intro_overlay.visible=false
+	if shop_overlay:shop_overlay.visible=false
+	if play_overlay:play_overlay.visible=false
+	current_mode="habitat";_apply_mode()
+	seed_pod_story_overlay.start(language_code)
+	_update_play_ui()
 
 func _build_play_overlay(hud:Control)->void:
 	play_overlay=Control.new();play_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);play_overlay.mouse_filter=Control.MOUSE_FILTER_IGNORE;hud.add_child(play_overlay)

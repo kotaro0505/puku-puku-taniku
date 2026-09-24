@@ -6,6 +6,7 @@ signal story_finished
 const Localizer = preload("res://scripts/game_localizer.gd")
 const DialoguePortraits = preload("res://scripts/dialogue_portraits.gd")
 const STORY_TEXTURE: Texture2D = preload("res://assets/story/first-awakening-seed-pod.jpg")
+const IMAGE_AREA_SIZE := Vector2(576, 650)
 const DIALOG_KEYS := [
 	"seed_pod_story_1",
 	"seed_pod_story_2",
@@ -50,11 +51,15 @@ func _build_ui() -> void:
 
 	var story_image := TextureRect.new()
 	story_image.name = "StoryImage"
-	story_image.texture = STORY_TEXTURE
-	story_image.position = Vector2.ZERO
-	story_image.size = Vector2(576, 650)
 	story_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	story_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	story_image.stretch_mode = TextureRect.STRETCH_SCALE
+	var contain_scale := minf(
+		IMAGE_AREA_SIZE.x / float(STORY_TEXTURE.get_width()),
+		IMAGE_AREA_SIZE.y / float(STORY_TEXTURE.get_height())
+	)
+	story_image.texture = STORY_TEXTURE
+	story_image.size = Vector2(STORY_TEXTURE.get_size()) * contain_scale
+	story_image.position = (IMAGE_AREA_SIZE - story_image.size) * 0.5
 	story_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(story_image)
 
@@ -81,6 +86,7 @@ func _build_ui() -> void:
 	speaker_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	speaker_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	speaker_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	speaker_portrait.z_index = 2
 	add_child(speaker_portrait)
 
 	speaker_label = Label.new()
@@ -90,6 +96,7 @@ func _build_ui() -> void:
 	speaker_label.add_theme_font_size_override("font_size", 16)
 	speaker_label.add_theme_color_override("font_color", Color("#f2cf92"))
 	speaker_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	speaker_label.z_index = 2
 	add_child(speaker_label)
 
 	story_text = Label.new()
@@ -105,6 +112,7 @@ func _build_ui() -> void:
 	story_text.add_theme_constant_override("shadow_offset_x", 1)
 	story_text.add_theme_constant_override("shadow_offset_y", 2)
 	story_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	story_text.z_index = 2
 	add_child(story_text)
 
 	page_count_label = Label.new()

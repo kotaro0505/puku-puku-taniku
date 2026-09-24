@@ -100,6 +100,12 @@ func _ready() -> void:
 	assert(game.seed_pod_story_overlay.DIALOG_KEYS.size() == 5)
 	assert(game.seed_pod_story_overlay.SPEAKER_KEYS == ["story_speaker_panda", "story_speaker_armadillo", "story_speaker_girl", "story_speaker_panda", "story_speaker_girl"])
 	assert(game.seed_pod_story_overlay.STORY_TEXTURE.get_width() == 960 and game.seed_pod_story_overlay.STORY_TEXTURE.get_height() == 1280)
+	var seed_pod_story_image := game.seed_pod_story_overlay.get_node("StoryImage") as TextureRect
+	assert(seed_pod_story_image != null)
+	assert(seed_pod_story_image.stretch_mode == TextureRect.STRETCH_SCALE)
+	print("SEED_POD_STORY_LAYOUT image_position=", seed_pod_story_image.position, " image_size=", seed_pod_story_image.size)
+	assert(seed_pod_story_image.size.is_equal_approx(Vector2(487.5, 650.0)))
+	assert(seed_pod_story_image.position.is_equal_approx(Vector2(44.25, 0.0)))
 	for locale in Localizer.SUPPORTED_LANGUAGES:
 		for key in game.seed_pod_story_overlay.DIALOG_KEYS:
 			assert(not Localizer.text(locale, str(key)).is_empty())
