@@ -23,6 +23,7 @@ const HabitatBeaconDeviceClass = preload("res://scripts/habitat_beacon_device.gd
 const PandaBeaconLogPanelClass = preload("res://scripts/panda_beacon_log_panel.gd")
 const OpeningStoryOverlayClass = preload("res://scripts/opening_story_overlay.gd")
 const HabitatAwakeningOverlayClass = preload("res://scripts/habitat_awakening_overlay.gd")
+const SeedPodStoryOverlayClass = preload("res://scripts/seed_pod_story_overlay.gd")
 const StoryProgressionClass = preload("res://scripts/story_progression.gd")
 const JureJureSystemClass = preload("res://scripts/jurejure_system.gd")
 const JureJureEventDisplayClass = preload("res://scripts/jurejure_event_display.gd")
@@ -574,6 +575,7 @@ var opening_prompt_tween: Tween
 var opening_finished := false
 var opening_story_overlay: OpeningStoryOverlay
 var habitat_awakening_overlay: Control
+var seed_pod_story_overlay: Control
 var habitat_second_awakening_overlay: Control
 var jurejure_event_display: Control
 
@@ -680,6 +682,7 @@ func _configure_habitat_background_ab()->void:
 func _continue_after_opening()->void:
 	if not opening_story_complete:call_deferred("_start_opening_story")
 	elif not intro_story_complete:call_deferred("_start_intro_story")
+	elif habitat_tutorial_complete and not seed_shop_open and not bool(tutorial_steps.get("seed_pod_story_seen",false)):call_deferred("_start_seed_pod_story")
 	elif habitat_tutorial_complete and not seed_shop_open:call_deferred("_start_seed_origin_event")
 	elif habitat_tutorial_complete and not panda_beacon_unlocked:call_deferred("_start_panda_beacon_unlock_event")
 	elif habitat_second_awakened and pending_special_series_explanation and not special_series_explanation_seen:call_deferred("_start_special_origin_event")
@@ -1229,6 +1232,7 @@ func _build_ui() -> void:
 	_build_opening_screen(hud)
 	_build_opening_story(hud)
 	_build_habitat_awakening(hud)
+	_build_seed_pod_story(hud)
 	_build_habitat_second_awakening(hud)
 	_build_habitat_plant_panel(hud)
 	_build_panda_beacon_log_panel(hud)
@@ -1278,6 +1282,11 @@ func _build_habitat_awakening(hud:Control)->void:
 	habitat_awakening_overlay=HabitatAwakeningOverlayClass.new()
 	hud.add_child(habitat_awakening_overlay)
 	habitat_awakening_overlay.awakening_finished.connect(_on_habitat_awakening_finished)
+
+func _build_seed_pod_story(hud:Control)->void:
+	seed_pod_story_overlay=SeedPodStoryOverlayClass.new()
+	hud.add_child(seed_pod_story_overlay)
+	seed_pod_story_overlay.story_finished.connect(_on_seed_pod_story_finished)
 
 func _build_habitat_second_awakening(hud:Control)->void:
 	habitat_second_awakening_overlay=HabitatSecondAwakeningOverlayClass.new()
@@ -1872,6 +1881,16 @@ func _start_seed_origin_event()->void:
 		{"speaker":"panda","text":Localizer.text(language_code,"seed_origin_3")},
 		{"speaker":"","text":Localizer.text(language_code,"seed_origin_received"),"button":Localizer.text(language_code,"continue")}
 	],false)
+
+func _start_seed_pod_story()->void:
+	if seed_shop_open or not habitat_tutorial_complete or bool(tutorial_steps.get("seed_pod_story_seen",false)) or seed_pod_story_overlay==null or not scripted_dialog_kind.is_empty():return
+	current_mode="habitat";_apply_mode()
+	seed_pod_story_overlay.start(language_code)
+	_update_play_ui()
+
+func _on_seed_pod_story_finished()->void:
+	tutorial_steps["seed_pod_story_seen"]=true
+	_save();_update_play_ui();call_deferred("_start_seed_origin_event")
 
 func _start_special_origin_event()->void:
 	if special_series_explanation_seen or not pending_special_series_explanation or not scripted_dialog_kind.is_empty():return
@@ -2642,7 +2661,7 @@ func _on_species_get_overlay_closed(context:String)->void:
 		"secret_gacha":
 			if secret_gacha_ui:secret_gacha_ui.resume_after_species_reveal()
 		"habitat_tutorial":
-			followup_started=true;call_deferred("_start_seed_origin_event")
+			followup_started=true;call_deferred("_start_seed_pod_story")
 		"pinwheel_gift":
 			call_deferred("_continue_armadillo_mystery_intro")
 	if context.begins_with("habitat_route:"):
@@ -2963,7 +2982,7 @@ func _update_play_ui()->void:
 	if not play_overlay:return
 	var preview_overlay_open:bool=catalog_preview_ui!=null and catalog_preview_ui.is_overlay_open()
 	var gacha_open:bool=(forest_gacha_ui!=null and forest_gacha_ui.visible) or (secret_gacha_ui!=null and secret_gacha_ui.visible) or (species_get_overlay!=null and species_get_overlay.visible)
-	var habitat_modal_open:bool=(habitat_plant_panel!=null and habitat_plant_panel.visible) or (panda_beacon_log_panel!=null and panda_beacon_log_panel.visible) or (habitat_dev_panel!=null and habitat_dev_panel.visible) or (habitat_awakening_overlay!=null and habitat_awakening_overlay.visible) or (habitat_second_awakening_overlay!=null and habitat_second_awakening_overlay.visible)
+	var habitat_modal_open:bool=(habitat_plant_panel!=null and habitat_plant_panel.visible) or (panda_beacon_log_panel!=null and panda_beacon_log_panel.visible) or (habitat_dev_panel!=null and habitat_dev_panel.visible) or (habitat_awakening_overlay!=null and habitat_awakening_overlay.visible) or (seed_pod_story_overlay!=null and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay!=null and habitat_second_awakening_overlay.visible)
 	var arrangement_navigation_suspended:bool=arrangement_scene_active or arrangement_transitioning or catalog_preview_mode_active or preview_overlay_open or gacha_open or habitat_modal_open
 	var arrangement_hud_hidden:bool=arrangement_scene_active or arrangement_transitioning
 	if main_status_hud:main_status_hud.visible=not arrangement_hud_hidden
@@ -3785,7 +3804,7 @@ func _update_main_story_progress(schedule_completion:=true)->void:
 	if schedule_completion and StoryProgressionClass.originals_complete(discovered) and not original_catalog_complete_event_seen and scripted_dialog_kind.is_empty():call_deferred("_start_original_catalog_complete_event")
 
 func _try_start_pending_story_event()->void:
-	if not scripted_dialog_kind.is_empty() or play_active or opening_story_overlay and opening_story_overlay.visible:return
+	if not scripted_dialog_kind.is_empty() or play_active or opening_story_overlay and opening_story_overlay.visible or seed_pod_story_overlay and seed_pod_story_overlay.visible:return
 	if species_get_overlay and species_get_overlay.visible:return
 	if result_overlay and result_overlay.visible:return
 	if encyclopedia_overlay and encyclopedia_overlay.visible:return
@@ -5371,7 +5390,7 @@ func _update_labels()->void:
 func _greenhouse_area_navigation_available()->bool:
 	if not _tutorial_fully_complete() or current_mode!="greenhouse" or play_active or catalog_preview_mode_active or arrangement_transitioning:return false
 	if arrangement_scene_active and arrangement_ui and arrangement_ui.is_editor_active():return false
-	return not ((opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (panda_beacon_log_panel and panda_beacon_log_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible))
+	return not ((opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (panda_beacon_log_panel and panda_beacon_log_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible))
 
 func _unhandled_input(event:InputEvent)->void:
 	if greenhouse_area_drag_tracking or (not arrangement_scene_active and _greenhouse_area_navigation_available()):
@@ -5447,7 +5466,7 @@ func _cancel_greenhouse_area_drag(update_ui:=true)->void:
 func _input(event:InputEvent)->void:
 	if audio_manager and (event is InputEventScreenTouch or event is InputEventMouseButton or event is InputEventKey):audio_manager.notify_user_gesture()
 	if arrangement_scene_active or arrangement_transitioning:return
-	if (opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible and not first_play_harvest_guide_active) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (panda_beacon_log_panel and panda_beacon_log_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible):return
+	if (opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible and not first_play_harvest_guide_active) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (panda_beacon_log_panel and panda_beacon_log_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible):return
 	if current_mode=="greenhouse" and not play_active and not catalog_preview_mode_active:return
 	if event is InputEventScreenTouch:
 		if event.pressed:

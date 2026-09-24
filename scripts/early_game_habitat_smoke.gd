@@ -91,6 +91,22 @@ func _ready() -> void:
 	game.species_get_overlay.busy = false
 	game.species_get_overlay.close_overlay()
 	await get_tree().create_timer(0.35).timeout
+	assert(game.seed_pod_story_overlay.visible and game.current_mode == "habitat")
+	assert(game.scripted_dialog_kind.is_empty() and not bool(game.tutorial_steps.get("seed_pod_story_seen", false)))
+	assert(game.seed_pod_story_overlay.DIALOG_KEYS.size() == 5)
+	assert(game.seed_pod_story_overlay.SPEAKER_KEYS == ["story_speaker_panda", "story_speaker_armadillo", "story_speaker_girl", "story_speaker_panda", "story_speaker_girl"])
+	assert(game.seed_pod_story_overlay.STORY_TEXTURE.get_width() == 960 and game.seed_pod_story_overlay.STORY_TEXTURE.get_height() == 1280)
+	for locale in Localizer.SUPPORTED_LANGUAGES:
+		for key in game.seed_pod_story_overlay.DIALOG_KEYS:
+			assert(not Localizer.text(locale, str(key)).is_empty())
+	for expected_page in range(5):
+		assert(game.seed_pod_story_overlay.page_index == expected_page)
+		assert(game.seed_pod_story_overlay.story_text.text == Localizer.text("ja", game.seed_pod_story_overlay.DIALOG_KEYS[expected_page]))
+		game.seed_pod_story_overlay.advance()
+		if expected_page < 4:
+			await get_tree().create_timer(0.25).timeout
+	await get_tree().process_frame
+	assert(not game.seed_pod_story_overlay.visible and bool(game.tutorial_steps.get("seed_pod_story_seen", false)))
 	assert(game.scripted_dialog_kind == "seed_origin")
 	var seed_origin_text := ""
 	for page in game.scripted_dialog_pages:
