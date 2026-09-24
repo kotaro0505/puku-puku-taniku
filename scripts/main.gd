@@ -13,6 +13,7 @@ const SecretGachaSystemClass = preload("res://scripts/secret_gacha_system.gd")
 const SecretGachaUIClass = preload("res://scripts/secret_gacha_ui.gd")
 const SpeciesGetOverlayClass = preload("res://scripts/species_get_overlay.gd")
 const Localizer = preload("res://scripts/game_localizer.gd")
+const DialoguePortraitsClass = preload("res://scripts/dialogue_portraits.gd")
 const StarRatingClass = preload("res://scripts/star_rating.gd")
 const UISymbolIconClass = preload("res://scripts/ui_symbol_icon.gd")
 const HabitatWildSystemClass = preload("res://scripts/habitat_wild_system.gd")
@@ -4471,12 +4472,10 @@ func _box(bg: Color, border: Color, radius: int, width: int) -> StyleBoxFlat:
 	s.set_border_width_all(width); s.set_corner_radius_all(radius); s.shadow_color=Color(0.18,0.08,0.02,0.34); s.shadow_size=6; s.shadow_offset=Vector2(0,3); s.content_margin_left=10; s.content_margin_right=10; s.content_margin_top=6; s.content_margin_bottom=6; return s
 
 func _panda_portrait_texture()->Texture2D:
-	var source:=load("res://assets/panda-clerk.png") as Texture2D
-	var portrait:=AtlasTexture.new();portrait.atlas=source;portrait.region=Rect2(0.0,0.0,source.get_width(),source.get_height()*.70)
-	return portrait
+	return DialoguePortraitsClass.texture("panda")
 
 func _armadillo_portrait_texture()->Texture2D:
-	return load("res://assets/armadillo-dialogue.png") as Texture2D
+	return DialoguePortraitsClass.texture("armadillo")
 
 func _jurejure_portrait_texture(speaker_id:String)->Texture2D:
 	var source:=load("res://assets/jurejure/jurejure-reference.jpg") as Texture2D
@@ -4491,8 +4490,7 @@ func _jurejure_portrait_texture(speaker_id:String)->Texture2D:
 
 func _speaker_portrait_texture(speaker_id:String)->Texture2D:
 	match speaker_id:
-		"panda":return _panda_portrait_texture()
-		"armadillo":return _armadillo_portrait_texture()
+		"panda","armadillo","girl":return DialoguePortraitsClass.texture(speaker_id)
 		"mouse","skunk","peccary":return _jurejure_portrait_texture(speaker_id)
 		_:return null
 

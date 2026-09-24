@@ -44,6 +44,9 @@ func _ready() -> void:
 	assert(game.habitat_awakening_overlay.SPEAKER_KEYS.slice(0, 14) == ["story_speaker_armadillo", "story_speaker_panda", "story_speaker_armadillo", "story_speaker_panda", "", "story_speaker_panda", "story_speaker_armadillo", "story_speaker_girl", "story_speaker_girl", "story_speaker_armadillo", "story_speaker_girl", "story_speaker_panda", "", "story_speaker_girl"])
 	for expected_page in range(4):
 		assert(game.habitat_awakening_overlay.page_index == expected_page)
+		assert(game.habitat_awakening_overlay.speaker_portrait.visible)
+		assert(game.habitat_awakening_overlay.speaker_portrait.texture != null)
+		assert(game.habitat_awakening_overlay.speaker_portrait.position.x < game.habitat_awakening_overlay.dialogue_label.position.x)
 		game.habitat_awakening_overlay.advance()
 		await get_tree().process_frame
 	assert(game.habitat_awakening_overlay.page_index == 4 and game.habitat_awakening_overlay.transitioning)
@@ -52,6 +55,7 @@ func _ready() -> void:
 		await get_tree().create_timer(0.25).timeout
 	assert(game.habitat_awakening_overlay.page_index == 5 and game.habitat_awakening_overlay.rain_active)
 	assert(game.habitat_awakening_overlay.dialogue_label.text == Localizer.text("ja", "awakening_surprise"))
+	assert(game.habitat_awakening_overlay.speaker_portrait.visible and game.habitat_awakening_overlay.speaker_portrait.texture != null)
 	while game.habitat_awakening_overlay.visible:
 		if game.habitat_awakening_overlay.transitioning:
 			await get_tree().create_timer(0.55).timeout
@@ -102,6 +106,8 @@ func _ready() -> void:
 	for expected_page in range(5):
 		assert(game.seed_pod_story_overlay.page_index == expected_page)
 		assert(game.seed_pod_story_overlay.story_text.text == Localizer.text("ja", game.seed_pod_story_overlay.DIALOG_KEYS[expected_page]))
+		assert(game.seed_pod_story_overlay.speaker_portrait.visible and game.seed_pod_story_overlay.speaker_portrait.texture != null)
+		assert(game.seed_pod_story_overlay.speaker_portrait.position.x < game.seed_pod_story_overlay.story_text.position.x)
 		game.seed_pod_story_overlay.advance()
 		if expected_page < 4:
 			await get_tree().create_timer(0.25).timeout

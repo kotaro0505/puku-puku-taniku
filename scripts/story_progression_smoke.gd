@@ -95,6 +95,11 @@ func _test_objective_sequence(game: Node) -> void:
 	assert(game.habitat_second_awakening_overlay.visible)
 	var overlay_guard := 0
 	while game.habitat_second_awakening_overlay.visible and overlay_guard < 10:
+		var expects_story_portrait: bool = game.habitat_second_awakening_overlay.page_index in [1, 2]
+		assert(game.habitat_second_awakening_overlay.speaker_portrait.visible == expects_story_portrait)
+		if expects_story_portrait:
+			assert(game.habitat_second_awakening_overlay.speaker_portrait.texture != null)
+			assert(game.habitat_second_awakening_overlay.speaker_portrait.position.x < game.habitat_second_awakening_overlay.dialogue_label.position.x)
 		game.habitat_second_awakening_overlay.advance()
 		overlay_guard += 1
 	assert(overlay_guard == 5)

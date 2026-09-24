@@ -4,6 +4,7 @@ extends Control
 signal awakening_finished
 
 const Localizer = preload("res://scripts/game_localizer.gd")
+const DialoguePortraits = preload("res://scripts/dialogue_portraits.gd")
 const DIALOG_KEYS := [
 	"second_awakening_light",
 	"second_awakening_panda",
@@ -20,6 +21,7 @@ var language_code := "ja"
 var page_index := 0
 var dialogue_label: Label
 var speaker_label: Label
+var speaker_portrait: TextureRect
 var instruction_label: Label
 var color_tint: ColorRect
 var light_layer: Control
@@ -71,16 +73,24 @@ func _build_ui() -> void:
 	text_style.set_corner_radius_all(24)
 	text_back.add_theme_stylebox_override("panel", text_style)
 	add_child(text_back)
+	speaker_portrait = TextureRect.new()
+	speaker_portrait.name = "SpeakerPortrait"
+	speaker_portrait.position = Vector2(40, 786)
+	speaker_portrait.size = Vector2(116, 126)
+	speaker_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	speaker_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	speaker_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(speaker_portrait)
 	speaker_label = Label.new()
-	speaker_label.position = Vector2(58, 757)
-	speaker_label.size = Vector2(460, 30)
+	speaker_label.position = Vector2(170, 757)
+	speaker_label.size = Vector2(354, 30)
 	speaker_label.add_theme_font_size_override("font_size", 14)
 	speaker_label.add_theme_color_override("font_color", Color("#ffd4ff"))
 	speaker_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(speaker_label)
 	dialogue_label = Label.new()
-	dialogue_label.position = Vector2(52, 784)
-	dialogue_label.size = Vector2(472, 131)
+	dialogue_label.position = Vector2(170, 784)
+	dialogue_label.size = Vector2(354, 131)
 	dialogue_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	dialogue_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	dialogue_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -133,6 +143,8 @@ func advance() -> void:
 func _show_page() -> void:
 	var speaker_key := str(SPEAKER_KEYS[page_index])
 	speaker_label.text = "" if speaker_key.is_empty() else Localizer.text(language_code, speaker_key)
+	speaker_portrait.texture = DialoguePortraits.texture(DialoguePortraits.speaker_id_from_key(speaker_key))
+	speaker_portrait.visible = speaker_portrait.texture != null
 	dialogue_label.text = Localizer.text(language_code, DIALOG_KEYS[page_index])
 
 

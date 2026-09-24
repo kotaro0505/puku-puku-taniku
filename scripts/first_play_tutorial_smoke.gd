@@ -81,6 +81,9 @@ func _ready() -> void:
 	assert("本当に育った" not in discovery_text and "図鑑に描いてある植物" not in discovery_text)
 	assert(Localizer.species_name("ja", game._catalog_entry(FIRST_SPECIES_ID)) in discovery_text)
 	while not game.scripted_dialog_kind.is_empty():
+		var speaker_id := str(game.scripted_dialog_pages[game.scripted_dialog_index].get("speaker", ""))
+		if speaker_id in ["girl", "panda", "armadillo"]:
+			assert(game.intro_panda_portrait.visible and game.intro_panda_portrait.texture != null)
 		game._advance_scripted_dialog()
 	await get_tree().process_frame
 	assert(game.first_colorata_confirmed and game.encyclopedia_unlocked)
@@ -109,6 +112,9 @@ func _ready() -> void:
 	assert("はじめまして" not in trio_text)
 	assert("昔、多肉が生えていたと言われる場所" in trio_text)
 	while not game.scripted_dialog_kind.is_empty():
+		var speaker_id := str(game.scripted_dialog_pages[game.scripted_dialog_index].get("speaker", ""))
+		if speaker_id in ["girl", "panda", "armadillo"]:
+			assert(game.intro_panda_portrait.visible and game.intro_panda_portrait.texture != null)
 		game._advance_scripted_dialog()
 	await get_tree().process_frame
 	assert(game.trio_originals_confirmed and game.habitat_unlocked)

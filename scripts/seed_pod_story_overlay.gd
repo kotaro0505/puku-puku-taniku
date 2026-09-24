@@ -4,6 +4,7 @@ extends Control
 signal story_finished
 
 const Localizer = preload("res://scripts/game_localizer.gd")
+const DialoguePortraits = preload("res://scripts/dialogue_portraits.gd")
 const STORY_TEXTURE: Texture2D = preload("res://assets/story/first-awakening-seed-pod.jpg")
 const DIALOG_KEYS := [
 	"seed_pod_story_1",
@@ -24,6 +25,7 @@ var language_code := "ja"
 var page_index := 0
 var story_text: Label
 var speaker_label: Label
+var speaker_portrait: TextureRect
 var page_count_label: Label
 var tap_hint: Label
 var text_tween: Tween
@@ -72,10 +74,19 @@ func _build_ui() -> void:
 	text_panel.add_theme_stylebox_override("panel", panel_style)
 	add_child(text_panel)
 
+	speaker_portrait = TextureRect.new()
+	speaker_portrait.name = "SpeakerPortrait"
+	speaker_portrait.position = Vector2(36, 718)
+	speaker_portrait.size = Vector2(120, 190)
+	speaker_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	speaker_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	speaker_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(speaker_portrait)
+
 	speaker_label = Label.new()
 	speaker_label.name = "StorySpeaker"
-	speaker_label.position = Vector2(42, 674)
-	speaker_label.size = Vector2(492, 32)
+	speaker_label.position = Vector2(170, 674)
+	speaker_label.size = Vector2(370, 32)
 	speaker_label.add_theme_font_size_override("font_size", 16)
 	speaker_label.add_theme_color_override("font_color", Color("#f2cf92"))
 	speaker_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -83,8 +94,8 @@ func _build_ui() -> void:
 
 	story_text = Label.new()
 	story_text.name = "StoryText"
-	story_text.position = Vector2(36, 708)
-	story_text.size = Vector2(504, 220)
+	story_text.position = Vector2(170, 708)
+	story_text.size = Vector2(370, 220)
 	story_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	story_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	story_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -158,7 +169,10 @@ func advance() -> void:
 
 
 func _show_page() -> void:
-	speaker_label.text = Localizer.text(language_code, SPEAKER_KEYS[page_index])
+	var speaker_key := str(SPEAKER_KEYS[page_index])
+	speaker_label.text = Localizer.text(language_code, speaker_key)
+	speaker_portrait.texture = DialoguePortraits.texture(DialoguePortraits.speaker_id_from_key(speaker_key))
+	speaker_portrait.visible = speaker_portrait.texture != null
 	story_text.text = Localizer.text(language_code, DIALOG_KEYS[page_index])
 	story_text.modulate = Color.WHITE
 	page_count_label.text = "%d / %d" % [page_index + 1, DIALOG_KEYS.size()]

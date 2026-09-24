@@ -4,6 +4,7 @@ extends Control
 signal awakening_finished
 
 const Localizer = preload("res://scripts/game_localizer.gd")
+const DialoguePortraits = preload("res://scripts/dialogue_portraits.gd")
 const DIALOG_KEYS := [
 	"awakening_empty_1", "awakening_empty_2", "awakening_overharvest", "awakening_sow",
 	"_pause_before_memory", "awakening_surprise", "awakening_memory", "awakening_thanks",
@@ -31,6 +32,7 @@ var rain_soft := false
 var transitioning := false
 var dialogue_label: Label
 var speaker_label: Label
+var speaker_portrait: TextureRect
 var instruction_label: Label
 var text_back: Panel
 var darkness: ColorRect
@@ -113,9 +115,18 @@ func _build_ui() -> void:
 	text_back.add_theme_stylebox_override("panel", text_style)
 	add_child(text_back)
 
+	speaker_portrait = TextureRect.new()
+	speaker_portrait.name = "SpeakerPortrait"
+	speaker_portrait.position = Vector2(40, 786)
+	speaker_portrait.size = Vector2(116, 126)
+	speaker_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	speaker_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	speaker_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(speaker_portrait)
+
 	speaker_label = Label.new()
-	speaker_label.position = Vector2(58, 757)
-	speaker_label.size = Vector2(460, 30)
+	speaker_label.position = Vector2(170, 757)
+	speaker_label.size = Vector2(354, 30)
 	speaker_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	speaker_label.add_theme_font_size_override("font_size", 14)
 	speaker_label.add_theme_color_override("font_color", Color("#f4ca7b"))
@@ -123,8 +134,8 @@ func _build_ui() -> void:
 	add_child(speaker_label)
 
 	dialogue_label = Label.new()
-	dialogue_label.position = Vector2(52, 784)
-	dialogue_label.size = Vector2(472, 131)
+	dialogue_label.position = Vector2(170, 784)
+	dialogue_label.size = Vector2(354, 131)
 	dialogue_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	dialogue_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	dialogue_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -206,11 +217,14 @@ func _show_current_dialogue() -> void:
 	_set_dialogue_visible(true)
 	var speaker_key := str(SPEAKER_KEYS[page_index])
 	speaker_label.text = "" if speaker_key.is_empty() else Localizer.text(language_code, speaker_key)
+	speaker_portrait.texture = DialoguePortraits.texture(DialoguePortraits.speaker_id_from_key(speaker_key))
+	speaker_portrait.visible = speaker_portrait.texture != null
 	dialogue_label.text = Localizer.text(language_code, DIALOG_KEYS[page_index])
 
 func _set_dialogue_visible(show: bool) -> void:
 	text_back.visible = show
 	speaker_label.visible = show
+	speaker_portrait.visible = show and speaker_portrait.texture != null
 	dialogue_label.visible = show
 	instruction_label.visible = show
 
