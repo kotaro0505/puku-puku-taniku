@@ -5,14 +5,16 @@ signal awakening_finished
 
 const Localizer = preload("res://scripts/game_localizer.gd")
 const DIALOG_KEYS := [
-	"awakening_empty_1", "awakening_empty_2", "awakening_sow", "awakening_wait",
-	"awakening_memory", "awakening_thanks", "awakening_apology", "awakening_promise_1",
-	"awakening_promise_2", "awakening_listened"
+	"awakening_empty_1", "awakening_empty_2", "awakening_overharvest", "awakening_sow",
+	"_pause_before_memory", "awakening_surprise", "awakening_memory", "awakening_thanks",
+	"awakening_apology", "awakening_promise_1", "awakening_promise_2",
+	"awakening_rain_stopping", "_pause_before_sprout", "awakening_sprout_look"
 ]
 const SPEAKER_KEYS := [
-	"story_speaker_armadillo", "story_speaker_panda", "story_speaker_panda", "",
-	"story_speaker_panda", "story_speaker_girl", "story_speaker_girl",
-	"story_speaker_armadillo", "story_speaker_girl", "story_speaker_panda"
+	"story_speaker_armadillo", "story_speaker_panda", "story_speaker_armadillo",
+	"story_speaker_panda", "", "story_speaker_panda", "story_speaker_armadillo",
+	"story_speaker_girl", "story_speaker_girl", "story_speaker_armadillo",
+	"story_speaker_girl", "story_speaker_panda", "", "story_speaker_girl"
 ]
 const GHOST_TEXTURES: Array[Texture2D] = [
 	preload("res://assets/plants/habitat/sprite-colorata.png"),
@@ -30,6 +32,7 @@ var transitioning := false
 var dialogue_label: Label
 var speaker_label: Label
 var instruction_label: Label
+var text_back: Panel
 var darkness: ColorRect
 var rain_tint: ColorRect
 var ghost_layer: Control
@@ -98,7 +101,7 @@ func _build_ui() -> void:
 		glow.add_theme_stylebox_override("panel", style)
 		sprout_layer.add_child(glow)
 
-	var text_back := Panel.new()
+	text_back = Panel.new()
 	text_back.position = Vector2(24, 744)
 	text_back.size = Vector2(528, 226)
 	text_back.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -171,6 +174,7 @@ func start(requested_language := "ja") -> void:
 		sprout.modulate.a = 0.0
 		sprout.scale = Vector2(0.1, 0.1)
 	instruction_label.text = Localizer.text(language_code, "opening_story_tap")
+	_set_dialogue_visible(true)
 	visible = true
 	move_to_front()
 	_show_page()
@@ -187,20 +191,48 @@ func advance() -> void:
 	_show_page()
 
 func _show_page() -> void:
+	if page_index == 4:
+		_begin_memory_reveal()
+		return
+	if page_index == 11:
+		_begin_rain_softening()
+		return
+	if page_index == 12:
+		_begin_sprout_reveal()
+		return
+	_show_current_dialogue()
+
+func _show_current_dialogue() -> void:
+	_set_dialogue_visible(true)
 	var speaker_key := str(SPEAKER_KEYS[page_index])
 	speaker_label.text = "" if speaker_key.is_empty() else Localizer.text(language_code, speaker_key)
 	dialogue_label.text = Localizer.text(language_code, DIALOG_KEYS[page_index])
-	if page_index == 3:
-		transitioning = true
-		var dark_tween := create_tween()
-		dark_tween.tween_property(darkness, "color:a", 0.56, 0.5)
-		dark_tween.finished.connect(func(): transitioning = false, CONNECT_ONE_SHOT)
-	elif page_index == 4:
+
+func _set_dialogue_visible(show: bool) -> void:
+	text_back.visible = show
+	speaker_label.visible = show
+	dialogue_label.visible = show
+	instruction_label.visible = show
+
+func _begin_memory_reveal() -> void:
+	transitioning = true
+	_set_dialogue_visible(false)
+	var sequence := create_tween()
+	sequence.tween_interval(0.65)
+	sequence.tween_property(darkness, "color:a", 0.56, 0.55)
+	sequence.tween_callback(func():
 		rain_active = true
 		rain_tint.color.a = 0.20
-		_show_ghosts()
-	elif page_index == 9:
-		_soften_and_answer()
+		queue_redraw()
+	)
+	sequence.tween_interval(0.35)
+	sequence.tween_callback(_show_ghosts)
+	sequence.tween_interval(0.90)
+	sequence.tween_callback(func():
+		page_index += 1
+		transitioning = false
+		_show_page()
+	)
 
 func _show_ghosts() -> void:
 	for index in ghosts.size():
@@ -210,17 +242,38 @@ func _show_ghosts() -> void:
 		tween.tween_property(ghost, "modulate:a", 0.58, 0.42)
 		tween.tween_property(ghost, "modulate:a", 0.34, 0.36)
 
-func _soften_and_answer() -> void:
+func _begin_rain_softening() -> void:
+	transitioning = true
+	_set_dialogue_visible(false)
 	rain_soft = true
-	var answer := create_tween().set_parallel()
-	answer.tween_property(darkness, "color:a", 0.24, 0.7)
-	answer.tween_property(rain_tint, "color:a", 0.07, 0.7)
+	var soften := create_tween().set_parallel()
+	soften.tween_property(darkness, "color:a", 0.24, 0.7)
+	soften.tween_property(rain_tint, "color:a", 0.07, 0.7)
+	soften.finished.connect(func():
+		transitioning = false
+		_show_current_dialogue()
+	, CONNECT_ONE_SHOT)
+
+func _begin_sprout_reveal() -> void:
+	transitioning = true
+	_set_dialogue_visible(false)
+	var reveal := create_tween().set_parallel()
 	for ghost in ghosts:
-		answer.tween_property(ghost, "position:y", ghost.position.y + 110.0, 0.75)
-		answer.tween_property(ghost, "modulate:a", 0.0, 0.75)
+		reveal.tween_property(ghost, "position:y", ghost.position.y + 110.0, 0.75)
+		reveal.tween_property(ghost, "modulate", Color(1.15, 1.08, 0.72, 0.0), 0.75)
+	reveal.set_parallel(false)
+	reveal.tween_interval(0.45)
+	reveal.set_parallel(true)
 	for sprout in sprout_layer.get_children():
-		answer.tween_property(sprout, "modulate:a", 1.0, 0.55).set_delay(0.35)
-		answer.tween_property(sprout, "scale", Vector2.ONE, 0.55).set_delay(0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		reveal.tween_property(sprout, "modulate:a", 1.0, 0.55)
+		reveal.tween_property(sprout, "scale", Vector2.ONE, 0.55).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	reveal.set_parallel(false)
+	reveal.tween_interval(0.20)
+	reveal.tween_callback(func():
+		page_index += 1
+		transitioning = false
+		_show_page()
+	)
 
 func _process(delta: float) -> void:
 	if not visible or not rain_active:

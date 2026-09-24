@@ -31,13 +31,27 @@ func _ready() -> void:
 	assert(game.main_story_stage == game.StoryProgressionClass.STAGE_AWAKEN_HABITAT)
 	for locale in Localizer.SUPPORTED_LANGUAGES:
 		for key in game.habitat_awakening_overlay.DIALOG_KEYS:
-			assert(not Localizer.text(locale, str(key)).is_empty())
+			if not str(key).begins_with("_pause_"):
+				assert(not Localizer.text(locale, str(key)).is_empty())
 	var awakening_text := ""
 	for key in game.habitat_awakening_overlay.DIALOG_KEYS:
-		awakening_text += Localizer.text("ja", str(key))
+		if not str(key).begins_with("_pause_"):
+			awakening_text += Localizer.text("ja", str(key))
 	assert("思い出しているように見える" in awakening_text)
 	assert("ありがとう" in awakening_text and "ごめんなさい" in awakening_text)
 	assert("もう同じことはしない" in awakening_text and "返していきます" in awakening_text)
+	assert("……何も起こらない。" not in awakening_text and "聞いてくれたのかな" not in awakening_text)
+	assert(game.habitat_awakening_overlay.SPEAKER_KEYS.slice(0, 14) == ["story_speaker_armadillo", "story_speaker_panda", "story_speaker_armadillo", "story_speaker_panda", "", "story_speaker_panda", "story_speaker_armadillo", "story_speaker_girl", "story_speaker_girl", "story_speaker_armadillo", "story_speaker_girl", "story_speaker_panda", "", "story_speaker_girl"])
+	for expected_page in range(4):
+		assert(game.habitat_awakening_overlay.page_index == expected_page)
+		game.habitat_awakening_overlay.advance()
+		await get_tree().process_frame
+	assert(game.habitat_awakening_overlay.page_index == 4 and game.habitat_awakening_overlay.transitioning)
+	assert(not game.habitat_awakening_overlay.text_back.visible)
+	while game.habitat_awakening_overlay.transitioning:
+		await get_tree().create_timer(0.25).timeout
+	assert(game.habitat_awakening_overlay.page_index == 5 and game.habitat_awakening_overlay.rain_active)
+	assert(game.habitat_awakening_overlay.dialogue_label.text == Localizer.text("ja", "awakening_surprise"))
 	while game.habitat_awakening_overlay.visible:
 		if game.habitat_awakening_overlay.transitioning:
 			await get_tree().create_timer(0.55).timeout
