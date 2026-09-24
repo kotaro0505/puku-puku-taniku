@@ -177,7 +177,7 @@ func _test_legacy_migration(game: Node) -> void:
 	assert(not game._habitat_wild_plant_by_id(preserved_habitat_id).is_empty())
 	assert(game.saved_arrangements.size() == 1 and game.saved_arrangements[0].plants.size() == 1)
 	assert(str(game.saved_arrangements[0].plants[0].species_id) == "colorata")
-	for species_id in ["colorata", "lutea", "shaviana", "laui"]:
+	for species_id in ["colorata", "affinis", "shaviana", "laui"]:
 		assert(bool(game.habitat_returned_species.get(species_id, false)))
 	game._save()
 	var migrated = JSON.parse_string(FileAccess.get_file_as_string("user://records.json"))

@@ -35,7 +35,7 @@ const LEGACY_HABITAT_REGENERATION_VERSION := 17
 const INITIAL_SERIES_ID := "base"
 const ORIGINAL_SERIES_ID := "base"
 const FIRST_STORY_SPECIES_ID := "colorata"
-const PANDA_STORY_SPECIES_ID := "lutea"
+const PANDA_STORY_SPECIES_ID := "affinis"
 const ARMADILLO_STORY_SPECIES_ID := "shaviana"
 const FOREST_GACHA_SPIN_COST := 1
 const FOREST_GACHA_CATALOG_UNLOCK_COST := 5
@@ -128,6 +128,7 @@ const TUTORIAL_FINGER_TIP_LOCAL := Vector2(27,5)
 const TUTORIAL_FINGER_PRESS_RATIO := Vector2(.58,.30)
 const TUTORIAL_FINGER_RELEASE_OFFSET := Vector2(-3,-7)
 const FIRST_PLAY_TUTORIAL_MESSAGE_KEYS := ["tutorial_growth_1","tutorial_growth_2","tutorial_growth_3","tutorial_growth_4","tutorial_growth_5"]
+const FIRST_PLAY_TUTORIAL_SPEAKERS := ["armadillo","panda","panda","armadillo","panda"]
 const FIRST_PLAY_TUTORIAL_INITIAL_DELAY := 3.0
 const SERIES_CAROUSEL_TRACK_ORIGIN := Vector2(48,0)
 const SERIES_CAROUSEL_CARD_SIZE := Vector2(480,590)
@@ -1720,8 +1721,7 @@ func _advance_intro_story()->void:
 		return
 	if not tutorial_dialog_kind.is_empty():
 		var finished_kind:=tutorial_dialog_kind;tutorial_dialog_kind="";tutorial_steps[finished_kind+"_dialog"]=true;intro_overlay.visible=false;shop_overlay.visible=false;intro_speaker_label.visible=true;intro_dialogue_label.add_theme_font_size_override("font_size",20);intro_dialogue_label.add_theme_color_override("font_color",UI_BROWN);intro_continue_button.text=Localizer.text(language_code,"next");_save();_update_play_ui();audio_manager.play_bgm("habitat" if current_mode=="habitat" else "greenhouse")
-		if finished_kind=="play1":_show_tutorial_guide("encyclopedia")
-		elif finished_kind=="play3":_show_tutorial_guide("habitat")
+		if finished_kind=="play3":_show_tutorial_guide("habitat")
 		elif finished_kind=="habitat_scroll":habitat_scroll_tutorial_active=true
 		elif finished_kind=="puku_gauge":puku_gauge_intro_complete=true;tutorial_steps["puku_gauge_intro_complete"]=true;_save();_update_currency_ui()
 		return
@@ -1772,7 +1772,7 @@ func _finish_scripted_dialog()->void:
 	var acquired:Array[String]=[];var open_beacon_event:=false;var open_puku_intro:=false;var open_catalog:=false;var guide_habitat:=false;var show_pinwheel_get:=false;var show_armadillo_gift:=false;var start_second_awakening:=false
 	match finished_kind:
 		"first_colorata_discovery":
-			first_colorata_confirmed=true;encyclopedia_unlocked=true;unlocked_series[ORIGINAL_SERIES_ID]=true;open_catalog=true
+			first_colorata_confirmed=true;encyclopedia_unlocked=true;unlocked_series[ORIGINAL_SERIES_ID]=true
 		"trio_originals":
 			_register_species_discovery(PANDA_STORY_SPECIES_ID,true);_register_species_discovery(ARMADILLO_STORY_SPECIES_ID,true)
 			trio_originals_confirmed=true;habitat_unlocked=true;guide_habitat=true
@@ -1837,7 +1837,7 @@ func _start_post_play_dialog(kind:String)->void:
 	tutorial_dialog_kind=kind;_set_shop_purchase_visible(false);shop_overlay.visible=true;intro_overlay.visible=true;_set_intro_speaker("panda");_position_intro_dialog();intro_speaker_label.visible=true;play_overlay.visible=false;play_open_button.visible=false;audio_manager.play_bgm("shop")
 	if kind=="play1":
 		var tutorial_entry:=_catalog_entry(first_tutorial_species_id)
-		intro_dialogue_label.text=Localizer.text(language_code,"tutorial_play1",[Localizer.species_name(language_code,tutorial_entry),Localizer.series_name(language_code,_series_entry(ORIGINAL_SERIES_ID))]);intro_continue_button.text="Catalog" if language_code=="en" else ("ずかんを みる" if language_code=="hiragana" else "図鑑を見る")
+		_set_intro_speaker("");intro_speaker_label.visible=false;intro_dialogue_label.text=Localizer.text(language_code,"original_catalog_new")+"\n"+Localizer.species_name(language_code,tutorial_entry);intro_continue_button.text=Localizer.text(language_code,"continue")
 	elif kind=="play2":intro_dialogue_label.text=Localizer.text(language_code,"tutorial_play2");intro_continue_button.text=Localizer.text(language_code,"main_greenhouse")
 	else:intro_dialogue_label.text=Localizer.text(language_code,"tutorial_play3");intro_continue_button.text=Localizer.text(language_code,"main_habitat")
 
@@ -1846,10 +1846,8 @@ func _start_first_colorata_discovery_event()->void:
 	var species_name:=Localizer.species_name(language_code,_catalog_entry(FIRST_STORY_SPECIES_ID))
 	_start_scripted_dialog("first_colorata_discovery",[
 		{"speaker":"panda","text":Localizer.text(language_code,"story_colorata_1")},
-		{"speaker":"panda","text":Localizer.text(language_code,"story_colorata_2")},
-		{"speaker":"armadillo","text":Localizer.text(language_code,"story_colorata_3",[species_name])},
-		{"speaker":"panda","text":Localizer.text(language_code,"story_colorata_4")},
-		{"speaker":"panda","text":Localizer.text(language_code,"story_colorata_5",[species_name]),"button":Localizer.text(language_code,"catalog")}
+		{"speaker":"armadillo","text":Localizer.text(language_code,"story_colorata_2",[species_name])},
+		{"speaker":"panda","text":Localizer.text(language_code,"story_colorata_3")}
 	],false)
 
 func _start_trio_originals_event()->void:
@@ -1860,7 +1858,8 @@ func _start_trio_originals_event()->void:
 		{"speaker":"panda","text":Localizer.text(language_code,"story_trio_1",[panda_name])},
 		{"speaker":"armadillo","text":Localizer.text(language_code,"story_trio_2",[armadillo_name])},
 		{"speaker":"armadillo","text":Localizer.text(language_code,"story_trio_3")},
-		{"speaker":"panda","text":Localizer.text(language_code,"story_trio_4")},
+		{"speaker":"girl","text":Localizer.text(language_code,"story_trio_4")},
+		{"speaker":"panda","text":Localizer.text(language_code,"story_trio_5")},
 		{"speaker":"armadillo","text":Localizer.text(language_code,"story_habitat_found_1")},
 		{"speaker":"panda","text":Localizer.text(language_code,"story_habitat_found_2"),"button":Localizer.text(language_code,"main_habitat")}
 	],false)
@@ -2125,7 +2124,7 @@ func _show_first_play_tutorial_dialog()->void:
 	var empty_style:=StyleBoxEmpty.new()
 	for state in ["normal","hover","pressed","disabled","focus"]:tutorial_guide_button.add_theme_stylebox_override(state,empty_style)
 	for connection in tutorial_guide_button.pressed.get_connections():tutorial_guide_button.pressed.disconnect(connection.callable)
-	tutorial_guide_button.pressed.connect(_dismiss_first_play_tutorial_dialog);tutorial_guide_finger.visible=false;tutorial_guide_message.text=Localizer.text(language_code,str(FIRST_PLAY_TUTORIAL_MESSAGE_KEYS[first_play_tutorial_message_index]));tutorial_dialog_panel.visible=true;tutorial_dialog_panel.position=Vector2(40,790);tutorial_guide_overlay.visible=true
+	tutorial_guide_button.pressed.connect(_dismiss_first_play_tutorial_dialog);tutorial_guide_finger.visible=false;tutorial_panda_portrait.texture=_speaker_portrait_texture(str(FIRST_PLAY_TUTORIAL_SPEAKERS[first_play_tutorial_message_index]));tutorial_panda_portrait.visible=true;tutorial_guide_message.text=Localizer.text(language_code,str(FIRST_PLAY_TUTORIAL_MESSAGE_KEYS[first_play_tutorial_message_index]));tutorial_dialog_panel.visible=true;tutorial_dialog_panel.position=Vector2(40,790);tutorial_guide_overlay.visible=true
 
 func _dismiss_first_play_tutorial_dialog()->void:
 	if not first_play_tutorial_dialog_visible:return
@@ -2137,7 +2136,7 @@ func _dismiss_first_play_tutorial_dialog()->void:
 		_save()
 		_maybe_activate_first_play_harvest_guide()
 		if play_active and play_seeds_remaining==0 and play_spawn_queue==0 and play_seed_animations_pending==0 and plants.is_empty():call_deferred("_finish_greenhouse_play")
-	else:tutorial_guide_message.text=Localizer.text(language_code,str(FIRST_PLAY_TUTORIAL_MESSAGE_KEYS[first_play_tutorial_message_index]))
+	else:tutorial_panda_portrait.texture=_speaker_portrait_texture(str(FIRST_PLAY_TUTORIAL_SPEAKERS[first_play_tutorial_message_index]));tutorial_guide_message.text=Localizer.text(language_code,str(FIRST_PLAY_TUTORIAL_MESSAGE_KEYS[first_play_tutorial_message_index]))
 
 func _hide_first_play_tutorial_overlay()->void:
 	if tutorial_guide_overlay==null:return
@@ -2162,6 +2161,7 @@ func _maybe_activate_first_play_harvest_guide()->bool:
 	if tutorial_finger_tween and tutorial_finger_tween.is_valid():tutorial_finger_tween.kill()
 	tutorial_finger_tween=null;tutorial_guide_overlay.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_guide_shade.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_guide_shade.material=first_play_harvest_spotlight_material;tutorial_guide_shade.color=Color(0.025,0.035,0.045,.82)
 	tutorial_guide_button.visible=false;tutorial_guide_button.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_guide_finger.visible=false;tutorial_guide_message.text=Localizer.text(language_code,"tutorial_harvest_tap");tutorial_dialog_panel.visible=true;tutorial_guide_overlay.visible=true;_update_first_play_harvest_guide_focus()
+	tutorial_panda_portrait.visible=false
 	return true
 
 func _update_first_play_harvest_guide_focus()->void:
@@ -3388,7 +3388,10 @@ func _play_result_new_species_animations()->void:
 	await get_tree().create_timer(.48).timeout
 	var queue:=result_new_species_queue.duplicate();result_new_species_queue.clear()
 	queue.append_array(result_deferred_species_queue);result_deferred_species_queue.clear()
-	for species_id_value in queue:_queue_species_get_by_id(str(species_id_value),true,"main_result")
+	for species_id_value in queue:
+		var species_id:=str(species_id_value)
+		var context:="first_colorata_catalog" if total_play_count==1 and species_id==FIRST_STORY_SPECIES_ID else "main_result"
+		_queue_species_get_by_id(species_id,true,context)
 
 func _start_result_new_species_pulse()->void:
 	if result_new_species_pulse_tween and result_new_species_pulse_tween.is_valid():result_new_species_pulse_tween.kill()
@@ -4480,6 +4483,7 @@ func _set_intro_speaker(speaker_id:String)->void:
 	if intro_speaker_label:
 		var speaker_key:="panda_shop_name"
 		match speaker_id:
+			"girl":speaker_key="story_speaker_girl"
 			"armadillo":speaker_key="armadillo_name"
 			"mouse":speaker_key="jurejure_mouse_name"
 			"skunk":speaker_key="jurejure_skunk_name"

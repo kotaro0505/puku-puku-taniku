@@ -50,7 +50,7 @@ func _ready() -> void:
 	assert(game.habitat_awakened and game.habitat_awakening_event_complete)
 	assert(game.habitat_wild_plants.size() == 3)
 	assert(game.habitat_pickups.filter(func(item): return str(item.get("kind", "")) == "wild_plant").size() == 3)
-	for species_id in ["colorata", "lutea", "shaviana"]:
+	for species_id in ["colorata", "affinis", "shaviana"]:
 		assert(bool(game.habitat_returned_species.get(species_id, false)))
 	assert(game.scripted_dialog_kind == "first_habitat_intro")
 	while not game.scripted_dialog_kind.is_empty():
@@ -122,6 +122,6 @@ func _prepare_trio_complete(game: Node) -> void:
 	game.encyclopedia_unlocked = true
 	game.habitat_unlocked = true
 	game.unlocked_series = {"base": true}
-	for species_id in ["colorata", "lutea", "shaviana"]:
+	for species_id in ["colorata", "affinis", "shaviana"]:
 		game._register_species_discovery(species_id, true)
 	game._update_main_story_progress(false)
