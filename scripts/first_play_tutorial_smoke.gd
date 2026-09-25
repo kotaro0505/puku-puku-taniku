@@ -26,10 +26,11 @@ func _ready() -> void:
 	assert(game.intro_story_complete and game.old_seed_bags == 1)
 	assert(game.OLD_SEED_GERMINATION_COUNT == 1)
 
+	game._hide_first_play_tutorial_overlay()
 	game._start_greenhouse_play("old")
 	await get_tree().create_timer(0.45).timeout
 	game.set_process(false)
-	assert(game.play_active and game.first_play_tutorial_active)
+	assert(game.play_active and not game.first_play_tutorial_active)
 	assert(game.plants.size() == 1 and game.first_tutorial_species_id == FIRST_SPECIES_ID)
 	var first_plant = game.plants[0]
 	assert(str(first_plant.data.get("species_id", "")) == FIRST_SPECIES_ID)
@@ -41,24 +42,10 @@ func _ready() -> void:
 	var state_before := str(first_plant.state)
 	first_plant.simulate(1.0)
 	assert(str(first_plant.state) == state_before)
-
-	game._process(game.FIRST_PLAY_TUTORIAL_INITIAL_DELAY + 0.01)
-	assert(game.first_play_tutorial_dialog_visible)
-	assert(game.FIRST_PLAY_TUTORIAL_SPEAKERS == ["armadillo", "panda", "panda", "armadillo", "panda"])
-	assert("armadillo-dialogue.png" in game.tutorial_panda_portrait.texture.resource_path)
-	for message_index in range(game.FIRST_PLAY_TUTORIAL_MESSAGE_KEYS.size()):
-		var message_key := str(game.FIRST_PLAY_TUTORIAL_MESSAGE_KEYS[message_index])
-		for locale in Localizer.SUPPORTED_LANGUAGES:
-			assert(not Localizer.text(locale, message_key).is_empty())
-		assert(game.tutorial_guide_message.text == Localizer.text(game.language_code, message_key))
-		game.tutorial_guide_button.pressed.emit()
-	assert(game.first_play_tutorial_sequence_complete)
-	assert(Localizer.text("ja", "tutorial_harvest_tap") == "ジュレてしまう前にタップで収穫！")
-	assert(game.first_play_harvest_guide_active)
-	assert(game.tutorial_guide_message.text == Localizer.text("ja", "tutorial_harvest_tap"))
-	assert(not game.tutorial_panda_portrait.visible)
-
-	first_plant.harvest()
+	assert(not game.tutorial_guide_overlay.visible)
+	assert(is_zero_approx(game.puku_gauge_cm) and is_zero_approx(game.puku_coin_gauge_cm))
+	first_plant.fast_forward_to_diameter(game.OLD_SEED_AUTO_HARVEST_CM)
+	game._process(0.01)
 	await get_tree().create_timer(0.75).timeout
 	game._poll_greenhouse_play_completion()
 	await get_tree().process_frame
@@ -122,5 +109,39 @@ func _ready() -> void:
 	game._update_play_ui();assert(not game.puku_gauge_area.visible and not game.encyclopedia_icon_button.visible)
 	assert(game.main_story_stage == game.StoryProgressionClass.STAGE_FIND_HABITAT)
 
-	print("FIRST_PLAY_TUTORIAL_SMOKE_OK seed=1 plant=1 species=colorata safe=true discovery=major trio=colorata+affinis+shaviana")
+	# The actual controls tutorial starts only with the first normal bag after
+	# the awakening items have been acquired.
+	game.mystery_items_acquired=true;game.encyclopedia_unlocked=true;game.seed_shop_open=true;game.habitat_awakened=true;game.habitat_tutorial_complete=true;game.mystery_catalog_tutorial_complete=true;game.normal_seed_bags=4;game.current_mode="greenhouse";game.normal_play_tutorial_complete=false;game.seed_pod_gauge_discovery_complete=false;game.puku_buyback_tutorial_complete=false;game.puku_gauge_cm=0.0;game.puku_coin_gauge_cm=0.0
+	game._hide_first_play_tutorial_overlay();game._start_greenhouse_play("normal")
+	await get_tree().create_timer(.45).timeout
+	assert(game.play_active and game.first_play_tutorial_active and game.normal_seed_bags==3 and game.current_target_count==12)
+	game._process(game.FIRST_PLAY_TUTORIAL_INITIAL_DELAY+.01)
+	assert(game.first_play_tutorial_dialog_visible and game.tutorial_guide_message.text==Localizer.text("ja","tutorial_normal_sow_1"))
+	game._dismiss_first_play_tutorial_dialog();assert(game.tutorial_guide_message.text==Localizer.text("ja","tutorial_normal_sow_2"))
+	game._dismiss_first_play_tutorial_dialog();assert(not game.first_play_tutorial_dialog_visible and game.first_play_tutorial_message_index==2)
+	game._process(.21);game._process(.01)
+	assert(game.first_play_tutorial_dialog_visible and game.tutorial_guide_message.text==Localizer.text("ja","tutorial_normal_sprout"))
+	game._dismiss_first_play_tutorial_dialog()
+	for plant in game.plants:plant.fast_forward_to_diameter(game.FIRST_PLAY_TUTORIAL_GROWTH_DIALOG_CM)
+	game._process(.21)
+	assert(game.first_play_tutorial_dialog_visible and game.tutorial_guide_message.text==Localizer.text("ja","tutorial_normal_growth"))
+	game._dismiss_first_play_tutorial_dialog()
+	for plant in game.plants:plant.fast_forward_to_diameter(game.FIRST_PLAY_TUTORIAL_JELLY_DIALOG_CM)
+	game._process(.21)
+	assert(game.first_play_tutorial_dialog_visible and game.tutorial_guide_message.text==Localizer.text("ja","tutorial_normal_jelly"))
+	game._dismiss_first_play_tutorial_dialog();assert(game.first_play_tutorial_sequence_complete)
+	game._process(.05);await get_tree().process_frame
+	assert(game.puku_gauge_cm>0.0 and is_zero_approx(game.puku_coin_gauge_cm))
+	assert(game.seed_pod_gauge_discovery_complete and game.scripted_dialog_kind=="seed_pod_gauge_discovery" and game.scripted_dialog_pages.size()==2)
+	while not game.scripted_dialog_kind.is_empty():game._advance_scripted_dialog()
+	for plant in game.plants:plant.fast_forward_to_diameter(30.1)
+	game.play_seed_animations_pending=0;game._process(.01)
+	assert(game.first_play_harvest_guide_active and game.tutorial_guide_message.text==Localizer.text("ja","tutorial_harvest_tap"))
+	game.plants[0].harvest();await get_tree().process_frame
+	assert(game.normal_play_tutorial_complete and game.puku_coin_gauge_cm>=30.0 and game.puku_buyback_tutorial_active)
+	assert(game.tutorial_guide_message.text==Localizer.text("ja","puku_buyback_1"));game._advance_puku_buyback_tutorial()
+	assert(game.tutorial_guide_message.text==Localizer.text("ja","puku_buyback_2"));game._advance_puku_buyback_tutorial()
+	assert(game.puku_buyback_tutorial_complete and not game.puku_buyback_tutorial_active)
+
+	print("FIRST_PLAY_TUTORIAL_SMOKE_OK old_seed=story_auto_harvest normal=staged_controls pod_discovery=true buyback=true")
 	get_tree().quit()

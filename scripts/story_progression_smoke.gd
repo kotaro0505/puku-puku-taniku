@@ -174,7 +174,7 @@ func _test_legacy_migration(game: Node) -> void:
 		assert(not game.bests.has(removed_id) and not game.discovered.has(removed_id))
 		assert(not game.species_get_counts.has(removed_id) and not game.greenhouse_available.has(removed_id))
 		assert(not game.forest_gacha_encountered.has(removed_id) and not game.habitat_returned_species.has(removed_id))
-	assert(game.puku_points == 37 and is_equal_approx(game.puku_gauge_cm, 123.5))
+	assert(game.puku_points == 37 and is_equal_approx(game.puku_gauge_cm, 154.375) and is_zero_approx(game.puku_coin_gauge_cm))
 	assert(is_equal_approx(float(game.bests.get("colorata", 0.0)), 100.0) and int(game.species_get_counts.get("laui", 0)) == 2)
 	assert(game.normal_seed_bags == 6 and game.volume_seed_bags == 2 and game.premium_seed_bags == 1 and game.mystery_seed_bags == 3)
 	assert(game.panda_beacon_unlocked and game.panda_beacon_count == 4 and game.panda_beacon_unread_log.size() == 1)

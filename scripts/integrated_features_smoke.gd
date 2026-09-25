@@ -121,7 +121,7 @@ func _test_language_and_symbol_safety(game)->void:
 func _test_one_time_gift_arrangement_and_share(game)->void:
 	var points_before:int=game.puku_points;var bags_before:int=game.normal_seed_bags
 	game._claim_first_habitat_gift_once();game._claim_first_habitat_gift_once()
-	assert(game.first_habitat_gift_claimed and game.puku_points==points_before and game.normal_seed_bags==bags_before+3)
+	assert(game.first_habitat_gift_claimed and game.puku_points==points_before and game.normal_seed_bags==bags_before+4)
 	assert(is_equal_approx(game.arrangement_ui._species_scale_max("laui"),game.arrangement_ui.PLANT_SCALE_MIN))
 	game.bests["laui"]=52.6;game._sync_arrangement_ui()
 	assert(is_equal_approx(game.arrangement_ui._species_scale_max("laui"),52.6/game.arrangement_ui.ARRANGEMENT_CM_AT_SCALE_ONE))

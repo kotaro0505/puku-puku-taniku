@@ -99,8 +99,8 @@ func _ready() -> void:
 	await get_tree().create_timer(0.35).timeout
 	assert(game.seed_pod_story_overlay.visible and game.current_mode == "habitat")
 	assert(game.scripted_dialog_kind.is_empty() and not bool(game.tutorial_steps.get("seed_pod_story_seen", false)))
-	assert(game.seed_pod_story_overlay.DIALOG_KEYS.size() == 6)
-	assert(game.seed_pod_story_overlay.SPEAKER_KEYS == ["story_speaker_panda", "story_speaker_armadillo", "story_speaker_girl", "story_speaker_armadillo", "story_speaker_panda", "story_speaker_armadillo"])
+	assert(game.seed_pod_story_overlay.DIALOG_KEYS.size() == 3)
+	assert(game.seed_pod_story_overlay.SPEAKER_KEYS == ["story_speaker_panda", "story_speaker_girl", "story_speaker_armadillo"])
 	assert(game.seed_pod_story_overlay.STORY_TEXTURE.get_width() == 960 and game.seed_pod_story_overlay.STORY_TEXTURE.get_height() == 1280)
 	var seed_pod_story_image := game.seed_pod_story_overlay.get_node("StoryImage") as TextureRect
 	assert(seed_pod_story_image != null)
@@ -111,18 +111,18 @@ func _ready() -> void:
 	for locale in Localizer.SUPPORTED_LANGUAGES:
 		for key in game.seed_pod_story_overlay.DIALOG_KEYS:
 			assert(not Localizer.text(locale, str(key)).is_empty())
-	for expected_page in range(6):
+	for expected_page in range(3):
 		assert(game.seed_pod_story_overlay.page_index == expected_page)
 		assert(game.seed_pod_story_overlay.story_text.text == Localizer.text("ja", game.seed_pod_story_overlay.DIALOG_KEYS[expected_page]))
 		assert(game.seed_pod_story_overlay.speaker_portrait.visible and game.seed_pod_story_overlay.speaker_portrait.texture != null)
 		assert(game.seed_pod_story_overlay.speaker_portrait.position.x < game.seed_pod_story_overlay.story_text.position.x)
 		game.seed_pod_story_overlay.advance()
-		if expected_page < 5:
+		if expected_page < 2:
 			await get_tree().create_timer(0.25).timeout
 	await get_tree().process_frame
 	assert(not game.seed_pod_story_overlay.visible and bool(game.tutorial_steps.get("seed_pod_story_seen", false)))
-	assert(game.mystery_items_acquired and game.seed_shop_open and game.normal_seed_bags == 3 and game.puku_points == 0)
-	assert(game.current_mode == "greenhouse" and game.puku_gauge_area.visible and game.encyclopedia_icon_button.visible)
+	assert(game.mystery_items_acquired and game.seed_shop_open and game.normal_seed_bags == 4 and game.puku_points == 0)
+	assert(game.current_mode == "greenhouse" and game.seed_pod_gauge_area.visible and game.puku_gauge_area.visible and game.encyclopedia_icon_button.visible)
 	assert(game.tutorial_guide_overlay.visible and str(game.tutorial_guide_button.get_meta("target", "")) == "encyclopedia")
 	game._complete_tutorial_guide()
 	await get_tree().process_frame
@@ -135,6 +135,12 @@ func _ready() -> void:
 	assert(game.mystery_catalog_tutorial_complete and game.encyclopedia_overlay.visible)
 	game._close_encyclopedia()
 	await get_tree().process_frame
+	assert(game.scripted_dialog_kind == "initial_seed_stock")
+	game._advance_scripted_dialog()
+	await get_tree().process_frame
+	assert(game.initial_seed_stock_notice_complete and game.tutorial_guide_overlay.visible and str(game.tutorial_guide_button.get_meta("target", "")) == "play_open_normal")
+	game._hide_first_play_tutorial_overlay();game.normal_play_tutorial_complete=true;game._save()
+	game._start_panda_beacon_unlock_event()
 	assert(game.scripted_dialog_kind == "panda_beacon_unlock")
 	while not game.scripted_dialog_kind.is_empty():
 		game._advance_scripted_dialog()
@@ -156,7 +162,7 @@ func _ready() -> void:
 	game._ensure_habitat_wild_state(now_unix, false)
 	assert(game.habitat_wild_plants.size() >= population_before)
 
-	print("EARLY_GAME_HABITAT_SMOKE_OK empty=true dormant=true awakening=rain+ghosts+promise sprouts=3 items=pod+stone+catalog catalog_tutorial=true shop=true beacon=true return_loop=true")
+	print("EARLY_GAME_HABITAT_SMOKE_OK empty=true dormant=true awakening=rain+ghosts+promise sprouts=3 items=pod+catalog stock=4x12 catalog_tutorial=true shop=true beacon=true return_loop=true")
 	get_tree().quit()
 
 func _prepare_trio_complete(game: Node) -> void:

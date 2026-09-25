@@ -10,17 +10,11 @@ const IMAGE_AREA_SIZE := Vector2(576, 650)
 const DIALOG_KEYS := [
 	"seed_pod_story_1",
 	"seed_pod_story_2",
-	"seed_pod_story_3",
-	"seed_pod_story_4",
-	"seed_pod_story_5",
-	"seed_pod_story_6"
+	"seed_pod_story_3"
 ]
 const SPEAKER_KEYS := [
 	"story_speaker_panda",
-	"story_speaker_armadillo",
 	"story_speaker_girl",
-	"story_speaker_armadillo",
-	"story_speaker_panda",
 	"story_speaker_armadillo"
 ]
 

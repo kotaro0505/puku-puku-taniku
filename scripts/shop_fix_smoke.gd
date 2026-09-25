@@ -20,7 +20,7 @@ func _ready()->void:
 	game.puku_points=2;var bags_before:int=game.normal_seed_bags;game._open_shop_seed_category()
 	assert(game.arrangement_ui.visible and game.arrangement_ui.seed_shop_page.visible and game.arrangement_ui.seed_shop_grid.get_child_count()==1)
 	game.arrangement_ui._request_seed_purchase("normal")
-	assert(game.puku_points==2 and game.normal_seed_bags==bags_before and "石の光" in game.arrangement_ui.seed_shop_message.text)
+	assert(game.puku_points==2 and game.normal_seed_bags==bags_before and "さやゲージ" in game.arrangement_ui.seed_shop_message.text)
 	game.arrangement_ui._request_seed_purchase("panda_beacon")
 	assert(game.puku_points==1 and game.panda_beacon_count==2 and game.normal_seed_bags==bags_before)
 	game.arrangement_ui.close();game._show_shop_categories()
