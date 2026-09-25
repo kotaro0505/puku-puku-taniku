@@ -35,6 +35,9 @@ func _ready() -> void:
 	var first_plant = game.plants[0]
 	assert(str(first_plant.data.get("species_id", "")) == FIRST_SPECIES_ID)
 	assert(not game._allow_plant_jelly(first_plant))
+	game._update_play_ui()
+	game._update_labels()
+	assert(not game.best_panel.visible and not first_plant.label.visible)
 	first_plant.jelly_checks_enabled = true
 	first_plant.jelly_safe_end_seconds = 0.0
 	first_plant.jelly_ramp_end_seconds = 0.0
@@ -44,12 +47,26 @@ func _ready() -> void:
 	assert(str(first_plant.state) == state_before)
 	assert(not game.tutorial_guide_overlay.visible)
 	assert(is_zero_approx(game.puku_gauge_cm) and is_zero_approx(game.puku_coin_gauge_cm))
+	first_plant.fast_forward_to_diameter(game.OLD_SEED_REACTION_SPROUT_CM)
+	game._process(0.01)
+	assert(game.scripted_dialog_kind == "old_seed_growth_reaction")
+	assert(game.scripted_dialog_pages.size() == 1 and game.scripted_dialog_pages[0].speaker == "armadillo")
+	assert(game.intro_dialogue_label.text == Localizer.text("ja", "old_seed_reaction_sprout"))
+	game._advance_scripted_dialog()
+	first_plant.fast_forward_to_diameter(game.OLD_SEED_REACTION_GROWTH_CM)
+	game._process(0.01)
+	assert(game.scripted_dialog_kind == "old_seed_growth_reaction")
+	assert(game.scripted_dialog_pages.size() == 1 and game.scripted_dialog_pages[0].speaker == "panda")
+	assert(game.intro_dialogue_label.text == Localizer.text("ja", "old_seed_reaction_growth"))
+	game._advance_scripted_dialog()
 	first_plant.fast_forward_to_diameter(game.OLD_SEED_AUTO_HARVEST_CM)
 	game._process(0.01)
-	await get_tree().create_timer(0.75).timeout
+	await get_tree().create_timer(1.25).timeout
 	game._poll_greenhouse_play_completion()
-	await get_tree().process_frame
-	assert(not game.play_active and game.result_overlay.visible and game.total_play_count == 1)
+	await get_tree().create_timer(0.65).timeout
+	assert(not game.play_active and not game.result_overlay.visible and game.total_play_count == 1)
+	assert(game.best_panel.visible and not game.play_updated_global_best)
+	assert(not game.bests.has(FIRST_SPECIES_ID))
 	assert(bool(game.discovered.get(FIRST_SPECIES_ID, false)))
 	assert(not game.first_colorata_confirmed)
 	assert(game.species_get_overlay.visible)
@@ -57,8 +74,6 @@ func _ready() -> void:
 	assert(game.species_get_overlay.name_label.text == Localizer.species_name("ja", game._catalog_entry(FIRST_SPECIES_ID)))
 	game.species_get_overlay.close_overlay()
 	await get_tree().create_timer(0.2).timeout
-
-	game._close_result()
 	assert(game.scripted_dialog_kind == "first_colorata_discovery")
 	assert(game.scripted_dialog_pages.size() == 3)
 	assert([game.scripted_dialog_pages[0].speaker, game.scripted_dialog_pages[1].speaker, game.scripted_dialog_pages[2].speaker] == ["panda", "armadillo", "panda"])
@@ -81,6 +96,8 @@ func _ready() -> void:
 	assert(game.scripted_dialog_pages.size() == 7)
 	assert([game.scripted_dialog_pages[0].speaker, game.scripted_dialog_pages[1].speaker, game.scripted_dialog_pages[2].speaker, game.scripted_dialog_pages[3].speaker, game.scripted_dialog_pages[4].speaker] == ["panda", "armadillo", "armadillo", "girl", "panda"])
 	for locale in Localizer.SUPPORTED_LANGUAGES:
+		assert(not Localizer.text(locale, "old_seed_reaction_sprout").is_empty())
+		assert(not Localizer.text(locale, "old_seed_reaction_growth").is_empty())
 		assert(Localizer.species_name(locale, game._catalog_entry("affinis")) in Localizer.text(locale, "story_trio_1", [Localizer.species_name(locale, game._catalog_entry("affinis"))]))
 		assert(Localizer.species_name(locale, game._catalog_entry("shaviana")) in Localizer.text(locale, "story_trio_2", [Localizer.species_name(locale, game._catalog_entry("shaviana"))]))
 		for key in ["story_trio_3", "story_trio_4", "story_trio_5"]:

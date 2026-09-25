@@ -115,14 +115,34 @@ static func initialize_population(plants: Array[Dictionary], candidate_species_i
 static func initialize_awakened_population(plants: Array[Dictionary], candidate_species_ids: Array[String], original_species_ids: Array[String], now_unix: float, rng: RandomNumberGenerator, safe_points: Array = []) -> void:
 	# The first sprouts belong to the awakening event. Start with only a few;
 	# ordinary timed spawning enriches the habitat after the story moment.
-	if not plants.is_empty() or candidate_species_ids.is_empty():
+	if not plants.is_empty() or (candidate_species_ids.is_empty() and original_species_ids.is_empty()):
 		return
-	var tutorial_pool := original_species_ids if not original_species_ids.is_empty() else candidate_species_ids
-	var tutorial_id := tutorial_pool[rng.randi_range(0, tutorial_pool.size() - 1)]
-	plants.append(_make_plant(tutorial_id, true, rng.randf_range(29.99970, 29.99985), now_unix, plants, rng, safe_points))
-	while plants.size() < 3:
-		var species_id := candidate_species_ids[rng.randi_range(0, candidate_species_ids.size() - 1)]
-		plants.append(_make_plant(species_id, false, rng.randf_range(2.0, 5.5), now_unix, plants, rng, safe_points))
+	var awakening_species: Array[String] = []
+	for species_id in original_species_ids:
+		if not species_id.is_empty() and species_id not in awakening_species:
+			awakening_species.append(species_id)
+			if awakening_species.size() == 3:
+				break
+	for species_id in candidate_species_ids:
+		if awakening_species.size() == 3:
+			break
+		if not species_id.is_empty() and species_id not in awakening_species:
+			awakening_species.append(species_id)
+	var spread_points: Array[Vector2] = []
+	if safe_points.size() >= 3:
+		var last_point_index := safe_points.size() - 1
+		for point_index in [int(round(last_point_index * 0.1)), int(round(last_point_index * 0.55)), int(round(last_point_index * 0.9))]:
+			spread_points.append(Vector2(safe_points[point_index]))
+	else:
+		spread_points = [Vector2(155, 410), Vector2(625, 455), Vector2(1130, 400)]
+	for index in mini(3, awakening_species.size()):
+		var tutorial := index == 0
+		var diameter := rng.randf_range(29.99970, 29.99985) if tutorial else rng.randf_range(2.0, 5.5)
+		var plant := _make_plant(awakening_species[index], tutorial, diameter, now_unix, plants, rng, safe_points)
+		plant["panorama_x"] = spread_points[index].x
+		plant["panorama_y"] = spread_points[index].y
+		plant["position_validated"] = true
+		plants.append(plant)
 
 
 static func add_pending_species(plants: Array[Dictionary], species_id: String, now_unix: float, rng: RandomNumberGenerator, safe_points: Array = []) -> void:

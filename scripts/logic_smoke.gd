@@ -33,15 +33,19 @@ func _ready()->void:
 	assert(game.opening_overlay.visible and game.audio_manager.current_bgm_key=="opening" and opening_players<=1 and opening_stream is AudioStreamOggVorbis and opening_stream.loop and game.audio_manager._bgm_target_db("opening")<game.audio_manager._bgm_target_db("greenhouse"));game.opening_story_complete=true;game._finish_opening();assert(not game.opening_overlay.visible)
 	assert(game.best_label.get_parent().position==Vector2(204,54))
 	var habitat_sky:Sky=game.habitat_environment.sky;var habitat_panorama:PanoramaSkyMaterial=habitat_sky.sky_material;assert(habitat_sky.radiance_size==Sky.RADIANCE_SIZE_512 and habitat_panorama.panorama.resource_path=="res://assets/highland-panorama.jpg" and habitat_panorama.panorama.get_width()==1280 and habitat_panorama.panorama.get_height()==640)
-	assert(game.mode_button.position==Vector2(398,198) and game.mode_button.size==Vector2(153,55));assert(game.shop_button.position==Vector2(398,262) and game.shop_button.size==Vector2(153,55));assert(game.result_confetti_layer.get_parent()==game.result_overlay)
+	assert(game.mode_button.position==Vector2(435,198) and game.mode_button.size==Vector2(116,55));assert(game.shop_button.position==Vector2(398,262) and game.shop_button.size==Vector2(153,55));assert(game.result_confetti_layer.get_parent()==game.result_overlay)
 	game._toggle_mode()
 	assert(game.current_mode=="habitat" and game.audio_manager.current_bgm_key=="habitat")
 	assert(not game.shop_button.visible and not game.habitat_status_label.visible and game.habitat_status_label.text.is_empty())
 	game.habitat_tutorial_complete=false;game.habitat_tutorial_started=false
 	game._start_first_habitat_tutorial()
 	assert(game.scripted_dialog_kind=="first_habitat_intro" and game.intro_panda_portrait.visible)
-	assert(game.intro_panda_portrait.stretch_mode==TextureRect.STRETCH_KEEP_ASPECT_CENTERED and game.intro_dialog_panel.position in [Vector2(40,725),Vector2(40,385)] and "芽が出た" in game.intro_dialogue_label.text)
-	game._finish_scripted_dialog();game.habitat_tutorial_complete=true;game.original_catalog_gifted=true;game.unlocked_series["base"]=true;game._toggle_mode()
+	assert(game.scripted_dialog_pages.size()==1 and game.intro_panda_portrait.stretch_mode==TextureRect.STRETCH_KEEP_ASPECT_CENTERED and game.intro_dialog_panel.position in [Vector2(40,725),Vector2(40,385)] and game.intro_dialogue_label.text=="芽が出た！")
+	await get_tree().process_frame
+	assert(game.habitat_lookaround_active and game.habitat_lookaround_context=="sprouts")
+	var tutorial_look_start:float=game.habitat_lookaround_start_yaw;game._update_habitat_view_follow(game.HABITAT_LOOKAROUND_DURATION_SECONDS*.5);assert(absf(game.view_yaw-tutorial_look_start)>170.0);game._update_habitat_view_follow(game.HABITAT_LOOKAROUND_DURATION_SECONDS);await get_tree().process_frame
+	assert(not game.habitat_lookaround_active and is_equal_approx(game.view_yaw,tutorial_look_start) and game.scripted_dialog_kind.is_empty())
+	game.habitat_tutorial_complete=true;game.original_catalog_gifted=true;game.unlocked_series["base"]=true;game._toggle_mode()
 	assert(game.current_mode=="greenhouse" and game.audio_manager.current_bgm_key=="greenhouse" and game.shop_button.visible)
 	game._toggle_mode();var habitat_stream:AudioStream=game.audio_manager._stream_for("bgm","habitat");var habitat_players:=0
 	for player in game.audio_manager.bgm_players:habitat_players+=1 if player.playing and player.stream==habitat_stream else 0

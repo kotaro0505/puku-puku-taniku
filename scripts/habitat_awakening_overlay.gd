@@ -2,6 +2,7 @@ class_name HabitatAwakeningOverlay
 extends Control
 
 signal awakening_finished
+signal lookaround_requested(context: String)
 
 const Localizer = preload("res://scripts/game_localizer.gd")
 const DialoguePortraits = preload("res://scripts/dialogue_portraits.gd")
@@ -24,12 +25,17 @@ const GHOST_TEXTURES: Array[Texture2D] = [
 	preload("res://assets/plants/habitat/sprite-laui.png"),
 	preload("res://assets/plants/habitat/sprite-kante.png")
 ]
+const GHOST_CENTER_RATIOS := [
+	Vector2(0.115, 0.34), Vector2(0.30, 0.52), Vector2(0.50, 0.29),
+	Vector2(0.70, 0.49), Vector2(0.885, 0.36)
+]
 
 var language_code := "ja"
 var page_index := 0
 var rain_active := false
 var rain_soft := false
 var transitioning := false
+var waiting_for_arrival_lookaround := false
 var dialogue_label: Label
 var speaker_label: Label
 var speaker_portrait: TextureRect
@@ -50,6 +56,7 @@ func _ready() -> void:
 	z_index = 880
 	rng.seed = 20260917
 	_build_ui()
+	resized.connect(_layout_ghosts)
 	set_process(true)
 	visible = false
 
@@ -70,18 +77,17 @@ func _build_ui() -> void:
 	ghost_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	ghost_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(ghost_layer)
-	var ghost_positions := [Vector2(58, 315), Vector2(190, 272), Vector2(330, 330), Vector2(102, 510), Vector2(363, 500)]
 	for index in GHOST_TEXTURES.size():
 		var ghost := TextureRect.new()
 		ghost.texture = GHOST_TEXTURES[index]
-		ghost.position = ghost_positions[index]
-		ghost.size = Vector2(145, 145)
+		ghost.size = Vector2(132, 132)
 		ghost.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		ghost.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		ghost.modulate = Color(0.72, 0.92, 1.0, 0.0)
 		ghost.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		ghost_layer.add_child(ghost)
 		ghosts.append(ghost)
+	_layout_ghosts()
 
 	sprout_layer = Control.new()
 	sprout_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -176,6 +182,7 @@ func start(requested_language := "ja") -> void:
 	rain_active = false
 	rain_soft = false
 	transitioning = false
+	waiting_for_arrival_lookaround = true
 	darkness.color.a = 0.12
 	rain_tint.color.a = 0.0
 	for ghost in ghosts:
@@ -189,9 +196,12 @@ func start(requested_language := "ja") -> void:
 	visible = true
 	move_to_front()
 	_show_page()
+	lookaround_requested.emit("arrival")
 
 func advance() -> void:
 	if not visible or transitioning:
+		return
+	if page_index == 0 and waiting_for_arrival_lookaround:
 		return
 	if page_index >= DIALOG_KEYS.size() - 1:
 		visible = false
@@ -200,6 +210,24 @@ func advance() -> void:
 		return
 	page_index += 1
 	_show_page()
+
+func complete_lookaround(context: String) -> void:
+	if context != "arrival" or not visible or page_index != 0 or not waiting_for_arrival_lookaround:
+		return
+	waiting_for_arrival_lookaround = false
+	advance()
+
+func _layout_ghosts() -> void:
+	var area := size
+	if area.x <= 0.0 or area.y <= 0.0:
+		area = get_viewport_rect().size
+	if area.x <= 0.0 or area.y <= 0.0:
+		area = Vector2(576, 1024)
+	var side := clampf(minf(area.x * 0.23, area.y * 0.13), 104.0, 145.0)
+	for index in mini(ghosts.size(), GHOST_CENTER_RATIOS.size()):
+		var ghost := ghosts[index]
+		ghost.size = Vector2(side, side)
+		ghost.position = Vector2(area.x * GHOST_CENTER_RATIOS[index].x, area.y * GHOST_CENTER_RATIOS[index].y) - ghost.size * 0.5
 
 func _show_page() -> void:
 	if page_index == 4:

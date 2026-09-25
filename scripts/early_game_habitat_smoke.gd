@@ -31,6 +31,21 @@ func _ready() -> void:
 	assert(game.habitat_arrival_started and not game.habitat_awakened)
 	assert(game.habitat_awakening_overlay.visible and game.habitat_wild_plants.is_empty())
 	assert(game.main_story_stage == game.StoryProgressionClass.STAGE_AWAKEN_HABITAT)
+	assert(game.habitat_lookaround_active and game.habitat_lookaround_context == "arrival")
+	var arrival_start_yaw: float = game.view_yaw
+	game.habitat_awakening_overlay.advance()
+	assert(game.habitat_awakening_overlay.page_index == 0)
+	game._update_habitat_view_follow(game.HABITAT_LOOKAROUND_DURATION_SECONDS * 0.5)
+	assert(game.habitat_lookaround_active and absf(game.view_yaw - arrival_start_yaw) > 170.0)
+	game._update_habitat_view_follow(game.HABITAT_LOOKAROUND_DURATION_SECONDS)
+	await get_tree().process_frame
+	assert(not game.habitat_lookaround_active and is_equal_approx(game.view_yaw, arrival_start_yaw))
+	assert(game.habitat_awakening_overlay.page_index == 1)
+	var ghost_centers: Array[Vector2] = []
+	for ghost in game.habitat_awakening_overlay.ghosts:
+		ghost_centers.append(ghost.position + ghost.size * 0.5)
+	assert(ghost_centers[0].x < 0.2 * 576.0 and ghost_centers[2].x > 0.4 * 576.0 and ghost_centers[2].x < 0.6 * 576.0 and ghost_centers[4].x > 0.8 * 576.0)
+	assert(not is_equal_approx(ghost_centers[0].y, ghost_centers[1].y) and not is_equal_approx(ghost_centers[2].y, ghost_centers[3].y))
 	for locale in Localizer.SUPPORTED_LANGUAGES:
 		for key in game.habitat_awakening_overlay.DIALOG_KEYS:
 			if not str(key).begins_with("_pause_"):
@@ -44,7 +59,7 @@ func _ready() -> void:
 	assert("もう同じことはしない" in awakening_text and "返していきます" in awakening_text)
 	assert("……何も起こらない。" not in awakening_text and "聞いてくれたのかな" not in awakening_text)
 	assert(game.habitat_awakening_overlay.SPEAKER_KEYS.slice(0, 14) == ["story_speaker_armadillo", "story_speaker_panda", "story_speaker_armadillo", "story_speaker_panda", "", "story_speaker_panda", "story_speaker_armadillo", "story_speaker_girl", "story_speaker_girl", "story_speaker_armadillo", "story_speaker_girl", "story_speaker_panda", "", "story_speaker_girl"])
-	for expected_page in range(4):
+	for expected_page in range(1, 4):
 		assert(game.habitat_awakening_overlay.page_index == expected_page)
 		assert(game.habitat_awakening_overlay.speaker_portrait.visible)
 		assert(game.habitat_awakening_overlay.speaker_portrait.texture != null)
@@ -70,11 +85,32 @@ func _ready() -> void:
 	assert(game.habitat_awakened and game.habitat_awakening_event_complete)
 	assert(game.habitat_wild_plants.size() == 3)
 	assert(game.habitat_pickups.filter(func(item): return str(item.get("kind", "")) == "wild_plant").size() == 3)
+	var awakening_ids: Array[String] = []
+	var awakening_xs: Array[float] = []
+	for plant in game.habitat_wild_plants:
+		awakening_ids.append(str(plant.get("species_id", "")))
+		awakening_xs.append(float(plant.get("panorama_x", 0.0)))
+	awakening_ids.sort()
+	awakening_xs.sort()
+	assert(awakening_ids == ["affinis", "colorata", "shaviana"])
+	assert(awakening_xs[0] < 300.0 and awakening_xs[1] > 500.0 and awakening_xs[1] < 900.0 and awakening_xs[2] > 1000.0)
 	for species_id in ["colorata", "affinis", "shaviana"]:
 		assert(bool(game.habitat_returned_species.get(species_id, false)))
 	assert(game.scripted_dialog_kind == "first_habitat_intro")
-	while not game.scripted_dialog_kind.is_empty():
-		game._advance_scripted_dialog()
+	assert(game.scripted_dialog_pages.size() == 1)
+	assert(game.intro_dialogue_label.text == Localizer.text("ja", "habitat_intro_1"))
+	assert(game.intro_dialogue_label.text == "芽が出た！")
+	await get_tree().process_frame
+	assert(game.habitat_lookaround_active and game.habitat_lookaround_context == "sprouts")
+	var sprout_start_yaw: float = game.habitat_lookaround_start_yaw
+	game._update_habitat_view_follow(game.HABITAT_LOOKAROUND_DURATION_SECONDS * 0.5)
+	assert(absf(game.view_yaw - sprout_start_yaw) > 170.0)
+	game._advance_scripted_dialog()
+	assert(game.scripted_dialog_kind == "first_habitat_intro")
+	game._update_habitat_view_follow(game.HABITAT_LOOKAROUND_DURATION_SECONDS)
+	await get_tree().process_frame
+	assert(not game.habitat_lookaround_active and is_equal_approx(game.view_yaw, sprout_start_yaw))
+	assert(game.scripted_dialog_kind.is_empty())
 	assert(game.habitat_tutorial_started)
 
 	# The first awakened sprout is nearly ready, but it still uses the real
