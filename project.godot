@@ -13,6 +13,7 @@ window/size/window_width_override=576
 window/size/window_height_override=1024
 window/stretch/mode="canvas_items"
 window/handheld/orientation=1
+window/dpi/allow_hidpi.web=false
 
 [editor_plugins]
 enabled=PackedStringArray("res://addons/NotificationSchedulerPlugin/plugin.cfg")
