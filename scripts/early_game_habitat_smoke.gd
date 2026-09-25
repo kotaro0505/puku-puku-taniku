@@ -10,6 +10,8 @@ func _ready() -> void:
 	game._reset_progression_state()
 	game.audio_manager.apply_settings({"bgm_enabled": false, "se_enabled": false})
 	_prepare_trio_complete(game)
+	game._update_play_ui()
+	assert(not game.puku_gauge_area.visible and not game.encyclopedia_icon_button.visible)
 
 	# Before awakening there is no population, no offline spawning and no rain.
 	game.current_mode = "habitat"
@@ -97,8 +99,8 @@ func _ready() -> void:
 	await get_tree().create_timer(0.35).timeout
 	assert(game.seed_pod_story_overlay.visible and game.current_mode == "habitat")
 	assert(game.scripted_dialog_kind.is_empty() and not bool(game.tutorial_steps.get("seed_pod_story_seen", false)))
-	assert(game.seed_pod_story_overlay.DIALOG_KEYS.size() == 5)
-	assert(game.seed_pod_story_overlay.SPEAKER_KEYS == ["story_speaker_panda", "story_speaker_armadillo", "story_speaker_girl", "story_speaker_panda", "story_speaker_girl"])
+	assert(game.seed_pod_story_overlay.DIALOG_KEYS.size() == 6)
+	assert(game.seed_pod_story_overlay.SPEAKER_KEYS == ["story_speaker_panda", "story_speaker_armadillo", "story_speaker_girl", "story_speaker_armadillo", "story_speaker_panda", "story_speaker_armadillo"])
 	assert(game.seed_pod_story_overlay.STORY_TEXTURE.get_width() == 960 and game.seed_pod_story_overlay.STORY_TEXTURE.get_height() == 1280)
 	var seed_pod_story_image := game.seed_pod_story_overlay.get_node("StoryImage") as TextureRect
 	assert(seed_pod_story_image != null)
@@ -109,35 +111,36 @@ func _ready() -> void:
 	for locale in Localizer.SUPPORTED_LANGUAGES:
 		for key in game.seed_pod_story_overlay.DIALOG_KEYS:
 			assert(not Localizer.text(locale, str(key)).is_empty())
-	for expected_page in range(5):
+	for expected_page in range(6):
 		assert(game.seed_pod_story_overlay.page_index == expected_page)
 		assert(game.seed_pod_story_overlay.story_text.text == Localizer.text("ja", game.seed_pod_story_overlay.DIALOG_KEYS[expected_page]))
 		assert(game.seed_pod_story_overlay.speaker_portrait.visible and game.seed_pod_story_overlay.speaker_portrait.texture != null)
 		assert(game.seed_pod_story_overlay.speaker_portrait.position.x < game.seed_pod_story_overlay.story_text.position.x)
 		game.seed_pod_story_overlay.advance()
-		if expected_page < 4:
+		if expected_page < 5:
 			await get_tree().create_timer(0.25).timeout
 	await get_tree().process_frame
 	assert(not game.seed_pod_story_overlay.visible and bool(game.tutorial_steps.get("seed_pod_story_seen", false)))
-	assert(game.scripted_dialog_kind == "seed_origin")
-	var seed_origin_text := ""
-	for page in game.scripted_dialog_pages:
-		seed_origin_text += str(page.get("text", ""))
-	assert("原生地" in seed_origin_text and "タネ" in seed_origin_text and "パンダのたねや" in seed_origin_text)
+	assert(game.mystery_items_acquired and game.seed_shop_open and game.normal_seed_bags == 3 and game.puku_points == 0)
+	assert(game.current_mode == "greenhouse" and game.puku_gauge_area.visible and game.encyclopedia_icon_button.visible)
+	assert(game.tutorial_guide_overlay.visible and str(game.tutorial_guide_button.get_meta("target", "")) == "encyclopedia")
+	game._complete_tutorial_guide()
+	await get_tree().process_frame
+	assert(game.encyclopedia_overlay.visible and game.current_encyclopedia_series_id == "base")
+	for species_id in ["colorata", "affinis", "shaviana"]:assert(bool(game.discovered.get(species_id, false)))
+	assert(game.scripted_dialog_kind == "mystery_catalog_tutorial" and game.scripted_dialog_pages.size() == 3)
 	while not game.scripted_dialog_kind.is_empty():
 		game._advance_scripted_dialog()
 	await get_tree().process_frame
-	assert(game.seed_shop_open and game.normal_seed_bags == 3 and game.puku_points == 10)
+	assert(game.mystery_catalog_tutorial_complete and game.encyclopedia_overlay.visible)
+	game._close_encyclopedia()
+	await get_tree().process_frame
 	assert(game.scripted_dialog_kind == "panda_beacon_unlock")
 	while not game.scripted_dialog_kind.is_empty():
 		game._advance_scripted_dialog()
 	await get_tree().process_frame
 	assert(game.panda_beacon_unlocked and game.panda_beacon_count == 1)
-	assert(game.scripted_dialog_kind == "puku_gauge_first_gift")
-	while not game.scripted_dialog_kind.is_empty():
-		game._advance_scripted_dialog()
 	assert(game.puku_gauge_intro_complete and game._tutorial_fully_complete())
-	game._close_shop()
 
 	# A legacy/direct modern discovery remains usable for save compatibility,
 	# but it does not run the old "creative era" explanation prematurely. New
@@ -153,7 +156,7 @@ func _ready() -> void:
 	game._ensure_habitat_wild_state(now_unix, false)
 	assert(game.habitat_wild_plants.size() >= population_before)
 
-	print("EARLY_GAME_HABITAT_SMOKE_OK empty=true dormant=true awakening=rain+ghosts+promise sprouts=3 shop=true beacon=true return_loop=true")
+	print("EARLY_GAME_HABITAT_SMOKE_OK empty=true dormant=true awakening=rain+ghosts+promise sprouts=3 items=pod+stone+catalog catalog_tutorial=true shop=true beacon=true return_loop=true")
 	get_tree().quit()
 
 func _prepare_trio_complete(game: Node) -> void:
@@ -161,7 +164,7 @@ func _prepare_trio_complete(game: Node) -> void:
 	game.intro_story_complete = true
 	game.first_colorata_confirmed = true
 	game.trio_originals_confirmed = true
-	game.encyclopedia_unlocked = true
+	game.encyclopedia_unlocked = false
 	game.habitat_unlocked = true
 	game.unlocked_series = {"base": true}
 	for species_id in ["colorata", "affinis", "shaviana"]:

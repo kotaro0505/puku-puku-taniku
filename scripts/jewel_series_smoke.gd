@@ -21,13 +21,14 @@ func _ready() -> void:
 	game._reset_progression_state()
 	game.habitat_second_awakened = true
 	game.intro_story_complete = true
+	game.mystery_items_acquired = true
 	game.encyclopedia_unlocked = true
 	game.habitat_unlocked = true
 
 	var jewel_series: Dictionary = game._series_entry("jewel")
 	assert(not jewel_series.is_empty())
 	assert(jewel_series.get("species_ids", []) == JEWEL_IDS)
-	assert(bool(jewel_series.get("catalog_purchase_enabled", false)))
+	assert(not bool(jewel_series.get("catalog_purchase_enabled", false)))
 	assert(game._is_normal_series("jewel") and not game._is_hidden_series("jewel"))
 	assert(game._shop_series_catalog().any(func(entry): return str(entry.get("series_id", "")) == "jewel"))
 	assert(not game._habitat_new_species_candidates().any(func(entry): return str(entry.get("series_id", "")) == "jewel"))

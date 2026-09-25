@@ -91,7 +91,7 @@ func _build_result_overlay()->void:
 	offer_panel=PanelContainer.new();offer_panel.custom_minimum_size=Vector2(430,132);offer_panel.add_theme_stylebox_override("panel",_box(Color(.28,.16,.07,.92),Color("#ba8c4e"),20,2));content.add_child(offer_panel)
 	var offer_content:=VBoxContainer.new();offer_content.alignment=BoxContainer.ALIGNMENT_CENTER;offer_content.add_theme_constant_override("separation",8);offer_panel.add_child(offer_content)
 	var choice_row:=HBoxContainer.new();choice_row.alignment=BoxContainer.ALIGNMENT_CENTER;choice_row.add_theme_constant_override("separation",16);offer_content.add_child(choice_row)
-	unlock_button=Button.new();unlock_button.name="UnlockButton";unlock_button.text="解放する\n5ぷく";unlock_button.custom_minimum_size=Vector2(184,76);_skin_button(unlock_button,Color("#d2a046"),18);unlock_button.pressed.connect(_request_unlock);choice_row.add_child(unlock_button)
+	unlock_button=Button.new();unlock_button.name="UnlockButton";unlock_button.text="自動で記録";unlock_button.custom_minimum_size=Vector2(184,76);_skin_button(unlock_button,Color("#d2a046"),18);unlock_button.pressed.connect(_request_unlock);choice_row.add_child(unlock_button)
 	later_button=Button.new();later_button.name="LaterButton";later_button.text="あとで";later_button.custom_minimum_size=Vector2(154,76);_skin_button(later_button,Color("#d8c59a"),18);later_button.pressed.connect(_request_later);choice_row.add_child(later_button)
 	result_close_button=Button.new();result_close_button.name="ResultCloseButton";result_close_button.text="ガチャへ戻る";result_close_button.custom_minimum_size=Vector2(260,62);_skin_button(result_close_button,Color("#d5aa58"),18);result_close_button.pressed.connect(_close_result);content.add_child(result_close_button)
 

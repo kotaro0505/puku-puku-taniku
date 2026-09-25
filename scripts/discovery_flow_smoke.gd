@@ -15,10 +15,8 @@ func _ready()->void:
 	game.pending_habitat_species.append("sweets_strawberry_shortcake")
 	assert(not game._habitat_new_species_candidates().any(func(entry):return str(entry.species_id)=="sweets_strawberry_shortcake"))
 	game.pending_habitat_species.erase("sweets_strawberry_shortcake")
-	var products:Array=game._seed_shop_products();var sweets_product:Dictionary={}
-	for product in products:
-		if str(product.get("seed_type",""))=="series:sweets":sweets_product=product;break
-	assert(not sweets_product.is_empty() and sweets_product.price_puku==null and not bool(sweets_product.purchasable) and int(sweets_product.count)==1)
+	var products:Array=game._seed_shop_products()
+	assert(not products.any(func(product):return str(product.get("seed_type",""))=="series:sweets"))
 	game.puku_points=10;game._buy_seed_bag("series:sweets")
 	assert(game.puku_points==10 and int(game.series_seed_inventory.get("sweets",0))==0)
 	var rain_pool:Array=game._rain_species_pool()

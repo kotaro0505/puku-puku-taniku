@@ -12,6 +12,8 @@ func _ready() -> void:
 	game.audio_manager.apply_settings({"bgm_enabled": false, "se_enabled": false})
 	game.opening_story_complete = true
 	game.opening_story_overlay.visible = false
+	game._update_play_ui()
+	assert(not game.puku_gauge_area.visible and not game.encyclopedia_icon_button.visible)
 
 	# The picture-book already established the old book and shared seed. The
 	# hand-off now gives exactly the player's single seed, with no duplicate
@@ -64,7 +66,7 @@ func _ready() -> void:
 	assert(bool(game.discovered.get(FIRST_SPECIES_ID, false)))
 	assert(not game.first_colorata_confirmed)
 	assert(game.species_get_overlay.visible)
-	assert(game.species_get_overlay.badge_label.text == Localizer.text("ja", "original_catalog_new"))
+	assert(game.species_get_overlay.badge_label.text == Localizer.text("ja", "new"))
 	assert(game.species_get_overlay.name_label.text == Localizer.species_name("ja", game._catalog_entry(FIRST_SPECIES_ID)))
 	game.species_get_overlay.close_overlay()
 	await get_tree().create_timer(0.2).timeout
@@ -86,13 +88,8 @@ func _ready() -> void:
 			assert(game.intro_panda_portrait.visible and game.intro_panda_portrait.texture != null)
 		game._advance_scripted_dialog()
 	await get_tree().process_frame
-	assert(game.first_colorata_confirmed and game.encyclopedia_unlocked)
+	assert(game.first_colorata_confirmed and not game.encyclopedia_unlocked)
 	assert(bool(game.unlocked_series.get("base", false)) and not game.encyclopedia_overlay.visible)
-
-	game._open_encyclopedia()
-	assert(game.encyclopedia_overlay.visible)
-	game._close_encyclopedia()
-	await get_tree().process_frame
 	assert(game.scripted_dialog_kind == "trio_originals")
 	assert(game.scripted_dialog_pages.size() == 7)
 	assert([game.scripted_dialog_pages[0].speaker, game.scripted_dialog_pages[1].speaker, game.scripted_dialog_pages[2].speaker, game.scripted_dialog_pages[3].speaker, game.scripted_dialog_pages[4].speaker] == ["panda", "armadillo", "armadillo", "girl", "panda"])
@@ -106,9 +103,9 @@ func _ready() -> void:
 		trio_text += str(page.get("text", ""))
 	assert(Localizer.species_name("ja", game._catalog_entry("affinis")) in trio_text)
 	assert(Localizer.species_name("ja", game._catalog_entry("shaviana")) in trio_text)
-	assert("同時に3品種も見られるなんて" in trio_text)
+	assert("こうして見られるなんて" in trio_text)
 	assert("ぷくぷくしてて可愛いね" in trio_text)
-	assert("この世界が多肉でいっぱいになってほしいね" in trio_text)
+	assert("この世界が多肉植物でいっぱいになってほしいね" in trio_text)
 	assert("はじめまして" not in trio_text)
 	assert("昔、多肉が生えていたと言われる場所" in trio_text)
 	while not game.scripted_dialog_kind.is_empty():
@@ -121,6 +118,8 @@ func _ready() -> void:
 	assert(bool(game.discovered.get("colorata", false)))
 	assert(bool(game.discovered.get("affinis", false)))
 	assert(bool(game.discovered.get("shaviana", false)))
+	assert(not game.mystery_items_acquired and not game.encyclopedia_unlocked)
+	game._update_play_ui();assert(not game.puku_gauge_area.visible and not game.encyclopedia_icon_button.visible)
 	assert(game.main_story_stage == game.StoryProgressionClass.STAGE_FIND_HABITAT)
 
 	print("FIRST_PLAY_TUTORIAL_SMOKE_OK seed=1 plant=1 species=colorata safe=true discovery=major trio=colorata+affinis+shaviana")

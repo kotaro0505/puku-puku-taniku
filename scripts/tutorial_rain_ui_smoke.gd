@@ -5,7 +5,7 @@ const Localizer=preload("res://scripts/game_localizer.gd")
 func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
-	game._reset_progression_state();game.opening_story_complete=true;game.intro_story_complete=true;game.first_colorata_confirmed=true;game.trio_originals_confirmed=true;game.total_play_count=3;game.formal_play_count=3;game.habitat_unlocked=true;game.habitat_arrival_started=true;game.habitat_awakened=true;game.habitat_awakening_event_complete=true;game.habitat_tutorial_started=true;game.habitat_tutorial_complete=true;game.seed_shop_open=true;game.panda_beacon_unlocked=true;game.panda_beacon_count=1;game.puku_gauge_intro_complete=true;game.encyclopedia_unlocked=true;game.first_tutorial_species_id="colorata";game.unlocked_series={"base":true}
+	game._reset_progression_state();game.opening_story_complete=true;game.intro_story_complete=true;game.first_colorata_confirmed=true;game.trio_originals_confirmed=true;game.total_play_count=3;game.formal_play_count=3;game.habitat_unlocked=true;game.habitat_arrival_started=true;game.habitat_awakened=true;game.habitat_awakening_event_complete=true;game.habitat_tutorial_started=true;game.habitat_tutorial_complete=true;game.mystery_items_acquired=true;game.mystery_catalog_tutorial_complete=true;game.seed_shop_open=true;game.panda_beacon_unlocked=true;game.panda_beacon_count=1;game.puku_gauge_intro_complete=true;game.encyclopedia_unlocked=true;game.first_tutorial_species_id="colorata";game.unlocked_series={"base":true}
 	assert(game.play_open_button.text=="たねをまく")
 	for guide_target in ["play_open","encyclopedia","habitat","old_seed"]:
 		game._show_tutorial_guide(guide_target)

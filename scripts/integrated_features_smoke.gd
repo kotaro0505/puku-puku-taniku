@@ -17,7 +17,7 @@ func _ready()->void:
 
 func _test_catalog_and_collection_rarity(game)->void:
 	assert(game._series_entry("common").is_empty() and game._series_species_entries("common").is_empty())
-	assert(Localizer.series_name("ja",game._series_entry("base"))=="原種図鑑")
+	assert(Localizer.series_name("ja",game._series_entry("base"))=="原種")
 	assert(game._series_species_entries("base").size()==21)
 	var rarity_data=JSON.parse_string(FileAccess.get_file_as_string("res://data/collection-rarity.json"));assert(rarity_data is Dictionary)
 	for series_value in game.series_catalog:
@@ -56,8 +56,8 @@ func _test_secret_gacha(game)->void:
 	var pot_result:Dictionary=game.secret_gacha_system.draw({}, {}, {"shallow_terracotta":true},test_rng,"pot");assert(str(pot_result.get("category",""))=="pot" and not str(pot_result.get("pot_id","")).is_empty())
 	var reward_pot_id:=str(pot_result.get("pot_id",""));game.owned_pots.erase(reward_pot_id);game._apply_secret_gacha_reward(pot_result);assert(bool(game.owned_pots.get(reward_pot_id,false)))
 	var page_result:Dictionary=game.secret_gacha_system.draw({}, {}, {},test_rng,"catalog_page");assert(str(page_result.get("category",""))=="catalog_page" and str(page_result.get("series_id",""))=="neon")
-	var page_series_id:=str(page_result.get("series_id",""));var pages_before:=int(game.old_catalog_page_inventory.get(page_series_id,0));game._apply_secret_gacha_reward(page_result)
-	assert(int(game.old_catalog_page_inventory.get(page_series_id,0))==pages_before+1)
+	var page_series_id:=str(page_result.get("series_id",""));game.unlocked_series.erase(page_series_id);var points_before_page:int=game.puku_points;game._apply_secret_gacha_reward(page_result)
+	assert(bool(game.unlocked_series.get(page_series_id,false)) and int(game.old_catalog_page_inventory.get(page_series_id,0))==0 and game.puku_points==points_before_page)
 	assert(game.forest_gacha_button.position.y<game.secret_gacha_button.position.y and game.forest_gacha_button.size==game.secret_gacha_button.size)
 	assert(game.shop_overlay.find_child("SecretGachaButton",true,false)==null)
 	game.secret_gacha_active=false;game.secret_gacha_draws_remaining=0;game._update_secret_gacha_button_state()
@@ -80,7 +80,7 @@ func _test_secret_gacha(game)->void:
 	assert(game.secret_gacha_ui.capsule_ready and game.secret_gacha_ui.capsule.visible and game.secret_gacha_ui.dial_texture.rotation>TAU)
 	await game.secret_gacha_ui._reveal_result();assert(game.secret_gacha_ui.result_overlay.visible and not game.secret_gacha_ui.busy)
 	game.secret_gacha_ui._close_result();game.secret_gacha_ui.close_gacha();game.secret_gacha_ui.animation_time_scale=1.0
-	game.opening_story_complete=true;game.intro_story_complete=true;game.first_colorata_confirmed=true;game.trio_originals_confirmed=true;game.habitat_unlocked=true;game.habitat_arrival_started=true;game.habitat_awakened=true;game.habitat_awakening_event_complete=true;game.habitat_tutorial_started=true;game.habitat_tutorial_complete=true;game.seed_shop_open=true;game.panda_beacon_unlocked=true;game.panda_beacon_count=1;game.puku_gauge_intro_complete=true;game.total_play_count=3;game.current_mode="greenhouse";game.play_active=false;game.puku_points=2;game._update_play_ui()
+	game.opening_story_complete=true;game.intro_story_complete=true;game.first_colorata_confirmed=true;game.trio_originals_confirmed=true;game.habitat_unlocked=true;game.habitat_arrival_started=true;game.habitat_awakened=true;game.habitat_awakening_event_complete=true;game.habitat_tutorial_started=true;game.habitat_tutorial_complete=true;game.mystery_items_acquired=true;game.mystery_catalog_tutorial_complete=true;game.encyclopedia_unlocked=true;game.seed_shop_open=true;game.panda_beacon_unlocked=true;game.panda_beacon_count=1;game.puku_gauge_intro_complete=true;game.total_play_count=3;game.current_mode="greenhouse";game.play_active=false;game.puku_points=2;game._update_play_ui()
 	assert(game.secret_gacha_button.visible and not game.secret_gacha_button.disabled)
 	game.secret_gacha_ui.animation_time_scale=.01;game.secret_gacha_button.pressed.emit();assert(game.secret_gacha_ui.visible and game.secret_gacha_ui.unlimited_play)
 	var points_before_actual_spin:int=game.puku_points;game.secret_gacha_ui.spin_button.pressed.emit()
@@ -100,7 +100,7 @@ func _test_language_and_symbol_safety(game)->void:
 		"research_status_sprouted","research_status_first","research_milestone_catalog","research_milestone_species",
 		"research_transfer","audio_se_on","story_colorata_1","story_trio_1","awakening_memory","seed_origin_1","special_origin_1","objective_old_seed","story_complete_1","jelly_float"
 	]
-	var numeric_format_keys:=["restore_offer","research_status_first","research_transfer"]
+	var numeric_format_keys:=["research_status_first","research_transfer"]
 	var string_format_keys:=["restore_success","research_milestone_species","story_trio_1"]
 	for language in ["ja","hiragana","en"]:
 		assert(Localizer.normalize_language(language)==language)
@@ -121,7 +121,7 @@ func _test_language_and_symbol_safety(game)->void:
 func _test_one_time_gift_arrangement_and_share(game)->void:
 	var points_before:int=game.puku_points;var bags_before:int=game.normal_seed_bags
 	game._claim_first_habitat_gift_once();game._claim_first_habitat_gift_once()
-	assert(game.first_habitat_gift_claimed and game.puku_points==points_before+10 and game.normal_seed_bags==bags_before+3)
+	assert(game.first_habitat_gift_claimed and game.puku_points==points_before and game.normal_seed_bags==bags_before+3)
 	assert(is_equal_approx(game.arrangement_ui._species_scale_max("laui"),game.arrangement_ui.PLANT_SCALE_MIN))
 	game.bests["laui"]=52.6;game._sync_arrangement_ui()
 	assert(is_equal_approx(game.arrangement_ui._species_scale_max("laui"),52.6/game.arrangement_ui.ARRANGEMENT_CM_AT_SCALE_ONE))

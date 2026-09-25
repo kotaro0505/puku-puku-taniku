@@ -20,6 +20,7 @@ func _ready() -> void:
 	game._reset_progression_state()
 	game.habitat_second_awakened = true
 	game.intro_story_complete = true
+	game.mystery_items_acquired = true
 	game.encyclopedia_unlocked = true
 	game.habitat_unlocked = true
 
@@ -27,7 +28,7 @@ func _ready() -> void:
 	assert(not series.is_empty())
 	assert(str(series.get("display_name", "")) == "海")
 	assert(series.get("species_ids", []) == SEA_IDS)
-	assert(bool(series.get("catalog_purchase_enabled", false)))
+	assert(not bool(series.get("catalog_purchase_enabled", false)))
 	assert(bool(series.get("preview_catalog_when_locked", false)))
 	assert(game._is_normal_series("sea") and not game._is_hidden_series("sea"))
 	assert(game._shop_series_catalog().any(func(entry): return str(entry.get("series_id", "")) == "sea"))

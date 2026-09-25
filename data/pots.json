@@ -14,7 +14,7 @@
     "display_name": "素焼き鉢",
     "image_path": "res://assets/arrangement/pots/classic-terracotta.png",
     "price_puku": 1,
-    "unlock_condition": {"type": "default", "display_text": "たねやで購入できます"},
+    "unlock_condition": {"type": "default", "display_text": "パンダのお店で購入できます"},
     "iap_product_id": "",
     "placement_area": {"x": 0.10, "y": 0.10, "width": 0.80, "height": 0.55},
     "sort_order": 10
@@ -24,7 +24,7 @@
     "display_name": "黒陶器鉢",
     "image_path": "res://assets/arrangement/pots/black-ceramic.png",
     "price_puku": 1,
-    "unlock_condition": {"type": "default", "display_text": "たねやで購入できます"},
+    "unlock_condition": {"type": "default", "display_text": "パンダのお店で購入できます"},
     "iap_product_id": "",
     "placement_area": {"x": 0.08, "y": 0.11, "width": 0.84, "height": 0.56},
     "sort_order": 20
@@ -34,7 +34,7 @@
     "display_name": "白陶器鉢",
     "image_path": "res://assets/arrangement/pots/white-ceramic.png",
     "price_puku": 1,
-    "unlock_condition": {"type": "default", "display_text": "たねやで購入できます"},
+    "unlock_condition": {"type": "default", "display_text": "パンダのお店で購入できます"},
     "iap_product_id": "",
     "placement_area": {"x": 0.12, "y": 0.10, "width": 0.76, "height": 0.54},
     "sort_order": 30
@@ -44,7 +44,7 @@
     "display_name": "クリスタル鉢",
     "image_path": "res://assets/arrangement/pots/clear-crystal.png",
     "price_puku": 1,
-    "unlock_condition": {"type": "default", "display_text": "たねやで購入できます"},
+    "unlock_condition": {"type": "default", "display_text": "パンダのお店で購入できます"},
     "iap_product_id": "",
     "placement_area": {"x": 0.08, "y": 0.10, "width": 0.84, "height": 0.55},
     "sort_order": 40
@@ -54,7 +54,7 @@
     "display_name": "アメジスト鉢",
     "image_path": "res://assets/arrangement/pots/amethyst-crystal.png",
     "price_puku": 1,
-    "unlock_condition": {"type": "default", "display_text": "たねやで購入できます"},
+    "unlock_condition": {"type": "default", "display_text": "パンダのお店で購入できます"},
     "iap_product_id": "",
     "placement_area": {"x": 0.08, "y": 0.10, "width": 0.84, "height": 0.55},
     "sort_order": 50
@@ -64,7 +64,7 @@
     "display_name": "ガラスボウル鉢",
     "image_path": "res://assets/arrangement/pots/glass-bowl.png",
     "price_puku": 1,
-    "unlock_condition": {"type": "default", "display_text": "たねやで購入できます"},
+    "unlock_condition": {"type": "default", "display_text": "パンダのお店で購入できます"},
     "iap_product_id": "",
     "placement_area": {"x": 0.10, "y": 0.09, "width": 0.80, "height": 0.56},
     "sort_order": 60
@@ -74,7 +74,7 @@
     "display_name": "アンティークブリキ鉢",
     "image_path": "res://assets/arrangement/pots/tin-bucket.png",
     "price_puku": 1,
-    "unlock_condition": {"type": "default", "display_text": "たねやで購入できます"},
+    "unlock_condition": {"type": "default", "display_text": "パンダのお店で購入できます"},
     "iap_product_id": "",
     "placement_area": {"x": 0.10, "y": 0.10, "width": 0.80, "height": 0.54},
     "sort_order": 70

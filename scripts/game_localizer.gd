@@ -13,10 +13,10 @@ const TEXT := {
 		"opening_tap": "タップしてはじめる",
 		"opening_story_tap": "タップしてつぎへ",
 		"opening_story_1": "ある日、女の子は\n古い倉庫のすみで、\nほこりをかぶった一冊の本を見つけました。\n\n「なんだろう、これ……」",
-		"opening_story_2": "ほこりを払い、\nみんなで本を見てみると——\n\n表紙には、\n\n「原種図鑑」\n\nと書かれていました。",
+		"opening_story_2": "ほこりを払い、\nみんなで本を見てみると——\n\nそれは、\n古い植物の本のようでした。",
 		"opening_story_3": "ページを開くと、\nそこには見たことのない植物が\nたくさん描かれていました。\n\nぷっくりした葉。\n変わったかたち。\n不思議な色。\n\nそこには、\n「多肉植物」という言葉が。\n\n「こんな植物、本当にあったのかな……」",
-		"opening_story_4": "そのころパンダも、\n別の場所で古いタネ袋を見つけていました。\n\n「これ、なんのタネだろう？」\n\n図鑑と見くらべて、\n3人は顔を見合わせました。\n\n「もしかして……\nこの植物のタネかもしれない」\n\nそこで3人は、\nタネを分けて蒔いてみることにしました。\n\n「どんな植物が育つんだろう——」",
-		"panda_shop_name": "パンダのたねや",
+		"opening_story_4": "そのころパンダも、\n別の場所で古いタネ袋を見つけていました。\n\n「これ、なんのタネだろう？」\n\n本に描かれた植物を見ながら、\n3人は顔を見合わせました。\n\n「もしかして……\nこの植物のタネかもしれない」\n\nそこで3人は、\nタネを分けて蒔いてみることにしました。",
+		"panda_shop_name": "パンダのお店",
 		"armadillo_name": "アルマジロ",
 		"story_speaker_girl": "女の子",
 		"story_speaker_panda": "パンダ",
@@ -29,13 +29,13 @@ const TEXT := {
 		"intro_old_seed": "3人で分けた古いたね。\nこれは、きみの分の1粒だよ。蒔いてみよう！",
 		"intro_old_seed_get": "正体不明の古いたね ×1 GET",
 		"story_colorata_1": "本当に多肉植物のタネだったなんて！",
-		"story_colorata_2": "図鑑によると、\nこれは『%s』っていう種類らしいよ！",
+		"story_colorata_2": "この本によると、\nこれは『%s』っていう種類らしいよ！",
 		"story_colorata_3": "すごい。\n世界に多肉植物が帰って来てくれたんだ……！",
-		"story_trio_1": "聞いて！ ぼくのタネも育ったんだ！\n図鑑によると『%s』っていうみたい。",
-		"story_trio_2": "僕もだ。『%s』という原種らしい。",
-		"story_trio_3": "信じられない。長い間失われていた植物を\n同時に3品種も見られるなんて……。",
+		"story_trio_1": "聞いて！ ぼくのタネも育ったんだ！\nこの本によると『%s』っていうみたい。",
+		"story_trio_2": "僕もだよ！『%s』っていう種類らしい。",
+		"story_trio_3": "信じられない。長い間失われていた植物を\nこうして見られるなんて……。",
 		"story_trio_4": "とってもきれい。そして、ぷくぷくしてて可愛いね！",
-		"story_trio_5": "もう一度、この世界が多肉でいっぱいになってほしいね。",
+		"story_trio_5": "もう一度、この世界が多肉植物でいっぱいになってほしいね。",
 		"story_habitat_found_1": "古い資料を調べていたら、\n昔、多肉が生えていたと言われる場所が分かったんだ！",
 		"story_habitat_found_2": "ほんとに！？\n今度みんなで行ってみない？",
 		"awakening_empty_1": "記録では、ここで間違いないはずなんだけど……。",
@@ -50,16 +50,20 @@ const TEXT := {
 		"awakening_promise_2": "これから新しく見つけた品種は、\nここにお返していきます。\nだから、また沢山の可愛い多肉植物を私たちにも見せてください！",
 		"awakening_rain_stopping": "……雨、やんできた。",
 		"awakening_sprout_look": "見て！",
-		"seed_pod_story_1": "みて！空からなんか降りてきたよ！",
-		"seed_pod_story_2": "タネのさや…かな？",
-		"seed_pod_story_3": "このさや、光ってる……。",
-		"seed_pod_story_4": "中に種が入ってる！",
-		"seed_pod_story_5": "帰ったらさっそくまいてみよう！",
-		"seed_origin_1": "雨上がりに、原生地が不思議なタネを残してる。\n……これ、タネだ。",
-		"seed_origin_2": "原生地が残したのかな。\nぼくらに育ててほしいのかもしれない。",
-		"seed_origin_3": "ぼくが集めて袋にするよ！\n同じ袋でも、何が育つかは分からない。\nこれが『パンダのたねや』の始まりだね。",
-		"seed_origin_received": "原生地の不思議なたね ×3 と ぷくコイン ×10 GET",
-		"special_origin_1": "これ……古い原種図鑑には載ってない。",
+		"seed_pod_story_1": "みて！ 空からなんか降りてきたよ！",
+		"seed_pod_story_2": "タネのさや……かな？",
+		"seed_pod_story_3": "この石、光ってる……。",
+		"seed_pod_story_4": "こっちは……図鑑？",
+		"seed_pod_story_5": "さやの中にタネが沢山入ってる！",
+		"seed_pod_story_6": "この石の光が強くなると、\nパンダのさやにタネができるみたいだ。",
+		"mystery_catalog_tutorial_1": "見て。この図鑑、さっき育てた多肉が載ってる。",
+		"mystery_catalog_tutorial_2": "コロラータたちだ……！",
+		"mystery_catalog_tutorial_3": "新しく見つけた多肉も、\nここに記録されていくみたいだ。",
+		"seed_origin_1": "不思議なさやの中に、タネができてる。",
+		"seed_origin_2": "石の光と、さやのタネはつながっているみたいだ。",
+		"seed_origin_3": "育てて、また次のタネを受け取ろう！",
+		"seed_origin_received": "さやのタネ ×3 GET",
+		"special_origin_1": "これ……不思議な図鑑には載ってない。",
 		"special_origin_2": "昔の多肉を戻してるだけじゃないんだ……。",
 		"special_origin_3": "この原生地、今の世界を見て、\n新しい多肉まで作ってるみたい。",
 		"jurejure_intro_panda_1": "あれ……？",
@@ -120,7 +124,7 @@ const TEXT := {
 		"tutorial_growth_5": "ちょっとドキドキだね！",
 		"tutorial_harvest_tap": "ジュレてしまう前にタップで収穫！",
 		"main_play": "たねをまく",
-		"main_shop": "パンダのたねや",
+		"main_shop": "パンダのお店",
 		"main_arrangement": "寄せ植え",
 		"main_forest_gacha": "森のガチャ\n1ぷく",
 		"main_secret_gacha": "秘密のガチャ",
@@ -143,7 +147,7 @@ const TEXT := {
 		"secret_unlimited": "いつでも遊べる",
 		"get": "GET!",
 		"new": "NEW!",
-		"original_catalog_new": "原種図鑑　NEW！",
+		"original_catalog_new": "NEW！",
 		"super_rare": "スーパーレア",
 		"tap_to_close": "タップしてとじる",
 		"habitat_intro_1": "芽が出た！ 原生地が、昔の多肉を思い出すように芽吹かせたのかもしれないね。",
@@ -153,7 +157,7 @@ const TEXT := {
 		"habitat_intro_5": "おっ、もうすぐ30cmだね。30cmまで育ったら収穫してみよう！",
 		"habitat_intro_6": "小さな多肉は、もう少しここで育ててあげよう。\nこの場所が、ずっと多肉でいっぱいだったらうれしいな。",
 		"habitat_too_small": "まだ小さいみたい。もう少し育つのを待とう。",
-		"original_registered": "%sを収穫できたね！\n原種図鑑の記録と一致したよ。",
+		"original_registered": "%sを不思議な図鑑に記録したよ！",
 		"panda_beacon_event_1": "アルマジロ君と、原生地の株を見守る装置を作ったんだ。",
 		"panda_beacon_event_2": "株が30cmになった瞬間を知らせるように調整したぞ！",
 		"panda_beacon_event_3": "名前は『パンダビーコン』！\n試作品を1個どうぞ。おみせにも並べておくね。",
@@ -166,10 +170,10 @@ const TEXT := {
 		"panda_beacon_notification_title": "パンダビーコンが反応しました",
 		"panda_beacon_notification_body": "%sが30cmになりました。収穫できます。",
 		"puku_intro_1": "収穫した多肉の大きさは、\nぷくゲージにたまっていくよ！",
-		"puku_intro_2": "ぷくゲージが600cmまでたまると、\nぷくコインが1枚もらえるんだ！",
-		"first_habitat_gift_1": "そうだ、はじめての原生地のお祝いにこれをあげるよ！",
-		"first_habitat_gift_2": "ぷくコイン10枚と、たねを3袋！\nいろいろ試してみてね。",
-		"first_habitat_gift_received": "ぷくコイン10枚と たね3袋を手に入れた！",
+		"puku_intro_2": "ぷくゲージが600cmまでたまると、\nタネ1つと、ぷくが3もらえるんだ！",
+		"first_habitat_gift_1": "さやの中に、最初のタネができてる！",
+		"first_habitat_gift_2": "タネを3回分受け取ったよ。\n育ててみよう！",
+		"first_habitat_gift_received": "さやのタネ ×3 GET",
 		"pinwheel_received": "ピンウィールを手に入れた！",
 		"mystery_seed_owned": "おや、なぞのたねを持っているようだね。",
 		"mystery_seed_request": "研究のために、そのたねを預けてもらえないか？",
@@ -200,6 +204,7 @@ const TEXT := {
 		,"best_record": "最高記録\n%.1f cm"
 		,"puku_count": "ぷくコイン ×%d"
 		,"puku_gain": "ぷくコイン +%d"
+		,"puku_gauge_reward": "たね +%d　ぷく +%d"
 		,"play_choose_seed": "どのたねをまく？"
 		,"seed_remaining": "たね袋\n残り %d粒"
 		,"series_seed_remaining": "シリーズ種\n残り %d粒"
@@ -211,13 +216,13 @@ const TEXT := {
 		,"old_seed_name": "古いたね"
 		,"bags_held": "%s %d袋"
 		,"shop_choose_category": "なにを見ますか？"
-		,"shop_category_seed": "たね\nたね袋"
+		,"shop_category_seed": "どうぐ\nビーコン"
 		,"shop_category_pot": "鉢\n寄せ植え"
 		,"shop_category_catalog": "図鑑\n新シリーズ"
 		,"shop_category_gacha": "森の\nガチャ"
 		,"shop_category_back": "カテゴリへもどる"
-		,"shop_seed_info": "たね袋を1袋ずつ購入できます"
-		,"normal_seed_price": "普通のたねは1ぷくコインで3袋です"
+		,"shop_seed_info": "通常のタネは、石の光が満ちるとさやにできます"
+		,"normal_seed_price": "通常のタネは販売していません"
 		,"price_tbd": "ぷく価格は準備中"
 		,"locked": "未解禁"
 		,"buy_bundle": "買う\n3袋  1ぷくコイン"
@@ -228,6 +233,7 @@ const TEXT := {
 		,"result_notable_title": "目立った収穫株"
 		,"result_close": "閉じる / 戻る"
 		,"result_total": "収穫サイズ合計　+%scm\nぷくゲージ +%scm　/　ぷくコイン +%d"
+		,"result_total_before_items": "収穫サイズ合計　+%scm"
 		,"result_count": "収穫株数　%d株"
 		,"result_best_update": "最大サイズ更新！\n%.1fcm"
 		,"result_max": "最大サイズ　%.1fcm"
@@ -246,9 +252,9 @@ const TEXT := {
 		,"catalog_locked": "未開放"
 		,"catalog_locked_preparing": "未開放\n表紙画像 準備中"
 		,"catalog_field": "このシリーズの原生地へ"
-		,"catalog_unlock_status": "この図鑑を入手すると、シリーズ種と出会えるようになります\n所持 %dぷくコイン　／　必要 %dぷくコイン"
+		,"catalog_unlock_status": "初めてGETした品種は、不思議な図鑑へ自動で記録されます"
 		,"catalog_preparing": "このシリーズは準備中です"
-		,"catalog_buy": "%dぷくコインで入手"
+		,"catalog_buy": "初GETで自動記録"
 		,"self_best": "自己ベスト  %.1f cm"
 		,"self_best_none": "自己ベスト　ー"
 		,"undiscovered": "未発見"
@@ -259,22 +265,22 @@ const TEXT := {
 		,"record_update": "収穫記録更新！\nNEW RECORD\n%.1f cm"
 		,"habitat_jellied": "ジュレてしまった株みたい。"
 		,"mystery_seed_get": "謎のたね GET!"
-		,"old_catalog_page_get": "古びた図鑑のページ GET!"
+		,"old_catalog_page_get": "新しいシリーズを図鑑に記録した！"
 		,"gacha_draw_count": "ガチャ %d回"
 		,"gacha_selecting": "森の実りを選んでいます…"
-		,"unlock_action": "解放する\n5ぷく"
+		,"unlock_action": "自動で記録"
 		,"later": "あとで"
 		,"gacha_return": "ガチャへ戻る"
 		,"encountered": "遭遇済み"
 		,"locked_series": "未解放シリーズ"
-		,"locked_offer": "未解放の『%s』の品種のようです。\n5ぷくコインで図鑑を解放しますか？"
+		,"locked_offer": "『%s』の新品種です。\n不思議な図鑑へ記録されます。"
 		,"forest_catalog_missing": "この図鑑は見つかりませんでした"
-		,"forest_unlock_need5": "解放には5ぷくコイン必要です。\n所持コインが足りません。"
+		,"forest_unlock_need5": "新品種は自動で図鑑へ記録されます。"
 		,"forest_unlock_complete_one": "『%s』を解放しました！\nこの品種を図鑑に登録しました。"
 		,"forest_unlock_complete_many": "『%s』を解放しました！\n遭遇済みの%d品種を登録しました。"
-		,"forest_deferred": "今回は登録されませんが、\nあとでこの図鑑を解放すると、\nこの品種も図鑑に登録されます。"
+		,"forest_deferred": "この品種は不思議な図鑑へ自動で記録されます。"
 		,"secret_turning": "ゴト…ゴトゴト……"
-		,"secret_catalog_page_prize": "%sの古びた図鑑ページ"
+		,"secret_catalog_page_prize": "%sの記録"
 		,"secret_prize": "秘密の景品"
 		,"arrangement_title": "寄せ植え"
 		,"arrangement_complete": "寄せ植え完成！"
@@ -311,11 +317,11 @@ const TEXT := {
 		,"arrangement_added": "%sを追加しました。選択したまま直接ドラッグできます"
 		,"viewer_title": "完成した寄せ植え"
 		,"pot_shop_title": "寄せ植え用の鉢"
-		,"catalog_shop_title": "シリーズ図鑑"
-		,"seed_shop_title": "たね袋"
-		,"catalog_shop_hint": "図鑑は一度購入すると、メイン画面からいつでも見られます"
+		,"catalog_shop_title": "シリーズ記録"
+		,"seed_shop_title": "どうぐ"
+		,"catalog_shop_hint": "新しいシリーズは初GET時に自動で記録されます"
 		,"product_image_preparing": "商品画像\n準備中"
-		,"catalog_page_product": "シリーズ図鑑ページ"
+		,"catalog_page_product": "シリーズ記録"
 		,"seed_bag_count": "たね袋\n%d粒"
 		,"pot_count": "%s　・　%d株"
 		,"arrangement_gesture_transform": "大きさと向きを調整しました"
@@ -326,7 +332,7 @@ const TEXT := {
 		,"shop_tab_premium": "プレミアム"
 		,"shop_tab_mystery": "謎種"
 		,"shop_category_short": "カテゴリ"
-		,"shop_catalog_preparing": "図鑑の新シリーズは\n準備中です"
+		,"shop_catalog_preparing": "図鑑は初GETで\n自動記録されます"
 		,"yes": "はい"
 		,"no": "いいえ"
 		,"restore": "復元する"
@@ -337,12 +343,12 @@ const TEXT := {
 		,"seed_premium_card": "24粒入り・所持 %d袋\n%s"
 		,"seed_mystery_card": "5粒入り・所持 %d袋\n%s"
 		,"seed_series_name": "%sの種"
-		,"seed_series_card": "1粒・所持 %d粒\nぷく価格は準備中"
+		,"seed_series_card": "1粒・所持 %d粒\n不思議なさやから入手"
 		,"unlock_after_plays": "あと%d回プレイで解禁"
 		,"unlock_mystery_species": "謎品種を1種発見で解禁"
 		,"not_enough_puku": "ぷくコインが足りません"
-		,"seed_series_price_tbd": "このシリーズ種のぷく価格は準備中です"
-		,"seed_price_tbd": "このたね袋のぷく価格は準備中です"
+		,"seed_series_price_tbd": "タネは不思議なさやから受け取れます"
+		,"seed_price_tbd": "タネは不思議なさやから受け取れます"
 		,"seed_normal_bought": "普通のたねを%d袋購入しました"
 		,"seed_normal_detail": "普通のたね　24粒 × 3袋\n原生地から集めた基本のたね。いろんな多肉が育ちます。\n金星1つ10%　金星2つ5%　新品種4%"
 		,"seed_volume_detail": "ボリュームパックたね　36粒 / 袋\n原生地のたねをたっぷり袋詰め。じっくり大物を狙えます。\nレア10%　スーパーレア5%　新種 約3%"
@@ -358,7 +364,7 @@ const TEXT := {
 		,"research_reward_title": "研究のお礼"
 		,"research_reward_note": "好きな図鑑を1冊えらんでね"
 		,"research_reward_later": "あとで選ぶ"
-		,"research_reward_empty": "今選べる未所持の図鑑はありません。\n新しい図鑑が入荷したら、また選べます。"
+		,"research_reward_empty": "今、新しく記録できるシリーズはありません。"
 		,"research_reward_choose": "%s\nこの図鑑をもらう"
 		,"research_reward_claimed": "%sをどうぞ。\n未発見の品種は、図鑑のシルエットを手がかりに探してみてね。"
 		,"rain_pending_notice": "原生地に恵みの雨が降っています"
@@ -392,7 +398,7 @@ const TEXT := {
 		,"shop_season_spring": "だんだんと暖かい日が増えてきたね。多肉もどんどん育つね！"
 		,"old_page_intro_1": "これ、原生地で拾ったんだ。\n古くて汚れているけど、図鑑のページみたいじゃない？"
 		,"old_page_intro_2": "アルマジロ君なら、きっと元の図鑑に復元できると思うよ。"
-		,"volume_intro_1": "新しいたねを入荷したよ！\nボリュームパックたねっていうんだ。"
+		,"volume_intro_1": "不思議なさやに、たくさんのタネができたよ！"
 		,"volume_intro_2": "36粒入ってるから、普通のたねよりたっぷり楽しめるよ。\nこれなら、じっくりどデカい多肉を育てられるね！"
 		,"bustamante_gift": "いつも来てくれてありがとう。\nストリクチフローラ ブスタマンテを1株、君にあげるよ。"
 		,"pinwheel_intro_1": "古い資料を調べていたら、育て方の手がかりを見つけたんだ。"
@@ -405,8 +411,8 @@ const TEXT := {
 		,"research_intro_2": "じつはぼく、この『謎のたね』を研究してるんだ。\nまだ、何の種なのかはわからないんだけどね。"
 		,"research_intro_3": "よかったら、そのたねを研究させてもらえないかな？"
 		,"research_return_offer": "謎のたねを持ってきてくれたんだね。\n研究のために、まとめて預かってもいいかい？"
-		,"restore_offer": "古びた図鑑のページだね。\n%dぷくコインで復元できるよ。やってみる？"
-		,"restore_shortage": "復元には%dぷくコイン必要なんだ。\nもう少し集まったら、また持ってきてね。"
+		,"restore_offer": "この記録は、不思議な図鑑へ自動で反映されるよ。"
+		,"restore_shortage": "この記録は、不思議な図鑑へ自動で反映されるよ。"
 		,"restore_success": "復元できたよ！\nこれは『%s』のページだったんだ。\nまだ見つけていない品種も、影から少しずつ調べられそうだね。"
 		,"research_status_sprouted": "聞いてよ！\nやっと、たねが発芽したんだ！\n大きくなるのをお楽しみに！"
 		,"research_status_growing": "ありがとう。\n順調に育ってるよ！"
@@ -428,9 +434,9 @@ const TEXT := {
 		,"audio_se": "効果音"
 		,"audio_se_on": "効果音 ON"
 		,"audio_note": "音源はモード・効果ごとに後から差し替えできます"
-		,"unlock_five_puku": "5ぷくコインで解放"
-		,"unlock_restore_page": "古びた図鑑のページを復元"
-		,"unlock_progress": "ゲームを進めると入荷"
+		,"unlock_five_puku": "初GETで自動記録"
+		,"unlock_restore_page": "初GETで自動記録"
+		,"unlock_progress": "ゲームを進めると閲覧可能"
 		,"unlock_future": "開放条件は今後追加予定"
 		,"jelly_float": "ジュレ"
 		,"preview_finished": "プレビュー終了"
@@ -443,10 +449,10 @@ const TEXT := {
 		"opening_tap": "タップして はじめる",
 		"opening_story_tap": "タップして つぎへ",
 		"opening_story_1": "あるひ、おんなのこは\nふるい そうこの すみで、\nほこりを かぶった いっさつの ほんを みつけました。\n\n「なんだろう、これ……」",
-		"opening_story_2": "ほこりを はらい、\nみんなで ほんを みてみると——\n\nひょうしには、\n\n「げんしゅずかん」\n\nと かかれていました。",
+		"opening_story_2": "ほこりを はらい、\nみんなで ほんを みてみると——\n\nそれは、\nふるい しょくぶつの ほんのようでした。",
 		"opening_story_3": "ぺーじを ひらくと、\nそこには みたことのない しょくぶつが\nたくさん えがかれていました。\n\nぷっくりした は。\nかわった かたち。\nふしぎな いろ。\n\nそこには、\n「たにくしょくぶつ」という ことばが。\n\n「こんな しょくぶつ、ほんとうに あったのかな……」",
-		"opening_story_4": "そのころ ぱんだも、\nべつの ばしょで ふるい たねぶくろを みつけていました。\n\n「これ、なんの たねだろう？」\n\nずかんと みくらべて、\n3にんは かおを みあわせました。\n\n「もしかして……\nこの しょくぶつの たねかもしれない」\n\nそこで3にんは、\nたねを わけて まいてみることに しました。\n\n「どんな しょくぶつが そだつんだろう——」",
-		"panda_shop_name": "ぱんだの たねや",
+		"opening_story_4": "そのころ ぱんだも、\nべつの ばしょで ふるい たねぶくろを みつけていました。\n\n「これ、なんの たねだろう？」\n\nほんに えがかれた しょくぶつを みながら、\n3にんは かおを みあわせました。\n\n「もしかして……\nこの しょくぶつの たねかもしれない」\n\nそこで3にんは、\nたねを わけて まいてみることに しました。",
+		"panda_shop_name": "ぱんだの おみせ",
 		"armadillo_name": "あるまじろ",
 		"story_speaker_girl": "おんなのこ",
 		"story_speaker_panda": "ぱんだ",
@@ -459,13 +465,13 @@ const TEXT := {
 		"intro_old_seed": "3にんで わけた ふるい たね。\nこれは、きみのぶんの 1つぶだよ。まいてみよう！",
 		"intro_old_seed_get": "しょうたいふめいの ふるい たね ×1 げっと",
 		"story_colorata_1": "ほんとうに たにくしょくぶつの たねだったなんて！",
-		"story_colorata_2": "ずかんによると、\nこれは『%s』っていう しゅるいらしいよ！",
+		"story_colorata_2": "この ほんによると、\nこれは『%s』っていう しゅるいらしいよ！",
 		"story_colorata_3": "すごい。\nせかいに たにくしょくぶつが かえってきてくれたんだ……！",
-		"story_trio_1": "きいて！ ぼくの たねも そだったんだ！\nずかんによると『%s』っていうみたい。",
-		"story_trio_2": "ぼくもだ。『%s』という げんしゅらしい。",
-		"story_trio_3": "しんじられない。ながいあいだ うしなわれていた しょくぶつを\nどうじに 3ひんしゅも みられるなんて……。",
+		"story_trio_1": "きいて！ ぼくの たねも そだったんだ！\nこの ほんによると『%s』っていうみたい。",
+		"story_trio_2": "ぼくもだよ！『%s』っていう しゅるいらしい。",
+		"story_trio_3": "しんじられない。ながいあいだ うしなわれていた しょくぶつを\nこうして みられるなんて……。",
 		"story_trio_4": "とっても きれい。そして、ぷくぷくしてて かわいいね！",
-		"story_trio_5": "もういちど、この せかいが たにくで いっぱいに なってほしいね。",
+		"story_trio_5": "もういちど、この せかいが たにくしょくぶつで いっぱいに なってほしいね。",
 		"story_habitat_found_1": "ふるい しりょうを しらべていたら、\nむかし、たにくが はえていたと いわれる ばしょが わかったんだ！",
 		"story_habitat_found_2": "ほんとに！？\nこんど みんなで いってみない？",
 		"awakening_empty_1": "きろくでは、ここで まちがいないはずなんだけど……。",
@@ -481,15 +487,19 @@ const TEXT := {
 		"awakening_rain_stopping": "……あめ、やんできた。",
 		"awakening_sprout_look": "みて！",
 		"seed_pod_story_1": "みて！ そらから なんか ふってきたよ！",
-		"seed_pod_story_2": "たねの さや…かな？",
-		"seed_pod_story_3": "この さや、ひかってる……。",
-		"seed_pod_story_4": "なかに たねが はいってる！",
-		"seed_pod_story_5": "かえったら さっそく まいてみよう！",
-		"seed_origin_1": "あめあがりに、げんせいちが ふしぎな たねを のこしてる。\n……これ、たねだ。",
-		"seed_origin_2": "げんせいちが のこしたのかな。\nぼくらに そだててほしいのかもしれない。",
-		"seed_origin_3": "ぼくが あつめて ふくろに するよ！\nおなじ ふくろでも、なにが そだつかは わからない。\nこれが『ぱんだの たねや』の はじまりだね。",
-		"seed_origin_received": "げんせいちの ふしぎな たね ×3 と ぷくこいん ×10 げっと",
-		"special_origin_1": "これ……ふるい げんしゅずかんには のってない。",
+		"seed_pod_story_2": "たねの さや……かな？",
+		"seed_pod_story_3": "この いし、ひかってる……。",
+		"seed_pod_story_4": "こっちは……ずかん？",
+		"seed_pod_story_5": "さやの なかに たねが たくさん はいってる！",
+		"seed_pod_story_6": "この いしの ひかりが つよくなると、\nぱんだの さやに たねが できるみたいだ。",
+		"mystery_catalog_tutorial_1": "みて。この ずかん、さっき そだてた たにくが のってる。",
+		"mystery_catalog_tutorial_2": "ころらーたたちだ……！",
+		"mystery_catalog_tutorial_3": "あたらしく みつけた たにくも、\nここに きろくされていくみたいだ。",
+		"seed_origin_1": "ふしぎな さやの なかに、たねが できてる。",
+		"seed_origin_2": "いしの ひかりと、さやの たねは つながっているみたいだ。",
+		"seed_origin_3": "そだてて、また つぎの たねを うけとろう！",
+		"seed_origin_received": "さやの たね ×3 げっと",
+		"special_origin_1": "これ……ふしぎな ずかんには のってない。",
 		"special_origin_2": "むかしの たにくを もどしてるだけじゃないんだ……。",
 		"special_origin_3": "この げんせいち、いまの せかいを みて、\nあたらしい たにくまで つくってるみたい。",
 		"jurejure_intro_panda_1": "あれ……？",
@@ -550,7 +560,7 @@ const TEXT := {
 		"tutorial_growth_5": "ちょっと どきどきだね！",
 		"tutorial_harvest_tap": "じゅれてしまう まえに おして しゅうかく！",
 		"main_play": "たねをまく",
-		"main_shop": "ぱんだの たねや",
+		"main_shop": "ぱんだの おみせ",
 		"main_arrangement": "よせうえ",
 		"main_forest_gacha": "もりの がちゃ\n1ぷく",
 		"main_secret_gacha": "ひみつの がちゃ",
@@ -573,7 +583,7 @@ const TEXT := {
 		"secret_unlimited": "いつでも あそべる",
 		"get": "げっと！",
 		"new": "はじめて！",
-		"original_catalog_new": "げんしゅずかん　NEW！",
+		"original_catalog_new": "はじめて！",
 		"super_rare": "すーぱーれあ",
 		"tap_to_close": "おして とじる",
 		"habitat_intro_1": "めが でた！ げんせいちが、むかしの たにくを おもいだすように めぶかせたのかもしれないね。",
@@ -583,7 +593,7 @@ const TEXT := {
 		"habitat_intro_5": "おっ、もうすぐ30せんちだね。30せんちまで そだったら しゅうかくしてみよう！",
 		"habitat_intro_6": "ちいさな たにくは、もうすこし ここで そだててあげよう。\nこのばしょが、ずっと たにくで いっぱいだったら うれしいな。",
 		"habitat_too_small": "まだ ちいさいみたい。もうすこし そだつのを まとう。",
-		"original_registered": "%sを しゅうかくできたね！\nげんしゅずかんの きろくと おなじだったよ。",
+		"original_registered": "%sを ふしぎな ずかんに きろくしたよ！",
 		"panda_beacon_event_1": "あるまじろくんと、げんせいちの かぶを みまもる そうちを つくったんだ。",
 		"panda_beacon_event_2": "かぶが 30cmに なった しゅんかんを しらせるように ちょうせいしたぞ！",
 		"panda_beacon_event_3": "なまえは『ぱんだびーこん』！\nしさくひんを 1こ どうぞ。おみせにも ならべておくね。",
@@ -596,10 +606,10 @@ const TEXT := {
 		"panda_beacon_notification_title": "ぱんだびーこんが はんのうしました",
 		"panda_beacon_notification_body": "%sが 30cmに なりました。しゅうかくできます。",
 		"puku_intro_1": "しゅうかくした たにくの おおきさは、\nぷくげーじに たまっていくよ！",
-		"puku_intro_2": "ぷくげーじが600せんちまで たまると、\nぷくこいんが1まい もらえるんだ！",
-		"first_habitat_gift_1": "そうだ、はじめての げんせいちの おいわいに これを あげるよ！",
-		"first_habitat_gift_2": "ぷくこいん10まいと、たねを3ふくろ！\nいろいろ ためしてみてね。",
-		"first_habitat_gift_received": "ぷくこいん10まいと たね3ふくろを てにいれた！",
+		"puku_intro_2": "ぷくげーじが600せんちまで たまると、\nたね1つと、ぷくが3もらえるんだ！",
+		"first_habitat_gift_1": "さやの なかに、さいしょの たねが できてる！",
+		"first_habitat_gift_2": "たねを 3かいぶん うけとったよ。\nそだててみよう！",
+		"first_habitat_gift_received": "さやの たね ×3 げっと",
 		"pinwheel_received": "ぴんうぃーるを てにいれた！",
 		"mystery_seed_owned": "おや、なぞのたねを もっているようだね。",
 		"mystery_seed_request": "けんきゅうのために、そのたねを あずけてもらえないか？",
@@ -630,6 +640,7 @@ const TEXT := {
 		,"best_record": "さいこうきろく\n%.1f せんち"
 		,"puku_count": "ぷくこいん ×%d"
 		,"puku_gain": "ぷくこいん +%d"
+		,"puku_gauge_reward": "たね +%d　ぷく +%d"
 		,"play_choose_seed": "どの たねを まく？"
 		,"seed_remaining": "たねぶくろ\nのこり %dつぶ"
 		,"series_seed_remaining": "しりーずの たね\nのこり %dつぶ"
@@ -641,13 +652,13 @@ const TEXT := {
 		,"old_seed_name": "ふるい たね"
 		,"bags_held": "%s %dふくろ"
 		,"shop_choose_category": "なにを みますか？"
-		,"shop_category_seed": "たね\nたねぶくろ"
+		,"shop_category_seed": "どうぐ\nびーこん"
 		,"shop_category_pot": "はち\nよせうえ"
 		,"shop_category_catalog": "ずかん\nあたらしい しりーず"
 		,"shop_category_gacha": "もりの\nがちゃ"
 		,"shop_category_back": "ぶんるいへ もどる"
-		,"shop_seed_info": "たねぶくろを 1ふくろずつ かえます"
-		,"normal_seed_price": "ふつうの たねは 1ぷくこいんで 3ふくろです"
+		,"shop_seed_info": "ふつうの たねは、いしの ひかりが みちると さやに できます"
+		,"normal_seed_price": "ふつうの たねは うっていません"
 		,"price_tbd": "ぷくの ねだんは じゅんびちゅう"
 		,"locked": "まだ つかえません"
 		,"buy_bundle": "かう\n3ふくろ  1ぷくこいん"
@@ -658,6 +669,7 @@ const TEXT := {
 		,"result_notable_title": "めだった しゅうかく"
 		,"result_close": "とじる / もどる"
 		,"result_total": "しゅうかくした おおきさ　+%sせんち\nぷくげーじ +%sせんち　/　ぷくこいん +%d"
+		,"result_total_before_items": "しゅうかくした おおきさ　+%sせんち"
 		,"result_count": "しゅうかく　%dかぶ"
 		,"result_best_update": "いちばん おおきい きろく！\n%.1fせんち"
 		,"result_max": "いちばん おおきい もの　%.1fせんち"
@@ -676,9 +688,9 @@ const TEXT := {
 		,"catalog_locked": "まだ ひらいていません"
 		,"catalog_locked_preparing": "まだ ひらいていません\nひょうしがぞう じゅんびちゅう"
 		,"catalog_field": "この しりーずの げんせいちへ"
-		,"catalog_unlock_status": "この ずかんを もらうと、しりーずの たねに であえます\nもっている %dぷくこいん　／　ひつよう %dぷくこいん"
+		,"catalog_unlock_status": "はじめて げっとした ひんしゅは、ふしぎな ずかんへ じどうで きろくされます"
 		,"catalog_preparing": "この しりーずは じゅんびちゅうです"
-		,"catalog_buy": "%dぷくこいんで もらう"
+		,"catalog_buy": "はじめて げっとすると じどうきろく"
 		,"self_best": "じぶんの さいこう  %.1f せんち"
 		,"self_best_none": "じぶんの さいこう　なし"
 		,"undiscovered": "まだ みつけていません"
@@ -689,22 +701,22 @@ const TEXT := {
 		,"record_update": "しゅうかく きろくこうしん！\nさいこうきろく\n%.1f せんち"
 		,"habitat_jellied": "じゅれてしまった かぶみたい。"
 		,"mystery_seed_get": "なぞの たねを みつけた！"
-		,"old_catalog_page_get": "ふるびた ずかんの ぺーじを みつけた！"
+		,"old_catalog_page_get": "あたらしい しりーずを ずかんに きろくした！"
 		,"gacha_draw_count": "がちゃ %dかい"
 		,"gacha_selecting": "もりの めぐみを えらんでいます…"
-		,"unlock_action": "ひらく\n5ぷく"
+		,"unlock_action": "じどうで きろく"
 		,"later": "あとで"
 		,"gacha_return": "がちゃへ もどる"
 		,"encountered": "であったよ"
 		,"locked_series": "まだ ひらいていない しりーず"
-		,"locked_offer": "まだ ひらいていない『%s』の ひんしゅみたい。\n5ぷくこいんで ずかんを ひらきますか？"
+		,"locked_offer": "『%s』の あたらしい ひんしゅです。\nふしぎな ずかんへ きろくされます。"
 		,"forest_catalog_missing": "この ずかんは みつかりませんでした"
-		,"forest_unlock_need5": "ひらくには 5ぷくこいん ひつようです。\nぷくこいんが たりません。"
+		,"forest_unlock_need5": "あたらしい ひんしゅは じどうで ずかんへ きろくされます。"
 		,"forest_unlock_complete_one": "『%s』を ひらきました！\nこの ひんしゅを ずかんに とうろくしました。"
 		,"forest_unlock_complete_many": "『%s』を ひらきました！\nであった %dひんしゅを とうろくしました。"
-		,"forest_deferred": "こんかいは とうろくされませんが、\nあとで この ずかんを ひらくと、\nこの ひんしゅも ずかんに とうろくされます。"
+		,"forest_deferred": "この ひんしゅは ふしぎな ずかんへ じどうで きろくされます。"
 		,"secret_turning": "ごと…ごとごと……"
-		,"secret_catalog_page_prize": "%sの ふるびた ずかんの ぺーじ"
+		,"secret_catalog_page_prize": "%sの きろく"
 		,"secret_prize": "ひみつの けいひん"
 		,"arrangement_title": "よせうえ"
 		,"arrangement_complete": "よせうえ かんせい！"
@@ -741,11 +753,11 @@ const TEXT := {
 		,"arrangement_added": "%sを ふやしました。そのまま ゆびで うごかせます"
 		,"viewer_title": "かんせいした よせうえ"
 		,"pot_shop_title": "よせうえようの はち"
-		,"catalog_shop_title": "しりーずずかん"
-		,"seed_shop_title": "たねぶくろ"
-		,"catalog_shop_hint": "ずかんは いちど かうと、めいんがめんから いつでも みられます"
+		,"catalog_shop_title": "しりーずの きろく"
+		,"seed_shop_title": "どうぐ"
+		,"catalog_shop_hint": "あたらしい しりーずは はじめての げっとで じどうきろくされます"
 		,"product_image_preparing": "しょうひんがぞう\nじゅんびちゅう"
-		,"catalog_page_product": "しりーずずかんの ぺーじ"
+		,"catalog_page_product": "しりーずの きろく"
 		,"seed_bag_count": "たねぶくろ\n%dつぶ"
 		,"pot_count": "%s　・　%dかぶ"
 		,"arrangement_gesture_transform": "おおきさと むきを ちょうせいしたよ"
@@ -756,7 +768,7 @@ const TEXT := {
 		,"shop_tab_premium": "ぷれみあむ"
 		,"shop_tab_mystery": "なぞたね"
 		,"shop_category_short": "しゅるい"
-		,"shop_catalog_preparing": "あたらしい ずかんは\nじゅんびちゅうです"
+		,"shop_catalog_preparing": "ずかんは はじめての げっとで\nじどうきろくされます"
 		,"yes": "はい"
 		,"no": "いいえ"
 		,"restore": "もとにもどす"
@@ -767,12 +779,12 @@ const TEXT := {
 		,"seed_premium_card": "24つぶいり・もっているのは%dふくろ\n%s"
 		,"seed_mystery_card": "5つぶいり・もっているのは%dふくろ\n%s"
 		,"seed_series_name": "%sの たね"
-		,"seed_series_card": "1つぶ・もっているのは%dつぶ\nぷくの ねだんは じゅんびちゅう"
+		,"seed_series_card": "1つぶ・もっているのは%dつぶ\nふしぎな さやから もらえます"
 		,"unlock_after_plays": "あと%dかい あそぶと つかえるよ"
 		,"unlock_mystery_species": "なぞの ひんしゅを 1しゅるい みつけると つかえるよ"
 		,"not_enough_puku": "ぷくこいんが たりません"
-		,"seed_series_price_tbd": "この しりーずの たねの ぷくの ねだんは じゅんびちゅうです"
-		,"seed_price_tbd": "この たねぶくろの ぷくの ねだんは じゅんびちゅうです"
+		,"seed_series_price_tbd": "たねは ふしぎな さやから もらえます"
+		,"seed_price_tbd": "たねは ふしぎな さやから もらえます"
 		,"seed_normal_bought": "ふつうの たねを%dふくろ かったよ"
 		,"seed_normal_detail": "ふつうの たね　24つぶ × 3ふくろ\nげんせいちから あつめた きほんの たねです。\nきんぼし1つ10%　きんぼし2つ5%　しんひんしゅ4%"
 		,"seed_volume_detail": "ぼりゅーむぱっく　36つぶ / ふくろ\nげんせいちの たねを たっぷり ふくろづめ しました。\nれあ10%　すーぱーれあ5%　しんしゅ やく3%"
@@ -788,7 +800,7 @@ const TEXT := {
 		,"research_reward_title": "けんきゅうの おれい"
 		,"research_reward_note": "すきな ずかんを 1さつ えらんでね"
 		,"research_reward_later": "あとで えらぶ"
-		,"research_reward_empty": "いま えらべる もっていない ずかんは ありません。\nあたらしい ずかんが はいったら また えらべます。"
+		,"research_reward_empty": "いま、あたらしく きろくできる しりーずは ありません。"
 		,"research_reward_choose": "%s\nこの ずかんを もらう"
 		,"research_reward_claimed": "%sを どうぞ。\nまだ みつけていない ひんしゅは、ずかんの かげを てがかりに さがしてみてね。"
 		,"rain_pending_notice": "げんせいちに めぐみの あめが ふっています"
@@ -822,7 +834,7 @@ const TEXT := {
 		,"shop_season_spring": "だんだん あたたかくなってきたね。たにくも どんどん そだつね！"
 		,"old_page_intro_1": "これ、げんせいちで ひろったんだ。\nふるくて よごれているけど、ずかんの ぺーじみたいじゃない？"
 		,"old_page_intro_2": "あるまじろくんなら、きっと もとの ずかんに もどせると おもうよ。"
-		,"volume_intro_1": "あたらしい たねが はいったよ！\nぼりゅーむぱっくたねって いうんだ。"
+		,"volume_intro_1": "ふしぎな さやに、たくさんの たねが できたよ！"
 		,"volume_intro_2": "36つぶ はいってるから、ふつうの たねより たっぷり たのしめるよ。\nじっくり おおきな たにくを そだてられるね！"
 		,"bustamante_gift": "いつも きてくれて ありがとう。\nすとりくちふろーら ぶすたまんてを 1かぶ、きみに あげるよ。"
 		,"pinwheel_intro_1": "ふるい しりょうを しらべていたら、そだてかたの てがかりを みつけたんだ。"
@@ -835,8 +847,8 @@ const TEXT := {
 		,"research_intro_2": "じつは ぼく、この『なぞのたね』を けんきゅうしてるんだ。\nまだ、なんの たねか わからないんだけどね。"
 		,"research_intro_3": "よかったら、そのたねを けんきゅうさせてもらえないかな？"
 		,"research_return_offer": "なぞのたねを もってきてくれたんだね。\nけんきゅうのために、まとめて あずかっても いいかい？"
-		,"restore_offer": "ふるびた ずかんの ぺーじだね。\n%dぷくこいんで もとにもどせるよ。やってみる？"
-		,"restore_shortage": "もとにもどすには %dぷくこいん ひつようなんだ。\nもうすこし あつまったら、また もってきてね。"
+		,"restore_offer": "この きろくは、ふしぎな ずかんへ じどうで はんえいされるよ。"
+		,"restore_shortage": "この きろくは、ふしぎな ずかんへ じどうで はんえいされるよ。"
 		,"restore_success": "もとにもどせたよ！\nこれは『%s』の ぺーじだったんだ。\nまだ みつけていない ひんしゅも、かげから すこしずつ しらべられそうだね。"
 		,"research_status_sprouted": "きいてよ！\nやっと、たねが めをだしたんだ！\nおおきくなるのを おたのしみに！"
 		,"research_status_growing": "ありがとう。\nじゅんちょうに そだってるよ！"
@@ -858,9 +870,9 @@ const TEXT := {
 		,"audio_se": "こうかおん"
 		,"audio_se_on": "こうかおん ON"
 		,"audio_note": "おんがくと おとの おおきさを かえられます"
-		,"unlock_five_puku": "5ぷくこいんで ひらきます"
-		,"unlock_restore_page": "ふるびた ずかんの ぺーじを もとにもどします"
-		,"unlock_progress": "げーむを すすめると おみせに ならびます"
+		,"unlock_five_puku": "はじめて GETで じどうきろく"
+		,"unlock_restore_page": "はじめて げっとすると じどうきろく"
+		,"unlock_progress": "げーむを すすめると みられます"
 		,"unlock_future": "ひらく じょうけんは じゅんびちゅうです"
 		,"jelly_float": "じゅれ"
 		,"preview_finished": "ぷれびゅー おわり"
@@ -873,10 +885,10 @@ const TEXT := {
 		"opening_tap": "Tap to Start",
 		"opening_story_tap": "Tap to continue",
 		"opening_story_1": "One day, the girl found a dusty old book\nin the corner of an old storeroom.\n\n\"What could this be...?\"",
-		"opening_story_2": "They brushed off the dust\nand opened the book together.\n\nIts cover read:\n\n\"Original Species Catalog\"",
+		"opening_story_2": "They brushed off the dust\nand looked through it together.\n\nIt seemed to be\nan old book about plants.",
 		"opening_story_3": "Inside were drawings of plants\nnone of them had ever seen.\n\nPlump leaves. Strange shapes.\nMysterious colors.\n\nThe pages called them \"succulents.\"\n\n\"Did plants like these really exist...?\"",
-		"opening_story_4": "Meanwhile, Panda had found an old bag of seeds\nsomewhere else.\n\n\"What kind of seeds are these?\"\n\nThe three compared them with the catalog.\n\n\"Maybe... they came from these plants.\"\n\nSo the girl, Panda, and Armadillo\ndivided the seeds and decided to plant them.\n\n\"I wonder what will grow...\"",
-		"panda_shop_name": "Panda's Seed Shop",
+		"opening_story_4": "Meanwhile, Panda had found an old bag of seeds\nsomewhere else.\n\n\"What kind of seeds are these?\"\n\nLooking at the plants drawn in the book,\nthe three glanced at one another.\n\n\"Maybe... these are seeds from those plants.\"\n\nSo they divided the seeds\nand decided to plant them.",
+		"panda_shop_name": "Panda's Shop",
 		"armadillo_name": "Armadillo",
 		"story_speaker_girl": "Girl",
 		"story_speaker_panda": "Panda",
@@ -889,11 +901,11 @@ const TEXT := {
 		"intro_old_seed": "We divided the old seeds among the three of us.\nThis one is yours. Let's plant it!",
 		"intro_old_seed_get": "You got 1 unidentified old seed!",
 		"story_colorata_1": "Those really were succulent seeds!",
-		"story_colorata_2": "According to the catalog,\nthis species is called '%s'!",
+		"story_colorata_2": "According to this book,\nthis species is called '%s'!",
 		"story_colorata_3": "Amazing.\nSucculents have returned to the world...!",
-		"story_trio_1": "Listen! My seed grew too!\nAccording to the catalog, it's called '%s'.",
-		"story_trio_2": "Mine did too. It seems to be an original species called '%s'.",
-		"story_trio_3": "I can't believe it. We're seeing three plant varieties\nthat were lost for so long, all at once...",
+		"story_trio_1": "Listen! My seed grew too!\nAccording to this book, it's called '%s'.",
+		"story_trio_2": "Mine did too! It seems this species is called '%s'.",
+		"story_trio_3": "I can't believe it. We're really seeing plants\nthat were lost for so long...",
 		"story_trio_4": "They're so beautiful. And their plump leaves are adorable!",
 		"story_trio_5": "I hope this world can be filled with succulents again.",
 		"story_habitat_found_1": "I searched the old records and found a place\nwhere succulents were once said to grow!",
@@ -912,14 +924,18 @@ const TEXT := {
 		"awakening_sprout_look": "Look!",
 		"seed_pod_story_1": "Look! Something is falling from the sky!",
 		"seed_pod_story_2": "Could that be... a seed pod?",
-		"seed_pod_story_3": "This pod is glowing...",
-		"seed_pod_story_4": "There are seeds inside!",
-		"seed_pod_story_5": "Let's plant them as soon as we get back!",
-		"seed_origin_1": "After the rain, the habitat left strange seeds behind.\n...These are seeds.",
-		"seed_origin_2": "Did the habitat leave them?\nMaybe it wants us to grow them.",
-		"seed_origin_3": "I'll gather them and pack them into bags!\nEven seeds from the same bag may grow into different plants.\nThis is the beginning of Panda's Seed Shop.",
-		"seed_origin_received": "You got 3 bags of the habitat's mysterious seeds and 10 Puku Coins!",
-		"special_origin_1": "This one... isn't in the old Original Species Catalog.",
+		"seed_pod_story_3": "This stone is glowing...",
+		"seed_pod_story_4": "And this one... is a catalog?",
+		"seed_pod_story_5": "The pod is filled with seeds!",
+		"seed_pod_story_6": "It looks like Panda's pod makes a seed\nwhen the light in this stone grows strong.",
+		"mystery_catalog_tutorial_1": "Look. The succulents we just grew are in this catalog.",
+		"mystery_catalog_tutorial_2": "Colorata and the others...!",
+		"mystery_catalog_tutorial_3": "It seems any new succulents we discover\nwill be recorded here too.",
+		"seed_origin_1": "A seed has formed inside the mysterious pod.",
+		"seed_origin_2": "The stone's light and the pod's seeds seem to be connected.",
+		"seed_origin_3": "Let's grow more and receive the next seed!",
+		"seed_origin_received": "You received 3 seeds from the pod!",
+		"special_origin_1": "This one... isn't in the mysterious catalog.",
 		"special_origin_2": "So the habitat is not only restoring old succulents...",
 		"special_origin_3": "It seems to be looking at today's world\nand creating new succulents too.",
 		"jurejure_intro_panda_1": "Huh...?",
@@ -980,7 +996,7 @@ const TEXT := {
 		"tutorial_growth_5": "That's a little nerve-racking!",
 		"tutorial_harvest_tap": "Tap to harvest before it turns to jelly!",
 		"main_play": "Plant Seeds",
-		"main_shop": "Panda's Seed Shop",
+		"main_shop": "Panda's Shop",
 		"main_arrangement": "Arrangement",
 		"main_forest_gacha": "Forest Gacha\n1 Puku",
 		"main_secret_gacha": "Secret Gacha",
@@ -1003,7 +1019,7 @@ const TEXT := {
 		"secret_unlimited": "Always available",
 		"get": "GET!",
 		"new": "NEW!",
-		"original_catalog_new": "Original Species Catalog  NEW!",
+		"original_catalog_new": "NEW!",
 		"super_rare": "SUPER RARE",
 		"tap_to_close": "Tap to close",
 		"habitat_intro_1": "A sprout! Perhaps the habitat is bringing back a succulent it remembers.",
@@ -1013,7 +1029,7 @@ const TEXT := {
 		"habitat_intro_5": "It is nearly 30 cm! Try harvesting it when it reaches 30 cm.",
 		"habitat_intro_6": "Let's leave the little succulents here to grow.\nI hope this place always stays full of them.",
 		"habitat_too_small": "It is still small. Let's wait for it to grow a little more.",
-		"original_registered": "You harvested %s!\nIt matches the record in the old Original Species Catalog.",
+		"original_registered": "%s was recorded in the mysterious catalog!",
 		"panda_beacon_event_1": "Armadillo and I built a device to watch plants in the habitat.",
 		"panda_beacon_event_2": "I tuned it to alert you the instant a plant reaches 30 cm!",
 		"panda_beacon_event_3": "We call it the Panda Beacon!\nHere is our first prototype. More are now in the shop.",
@@ -1026,10 +1042,10 @@ const TEXT := {
 		"panda_beacon_notification_title": "Your Panda Beacon reacted!",
 		"panda_beacon_notification_body": "%s has reached 30 cm and can be harvested.",
 		"puku_intro_1": "The size of every succulent you harvest\nfills your Puku Gauge!",
-		"puku_intro_2": "Fill the gauge to 600 cm\nto earn one Puku Coin!",
-		"first_habitat_gift_1": "Here is a present to celebrate your first habitat visit!",
-		"first_habitat_gift_2": "Ten Puku Coins and three seed bags!\nTry lots of things.",
-		"first_habitat_gift_received": "You got 10 Puku Coins and 3 seed bags!",
+		"puku_intro_2": "Fill the gauge to 600 cm\nto receive one seed and 3 Puku!",
+		"first_habitat_gift_1": "The first seeds have formed inside the pod!",
+		"first_habitat_gift_2": "You received enough seeds for three growing sessions.\nLet's grow them!",
+		"first_habitat_gift_received": "Pod Seeds x3 GET",
 		"pinwheel_received": "You got Pinwheel!",
 		"mystery_seed_owned": "Oh, I see you already have a mystery seed.",
 		"mystery_seed_request": "Would you let me study that seed?",
@@ -1060,6 +1076,7 @@ const TEXT := {
 		,"best_record": "Best Record\n%.1f cm"
 		,"puku_count": "Puku Coins ×%d"
 		,"puku_gain": "Puku Coin +%d"
+		,"puku_gauge_reward": "Seed +%d   Puku +%d"
 		,"play_choose_seed": "Which seeds will you plant?"
 		,"seed_remaining": "Seed Bag\n%d seeds left"
 		,"series_seed_remaining": "Series Seed\n%d seeds left"
@@ -1071,13 +1088,13 @@ const TEXT := {
 		,"old_seed_name": "Old Seeds"
 		,"bags_held": "%s · %d bags"
 		,"shop_choose_category": "What would you like to see?"
-		,"shop_category_seed": "Seeds\nSeed Bags"
+		,"shop_category_seed": "Tools\nBeacon"
 		,"shop_category_pot": "Pots\nArrangements"
 		,"shop_category_catalog": "Catalogs\nNew Series"
 		,"shop_category_gacha": "Forest\nGacha"
 		,"shop_category_back": "Back to categories"
-		,"shop_seed_info": "Buy seed bags one at a time"
-		,"normal_seed_price": "Three normal seed bags cost 1 Puku Coin"
+		,"shop_seed_info": "Normal seeds form in the pod when the stone's light fills up"
+		,"normal_seed_price": "Normal seeds are not sold"
 		,"price_tbd": "Puku price coming later"
 		,"locked": "Locked"
 		,"buy_bundle": "Buy\n3 bags · 1 Puku Coin"
@@ -1088,6 +1105,7 @@ const TEXT := {
 		,"result_notable_title": "Notable Harvests"
 		,"result_close": "Close / Back"
 		,"result_total": "Total harvested size +%s cm\nPuku Gauge +%s cm / Puku Coins +%d"
+		,"result_total_before_items": "Total harvested size +%s cm"
 		,"result_count": "%d plants harvested"
 		,"result_best_update": "New Largest Size!\n%.1f cm"
 		,"result_max": "Largest size %.1f cm"
@@ -1106,9 +1124,9 @@ const TEXT := {
 		,"catalog_locked": "Locked"
 		,"catalog_locked_preparing": "Locked\nCover image coming soon"
 		,"catalog_field": "Visit this series habitat"
-		,"catalog_unlock_status": "Get this catalog to encounter its series seeds\nYou have %d Puku Coins / Need %d"
+		,"catalog_unlock_status": "A species is recorded automatically the first time you GET it"
 		,"catalog_preparing": "This series is coming soon"
-		,"catalog_buy": "Get for %d Puku Coins"
+		,"catalog_buy": "Recorded automatically on first GET"
 		,"self_best": "Personal best %.1f cm"
 		,"self_best_none": "Personal best —"
 		,"undiscovered": "Not discovered"
@@ -1119,22 +1137,22 @@ const TEXT := {
 		,"record_update": "NEW HARVEST RECORD\n%.1f cm"
 		,"habitat_jellied": "This plant has turned to jelly."
 		,"mystery_seed_get": "Mystery Seed GET!"
-		,"old_catalog_page_get": "Old Catalog Page GET!"
+		,"old_catalog_page_get": "A new series was recorded in the catalog!"
 		,"gacha_draw_count": "Gacha %d"
 		,"gacha_selecting": "Choosing a forest gift…"
-		,"unlock_action": "Unlock\n5 Puku"
+		,"unlock_action": "Record automatically"
 		,"later": "Later"
 		,"gacha_return": "Back to Gacha"
 		,"encountered": "Encountered"
 		,"locked_series": "LOCKED SERIES"
-		,"locked_offer": "This species belongs to the locked %s.\nUnlock its catalog for 5 Puku Coins?"
+		,"locked_offer": "This is a new species from %s.\nIt will be recorded automatically."
 		,"forest_catalog_missing": "That catalog could not be found"
-		,"forest_unlock_need5": "Unlocking costs 5 Puku Coins.\nYou do not have enough."
+		,"forest_unlock_need5": "New species are recorded automatically."
 		,"forest_unlock_complete_one": "Unlocked %s!\nAdded this species to your catalog."
 		,"forest_unlock_complete_many": "Unlocked %s!\nAdded %d encountered species."
-		,"forest_deferred": "It is not registered this time.\nWhen you unlock this catalog later,\nthis species will be registered too."
+		,"forest_deferred": "This species is recorded in the mysterious catalog automatically."
 		,"secret_turning": "Clunk… rumble…"
-		,"secret_catalog_page_prize": "Old %s Page"
+		,"secret_catalog_page_prize": "%s record"
 		,"secret_prize": "Secret Prize"
 		,"arrangement_title": "Arrangements"
 		,"arrangement_complete": "Arrangement Complete!"
@@ -1171,11 +1189,11 @@ const TEXT := {
 		,"arrangement_added": "Added %s. Drag it directly while selected"
 		,"viewer_title": "Finished Arrangement"
 		,"pot_shop_title": "Arrangement Pots"
-		,"catalog_shop_title": "Series Catalogs"
-		,"seed_shop_title": "Seed Bags"
-		,"catalog_shop_hint": "Once purchased, catalogs are always available from the main screen"
+		,"catalog_shop_title": "Series Records"
+		,"seed_shop_title": "Tools"
+		,"catalog_shop_hint": "New series are recorded automatically on their first GET"
 		,"product_image_preparing": "Product image\ncoming soon"
-		,"catalog_page_product": "Series catalog page"
+		,"catalog_page_product": "Series record"
 		,"seed_bag_count": "Seed Bag\n%d seeds"
 		,"pot_count": "%s · %d plants"
 		,"arrangement_gesture_transform": "Size and angle adjusted"
@@ -1186,7 +1204,7 @@ const TEXT := {
 		,"shop_tab_premium": "Premium"
 		,"shop_tab_mystery": "Mystery"
 		,"shop_category_short": "Categories"
-		,"shop_catalog_preparing": "New catalogs are\ncoming soon"
+		,"shop_catalog_preparing": "The catalog records\neach first GET automatically"
 		,"yes": "Yes"
 		,"no": "No"
 		,"restore": "Restore"
@@ -1197,12 +1215,12 @@ const TEXT := {
 		,"seed_premium_card": "24 seeds · %d bags owned\n%s"
 		,"seed_mystery_card": "5 seeds · %d bags owned\n%s"
 		,"seed_series_name": "%s Seeds"
-		,"seed_series_card": "1 seed · %d owned\nPuku price coming soon"
+		,"seed_series_card": "1 seed · %d owned\nReceived from the mysterious pod"
 		,"unlock_after_plays": "Unlocks after %d more plays"
 		,"unlock_mystery_species": "Find one mystery species to unlock"
 		,"not_enough_puku": "Not enough Puku Coins"
-		,"seed_series_price_tbd": "The Puku price for these series seeds is coming soon"
-		,"seed_price_tbd": "The Puku price for this seed bag is coming soon"
+		,"seed_series_price_tbd": "Seeds are received from the mysterious pod"
+		,"seed_price_tbd": "Seeds are received from the mysterious pod"
 		,"seed_normal_bought": "Bought %d normal seed bags"
 		,"seed_normal_detail": "Normal Seeds · 24 seeds × 3 bags\nBasic seeds gathered from the habitat; many succulents may grow.\n1 Gold Star 10% · 2 Gold Stars 5% · New species 4%"
 		,"seed_volume_detail": "Volume Pack · 36 seeds per bag\nA generous bag of habitat seeds for growing big succulents.\nRare 10% · Super Rare 5% · New species about 3%"
@@ -1218,7 +1236,7 @@ const TEXT := {
 		,"research_reward_title": "Research Reward"
 		,"research_reward_note": "Choose one catalog"
 		,"research_reward_later": "Choose Later"
-		,"research_reward_empty": "No unowned catalog is available right now.\nYou can choose again when a new one arrives."
+		,"research_reward_empty": "There is no new series to record right now."
 		,"research_reward_choose": "%s\nChoose this catalog"
 		,"research_reward_claimed": "Here is %s.\nUse the silhouettes to look for species you have not found yet."
 		,"rain_pending_notice": "Blessed rain is falling in the habitat"
@@ -1252,7 +1270,7 @@ const TEXT := {
 		,"shop_season_spring": "The days are getting warmer, and the succulents are growing quickly!"
 		,"old_page_intro_1": "I found this in the habitat.\nIt is old and dirty, but does it look like a catalog page to you?"
 		,"old_page_intro_2": "I think Armadillo could restore it to its original catalog."
-		,"volume_intro_1": "A new seed pack just arrived!\nIt is called the Volume Pack."
+		,"volume_intro_1": "The mysterious pod has grown lots of seeds!"
 		,"volume_intro_2": "It contains 36 seeds, so there is more to enjoy than in a normal bag.\nYou can take your time growing a giant succulent!"
 		,"bustamante_gift": "Thank you for visiting so often.\nI would like to give you one Strictiflora Bustamante."
 		,"pinwheel_intro_1": "I found a clue about growing them while studying some old records."
@@ -1265,8 +1283,8 @@ const TEXT := {
 		,"research_intro_2": "I have been studying these Mystery Seeds.\nI still do not know what kind of seed they are."
 		,"research_intro_3": "Would you let me study that seed?"
 		,"research_return_offer": "You brought more Mystery Seeds.\nMay I take them together for my research?"
-		,"restore_offer": "That is an old catalog page.\nI can restore it for %d Puku Coins. Shall I?"
-		,"restore_shortage": "Restoration needs %d Puku Coins.\nBring it back when you have collected a few more."
+		,"restore_offer": "This record will be added to the mysterious catalog automatically."
+		,"restore_shortage": "This record will be added to the mysterious catalog automatically."
 		,"restore_success": "Restoration complete!\nThis page belonged to %s.\nThe silhouettes may help us study species you have not found yet."
 		,"research_status_sprouted": "Listen!\nThe seed finally sprouted!\nWait until you see how it grows!"
 		,"research_status_growing": "Thank you.\nIt is growing well!"
@@ -1288,9 +1306,9 @@ const TEXT := {
 		,"audio_se": "Sound Effects"
 		,"audio_se_on": "Sound Effects ON"
 		,"audio_note": "Music and sound volume can be adjusted here."
-		,"unlock_five_puku": "Unlock for 5 Puku Coins"
-		,"unlock_restore_page": "Restore an old catalog page"
-		,"unlock_progress": "Progress through the game to stock this catalog"
+		,"unlock_five_puku": "Recorded on first GET"
+		,"unlock_restore_page": "Recorded automatically on first GET"
+		,"unlock_progress": "Progress through the game to view this series"
 		,"unlock_future": "Unlock requirement coming soon"
 		,"jelly_float": "Jelly"
 		,"preview_finished": "Preview Finished"
@@ -1328,7 +1346,7 @@ const HIRAGANA_POT_NAMES := {
 }
 
 const HIRAGANA_SERIES_NAMES := {
-	"base":"げんしゅずかん", "metal":"きんぞくたにく",
+	"base":"げんしゅ", "metal":"きんぞくたにく",
 	"jewel":"ほうせきたにく", "jelly":"ぜりー", "sweets":"すいーつたにく", "gummy":"ぐみたにく",
 	"stardust":"ほしくずたにく", "glow":"ちっこうたにく", "neon":"ねおんたにく",
 	"stone":"すとーん", "sea":"うみ", "yumekawa":"ゆめふわ", "forest_amber":"もりと こはく"
@@ -1368,7 +1386,7 @@ static func species_description(language:String,entry:Dictionary)->String:
 
 static func series_name(language:String,entry:Dictionary)->String:
 	var series_id:=str(entry.get("series_id",""))
-	if normalize_language(language)==LANGUAGE_EN:return series_id.replace("_"," ").capitalize()+" Catalog"
+	if normalize_language(language)==LANGUAGE_EN:return "Original Species" if series_id=="base" else series_id.replace("_"," ").capitalize()+" Catalog"
 	if normalize_language(language)==LANGUAGE_HIRAGANA:return str(HIRAGANA_SERIES_NAMES.get(series_id,_katakana_to_hiragana(str(entry.get("display_name",series_id)))))
 	return str(entry.get("display_name",series_id))
 

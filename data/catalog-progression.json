@@ -1,21 +1,20 @@
 {
   "normal_series": [
-    {"series_id":"gummy","price_puku":5},
-    {"series_id":"metal","price_puku":5},
-    {"series_id":"sweets","price_puku":5},
-    {"series_id":"glow","price_puku":5},
-    {"series_id":"jewel","price_puku":5},
-    {"series_id":"jelly","price_puku":5},
-    {"series_id":"stardust","price_puku":5},
-    {"series_id":"stone","price_puku":5},
-    {"series_id":"sea","price_puku":5},
-    {"series_id":"yumekawa","price_puku":5},
-    {"series_id":"forest_amber","price_puku":5}
+	{"series_id":"gummy"},
+	{"series_id":"metal"},
+	{"series_id":"sweets"},
+	{"series_id":"glow"},
+	{"series_id":"jewel"},
+	{"series_id":"jelly"},
+	{"series_id":"stardust"},
+	{"series_id":"stone"},
+	{"series_id":"sea"},
+	{"series_id":"yumekawa"},
+	{"series_id":"forest_amber"}
   ],
   "hidden_series": [
     {
       "series_id":"neon",
-      "restoration_cost_puku":5,
       "old_page_spawn":{"enabled":false,"chance":0.002,"condition":{"type":"formal_play_count","value":40}}
     }
   ]

@@ -20,13 +20,14 @@ func _ready() -> void:
 	await get_tree().process_frame
 	game._reset_progression_state()
 	game.intro_story_complete = true
+	game.mystery_items_acquired = true
 	game.encyclopedia_unlocked = true
 
 	var stone_series: Dictionary = game._series_entry("stone")
 	assert(not stone_series.is_empty())
 	assert(stone_series.get("species_ids", []) == STONE_IDS)
 	assert(str(stone_series.get("display_name", "")) == "ストーン")
-	assert(bool(stone_series.get("catalog_purchase_enabled", false)))
+	assert(not bool(stone_series.get("catalog_purchase_enabled", false)))
 	assert(bool(stone_series.get("preview_catalog_when_locked", false)))
 	assert(game._is_normal_series("stone") and not game._is_hidden_series("stone"))
 	assert(game._shop_series_catalog().any(func(entry): return str(entry.get("series_id", "")) == "stone"))

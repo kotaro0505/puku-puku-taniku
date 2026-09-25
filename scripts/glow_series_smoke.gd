@@ -23,13 +23,13 @@ const EXPECTED_IMAGE_SIZE := COMPLETE_SUBJECT_SIZE + SUBJECT_PADDING * 2
 func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
-	game.encyclopedia_unlocked=true;game.unlocked_series={"base":true};game.discovered.clear();game.species_get_counts.clear()
+	game.mystery_items_acquired=true;game.encyclopedia_unlocked=true;game.unlocked_series={"base":true};game.discovered.clear();game.species_get_counts.clear()
 	var glow:Dictionary=game._series_entry("glow")
 	assert(str(glow.get("display_name",""))=="蓄光多肉")
 	assert(CatalogImageLoader._versioned_relative_path("assets/catalog/glow/glow-lime-heart.png")=="assets/catalog/glow/glow-lime-heart.png?v=glow-20260915-2")
 	assert(CatalogImageLoader._versioned_relative_path("assets/catalog/jewel/jewel-opal-rosette.png")=="assets/catalog/jewel/jewel-opal-rosette.png")
 	game.formal_play_count=10
-	assert(not game._can_browse_series(glow) and not game._is_series_unlocked(glow) and game._catalog_purchase_enabled(glow))
+	assert(not game._can_browse_series(glow) and not game._is_series_unlocked(glow) and not game._catalog_purchase_enabled(glow))
 	var entries:Array[Dictionary]=game._series_species_entries("glow")
 	assert(entries.size()==12 and glow.get("species_ids",[])==EXPECTED.keys())
 	var seen:Dictionary={}

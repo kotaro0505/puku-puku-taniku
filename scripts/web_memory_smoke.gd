@@ -17,6 +17,8 @@ func _ready()->void:
 	game.habitat_awakening_event_complete=true
 	game.habitat_tutorial_started=true
 	game.habitat_tutorial_complete=true
+	game.mystery_items_acquired=true
+	game.mystery_catalog_tutorial_complete=true
 	game.seed_shop_open=true
 	game.panda_beacon_unlocked=true
 	game.panda_beacon_count=1

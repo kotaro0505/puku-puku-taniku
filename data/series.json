@@ -1,9 +1,9 @@
 [
   {
     "series_id": "base",
-    "display_name": "原種図鑑",
+    "display_name": "原種",
     "subtitle": "かつて自然の中に生きていた多肉たち",
-    "description": "失われた原種を記した古い図鑑です。現代で生まれた特別な多肉は、3人が新しい記録として追記していきます。",
+    "description": "この世界に帰ってきた原種を記録するページです。現代で生まれた特別な多肉も、新しい記録として追記されていきます。",
     "cover_image_path": "res://assets/plants/sprite-colorata.png",
     "species_ids": [
       "colorata",
@@ -49,7 +49,7 @@
     "field_id": "metal_field",
     "unlock_type": "future",
     "preview_catalog_when_locked": true,
-    "catalog_purchase_enabled": true,
+    "catalog_purchase_enabled": false,
     "unlock_condition": {"display_text": "今後追加予定"},
     "iap_product_id": "",
     "sort_order": 10
@@ -69,8 +69,8 @@
     "field_id": "jewel_field",
     "unlock_type": "future",
     "preview_catalog_when_locked": true,
-    "catalog_purchase_enabled": true,
-    "unlock_condition": {"display_text": "5ぷくコインで交換"},
+    "catalog_purchase_enabled": false,
+    "unlock_condition": {"display_text": "初GETで自動記録"},
     "iap_product_id": "",
     "sort_order": 20
   },
@@ -95,7 +95,7 @@
     "field_id": "jelly_field",
     "unlock_type": "future",
     "preview_catalog_when_locked": true,
-    "catalog_purchase_enabled": true,
+    "catalog_purchase_enabled": false,
     "unlock_condition": {"display_text": "今後追加予定"},
     "iap_product_id": "",
     "sort_order": 30
@@ -115,7 +115,7 @@
     "field_id": "sweets_field",
     "unlock_type": "future",
     "preview_catalog_when_locked": true,
-    "catalog_purchase_enabled": true,
+    "catalog_purchase_enabled": false,
     "unlock_condition": {"display_text": "今後追加予定"},
     "iap_product_id": "",
     "sort_order": 40
@@ -123,8 +123,8 @@
   {
     "series_id": "gummy",
     "display_name": "グミ多肉",
-    "subtitle": "5ぷくコインで解放",
-    "description": "ぷにっとカラフルなグミ多肉のシリーズです。5ぷくコインで図鑑を解放できます。",
+    "subtitle": "ぷにっとカラフルな多肉たち",
+    "description": "ぷにっとカラフルなグミ多肉のシリーズです。初めて出会った品種は自動で記録されます。",
     "cover_image_path": "res://assets/catalog/gummy/gummy-peach-milk.png",
     "species_ids": [
       "gummy_peach_milk",
@@ -139,9 +139,9 @@
     "field_id": "gummy_field",
     "unlock_type": "future",
     "preview_catalog_when_locked": true,
-    "unlock_condition": {"display_text": "5ぷくコインで解放"},
+    "catalog_purchase_enabled": false,
+    "unlock_condition": {"display_text": "初GETで自動記録"},
     "iap_product_id": "",
-    "unlock_price_puku": 5,
     "pod_seed_weight": 1.0,
     "sort_order": 50
   },
@@ -181,7 +181,7 @@
     "field_id": "glow_field",
     "unlock_type": "future",
     "preview_catalog_when_locked": true,
-    "catalog_purchase_enabled": true,
+    "catalog_purchase_enabled": false,
     "unlock_condition": {"display_text": "今後追加予定"},
     "iap_product_id": "",
     "sort_order": 70
@@ -190,13 +190,13 @@
     "series_id": "neon",
     "display_name": "ネオン多肉",
     "subtitle": "闇に浮かぶ秘密の光",
-    "description": "古びたページから復元された、冷たい光を秘める隠れシリーズです。",
+    "description": "冷たい光を秘める、ひっそりと現れる隠れシリーズです。",
     "cover_image_path": "res://assets/plants/mystery-glow-colorata.png",
     "species_ids": ["neon_cyan_rosette","neon_magenta_spike","neon_lime_cluster"],
     "field_id": "neon_field",
     "unlock_type": "future",
     "catalog_purchase_enabled": false,
-    "unlock_condition": {"display_text": "古びた図鑑のページを復元"},
+    "unlock_condition": {"display_text": "初GETで自動記録"},
     "iap_product_id": "",
     "sort_order": 80
   },
@@ -221,7 +221,7 @@
     "field_id": "stone_field",
     "unlock_type": "future",
     "preview_catalog_when_locked": true,
-    "catalog_purchase_enabled": true,
+    "catalog_purchase_enabled": false,
     "unlock_condition": {"display_text": "今後追加予定"},
     "iap_product_id": "",
     "sort_order": 90
@@ -247,8 +247,8 @@
     "field_id": "sea_field",
     "unlock_type": "future",
     "preview_catalog_when_locked": true,
-    "catalog_purchase_enabled": true,
-    "unlock_condition": {"display_text": "5ぷくコインで交換"},
+    "catalog_purchase_enabled": false,
+    "unlock_condition": {"display_text": "初GETで自動記録"},
     "iap_product_id": "",
     "sort_order": 100
   },
@@ -273,8 +273,8 @@
     "field_id": "yumekawa_field",
     "unlock_type": "future",
     "preview_catalog_when_locked": true,
-    "catalog_purchase_enabled": true,
-    "unlock_condition": {"display_text": "5ぷくコインで交換"},
+    "catalog_purchase_enabled": false,
+    "unlock_condition": {"display_text": "初GETで自動記録"},
     "iap_product_id": "",
     "sort_order": 110
   },
@@ -299,8 +299,8 @@
     "field_id": "forest_amber_field",
     "unlock_type": "future",
     "preview_catalog_when_locked": true,
-    "catalog_purchase_enabled": true,
-    "unlock_condition": {"display_text": "ゲームを進めると入荷"},
+    "catalog_purchase_enabled": false,
+    "unlock_condition": {"display_text": "ゲームを進めると出現"},
     "iap_product_id": "",
     "sort_order": 120
   }

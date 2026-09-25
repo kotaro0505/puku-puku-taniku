@@ -14,6 +14,8 @@ func _ready()->void:
 					var codepoint:=page_text.unicode_at(character_index)
 					if codepoint!=10:assert(story_font.has_char(codepoint))
 	assert("別の場所" in Localizer.text("ja","opening_story_4"))
+	assert("古い植物の本" in Localizer.text("ja","opening_story_2"))
+	assert("原種図鑑" not in Localizer.text("ja","opening_story_2"))
 	assert(not "売れ残った" in Localizer.text("ja","intro_old_seed"))
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
