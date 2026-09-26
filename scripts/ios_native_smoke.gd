@@ -50,6 +50,12 @@ func _ready() -> void:
 	game.habitat_wild_initialized=false
 	game.habitat_wild_next_spawn_unix=0
 	game.pending_habitat_species.clear()
+	# Habitat population now requires the first awakening and its permanent
+	# settlement pool; make that prerequisite explicit instead of inheriting a
+	# previous smoke test's user:// save state.
+	game.habitat_awakened=true
+	game.discovered["colorata"]=true
+	game.habitat_returned_species["colorata"]=true
 	game.habitat_tutorial_complete=true
 	game._build_habitat_items(true)
 	assert(game.habitat_wild_plants.size()>=game.HabitatWildSystemClass.INITIAL_POPULATION_MIN and game.habitat_wild_plants.size()<=game.HabitatWildSystemClass.INITIAL_POPULATION_MAX)

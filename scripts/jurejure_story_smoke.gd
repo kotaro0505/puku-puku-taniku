@@ -16,7 +16,7 @@ func _ready() -> void:
 	_test_creative_gate(game)
 	await _test_save_compatibility(game)
 	game._reset_progression_state()
-	print("JUREJURE_STORY_SMOKE_OK group=three present=100_percent choice=true battle=12v12 win_reward=true pod_respawn=true loss=40_to_80_percent puku_clamped=true softening=disabled save=true")
+	print("JUREJURE_STORY_SMOKE_OK group=three present=100_percent choice=true battle=6v6 sow=manual shared_rules=true win_reward=true pod_respawn=true loss=40_to_80_percent puku_clamped=true softening=disabled save=true")
 	get_tree().quit()
 
 
@@ -112,7 +112,15 @@ func _test_battle_win_and_respawn(game: Node) -> void:
 	game.puku_puku_battle._accept_battle()
 	await get_tree().process_frame
 	assert(game.audio_manager.current_bgm_key == "puku_battle")
-	assert(game.puku_puku_battle.visible and game.puku_puku_battle.battle_active)
+	assert(game.puku_puku_battle.visible and not game.puku_puku_battle.battle_active)
+	assert(game.puku_puku_battle.battle_phase == "awaiting_sow")
+	assert(game.puku_puku_battle.units.is_empty())
+	assert(game.puku_puku_battle.sow_button.visible)
+	assert(is_equal_approx(game.puku_puku_battle.player_score, 0.0))
+	assert(is_equal_approx(game.puku_puku_battle.opponent_score, 0.0))
+	game.puku_puku_battle.debug_sow_immediately()
+	assert(game.puku_puku_battle.battle_active)
+	assert(game.puku_puku_battle.battle_phase == "growing")
 	assert(game.puku_puku_battle.units.size() == JureJureSystemClass.BATTLE_PLANTS_PER_SIDE * 2)
 	var player_units := 0
 	var opponent_units := 0
@@ -121,7 +129,7 @@ func _test_battle_win_and_respawn(game: Node) -> void:
 			opponent_units += 1
 		else:
 			player_units += 1
-	assert(player_units == 12 and opponent_units == 12)
+	assert(player_units == 6 and opponent_units == 6)
 	assert(game.puku_puku_battle.battle_layer.get_node_or_null("BattleBackground") is TextureRect)
 
 	game.puku_puku_battle.debug_force_result(420.0, 180.0)
@@ -171,6 +179,8 @@ func _test_battle_loss(game: Node) -> void:
 	game.puku_puku_battle._accept_battle()
 	await get_tree().process_frame
 	assert(game.audio_manager.current_bgm_key == "puku_battle")
+	assert(game.puku_puku_battle.units.is_empty())
+	game.puku_puku_battle.debug_sow_immediately()
 	game.puku_puku_battle.debug_force_result(20.0, 260.0)
 	await get_tree().process_frame
 	var remaining: int = game.habitat_wild_plants.size()

@@ -7,22 +7,36 @@ signal battle_resolved(result: Dictionary)
 signal return_requested
 
 const Localizer = preload("res://scripts/game_localizer.gd")
+const SucculentClass = preload("res://scripts/succulent.gd")
 const BACKGROUND_PATH := "res://assets/jurejure/puku-puku-battle-background.jpg"
-const PLANTS_PER_SIDE := 12
+const PLANTS_PER_SIDE := 6
+const INITIAL_DIAMETER_CM := 1.6
+const MAX_DISPLAY_SIZE_PX := 106.0
+const SOW_SECONDS := 0.46
+const GERMINATION_SECONDS := 0.54
 
+# Coordinates are local to clipped soil-only fields. The generous margins keep
+# a normally grown plant's complete visual on dirt, while clipping guarantees
+# that an exceptionally large plant can never cross the central VS divider.
+const OPPONENT_FIELD_RECT := Rect2(30, 260, 516, 218)
+const PLAYER_FIELD_RECT := Rect2(30, 690, 516, 300)
 const OPPONENT_POINTS := [
-	Vector2(62, 306), Vector2(150, 292), Vector2(240, 315), Vector2(330, 292), Vector2(420, 315), Vector2(510, 298),
-	Vector2(88, 410), Vector2(176, 390), Vector2(266, 416), Vector2(356, 392), Vector2(446, 416), Vector2(522, 392)
+	Vector2(78, 66), Vector2(258, 53), Vector2(438, 68),
+	Vector2(126, 158), Vector2(310, 148), Vector2(438, 162)
 ]
 const PLAYER_POINTS := [
-	Vector2(62, 800), Vector2(150, 784), Vector2(240, 810), Vector2(330, 786), Vector2(420, 810), Vector2(510, 790),
-	Vector2(88, 912), Vector2(176, 890), Vector2(266, 920), Vector2(356, 894), Vector2(446, 920), Vector2(522, 896)
+	Vector2(80, 76), Vector2(258, 58), Vector2(436, 80),
+	Vector2(128, 210), Vector2(310, 192), Vector2(436, 214)
 ]
 
 var language_code := "ja"
 var choice_layer: Control
 var battle_layer: Control
 var unit_layer: Control
+var opponent_field: Control
+var player_field: Control
+var logic_root: Node
+var sow_button: Button
 var opponent_score_label: Label
 var player_score_label: Label
 var result_panel: PanelContainer
@@ -35,6 +49,9 @@ var player_resolved := 0
 var opponent_resolved := 0
 var resolution_emitted := false
 var units: Array[Dictionary] = []
+var battle_phase := "idle"
+var pending_entries: Array[Dictionary] = []
+var pending_textures: Dictionary = {}
 var rng := RandomNumberGenerator.new()
 
 
@@ -109,10 +126,25 @@ func _build_ui() -> void:
 	unit_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	unit_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	battle_layer.add_child(unit_layer)
+	opponent_field = _field_control("OpponentSoilField", OPPONENT_FIELD_RECT)
+	player_field = _field_control("PlayerSoilField", PLAYER_FIELD_RECT)
+	unit_layer.add_child(opponent_field)
+	unit_layer.add_child(player_field)
+	logic_root = Node.new()
+	logic_root.name = "BattlePlantLogic"
+	add_child(logic_root)
 	opponent_score_label = _score_label(Vector2(316, 202), Color("#ffd6b1"))
 	battle_layer.add_child(opponent_score_label)
 	player_score_label = _score_label(Vector2(316, 680), Color("#e0ffd2"))
 	battle_layer.add_child(player_score_label)
+	sow_button = Button.new()
+	sow_button.name = "SowBattleSeedsButton"
+	sow_button.position = Vector2(166, 884)
+	sow_button.size = Vector2(244, 64)
+	_style_button(sow_button, Color("#8fc45d"), 23)
+	sow_button.pressed.connect(_on_sow_pressed)
+	sow_button.visible = false
+	battle_layer.add_child(sow_button)
 
 	result_panel = PanelContainer.new()
 	result_panel.position = Vector2(78, 394)
@@ -172,19 +204,104 @@ func start_battle(entries: Array[Dictionary], textures: Dictionary, language: St
 	player_resolved = 0
 	opponent_resolved = 0
 	resolution_emitted = false
-	battle_active = true
-	var usable_entries: Array[Dictionary] = entries.duplicate(true)
-	if usable_entries.is_empty():
-		battle_active = false
+	battle_active = false
+	battle_phase = "awaiting_sow"
+	pending_entries = entries.duplicate(true)
+	pending_textures = textures.duplicate()
+	sow_button.text = Localizer.text(language_code, "jurejure_battle_sow")
+	sow_button.disabled = false
+	sow_button.modulate = Color.WHITE
+	sow_button.visible = true
+	if pending_entries.is_empty():
+		battle_phase = "invalid"
+		sow_button.visible = false
 		return
-	for index in range(PLANTS_PER_SIDE):
-		_create_unit(false, index, usable_entries, textures)
-		_create_unit(true, index, usable_entries, textures)
 	_update_scores()
 	move_to_front()
 
 
-func _create_unit(opponent: bool, point_index: int, entries: Array[Dictionary], textures: Dictionary) -> void:
+func _on_sow_pressed() -> void:
+	if battle_phase != "awaiting_sow":
+		return
+	_run_sow_sequence()
+
+
+func _run_sow_sequence() -> void:
+	battle_phase = "sowing"
+	sow_button.disabled = true
+	var button_fade := create_tween().bind_node(sow_button)
+	button_fade.tween_property(sow_button, "modulate:a", 0.0, 0.18)
+	button_fade.tween_callback(sow_button.hide)
+	_spawn_seed_markers()
+	await get_tree().create_timer(SOW_SECONDS).timeout
+	if battle_phase != "sowing" or not is_inside_tree():
+		return
+	_clear_seed_markers()
+	_create_all_units(true)
+	battle_phase = "germinating"
+	await get_tree().create_timer(GERMINATION_SECONDS).timeout
+	if battle_phase != "germinating" or not is_inside_tree():
+		return
+	battle_phase = "growing"
+	battle_active = true
+
+
+func debug_sow_immediately() -> void:
+	if battle_phase != "awaiting_sow":
+		return
+	sow_button.visible = false
+	sow_button.disabled = true
+	_clear_seed_markers()
+	_create_all_units(false)
+	battle_phase = "growing"
+	battle_active = true
+
+
+func _spawn_seed_markers() -> void:
+	for index in range(PLANTS_PER_SIDE):
+		_spawn_seed_marker(opponent_field, OPPONENT_POINTS[index], true, index)
+		_spawn_seed_marker(player_field, PLAYER_POINTS[index], false, index)
+
+
+func _spawn_seed_marker(field: Control, point: Vector2, opponent: bool, index: int) -> void:
+	var marker := Panel.new()
+	marker.name = ("Opponent" if opponent else "Player") + "Seed%02d" % index
+	marker.position = point - Vector2(7, 34)
+	marker.size = Vector2(14, 14)
+	marker.pivot_offset = marker.size * 0.5
+	marker.scale = Vector2(0.2, 0.2)
+	marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	marker.add_to_group("battle_seed_marker")
+	var seed_style := StyleBoxFlat.new()
+	seed_style.bg_color = Color("#604021") if opponent else Color("#dfb85b")
+	seed_style.border_color = Color("#f4d58a")
+	seed_style.set_border_width_all(2)
+	seed_style.set_corner_radius_all(7)
+	marker.add_theme_stylebox_override("panel", seed_style)
+	field.add_child(marker)
+	var fall := create_tween().bind_node(marker).set_parallel(true)
+	fall.tween_property(marker, "position", point - marker.size * 0.5, SOW_SECONDS).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	fall.tween_property(marker, "scale", Vector2.ONE, SOW_SECONDS * 0.72).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+func _clear_seed_markers() -> void:
+	for field in [opponent_field, player_field]:
+		if field == null:
+			continue
+		for child in field.get_children():
+			if child.is_in_group("battle_seed_marker"):
+				child.free()
+
+
+func _create_all_units(animate_germination: bool) -> void:
+	if not units.is_empty():
+		return
+	for index in range(PLANTS_PER_SIDE):
+		_create_unit(false, index, pending_entries, pending_textures, animate_germination)
+		_create_unit(true, index, pending_entries, pending_textures, animate_germination)
+
+
+func _create_unit(opponent: bool, point_index: int, entries: Array[Dictionary], textures: Dictionary, animate_germination: bool) -> void:
 	var entry: Dictionary = entries[rng.randi_range(0, entries.size() - 1)]
 	var species_id := str(entry.get("species_id", ""))
 	var texture := textures.get(species_id) as Texture2D
@@ -201,17 +318,34 @@ func _create_unit(opponent: bool, point_index: int, entries: Array[Dictionary], 
 	button.focus_mode = Control.FOCUS_NONE
 	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	button.mouse_filter = Control.MOUSE_FILTER_IGNORE if opponent else Control.MOUSE_FILTER_STOP
-	unit_layer.add_child(button)
-	var jelly_cm := rng.randf_range(34.0, 58.0)
+	var field := opponent_field if opponent else player_field
+	field.add_child(button)
+	var point: Vector2 = (OPPONENT_POINTS if opponent else PLAYER_POINTS)[point_index]
+	button.z_index = int(point.y)
+	var logic_seed := int(rng.randi())
+	var logic = SucculentClass.new()
+	logic.name = ("Opponent" if opponent else "Player") + "Logic%02d" % point_index
+	logic_root.add_child(logic)
+	logic.setup(entry, logic_seed, null, null, true)
+	var harvest_plan := ai_harvest_plan(
+		float(logic.jelly_safe_end_seconds),
+		float(logic.jelly_ramp_end_seconds),
+		rng.randf(),
+		rng.randf()
+	) if opponent else {"style": "player", "age": -1.0}
 	var unit := {
 		"node": button,
+		"logic": logic,
 		"opponent": opponent,
-		"point": (OPPONENT_POINTS if opponent else PLAYER_POINTS)[point_index],
-		"size_cm": 1.6,
-		"growth_rate": rng.randf_range(5.2, 7.4),
-		"jelly_cm": jelly_cm,
-		"ai_harvest_cm": rng.randf_range(18.0, jelly_cm - 2.5),
+		"field": field,
+		"point": point,
+		"size_cm": float(logic.diameter_cm),
+		"logic_seed": logic_seed,
+		"ai_style": str(harvest_plan.get("style", "player")),
+		"ai_harvest_age": float(harvest_plan.get("age", -1.0)),
 		"done": false,
+		"jellied": false,
+		"score": 0.0,
 		"species_id": species_id
 	}
 	var unit_index := units.size()
@@ -219,21 +353,47 @@ func _create_unit(opponent: bool, point_index: int, entries: Array[Dictionary], 
 	if not opponent:
 		button.pressed.connect(_harvest_player.bind(unit_index))
 	_update_unit_visual(unit_index)
+	if animate_germination:
+		button.scale = Vector2(0.12, 0.12)
+		button.modulate.a = 0.18
+		var germinate := create_tween().bind_node(button).set_parallel(true)
+		germinate.tween_property(button, "scale", Vector2.ONE, GERMINATION_SECONDS).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		germinate.tween_property(button, "modulate:a", 1.0, GERMINATION_SECONDS * 0.72)
+
+
+static func ai_harvest_plan(safe_end: float, ramp_end: float, style_roll: float, timing_roll: float) -> Dictionary:
+	var safe := maxf(0.1, safe_end)
+	var ramp_span := maxf(0.1, ramp_end - safe)
+	var timing := clampf(timing_roll, 0.0, 1.0)
+	if style_roll < 0.24:
+		return {"style": "cautious", "age": lerpf(safe * 0.72, safe * 0.98, timing)}
+	if style_roll < 0.62:
+		return {"style": "steady", "age": safe + ramp_span * lerpf(0.22, 0.58, timing)}
+	if style_roll < 0.88:
+		return {"style": "greedy", "age": safe + ramp_span * lerpf(0.64, 0.98, timing)}
+	return {"style": "reckless", "age": ramp_end + lerpf(1.5, 7.0, timing)}
 
 
 func _process(delta: float) -> void:
-	if not battle_active:
+	if not battle_active or battle_phase != "growing":
 		return
 	for unit_index in range(units.size()):
 		var unit: Dictionary = units[unit_index]
 		if bool(unit.get("done", false)):
 			continue
-		unit["size_cm"] = float(unit.get("size_cm", 1.6)) + float(unit.get("growth_rate", 6.0)) * delta
+		var logic = unit.get("logic")
+		if not is_instance_valid(logic):
+			continue
+		# Succulent.simulate() is also the greenhouse source of truth. It applies
+		# the shared growth rhythm, individual traits and FPS-independent jelly
+		# hazard before the gang gets a chance to make its harvest decision.
+		logic.simulate(delta)
+		unit["size_cm"] = float(logic.diameter_cm)
 		units[unit_index] = unit
-		if bool(unit.get("opponent", false)) and float(unit["size_cm"]) >= float(unit.get("ai_harvest_cm", 22.0)):
-			_resolve_unit(unit_index, false)
-		elif float(unit["size_cm"]) >= float(unit.get("jelly_cm", 45.0)):
+		if str(logic.state) == "jelly":
 			_resolve_unit(unit_index, true)
+		elif bool(unit.get("opponent", false)) and float(logic.age) >= float(unit.get("ai_harvest_age", INF)):
+			_resolve_unit(unit_index, false)
 		else:
 			_update_unit_visual(unit_index)
 
@@ -253,10 +413,17 @@ func _resolve_unit(unit_index: int, jellied: bool) -> void:
 	var unit: Dictionary = units[unit_index]
 	if bool(unit.get("done", false)):
 		return
+	var logic = unit.get("logic")
+	var resolved_as_jelly := jellied or (is_instance_valid(logic) and str(logic.state) == "jelly")
+	if not resolved_as_jelly and is_instance_valid(logic):
+		logic.harvest()
+		unit["size_cm"] = float(logic.diameter_cm)
 	unit["done"] = true
-	units[unit_index] = unit
+	unit["jellied"] = resolved_as_jelly
 	var opponent := bool(unit.get("opponent", false))
-	var score := 0.0 if jellied else float(unit.get("size_cm", 0.0))
+	var score := 0.0 if resolved_as_jelly else float(unit.get("size_cm", 0.0))
+	unit["score"] = score
+	units[unit_index] = unit
 	if opponent:
 		opponent_resolved += 1
 		opponent_score += score
@@ -264,7 +431,7 @@ func _resolve_unit(unit_index: int, jellied: bool) -> void:
 		player_resolved += 1
 		player_score += score
 	_update_scores()
-	_show_unit_result(unit, score, jellied)
+	_show_unit_result(unit, score, resolved_as_jelly)
 	if player_resolved >= PLANTS_PER_SIDE and opponent_resolved >= PLANTS_PER_SIDE:
 		_complete_battle()
 
@@ -290,7 +457,11 @@ func _show_unit_result(unit: Dictionary, score: float, jellied: bool) -> void:
 	popup.add_theme_color_override("font_color", Color("#dfa6ff") if jellied else Color("#fff3a0"))
 	popup.add_theme_color_override("font_outline_color", Color("#4a2518"))
 	popup.add_theme_constant_override("outline_size", 5)
-	unit_layer.add_child(popup)
+	var field := unit.get("field") as Control
+	if is_instance_valid(field):
+		field.add_child(popup)
+	else:
+		unit_layer.add_child(popup)
 	var float_tween := create_tween().bind_node(popup).set_parallel(true)
 	float_tween.tween_property(popup, "position:y", popup.position.y - 44.0, 0.65).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	float_tween.tween_property(popup, "modulate:a", 0.0, 0.65).set_delay(0.18)
@@ -304,7 +475,10 @@ func _update_unit_visual(unit_index: int) -> void:
 	var button := unit.get("node") as TextureButton
 	if not is_instance_valid(button):
 		return
-	var size_px := clampf(31.0 + float(unit.get("size_cm", 1.6)) * 1.02, 34.0, 88.0)
+	# Only the 2D presentation is capped. The shared Succulent logic retains the
+	# complete real diameter for scoring, however large the plant becomes.
+	var diameter_cm := float(unit.get("size_cm", INITIAL_DIAMETER_CM))
+	var size_px := clampf(30.0 + maxf(0.0, diameter_cm - INITIAL_DIAMETER_CM) * 1.16, 30.0, MAX_DISPLAY_SIZE_PX)
 	button.size = Vector2(size_px, size_px)
 	button.position = Vector2(unit.get("point", Vector2.ZERO)) - button.size * 0.5
 	button.pivot_offset = button.size * 0.5
@@ -314,6 +488,7 @@ func _complete_battle() -> void:
 	if resolution_emitted:
 		return
 	battle_active = false
+	battle_phase = "result"
 	resolution_emitted = true
 	var won := player_score >= opponent_score
 	result_label.text = Localizer.text(language_code, "jurejure_battle_win" if won else "jurejure_battle_loss")
@@ -349,14 +524,27 @@ func _return_to_habitat() -> void:
 	visible = false
 	battle_layer.visible = false
 	result_panel.visible = false
+	_clear_units()
 	return_requested.emit()
 
 
 func _clear_units() -> void:
 	battle_active = false
-	for child in unit_layer.get_children():
-		child.free()
+	battle_phase = "idle"
+	if sow_button != null:
+		sow_button.visible = false
+	_clear_seed_markers()
+	for field in [opponent_field, player_field]:
+		if field == null:
+			continue
+		for child in field.get_children():
+			child.free()
+	if logic_root != null:
+		for child in logic_root.get_children():
+			child.free()
 	units.clear()
+	pending_entries.clear()
+	pending_textures.clear()
 
 
 func debug_force_result(forced_player_score: float, forced_opponent_score: float) -> void:
@@ -386,6 +574,16 @@ func _score_label(position_value: Vector2, color: Color) -> Label:
 	label.add_theme_constant_override("outline_size", 6)
 	label.add_theme_stylebox_override("normal", _box(Color(0.10, 0.045, 0.022, 0.82), Color(0.92, 0.72, 0.35, 0.72), 16, 2))
 	return label
+
+
+func _field_control(field_name: String, field_rect: Rect2) -> Control:
+	var field := Control.new()
+	field.name = field_name
+	field.position = field_rect.position
+	field.size = field_rect.size
+	field.clip_contents = true
+	field.mouse_filter = Control.MOUSE_FILTER_PASS
+	return field
 
 
 func _style_button(button: Button, color: Color, font_size: int) -> void:

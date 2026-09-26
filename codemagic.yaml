@@ -138,6 +138,7 @@ workflows:
           run_script_smoke res://scripts/habitat_revision_smoke.gd HABITAT_REVISION_SMOKE_OK
           run_script_smoke res://scripts/early_game_habitat_smoke.gd EARLY_GAME_HABITAT_SMOKE_OK
           run_script_smoke res://scripts/jurejure_story_smoke.gd JUREJURE_STORY_SMOKE_OK
+          run_script_smoke res://scripts/puku_puku_battle_smoke.gd PUKU_PUKU_BATTLE_SMOKE_OK
           run_script_smoke res://scripts/normal_seed_distribution_smoke.gd NORMAL_SEED_DISTRIBUTION_SMOKE_OK
           run_script_smoke res://scripts/ios_native_smoke.gd IOS_NATIVE_SMOKE_OK
 

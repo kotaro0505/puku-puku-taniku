@@ -151,7 +151,7 @@ var jelly_permission:Callable
 var jelly_checks_enabled := true
 var sway_phase := 0.0
 
-func setup(species: Dictionary, seed_value: int, screen_label: Label, _danger: Label) -> void:
+func setup(species: Dictionary, seed_value: int, screen_label: Label, _danger: Label, logic_only := false) -> void:
 	data = species
 	rng.seed = seed_value
 	sway_phase = rng.randf_range(0.0, TAU)
@@ -184,6 +184,11 @@ func setup(species: Dictionary, seed_value: int, screen_label: Label, _danger: L
 	label = screen_label
 	# Species rarity and the independent special roll never change growth speed.
 	growth_rate = 1.0
+	# Battle plants use this same node as their simulation source of truth, but
+	# render through the battle's clipped 2D field instead of constructing the
+	# greenhouse-only Sprite3D/contact shadow presentation.
+	if logic_only:
+		return
 	_build_contact_shadow()
 	plant_sprite = Sprite3D.new()
 	var variant := str(data.get("visual_variant", "laui"))
@@ -339,7 +344,8 @@ func harvest() -> void:
 func jelly() -> void:
 	if state != "growing": return
 	state = "jelly"
-	plant_sprite.modulate = Color(0.78, 0.90, 0.86, 0.72)
+	if plant_sprite != null:
+		plant_sprite.modulate = Color(0.78, 0.90, 0.86, 0.72)
 	jellied.emit(self)
 
 func hit_radius() -> float: return max(.42, visual_scale * .72)
