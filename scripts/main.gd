@@ -1835,7 +1835,10 @@ func _start_scripted_dialog(kind:String,pages:Array,shop_context:=false)->void:
 		armadillo_present=scripted_dialog_pages.any(func(page:Dictionary)->bool:return str(page.get("speaker",""))=="armadillo")
 		shop_background.texture=load("res://assets/shop-background-armadillo.jpg" if armadillo_present else "res://assets/shop-background-final.jpg")
 		armadillo_tap_button.visible=false;audio_manager.play_bgm("shop")
-	else:audio_manager.play_bgm("habitat" if current_mode=="habitat" else "greenhouse")
+	else:
+		# Keep the gang's theme through its dialogue and the battle choice.
+		if kind not in ["jurejure_intro","jurejure_challenge"]:
+			audio_manager.play_bgm("habitat" if current_mode=="habitat" else "greenhouse")
 	_advance_scripted_dialog()
 
 func _advance_scripted_dialog()->void:
@@ -1911,7 +1914,9 @@ func _finish_scripted_dialog()->void:
 		armadillo_tap_button.visible=armadillo_present;_update_shop_ui()
 		if show_pinwheel_get:call_deferred("_queue_species_get_by_id",HIDDEN_PINWHEEL_ID,true,"pinwheel_gift")
 		elif show_armadillo_gift and not armadillo_gift_species_id.is_empty():call_deferred("_queue_species_get_by_id",armadillo_gift_species_id,true,"armadillo_gift")
-	else:audio_manager.play_bgm("habitat" if current_mode=="habitat" else "greenhouse")
+	else:
+		if finished_kind not in ["jurejure_intro","jurejure_challenge"]:
+			audio_manager.play_bgm("habitat" if current_mode=="habitat" else "greenhouse")
 	_update_play_ui()
 	if start_trio_event:call_deferred("_start_trio_originals_event")
 	elif finished_kind=="first_habitat_intro":call_deferred("_start_seed_pod_story")
@@ -4997,6 +5002,7 @@ func _update_habitat_wild_growth(delta:float)->void:
 func _on_jurejure_group_pressed()->void:
 	if current_mode!="habitat" or not _should_show_jurejure_group() or not scripted_dialog_kind.is_empty():return
 	if puku_puku_battle and puku_puku_battle.visible:return
+	if audio_manager:audio_manager.play_bgm("jurejure")
 	if not jurejure_intro_complete:_start_jurejure_intro_event()
 	else:_start_jurejure_challenge_event()
 
@@ -5005,6 +5011,7 @@ func _show_jurejure_battle_choice()->void:
 	puku_puku_battle.show_choice(language_code);_update_play_ui()
 
 func _on_jurejure_battle_declined()->void:
+	if audio_manager:audio_manager.play_bgm("habitat")
 	_update_play_ui()
 
 func _jurejure_battle_species_entries()->Array[Dictionary]:
@@ -5032,8 +5039,11 @@ func _start_puku_puku_battle()->void:
 	if puku_puku_battle==null:return
 	var entries:=_jurejure_battle_species_entries();var textures:=_jurejure_battle_textures(entries)
 	if entries.is_empty() or textures.is_empty():
-		puku_puku_battle.visible=false;_update_play_ui();return
+		puku_puku_battle.visible=false
+		if audio_manager:audio_manager.play_bgm("habitat")
+		_update_play_ui();return
 	jurejure_last_battle_result.clear();jurejure_pending_reward_species_id=""
+	if audio_manager:audio_manager.play_bgm("puku_battle")
 	puku_puku_battle.start_battle(entries,textures,language_code);_update_play_ui()
 
 func _jurejure_reward_candidates()->Array[Dictionary]:

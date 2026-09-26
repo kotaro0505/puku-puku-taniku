@@ -49,6 +49,7 @@ func _prepare_act_one(game: Node) -> void:
 
 func _test_habitat_group_and_intro(game: Node) -> void:
 	_prepare_act_one(game)
+	assert(game.audio_manager.current_bgm_key == "habitat")
 	assert(JureJureSystemClass.should_be_present(true, true, false, false))
 	assert(not JureJureSystemClass.should_be_present(true, true, false, true))
 	assert(not JureJureSystemClass.should_be_present(true, true, true, false))
@@ -67,6 +68,7 @@ func _test_habitat_group_and_intro(game: Node) -> void:
 
 	game._on_jurejure_group_pressed()
 	assert(game.scripted_dialog_kind == "jurejure_intro")
+	assert(game.audio_manager.current_bgm_key == "jurejure")
 	var all_text := ""
 	for page in game.scripted_dialog_pages:
 		all_text += str(page.get("text", ""))
@@ -81,16 +83,20 @@ func _test_habitat_group_and_intro(game: Node) -> void:
 	assert(game.puku_puku_battle.visible)
 	assert(game.puku_puku_battle.choice_layer.visible)
 	assert(not game.puku_puku_battle.battle_active)
+	assert(game.audio_manager.current_bgm_key == "jurejure")
 	game.puku_puku_battle._decline_battle()
 	assert(not game.puku_puku_battle.visible)
+	assert(game.audio_manager.current_bgm_key == "habitat")
 	assert(not _group_item(game).is_empty())
 
 	game._on_jurejure_group_pressed()
 	assert(game.scripted_dialog_kind == "jurejure_challenge")
+	assert(game.audio_manager.current_bgm_key == "jurejure")
 	assert(game.scripted_dialog_pages.size() == 2)
 	_finish_dialog(game)
 	await get_tree().process_frame
 	assert(game.puku_puku_battle.choice_layer.visible)
+	assert(game.audio_manager.current_bgm_key == "jurejure")
 
 	var position_samples := {}
 	var position_rng := RandomNumberGenerator.new()
@@ -105,6 +111,7 @@ func _test_habitat_group_and_intro(game: Node) -> void:
 func _test_battle_win_and_respawn(game: Node) -> void:
 	game.puku_puku_battle._accept_battle()
 	await get_tree().process_frame
+	assert(game.audio_manager.current_bgm_key == "puku_battle")
 	assert(game.puku_puku_battle.visible and game.puku_puku_battle.battle_active)
 	assert(game.puku_puku_battle.units.size() == JureJureSystemClass.BATTLE_PLANTS_PER_SIDE * 2)
 	var player_units := 0
@@ -119,6 +126,7 @@ func _test_battle_win_and_respawn(game: Node) -> void:
 
 	game.puku_puku_battle.debug_force_result(420.0, 180.0)
 	await get_tree().process_frame
+	assert(game.audio_manager.current_bgm_key == "puku_battle")
 	assert(game.jurejure_waiting_for_seed_pod_reward)
 	assert(game.jurejure_battle_count == 1 and game.jurejure_battle_win_count == 1)
 	var reward_id: String = game.jurejure_pending_reward_species_id
@@ -131,6 +139,7 @@ func _test_battle_win_and_respawn(game: Node) -> void:
 	assert(_group_item(game).is_empty())
 
 	game.puku_puku_battle._return_to_habitat()
+	assert(game.audio_manager.current_bgm_key == "habitat")
 	assert(game.scripted_dialog_kind == "jurejure_battle_win")
 	_finish_dialog(game)
 	await get_tree().process_frame
@@ -161,6 +170,7 @@ func _test_battle_loss(game: Node) -> void:
 	await get_tree().process_frame
 	game.puku_puku_battle._accept_battle()
 	await get_tree().process_frame
+	assert(game.audio_manager.current_bgm_key == "puku_battle")
 	game.puku_puku_battle.debug_force_result(20.0, 260.0)
 	await get_tree().process_frame
 	var remaining: int = game.habitat_wild_plants.size()
@@ -170,6 +180,7 @@ func _test_battle_loss(game: Node) -> void:
 	assert(not game.jurejure_waiting_for_seed_pod_reward)
 	assert(not _group_item(game).is_empty())
 	game.puku_puku_battle._return_to_habitat()
+	assert(game.audio_manager.current_bgm_key == "habitat")
 	assert(game.scripted_dialog_kind == "jurejure_battle_loss")
 	_finish_dialog(game)
 	await get_tree().process_frame

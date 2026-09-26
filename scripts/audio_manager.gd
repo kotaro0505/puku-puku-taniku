@@ -72,8 +72,10 @@ func settings_dictionary() -> Dictionary:
 	return {"bgm_enabled":bgm_enabled,"se_enabled":se_enabled,"bgm_volume":bgm_volume,"se_volume":se_volume}
 
 func play_bgm(key: String, restart := false) -> void:
+	var previous_key := current_bgm_key
 	if application_audio_paused and key != current_bgm_key: bgm_changed_while_paused = true
 	current_bgm_key = key
+	if key != previous_key: print("BGM_TRANSITION from=", previous_key, " to=", key)
 	if not _bgm_playback_allowed(): return
 	var stream := _stream_for("bgm", key)
 	if stream == null:
@@ -213,6 +215,8 @@ func _enable_bgm_loop(stream: AudioStream) -> void:
 			stream.loop_begin = 0
 			stream.loop_end = maxi(1, roundi(stream.get_length() * stream.mix_rate))
 	elif stream is AudioStreamOggVorbis:
+		stream.loop = true
+	elif stream is AudioStreamMP3:
 		stream.loop = true
 
 func _fallback_se(key: String) -> AudioStreamWAV:

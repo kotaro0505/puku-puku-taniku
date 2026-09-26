@@ -36,6 +36,23 @@ func _ready() -> void:
 	await get_tree().create_timer(audio.BGM_FADE_SECONDS + 0.10).timeout
 	_assert_single_finished_crossfade(audio, "habitat")
 
+	var bgm_config:Dictionary = audio.config.get("bgm", {})
+	assert(str(bgm_config.get("jurejure", "")) == "res://assets/audio/jurejure-gang-theme.mp3")
+	assert(str(bgm_config.get("puku_battle", "")) == "res://assets/audio/puku-puku-battle.mp3")
+	audio.play_bgm("jurejure")
+	await get_tree().create_timer(audio.BGM_FADE_SECONDS + 0.10).timeout
+	_assert_single_finished_crossfade(audio, "jurejure")
+	var jurejure_stream:AudioStreamMP3 = audio.bgm_players[audio.active_bgm].stream as AudioStreamMP3
+	assert(jurejure_stream != null and jurejure_stream.loop)
+	audio.play_bgm("puku_battle")
+	await get_tree().create_timer(audio.BGM_FADE_SECONDS + 0.10).timeout
+	_assert_single_finished_crossfade(audio, "puku_battle")
+	var battle_stream:AudioStreamMP3 = audio.bgm_players[audio.active_bgm].stream as AudioStreamMP3
+	assert(battle_stream != null and battle_stream.loop)
+	audio.play_bgm("habitat")
+	await get_tree().create_timer(audio.BGM_FADE_SECONDS + 0.10).timeout
+	_assert_single_finished_crossfade(audio, "habitat")
+
 	audio._pause_bgm_for_background()
 	assert(audio.application_audio_paused and _unpaused_playing_count(audio) == 0)
 	audio._resume_bgm_from_background()
@@ -58,7 +75,7 @@ func _ready() -> void:
 	await get_tree().create_timer(audio.BGM_FADE_SECONDS + 0.10).timeout
 	_assert_single_finished_crossfade(audio, "shop")
 
-	print("WEB_AUDIO_SMOKE_OK locked_start=silent playback=stream crossfade=single visibility=pause_resume")
+	print("WEB_AUDIO_SMOKE_OK locked_start=silent playback=stream crossfade=single jurejure_sequence=true mp3_loop=true visibility=pause_resume")
 	get_tree().quit()
 
 func _playing_count(audio:Node) -> int:
