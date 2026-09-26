@@ -12,7 +12,7 @@ const PAGE_TEXTURES: Array[Texture2D] = [
 	preload("res://assets/opening_story/page-4.jpg")
 ]
 const PAGE_TEXT_KEYS := ["opening_story_1", "opening_story_2", "opening_story_3", "opening_story_4"]
-const PAGE_FONT_SIZES := [18, 18, 16, 14]
+const PAGE_FONT_SIZES := [20, 20, 20, 20]
 
 var current_page_index := -1
 var replay_mode := false
@@ -52,15 +52,14 @@ func _build_ui() -> void:
 
 	text_panel = Panel.new()
 	text_panel.name = "StoryTextPanel"
-	text_panel.position = Vector2(0, 590)
-	text_panel.size = Vector2(576, 434)
+	text_panel.position = Vector2(14, 586)
+	text_panel.size = Vector2(548, 414)
 	text_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var panel_style := StyleBoxFlat.new()
 	panel_style.bg_color = Color(0.105, 0.055, 0.035, 0.92)
 	panel_style.border_color = Color(0.89, 0.68, 0.39, 0.48)
-	panel_style.border_width_top = 2
-	panel_style.corner_radius_top_left = 24
-	panel_style.corner_radius_top_right = 24
+	panel_style.set_border_width_all(2)
+	panel_style.set_corner_radius_all(24)
 	panel_style.shadow_color = Color(0.04, 0.02, 0.01, 0.35)
 	panel_style.shadow_size = 8
 	text_panel.add_theme_stylebox_override("panel", panel_style)
@@ -68,9 +67,9 @@ func _build_ui() -> void:
 
 	story_text = Label.new()
 	story_text.name = "StoryText"
-	story_text.position = Vector2(26, 604)
-	story_text.size = Vector2(524, 358)
-	story_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	story_text.position = Vector2(24, 600)
+	story_text.size = Vector2(528, 346)
+	story_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	story_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	story_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	story_text.add_theme_color_override("font_color", Color("#fff6df"))
@@ -95,7 +94,7 @@ func _build_ui() -> void:
 
 	tap_hint = Label.new()
 	tap_hint.name = "StoryTapHint"
-	tap_hint.position = Vector2(148, 970)
+	tap_hint.position = Vector2(148, 954)
 	tap_hint.size = Vector2(280, 36)
 	tap_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	tap_hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -166,15 +165,15 @@ func _show_page(index: int) -> void:
 	page_image.texture = PAGE_TEXTURES[index]
 	page_image.modulate = Color.WHITE
 	if index==3:
-		text_panel.position.y=526
-		text_panel.size.y=498
-		story_text.position.y=540
-		story_text.size.y=414
+		text_panel.position.y=506
+		text_panel.size.y=494
+		story_text.position.y=520
+		story_text.size.y=410
 	else:
-		text_panel.position.y=590
-		text_panel.size.y=434
-		story_text.position.y=604
-		story_text.size.y=358
+		text_panel.position.y=586
+		text_panel.size.y=414
+		story_text.position.y=600
+		story_text.size.y=346
 	story_text.text = Localizer.text(language_code, PAGE_TEXT_KEYS[index])
 	story_text.add_theme_font_size_override("font_size", int(PAGE_FONT_SIZES[index]))
 	story_text.modulate = Color.WHITE

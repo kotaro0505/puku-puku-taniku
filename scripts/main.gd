@@ -31,6 +31,7 @@ const SlotMachineScene = preload("res://scenes/slot_machine.tscn")
 const DEVELOPMENT_CATALOG_PREVIEW_ENABLED := true
 const SECRET_GACHA_ALWAYS_PLAYABLE := true
 const PROGRESSION_VERSION := 23
+const SAVE_PATH := "user://records.json"
 const LEGACY_HABITAT_REGENERATION_VERSION := 17
 const INITIAL_SERIES_ID := "base"
 const ORIGINAL_SERIES_ID := "base"
@@ -430,6 +431,7 @@ var species_get_queue:Array[Dictionary]=[]
 var species_get_active_context:=""
 var language_code:="ja"
 var language_selected:=false
+var save_file_present_on_boot:=false
 var first_habitat_gift_claimed:=false
 var old_catalog_pages:=0
 var old_catalog_page_inventory:Dictionary={}
@@ -626,7 +628,11 @@ func _ready() -> void:
 	if not legacy_habitat_notification_ids_to_cancel.is_empty():
 		habitat_notification_service=HabitatNotificationServiceClass.new();add_child(habitat_notification_service)
 		habitat_notification_service.cancel_all(legacy_habitat_notification_ids_to_cancel);legacy_habitat_notification_ids_to_cancel.clear()
-	if best_spawn_unlocks_dirty or get_counts_migration_dirty or recovered_forest_encounters:_save();best_spawn_unlocks_dirty=false;get_counts_migration_dirty=false
+	if best_spawn_unlocks_dirty or get_counts_migration_dirty or recovered_forest_encounters:
+		# A true cold start must reach the language choice before creating its
+		# first save.  The selected language then persists all initialized state.
+		if save_file_present_on_boot or language_selected:_save()
+		best_spawn_unlocks_dirty=false;get_counts_migration_dirty=false
 	_build_world()
 	_build_ui()
 	if habitat_awakened and (habitat_wild_initialized or habitat_unlocked):_ensure_habitat_wild_state(Time.get_unix_time_from_system(),true)
@@ -793,9 +799,12 @@ func _load_pot_data()->void:
 func _load_save() -> void:
 	_cancel_puku_gauge_animations()
 	legacy_habitat_migration_dirty=false;legacy_habitat_notification_ids_to_cancel.clear();panda_beacon_unread_log.clear()
-	if FileAccess.file_exists("user://records.json"):
-		var value = JSON.parse_string(FileAccess.get_file_as_string("user://records.json"))
+	save_file_present_on_boot=false
+	language_selected=false
+	if FileAccess.file_exists(SAVE_PATH):
+		var value = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
 		if value is Dictionary:
+			save_file_present_on_boot=true
 			var saved_progression_version:=int(value.get("progression_version",0))
 			# Legacy `yen`, `money`, and `coins` fields are intentionally ignored. They
 			# remain valid JSON input, but game progression now uses puku coins only.
@@ -933,7 +942,7 @@ func _load_save() -> void:
 			_migrate_mystery_route_progress()
 
 func _save() -> void:
-	var f := FileAccess.open("user://records.json",FileAccess.WRITE)
+	var f := FileAccess.open(SAVE_PATH,FileAccess.WRITE)
 	if audio_manager:audio_settings=audio_manager.settings_dictionary()
 	var payload:={
 		"progression_version":PROGRESSION_VERSION,"bests":bests,"discovered":discovered,"species_get_counts":species_get_counts,
