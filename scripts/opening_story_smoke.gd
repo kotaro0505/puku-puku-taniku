@@ -30,6 +30,9 @@ func _ready()->void:
 	assert(not FileAccess.file_exists(SAVE_PATH))
 	assert(game.opening_language_panel.visible and game.opening_tap_area.disabled)
 	assert(not game.opening_prompt.visible and not game.opening_prompt_localized.visible)
+	var initial_language_buttons:Array=game.opening_language_panel.find_children("*","Button",true,false)
+	assert(initial_language_buttons.size()==3)
+	assert([initial_language_buttons[0].text,initial_language_buttons[1].text,initial_language_buttons[2].text]==["日本語","English","ひらがな"])
 	game._finish_opening();await get_tree().process_frame
 	assert(game.opening_overlay.visible and not game.opening_story_overlay.visible)
 	game._select_initial_language("ja")
