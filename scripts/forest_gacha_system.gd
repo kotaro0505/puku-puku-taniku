@@ -71,6 +71,7 @@ func eligible_species(series_id:String,creative_allowed:=true)->Array[Dictionary
 	for species_id_value in series_entry.get("species_ids",[]):
 		var entry:Dictionary=species_by_id.get(str(species_id_value),{})
 		if entry.is_empty() or bool(entry.get("special_route_only",false)):continue
+		if str(entry.get("story_group","")).to_lower()=="jurejure":continue
 		if not creative_allowed and not bool(entry.get("main_story_original",false)):continue
 		if str(entry.get("rarity","")) in ["隠し原種","謎品種"]:continue
 		result.append(entry)

@@ -1,11 +1,11 @@
 extends Node
 
-const KNOWN_ZERO := ["colorata","lutea"]
+const KNOWN_ZERO := ["colorata","lutea","pinwheel"]
 const KNOWN_ONE := "golden_kannte"
 const KNOWN_TWO := "golden_laui"
 const UNLOCKED_NEW := "shaviana"
 const LOCKED_NEW := "gummy_peach_milk"
-const EXCLUDED := ["pinwheel","glow_colorata","metal_laui"]
+const EXCLUDED := ["glow_colorata","metal_laui"]
 
 func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
@@ -21,7 +21,7 @@ func _ready()->void:
 	get_tree().quit()
 
 func _configure_probe_catalog(game:Node)->void:
-	game.habitat_second_awakened=true
+	game.act2_unlocked=true
 	var ids:=KNOWN_ZERO+[KNOWN_ONE,KNOWN_TWO,UNLOCKED_NEW,LOCKED_NEW]+EXCLUDED
 	var probes:Array[Dictionary]=[]
 	for species_id in ids:
@@ -37,6 +37,8 @@ func _configure_probe_catalog(game:Node)->void:
 	# two exclusion paths are exercised independently.
 	var mystery:Dictionary=game._catalog_entry("metal_laui");mystery["special_route_only"]=false
 	game.discovered={KNOWN_ZERO[0]:true,KNOWN_ZERO[1]:true,KNOWN_ONE:true,KNOWN_TWO:true,EXCLUDED[0]:true,EXCLUDED[1]:true}
+	game.discovered[KNOWN_ZERO[2]]=true
+	game.species_get_counts={KNOWN_ZERO[0]:1,KNOWN_ZERO[1]:1,KNOWN_ZERO[2]:1,KNOWN_ONE:1,KNOWN_TWO:1,EXCLUDED[0]:1,EXCLUDED[1]:1}
 	game.greenhouse_available=game.discovered.duplicate(true)
 	game.unlocked_series={"base":true}
 	game.forest_gacha_encountered.clear()
@@ -61,13 +63,14 @@ func _test_exact_routes(game:Node)->void:
 	assert(not bool(game.discovered.get(LOCKED_NEW,false)) and not bool(game.unlocked_series.get("gummy",false)))
 
 func _test_uniform_known_category(game:Node)->void:
-	var counts:={KNOWN_ZERO[0]:0,KNOWN_ZERO[1]:0}
+	var counts:={KNOWN_ZERO[0]:0,KNOWN_ZERO[1]:0,KNOWN_ZERO[2]:0}
 	for draw in range(12000):
 		var species_id:=str(game._select_species_for_seed("normal",.50).species_id)
 		assert(species_id in KNOWN_ZERO)
 		counts[species_id]=int(counts[species_id])+1
-	var heavy_ratio:=float(counts[KNOWN_ZERO[0]])/12000.0
-	assert(heavy_ratio>.47 and heavy_ratio<.53)
+	for species_id in KNOWN_ZERO:
+		var ratio:=float(counts[species_id])/12000.0
+		assert(ratio>.30 and ratio<.36)
 
 func _test_distribution(game:Node)->void:
 	game.forest_gacha_encountered.clear()

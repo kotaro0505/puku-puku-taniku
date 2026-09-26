@@ -146,25 +146,45 @@ func _ready() -> void:
 	assert(bool(game.discovered.get("colorata", false)))
 	assert(bool(game.discovered.get("affinis", false)))
 	assert(bool(game.discovered.get("shaviana", false)))
+	assert(game._species_get_count("affinis") == 0 and game._species_get_count("shaviana") == 0)
+	assert(not bool(game.greenhouse_available.get("affinis", false)) and not bool(game.greenhouse_available.get("shaviana", false)))
+	assert(game.species_get_overlay.visible)
+	assert(game.species_get_overlay.name_label.text == Localizer.species_name("ja", game._catalog_entry("affinis")))
+	assert(game.species_get_overlay.badge_label.text == Localizer.text("ja", "original_catalog_new"))
+	await get_tree().create_timer(.65).timeout
+	game.species_get_overlay.close_overlay()
+	await get_tree().create_timer(.45).timeout
+	assert(game.species_get_overlay.visible)
+	assert(game.species_get_overlay.name_label.text == Localizer.species_name("ja", game._catalog_entry("shaviana")))
+	assert(game.species_get_overlay.badge_label.text == Localizer.text("ja", "original_catalog_new"))
+	await get_tree().create_timer(.65).timeout
+	game.species_get_overlay.close_overlay()
+	await get_tree().create_timer(.45).timeout
 	assert(not game.mystery_items_acquired and not game.encyclopedia_unlocked)
 	game._update_play_ui();assert(not game.puku_gauge_area.visible and not game.encyclopedia_icon_button.visible)
-	assert(game.main_story_stage == game.StoryProgressionClass.STAGE_FIND_HABITAT)
+	assert(game.main_story_stage == game.StoryProgressionClass.ACT_1)
 	assert(game.tutorial_guide_overlay.visible and str(game.tutorial_guide_button.get_meta("target", "")) == "habitat")
 	assert(game.tutorial_guide_button.size.is_equal_approx(game.mode_button.size))
 	assert(game.tutorial_guide_button.custom_minimum_size.is_equal_approx(game.mode_button.size))
 
-	# The actual controls tutorial starts only with the first normal bag after
+	# The actual controls tutorial starts only with the first normal set after
 	# the awakening items have been acquired.
-	game.mystery_items_acquired=true;game.encyclopedia_unlocked=true;game.seed_shop_open=true;game.habitat_awakened=true;game.habitat_tutorial_complete=true;game.mystery_catalog_tutorial_complete=true;game.normal_seed_bags=4;game.current_mode="greenhouse";game.normal_play_tutorial_complete=false;game.seed_pod_gauge_discovery_complete=false;game.puku_buyback_tutorial_complete=false;game.puku_gauge_cm=0.0;game.puku_coin_gauge_cm=0.0
+	game._hide_first_play_tutorial_overlay()
+	game.mystery_items_acquired=true;game.encyclopedia_unlocked=true;game.seed_shop_open=true;game.habitat_awakened=true;game.habitat_tutorial_complete=true;game.mystery_catalog_tutorial_complete=true;game.initial_seed_stock_notice_complete=true;game.normal_seed_bags=1;game.current_mode="greenhouse";game.normal_play_tutorial_complete=false;game.seed_pod_gauge_discovery_complete=false;game.seed_pod_first_reward_seen=false;game.puku_buyback_tutorial_complete=false;game.puku_gauge_cm=0.0;game.puku_coin_gauge_cm=0.0
 	game._update_play_ui();assert(game.best_panel.visible)
-	game._hide_first_play_tutorial_overlay();game._start_greenhouse_play("normal")
+	game._show_tutorial_guide("play_open_normal")
+	assert(str(game.tutorial_guide_button.get_meta("target", "")) == "play_open_normal")
+	game._complete_tutorial_guide()
+	assert(game.scripted_dialog_kind == "first_normal_sow_prompt")
+	assert(game.intro_dialogue_label.text == "じゃあ、蒔いてみるね！")
+	game._advance_scripted_dialog()
+	await get_tree().process_frame
+	assert(game.tutorial_guide_overlay.visible and str(game.tutorial_guide_button.get_meta("target", "")) == "normal_seed")
+	game._complete_tutorial_guide()
 	await get_tree().create_timer(.45).timeout
-	assert(game.play_active and game.first_play_tutorial_active and game.normal_seed_bags==3 and game.current_target_count==12)
+	assert(game.play_active and game.first_play_tutorial_active and game.normal_seed_bags==0 and game.current_target_count==12)
+	for plant in game.plants:plant.fast_forward_to_diameter(2.0)
 	game._process(game.FIRST_PLAY_TUTORIAL_INITIAL_DELAY+.01)
-	assert(game.first_play_tutorial_dialog_visible and game.tutorial_guide_message.text==Localizer.text("ja","tutorial_normal_sow_1"))
-	game._dismiss_first_play_tutorial_dialog();assert(game.tutorial_guide_message.text==Localizer.text("ja","tutorial_normal_sow_2"))
-	game._dismiss_first_play_tutorial_dialog();assert(not game.first_play_tutorial_dialog_visible and game.first_play_tutorial_message_index==2)
-	game._process(.21);game._process(.01)
 	assert(game.first_play_tutorial_dialog_visible and game.tutorial_guide_message.text==Localizer.text("ja","tutorial_normal_sprout"))
 	game._dismiss_first_play_tutorial_dialog()
 	for plant in game.plants:plant.fast_forward_to_diameter(game.FIRST_PLAY_TUTORIAL_GROWTH_DIALOG_CM)
@@ -176,9 +196,8 @@ func _ready() -> void:
 	assert(game.first_play_tutorial_dialog_visible and game.tutorial_guide_message.text==Localizer.text("ja","tutorial_normal_jelly"))
 	game._dismiss_first_play_tutorial_dialog();assert(game.first_play_tutorial_sequence_complete)
 	game._process(.05);await get_tree().process_frame
-	assert(game.puku_gauge_cm>0.0 and is_zero_approx(game.puku_coin_gauge_cm))
-	assert(game.seed_pod_gauge_discovery_complete and game.scripted_dialog_kind=="seed_pod_gauge_discovery" and game.scripted_dialog_pages.size()==2)
-	while not game.scripted_dialog_kind.is_empty():game._advance_scripted_dialog()
+	assert(is_zero_approx(game.puku_gauge_cm) and is_zero_approx(game.puku_coin_gauge_cm))
+	assert(not game.seed_pod_gauge_discovery_complete and game.scripted_dialog_kind.is_empty())
 	for plant in game.plants:plant.fast_forward_to_diameter(game.TUTORIAL_HARVEST_CM + .1)
 	game.play_seed_animations_pending=0;game._process(.01)
 	assert(game.first_play_harvest_guide_active and game.tutorial_guide_message.text==Localizer.text("ja","tutorial_harvest_tap"))
@@ -193,7 +212,36 @@ func _ready() -> void:
 	assert(((seed_center - puku_center) / puku_half_size).length() > 1.0)
 	assert(game.tutorial_guide_message.text==Localizer.text("ja","puku_buyback_2"));game._advance_puku_buyback_tutorial()
 	assert(game.puku_buyback_tutorial_complete and not game.puku_buyback_tutorial_active)
+	assert(Localizer.text("ja","puku_buyback_2") == "このゲージが満タンになったら\n3ぷくコインと交換するね！")
+
+	# Collapse the remaining simulation to the actual final plant. The first
+	# tutorial must fill the pod before the result and grant exactly three sets.
+	game._clear_greenhouse_plants()
+	game.play_seeds_remaining=0;game.play_spawn_queue=0;game.play_seed_animations_pending=0
+	game.spawn_plant(false, Vector3.ZERO)
+	assert(game.plants.size() == 1)
+	var final_plant = game.plants[0]
+	final_plant.fast_forward_to_diameter(30.0)
+	var pod_before_final: float = game.puku_gauge_cm
+	final_plant.harvest()
+	await get_tree().process_frame
+	assert(game.first_seed_pod_reward_event_active and not game.result_overlay.visible)
+	assert(is_equal_approx(game.puku_gauge_cm, pod_before_final + 30.0))
+	await get_tree().create_timer(1.65).timeout
+	assert(game.scripted_dialog_kind == "first_seed_pod_reward")
+	assert(game.scripted_dialog_pages.size() == 4)
+	assert(game.intro_dialogue_label.text == Localizer.text("ja", "seed_pod_tutorial_girl"))
+	for key in ["seed_pod_tutorial_armadillo", "seed_pod_tutorial_panda"]:
+		game._advance_scripted_dialog()
+		assert(game.intro_dialogue_label.text == Localizer.text("ja", key))
+	game._advance_scripted_dialog()
+	assert(game.intro_dialogue_label.text == "たね（12粒）×3セット　GET！")
+	assert(game.normal_seed_bags == 3 and game.seed_pod_first_reward_seen and is_zero_approx(game.puku_gauge_cm))
+	game._advance_scripted_dialog()
+	await get_tree().process_frame
+	assert(game.result_overlay.visible and not game.first_seed_pod_reward_event_active)
+	assert(game.normal_seed_bags == 3)
 
 	assert(Localizer.text("ja","puku_buyback_1") == "育てた多肉はうちのお店で買い取るよ！")
-	print("FIRST_PLAY_TUTORIAL_SMOKE_OK old_seed=manual_25cm_harvest normal=staged_25cm_harvest pod_discovery=true buyback=ellipse")
+	print("FIRST_PLAY_TUTORIAL_SMOKE_OK trio_cards=catalog_only pre_sow=true old_seed=manual_25cm_harvest normal=harvest_only_gauges forced_pod_max=true reward=3sets result_after_reward=true")
 	get_tree().quit()

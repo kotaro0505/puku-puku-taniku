@@ -9,7 +9,7 @@ const DialoguePortraits = preload("res://scripts/dialogue_portraits.gd")
 const DIALOG_KEYS := [
 	"awakening_empty_1", "awakening_empty_2", "awakening_overharvest", "awakening_sow",
 	"_pause_before_memory", "awakening_surprise", "awakening_memory", "awakening_thanks",
-	"awakening_apology", "awakening_promise_1", "awakening_promise_2",
+	"awakening_apology", "awakening_promise_1", "awakening_promise_2", "awakening_promise_3",
 	"awakening_rain_stopping", "_pause_before_sprout", "awakening_sprout_look",
 	"awakening_sprout_panda"
 ]
@@ -17,7 +17,7 @@ const SPEAKER_KEYS := [
 	"story_speaker_armadillo", "story_speaker_panda", "story_speaker_armadillo",
 	"story_speaker_panda", "", "story_speaker_panda", "story_speaker_armadillo",
 	"story_speaker_girl", "story_speaker_girl", "story_speaker_armadillo",
-	"story_speaker_girl", "story_speaker_panda", "", "story_speaker_girl",
+	"story_speaker_girl", "story_speaker_girl", "story_speaker_panda", "", "story_speaker_girl",
 	"story_speaker_panda"
 ]
 const GHOST_TEXTURES: Array[Texture2D] = [

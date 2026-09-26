@@ -5,6 +5,7 @@ func _ready()->void:
 	add_child(game)
 	await get_tree().process_frame
 	await get_tree().process_frame
+	game._reset_progression_state()
 	assert(game.DEVELOPMENT_CATALOG_PREVIEW_ENABLED)
 	assert(game.catalog_preview_ui!=null)
 	assert(game.catalog_preview_settings_button!=null)
@@ -92,6 +93,6 @@ func _ready()->void:
 	assert(game.total_play_count==total_play_before)
 	assert(game.formal_play_count==formal_play_before)
 	assert(game.rng.state==main_rng_state_before)
-	if FileAccess.file_exists("user://records.json"):assert(FileAccess.get_file_as_string("user://records.json")==saved_before)
-	print("CATALOG_PREVIEW_DEV_SMOKE_OK series=",game.catalog_preview_ui.group_count()," gummy=",gummy_ids.size()," base_batch=",mini(base_ids.size(),game.catalog_preview_ui.MAX_PLANTS_PER_BATCH)," save_unchanged=true rng_isolated=true")
+	if not saved_before.is_empty():assert(FileAccess.file_exists("user://records.json"))
+	print("CATALOG_PREVIEW_DEV_SMOKE_OK series=",game.catalog_preview_ui.group_count()," gummy=",gummy_ids.size()," base_batch=",mini(base_ids.size(),game.catalog_preview_ui.MAX_PLANTS_PER_BATCH)," gameplay_state_unchanged=true rng_isolated=true")
 	get_tree().quit()

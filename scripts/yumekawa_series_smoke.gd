@@ -19,7 +19,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	game._reset_progression_state()
-	game.habitat_second_awakened = true
+	game.act2_unlocked = true
 	game.intro_story_complete = true
 	game.mystery_items_acquired = true
 	game.encyclopedia_unlocked = true

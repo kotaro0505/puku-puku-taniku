@@ -35,7 +35,8 @@ func _ready()->void:
 
 func show_species(entry:Dictionary,texture:Texture2D,is_new:bool,context:String,language:String="ja")->void:
 	current_context=context;current_language=Localizer.normalize_language(language);visible=true;busy=true
-	result_image.texture=texture;badge_label.text=Localizer.text(current_language,"original_catalog_new" if context=="first_colorata_catalog" else ("new" if is_new else "get"));name_label.text=Localizer.species_name(current_language,entry)
+	var story_catalog_card:=context in ["first_colorata_catalog","trio_affinis_catalog","trio_shaviana_catalog"]
+	result_image.texture=texture;badge_label.text=Localizer.text(current_language,"original_catalog_new" if story_catalog_card else ("new" if is_new else "get"));name_label.text=Localizer.species_name(current_language,entry)
 	var stars:=clampi(int(entry.get("gold_star_count",0)),0,2);star_rating.star_count=stars;rarity_label.text=Localizer.text(current_language,"super_rare") if stars>0 else "";star_rating.visible=stars>0;hint_label.text=Localizer.text(current_language,"tap_to_close")
 	card.scale=Vector2(.56,.56);card.rotation=-.035;flash.color.a=.94
 	var reveal:=create_tween().set_parallel(true);reveal.tween_property(card,"scale",Vector2.ONE,.44).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT);reveal.tween_property(card,"rotation",0.0,.34).set_trans(Tween.TRANS_QUAD);reveal.tween_property(flash,"color:a",0.0,.52)

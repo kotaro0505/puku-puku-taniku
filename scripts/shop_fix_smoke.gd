@@ -30,13 +30,9 @@ func _ready()->void:
 	game.volume_seed_unlocked=true;game.volume_seed_intro_seen=false;game.shop_overlay.visible=true;game._prepare_shop_visit(false)
 	assert(game.shop_chatter_sequence_kind!="volume_intro")
 
-	game._prepare_shop_visit(true);game._on_armadillo_tapped();assert(game.shop_chatter_sequence_kind=="pinwheel_intro" and not bool(game.discovered.get("pinwheel",false)))
-	while game.shop_chatter_bubble.visible:game._dismiss_or_advance_shop_chatter()
-	assert(bool(game.discovered.get("pinwheel",false)))
-	await get_tree().process_frame
-	if game.species_get_overlay.visible:
-		game.species_get_overlay.busy=false;game.species_get_overlay.close_overlay();await get_tree().create_timer(.2).timeout
-	if game.scripted_dialog_kind=="armadillo_mystery_intro":game._finish_scripted_dialog()
+	game._prepare_shop_visit(true);game._queue_armadillo_progress_event()
+	assert(game.pending_armadillo_story_event.is_empty() and game.shop_chatter_sequence_kind!="pinwheel_intro")
+	assert(not bool(game.discovered.get("pinwheel",false)))
 
 	game._save();game.mystery_items_acquired=false;game.encyclopedia_unlocked=false;game.seed_shop_open=false;game._load_save();game._update_play_ui()
 	assert(game.mystery_items_acquired and game.encyclopedia_unlocked and game.seed_shop_open and game.shop_button.visible)

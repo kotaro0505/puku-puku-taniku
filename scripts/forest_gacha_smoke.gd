@@ -5,7 +5,7 @@ const FIRST_FIVE:=5
 func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
-	game._reset_progression_state();game.opening_story_complete=true;game.intro_story_complete=true;game.first_colorata_confirmed=true;game.trio_originals_confirmed=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.habitat_arrival_started=true;game.habitat_awakened=true;game.habitat_awakening_event_complete=true;game.habitat_second_awakened=true;game.habitat_second_awakening_complete=true;game.habitat_tutorial_started=true;game.habitat_tutorial_complete=true;game.seed_shop_open=true;game.panda_beacon_unlocked=true;game.panda_beacon_count=1;game.puku_gauge_intro_complete=true;game.total_play_count=3;game.puku_points=20;game._update_play_ui()
+	game._reset_progression_state();game.opening_story_complete=true;game.intro_story_complete=true;game.first_colorata_confirmed=true;game.trio_originals_confirmed=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.habitat_arrival_started=true;game.habitat_awakened=true;game.habitat_awakening_event_complete=true;game.habitat_tutorial_started=true;game.habitat_tutorial_complete=true;game.seed_shop_open=true;game.panda_beacon_unlocked=true;game.panda_beacon_count=1;game.puku_gauge_intro_complete=true;game.total_play_count=3;game.puku_points=20;game.current_mode="greenhouse";game._update_play_ui()
 	_test_assets_and_routes(game)
 	_test_draw_rules(game)
 	await _test_spin_capsule_and_reveal(game)
@@ -22,12 +22,26 @@ func _test_assets_and_routes(game)->void:
 	var dial:=game.forest_gacha_ui.find_child("TemporaryDial",true,false) as TextureRect;assert(dial!=null and dial.texture.resource_path=="res://assets/forest_gacha/temporary-dial.png")
 	assert(dial.size==game.forest_gacha_ui.DIAL_SIZE and (dial.position+dial.size*.5).is_equal_approx(game.forest_gacha_ui.DIAL_CENTER))
 	var dial_image:=dial.texture.get_image();assert(dial_image!=null and dial_image.detect_alpha()!=Image.ALPHA_NONE and dial_image.get_pixel(0,0).a<.01)
+	game.act2_unlocked=false;game.forest_gacha_unlocked=false;game.forest_gacha_intro_seen=false;game._update_play_ui()
+	assert(not game.forest_gacha_button.visible and not shop_route.visible)
+	game._open_forest_gacha();assert(not game.forest_gacha_ui.visible)
+	game.act2_unlocked=true;game.forest_gacha_unlocked=true;game._update_play_ui()
+	assert(not game.forest_gacha_button.visible and not shop_route.visible)
+	game._start_forest_gacha_intro_event()
+	assert(game.scripted_dialog_kind=="forest_gacha_intro" and game.intro_dialogue_label.text=="そういえば……森の方で変な機械を見つけたんだ。")
+	game._advance_scripted_dialog();assert(game.intro_dialogue_label.text=="森のガチャが使えるようになった！")
+	game._advance_scripted_dialog();game._update_play_ui()
+	assert(game.forest_gacha_intro_seen and game.forest_gacha_button.visible and shop_route.visible)
 	game._open_shop();assert(game.shop_overlay.visible);shop_route.pressed.emit();assert(game.forest_gacha_ui.visible and not game.shop_overlay.visible);game._close_forest_gacha()
 	game._open_forest_gacha();assert(game.forest_gacha_ui.visible);game._close_forest_gacha()
 
 func _test_draw_rules(game)->void:
 	var test_rng:=RandomNumberGenerator.new();test_rng.seed=20260909
 	var unlocked:Dictionary={"base":true};var encountered:Dictionary={};var known:Dictionary={"colorata":true}
+	var pre_act_two_series:Array[Dictionary]=game.forest_gacha_system.eligible_series(true,unlocked,false)
+	assert(pre_act_two_series.size()==1 and str(pre_act_two_series[0].get("series_id",""))=="base")
+	for original_entry in game.forest_gacha_system.eligible_species("base",false):
+		assert(bool(original_entry.get("main_story_original",false)) and str(original_entry.get("story_group",""))!="jurejure")
 	for draw_number in range(1,FIRST_FIVE+1):
 		var first_result:Dictionary=game.forest_gacha_system.draw(draw_number,unlocked,known,encountered,test_rng,0.0);assert(first_result.source=="unlocked" and str(first_result.series_id)=="base")
 	var locked_result:Dictionary=game.forest_gacha_system.draw(6,unlocked,known,encountered,test_rng,0.0);assert(locked_result.source=="locked" and str(locked_result.series_id)!="neon" and not game._is_hidden_series(str(locked_result.series_id)))
@@ -50,7 +64,8 @@ func _test_spin_capsule_and_reveal(game)->void:
 	game.puku_points=0;var previous_count:int=game.forest_gacha_draw_count;game._open_forest_gacha();game._spin_forest_gacha();assert(game.forest_gacha_draw_count==previous_count and game.puku_points==0);game._close_forest_gacha()
 
 func _test_encounter_save_and_unlock(game)->void:
-	var target_id:="gummy_peach_milk";game.unlocked_series.erase("gummy");game.discovered.erase(target_id);game.greenhouse_available.erase(target_id);game.unlocked_species.erase(target_id);game.forest_gacha_encountered={target_id:true};game.forest_gacha_draw_count=9;game._save();game.forest_gacha_encountered.clear();game.forest_gacha_draw_count=0;game._load_save();assert(game.forest_gacha_draw_count==9 and bool(game.forest_gacha_encountered.get(target_id,false)) and not bool(game.discovered.get(target_id,false)))
+	var target_id:="gummy_peach_milk";game.unlocked_series.erase("gummy");game.discovered.erase(target_id);game.greenhouse_available.erase(target_id);game.unlocked_species.erase(target_id);game.forest_gacha_encountered={target_id:true};game.forest_gacha_draw_count=9;game.act2_unlocked=true;game.forest_gacha_unlocked=true;game.forest_gacha_intro_seen=true;game._save();game.forest_gacha_encountered.clear();game.forest_gacha_draw_count=0;game.act2_unlocked=false;game.forest_gacha_unlocked=false;game.forest_gacha_intro_seen=false;game._load_save();assert(game.forest_gacha_draw_count==9 and bool(game.forest_gacha_encountered.get(target_id,false)) and not bool(game.discovered.get(target_id,false)))
+	assert(game.act2_unlocked and game.forest_gacha_unlocked and game.forest_gacha_intro_seen)
 	var registered:Array[String]=game._unlock_series_and_register_encounters("gummy");assert(target_id in registered and bool(game.discovered.get(target_id,false)) and bool(game.greenhouse_available.get(target_id,false)))
 	game.unlocked_series.erase("gummy");game.discovered.erase(target_id);game.greenhouse_available.erase(target_id);game.unlocked_species.erase(target_id);game.forest_gacha_encountered={target_id:true};game.puku_points=5;game.forest_gacha_ui.open_gacha(game.puku_points,game.forest_gacha_draw_count);game._unlock_forest_gacha_series("gummy",target_id);assert(game.puku_points==5 and bool(game.unlocked_series.get("gummy",false)) and bool(game.discovered.get(target_id,false)) and game.forest_gacha_ui.result_badge.text=="NEW!")
 	game.unlocked_series.erase("gummy");game.discovered.erase(target_id);game.greenhouse_available.erase(target_id);game.unlocked_species.erase(target_id);game.forest_gacha_encountered={target_id:true};game._unlock_series_and_register_encounters("gummy");assert(bool(game.discovered.get(target_id,false)))

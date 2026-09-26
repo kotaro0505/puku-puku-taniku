@@ -2,6 +2,7 @@ extends Node
 
 const StoryProgressionClass = preload("res://scripts/story_progression.gd")
 
+
 func _ready() -> void:
 	var game = load("res://main.tscn").instantiate()
 	add_child(game)
@@ -9,12 +10,13 @@ func _ready() -> void:
 	await get_tree().process_frame
 	game.audio_manager.apply_settings({"bgm_enabled": false, "se_enabled": false})
 	_test_catalog_contract(game)
-	_test_objective_sequence(game)
-	_test_legacy_migration(game)
-	_test_v18_completed_story_migration(game)
+	await _test_three_act_sequence(game)
+	_test_retired_unlock_conditions(game)
+	_test_legacy_three_act_migration(game)
 	game._reset_progression_state()
-	print("STORY_PROGRESSION_SMOKE_OK originals=12 stages=11 second_awakening=true common_migration=true v18_completion_migration=true preservation=true")
+	print("STORY_PROGRESSION_SMOKE_OK acts=3 first_battle=act2 fantasy=1+6+24 act3=next_habitat crisis=visual_only old_objectives=removed old_gates=retired migration=preserved")
 	get_tree().quit()
+
 
 func _test_catalog_contract(game: Node) -> void:
 	assert(game.INITIAL_SERIES_ID == "base")
@@ -33,167 +35,182 @@ func _test_catalog_contract(game: Node) -> void:
 			modern_annotations.append(str(entry.get("species_id", "")))
 	assert(originals == StoryProgressionClass.MAIN_STORY_ORIGINAL_IDS)
 	assert(originals.size() == 12 and modern_annotations.size() == 9)
+	for ordinary_id in ["hyalina_san_luis_de_la_paz", "purpusorum", "pinwheel", "tovarensis_tovar", "strictiflora_bustamante"]:
+		var ordinary_entry: Dictionary = game._catalog_entry(ordinary_id)
+		assert(not ordinary_entry.is_empty())
+		assert(bool(ordinary_entry.get("main_story_original", false)))
+		assert(str(ordinary_entry.get("rarity", "")) == "通常")
+		assert(float(ordinary_entry.get("spawn_weight", 0.0)) > 0.0)
+		assert(not bool(ordinary_entry.get("special_route_only", false)))
+	var unlock_rules = JSON.parse_string(FileAccess.get_file_as_string("res://data/unlock-rules.json"))
+	assert(unlock_rules is Array and unlock_rules.is_empty())
+	var main_source := FileAccess.get_file_as_string("res://scripts/main.gd")
+	var localizer_source := FileAccess.get_file_as_string("res://scripts/game_localizer.gd")
+	assert(not main_source.contains("objective_") and not localizer_source.contains("objective_"))
+	assert(not main_source.contains("unlock_after_plays") and not localizer_source.contains("unlock_after_plays"))
+	assert(not localizer_source.contains("catalog_field"))
+	var progression_source := FileAccess.get_file_as_string("res://scripts/story_progression.gd")
+	for retired_stage_name in ["STAGE_ORIGINALS_5", "STAGE_SIZE_50", "STAGE_ORIGINALS_8", "STAGE_SIZE_100", "STAGE_ORIGINALS_12", "STAGE_SECOND_AWAKENING"]:
+		assert(not progression_source.contains(retired_stage_name))
+	assert(game.find_child("*Objective*", true, false) == null)
 
-func _test_objective_sequence(game: Node) -> void:
+
+func _test_three_act_sequence(game: Node) -> void:
 	game._reset_progression_state()
+	game.opening_story_overlay.visible = false
+	game.intro_overlay.visible = false
 	game.intro_story_complete = true
-	game._update_main_story_progress(false)
-	assert(game.main_story_stage == StoryProgressionClass.STAGE_OLD_SEED)
 	game.first_colorata_confirmed = true
-	game.discovered = {"colorata": true}
-	game._update_main_story_progress(false)
-	assert(game.main_story_stage == StoryProgressionClass.STAGE_TRIO)
 	game.trio_originals_confirmed = true
-	game.discovered["lutea"] = true
-	game.discovered["shaviana"] = true
 	game.habitat_unlocked = true
-	game._update_main_story_progress(false)
-	assert(game.main_story_stage == StoryProgressionClass.STAGE_FIND_HABITAT)
 	game.habitat_arrival_started = true
-	game._update_main_story_progress(false)
-	assert(game.main_story_stage == StoryProgressionClass.STAGE_AWAKEN_HABITAT)
 	game.habitat_awakened = true
-	game._update_main_story_progress(false)
-	assert(game.main_story_stage == StoryProgressionClass.STAGE_ORIGINALS_5)
-	for species_id in ["hyalina_san_luis_de_la_paz", "purpusorum"]:
-		game.discovered[species_id] = true
-	game._update_main_story_progress(false)
-	assert(game.main_story_stage == StoryProgressionClass.STAGE_SIZE_50)
-	game.bests["colorata"] = 50.0
-	game._update_main_story_progress(false)
-	assert(game.main_story_stage == StoryProgressionClass.STAGE_ORIGINALS_8)
-	for species_id in ["pinwheel", "juliana", "affinis"]:
-		game.discovered[species_id] = true
-	game._update_main_story_progress(false)
-	assert(game.main_story_stage == StoryProgressionClass.STAGE_SIZE_100)
-	game.bests["lutea"] = 100.0
-	game._update_main_story_progress(false)
-	assert(game.main_story_stage == StoryProgressionClass.STAGE_ORIGINALS_12)
-	for species_id in StoryProgressionClass.MAIN_STORY_ORIGINAL_IDS:
-		game.discovered[species_id] = true
-	game._update_main_story_progress(false)
-	assert(game.main_story_stage == StoryProgressionClass.STAGE_SECOND_AWAKENING)
-	assert(not game.main_story_complete and not game.main_story_completion_seen)
-	game._start_original_catalog_complete_event()
-	assert(game.scripted_dialog_kind == "original_catalog_complete")
-	var completion_text := ""
-	for page in game.scripted_dialog_pages:
-		completion_text += str(page.get("text", ""))
-	assert("全部この世界に戻ってきた" in completion_text)
-	assert("今は多肉が生きている" in completion_text)
-	while not game.scripted_dialog_kind.is_empty():
-		game._advance_scripted_dialog()
-	assert(game.original_catalog_complete_event_seen and not game.main_story_complete)
-	game.current_mode = "habitat"
-	game.jurejure_intro_complete = true
-	game._start_habitat_second_awakening()
-	assert(game.habitat_second_awakening_overlay.visible)
-	assert(not game.jurejure_return_event_complete)
-	var overlay_guard := 0
-	while game.habitat_second_awakening_overlay.visible and overlay_guard < 10:
-		var expects_story_portrait: bool = game.habitat_second_awakening_overlay.page_index in [1, 2]
-		assert(game.habitat_second_awakening_overlay.speaker_portrait.visible == expects_story_portrait)
-		if expects_story_portrait:
-			assert(game.habitat_second_awakening_overlay.speaker_portrait.texture != null)
-			assert(game.habitat_second_awakening_overlay.speaker_portrait.position.x < game.habitat_second_awakening_overlay.dialogue_label.position.x)
-		game.habitat_second_awakening_overlay.advance()
-		overlay_guard += 1
-	assert(overlay_guard == 4)
-	assert(game.habitat_second_awakened and game.habitat_second_awakening_complete)
-	assert(game.main_story_stage == StoryProgressionClass.STAGE_COMPLETE)
-	assert(game.main_story_completion_seen and game.main_story_complete)
-	assert(not game.jurejure_return_event_complete)
-
-func _test_legacy_migration(game: Node) -> void:
-	game._reset_progression_state()
-	game.opening_story_complete = true
-	game.intro_story_complete = true
-	game.habitat_unlocked = true
+	game.habitat_awakening_event_complete = true
 	game.habitat_tutorial_started = true
 	game.habitat_tutorial_complete = true
+	game.habitat_tutorial_returned_to_greenhouse = true
+	game.mystery_items_acquired = true
+	game.mystery_catalog_tutorial_complete = true
+	game.seed_shop_open = true
 	game.puku_gauge_intro_complete = true
-	game.panda_beacon_unlocked = true
-	game.panda_beacon_count = 4
-	game.panda_beacon_unread_log.clear()
-	game.panda_beacon_unread_log.append({"individual_id": "legacy_notice", "species_id": "laui", "diameter_cm": 42.3, "jellied_unix": 12345.0})
-	game.puku_points = 37
-	game.puku_gauge_cm = 123.5
-	game.bests = {"colorata": 100.0, "laui": 62.0, "momotaro": 999.0}
-	game.discovered = {"colorata": true, "laui": true, "momotaro": true}
-	game.species_get_counts = {"colorata": 5, "laui": 2, "momotaro": 8}
-	game.unlocked_series = {"common": true, "metal": true}
-	game.greenhouse_available = {"colorata": true, "laui": true, "momotaro": true}
-	game.unlocked_species = game.greenhouse_available.duplicate(true)
-	game.pending_habitat_species = ["laui", "momotaro"]
-	game.series_seed_inventory = {"common": 4, "metal": 2}
-	game.forest_gacha_encountered = {"momotaro": true, "metal_gold_cluster": true}
-	game.habitat_returned_species = {"momotaro": true, "laui": true}
-	game.normal_seed_bags = 6
-	game.volume_seed_bags = 2
+	game.jurejure_intro_complete = true
+	game.jurejure_enabled = true
+	game.current_mode = "greenhouse"
+	game._apply_mode()
+	game._update_main_story_progress(false)
+	assert(game.main_story_stage == StoryProgressionClass.ACT_1)
+
+	# Old completion numbers no longer move the story at all.
+	for species_id in StoryProgressionClass.MAIN_STORY_ORIGINAL_IDS:
+		game.discovered[species_id] = true
+	game.bests["colorata"] = 150.0
+	game.total_play_count = 20
+	game.formal_play_count = 20
+	game.armadillo_research_total = 30
+	game._update_main_story_progress(false)
+	assert(game.main_story_stage == StoryProgressionClass.ACT_1)
+	assert(not game.act2_unlocked and not game.forest_gacha_unlocked)
+
+	# Any normally resolved first battle, including a loss, opens Act 2.
+	game._on_puku_puku_battle_resolved({"won": false, "player_score": 1.0, "opponent_score": 2.0})
+	assert(game.jurejure_battle_count == 1 and game.jurejure_battle_win_count == 0)
+	assert(game.act2_unlocked and game.forest_gacha_unlocked and not game.forest_gacha_intro_seen)
+	assert(game.main_story_stage == StoryProgressionClass.ACT_2)
+	game.forest_gacha_intro_seen = true
+
+	var fantasy_ids: Array[String] = []
+	for entry in game.catalog_species:
+		if game._is_fantasy_species(entry):
+			fantasy_ids.append(str(entry.get("species_id", "")))
+	assert(fantasy_ids.size() >= 24)
+	# Encyclopedia discovery by itself is not a real GET.
+	for index in range(24):
+		game.discovered[fantasy_ids[index]] = true
+	assert(game._unique_fantasy_species_get_count() == 0)
+	assert(not game.act3_unlocked)
+
+	game._record_species_get(fantasy_ids[0])
+	assert(game._unique_fantasy_species_get_count() == 1)
+	game._try_start_pending_story_event()
+	assert(game.scripted_dialog_kind == "fantasy_first_discovery")
+	assert(game.scripted_dialog_pages.size() == 3)
+	assert(str(game.scripted_dialog_pages[0].get("text", "")) == "……なにこれ！？")
+	_finish_dialog(game)
+	assert(game.fantasy_first_discovery_seen)
+
+	for index in range(1, 6):
+		game._record_species_get(fantasy_ids[index])
+	game._try_start_pending_story_event()
+	assert(game.scripted_dialog_kind == "fantasy_realization")
+	assert(game.scripted_dialog_pages.size() == 3)
+	assert("想像したものが、多肉になってる？" in str(game.scripted_dialog_pages[2].get("text", "")))
+	_finish_dialog(game)
+	assert(game.fantasy_realization_seen)
+
+	for index in range(6, 24):
+		game._record_species_get(fantasy_ids[index])
+	assert(game._unique_fantasy_species_get_count() == 24)
+	assert(game.act3_unlocked and game.act3_intro_pending and not game.act3_intro_seen)
+	assert(game.main_story_stage == StoryProgressionClass.ACT_3)
+	assert(game.scripted_dialog_kind.is_empty())
+	# Merely assigning habitat mode is not a visit; the intro waits for the next
+	# real navigation entry and therefore cannot appear behind a GET screen.
+	game.current_mode = "habitat"
+	game._apply_mode()
+	game._try_start_pending_story_event()
+	assert(game.scripted_dialog_kind.is_empty())
+	game.current_mode = "greenhouse"
+	game._apply_mode()
+	game._toggle_mode()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert(game.current_mode == "habitat" and game.scripted_dialog_kind == "act3_intro")
+	assert(str(game.scripted_dialog_pages[0].get("text", "")) == "つまり、欲しいものを想像すればいいんだチュー！？")
+	assert(str(game.scripted_dialog_pages[1].get("text", "")) == "だったら、もっともっと作らせるチュー！")
+	_finish_dialog(game)
+	assert(game.act3_intro_seen and not game.act3_intro_pending)
+
+	# The crisis also waits for a later habitat visit and changes presentation
+	# only. It must not revive the retired rain bonus or mutate collection state.
+	var settled_before: Dictionary = game.habitat_returned_species.duplicate(true)
+	var discovered_before: Dictionary = game.discovered.duplicate(true)
+	var get_counts_before: Dictionary = game.species_get_counts.duplicate(true)
+	var seeds_before: int = game.normal_seed_bags
+	game.habitat_crisis_pending = true
+	game.habitat_crisis_started = false
+	game.finale_complete = false
+	game.habitat_crisis_eligible_visit_id = game.habitat_visit_id
+	game._try_start_pending_story_event()
+	assert(game.scripted_dialog_kind.is_empty())
+	game._toggle_mode()
+	game._toggle_mode()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert(game.current_mode == "habitat" and game.scripted_dialog_kind == "habitat_crisis")
+	assert(game.habitat_crisis_started and not game.habitat_crisis_pending)
+	assert(game.habitat_crisis_atmosphere.crisis_active and game.habitat_crisis_atmosphere.visible)
+	assert(str(game.scripted_dialog_pages[0].get("text", "")) == "……おかしい。")
+	assert("自然の中で創造していることを" in str(game.scripted_dialog_pages[5].get("text", "")))
+	assert(not game.rain_bonus_active and not game.rain_bonus_in_progress and game.rain_bag_count == 0)
+	assert(game.rain_visual == null)
+	assert(game.habitat_returned_species == settled_before)
+	assert(game.discovered == discovered_before and game.species_get_counts == get_counts_before)
+	assert(game.normal_seed_bags == seeds_before)
+	_finish_dialog(game)
+	assert(game.finale_complete and game.main_story_stage == StoryProgressionClass.ACT_FINALE)
+
+
+func _test_retired_unlock_conditions(game: Node) -> void:
+	game._reset_progression_state()
+	var special_ids := ["hyalina_san_luis_de_la_paz", "purpusorum", "pinwheel", "tovarensis_tovar", "strictiflora_bustamante"]
+	game.bests = {"colorata": 100.0, "lutea": 60.0, "shaviana": 60.0}
+	game.total_play_count = 13
+	game.normal_play_count = 13
+	game.formal_play_count = 13
+	game.armadillo_research_total = 25
+	game._evaluate_unlock_rules("harvest_size", 100.0)
+	assert(not game._evaluate_best_spawn_unlocks())
+	game._queue_armadillo_progress_event()
+	game._prepare_tovar_event_for_play()
+	assert(game.pending_armadillo_story_event.is_empty() and not game.tovar_event_active)
+	for species_id in special_ids:
+		assert(not bool(game.discovered.get(species_id, false)))
+	assert(game.mystery_route_assignments.is_empty())
+
+	# Formal-play counts no longer unlock inventory. Existing inventory remains
+	# usable with no count gate.
+	game.volume_seed_unlocked = false
+	game.premium_seed_unlocked = false
+	game.volume_seed_bags = 0
+	game.premium_seed_bags = 0
+	game._refresh_seed_pack_unlocks()
+	assert(not game._volume_seed_unlocked() and not game._premium_seed_unlocked())
+	game.volume_seed_bags = 1
 	game.premium_seed_bags = 1
-	game.mystery_seed_bags = 3
-	game.rain_event_pending = true
-	game.rain_bonus_in_progress = true
-	game.rain_time_remaining = 17.0
-	game.saved_arrangements = [{
-		"arrangement_id": "legacy_arrangement", "name": "残す寄せ植え", "pot_id": game.DEFAULT_POT_ID,
-		"created_at": "legacy", "completed": true,
-		"plants": [
-			{"species_id": "colorata", "x": 200.0, "y": 260.0, "scale": 1.0, "rotation": 0.0, "z_index": 0},
-			{"species_id": "momotaro", "x": 300.0, "y": 260.0, "scale": 1.0, "rotation": 0.0, "z_index": 1}
-		]
-	}]
-	var migration_rng := RandomNumberGenerator.new()
-	migration_rng.seed = 180917
-	game.habitat_wild_plants.clear()
-	var migration_species: Array[String] = ["colorata", "laui"]
-	game.HabitatWildSystemClass.initialize_population(game.habitat_wild_plants, migration_species, migration_species, true, Time.get_unix_time_from_system(), migration_rng, game.HABITAT_SAFE_PLANT_POINTS)
-	game.habitat_wild_initialized = true
-	game.habitat_wild_next_spawn_unix = Time.get_unix_time_from_system() + 7200.0
-	var preserved_habitat_id := str(game.habitat_wild_plants[0].get("individual_id", ""))
-	game._save()
-	var payload = JSON.parse_string(FileAccess.get_file_as_string("user://records.json"))
-	assert(payload is Dictionary)
-	payload["progression_version"] = 17
-	payload["panda_beacon_unlocked"] = true
-	payload["panda_beacon_count"] = 4
-	payload["panda_beacon_unread_log"] = [{"individual_id": "legacy_notice", "species_id": "laui"}]
-	payload["rain_event_pending"] = true
-	payload["rain_bonus_in_progress"] = true
-	payload["rain_time_remaining"] = 17.0
-	for new_key in ["first_colorata_confirmed", "trio_originals_confirmed", "habitat_arrival_started", "habitat_awakened", "habitat_awakening_event_complete", "seed_shop_open", "special_series_explanation_seen", "main_story_stage", "main_story_complete", "main_story_completion_seen", "original_catalog_complete_event_seen", "jurejure_intro_complete", "habitat_second_awakened"]:
-		payload.erase(new_key)
-	var file := FileAccess.open("user://records.json", FileAccess.WRITE)
-	file.store_string(JSON.stringify(payload))
-	file.close()
+	assert(game._volume_seed_unlocked() and game._premium_seed_unlocked())
 
-	game._load_save()
-	assert(game.opening_story_complete and game.intro_story_complete)
-	assert(game.first_colorata_confirmed and game.trio_originals_confirmed)
-	assert(game.habitat_unlocked and game.habitat_arrival_started and game.habitat_awakened and game.habitat_awakening_event_complete)
-	assert(game.seed_shop_open and bool(game.unlocked_series.get("base", false)) and bool(game.unlocked_series.get("metal", false)))
-	assert(not bool(game.unlocked_series.get("common", false)) and not game.series_seed_inventory.has("common"))
-	for removed_id in StoryProgressionClass.REMOVED_COMMON_SPECIES_IDS:
-		assert(not game.bests.has(removed_id) and not game.discovered.has(removed_id))
-		assert(not game.species_get_counts.has(removed_id) and not game.greenhouse_available.has(removed_id))
-		assert(not game.forest_gacha_encountered.has(removed_id) and not game.habitat_returned_species.has(removed_id))
-	assert(game.puku_points == 37 and is_equal_approx(game.puku_gauge_cm, 154.375) and is_zero_approx(game.puku_coin_gauge_cm))
-	assert(is_equal_approx(float(game.bests.get("colorata", 0.0)), 100.0) and int(game.species_get_counts.get("laui", 0)) == 2)
-	assert(game.normal_seed_bags == 6 and game.volume_seed_bags == 2 and game.premium_seed_bags == 1 and game.mystery_seed_bags == 3)
-	assert(not game.panda_beacon_unlocked and game.panda_beacon_count == 0 and game.panda_beacon_unread_log.is_empty())
-	assert(not game.rain_event_pending and not game.rain_bonus_in_progress and is_zero_approx(game.rain_time_remaining))
-	assert(not game._habitat_wild_plant_by_id(preserved_habitat_id).is_empty())
-	assert(game.saved_arrangements.size() == 1 and game.saved_arrangements[0].plants.size() == 1)
-	assert(str(game.saved_arrangements[0].plants[0].species_id) == "colorata")
-	for species_id in ["colorata", "affinis", "shaviana", "laui"]:
-		assert(bool(game.habitat_returned_species.get(species_id, false)))
-	game._save()
-	var migrated = JSON.parse_string(FileAccess.get_file_as_string("user://records.json"))
-	assert(int(migrated.get("progression_version", 0)) == game.PROGRESSION_VERSION)
-	assert(bool(migrated.get("habitat_awakened", false)) and migrated.has("main_story_stage"))
-	assert(not migrated.has("panda_beacon_unlocked") and not migrated.has("rain_event_pending"))
 
-func _test_v18_completed_story_migration(game: Node) -> void:
+func _test_legacy_three_act_migration(game: Node) -> void:
 	game._reset_progression_state()
 	game.opening_story_complete = true
 	game.intro_story_complete = true
@@ -205,18 +222,56 @@ func _test_v18_completed_story_migration(game: Node) -> void:
 	game.habitat_awakening_event_complete = true
 	game.habitat_tutorial_started = true
 	game.habitat_tutorial_complete = true
-	game.habitat_tutorial_returned_to_greenhouse = true
-	game.puku_points = 91
-	game.bests["colorata"] = 100.0
-	for species_id in StoryProgressionClass.MAIN_STORY_ORIGINAL_IDS:
-		game.discovered[species_id] = true
-	game.main_story_stage = 9
-	game.main_story_complete = true
-	game.main_story_completion_seen = true
-	game._migrate_story_progress(18)
-	assert(game.original_catalog_complete_event_seen)
-	assert(game.main_story_stage == StoryProgressionClass.STAGE_SECOND_AWAKENING)
-	assert(not game.main_story_complete and not game.main_story_completion_seen)
-	assert(not game.habitat_second_awakened and not game.habitat_second_awakening_complete)
-	assert(not game.jurejure_return_event_complete)
-	assert(game.puku_points == 91)
+	game.mystery_items_acquired = true
+	game.seed_shop_open = true
+	game.puku_gauge_intro_complete = true
+	game.habitat_second_awakened = true
+	game.normal_seed_bags = 6
+	game.volume_seed_bags = 2
+	game.premium_seed_bags = 1
+	game.mystery_seed_bags = 3
+	game.bests = {"colorata": 100.0, "laui": 62.0}
+	game.discovered = {"colorata": true, "hyalina_san_luis_de_la_paz": true, "purpusorum": true, "pinwheel": true, "tovarensis_tovar": true, "transparent_succulent": true}
+	game.species_get_counts = {"colorata": 3, "hyalina_san_luis_de_la_paz": 1, "purpusorum": 1, "pinwheel": 1, "tovarensis_tovar": 1, "transparent_succulent": 1}
+	game.greenhouse_available = game.discovered.duplicate(true)
+	game.unlocked_species = game.greenhouse_available.duplicate(true)
+	game.habitat_returned_species = {"colorata": true, "laui": true, "transparent_succulent": true}
+	var fantasy_ids: Array[String] = []
+	for entry in game.catalog_species:
+		if game._is_fantasy_species(entry):
+			fantasy_ids.append(str(entry.get("species_id", "")))
+	for index in range(24):
+		game.discovered[fantasy_ids[index]] = true
+		game.species_get_counts[fantasy_ids[index]] = 1
+		game.greenhouse_available[fantasy_ids[index]] = true
+		game.habitat_returned_species[fantasy_ids[index]] = true
+	game.completed_unlock_conditions = {"legacy_40cm": true, "legacy_play_13": true}
+	game._save()
+	var payload = JSON.parse_string(FileAccess.get_file_as_string("user://records.json"))
+	assert(payload is Dictionary)
+	payload["progression_version"] = 23
+	for key in ["act2_unlocked", "forest_gacha_unlocked", "forest_gacha_intro_seen", "fantasy_first_discovery_seen", "fantasy_realization_seen", "act3_unlocked", "act3_intro_pending", "act3_intro_seen", "jurejure_species_first_seen", "habitat_crisis_pending", "habitat_crisis_started", "finale_complete"]:
+		payload.erase(key)
+	var file := FileAccess.open("user://records.json", FileAccess.WRITE)
+	file.store_string(JSON.stringify(payload))
+	file.close()
+
+	game.discovered.clear();game.species_get_counts.clear();game.habitat_returned_species.clear();game.normal_seed_bags=0
+	game._load_save()
+	assert(game.act2_unlocked and game.forest_gacha_unlocked)
+	assert(game.fantasy_first_discovery_seen and game.fantasy_realization_seen)
+	assert(game._unique_fantasy_species_get_count() == 24)
+	assert(game.act3_unlocked and game.act3_intro_pending and not game.act3_intro_seen)
+	assert(game.scripted_dialog_kind.is_empty())
+	assert(game.normal_seed_bags == 6 and game.volume_seed_bags == 2 and game.premium_seed_bags == 1 and game.mystery_seed_bags == 3)
+	assert(bool(game.discovered.get("pinwheel", false)) and game._species_get_count("pinwheel") == 1)
+	assert(bool(game.discovered.get("transparent_succulent", false)) and game._species_get_count("transparent_succulent") == 1)
+	assert(bool(game.habitat_returned_species.get("laui", false)) and bool(game.habitat_returned_species.get("transparent_succulent", false)))
+	assert(bool(game.completed_unlock_conditions.get("legacy_40cm", false)) and bool(game.completed_unlock_conditions.get("legacy_play_13", false)))
+	game._evaluate_unlock_rules("harvest_size", 100.0)
+	assert(game._species_get_count("pinwheel") == 1 and game._species_get_count("transparent_succulent") == 1)
+
+
+func _finish_dialog(game: Node) -> void:
+	while not game.scripted_dialog_kind.is_empty():
+		game._advance_scripted_dialog()

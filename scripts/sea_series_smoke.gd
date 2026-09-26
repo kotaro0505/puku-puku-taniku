@@ -18,7 +18,7 @@ func _ready() -> void:
 	add_child(game)
 	get_tree().paused = false
 	game._reset_progression_state()
-	game.habitat_second_awakened = true
+	game.act2_unlocked = true
 	game.intro_story_complete = true
 	game.mystery_items_acquired = true
 	game.encyclopedia_unlocked = true

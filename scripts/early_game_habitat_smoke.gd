@@ -30,7 +30,7 @@ func _ready() -> void:
 	game._start_habitat_awakening_event()
 	assert(game.habitat_arrival_started and not game.habitat_awakened)
 	assert(game.habitat_awakening_overlay.visible and game.habitat_wild_plants.is_empty())
-	assert(game.main_story_stage == game.StoryProgressionClass.STAGE_AWAKEN_HABITAT)
+	assert(game.main_story_stage == game.StoryProgressionClass.ACT_1)
 	assert(game.habitat_lookaround_active and game.habitat_lookaround_context == "arrival")
 	var arrival_start_yaw: float = game.view_yaw
 	game.habitat_awakening_overlay.advance()
@@ -58,7 +58,10 @@ func _ready() -> void:
 	assert("ありがとう" in awakening_text and "ごめんなさい" in awakening_text)
 	assert("もう同じことはしない" in awakening_text and "返していきます" in awakening_text)
 	assert("……何も起こらない。" not in awakening_text and "聞いてくれたのかな" not in awakening_text)
-	assert(game.habitat_awakening_overlay.SPEAKER_KEYS == ["story_speaker_armadillo", "story_speaker_panda", "story_speaker_armadillo", "story_speaker_panda", "", "story_speaker_panda", "story_speaker_armadillo", "story_speaker_girl", "story_speaker_girl", "story_speaker_armadillo", "story_speaker_girl", "story_speaker_panda", "", "story_speaker_girl", "story_speaker_panda"])
+	assert(game.habitat_awakening_overlay.SPEAKER_KEYS == ["story_speaker_armadillo", "story_speaker_panda", "story_speaker_armadillo", "story_speaker_panda", "", "story_speaker_panda", "story_speaker_armadillo", "story_speaker_girl", "story_speaker_girl", "story_speaker_armadillo", "story_speaker_girl", "story_speaker_girl", "story_speaker_panda", "", "story_speaker_girl", "story_speaker_panda"])
+	assert(Localizer.text("ja", "awakening_overharvest") == "乱獲や密猟も、絶滅の大きな原因だったみたいだ……。")
+	assert(Localizer.text("ja", "awakening_promise_2") == "これから新しく見つけた品種は、\nここにお返していきます。")
+	assert(Localizer.text("ja", "awakening_promise_3") == "だから、また沢山の可愛い多肉植物を\n私たちにも見せてください！")
 	for expected_page in range(1, 4):
 		assert(game.habitat_awakening_overlay.page_index == expected_page)
 		assert(game.habitat_awakening_overlay.speaker_portrait.visible)
@@ -137,10 +140,17 @@ func _ready() -> void:
 	assert(game.seed_pod_story_overlay.modulate.a < 1.0 and game.seed_pod_story_overlay.transitioning)
 	await get_tree().create_timer(.58).timeout
 	assert(is_equal_approx(game.seed_pod_story_overlay.modulate.a, 1.0) and not game.seed_pod_story_overlay.transitioning)
+	assert(is_zero_approx(seed_pod_story_image.modulate.a))
 	for locale in Localizer.SUPPORTED_LANGUAGES:
 		for key in game.seed_pod_story_overlay.DIALOG_KEYS:
 			assert(not Localizer.text(locale, str(key)).is_empty())
-	for expected_page in range(3):
+	assert(game.seed_pod_story_overlay.page_index == 0)
+	assert(game.seed_pod_story_overlay.story_text.text == Localizer.text("ja", "seed_pod_story_1"))
+	game.seed_pod_story_overlay.advance()
+	assert(game.seed_pod_story_overlay.transitioning)
+	await get_tree().create_timer(1.65).timeout
+	assert(is_equal_approx(seed_pod_story_image.modulate.a, 1.0))
+	for expected_page in range(1, 3):
 		assert(game.seed_pod_story_overlay.page_index == expected_page)
 		assert(game.seed_pod_story_overlay.story_text.text == Localizer.text("ja", game.seed_pod_story_overlay.DIALOG_KEYS[expected_page]))
 		assert(game.seed_pod_story_overlay.speaker_portrait.visible and game.seed_pod_story_overlay.speaker_portrait.texture != null)
@@ -154,11 +164,14 @@ func _ready() -> void:
 	assert(game.scene_transition_fade.visible and game.scripted_dialog_kind.is_empty())
 	await get_tree().create_timer(.82).timeout
 	assert(not game.seed_pod_story_overlay.visible and bool(game.tutorial_steps.get("seed_pod_story_seen", false)))
-	assert(game.mystery_items_acquired and game.seed_shop_open and game.normal_seed_bags == 4 and game.puku_points == 0)
+	assert(game.mystery_items_acquired and game.seed_shop_open and game.normal_seed_bags == 0 and game.puku_points == 0)
 	assert(game.current_mode == "greenhouse" and game.seed_pod_gauge_area.visible and game.puku_gauge_area.visible and game.encyclopedia_icon_button.visible)
-	assert(not game.scene_transition_fade.visible and game.scripted_dialog_kind == "mystery_catalog_prompt")
-	assert(game.intro_dialogue_label.text == Localizer.text("ja", "mystery_catalog_prompt"))
-	game._advance_scripted_dialog()
+	assert(not game.scene_transition_fade.visible and game.scripted_dialog_kind == "habitat_return")
+	assert(game.scripted_dialog_pages.size() == 5)
+	var return_keys := ["habitat_return_panda", "habitat_return_girl_1", "habitat_return_armadillo_1", "habitat_return_girl_2", "habitat_return_armadillo_2"]
+	for expected_page in range(return_keys.size()):
+		assert(game.intro_dialogue_label.text == Localizer.text("ja", return_keys[expected_page]))
+		game._advance_scripted_dialog()
 	await get_tree().process_frame
 	assert(game.tutorial_guide_overlay.visible and str(game.tutorial_guide_button.get_meta("target", "")) == "encyclopedia")
 	assert(game.tutorial_guide_shade.color.a >= .7 and game.tutorial_highlight_tween != null)
@@ -176,6 +189,13 @@ func _ready() -> void:
 	game._close_encyclopedia()
 	await get_tree().process_frame
 	assert(game.scripted_dialog_kind == "initial_seed_stock")
+	assert(game.normal_seed_bags == 0 and game.scripted_dialog_pages.size() == 3)
+	assert(game.intro_dialogue_label.text == Localizer.text("ja", "initial_seed_stock_girl"))
+	game._advance_scripted_dialog()
+	assert(game.intro_dialogue_label.text == Localizer.text("ja", "initial_seed_stock_armadillo"))
+	game._advance_scripted_dialog()
+	assert(game.intro_dialogue_label.text == Localizer.text("ja", "initial_seed_stock_received"))
+	assert(game.normal_seed_bags == 1 and game.first_habitat_gift_claimed)
 	game._advance_scripted_dialog()
 	await get_tree().process_frame
 	assert(game.initial_seed_stock_notice_complete and game.tutorial_guide_overlay.visible and str(game.tutorial_guide_button.get_meta("target", "")) == "play_open_normal")
@@ -196,7 +216,7 @@ func _ready() -> void:
 	game._ensure_habitat_wild_state(now_unix, false)
 	assert(game.habitat_wild_plants.size() >= population_before)
 
-	print("EARLY_GAME_HABITAT_SMOKE_OK empty=true dormant=true awakening=rain+ghosts+three_green_sprouts no_second_lookaround=true observation=true items=pod+catalog fade=true stock=4x12 catalog_tutorial=prompt+4 shop=true beacon=retired settlement=true")
+	print("EARLY_GAME_HABITAT_SMOKE_OK empty=true dormant=true awakening=rain+ghosts+three_green_sprouts promise=two_pages observation=true items=pod+catalog image_fade=true return_dialog=5 stock=1x12 catalog_tutorial=4 shop=true beacon=retired settlement=true")
 	get_tree().quit()
 
 func _prepare_trio_complete(game: Node) -> void:
@@ -207,6 +227,8 @@ func _prepare_trio_complete(game: Node) -> void:
 	game.encyclopedia_unlocked = false
 	game.habitat_unlocked = true
 	game.unlocked_series = {"base": true}
-	for species_id in ["colorata", "affinis", "shaviana"]:
-		game._register_species_discovery(species_id, true)
+	game._register_species_discovery("colorata", true)
+	game._register_story_catalog_species("affinis")
+	game._register_story_catalog_species("shaviana")
+	assert(game._species_get_count("affinis") == 0 and game._species_get_count("shaviana") == 0)
 	game._update_main_story_progress(false)

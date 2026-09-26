@@ -52,6 +52,7 @@ func _draw_category(category:String,unlocked_series:Dictionary,discovered:Dictio
 			for species_id_value in species_by_id:
 				var entry:Dictionary=species_by_id[species_id_value];var species_id:=str(species_id_value)
 				if int(entry.get("gold_star_count",0))<=0 or bool(entry.get("special_route_only",false)):continue
+				if str(entry.get("story_group","")).to_lower()=="jurejure":continue
 				if not creative_allowed and not bool(entry.get("main_story_original",false)):continue
 				candidates.append(entry)
 				if not bool(discovered.get(species_id,false)):preferred.append(entry)

@@ -98,7 +98,7 @@ func _test_language_and_symbol_safety(game)->void:
 		"shop_season_new_year","old_page_intro_1","volume_intro_1","bustamante_gift","pinwheel_intro_1",
 		"armadillo_idle_1","research_intro_1","research_return_offer","restore_offer","restore_success",
 		"research_status_sprouted","research_status_first","research_milestone_catalog","research_milestone_species",
-		"research_transfer","audio_se_on","story_colorata_1","story_trio_1","awakening_memory","seed_origin_1","special_origin_1","objective_old_seed","story_complete_1","jelly_float"
+		"research_transfer","audio_se_on","story_colorata_1","story_trio_1","awakening_memory","habitat_return_panda","initial_seed_stock_received","tutorial_normal_pre_sow","seed_pod_tutorial_received","forest_gacha_intro_system","fantasy_first_girl","fantasy_six_girl_2","act3_mouse_realizes","habitat_crisis_armadillo_1","jelly_float"
 	]
 	var numeric_format_keys:=["research_status_first","research_transfer"]
 	var string_format_keys:=["restore_success","research_milestone_species","story_trio_1"]
@@ -121,7 +121,7 @@ func _test_language_and_symbol_safety(game)->void:
 func _test_one_time_gift_arrangement_and_share(game)->void:
 	var points_before:int=game.puku_points;var bags_before:int=game.normal_seed_bags
 	game._claim_first_habitat_gift_once();game._claim_first_habitat_gift_once()
-	assert(game.first_habitat_gift_claimed and game.puku_points==points_before and game.normal_seed_bags==bags_before+4)
+	assert(game.first_habitat_gift_claimed and game.puku_points==points_before and game.normal_seed_bags==bags_before+1)
 	assert(is_equal_approx(game.arrangement_ui._species_scale_max("laui"),game.arrangement_ui.PLANT_SCALE_MIN))
 	game.bests["laui"]=52.6;game._sync_arrangement_ui()
 	assert(is_equal_approx(game.arrangement_ui._species_scale_max("laui"),52.6/game.arrangement_ui.ARRANGEMENT_CM_AT_SCALE_ONE))

@@ -48,8 +48,15 @@ func _test_animated_gold_queue(game)->void:
 
 func _test_harvest_integration(game)->void:
 	game._cancel_puku_gauge_animations();game._clear_greenhouse_plants();game.puku_gauge_cm=111.0;game.puku_coin_gauge_cm=490.0;game.puku_points=0;game.normal_seed_bags=4;game.play_harvest_cm_total=0.0;game.play_puku_earned_total=0;game.play_active=true;game.active_seed_type="normal"
-	game._spawn_specific_plant("colorata");var plant=game.plants.back();plant.jelly_checks_enabled=false;plant.diameter_cm=12.5;plant.harvest()
-	assert(is_equal_approx(game.puku_gauge_cm,111.0) and is_equal_approx(game.puku_coin_gauge_cm,2.5) and game.puku_points==3 and game.normal_seed_bags==4 and is_equal_approx(game.play_harvest_cm_total,12.5) and game.play_puku_earned_total==3)
+	game._spawn_specific_plant("colorata");var plant=game.plants.back();plant.jelly_checks_enabled=false
+	game._process(.5)
+	assert(is_equal_approx(game.puku_gauge_cm,111.0) and is_equal_approx(game.puku_coin_gauge_cm,490.0))
+	plant.diameter_cm=12.5;plant.harvest()
+	assert(is_equal_approx(game.puku_gauge_cm,123.5) and is_equal_approx(game.puku_coin_gauge_cm,2.5) and game.puku_points==3 and game.normal_seed_bags==4 and is_equal_approx(game.play_harvest_cm_total,12.5) and game.play_puku_earned_total==3)
+	game._spawn_specific_plant("colorata");var jelly_plant=game.plants.back();jelly_plant.diameter_cm=88.0
+	var pod_before_jelly:float=game.puku_gauge_cm;var puku_before_jelly:float=game.puku_coin_gauge_cm
+	game._on_jellied(jelly_plant)
+	assert(is_equal_approx(game.puku_gauge_cm,pod_before_jelly) and is_equal_approx(game.puku_coin_gauge_cm,puku_before_jelly))
 	game._show_play_result();assert("収穫サイズ合計" in game.result_total_label.text and "ぷくゲージ +12.5cm" in game.result_total_label.text and "ぷくコイン +3" in game.result_total_label.text and not "¥" in game.result_total_label.text)
 	game.result_overlay.visible=false;game.play_active=false;game._clear_greenhouse_plants();game._cancel_puku_gauge_animations()
 

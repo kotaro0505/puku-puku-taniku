@@ -21,6 +21,7 @@ const SPEAKER_KEYS := [
 var language_code := "ja"
 var page_index := 0
 var story_text: Label
+var story_image: TextureRect
 var speaker_label: Label
 var speaker_portrait: TextureRect
 var page_count_label: Label
@@ -47,7 +48,7 @@ func _build_ui() -> void:
 	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(background)
 
-	var story_image := TextureRect.new()
+	story_image = TextureRect.new()
 	story_image.name = "StoryImage"
 	story_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	story_image.stretch_mode = TextureRect.STRETCH_SCALE
@@ -63,15 +64,14 @@ func _build_ui() -> void:
 
 	var text_panel := Panel.new()
 	text_panel.name = "StoryTextPanel"
-	text_panel.position = Vector2(0, 744)
-	text_panel.size = Vector2(576, 226)
+	text_panel.position = Vector2(14, 730)
+	text_panel.size = Vector2(548, 240)
 	text_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var panel_style := StyleBoxFlat.new()
 	panel_style.bg_color = Color(0.105, 0.055, 0.035, 0.92)
 	panel_style.border_color = Color(0.89, 0.68, 0.39, 0.48)
-	panel_style.border_width_top = 2
-	panel_style.corner_radius_top_left = 24
-	panel_style.corner_radius_top_right = 24
+	panel_style.set_border_width_all(2)
+	panel_style.set_corner_radius_all(24)
 	panel_style.shadow_color = Color(0.04, 0.02, 0.01, 0.35)
 	panel_style.shadow_size = 8
 	text_panel.add_theme_stylebox_override("panel", panel_style)
@@ -163,6 +163,7 @@ func start(requested_language := "ja") -> void:
 	page_index = 0
 	transitioning = true
 	exit_fade.color.a = 0.0
+	story_image.modulate.a = 0.0
 	tap_hint.text = Localizer.text(language_code, "opening_story_tap")
 	modulate.a = 0.0
 	visible = true
@@ -175,6 +176,13 @@ func start(requested_language := "ja") -> void:
 
 func advance() -> void:
 	if not visible or transitioning:
+		return
+	if page_index == 0 and story_image.modulate.a < 0.99:
+		transitioning = true
+		fade_tween = create_tween()
+		fade_tween.tween_property(story_image, "modulate:a", 1.0, 1.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		fade_tween.tween_interval(0.18)
+		fade_tween.tween_callback(_advance_after_image_fade)
 		return
 	if page_index >= DIALOG_KEYS.size() - 1:
 		transitioning = true
@@ -189,6 +197,11 @@ func advance() -> void:
 	text_tween.tween_callback(_show_page)
 	text_tween.tween_property(story_text, "modulate:a", 1.0, 0.14)
 	text_tween.finished.connect(func(): transitioning = false, CONNECT_ONE_SHOT)
+
+
+func _advance_after_image_fade() -> void:
+	transitioning = false
+	advance()
 
 
 func _show_page() -> void:
