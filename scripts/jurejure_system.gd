@@ -1,17 +1,25 @@
 class_name JureJureSystem
 extends RefCounted
 
-# All pacing knobs live here so the event can be tuned without touching the
-# habitat simulation. A roll only happens while the game is running.
-const EVENT_CHECK_INTERVAL_SECONDS := 60.0
-const EVENT_CHANCE_PER_CHECK := 0.02
-const EVENT_COOLDOWN_SECONDS := 21600.0
-const EVENT_GRACE_SECONDS := 1800.0
-const MID_STAGE_ORIGINAL_COUNT := 6
-const LATE_STAGE_ORIGINAL_COUNT := 10
+# Legacy growth values remain readable so saves from the old timed-event
+# implementation migrate without losing their story state. Act I no longer
+# uses those values to soften the gang's behaviour.
 const GROWTH_EARLY := 0
 const GROWTH_MID := 1
 const GROWTH_LATE := 2
+const MID_STAGE_ORIGINAL_COUNT := 6
+const LATE_STAGE_ORIGINAL_COUNT := 10
+
+const BATTLE_PLANTS_PER_SIDE := 12
+const LOSS_TAKE_MIN_RATIO := 0.40
+const LOSS_TAKE_MAX_RATIO := 0.80
+
+# Ground-tested panorama positions. A visit chooses one point and keeps it
+# until the player leaves, so a habitat refresh cannot teleport the group.
+const HABITAT_GROUP_POINTS := [
+	Vector2(85, 414), Vector2(286, 420), Vector2(514, 410),
+	Vector2(742, 424), Vector2(963, 408), Vector2(1180, 418)
+]
 
 
 static func growth_stage(original_count: int) -> int:
@@ -22,64 +30,68 @@ static func growth_stage(original_count: int) -> int:
 	return GROWTH_EARLY
 
 
-static func is_safe_target(plant: Dictionary, settled_species: Dictionary) -> bool:
-	var individual_id := str(plant.get("individual_id", ""))
-	var species_id := str(plant.get("species_id", ""))
-	if individual_id.is_empty() or species_id.is_empty():
-		return false
-	if not bool(settled_species.get(species_id, false)):
-		return false
-	if bool(plant.get("tutorial", false)) or bool(plant.get("story_protected", false)):
-		return false
-	if bool(plant.get("jelly_immune", false)) or bool(plant.get("jellied", false)):
-		return false
-	return true
+static func should_be_present(
+		habitat_awakened: bool,
+		returned_to_greenhouse: bool,
+		habitat_second_awakened: bool,
+		waiting_for_seed_pod_reward: bool
+	) -> bool:
+	return habitat_awakened \
+		and returned_to_greenhouse \
+		and not habitat_second_awakened \
+		and not waiting_for_seed_pod_reward
 
 
-static func choose_target(
-	plants: Array[Dictionary],
-	settled_species: Dictionary,
-	rng: RandomNumberGenerator
-	) -> Dictionary:
-	var candidates: Array[Dictionary] = []
+static func choose_visit_point(
+		plants: Array[Dictionary],
+		rng: RandomNumberGenerator
+	) -> Vector2:
+	var clear_points: Array[Vector2] = []
+	for point in HABITAT_GROUP_POINTS:
+		var clear := true
+		for plant in plants:
+			if bool(plant.get("jellied", false)):
+				continue
+			var plant_point := Vector2(
+				float(plant.get("panorama_x", 640.0)),
+				float(plant.get("panorama_y", 410.0))
+			)
+			var wrapped_dx := absf(point.x - plant_point.x)
+			wrapped_dx = minf(wrapped_dx, 1280.0 - wrapped_dx)
+			if wrapped_dx < 76.0 and absf(point.y - plant_point.y) < 42.0:
+				clear = false
+				break
+		if clear:
+			clear_points.append(point)
+	var source: Array[Vector2] = clear_points
+	if source.is_empty():
+		for fallback_point in HABITAT_GROUP_POINTS:
+			source.append(fallback_point)
+	return source[rng.randi_range(0, source.size() - 1)]
+
+
+static func loss_take_count(population_size: int, ratio: float) -> int:
+	if population_size <= 0:
+		return 0
+	var safe_ratio := clampf(ratio, LOSS_TAKE_MIN_RATIO, LOSS_TAKE_MAX_RATIO)
+	return clampi(ceili(float(population_size) * safe_ratio), 1, population_size)
+
+
+static func choose_loss_ids(
+		plants: Array[Dictionary],
+		rng: RandomNumberGenerator,
+		ratio: float
+	) -> Array[String]:
+	var candidates: Array[String] = []
 	for plant in plants:
-		if not is_safe_target(plant, settled_species):
+		if bool(plant.get("jellied", false)) or bool(plant.get("story_protected", false)):
 			continue
-		candidates.append(plant)
-	if candidates.is_empty():
-		return {}
-	return candidates[rng.randi_range(0, candidates.size() - 1)]
-
-
-static func make_event(plant: Dictionary, now_unix: float) -> Dictionary:
-	return {
-		"individual_id": str(plant.get("individual_id", "")),
-		"species_id": str(plant.get("species_id", "")),
-		"diameter_at_start": maxf(0.0, float(plant.get("diameter_cm", 0.0))),
-		"event_type": "habitat_take",
-		"started_unix": now_unix,
-		"deadline_unix": now_unix + EVENT_GRACE_SECONDS
-	}
-
-
-static func normalize_active_event(source: Variant, plants: Array[Dictionary], now_unix: float) -> Dictionary:
-	if not source is Dictionary:
-		return {}
-	var event: Dictionary = source.duplicate(true)
-	var individual_id := str(event.get("individual_id", ""))
-	if individual_id.is_empty():
-		return {}
-	var found := false
-	for plant in plants:
-		if str(plant.get("individual_id", "")) == individual_id:
-			found = true
-			break
-	if not found:
-		return {}
-	event["species_id"] = str(event.get("species_id", ""))
-	event["diameter_at_start"] = maxf(0.0, float(event.get("diameter_at_start", 0.0)))
-	event.erase("harvest_race")
-	event["event_type"] = "habitat_take"
-	event["started_unix"] = maxf(0.0, float(event.get("started_unix", now_unix)))
-	event["deadline_unix"] = maxf(float(event["started_unix"]), float(event.get("deadline_unix", now_unix + EVENT_GRACE_SECONDS)))
-	return event
+		var individual_id := str(plant.get("individual_id", ""))
+		if not individual_id.is_empty():
+			candidates.append(individual_id)
+	for index in range(candidates.size() - 1, 0, -1):
+		var swap_index := rng.randi_range(0, index)
+		var held := candidates[index]
+		candidates[index] = candidates[swap_index]
+		candidates[swap_index] = held
+	return candidates.slice(0, loss_take_count(candidates.size(), ratio))
