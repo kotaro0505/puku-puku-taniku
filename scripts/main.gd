@@ -1350,7 +1350,7 @@ func _build_opening_screen(hud:Control)->void:
 	opening_language_panel=PanelContainer.new();opening_language_panel.name="InitialLanguagePanel";opening_language_panel.position=Vector2(68,610);opening_language_panel.size=Vector2(440,340);opening_language_panel.add_theme_stylebox_override("panel",_box(Color(0.16,0.085,0.045,.96),Color("#f1c36f"),28,4));opening_overlay.add_child(opening_language_panel)
 	var language_content:=VBoxContainer.new();language_content.alignment=BoxContainer.ALIGNMENT_CENTER;language_content.add_theme_constant_override("separation",12);opening_language_panel.add_child(language_content)
 	var language_title:=Label.new();language_title.text="ことばを えらんでください\nChoose your language";language_title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;language_title.add_theme_font_size_override("font_size",22);language_title.add_theme_color_override("font_color",Color("#fff4d8"));language_content.add_child(language_title)
-	for language_entry in [{"code":"ja","label":"日本語"},{"code":"en","label":"English"},{"code":"hiragana","label":"ひらがな"}]:
+	for language_entry in [{"code":"ja","label":"日本語"},{"code":"en","label":"英語"},{"code":"hiragana","label":"ひらがな"}]:
 		var language_button:=Button.new();language_button.text=str(language_entry.label);language_button.custom_minimum_size=Vector2(330,64);_skin_button(language_button,Color("#f0d29b"),20);language_button.pressed.connect(_select_initial_language.bind(str(language_entry.code)));language_content.add_child(language_button)
 	_show_opening()
 
