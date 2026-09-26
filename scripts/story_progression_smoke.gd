@@ -158,6 +158,12 @@ func _test_legacy_migration(game: Node) -> void:
 	var payload = JSON.parse_string(FileAccess.get_file_as_string("user://records.json"))
 	assert(payload is Dictionary)
 	payload["progression_version"] = 17
+	payload["panda_beacon_unlocked"] = true
+	payload["panda_beacon_count"] = 4
+	payload["panda_beacon_unread_log"] = [{"individual_id": "legacy_notice", "species_id": "laui"}]
+	payload["rain_event_pending"] = true
+	payload["rain_bonus_in_progress"] = true
+	payload["rain_time_remaining"] = 17.0
 	for new_key in ["first_colorata_confirmed", "trio_originals_confirmed", "habitat_arrival_started", "habitat_awakened", "habitat_awakening_event_complete", "seed_shop_open", "special_series_explanation_seen", "main_story_stage", "main_story_complete", "main_story_completion_seen", "original_catalog_complete_event_seen", "jurejure_intro_complete", "habitat_second_awakened"]:
 		payload.erase(new_key)
 	var file := FileAccess.open("user://records.json", FileAccess.WRITE)
@@ -177,8 +183,8 @@ func _test_legacy_migration(game: Node) -> void:
 	assert(game.puku_points == 37 and is_equal_approx(game.puku_gauge_cm, 154.375) and is_zero_approx(game.puku_coin_gauge_cm))
 	assert(is_equal_approx(float(game.bests.get("colorata", 0.0)), 100.0) and int(game.species_get_counts.get("laui", 0)) == 2)
 	assert(game.normal_seed_bags == 6 and game.volume_seed_bags == 2 and game.premium_seed_bags == 1 and game.mystery_seed_bags == 3)
-	assert(game.panda_beacon_unlocked and game.panda_beacon_count == 4 and game.panda_beacon_unread_log.size() == 1)
-	assert(game.rain_event_pending and game.rain_bonus_in_progress and is_equal_approx(game.rain_time_remaining, 17.0))
+	assert(not game.panda_beacon_unlocked and game.panda_beacon_count == 0 and game.panda_beacon_unread_log.is_empty())
+	assert(not game.rain_event_pending and not game.rain_bonus_in_progress and is_zero_approx(game.rain_time_remaining))
 	assert(not game._habitat_wild_plant_by_id(preserved_habitat_id).is_empty())
 	assert(game.saved_arrangements.size() == 1 and game.saved_arrangements[0].plants.size() == 1)
 	assert(str(game.saved_arrangements[0].plants[0].species_id) == "colorata")
@@ -188,6 +194,7 @@ func _test_legacy_migration(game: Node) -> void:
 	var migrated = JSON.parse_string(FileAccess.get_file_as_string("user://records.json"))
 	assert(int(migrated.get("progression_version", 0)) == game.PROGRESSION_VERSION)
 	assert(bool(migrated.get("habitat_awakened", false)) and migrated.has("main_story_stage"))
+	assert(not migrated.has("panda_beacon_unlocked") and not migrated.has("rain_event_pending"))
 
 func _test_v18_completed_story_migration(game: Node) -> void:
 	game._reset_progression_state()
@@ -203,7 +210,6 @@ func _test_v18_completed_story_migration(game: Node) -> void:
 	game.habitat_tutorial_complete = true
 	game.habitat_tutorial_returned_to_greenhouse = true
 	game.puku_points = 91
-	game.panda_beacon_count = 3
 	game.bests["colorata"] = 100.0
 	for species_id in StoryProgressionClass.MAIN_STORY_ORIGINAL_IDS:
 		game.discovered[species_id] = true
@@ -216,4 +222,4 @@ func _test_v18_completed_story_migration(game: Node) -> void:
 	assert(not game.main_story_complete and not game.main_story_completion_seen)
 	assert(not game.habitat_second_awakened and not game.habitat_second_awakening_complete)
 	assert(not game.jurejure_return_event_complete)
-	assert(game.puku_points == 91 and game.panda_beacon_count == 3)
+	assert(game.puku_points == 91)

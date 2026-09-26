@@ -22,14 +22,12 @@ static func growth_stage(original_count: int) -> int:
 	return GROWTH_EARLY
 
 
-static func is_safe_target(plant: Dictionary, discovered: Dictionary, species_get_counts: Dictionary) -> bool:
+static func is_safe_target(plant: Dictionary, settled_species: Dictionary) -> bool:
 	var individual_id := str(plant.get("individual_id", ""))
 	var species_id := str(plant.get("species_id", ""))
 	if individual_id.is_empty() or species_id.is_empty():
 		return false
-	if not bool(discovered.get(species_id, false)):
-		return false
-	if int(species_get_counts.get(species_id, 0)) <= 0:
+	if not bool(settled_species.get(species_id, false)):
 		return false
 	if bool(plant.get("tutorial", false)) or bool(plant.get("story_protected", false)):
 		return false
@@ -38,47 +36,19 @@ static func is_safe_target(plant: Dictionary, discovered: Dictionary, species_ge
 	return true
 
 
-static func candidate_weight(plant: Dictionary, current_growth_stage: int, second_awakened: bool) -> float:
-	var is_small := float(plant.get("diameter_cm", 0.0)) < 30.0
-	if not is_small:
-		return 1.0
-	if second_awakened:
-		return 0.0
-	match clampi(current_growth_stage, 0, 2):
-		1:
-			return 0.35
-		2:
-			return 0.10
-		_:
-			return 1.0
-
-
 static func choose_target(
 	plants: Array[Dictionary],
-	discovered: Dictionary,
-	species_get_counts: Dictionary,
-	current_growth_stage: int,
-	second_awakened: bool,
+	settled_species: Dictionary,
 	rng: RandomNumberGenerator
 	) -> Dictionary:
-	var weighted: Array[Dictionary] = []
-	var total := 0.0
+	var candidates: Array[Dictionary] = []
 	for plant in plants:
-		if not is_safe_target(plant, discovered, species_get_counts):
+		if not is_safe_target(plant, settled_species):
 			continue
-		var weight := candidate_weight(plant, current_growth_stage, second_awakened)
-		if weight <= 0.0:
-			continue
-		total += weight
-		weighted.append({"plant": plant, "weight": weight})
-	if weighted.is_empty() or total <= 0.0:
+		candidates.append(plant)
+	if candidates.is_empty():
 		return {}
-	var roll := rng.randf() * total
-	for value in weighted:
-		roll -= float(value.get("weight", 0.0))
-		if roll <= 0.0:
-			return value.get("plant", {})
-	return weighted.back().get("plant", {})
+	return candidates[rng.randi_range(0, candidates.size() - 1)]
 
 
 static func make_event(plant: Dictionary, now_unix: float) -> Dictionary:
@@ -86,7 +56,7 @@ static func make_event(plant: Dictionary, now_unix: float) -> Dictionary:
 		"individual_id": str(plant.get("individual_id", "")),
 		"species_id": str(plant.get("species_id", "")),
 		"diameter_at_start": maxf(0.0, float(plant.get("diameter_cm", 0.0))),
-		"harvest_race": float(plant.get("diameter_cm", 0.0)) >= 30.0,
+		"event_type": "habitat_take",
 		"started_unix": now_unix,
 		"deadline_unix": now_unix + EVENT_GRACE_SECONDS
 	}
@@ -108,7 +78,8 @@ static func normalize_active_event(source: Variant, plants: Array[Dictionary], n
 		return {}
 	event["species_id"] = str(event.get("species_id", ""))
 	event["diameter_at_start"] = maxf(0.0, float(event.get("diameter_at_start", 0.0)))
-	event["harvest_race"] = bool(event.get("harvest_race", event["diameter_at_start"] >= 30.0))
+	event.erase("harvest_race")
+	event["event_type"] = "habitat_take"
 	event["started_unix"] = maxf(0.0, float(event.get("started_unix", now_unix)))
 	event["deadline_unix"] = maxf(float(event["started_unix"]), float(event.get("deadline_unix", now_unix + EVENT_GRACE_SECONDS)))
 	return event

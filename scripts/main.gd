@@ -20,8 +20,6 @@ const HabitatWildSystemClass = preload("res://scripts/habitat_wild_system.gd")
 const HabitatNotificationServiceClass = preload("res://scripts/habitat_notification_service.gd")
 const HabitatPlantPanelClass = preload("res://scripts/habitat_plant_panel.gd")
 const HabitatDevPanelClass = preload("res://scripts/habitat_dev_panel.gd")
-const HabitatBeaconDeviceClass = preload("res://scripts/habitat_beacon_device.gd")
-const PandaBeaconLogPanelClass = preload("res://scripts/panda_beacon_log_panel.gd")
 const OpeningStoryOverlayClass = preload("res://scripts/opening_story_overlay.gd")
 const HabitatAwakeningOverlayClass = preload("res://scripts/habitat_awakening_overlay.gd")
 const SeedPodStoryOverlayClass = preload("res://scripts/seed_pod_story_overlay.gd")
@@ -32,7 +30,7 @@ const HabitatSecondAwakeningOverlayClass = preload("res://scripts/habitat_second
 const SlotMachineScene = preload("res://scenes/slot_machine.tscn")
 const DEVELOPMENT_CATALOG_PREVIEW_ENABLED := true
 const SECRET_GACHA_ALWAYS_PLAYABLE := true
-const PROGRESSION_VERSION := 21
+const PROGRESSION_VERSION := 22
 const LEGACY_HABITAT_REGENERATION_VERSION := 17
 const INITIAL_SERIES_ID := "base"
 const ORIGINAL_SERIES_ID := "base"
@@ -45,12 +43,7 @@ const SEED_POD_GAUGE_TARGET_CM := 750.0
 const SEED_POD_GAUGE_REWARD_BAGS := 3
 const PUKU_GAUGE_TARGET_CM := 500.0
 const PUKU_GAUGE_REWARD_PUKU := 3
-const PANDA_BEACON_PRICE_PUKU := 1
 const HABITAT_TIME_MULTIPLIERS := [1, 60, 3600, 21600, 86400]
-const HABITAT_BADGE_FONT_SIZE := 13
-const HABITAT_BADGE_OUTLINE_SIZE := 2
-const HABITAT_BADGE_PIXEL_SIZE := 0.0021
-const HABITAT_BEACON_SIDE_OFFSET := 0.50
 const DEFAULT_POT_ID := "shallow_terracotta"
 const NORMAL_GERMINATION_COUNT := 12
 const VOLUME_GERMINATION_COUNT := 36
@@ -80,13 +73,6 @@ const ARRANGEMENT_POT_ANCHOR := Vector2(0.50,760.0/1086.0)
 const HABITAT_DRAG_SCALE := 0.055
 const HABITAT_LOOKAROUND_DURATION_SECONDS := 8.0
 const HABITAT_ITEM_RADIUS := 9.0
-const RAIN_BONUS_DURATION_SECONDS := 60.0
-const RAIN_INITIAL_PLANT_COUNT := 12
-const RAIN_MAX_ACTIVE_PLANTS := 22
-const RAIN_TRIGGER_CHANCES := [0.01,0.02,0.03,0.05,0.08,0.12,0.20]
-const HABITAT_NEW_SPECIES_CHANCES := {"通常":0.08,"レア":0.025,"スーパーレア":0.005,"シリーズ未解禁":0.04}
-const RAIN_DISCOVERY_MIN_CM := 30.0
-const RAIN_UNDISCOVERED_SPAWN_CHANCE := 0.08
 const NORMAL_SEED_UNLOCKED_NEW_RATE := 0.03
 const NORMAL_SEED_LOCKED_NEW_RATE := 0.01
 const NORMAL_SEED_NO_STAR_RATE := 0.81
@@ -107,10 +93,8 @@ const HIDDEN_PINWHEEL_ID := "pinwheel"
 const HIDDEN_TOVAR_ID := "tovarensis_tovar"
 const HIDDEN_BUSTAMANTE_ID := "strictiflora_bustamante"
 const MYSTERY_RESEARCH_TRANSPARENT_ID := "transparent_succulent"
-const MYSTERY_ROUTE_RAIN := "rain_second"
 const MYSTERY_ROUTE_RESEARCH := "research_25"
 const MYSTERY_ROUTE_BEST_100 := "best_100"
-const MYSTERY_ROUTE_HABITAT_COMPLETE := "habitat_normal_complete"
 const BEST_UNLOCK_HYALINA_ID := "hyalina_san_luis_de_la_paz"
 const BEST_UNLOCK_PURPUSORUM_ID := "purpusorum"
 const BEST_UNLOCK_HYALINA_CM := 40.0
@@ -123,8 +107,6 @@ const SHOP_CHATTER_KEYS := [
 	"shop_chatter_leaf","shop_chatter_affinis","shop_chatter_browse"
 ]
 const HABITAT_SAFE_PLANT_POINTS := [Vector2(70,400),Vector2(155,410),Vector2(245,400),Vector2(335,420),Vector2(430,405),Vector2(535,415),Vector2(705,430),Vector2(820,410),Vector2(920,395),Vector2(1025,420),Vector2(1130,400),Vector2(1220,415)]
-const RAIN_GROUND_REGIONS := [Rect2(24,390,205,48),Rect2(255,400,235,48),Rect2(510,410,130,45),Rect2(660,420,145,45),Rect2(830,402,205,48),Rect2(1060,390,196,48)]
-const HABITAT_NEW_SPECIES_POINTS := [Vector2(640,385),Vector2(735,392),Vector2(545,388),Vector2(815,395),Vector2(465,392)]
 const HABITAT_SAFE_SEED_POINTS := [Vector2(45,430),Vector2(115,445),Vector2(190,430),Vector2(275,445),Vector2(360,440),Vector2(455,435),Vector2(545,445),Vector2(625,455),Vector2(715,450),Vector2(805,440),Vector2(895,430),Vector2(980,445),Vector2(1060,435),Vector2(1140,445),Vector2(1210,435),Vector2(1260,455)]
 const UI_CREAM := Color("#fff1d2")
 const UI_BROWN := Color("#4a2618")
@@ -509,8 +491,6 @@ var panda_beacon_count := 0
 var panda_beacon_unread_log: Array[Dictionary] = []
 var habitat_notification_service
 var habitat_plant_panel
-var panda_beacon_log_panel
-var panda_beacon_log_button: Button
 var habitat_dev_panel
 var habitat_dev_open_button: Button
 var habitat_debug_enabled := false
@@ -536,7 +516,6 @@ var mystery_route_completed: Dictionary = {}
 var mystery_route_dialog_seen: Dictionary = {}
 var rain_completion_count := 0
 var best_100_achieved := false
-var normal_habitat_complete := false
 var login_bonus_date := ""
 var play_active := false
 var play_time_remaining := 0.0
@@ -636,15 +615,18 @@ func _ready() -> void:
 	var recovered_forest_encounters:=_register_encountered_species_for_unlocked_series()
 	_apply_saved_unlocks()
 	audio_manager=AudioManagerClass.new();add_child(audio_manager);audio_manager.apply_settings(audio_settings)
-	habitat_notification_service=HabitatNotificationServiceClass.new();add_child(habitat_notification_service);habitat_notification_service.native_ready.connect(_reconcile_beacon_notifications)
-	if not legacy_habitat_notification_ids_to_cancel.is_empty():habitat_notification_service.cancel_all(legacy_habitat_notification_ids_to_cancel);legacy_habitat_notification_ids_to_cancel.clear()
+	# The retired Panda Beacon may have left native notifications on an upgraded
+	# device.  Create the legacy service only long enough to cancel those IDs;
+	# normal play never schedules habitat notifications anymore.
+	if not legacy_habitat_notification_ids_to_cancel.is_empty():
+		habitat_notification_service=HabitatNotificationServiceClass.new();add_child(habitat_notification_service)
+		habitat_notification_service.cancel_all(legacy_habitat_notification_ids_to_cancel);legacy_habitat_notification_ids_to_cancel.clear()
 	if best_spawn_unlocks_dirty or get_counts_migration_dirty or recovered_forest_encounters:_save();best_spawn_unlocks_dirty=false;get_counts_migration_dirty=false
 	_build_world()
 	_build_ui()
 	if habitat_awakened and (habitat_wild_initialized or habitat_unlocked):_ensure_habitat_wild_state(Time.get_unix_time_from_system(),true)
 	if legacy_habitat_migration_dirty:_save();legacy_habitat_migration_dirty=false
 	_build_habitat_items()
-	_reconcile_beacon_notifications()
 	get_viewport().size_changed.connect(_layout)
 	_layout()
 	_wire_ui_sounds(self)
@@ -724,7 +706,6 @@ func _continue_after_opening()->void:
 	elif habitat_tutorial_complete and not mystery_items_acquired:call_deferred("_start_seed_pod_story")
 	elif mystery_items_acquired and not mystery_catalog_tutorial_complete:call_deferred("_start_mystery_catalog_tutorial")
 	elif mystery_items_acquired and mystery_catalog_tutorial_complete and not normal_play_tutorial_complete:call_deferred("_start_initial_seed_stock_notice")
-	elif habitat_tutorial_complete and not panda_beacon_unlocked:call_deferred("_start_panda_beacon_unlock_event")
 	elif habitat_second_awakened and pending_special_series_explanation and not special_series_explanation_seen:call_deferred("_start_special_origin_event")
 	elif StoryProgressionClass.originals_complete(discovered) and not original_catalog_complete_event_seen:call_deferred("_start_original_catalog_complete_event")
 	elif _daily_seed_gift_due():call_deferred("_start_daily_seed_gift")
@@ -800,7 +781,7 @@ func _load_save() -> void:
 			# Legacy `yen`, `money`, and `coins` fields are intentionally ignored. They
 			# remain valid JSON input, but game progression now uses puku coins only.
 			bests=value.get("bests",{});puku_gauge_cm=maxf(0.0,float(value.get("puku_gauge_cm",0.0)));puku_coin_gauge_cm=maxf(0.0,float(value.get("puku_coin_gauge_cm",0.0)));puku_points=maxi(0,int(value.get("puku_points",0)));discovered=value.get("discovered",{});habitat_seed_date=str(value.get("habitat_seed_date",""));habitat_seeds_collected=int(value.get("habitat_seeds_collected",0))
-			if saved_progression_version<PROGRESSION_VERSION:
+			if saved_progression_version<21:
 				# v20 used one 600 cm gauge for both rewards. Preserve its fill ratio as
 				# pod light without granting migration-time seeds or coins.
 				puku_gauge_cm=clampf(puku_gauge_cm/LEGACY_COMBINED_GAUGE_TARGET_CM*SEED_POD_GAUGE_TARGET_CM,0.0,SEED_POD_GAUGE_TARGET_CM-.001)
@@ -836,8 +817,9 @@ func _load_save() -> void:
 			if not active_jurejure_event is Dictionary:active_jurejure_event={}
 			jurejure_return_event_complete=bool(value.get("jurejure_return_event_complete",false));habitat_second_awakened=bool(value.get("habitat_second_awakened",false));habitat_second_awakening_complete=bool(value.get("habitat_second_awakening_complete",habitat_second_awakened))
 			if not habitat_returned_species is Dictionary:habitat_returned_species={}
-			rain_bag_count=maxi(0,int(value.get("rain_bag_count",0)));rain_event_pending=bool(value.get("rain_event_pending",false));rain_bonus_in_progress=bool(value.get("rain_bonus_in_progress",false));rain_time_remaining=clampf(float(value.get("rain_time_remaining",RAIN_BONUS_DURATION_SECONDS)),0.0,RAIN_BONUS_DURATION_SECONDS)
-			rain_intro_normal_bags=maxi(0,int(value.get("rain_intro_normal_bags",0)));rain_draws_unlocked=bool(value.get("rain_draws_unlocked",total_play_count>3))
+			# Post-awakening rain bonus mode was retired in v22. Legacy fields are
+			# accepted but deliberately normalized to an inactive state.
+			rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_intro_normal_bags=0;rain_draws_unlocked=false
 			normal_play_count=maxi(0,int(value.get("normal_play_count",0)));shop_visit_count=maxi(0,int(value.get("shop_visit_count",0)));hidden_species_acquired=value.get("hidden_species_acquired",{});tovar_next_play=maxi(TOVAR_FIRST_PLAY,int(value.get("tovar_next_play",TOVAR_FIRST_PLAY)));tovar_attempt_count=maxi(0,int(value.get("tovar_attempt_count",0)));tovar_event_active=false;tovar_harvested_this_play=false
 			formal_play_count=maxi(0,int(value.get("formal_play_count",normal_play_count)))
 			volume_seed_unlocked=bool(value.get("volume_seed_unlocked",formal_play_count>=3));volume_seed_intro_seen=bool(value.get("volume_seed_intro_seen",false));premium_seed_unlocked=bool(value.get("premium_seed_unlocked",formal_play_count>=13 or int(value.get("premium_seed_bags",0))>0));mystery_seed_pack_unlocked=bool(value.get("mystery_seed_pack_unlocked",false))
@@ -857,10 +839,12 @@ func _load_save() -> void:
 			if not forest_gacha_encountered is Dictionary:forest_gacha_encountered={}
 			habitat_mystery_seeds_pending=maxi(0,int(value.get("habitat_mystery_seeds_pending",0)))
 			habitat_tutorial_started=bool(value.get("habitat_tutorial_started",false));habitat_tutorial_complete=bool(value.get("habitat_tutorial_complete",false));habitat_tutorial_species_id=str(value.get("habitat_tutorial_species_id",""));original_catalog_gifted=bool(value.get("original_catalog_gifted",false))
-			panda_beacon_unlocked=bool(value.get("panda_beacon_unlocked",false));panda_beacon_count=maxi(0,int(value.get("panda_beacon_count",0)));panda_beacon_unread_log=_normalize_panda_beacon_unread_log(value.get("panda_beacon_unread_log",[]))
+			# Preserve load compatibility, but retire all Beacon inventory/log state.
+			panda_beacon_unlocked=false;panda_beacon_count=0;panda_beacon_unread_log.clear()
 			var valid_habitat_ids:Array[String]=[]
 			for habitat_entry in catalog_species:valid_habitat_ids.append(str(habitat_entry.get("species_id","")))
 			var raw_habitat_population:Variant=value.get("habitat_wild_plants",[])
+			_queue_legacy_beacon_cleanup(raw_habitat_population)
 			if saved_progression_version<LEGACY_HABITAT_REGENERATION_VERSION and _migrate_legacy_runaway_habitat(raw_habitat_population):
 				pass
 			else:
@@ -874,8 +858,7 @@ func _load_save() -> void:
 			secret_gacha_active=bool(value.get("secret_gacha_active",false));secret_gacha_draws_remaining=maxi(0,int(value.get("secret_gacha_draws_remaining",0)));secret_gacha_last_roll_play_count=int(value.get("secret_gacha_last_roll_play_count",-1))
 			if secret_gacha_draws_remaining<=0:secret_gacha_active=false
 			mystery_route_assignments=value.get("mystery_route_assignments",{});mystery_route_completed=value.get("mystery_route_completed",{});mystery_route_dialog_seen=value.get("mystery_route_dialog_seen",{})
-			rain_completion_count=maxi(0,int(value.get("rain_completion_count",0)));best_100_achieved=bool(value.get("best_100_achieved",false));normal_habitat_complete=bool(value.get("normal_habitat_complete",false))
-			if not rain_event_pending:rain_bonus_in_progress=false;rain_time_remaining=0.0
+			rain_completion_count=0;best_100_achieved=bool(value.get("best_100_achieved",false))
 			if value.has("normal_seed_bags"):
 				normal_seed_bags=int(value.get("normal_seed_bags",0));volume_seed_bags=int(value.get("volume_seed_bags",0));premium_seed_bags=int(value.get("premium_seed_bags",0));mystery_seed_bags=int(value.get("mystery_seed_bags",0));login_bonus_date=str(value.get("login_bonus_date",""))
 			else:
@@ -902,7 +885,7 @@ func _load_save() -> void:
 				# Earlier saves did not count repeat harvests. A discovered entry proves at
 				# least one real acquisition, so migrate that safe minimum exactly once.
 				for species_id in discovered:
-					if bool(discovered.get(species_id,false)):species_get_counts[str(species_id)]=1
+					if bool(discovered.get(species_id,false)) and str(species_id) not in [PANDA_STORY_SPECIES_ID,ARMADILLO_STORY_SPECIES_ID]:species_get_counts[str(species_id)]=1
 				get_counts_migration_dirty=true
 			else:
 				var sanitized_get_counts:Dictionary={}
@@ -914,6 +897,8 @@ func _load_save() -> void:
 				if bool(discovered.get(hidden_id,false)):hidden_species_acquired[hidden_id]=true
 			_sanitize_removed_common_progress()
 			_migrate_story_progress(saved_progression_version)
+			_migrate_habitat_settlement()
+			active_jurejure_event=JureJureSystemClass.normalize_active_event(active_jurejure_event,habitat_wild_plants,Time.get_unix_time_from_system())
 			if saved_progression_version<14:
 				habitat_tutorial_started=habitat_unlocked
 				habitat_tutorial_complete=habitat_unlocked
@@ -948,9 +933,7 @@ func _save() -> void:
 		"normal_seed_bags":normal_seed_bags,"volume_seed_bags":volume_seed_bags,"premium_seed_bags":premium_seed_bags,"mystery_seed_bags":mystery_seed_bags,
 		"volume_seed_unlocked":volume_seed_unlocked,"volume_seed_intro_seen":volume_seed_intro_seen,"premium_seed_unlocked":premium_seed_unlocked,"mystery_seed_pack_unlocked":mystery_seed_pack_unlocked,
 		"mystery_route_assignments":mystery_route_assignments,"mystery_route_completed":mystery_route_completed,"mystery_route_dialog_seen":mystery_route_dialog_seen,
-		"rain_completion_count":rain_completion_count,"best_100_achieved":best_100_achieved,"normal_habitat_complete":normal_habitat_complete,
-		"login_bonus_date":login_bonus_date,"audio_settings":audio_settings,"rain_bag_count":rain_bag_count,"rain_event_pending":rain_event_pending,
-		"rain_bonus_in_progress":rain_bonus_in_progress,"rain_time_remaining":rain_time_remaining,"rain_intro_normal_bags":rain_intro_normal_bags,"rain_draws_unlocked":rain_draws_unlocked,
+		"best_100_achieved":best_100_achieved,"login_bonus_date":login_bonus_date,"audio_settings":audio_settings,
 		"series_seed_inventory":series_seed_inventory,"forest_gacha_draw_count":forest_gacha_draw_count,"forest_gacha_encountered":forest_gacha_encountered,
 		"puku_gauge_cm":puku_gauge_cm,"puku_coin_gauge_cm":puku_coin_gauge_cm,"puku_points":puku_points,"old_catalog_pages":old_catalog_pages,"old_catalog_page_inventory":old_catalog_page_inventory,
 		"old_catalog_intro_seen":old_catalog_intro_seen,"old_catalog_intro_pending":old_catalog_intro_pending,"research_catalog_reward_pending":research_catalog_reward_pending,
@@ -960,33 +943,12 @@ func _save() -> void:
 		"habitat_wild_plants":habitat_wild_plants,"habitat_wild_initialized":habitat_wild_initialized,"habitat_wild_next_spawn_unix":habitat_wild_next_spawn_unix,
 		"habitat_tutorial_started":habitat_tutorial_started,"habitat_tutorial_complete":habitat_tutorial_complete,
 		"habitat_tutorial_species_id":habitat_tutorial_species_id,"original_catalog_gifted":original_catalog_gifted,
-		"panda_beacon_unlocked":panda_beacon_unlocked,"panda_beacon_count":panda_beacon_count,"panda_beacon_unread_log":panda_beacon_unread_log,
 		"armadillo_intro_event_3_completed":armadillo_intro_event_3_completed,"armadillo_series_event_7_completed":armadillo_series_event_7_completed,
 		"pending_armadillo_story_event":pending_armadillo_story_event,"armadillo_gift_series_id":armadillo_gift_series_id,"armadillo_gift_species_id":armadillo_gift_species_id,
 		"language_code":language_code,"first_habitat_gift_claimed":first_habitat_gift_claimed,
 		"secret_gacha_active":secret_gacha_active,"secret_gacha_draws_remaining":secret_gacha_draws_remaining,"secret_gacha_last_roll_play_count":secret_gacha_last_roll_play_count
 	}
 	f.store_string(JSON.stringify(payload))
-
-func _normalize_panda_beacon_unread_log(source:Variant)->Array[Dictionary]:
-	var normalized:Array[Dictionary]=[]
-	if not source is Array:return normalized
-	var seen:Dictionary={}
-	for value in source:
-		if not value is Dictionary:continue
-		var entry:Dictionary=value;var individual_id:=str(entry.get("individual_id",""));var species_id:=str(entry.get("species_id",""))
-		if individual_id.is_empty() or species_id.is_empty() or seen.has(individual_id):continue
-		seen[individual_id]=true
-		normalized.append({
-			"individual_id":individual_id,
-			"species_id":species_id,
-			"diameter_cm":maxf(0.0,float(entry.get("diameter_cm",0.0))),
-			"jellied_unix":maxf(0.0,float(entry.get("jellied_unix",0.0))),
-			"event_unix":maxf(0.0,float(entry.get("event_unix",entry.get("jellied_unix",0.0)))),
-			"event_type":str(entry.get("event_type","jellied")),
-			"harvest_race":bool(entry.get("harvest_race",false))
-		})
-	return normalized
 
 func _queue_stale_jellied_habitat_cleanup(source:Variant)->void:
 	if not source is Array:return
@@ -997,6 +959,33 @@ func _queue_stale_jellied_habitat_cleanup(source:Variant)->void:
 			if individual_id not in legacy_habitat_notification_ids_to_cancel:legacy_habitat_notification_ids_to_cancel.append(individual_id)
 			if habitat_notification_service:habitat_notification_service.cancel(individual_id)
 		legacy_habitat_migration_dirty=true
+
+func _queue_legacy_beacon_cleanup(source:Variant)->void:
+	if not source is Array:return
+	for value in source:
+		if not value is Dictionary or not bool(value.get("panda_beacon_installed",false)):continue
+		var individual_id:=str(value.get("individual_id",""))
+		if not individual_id.is_empty() and individual_id not in legacy_habitat_notification_ids_to_cancel:legacy_habitat_notification_ids_to_cancel.append(individual_id)
+	legacy_habitat_migration_dirty=legacy_habitat_migration_dirty or not legacy_habitat_notification_ids_to_cancel.is_empty()
+
+func _migrate_habitat_settlement()->void:
+	var settled:Dictionary={}
+	for species_id_value in discovered:
+		var species_id:=str(species_id_value)
+		if bool(discovered.get(species_id,false)) and not _catalog_entry(species_id).is_empty():settled[species_id]=true
+	if habitat_awakened:
+		for story_species_id in [FIRST_STORY_SPECIES_ID,PANDA_STORY_SPECIES_ID,ARMADILLO_STORY_SPECIES_ID]:settled[story_species_id]=true
+	habitat_returned_species=settled
+	var kept_plants:Array[Dictionary]=[]
+	for plant in habitat_wild_plants:
+		if bool(settled.get(str(plant.get("species_id","")),false)):kept_plants.append(plant)
+	if kept_plants.size()!=habitat_wild_plants.size():legacy_habitat_migration_dirty=true
+	habitat_wild_plants.assign(kept_plants)
+	var kept_pending:Array=[]
+	for species_id_value in pending_habitat_species:
+		var species_id:=str(species_id_value)
+		if bool(settled.get(species_id,false)) and species_id not in kept_pending:kept_pending.append(species_id)
+	pending_habitat_species=kept_pending
 
 func _migrate_legacy_runaway_habitat(raw_population:Variant)->bool:
 	if not HabitatWildSystemClass.has_legacy_runaway_population(raw_population):return false
@@ -1045,7 +1034,7 @@ func _migrate_story_progress(saved_progression_version:int)->void:
 		if jurejure_next_check_unix<=0.0:jurejure_next_check_unix=Time.get_unix_time_from_system()+JureJureSystemClass.EVENT_CHECK_INTERVAL_SECONDS
 		return
 	var previously_completed:=main_story_complete or main_story_completion_seen or main_story_stage>=9
-	var established_save:=habitat_unlocked or habitat_tutorial_started or habitat_tutorial_complete or habitat_wild_initialized or panda_beacon_unlocked
+	var established_save:=habitat_unlocked or habitat_tutorial_started or habitat_tutorial_complete or habitat_wild_initialized
 	if established_save:
 		opening_story_complete=true;intro_story_complete=true;first_colorata_confirmed=true;trio_originals_confirmed=true
 		for species_id in [FIRST_STORY_SPECIES_ID,PANDA_STORY_SPECIES_ID,ARMADILLO_STORY_SPECIES_ID]:
@@ -1053,7 +1042,7 @@ func _migrate_story_progress(saved_progression_version:int)->void:
 		habitat_unlocked=true;habitat_arrival_started=true;habitat_awakened=true;habitat_awakening_event_complete=true
 	elif intro_story_complete and total_play_count>0:
 		first_colorata_confirmed=true;discovered[FIRST_STORY_SPECIES_ID]=true;greenhouse_available[FIRST_STORY_SPECIES_ID]=true;unlocked_species[FIRST_STORY_SPECIES_ID]=true
-	if habitat_tutorial_complete or panda_beacon_unlocked or puku_gauge_intro_complete or normal_seed_bags>0:
+	if habitat_tutorial_complete or puku_gauge_intro_complete or normal_seed_bags>0:
 		seed_shop_open=true
 	if habitat_awakened:
 		for species_id in discovered:
@@ -1105,11 +1094,10 @@ func _migrate_mystery_route_progress()->void:
 	if not best_100_achieved:
 		for best_value in bests.values():
 			if float(best_value)>=100.0:best_100_achieved=true;break
-	if best_100_achieved:_assign_mystery_route(MYSTERY_ROUTE_BEST_100,true)
+	if best_100_achieved:_grant_mystery_route_reward(MYSTERY_ROUTE_BEST_100)
 	if armadillo_research_total>=25 and not mystery_route_assignments.has(MYSTERY_ROUTE_RESEARCH):
 		# Let the next research handoff deliver the new route reward visibly.
 		armadillo_research_rewards.erase("mystery_route_25")
-	_evaluate_normal_habitat_completion()
 
 func _mystery_route_candidates()->Array[String]:
 	var assigned:Array=[]
@@ -1128,37 +1116,24 @@ func _mystery_event_species_ids()->Array[String]:
 
 func _assign_mystery_route(route_id:String,spawn_in_habitat:bool)->String:
 	var existing:=str(mystery_route_assignments.get(route_id,""))
-	if not existing.is_empty():
-		if spawn_in_habitat and habitat_second_awakened and not bool(discovered.get(existing,false)) and existing not in pending_habitat_species:pending_habitat_species.append(existing)
-		return existing
+	if not existing.is_empty():return existing
 	var candidates:=_mystery_route_candidates()
 	if candidates.is_empty():return ""
 	var chosen:=candidates[rng.randi_range(0,candidates.size()-1)]
 	mystery_route_assignments[route_id]=chosen;mystery_route_completed[route_id]=false
 	best_spawn_unlocks_dirty=true
-	if spawn_in_habitat and habitat_second_awakened and chosen not in pending_habitat_species:pending_habitat_species.append(chosen)
 	return chosen
+
+func _grant_mystery_route_reward(route_id:String)->String:
+	var species_id:=_assign_mystery_route(route_id,false)
+	if species_id.is_empty():return ""
+	if _grant_hidden_species(species_id):mystery_route_completed[route_id]=true
+	return species_id
 
 func _mystery_route_for_species(species_id:String)->String:
 	for route_id in mystery_route_assignments:
 		if str(mystery_route_assignments[route_id])==species_id:return str(route_id)
 	return ""
-
-func _normal_habitat_collection_ids()->Array[String]:
-	var ids:Array[String]=[]
-	for entry in catalog_species:
-		var species_id:=str(entry.get("species_id",""))
-		if not bool(entry.get("main_story_original",false)) or str(entry.get("rarity",""))!="通常" or species_id in [BEST_UNLOCK_HYALINA_ID,BEST_UNLOCK_PURPUSORUM_ID]:continue
-		ids.append(species_id)
-	return ids
-
-func _evaluate_normal_habitat_completion()->void:
-	if normal_habitat_complete:return
-	var targets:=_normal_habitat_collection_ids()
-	if targets.is_empty():return
-	for species_id in targets:
-		if not bool(discovered.get(species_id,false)):return
-	normal_habitat_complete=true;_assign_mystery_route(MYSTERY_ROUTE_HABITAT_COMPLETE,true)
 
 func _evaluate_best_spawn_unlocks(apply_now:=true)->bool:
 	var has_hyalina_best:=false
@@ -1278,7 +1253,6 @@ func _build_ui() -> void:
 		else:settings_button=b;b.pressed.connect(_open_settings)
 	mode_button=Button.new();mode_button.text="原生地";mode_button.position=Vector2(435,198);mode_button.size=Vector2(116,55);_skin_button(mode_button,Color("#fff0cf"),16);mode_button.mouse_filter=Control.MOUSE_FILTER_STOP;mode_button.pressed.connect(_toggle_mode);hud.add_child(mode_button)
 	external_navigation_controls.append(mode_button)
-	panda_beacon_log_button=Button.new();panda_beacon_log_button.name="PandaBeaconUnreadButton";panda_beacon_log_button.position=Vector2(398,326);panda_beacon_log_button.size=Vector2(153,55);_skin_button(panda_beacon_log_button,Color("#d9e4d7"),15);panda_beacon_log_button.mouse_filter=Control.MOUSE_FILTER_STOP;panda_beacon_log_button.pressed.connect(_open_panda_beacon_log);panda_beacon_log_button.visible=false;hud.add_child(panda_beacon_log_button)
 	if habitat_debug_enabled:
 		habitat_dev_open_button=Button.new();habitat_dev_open_button.name="HabitatDevQuickOpen";habitat_dev_open_button.text="原生地テスト";habitat_dev_open_button.position=Vector2(398,262);habitat_dev_open_button.size=Vector2(153,55);_skin_button(habitat_dev_open_button,Color("#adcbb8"),15);habitat_dev_open_button.mouse_filter=Control.MOUSE_FILTER_STOP;habitat_dev_open_button.pressed.connect(_open_habitat_dev);hud.add_child(habitat_dev_open_button)
 	shop_button=Button.new();shop_button.text="おみせ";shop_button.position=Vector2(398,262);shop_button.size=Vector2(153,55);_skin_button(shop_button,Color("#fff0cf"),16);shop_button.mouse_filter=Control.MOUSE_FILTER_STOP;shop_button.pressed.connect(_open_shop);hud.add_child(shop_button)
@@ -1315,7 +1289,6 @@ func _build_ui() -> void:
 	_build_seed_pod_story(hud)
 	_build_habitat_second_awakening(hud)
 	_build_habitat_plant_panel(hud)
-	_build_panda_beacon_log_panel(hud)
 	_build_jurejure_event_display(hud)
 	if habitat_debug_enabled:_build_habitat_dev_panel(hud)
 	_update_best_ui()
@@ -1455,9 +1428,8 @@ func _build_shop(hud:Control)->void:
 	var category_panel:=PanelContainer.new();category_panel.position=Vector2(28,735);category_panel.size=Vector2(520,265);category_panel.add_theme_stylebox_override("panel",_box(Color(0.22,0.12,0.07,.94),Color("#d7aa64"),20,3));shop_overlay.add_child(category_panel)
 	var category_content:=Control.new();category_content.custom_minimum_size=Vector2(500,245);category_panel.add_child(category_content)
 	var category_title:=Label.new();category_title.name="ShopCategoryTitle";category_title.text="なにを見ますか？";category_title.position=Vector2(10,8);category_title.size=Vector2(480,42);category_title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;category_title.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;category_title.add_theme_font_size_override("font_size",22);category_title.add_theme_color_override("font_color",UI_CREAM);category_content.add_child(category_title)
-	var category_seed:=Button.new();category_seed.name="ShopCategorySeed";category_seed.text="どうぐ\nビーコン";category_seed.position=Vector2(14,58);category_seed.size=Vector2(148,160);_skin_button(category_seed,Color("#d8b56b"),16);category_seed.pressed.connect(_open_shop_seed_category);category_content.add_child(category_seed)
-	shop_pot_button=Button.new();shop_pot_button.name="ShopCategoryPot";shop_pot_button.text="鉢\n寄せ植え";shop_pot_button.position=Vector2(176,58);shop_pot_button.size=Vector2(148,160);_skin_button(shop_pot_button,Color("#c99d72"),16);shop_pot_button.pressed.connect(_open_shop_pot_category);category_content.add_child(shop_pot_button)
-	var category_gacha:=Button.new();category_gacha.name="ShopForestGachaButton";category_gacha.text="森の\nガチャ";category_gacha.position=Vector2(338,58);category_gacha.size=Vector2(148,160);_skin_button(category_gacha,Color("#9eb06c"),16);category_gacha.pressed.connect(_open_forest_gacha);category_content.add_child(category_gacha)
+	shop_pot_button=Button.new();shop_pot_button.name="ShopCategoryPot";shop_pot_button.text="鉢\n寄せ植え";shop_pot_button.position=Vector2(82,58);shop_pot_button.size=Vector2(160,160);_skin_button(shop_pot_button,Color("#c99d72"),16);shop_pot_button.pressed.connect(_open_shop_pot_category);category_content.add_child(shop_pot_button)
+	var category_gacha:=Button.new();category_gacha.name="ShopForestGachaButton";category_gacha.text="森の\nガチャ";category_gacha.position=Vector2(258,58);category_gacha.size=Vector2(160,160);_skin_button(category_gacha,Color("#9eb06c"),16);category_gacha.pressed.connect(_open_forest_gacha);category_content.add_child(category_gacha)
 	shop_category_controls=[category_panel]
 	shop_catalog_controls=[]
 	shop_chatter_bubble=PanelContainer.new();shop_chatter_bubble.position=Vector2(88,276);shop_chatter_bubble.size=Vector2(400,108);shop_chatter_bubble.mouse_filter=Control.MOUSE_FILTER_STOP;shop_chatter_bubble.gui_input.connect(_on_shop_chatter_gui_input);shop_chatter_bubble.add_theme_stylebox_override("panel",_box(Color(1.0,.95,.82,.97),Color("#9b6739"),24,3));shop_chatter_bubble.visible=false;shop_overlay.add_child(shop_chatter_bubble)
@@ -1514,10 +1486,9 @@ func _sync_arrangement_ui()->void:
 	arrangement_ui.sync_seed_shop_state(_seed_shop_products(),puku_points)
 
 func _seed_shop_products()->Array:
-	var products:Array=[]
-	if panda_beacon_unlocked:
-		products.append({"seed_type":"panda_beacon","display_name":Localizer.text(language_code,"panda_beacon_name"),"count":1,"preview_text":Localizer.text(language_code,"panda_beacon_preview"),"price_puku":PANDA_BEACON_PRICE_PUKU,"purchasable":true,"unlocked":true,"description":Localizer.text(language_code,"panda_beacon_shop_card",[panda_beacon_count]),"accent":"#9fc8b5"})
-	return products
+	# Normal seeds come from the pod gauge, and the retired Panda Beacon is no
+	# longer a shop product. Pots and gachas keep their existing shop routes.
+	return []
 
 func _open_arrangements()->void:
 	if not _tutorial_fully_complete() or current_mode!="greenhouse" or play_active or catalog_preview_mode_active or arrangement_scene_active or arrangement_transitioning:return
@@ -1861,20 +1832,20 @@ func _advance_scripted_dialog()->void:
 func _finish_scripted_dialog()->void:
 	var finished_kind:=scripted_dialog_kind;var keep_shop:=scripted_dialog_shop_context
 	scripted_dialog_kind="";scripted_dialog_pages.clear();scripted_dialog_index=-1;scripted_dialog_shop_context=false;intro_overlay.visible=false
-	var acquired:Array[String]=[];var open_beacon_event:=false;var open_puku_intro:=false;var open_catalog:=false;var guide_habitat:=false;var show_pinwheel_get:=false;var show_armadillo_gift:=false;var start_second_awakening:=false;var start_trio_event:=false
+	var acquired:Array[String]=[];var open_puku_intro:=false;var open_catalog:=false;var guide_habitat:=false;var show_pinwheel_get:=false;var show_armadillo_gift:=false;var start_second_awakening:=false;var start_trio_event:=false
 	match finished_kind:
 		"first_colorata_discovery":
 			first_colorata_confirmed=true;start_trio_event=true
 		"trio_originals":
-			_register_species_discovery(PANDA_STORY_SPECIES_ID,true);_register_species_discovery(ARMADILLO_STORY_SPECIES_ID,true)
+			_register_species_discovery(PANDA_STORY_SPECIES_ID,false);_register_species_discovery(ARMADILLO_STORY_SPECIES_ID,false)
 			trio_originals_confirmed=true;habitat_unlocked=true;guide_habitat=true
 		"first_habitat_intro":
-			habitat_tutorial_started=true
+			habitat_tutorial_started=true;habitat_tutorial_complete=true
+			for habitat_plant in habitat_wild_plants:
+				habitat_plant["tutorial"]=false;habitat_plant["jelly_immune"]=false
+			tutorial_steps["habitat_observation_intro"]=true
 		"seed_origin":
-			seed_shop_open=true;original_catalog_gifted=true;unlocked_series[ORIGINAL_SERIES_ID]=true;habitat_tutorial_returned_to_greenhouse=true;open_beacon_event=true
-		"panda_beacon_unlock":
-			panda_beacon_unlocked=true;panda_beacon_count=maxi(1,panda_beacon_count)
-			if habitat_notification_service:habitat_notification_service.request_permissions()
+			seed_shop_open=true;original_catalog_gifted=true;unlocked_series[ORIGINAL_SERIES_ID]=true;habitat_tutorial_returned_to_greenhouse=true
 		"mystery_catalog_tutorial":
 			mystery_catalog_tutorial_complete=true;tutorial_steps["mystery_catalog_tutorial_complete"]=true
 		"initial_seed_stock":
@@ -1906,7 +1877,6 @@ func _finish_scripted_dialog()->void:
 			armadillo_research_intro_seen=true
 		"puku_gauge_first_gift":
 			puku_gauge_intro_complete=true;tutorial_steps["puku_gauge_intro_complete"]=true;shop_current_page="categories";_set_shop_purchase_visible(true)
-		"rain_first":tutorial_steps["rain_first_dialog"]=true
 	_update_main_story_progress(false);_save();shop_overlay.visible=keep_shop
 	if keep_shop:
 		armadillo_tap_button.visible=armadillo_present;_update_shop_ui()
@@ -1915,6 +1885,7 @@ func _finish_scripted_dialog()->void:
 	else:audio_manager.play_bgm("habitat" if current_mode=="habitat" else "greenhouse")
 	_update_play_ui()
 	if start_trio_event:call_deferred("_start_trio_originals_event")
+	elif finished_kind=="first_habitat_intro":call_deferred("_start_seed_pod_story")
 	elif finished_kind=="initial_seed_stock":call_deferred("_show_tutorial_guide","play_open_normal")
 	else:call_deferred("_try_start_pending_story_event")
 	if finished_kind=="armadillo_mystery_intro" and mystery_seed_count>0:call_deferred("_show_shop_chatter",Localizer.text(language_code,"mystery_seed_request"),false,"research_offer","armadillo")
@@ -1922,10 +1893,6 @@ func _finish_scripted_dialog()->void:
 		call_deferred("_open_encyclopedia")
 	elif guide_habitat:
 		call_deferred("_show_tutorial_guide","habitat")
-	elif open_beacon_event:
-		current_mode="greenhouse";_apply_mode()
-		if panda_beacon_unlocked:call_deferred("_start_puku_gauge_intro_dialog")
-		else:call_deferred("_start_panda_beacon_unlock_event")
 	elif open_puku_intro:
 		current_mode="greenhouse";_apply_mode();shop_overlay.visible=true
 		call_deferred("_start_puku_gauge_intro_dialog")
@@ -2078,9 +2045,6 @@ func _on_habitat_second_awakening_finished()->void:
 	habitat_second_awakened=true;habitat_second_awakening_complete=true
 	main_story_complete=true;main_story_completion_seen=true;special_series_explanation_seen=true;pending_special_series_explanation=false
 	jurejure_growth_stage=JureJureSystemClass.GROWTH_LATE
-	for route_species_value in mystery_route_assignments.values():
-		var route_species:=str(route_species_value)
-		if not route_species.is_empty() and not bool(discovered.get(route_species,false)) and route_species not in pending_habitat_species:pending_habitat_species.append(route_species)
 	_register_encountered_species_for_unlocked_series()
 	_update_main_story_progress(false);_save();_apply_saved_unlocks();_build_habitat_items(true);_update_play_ui()
 
@@ -2101,7 +2065,7 @@ func _start_first_habitat_tutorial()->void:
 func _start_habitat_awakening_event()->void:
 	if habitat_awakened or not trio_originals_confirmed or habitat_awakening_overlay==null:return
 	habitat_arrival_started=true;_update_main_story_progress(false);_save()
-	current_mode="habitat";rain_event_pending=false;rain_bonus_in_progress=false;rain_time_remaining=0.0
+	current_mode="habitat"
 	_cancel_all_habitat_notifications()
 	habitat_wild_plants.clear();habitat_wild_initialized=false;habitat_wild_next_spawn_unix=0.0
 	_clear_habitat_items();_apply_mode();_update_play_ui();audio_manager.play_bgm("habitat")
@@ -2110,22 +2074,15 @@ func _start_habitat_awakening_event()->void:
 func _on_habitat_awakening_finished()->void:
 	if habitat_awakened:return
 	habitat_awakened=true;habitat_awakening_event_complete=true
-	for species_id in [FIRST_STORY_SPECIES_ID,PANDA_STORY_SPECIES_ID,ARMADILLO_STORY_SPECIES_ID]:habitat_returned_species[species_id]=true
+	# Every species legitimately restored before this moment is now part of the
+	# permanent settlement pool; the trio are added as the story exception.
+	_migrate_habitat_settlement()
 	var now_unix:=Time.get_unix_time_from_system()
 	var awakening_species:Array[String]=[FIRST_STORY_SPECIES_ID,PANDA_STORY_SPECIES_ID,ARMADILLO_STORY_SPECIES_ID]
 	HabitatWildSystemClass.initialize_awakened_population(habitat_wild_plants,awakening_species,awakening_species,now_unix,rng,HABITAT_SAFE_PLANT_POINTS)
 	habitat_wild_initialized=true;habitat_wild_next_spawn_unix=HabitatWildSystemClass.next_spawn_unix(now_unix,rng,habitat_wild_plants.size())
-	_refresh_habitat_growth_profiles();_update_main_story_progress(false);_save();_build_habitat_items(true);_reconcile_beacon_notifications()
+	_refresh_habitat_growth_profiles();_update_main_story_progress(false);_save();_build_habitat_items(true)
 	call_deferred("_start_first_habitat_tutorial")
-
-func _start_panda_beacon_unlock_event()->void:
-	if panda_beacon_unlocked or not habitat_tutorial_complete or not scripted_dialog_kind.is_empty():return
-	_start_scripted_dialog("panda_beacon_unlock",[
-		{"speaker":"panda","text":Localizer.text(language_code,"panda_beacon_event_1")},
-		{"speaker":"armadillo","text":Localizer.text(language_code,"panda_beacon_event_2")},
-		{"speaker":"panda","text":Localizer.text(language_code,"panda_beacon_event_3")},
-		{"speaker":"","text":Localizer.text(language_code,"panda_beacon_event_received"),"button":Localizer.text(language_code,"continue")}
-	],false)
 
 func _start_puku_gauge_intro_dialog()->void:
 	if puku_gauge_intro_complete:return
@@ -2229,7 +2186,6 @@ func _complete_tutorial_guide()->void:
 	elif target=="play_open_normal":_open_play_modal();call_deferred("_show_tutorial_guide","normal_seed")
 	elif target=="old_seed":_start_greenhouse_play("old")
 	elif target=="normal_seed":_start_greenhouse_play("normal")
-	elif target=="habitat_species" and not tutorial_habitat_item.is_empty():_collect_habitat_wild_plant(tutorial_habitat_item)
 
 func _begin_first_play_tutorial()->void:
 	first_play_tutorial_active=true;first_play_tutorial_dialog_visible=false;first_play_tutorial_message_index=0;first_play_tutorial_wait_remaining=FIRST_PLAY_TUTORIAL_INITIAL_DELAY;first_play_tutorial_sequence_complete=false;first_play_harvest_guide_active=false;first_play_has_harvested=false;tutorial_harvest_plant=null
@@ -2342,7 +2298,7 @@ func _first_play_harvestable_plants()->Array:
 	return harvestable
 
 func _maybe_activate_first_play_harvest_guide()->bool:
-	if not first_play_tutorial_active or not first_play_tutorial_sequence_complete or first_play_harvest_guide_active or first_play_has_harvested or bool(tutorial_steps.get("first_harvest_guide",false)) or not play_active or rain_bonus_active:return false
+	if not first_play_tutorial_active or not first_play_tutorial_sequence_complete or first_play_harvest_guide_active or first_play_has_harvested or bool(tutorial_steps.get("first_harvest_guide",false)) or not play_active:return false
 	# The normal bag can hold more seeds than the initial active-plant slots.
 	# Guide the first harvest as soon as one visible plant is ready; that harvest
 	# then frees a slot for the remaining seeds instead of deadlocking the lesson.
@@ -2370,13 +2326,6 @@ func _update_first_play_harvest_guide_focus()->void:
 
 func _end_first_play_tutorial_context()->void:
 	first_play_tutorial_active=false;first_play_tutorial_dialog_visible=false;first_play_harvest_guide_active=false;tutorial_harvest_plant=null;_hide_first_play_tutorial_overlay()
-
-func _show_habitat_species_guide(item:Dictionary,species_name:String)->void:
-	_prepare_standard_tutorial_guide()
-	tutorial_habitat_item=item;var node:Node3D=item.node;var screen:=camera.unproject_position(node.global_position)
-	tutorial_guide_button.position=screen-Vector2(66,66);tutorial_guide_button.size=Vector2(132,132);tutorial_guide_button.text="";tutorial_guide_button.icon=node.texture;tutorial_guide_button.expand_icon=true;tutorial_guide_button.set_meta("target","habitat_species");_skin_button(tutorial_guide_button,Color(0.25,0.18,0.08,.35),16)
-	for connection in tutorial_guide_button.pressed.get_connections():tutorial_guide_button.pressed.disconnect(connection.callable)
-	tutorial_guide_button.pressed.connect(_complete_tutorial_guide);tutorial_guide_message.text=Localizer.text(language_code,"habitat_wild_guide",[species_name]);tutorial_dialog_panel.visible=true;_position_tutorial_dialog(Rect2(tutorial_guide_button.position,tutorial_guide_button.size));tutorial_guide_overlay.visible=true;_start_tutorial_finger_press(tutorial_guide_button,Color(1.35,1.22,.65,1))
 
 func _show_intro_gift_effect()->void:
 	for i in range(7):
@@ -2412,30 +2361,13 @@ func _build_settings(hud:Control)->void:
 
 func _build_habitat_plant_panel(hud:Control)->void:
 	habitat_plant_panel=HabitatPlantPanelClass.new();hud.add_child(habitat_plant_panel)
-	habitat_plant_panel.install_requested.connect(_install_panda_beacon)
-	habitat_plant_panel.remove_requested.connect(_remove_panda_beacon)
 	habitat_plant_panel.close_requested.connect(_update_play_ui)
-
-func _build_panda_beacon_log_panel(hud:Control)->void:
-	panda_beacon_log_panel=PandaBeaconLogPanelClass.new();hud.add_child(panda_beacon_log_panel)
-	panda_beacon_log_panel.confirmed.connect(_confirm_panda_beacon_unread_log)
-	panda_beacon_log_panel.close_requested.connect(_update_play_ui)
-
-func _open_panda_beacon_log()->void:
-	if panda_beacon_log_panel==null or panda_beacon_unread_log.is_empty():return
-	panda_beacon_log_panel.open(panda_beacon_unread_log,Callable(self,"_habitat_species_name"),language_code);_update_play_ui()
-
-func _confirm_panda_beacon_unread_log()->void:
-	panda_beacon_unread_log.clear();_save();_update_play_ui()
 
 func _build_habitat_dev_panel(hud:Control)->void:
 	habitat_dev_panel=HabitatDevPanelClass.new();hud.add_child(habitat_dev_panel)
 	habitat_dev_panel.random_reset_requested.connect(_debug_reset_normal_habitat)
-	habitat_dev_panel.label_preview_requested.connect(_debug_prepare_habitat_label_preview)
 	habitat_dev_panel.multiplier_requested.connect(_debug_set_habitat_multiplier)
 	habitat_dev_panel.time_jump_requested.connect(_debug_jump_habitat_time)
-	habitat_dev_panel.rain_start_requested.connect(_debug_start_habitat_rain)
-	habitat_dev_panel.rain_stop_requested.connect(_debug_stop_habitat_rain)
 	habitat_dev_panel.close_requested.connect(_update_play_ui)
 
 func _open_habitat_dev()->void:
@@ -2505,7 +2437,7 @@ func _build_catalog_preview_dev(hud:Control)->void:
 	catalog_preview_ui.configure(catalog_species,series_catalog)
 
 func _open_catalog_preview_dev()->void:
-	if not DEVELOPMENT_CATALOG_PREVIEW_ENABLED or catalog_preview_ui==null or play_active or rain_bonus_active or arrangement_scene_active:return
+	if not DEVELOPMENT_CATALOG_PREVIEW_ENABLED or catalog_preview_ui==null or play_active or arrangement_scene_active:return
 	settings_overlay.visible=false;play_modal_open=false;current_mode="greenhouse";_apply_mode()
 	catalog_preview_ui.configure(catalog_species,series_catalog);catalog_preview_ui.open();_update_play_ui()
 
@@ -2673,7 +2605,6 @@ func _apply_language_to_ui()->void:
 	_set_named_localized_text("PlayCloseButton","close")
 	_set_named_localized_text("ShopCloseButton","back")
 	_set_named_localized_text("ShopCategoryTitle","shop_choose_category")
-	_set_named_localized_text("ShopCategorySeed","shop_category_seed")
 	_set_named_localized_text("ShopCategoryPot","shop_category_pot")
 	_set_named_localized_text("ShopCategoryCatalog","shop_category_catalog")
 	_set_named_localized_text("ShopForestGachaButton","shop_category_gacha")
@@ -2718,7 +2649,7 @@ func _build_species_get_overlay(hud:Control)->void:
 	species_get_overlay.closed.connect(_on_species_get_overlay_closed)
 
 func _open_forest_gacha()->void:
-	if forest_gacha_ui==null or play_active or rain_bonus_active or arrangement_scene_active or not _tutorial_fully_complete():return
+	if forest_gacha_ui==null or play_active or arrangement_scene_active or not _tutorial_fully_complete():return
 	if (encyclopedia_overlay and encyclopedia_overlay.visible) or (settings_overlay and settings_overlay.visible) or (secret_gacha_ui and secret_gacha_ui.visible):return
 	if shop_overlay and shop_overlay.visible:
 		_hide_shop_chatter(true);shop_current_page="categories";shop_overlay.visible=false;shop_background.texture=null
@@ -2843,7 +2774,7 @@ func _on_species_get_overlay_closed(context:String)->void:
 	elif not followup_started and StoryProgressionClass.originals_complete(discovered) and not original_catalog_complete_event_seen:call_deferred("_start_original_catalog_complete_event")
 
 func _open_secret_gacha()->void:
-	if secret_gacha_ui==null or not _secret_gacha_is_playable() or play_active or rain_bonus_active or arrangement_scene_active or not _tutorial_fully_complete():return
+	if secret_gacha_ui==null or not _secret_gacha_is_playable() or play_active or arrangement_scene_active or not _tutorial_fully_complete():return
 	if (encyclopedia_overlay and encyclopedia_overlay.visible) or (settings_overlay and settings_overlay.visible) or (forest_gacha_ui and forest_gacha_ui.visible):return
 	play_modal_open=false;play_overlay.visible=false;secret_gacha_ui.open_gacha(puku_points,secret_gacha_draws_remaining,SECRET_GACHA_ALWAYS_PLAYABLE);audio_manager.play_bgm("shop");_update_play_ui()
 
@@ -2908,7 +2839,7 @@ func _reset_progression_state()->void:
 	_cancel_all_habitat_notifications()
 	old_catalog_pages=0;old_catalog_page_inventory.clear();old_catalog_intro_seen=false;old_catalog_intro_pending=false;habitat_old_catalog_page_pending=false;habitat_old_catalog_page_series_id="";old_catalog_page_roll_play_count=-1;research_catalog_reward_pending=false
 	JellyBalanceClass.reset_formal();jelly_trait_display_enabled=false;dev_jelly_test_active=false;last_jelly_claim_msec=-1000000000
-	mystery_route_assignments.clear();mystery_route_completed.clear();mystery_route_dialog_seen.clear();rain_completion_count=0;best_100_achieved=false;normal_habitat_complete=false;shop_selected_seed_type="normal"
+	mystery_route_assignments.clear();mystery_route_completed.clear();mystery_route_dialog_seen.clear();rain_completion_count=0;best_100_achieved=false;shop_selected_seed_type="normal"
 	first_tutorial_species_id="";habitat_wild_plants.clear();habitat_wild_initialized=false;habitat_wild_next_spawn_unix=0.0;habitat_tutorial_started=false;habitat_tutorial_complete=false;habitat_tutorial_species_id="";original_catalog_gifted=false;panda_beacon_unlocked=false;panda_beacon_count=0;panda_beacon_unread_log.clear();first_habitat_gift_claimed=false;armadillo_intro_event_3_completed=false;armadillo_series_event_7_completed=false;pending_armadillo_story_event="";armadillo_gift_series_id="";armadillo_gift_species_id="";scripted_dialog_kind="";scripted_dialog_pages.clear();scripted_dialog_index=-1
 	first_colorata_confirmed=false;trio_originals_confirmed=false;habitat_arrival_started=false;habitat_awakened=false;habitat_awakening_event_complete=false;seed_shop_open=false;mystery_items_acquired=false;mystery_catalog_tutorial_complete=false;normal_play_tutorial_complete=false;seed_pod_gauge_discovery_complete=false;seed_pod_first_reward_seen=false;initial_seed_stock_notice_complete=false;puku_buyback_tutorial_complete=false;puku_buyback_tutorial_active=false;puku_buyback_tutorial_index=0;habitat_returned_species.clear();special_series_explanation_seen=false;pending_special_series_explanation=false;main_story_stage=StoryProgressionClass.STAGE_OLD_SEED;main_story_complete=false;main_story_completion_seen=false
 	original_catalog_complete_event_seen=false;habitat_tutorial_returned_to_greenhouse=false;jurejure_intro_complete=false;jurejure_enabled=false;jurejure_growth_stage=JureJureSystemClass.GROWTH_EARLY;jurejure_growth_event_mask=0;active_jurejure_event={};jurejure_next_check_unix=0.0;jurejure_cooldown_until_unix=0.0;jurejure_return_event_complete=false;habitat_second_awakened=false;habitat_second_awakening_complete=false;jurejure_update_accumulator=0.0
@@ -3027,12 +2958,9 @@ func _finish_greenhouse_play()->void:
 	if total_play_count==1:
 		if first_tutorial_species_id.is_empty():_ensure_first_tutorial_species()
 		_register_species_discovery(first_tutorial_species_id,false);greenhouse_available[first_tutorial_species_id]=true;unlocked_species=greenhouse_available.duplicate(true);_apply_saved_unlocks();unlocked_series[INITIAL_SERIES_ID]=true
-	var tutorial_habitat_queued:=false
 	if total_play_count==3 and not bool(tutorial_steps.get("habitat_species_queued",false)):
 		tutorial_steps["habitat_species_queued"]=true
 	_evaluate_unlock_rules("play_count",float(total_play_count))
-	if formal_play and not tutorial_habitat_queued:_roll_habitat_new_species()
-	_roll_rain_event()
 	if formal_play:
 		_maybe_activate_secret_gacha()
 	_clear_greenhouse_plants();_save();_update_play_ui();_show_play_result();audio_manager.play_se("result",.7)
@@ -3040,7 +2968,6 @@ func _finish_greenhouse_play()->void:
 func _greenhouse_finish_block_reason()->String:
 	if first_play_tutorial_active and not first_play_tutorial_sequence_complete:return "first_play_tutorial_sequence_incomplete"
 	if not play_active:return "play_inactive"
-	if rain_bonus_active:return "rain_bonus_active"
 	if play_seeds_remaining>0:return "play_seeds_remaining"
 	if play_spawn_queue>0:return "play_spawn_queue"
 	if play_seed_animations_pending>0:return "play_seed_animations_pending"
@@ -3154,7 +3081,7 @@ func _update_play_ui()->void:
 	if not play_overlay:return
 	var preview_overlay_open:bool=catalog_preview_ui!=null and catalog_preview_ui.is_overlay_open()
 	var gacha_open:bool=(forest_gacha_ui!=null and forest_gacha_ui.visible) or (secret_gacha_ui!=null and secret_gacha_ui.visible) or (species_get_overlay!=null and species_get_overlay.visible)
-	var habitat_modal_open:bool=(habitat_plant_panel!=null and habitat_plant_panel.visible) or (panda_beacon_log_panel!=null and panda_beacon_log_panel.visible) or (habitat_dev_panel!=null and habitat_dev_panel.visible) or (habitat_awakening_overlay!=null and habitat_awakening_overlay.visible) or (seed_pod_story_overlay!=null and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay!=null and habitat_second_awakening_overlay.visible)
+	var habitat_modal_open:bool=(habitat_plant_panel!=null and habitat_plant_panel.visible) or (habitat_dev_panel!=null and habitat_dev_panel.visible) or (habitat_awakening_overlay!=null and habitat_awakening_overlay.visible) or (seed_pod_story_overlay!=null and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay!=null and habitat_second_awakening_overlay.visible)
 	var arrangement_navigation_suspended:bool=arrangement_scene_active or arrangement_transitioning or catalog_preview_mode_active or preview_overlay_open or gacha_open or habitat_modal_open
 	var arrangement_hud_hidden:bool=arrangement_scene_active or arrangement_transitioning
 	if main_status_hud:main_status_hud.visible=not arrangement_hud_hidden
@@ -3164,14 +3091,11 @@ func _update_play_ui()->void:
 	if seed_pod_gauge_area:seed_pod_gauge_area.visible=mystery_items_acquired
 	play_overlay.visible=current_mode=="greenhouse" and not play_active and play_modal_open
 	play_open_button.visible=current_mode=="greenhouse" and intro_story_complete and not play_active and not play_modal_open and not arrangement_navigation_suspended and (not result_overlay or not result_overlay.visible) and (not shop_overlay or not shop_overlay.visible) and (not encyclopedia_overlay or not encyclopedia_overlay.visible) and (not settings_overlay or not settings_overlay.visible) and (not arrangement_ui or not arrangement_ui.visible)
-	seed_bag_panel.visible=current_mode=="greenhouse" and play_active and not rain_bonus_active and active_seed_type!="old"
+	seed_bag_panel.visible=current_mode=="greenhouse" and play_active and active_seed_type!="old"
 	play_timer_label.visible=seed_bag_panel.visible
 	for control in external_navigation_controls:control.visible=not play_active and not arrangement_navigation_suspended
 	for control in encyclopedia_navigation_controls:control.visible=not play_active and not arrangement_navigation_suspended and mystery_items_acquired and encyclopedia_unlocked
 	if mode_button:mode_button.visible=not play_active and not arrangement_navigation_suspended and habitat_unlocked
-	if panda_beacon_log_button:
-		panda_beacon_log_button.visible=current_mode=="habitat" and not play_active and not arrangement_navigation_suspended and not panda_beacon_unread_log.is_empty()
-		panda_beacon_log_button.text=("Beacon %d"%panda_beacon_unread_log.size()) if language_code=="en" else (("びーこん %d"%panda_beacon_unread_log.size()) if language_code=="hiragana" else "ビーコン %d"%panda_beacon_unread_log.size())
 	if habitat_dev_open_button:habitat_dev_open_button.visible=current_mode=="habitat" and not play_active and not arrangement_navigation_suspended
 	if shop_button:shop_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete()
 	if arrangement_button:arrangement_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete()
@@ -3304,9 +3228,7 @@ func _grant_armadillo_research_milestones(previous_total:int,new_total:int,new_s
 	if previous_total<8 and new_total>=8 and not bool(armadillo_research_rewards.get("8",false)):
 		research_catalog_reward_pending=true;messages.append(Localizer.text(language_code,"research_milestone_catalog"))
 	if previous_total<13 and new_total>=13 and not bool(armadillo_research_rewards.get("13",false)):
-		var before:=pending_habitat_species.size();_queue_random_species("通常")
-		if pending_habitat_species.size()>before:messages.append(Localizer.text(language_code,"research_milestone_habitat"))
-		else:normal_seed_bags+=1;messages.append(Localizer.text(language_code,"research_milestone_seed_instead"))
+		normal_seed_bags+=1;messages.append(Localizer.text(language_code,"research_milestone_seed_instead"))
 		armadillo_research_rewards["13"]=true
 	if previous_total<18 and new_total>=18 and not bool(armadillo_research_rewards.get("18",false)):
 		armadillo_research_rewards["18"]=true;messages.append(Localizer.text(language_code,"research_milestone_sprout"))
@@ -3338,7 +3260,9 @@ func _hidden_species_owned(species_id:String)->bool:
 func _grant_hidden_species(species_id:String)->bool:
 	if _hidden_species_owned(species_id):return false
 	hidden_species_acquired[species_id]=true;_register_species_discovery(species_id,true)
-	audio_manager.play_se("new_species",.62);_save()
+	# Save migration can grant a legacy route before _ready() creates audio.
+	if audio_manager:audio_manager.play_se("new_species",.62)
+	_save()
 	return true
 
 func _close_shop()->void:
@@ -3348,11 +3272,6 @@ func _close_shop()->void:
 
 func _buy_seed_bag(seed_type:String)->void:
 	if not _tutorial_fully_complete():return
-	if seed_type=="panda_beacon":
-		if not panda_beacon_unlocked:_show_seed_shop_message(Localizer.text(language_code,"panda_beacon_locked"));return
-		if puku_points<PANDA_BEACON_PRICE_PUKU:_show_seed_shop_message(Localizer.text(language_code,"not_enough_puku"));return
-		puku_points-=PANDA_BEACON_PRICE_PUKU;panda_beacon_count+=1
-		audio_manager.notify_user_gesture();audio_manager.play_se("purchase",1.0);_save();_update_currency_ui();_update_shop_ui();_update_play_ui();_sync_arrangement_ui();_show_seed_shop_message(Localizer.text(language_code,"panda_beacon_bought",[panda_beacon_count]));return
 	_show_seed_shop_message(Localizer.text(language_code,"shop_seed_info"))
 
 func _show_seed_shop_message(message:String)->void:
@@ -3393,7 +3312,7 @@ func _update_shop_ui()->void:
 		shop_buy_pulse_tween=create_tween().set_loops();shop_buy_pulse_tween.tween_property(shop_buy_glow,"modulate:a",.88,.9).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT);shop_buy_pulse_tween.tween_property(shop_buy_glow,"modulate:a",.34,.9).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 func _tutorial_fully_complete()->bool:
-	return intro_story_complete and habitat_awakened and habitat_tutorial_complete and seed_shop_open and panda_beacon_unlocked and puku_gauge_intro_complete
+	return intro_story_complete and habitat_awakened and habitat_tutorial_complete and seed_shop_open and puku_gauge_intro_complete
 
 func _refresh_seed_pack_unlocks()->void:
 	if formal_play_count>=3:volume_seed_unlocked=true
@@ -3631,7 +3550,6 @@ func _show_play_result()->void:
 	for i in range(mini(3,notable.size())):lines.append("%s　%.1fcm"%[str(notable[i].get("name","")),float(notable[i].get("size",0.0))])
 	result_notable_label.text="\n".join(lines) if not lines.is_empty() else Localizer.text(language_code,"result_none")
 	if play_hidden_species_unlocked==HIDDEN_TOVAR_ID:result_notable_label.text+="\n\n"+Localizer.text(language_code,"result_hidden_registered",[Localizer.species_name(language_code,_catalog_entry(HIDDEN_TOVAR_ID))])
-	if rain_event_pending:result_notable_label.text+="\n\n"+Localizer.text(language_code,"rain_pending_notice")
 	var new_names:Array[String]=[]
 	for species_id in result_new_species_queue:
 		var entry:=_catalog_entry(str(species_id));var species_name:=Localizer.species_name(language_code,entry)
@@ -3753,7 +3671,6 @@ func _close_result()->void:
 	if result_new_species_pulse_tween and result_new_species_pulse_tween.is_valid():result_new_species_pulse_tween.kill()
 	result_new_species_pulse_tween=null;result_new_species_label.scale=Vector2.ONE;result_overlay.visible=false;result_overlay.modulate.a=1.0;_clear_result_confetti();_update_play_ui()
 	if total_play_count==1 and not first_colorata_confirmed:_start_first_colorata_discovery_event()
-	elif mystery_items_acquired and normal_play_tutorial_complete and not panda_beacon_unlocked:_start_panda_beacon_unlock_event()
 	elif habitat_second_awakened and pending_special_series_explanation and not special_series_explanation_seen:_start_special_origin_event()
 	elif StoryProgressionClass.originals_complete(discovered) and not original_catalog_complete_event_seen:_start_original_catalog_complete_event()
 	else:_start_pending_armadillo_story()
@@ -3825,7 +3742,6 @@ func _close_encyclopedia()->void:
 	for child in encyclopedia_detail_page.get_children():child.free()
 	_update_play_ui()
 	if mystery_items_acquired and mystery_catalog_tutorial_complete and habitat_tutorial_complete and not normal_play_tutorial_complete:call_deferred("_start_initial_seed_stock_notice")
-	elif mystery_items_acquired and mystery_catalog_tutorial_complete and habitat_tutorial_complete and not panda_beacon_unlocked:call_deferred("_start_panda_beacon_unlock_event")
 	elif first_colorata_confirmed and not trio_originals_confirmed:call_deferred("_start_trio_originals_event")
 	else:call_deferred("_try_start_pending_story_event")
 
@@ -4023,13 +3939,12 @@ func _register_species_discovery(species_id:String,count_get:=true)->bool:
 	for active_entry in species:
 		if str(active_entry.get("species_id",""))==species_id:already_present=true;break
 	if not already_present:species.append(entry)
+	if habitat_awakened:habitat_returned_species[species_id]=true
 	if first_discovery:
 		var series_id:=_series_id_for_species(species_id)
 		if not series_id.is_empty():unlocked_series[series_id]=true
 		encyclopedia_unlocked=mystery_items_acquired;_refresh_seed_pack_unlocks()
-		if habitat_awakened:
-			habitat_returned_species[species_id]=true
-			if habitat_second_awakened and not bool(entry.get("main_story_original",false)) and not special_series_explanation_seen:pending_special_series_explanation=true
+		if habitat_awakened and habitat_second_awakened and not bool(entry.get("main_story_original",false)) and not special_series_explanation_seen:pending_special_series_explanation=true
 		_update_main_story_progress(false)
 	return first_discovery
 
@@ -4357,7 +4272,7 @@ func _clear_habitat_items()->void:
 
 func _build_habitat_items(force:=false)->void:
 	_clear_habitat_items()
-	if current_mode!="habitat" and not rain_bonus_active and not force:return
+	if current_mode!="habitat" and not force:return
 	if not habitat_awakened:
 		_update_habitat_ui();return
 	_ensure_habitat_wild_state()
@@ -4376,32 +4291,29 @@ func _build_habitat_items(force:=false)->void:
 
 func _original_habitat_species_ids()->Array[String]:
 	var ids:Array[String]=[]
-	for entry in _series_species_entries(ORIGINAL_SERIES_ID):
-		var species_id:=str(entry.get("species_id",""))
-		if species_id.is_empty() or not bool(entry.get("main_story_original",false)) or bool(entry.get("catalog_only",false)) or bool(entry.get("special_route_only",false)) or _seed_new_species_blocked(species_id):continue
-		ids.append(species_id)
+	for species_id in [FIRST_STORY_SPECIES_ID,PANDA_STORY_SPECIES_ID,ARMADILLO_STORY_SPECIES_ID]:
+		if not _catalog_entry(species_id).is_empty():ids.append(species_id)
 	return ids
 
 func _habitat_population_candidate_ids()->Array[String]:
-	var ids:=_original_habitat_species_ids()
-	for pending_id_value in pending_habitat_species:
-		var pending_id:=str(pending_id_value)
-		var pending_entry:=_catalog_entry(pending_id)
-		if not pending_id.is_empty() and not pending_entry.is_empty() and _species_available_in_current_era(pending_entry) and pending_id not in ids:ids.append(pending_id)
+	var ids:Array[String]=[]
 	for returned_id_value in habitat_returned_species:
 		var returned_id:=str(returned_id_value)
 		var returned_entry:=_catalog_entry(returned_id)
-		if bool(habitat_returned_species.get(returned_id,false)) and not returned_entry.is_empty() and _species_available_in_current_era(returned_entry) and returned_id not in ids:ids.append(returned_id)
+		if not bool(habitat_returned_species.get(returned_id,false)):continue
+		if returned_entry.is_empty() or not _species_available_in_current_era(returned_entry):continue
+		if returned_id not in ids:ids.append(returned_id)
+	ids.sort()
 	return ids
 
 func _ensure_habitat_wild_state(target_unix:float=-1.0,allow_native_notifications:=true)->Dictionary:
 	var now_unix:=Time.get_unix_time_from_system() if target_unix<0.0 else target_unix
-	var originals:=_original_habitat_species_ids()
-	var result:={"changed":false,"population_changed":false,"timing_changed":false,"ready":[],"ready_details":[],"jellied":[],"jellied_details":[],"removed":[]}
+	var candidates:=_habitat_population_candidate_ids()
+	var result:={"changed":false,"population_changed":false,"timing_changed":false,"jellied":[],"jellied_details":[],"removed":[]}
 	if not habitat_awakened:return result
 	if not habitat_wild_initialized:
 		var initial_size:=habitat_wild_plants.size()
-		HabitatWildSystemClass.initialize_population(habitat_wild_plants,originals,originals,habitat_tutorial_complete,now_unix,rng,HABITAT_SAFE_PLANT_POINTS)
+		HabitatWildSystemClass.initialize_population(habitat_wild_plants,candidates,candidates,true,now_unix,rng,HABITAT_SAFE_PLANT_POINTS)
 		habitat_wild_initialized=true
 		result["population_changed"]=habitat_wild_plants.size()!=initial_size
 	if habitat_wild_next_spawn_unix<=0.0:habitat_wild_next_spawn_unix=HabitatWildSystemClass.next_spawn_unix(now_unix,rng,habitat_wild_plants.size())
@@ -4409,7 +4321,7 @@ func _ensure_habitat_wild_state(target_unix:float=-1.0,allow_native_notification
 	var spawn_guard:=0
 	while now_unix>=habitat_wild_next_spawn_unix and spawn_guard<20000:
 		_merge_habitat_time_result(result,HabitatWildSystemClass.advance_time_with_events(habitat_wild_plants,habitat_wild_next_spawn_unix))
-		if HabitatWildSystemClass.spawn_one(habitat_wild_plants,_habitat_population_candidate_ids(),habitat_wild_next_spawn_unix,rng,HABITAT_SAFE_PLANT_POINTS):
+		if HabitatWildSystemClass.spawn_one(habitat_wild_plants,candidates,habitat_wild_next_spawn_unix,rng,HABITAT_SAFE_PLANT_POINTS):
 			result["population_changed"]=true
 			_refresh_habitat_growth_profile(habitat_wild_plants.back())
 		habitat_wild_next_spawn_unix=HabitatWildSystemClass.next_spawn_unix(habitat_wild_next_spawn_unix,rng,habitat_wild_plants.size())
@@ -4419,13 +4331,6 @@ func _ensure_habitat_wild_state(target_unix:float=-1.0,allow_native_notification
 			break
 	if habitat_wild_plants.is_empty() and habitat_wild_next_spawn_unix>now_unix+HabitatWildSystemClass.MAX_EMPTY_INTERVAL_SECONDS:
 		habitat_wild_next_spawn_unix=now_unix+HabitatWildSystemClass.MAX_EMPTY_INTERVAL_SECONDS
-	for pending_id_value in pending_habitat_species:
-		var pending_entry:=_catalog_entry(str(pending_id_value))
-		if not _species_available_in_current_era(pending_entry):continue
-		var size_before:=habitat_wild_plants.size()
-		HabitatWildSystemClass.add_pending_species(habitat_wild_plants,str(pending_id_value),now_unix,rng,HABITAT_SAFE_PLANT_POINTS)
-		if habitat_wild_plants.size()>size_before:
-			result["population_changed"]=true;_refresh_habitat_growth_profile(habitat_wild_plants.back())
 	if HabitatWildSystemClass.repair_unsafe_positions(habitat_wild_plants,HABITAT_SAFE_PLANT_POINTS,rng):result["changed"]=true
 	_merge_habitat_time_result(result,HabitatWildSystemClass.advance_time_with_events(habitat_wild_plants,now_unix))
 	result["changed"]=bool(result["changed"]) or bool(result["population_changed"]) or bool(result["timing_changed"])
@@ -4446,11 +4351,11 @@ func _refresh_habitat_growth_profile(plant:Dictionary)->bool:
 
 func _merge_habitat_time_result(target:Dictionary,source:Dictionary)->void:
 	if bool(source.get("changed",false)):target["changed"]=true
-	for key in ["ready","jellied","removed"]:
+	for key in ["jellied","removed"]:
 		for individual_id_value in source.get(key,[]):
 			var individual_id:=str(individual_id_value)
 			if individual_id not in target[key]:target[key].append(individual_id)
-	for key in ["ready_details","jellied_details"]:
+	for key in ["jellied_details"]:
 		for detail_value in source.get(key,[]):
 			if not detail_value is Dictionary:continue
 			var individual_id:=str(detail_value.get("individual_id",""));var already_added:=false
@@ -4460,45 +4365,17 @@ func _merge_habitat_time_result(target:Dictionary,source:Dictionary)->void:
 	if not source.get("removed",[]).is_empty():target["population_changed"]=true
 
 func _handle_habitat_time_events(events:Dictionary,allow_native_notifications:bool)->void:
-	for individual_id_value in events.get("ready",[]):
-		var individual_id:=str(individual_id_value);var plant:=_habitat_wild_plant_by_id(individual_id);var detail:=_habitat_event_detail(events.get("ready_details",[]),individual_id)
-		var event_plant:Dictionary=plant if not plant.is_empty() else detail
-		if event_plant.is_empty() or not bool(event_plant.get("panda_beacon_installed",false)):continue
-		if habitat_notification_service:habitat_notification_service.cancel(individual_id)
-		var species_name:=_habitat_species_name(str(event_plant.get("species_id","")))
-		var message:=Localizer.text(language_code,"panda_beacon_notification_body",[species_name])
-		if habitat_debug_enabled or not allow_native_notifications:_record_habitat_debug_event("%s　%s"%[_format_habitat_event_time(float(event_plant.get("harvest_ready_reached_unix",0.0))),message])
-		elif not plant.is_empty() and current_mode=="habitat":_show_rain_notice(Localizer.text(language_code,"panda_beacon_notification_title")+"\n"+message)
 	for individual_id_value in events.get("removed",[]):
 		var removed_id:=str(individual_id_value)
-		if habitat_notification_service:habitat_notification_service.cancel(removed_id);habitat_notification_service.cancel(_jurejure_notification_key(removed_id))
 		if habitat_plant_panel and habitat_plant_panel.visible and str(habitat_plant_panel.individual_id)==removed_id:habitat_plant_panel.close()
-	var unread_added:=false
-	for detail_value in events.get("jellied_details",[]):
-		if not detail_value is Dictionary:continue
-		var detail:Dictionary=detail_value
-		if not bool(detail.get("panda_beacon_installed",false)):continue
-		unread_added=_append_panda_beacon_unread_event(detail) or unread_added
-		if habitat_debug_enabled:_record_habitat_debug_event("%s　%sがジュレたためビーコン枠を返却"%[_format_habitat_event_time(float(detail.get("jellied_unix",0.0))),_habitat_species_name(str(detail.get("species_id","")))])
 	var active_removed:=str(active_jurejure_event.get("individual_id",""))
 	if not active_removed.is_empty() and active_removed in events.get("removed",[]):_clear_active_jurejure_event(false,false)
-	if unread_added:_update_play_ui()
 
 func _habitat_event_detail(details:Variant,individual_id:String)->Dictionary:
 	if details is Array:
 		for value in details:
 			if value is Dictionary and str(value.get("individual_id",""))==individual_id:return value
 	return {}
-
-func _append_panda_beacon_unread_event(detail:Dictionary)->bool:
-	var individual_id:=str(detail.get("individual_id",""))
-	if individual_id.is_empty():return false
-	var entry:={"individual_id":individual_id,"species_id":str(detail.get("species_id","")),"diameter_cm":maxf(0.0,float(detail.get("diameter_cm",0.0))),"jellied_unix":maxf(0.0,float(detail.get("jellied_unix",0.0))),"event_unix":maxf(0.0,float(detail.get("jellied_unix",0.0))),"event_type":"jellied","harvest_race":false}
-	for index in range(panda_beacon_unread_log.size()):
-		if str(panda_beacon_unread_log[index].get("individual_id",""))==individual_id:
-			panda_beacon_unread_log[index]=entry;return true
-	panda_beacon_unread_log.append(entry)
-	return true
 
 func _habitat_species_name(species_id:String)->String:
 	var entry:=_catalog_entry(species_id)
@@ -4521,54 +4398,24 @@ func _add_habitat_wild_plant(plant:Dictionary)->void:
 	var sprite:=Sprite3D.new();sprite.texture=texture;sprite.billboard=BaseMaterial3D.BILLBOARD_ENABLED;sprite.no_depth_test=true;sprite.texture_filter=BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS;sprite.pixel_size=1.15/maxf(1.0,float(sprite.texture.get_width()));sprite.offset.y=-float(sprite.texture.get_height())*.18;sprite.position=_panorama_point_to_world(Vector2(float(plant.get("panorama_x",640.0)),float(plant.get("panorama_y",410.0))),HABITAT_ITEM_RADIUS);habitat_items_root.add_child(sprite)
 	var scale_value:=_habitat_wild_visual_scale(float(plant.get("diameter_cm",1.6)));sprite.scale=Vector3.ONE*scale_value
 	if bool(plant.get("tutorial",false)):sprite.modulate=Color(1.15,1.10,.78,1.0)
-	var badge:=Label3D.new();badge.font_size=HABITAT_BADGE_FONT_SIZE;badge.outline_size=HABITAT_BADGE_OUTLINE_SIZE;badge.pixel_size=HABITAT_BADGE_PIXEL_SIZE;badge.billboard=BaseMaterial3D.BILLBOARD_ENABLED;badge.fixed_size=true;badge.no_depth_test=true;badge.double_sided=true;badge.modulate=Color("#ffe36d") if float(plant.get("diameter_cm",0.0))>=HabitatWildSystemClass.HARVEST_MIN_CM else Color("#f4eed7");habitat_items_root.add_child(badge)
-	var item={"node":sprite,"kind":"wild_plant","species_id":str(plant.get("species_id","")),"individual_id":str(plant.get("individual_id","")),"status_label":badge,"beacon_node":null};habitat_pickups.append(item);_refresh_habitat_wild_item(item,plant)
+	var item={"node":sprite,"kind":"wild_plant","species_id":str(plant.get("species_id","")),"individual_id":str(plant.get("individual_id",""))};habitat_pickups.append(item);_refresh_habitat_wild_item(item,plant)
 
 func _habitat_wild_visual_scale(diameter_cm:float)->float:
-	return maxf(.32,.18+(maxf(1.6,diameter_cm)-1.6)*.058)
+	# Habitat plants keep growing in their data, but the observation view caps
+	# their billboard size so one old individual cannot hide the whole habitat.
+	return clampf(.18+(maxf(1.6,diameter_cm)-1.6)*.058,.32,2.8)
 
 func _refresh_habitat_wild_item(item:Dictionary,plant:Dictionary,animate_beacon:=false)->void:
-	var node:Sprite3D=item.get("node");var badge:Label3D=item.get("status_label")
+	var node:Sprite3D=item.get("node")
 	if not is_instance_valid(node):return
 	var diameter:=float(plant.get("diameter_cm",1.6));var visual_scale:=_habitat_wild_visual_scale(diameter);node.scale=Vector3.ONE*visual_scale
 	if bool(plant.get("tutorial",false)):node.modulate=Color(1.15,1.10,.78,1.0)
 	else:node.modulate=Color.WHITE
-	if is_instance_valid(badge):
-		var ready:=diameter>=HabitatWildSystemClass.HARVEST_MIN_CM
-		badge.position=node.position+Vector3.UP*minf(3.4,.58+visual_scale*.48)
-		badge.text=Localizer.text(language_code,"harvest_ready",[diameter]) if ready else "%.1fcm"%diameter;badge.modulate=Color("#ffe36d") if ready else Color("#f4eed7")
-	_sync_habitat_beacon_visual(item,plant,animate_beacon)
-
-func _sync_habitat_beacon_visual(item:Dictionary,plant:Dictionary,animate:=false)->void:
-	var plant_node:Node3D=item.get("node");var beacon=item.get("beacon_node");var installed:=bool(plant.get("panda_beacon_installed",false))
-	if not installed:
-		if is_instance_valid(beacon):beacon.queue_free()
-		item["beacon_node"]=null
-		return
-	if not is_instance_valid(plant_node):return
-	if not is_instance_valid(beacon):
-		beacon=HabitatBeaconDeviceClass.new();beacon.position=_habitat_beacon_world_position(plant_node.position,float(plant_node.scale.x));habitat_items_root.add_child(beacon);item["beacon_node"]=beacon
-		if animate:beacon.play_install()
-		else:beacon.show_immediately()
-	else:beacon.position=_habitat_beacon_world_position(plant_node.position,float(plant_node.scale.x))
-
-func _habitat_beacon_world_position(plant_position:Vector3,plant_visual_scale:float)->Vector3:
-	var radial:=Vector3(plant_position.x,0.0,plant_position.z)
-	var screen_right:=Vector3.RIGHT if radial.length_squared()<0.0001 else Vector3.UP.cross(radial.normalized()).normalized()
-	var side_offset:=HABITAT_BEACON_SIDE_OFFSET+minf(1.35,maxf(0.0,plant_visual_scale)*0.30)
-	return plant_position+screen_right*side_offset+Vector3.UP*-0.10
 
 func _habitat_wild_item_by_id(individual_id:String)->Dictionary:
 	for item in habitat_pickups:
 		if str(item.get("kind",""))=="wild_plant" and str(item.get("individual_id",""))==individual_id:return item
 	return {}
-
-func _animate_habitat_beacon_removal(individual_id:String)->void:
-	var item:=_habitat_wild_item_by_id(individual_id)
-	if item.is_empty():return
-	var beacon=item.get("beacon_node")
-	item["beacon_node"]=null
-	if is_instance_valid(beacon):beacon.play_remove()
 
 func _add_habitat_seed(panorama_point:Vector2)->void:
 	var seed:=MeshInstance3D.new();var mesh:=SphereMesh.new();mesh.radius=.105;mesh.height=.24;mesh.radial_segments=12;mesh.rings=6;seed.mesh=mesh
@@ -4603,22 +4450,15 @@ func _reset_daily_seeds_if_needed()->void:
 
 func _update_habitat_ui()->void:
 	if habitat_status_label:
-		habitat_status_label.visible=current_mode=="habitat" and rain_bonus_active
-		habitat_status_label.text=Localizer.text(language_code,"habitat_rain_remaining",[ceili(rain_time_remaining)]) if rain_bonus_active else ""
+		habitat_status_label.visible=false
+		habitat_status_label.text=""
 	if mode_button and current_mode=="greenhouse":mode_button.text=Localizer.text(language_code,"main_habitat")
 	_update_habitat_button_glow()
 
 func _roll_rain_event()->void:
-	if not habitat_awakened or rain_event_pending or active_seed_type=="old":return
-	if not rain_draws_unlocked:
-		rain_intro_normal_bags+=1
-		if rain_intro_normal_bags<2:return
-		rain_draws_unlocked=true
-	rain_bag_count+=1
-	var chance:float=float(RAIN_TRIGGER_CHANCES[mini(rain_bag_count-1,RAIN_TRIGGER_CHANCES.size()-1)])
-	if rng.randf()>=chance:return
-	rain_event_pending=true;rain_bonus_in_progress=false;rain_time_remaining=RAIN_BONUS_DURATION_SECONDS
-	_show_rain_notice(Localizer.text(language_code,"rain_pending_notice"))
+	# Post-awakening rain bonus gameplay was retired. Story rain is rendered by
+	# HabitatAwakeningOverlay and does not pass through this legacy hook.
+	return
 
 func _show_rain_notice(message:String)->void:
 	if effects_layer==null:return
@@ -4631,11 +4471,10 @@ func _evaluate_unlock_rules(trigger:String,current_value:float)->void:
 		var rule_id:=str(rule.get("id",""))
 		if bool(completed_unlock_conditions.get(rule_id,false)) or current_value<float(rule.get("value",0.0)):continue
 		completed_unlock_conditions[rule_id]=true
-		var pending_before:=pending_habitat_species.size();_queue_random_species(str(rule.get("rarity","通常")))
-		if pending_habitat_species.size()>pending_before:audio_manager.play_se("level_up",.52)
-	_build_habitat_items();_save()
+		if _queue_random_species(str(rule.get("rarity","通常"))):audio_manager.play_se("level_up",.52)
+	_save()
 
-func _queue_random_species(rarity:String)->void:
+func _queue_random_species(rarity:String)->bool:
 	var candidates:Array=[]
 	for entry in catalog_species:
 		if not _species_available_in_current_era(entry):continue
@@ -4643,41 +4482,29 @@ func _queue_random_species(rarity:String)->void:
 		if bool(entry.get("catalog_only",false)):continue
 		if str(entry.get("rarity","通常"))!=rarity:continue
 		if species_id in [BEST_UNLOCK_HYALINA_ID,BEST_UNLOCK_PURPUSORUM_ID]:continue
-		if bool(discovered.get(species_id,false)) or bool(greenhouse_available.get(species_id,false)) or species_id in pending_habitat_species:continue
+		if bool(discovered.get(species_id,false)) or bool(greenhouse_available.get(species_id,false)):continue
 		candidates.append(entry)
-	if candidates.is_empty():return
-	var chosen:Dictionary=candidates[rng.randi_range(0,candidates.size()-1)];pending_habitat_species.append(str(chosen.species_id))
+	if candidates.is_empty():return false
+	var chosen:Dictionary=candidates[rng.randi_range(0,candidates.size()-1)]
+	var species_id:=str(chosen.get("species_id",""));greenhouse_available[species_id]=true;unlocked_species[species_id]=true
+	_apply_saved_unlocks()
+	return true
 
 func _habitat_new_species_candidates()->Array[Dictionary]:
-	var candidates:Array[Dictionary]=[]
-	for entry in catalog_species:
-		var species_id:=str(entry.get("species_id",""))
-		if species_id.is_empty() or not bool(entry.get("main_story_original",false)) or _series_id_for_species(species_id)!=ORIGINAL_SERIES_ID or not _species_is_in_unlocked_series(species_id):continue
-		if bool(discovered.get(species_id,false)) or species_id in pending_habitat_species:continue
-		if bool(entry.get("special_route_only",false)) or _seed_new_species_blocked(species_id):continue
-		if not HABITAT_NEW_SPECIES_CHANCES.has(str(entry.get("rarity","通常"))):continue
-		candidates.append(entry)
-	return candidates
+	return []
 
 func _roll_habitat_new_species()->String:
-	if not habitat_awakened:return ""
-	var candidates:=_habitat_new_species_candidates()
-	if candidates.is_empty():return ""
-	var chosen:Dictionary=candidates[rng.randi_range(0,candidates.size()-1)]
-	var chance:=float(HABITAT_NEW_SPECIES_CHANCES.get(str(chosen.get("rarity","通常")),0.0))
-	if rng.randf()>=chance:return ""
-	var species_id:=str(chosen.get("species_id",""));pending_habitat_species.append(species_id)
-	_build_habitat_items();return species_id
+	return ""
 
 func _update_habitat_button_glow()->void:
 	if not mode_button:return
-	var has_pending:=not pending_habitat_species.is_empty() or rain_event_pending
+	var has_pending:=habitat_mystery_seeds_pending>0 or habitat_old_catalog_page_pending
 	if habitat_glow_tween and habitat_glow_tween.is_valid():habitat_glow_tween.kill()
 	mode_button.self_modulate=Color.WHITE
 	if habitat_sparkle and is_instance_valid(habitat_sparkle):habitat_sparkle.queue_free()
 	if not has_pending:return
-	habitat_sparkle=UISymbolIcon.new();habitat_sparkle.symbol="rain" if rain_event_pending else "sparkle";habitat_sparkle.icon_color=Color("#bceaff") if rain_event_pending else Color("#fff2a1");habitat_sparkle.position=Vector2(5,-9);habitat_sparkle.size=Vector2(26,26);habitat_sparkle.mouse_filter=Control.MOUSE_FILTER_IGNORE;mode_button.add_child(habitat_sparkle)
-	var glow_color:=Color(0.72,1.05,1.22,1) if rain_event_pending else Color(1.2,1.12,.72,1)
+	habitat_sparkle=UISymbolIcon.new();habitat_sparkle.symbol="sparkle";habitat_sparkle.icon_color=Color("#fff2a1");habitat_sparkle.position=Vector2(5,-9);habitat_sparkle.size=Vector2(26,26);habitat_sparkle.mouse_filter=Control.MOUSE_FILTER_IGNORE;mode_button.add_child(habitat_sparkle)
+	var glow_color:=Color(1.2,1.12,.72,1)
 	habitat_glow_tween=create_tween().set_loops();habitat_glow_tween.tween_property(mode_button,"self_modulate",glow_color,.75).set_trans(Tween.TRANS_SINE);habitat_glow_tween.parallel().tween_property(habitat_sparkle,"position:x",72.0,.75).set_trans(Tween.TRANS_SINE);habitat_glow_tween.parallel().tween_property(habitat_sparkle,"modulate:a",.25,.75);habitat_glow_tween.tween_property(mode_button,"self_modulate",Color.WHITE,.75);habitat_glow_tween.parallel().tween_property(habitat_sparkle,"position:x",5.0,.01);habitat_glow_tween.parallel().tween_property(habitat_sparkle,"modulate:a",1.0,.01);habitat_glow_tween.tween_interval(1.25)
 
 func _open_species_detail(entry:Dictionary)->void:
@@ -4803,9 +4630,6 @@ func _arrangement_pot_anchor_screen()->Vector2:
 	return get_viewport().get_visible_rect().size*ARRANGEMENT_POT_ANCHOR
 
 func spawn_plant(force_golden := false,spawn_position:Variant=null) -> void:
-	if rain_bonus_active:
-		_spawn_rain_plant()
-		return
 	var chosen:Dictionary
 	if active_seed_type=="old":
 		chosen=_catalog_entry(FIRST_STORY_SPECIES_ID)
@@ -4830,7 +4654,7 @@ func spawn_plant(force_golden := false,spawn_position:Variant=null) -> void:
 	if audio_manager:audio_manager.play_se("sprout",.28)
 
 func _spawn_greenhouse_seed()->void:
-	if not play_active or rain_bonus_active or play_seeds_remaining<=0:return
+	if not play_active or play_seeds_remaining<=0:return
 	var spawn_position:=_find_spawn_position();pending_seed_positions.append(spawn_position);play_seeds_remaining-=1;play_seed_animations_pending+=1;_update_play_ui();_animate_and_spawn_greenhouse_seed(spawn_position)
 
 func _animate_and_spawn_greenhouse_seed(spawn_position:Vector3)->void:
@@ -4842,11 +4666,11 @@ func _animate_and_spawn_greenhouse_seed(spawn_position:Vector3)->void:
 	if is_instance_valid(seed):seed.queue_free()
 	pending_seed_positions.erase(spawn_position)
 	play_seed_animations_pending=maxi(0,play_seed_animations_pending-1)
-	if play_active and not rain_bonus_active:spawn_plant(false,spawn_position)
+	if play_active:spawn_plant(false,spawn_position)
 	if play_active and play_seeds_remaining==0 and play_spawn_queue==0 and play_seed_animations_pending==0 and plants.is_empty():call_deferred("_finish_greenhouse_play")
 
 func _queue_greenhouse_replacements()->void:
-	if not play_active or rain_bonus_active or active_seed_type=="old" or play_seeds_remaining<=play_spawn_queue:return
+	if not play_active or active_seed_type=="old" or play_seeds_remaining<=play_spawn_queue:return
 	var open_slots:=maxi(0,play_concurrent_target-(plants.size()+play_spawn_queue+play_seed_animations_pending))
 	var add_count:=mini(open_slots,play_seeds_remaining-play_spawn_queue)
 	if add_count<=0:return
@@ -4857,57 +4681,6 @@ func _next_greenhouse_spawn_interval()->float:
 	if plants.size()<=3:return rng.randf_range(.04,.18)
 	if rng.randf()<.20:return rng.randf_range(.04,.16)
 	return rng.randf_range(.28,.92)
-
-func _spawn_rain_plant()->void:
-	var pool:=_rain_species_pool()
-	if pool.is_empty():return
-	var chosen:Dictionary=_choose_rain_species(pool)
-	var pos:=_find_rain_spawn_position()
-	var label:=_plant_label();labels_layer.add_child(label)
-	var p=SucculentClass.new();p.original_pos=pos;p.position=pos;world_root.add_child(p);p.setup(chosen,rng.randi(),label,null);p.jelly_permission=Callable(self,"_allow_plant_jelly").bind(p);p.harvested.connect(_on_harvested);p.jellied.connect(_on_jellied);plants.append(p)
-	if audio_manager:audio_manager.play_se("sprout",.22)
-
-func _rain_species_pool()->Array:
-	var pool:Array=[]
-	for entry in catalog_species:
-		if not _species_available_in_current_era(entry):continue
-		var species_id:=str(entry.get("species_id",""))
-		if species_id.is_empty() or bool(entry.get("special_route_only",false)) or _seed_new_species_blocked(species_id):continue
-		var known:=bool(discovered.get(species_id,false)) and bool(greenhouse_available.get(species_id,false))
-		var undiscovered_unlocked:=not bool(discovered.get(species_id,false)) and _species_is_in_unlocked_series(species_id)
-		if known or undiscovered_unlocked:pool.append(entry)
-	if pool.is_empty():
-		for entry in catalog_species:
-			if str(entry.species_id)==FIRST_STORY_SPECIES_ID:pool.append(entry);break
-	return pool
-
-func _choose_rain_species(pool:Array)->Dictionary:
-	var known:Array=[];var undiscovered_pool:Array=[]
-	for entry in pool:
-		if bool(discovered.get(str(entry.get("species_id","")),false)):known.append(entry)
-		else:undiscovered_pool.append(entry)
-	var target:Array=undiscovered_pool if not undiscovered_pool.is_empty() and (known.is_empty() or rng.randf()<RAIN_UNDISCOVERED_SPAWN_CHANCE) else known
-	if target.is_empty():target=pool
-	return target[rng.randi_range(0,target.size()-1)]
-
-func _find_rain_spawn_position()->Vector3:
-	# Keep rain sprouts on the panorama's visible ground band and slightly behind
-	# ordinary habitat pickups, so none appear at the camera's feet.
-	var rain_radius:=HABITAT_ITEM_RADIUS+1.15
-	var best:=_panorama_point_to_world(_random_rain_ground_point(),rain_radius)
-	var best_clearance:=-1.0
-	for attempt in range(96):
-		var candidate:=_panorama_point_to_world(_random_rain_ground_point(),rain_radius)
-		var clearance:=99.0
-		for plant in plants:
-			if is_instance_valid(plant):clearance=minf(clearance,candidate.distance_to(plant.original_pos))
-		if clearance>best_clearance:best=candidate;best_clearance=clearance
-		if clearance>=1.15:return candidate
-	return best
-
-func _random_rain_ground_point()->Vector2:
-	var region:Rect2=RAIN_GROUND_REGIONS[rng.randi_range(0,RAIN_GROUND_REGIONS.size()-1)]
-	return Vector2(rng.randf_range(region.position.x,region.end.x),rng.randf_range(region.position.y,region.end.y))
 
 func _weighted_species()->Dictionary:
 	var total:=0.0
@@ -5083,52 +4856,9 @@ func _spawn_center_inside_soil(candidate:Vector3)->bool:
 func _plant_label()->Label:
 	var l:=Label.new(); l.text="1.6 cm"; l.size=Vector2(92,34); l.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; l.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; l.add_theme_font_size_override("font_size",17); l.add_theme_color_override("font_color",Color.WHITE); l.add_theme_stylebox_override("normal",_box(Color(0.14,0.08,0.05,.92),Color("#f4e1be"),11,2)); l.mouse_filter=Control.MOUSE_FILTER_IGNORE; return l
 
-func _start_rain_bonus()->void:
-	if not habitat_awakened or not rain_event_pending or rain_bonus_active:return
-	rain_bonus_active=true;rain_bonus_in_progress=true;play_active=true;active_seed_type="rain";play_time_remaining=0.0
-	if rain_time_remaining<=0.0:rain_time_remaining=RAIN_BONUS_DURATION_SECONDS
-	rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=ceili(rain_time_remaining)
-	play_harvest_cm_total=0.0;play_puku_earned_total=0;play_harvest_count=0;play_max_size=0.0;play_notable_species.clear();_clear_greenhouse_plants()
-	for child in habitat_items_root.get_children():child.free()
-	habitat_pickups.clear();habitat_items_root.visible=false
-	for i in range(RAIN_INITIAL_PLANT_COUNT):spawn_plant()
-	_start_rain_visual();_reconcile_beacon_notifications();_save();_update_play_ui();_update_habitat_ui();_refresh_habitat_dev_panel();_show_rain_notice(Localizer.text(language_code,"rain_started_notice"))
-	if not bool(tutorial_steps.get("rain_first_dialog",false)):call_deferred("_start_first_rain_dialog")
-
-func _start_first_rain_dialog()->void:
-	if bool(tutorial_steps.get("rain_first_dialog",false)) or not rain_bonus_active:return
-	_start_scripted_dialog("rain_first",[
-		{"speaker":"panda","text":Localizer.text(language_code,"rain_intro_1")},
-		{"speaker":"panda","text":Localizer.text(language_code,"rain_intro_2")},
-		{"speaker":"panda","text":Localizer.text(language_code,"rain_intro_3"),"button":Localizer.text(language_code,"continue")}
-	],false)
-
-func _finish_rain_bonus()->void:
-	if not rain_bonus_active:return
-	rain_bonus_active=false;rain_bonus_in_progress=false;rain_event_pending=false;rain_time_remaining=0.0;rain_bag_count=0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;play_active=false
-	rain_completion_count+=1
-	if rain_completion_count>=2:_assign_mystery_route(MYSTERY_ROUTE_RAIN,true)
-	_clear_greenhouse_plants();_stop_rain_visual();_build_habitat_items();habitat_items_root.visible=current_mode=="habitat";_reconcile_beacon_notifications();_save();_update_play_ui();_update_habitat_ui();_refresh_habitat_dev_panel();_show_rain_notice(Localizer.text(language_code,"rain_finished_notice"))
-
-func _start_rain_visual()->void:
-	_stop_rain_visual();rain_visual=Control.new();rain_visual.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);rain_visual.mouse_filter=Control.MOUSE_FILTER_IGNORE;effects_layer.add_child(rain_visual)
-	var tint:=ColorRect.new();tint.color=Color(0.18,0.34,0.46,.13);tint.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);tint.mouse_filter=Control.MOUSE_FILTER_IGNORE;rain_visual.add_child(tint)
-	rain_drops.clear()
-	var viewport_size:=get_viewport().get_visible_rect().size
-	for i in range(30):
-		var drop:=ColorRect.new();drop.color=Color(0.75,0.91,1.0,rng.randf_range(.25,.58));drop.size=Vector2(rng.randf_range(1.0,2.2),rng.randf_range(32.0,68.0));drop.rotation=-.16;drop.position=Vector2(rng.randf_range(0.0,viewport_size.x),rng.randf_range(-viewport_size.y,viewport_size.y));drop.mouse_filter=Control.MOUSE_FILTER_IGNORE;drop.set_meta("speed",rng.randf_range(520.0,850.0));rain_visual.add_child(drop);rain_drops.append(drop)
-
 func _stop_rain_visual()->void:
 	if rain_visual and is_instance_valid(rain_visual):rain_visual.free()
 	rain_visual=null;rain_drops.clear()
-
-func _update_rain_visual(delta:float)->void:
-	if not rain_bonus_active:return
-	var viewport_size:=get_viewport().get_visible_rect().size
-	for drop in rain_drops:
-		if not is_instance_valid(drop):continue
-		drop.position+=Vector2(-70.0,float(drop.get_meta("speed",650.0)))*delta
-		if drop.position.y>viewport_size.y+80.0:drop.position=Vector2(rng.randf_range(0.0,viewport_size.x+100.0),rng.randf_range(-240.0,-40.0))
 
 func _process(delta:float)->void:
 	_update_greenhouse_pan_follow(delta)
@@ -5136,7 +4866,6 @@ func _process(delta:float)->void:
 	_update_habitat_wild_growth(delta)
 	_update_jurejure_events(delta)
 	_update_habitat_scroll_tutorial()
-	_update_rain_visual(delta)
 	if _update_first_play_tutorial(delta):
 		_update_labels()
 		return
@@ -5146,27 +4875,7 @@ func _process(delta:float)->void:
 	if puku_buyback_tutorial_active or scripted_dialog_kind in ["seed_pod_gauge_discovery","seed_pod_first_reward"]:
 		_update_labels()
 		return
-	if rain_bonus_active:
-		if scripted_dialog_kind=="rain_first":
-			_update_labels()
-			return
-		rain_time_remaining=maxf(0.0,rain_time_remaining-delta)
-		var remaining_second:=ceili(rain_time_remaining)
-		if remaining_second!=rain_last_saved_second:rain_last_saved_second=remaining_second;_save();_update_habitat_ui()
-		if rain_time_remaining<=0.0:
-			_finish_rain_bonus()
-			return
-		var rain_seed_pod_growth:=0.0
-		for p in plants:
-			if is_instance_valid(p):
-				var previous_rain_diameter:=float(p.diameter_cm)
-				p.simulate(delta)
-				if mystery_items_acquired and p.state=="growing":rain_seed_pod_growth+=maxf(0.0,float(p.diameter_cm)-previous_rain_diameter)
-		if rain_seed_pod_growth>0.0:add_seed_pod_gauge_cm(rain_seed_pod_growth,false,true)
-		if rain_spawn_queue>0 and plants.size()<RAIN_MAX_ACTIVE_PLANTS:
-			rain_spawn_timer-=delta
-			if rain_spawn_timer<=0.0:rain_spawn_queue-=1;spawn_plant();rain_spawn_timer=rng.randf_range(.14,.32)
-	elif current_mode=="greenhouse" and (play_active or dev_jelly_test_active or catalog_preview_mode_active):
+	if current_mode=="greenhouse" and (play_active or dev_jelly_test_active or catalog_preview_mode_active):
 		var seed_pod_growth:=0.0
 		var old_seed_ready:Array=[]
 		var old_seed_max_diameter:=0.0
@@ -5197,7 +4906,7 @@ func _process(delta:float)->void:
 				play_spawn_queue-=1;_spawn_greenhouse_seed()
 				if play_spawn_queue>0:play_spawn_timer=_next_greenhouse_spawn_interval()
 	_poll_greenhouse_play_completion()
-	if not rain_bonus_active:_resolve_crowding(delta)
+	_resolve_crowding(delta)
 	_update_labels()
 
 func _update_habitat_wild_growth(delta:float)->void:
@@ -5209,13 +4918,12 @@ func _update_habitat_wild_growth(delta:float)->void:
 	if habitat_debug_enabled and habitat_time_multiplier>1:target_unix+=elapsed_real*float(habitat_time_multiplier-1)
 	var result:=_ensure_habitat_wild_state(target_unix,habitat_time_multiplier==1)
 	if target_unix>wall_now:_rebase_habitat_clock(target_unix-wall_now)
-	var event_changed:bool=not result.get("ready",[]).is_empty() or not result.get("jellied",[]).is_empty()
+	var event_changed:bool=not result.get("jellied",[]).is_empty()
 	if bool(result.get("population_changed",false)):
-		_reconcile_beacon_notifications()
-		if current_mode=="habitat" and not rain_bonus_active:_build_habitat_items(true)
+		if current_mode=="habitat":_build_habitat_items(true)
 		else:_save()
-	elif current_mode=="habitat" and not rain_bonus_active:_refresh_habitat_wild_badges()
-	if bool(result.get("timing_changed",false)) or event_changed:_reconcile_beacon_notifications();_save()
+	elif current_mode=="habitat":_refresh_habitat_wild_badges()
+	if bool(result.get("timing_changed",false)) or event_changed:_save()
 	if habitat_wild_save_accumulator>=10.0:habitat_wild_save_accumulator=0.0;_save()
 	_refresh_habitat_dev_panel()
 
@@ -5230,10 +4938,6 @@ func _update_jurejure_events(delta:float)->void:
 		if plant.is_empty():
 			_clear_active_jurejure_event(false,false)
 			return
-		if not bool(active_jurejure_event.get("harvest_race",false)) and float(plant.get("diameter_cm",0.0))>=HabitatWildSystemClass.HARVEST_MIN_CM:
-			active_jurejure_event["harvest_race"]=true
-			_notify_jurejure_target(plant)
-			_save()
 		if now_unix>=float(active_jurejure_event.get("deadline_unix",now_unix+1.0)):
 			_resolve_jurejure_deadline(plant,now_unix)
 			return
@@ -5250,7 +4954,7 @@ func _update_jurejure_events(delta:float)->void:
 func _start_random_jurejure_event(now_unix:float=-1.0)->bool:
 	if not active_jurejure_event.is_empty() or not jurejure_enabled:return false
 	var event_time:=Time.get_unix_time_from_system() if now_unix<0.0 else now_unix
-	var plant:=JureJureSystemClass.choose_target(habitat_wild_plants,discovered,species_get_counts,jurejure_growth_stage,habitat_second_awakened,rng)
+	var plant:=JureJureSystemClass.choose_target(habitat_wild_plants,habitat_returned_species,rng)
 	if plant.is_empty():return false
 	active_jurejure_event=JureJureSystemClass.make_event(plant,event_time)
 	jurejure_cooldown_until_unix=event_time+JureJureSystemClass.EVENT_COOLDOWN_SECONDS
@@ -5259,48 +4963,31 @@ func _start_random_jurejure_event(now_unix:float=-1.0)->bool:
 
 func _notify_jurejure_target(plant:Dictionary)->void:
 	if plant.is_empty():return
-	var race:=bool(active_jurejure_event.get("harvest_race",float(plant.get("diameter_cm",0.0))>=HabitatWildSystemClass.HARVEST_MIN_CM))
 	var species_name:=_habitat_species_name(str(plant.get("species_id","")))
-	var message:=Localizer.text(language_code,"jurejure_target_ready" if race else "jurejure_target_small",[species_name])
-	if bool(plant.get("panda_beacon_installed",false)):
-		_upsert_jurejure_beacon_log(plant,"jurejure_targeted_ready" if race else "jurejure_targeted_small",race)
-		if habitat_notification_service:
-			habitat_notification_service.schedule_at(_jurejure_notification_key(str(plant.get("individual_id",""))),Time.get_unix_time_from_system()+2.0,Localizer.text(language_code,"panda_beacon_notification_title"),message,habitat_time_multiplier==1)
-		_update_play_ui()
+	var message:=Localizer.text(language_code,"jurejure_target_small",[species_name])
 	if current_mode=="habitat":_show_rain_notice(message)
 	if habitat_debug_enabled:_record_habitat_debug_event(message)
 
 func _resolve_jurejure_deadline(plant:Dictionary,now_unix:float)->void:
-	if plant.is_empty() or not JureJureSystemClass.is_safe_target(plant,discovered,species_get_counts):
+	if plant.is_empty() or not JureJureSystemClass.is_safe_target(plant,habitat_returned_species):
 		_clear_active_jurejure_event(true)
 		return
-	var race:=bool(active_jurejure_event.get("harvest_race",float(plant.get("diameter_cm",0.0))>=HabitatWildSystemClass.HARVEST_MIN_CM))
 	var species_name:=_habitat_species_name(str(plant.get("species_id","")))
-	var message:=Localizer.text(language_code,"jurejure_taken_ready" if race else "jurejure_taken_small",[species_name])
-	var had_beacon:=bool(plant.get("panda_beacon_installed",false))
-	if had_beacon:_upsert_jurejure_beacon_log(plant,"jurejure_taken_ready" if race else "jurejure_taken_small",race,now_unix)
-	_release_panda_beacon(plant)
+	var message:=Localizer.text(language_code,"jurejure_taken_small",[species_name])
 	HabitatWildSystemClass.remove_individual(habitat_wild_plants,str(plant.get("individual_id","")))
-	_clear_active_jurejure_event(true,not had_beacon)
-	_save();_reconcile_beacon_notifications();_build_habitat_items(true);_update_play_ui();_refresh_habitat_dev_panel()
-	if current_mode=="habitat" or had_beacon:_show_rain_notice(message)
+	_clear_active_jurejure_event(true)
+	_save();_build_habitat_items(true);_update_play_ui();_refresh_habitat_dev_panel()
+	if current_mode=="habitat":_show_rain_notice(message)
 	if habitat_debug_enabled:_record_habitat_debug_event(message)
 
 func _on_jurejure_display_pressed()->void:
 	if active_jurejure_event.is_empty():return
 	var plant:=_habitat_wild_plant_by_id(str(active_jurejure_event.get("individual_id","")))
 	if plant.is_empty():_clear_active_jurejure_event(false);return
-	if bool(active_jurejure_event.get("harvest_race",false)) or float(plant.get("diameter_cm",0.0))>=HabitatWildSystemClass.HARVEST_MIN_CM:
-		_show_rain_notice(Localizer.text(language_code,"jurejure_race_hint"))
-		return
 	_show_rain_notice(Localizer.text(language_code,"jurejure_panda_defend"))
 	_clear_active_jurejure_event(true);_save();_update_play_ui()
 
 func _clear_active_jurejure_event(play_escape:=true,clear_targeted_log:=true)->void:
-	var individual_id:=str(active_jurejure_event.get("individual_id",""))
-	if not individual_id.is_empty():
-		if habitat_notification_service:habitat_notification_service.cancel(_jurejure_notification_key(individual_id))
-		if clear_targeted_log:_remove_jurejure_targeted_log(individual_id)
 	active_jurejure_event={}
 	if jurejure_event_display:
 		if play_escape:jurejure_event_display.play_escape()
@@ -5309,36 +4996,17 @@ func _clear_active_jurejure_event(play_escape:=true,clear_targeted_log:=true)->v
 func _refresh_jurejure_display()->void:
 	if jurejure_event_display==null:return
 	if scripted_dialog_kind in ["jurejure_intro","jurejure_return"]:return
-	if current_mode!="habitat" or rain_bonus_active or active_jurejure_event.is_empty():
+	if current_mode!="habitat" or active_jurejure_event.is_empty():
 		jurejure_event_display.hide_immediately();return
 	var individual_id:=str(active_jurejure_event.get("individual_id",""));var item:=_habitat_wild_item_by_id(individual_id)
 	if item.is_empty():jurejure_event_display.hide_immediately();return
 	var node:Node3D=item.get("node")
 	if not is_instance_valid(node):jurejure_event_display.hide_immediately();return
-	var race:=bool(active_jurejure_event.get("harvest_race",false))
 	var position:=camera.unproject_position(node.global_position+Vector3.UP*.45)
-	var status:=Localizer.text(language_code,"jurejure_status_ready" if race else "jurejure_status_small")
+	var status:=Localizer.text(language_code,"jurejure_status_small")
 	if not jurejure_event_display.visible:jurejure_event_display.show_at(position,status)
 	else:
 		jurejure_event_display.status_label.text=status;jurejure_event_display.set_target_screen_position(position)
-
-func _jurejure_notification_key(individual_id:String)->String:
-	return "jurejure_"+individual_id
-
-func _upsert_jurejure_beacon_log(plant:Dictionary,event_type:String,race:bool,event_unix:float=-1.0)->void:
-	var individual_id:=str(plant.get("individual_id",""));var when:=Time.get_unix_time_from_system() if event_unix<0.0 else event_unix
-	if individual_id.is_empty():return
-	var entry:={"individual_id":individual_id,"species_id":str(plant.get("species_id","")),"diameter_cm":float(plant.get("diameter_cm",0.0)),"jellied_unix":0.0,"event_unix":when,"event_type":event_type,"harvest_race":race}
-	for index in range(panda_beacon_unread_log.size()):
-		if str(panda_beacon_unread_log[index].get("individual_id",""))==individual_id:
-			panda_beacon_unread_log[index]=entry;return
-	panda_beacon_unread_log.append(entry)
-
-func _remove_jurejure_targeted_log(individual_id:String)->void:
-	for index in range(panda_beacon_unread_log.size()-1,-1,-1):
-		var entry:Dictionary=panda_beacon_unread_log[index]
-		if str(entry.get("individual_id",""))==individual_id and str(entry.get("event_type","" )).begins_with("jurejure_targeted"):
-			panda_beacon_unread_log.remove_at(index)
 
 func _habitat_wild_plant_by_id(individual_id:String)->Dictionary:
 	for plant in habitat_wild_plants:
@@ -5353,85 +5021,13 @@ func _habitat_individual_ids()->Array[String]:
 func _cancel_all_habitat_notifications()->void:
 	if habitat_notification_service==null:return
 	var ids:=_habitat_individual_ids();habitat_notification_service.cancel_all(ids)
-	for individual_id in ids:habitat_notification_service.cancel(_jurejure_notification_key(individual_id))
-
-func _panda_beacon_used_count()->int:
-	var used:=0
-	for plant in habitat_wild_plants:
-		if bool(plant.get("panda_beacon_installed",false)):used+=1
-	return used
-
-func _reconcile_beacon_notifications()->void:
-	if habitat_notification_service==null:return
-	var changed:=false;var admitted:=0;var habitat_now:=Time.get_unix_time_from_system()
-	for plant in habitat_wild_plants:
-		var individual_id:=str(plant.get("individual_id",""));var installed:=bool(plant.get("panda_beacon_installed",false))
-		if installed and (not panda_beacon_unlocked or bool(plant.get("jellied",false)) or admitted>=panda_beacon_count):
-			plant["panda_beacon_installed"]=false;installed=false;changed=true
-		if not installed:
-			habitat_notification_service.cancel(individual_id);habitat_notification_service.cancel(_jurejure_notification_key(individual_id));_remove_jurejure_targeted_log(individual_id);continue
-		admitted+=1
-		if float(plant.get("diameter_cm",0.0))>=HabitatWildSystemClass.HARVEST_MIN_CM:
-			habitat_notification_service.cancel(individual_id);continue
-		var eta:=HabitatWildSystemClass.harvest_ready_unix(plant,float(plant.get("last_updated_unix",habitat_now)))
-		plant["harvest_ready_unix"]=eta
-		var native_allowed:=habitat_time_multiplier==1
-		var wall_trigger:=Time.get_unix_time_from_system()+maxf(1.0,eta-habitat_now)
-		var species_name:=_habitat_species_name(str(plant.get("species_id","")))
-		habitat_notification_service.schedule_at(individual_id,wall_trigger,Localizer.text(language_code,"panda_beacon_notification_title"),Localizer.text(language_code,"panda_beacon_notification_body",[species_name]),native_allowed)
-	if changed:_save()
 
 func _open_habitat_plant_panel(plant:Dictionary)->void:
-	if habitat_plant_panel==null or plant.is_empty() or bool(plant.get("jellied",false)) or float(plant.get("diameter_cm",0.0))>=HabitatWildSystemClass.HARVEST_MIN_CM:return
-	var eta:=HabitatWildSystemClass.harvest_ready_unix(plant,float(plant.get("last_updated_unix",Time.get_unix_time_from_system())))
-	habitat_plant_panel.open_for(plant,_habitat_species_name(str(plant.get("species_id",""))),panda_beacon_unlocked,panda_beacon_count,_panda_beacon_used_count(),_format_habitat_eta(eta),_panda_beacon_panel_texts())
+	if habitat_plant_panel==null or plant.is_empty() or bool(plant.get("jellied",false)):return
+	var size_text:=Localizer.text(language_code,"habitat_observe_size",[float(plant.get("diameter_cm",0.0))])
+	var observation_text:=Localizer.text(language_code,"habitat_observe_note")
+	habitat_plant_panel.open_for(plant,_habitat_species_name(str(plant.get("species_id",""))),size_text,observation_text,Localizer.text(language_code,"close"))
 	_update_play_ui()
-
-func _panda_beacon_panel_texts()->Dictionary:
-	if language_code=="en":return {"size":"Current size: %.3f cm","growing":"Growing slowly and safely until 30 cm","eta":"Estimated 30 cm: %s","usage":"Panda Beacons: %d owned, %d in use","installed":"Panda Beacon installed","removed":"Panda Beacon recovered","locked":"Panda Beacons are not unlocked yet","remove":"Remove Panda Beacon","full":"No Panda Beacons are available","install":"Install Panda Beacon"}
-	if language_code=="hiragana":return {"size":"いまの おおきさ %.3fcm","growing":"30cmまでは あんぜんに ゆっくり そだちます","eta":"30cmの よてい：%s","usage":"ぱんだびーこん %dこのうち %dこを しようちゅう","installed":"ぱんだびーこん せっちちゅう","removed":"ぱんだびーこんを かいしゅうしました","locked":"ぱんだびーこんは まだ つかえません","remove":"ぱんだびーこんを はずす","full":"あいている びーこんが ありません","install":"ぱんだびーこんを せっち"}
-	return {"size":"現在 %.3fcm","growing":"30cmまでは安全にゆっくり成長します","eta":"30cm到達予定：%s","usage":"パンダビーコン %d個中 %d個使用中","installed":"パンダビーコン設置中","removed":"パンダビーコンを回収しました","locked":"パンダビーコンはまだ使えません","remove":"パンダビーコンを外す","full":"空きビーコンがありません","install":"パンダビーコンを設置"}
-
-func _format_habitat_eta(eta_unix:float)->String:
-	var remaining:=maxf(0.0,eta_unix-Time.get_unix_time_from_system())
-	var days:=floori(remaining/86400.0);var hours:=floori(fmod(remaining,86400.0)/3600.0);var minutes:=ceili(fmod(remaining,3600.0)/60.0)
-	if language_code=="en":return "in %dd %dh %dm"%[days,hours,minutes]
-	return "あと%d日 %d時間 %d分"%[days,hours,minutes]
-
-func _install_panda_beacon(individual_id:String)->void:
-	var habitat_result:=_ensure_habitat_wild_state(Time.get_unix_time_from_system(),true)
-	if bool(habitat_result.get("population_changed",false)) and current_mode=="habitat" and not rain_bonus_active:_build_habitat_items(true)
-	var plant:=_habitat_wild_plant_by_id(individual_id)
-	if plant.is_empty() or not panda_beacon_unlocked or bool(plant.get("jellied",false)) or float(plant.get("diameter_cm",0.0))>=HabitatWildSystemClass.HARVEST_MIN_CM:return
-	if bool(plant.get("panda_beacon_installed",false)):_open_habitat_plant_panel(plant);return
-	if _panda_beacon_used_count()>=panda_beacon_count:
-		habitat_plant_panel.show_message(str(_panda_beacon_panel_texts().get("full","空きビーコンがありません")));return
-	plant["panda_beacon_installed"]=true
-	if habitat_notification_service:habitat_notification_service.request_permissions()
-	_reconcile_beacon_notifications();_save()
-	var item:=_habitat_wild_item_by_id(individual_id)
-	if not item.is_empty():_refresh_habitat_wild_item(item,plant,true)
-	else:_refresh_habitat_wild_badges()
-	if audio_manager:audio_manager.play_se("beacon_set",.9)
-	_open_habitat_plant_panel(plant);_refresh_habitat_dev_panel()
-
-func _remove_panda_beacon(individual_id:String)->void:
-	var plant:=_habitat_wild_plant_by_id(individual_id)
-	if plant.is_empty():return
-	_animate_habitat_beacon_removal(individual_id)
-	plant["panda_beacon_installed"]=false
-	if habitat_notification_service:habitat_notification_service.cancel(individual_id);habitat_notification_service.cancel(_jurejure_notification_key(individual_id))
-	_remove_jurejure_targeted_log(individual_id)
-	if audio_manager:audio_manager.play_se("beacon_remove",.88)
-	_save();_refresh_habitat_wild_badges();_open_habitat_plant_panel(plant)
-	if habitat_plant_panel:habitat_plant_panel.show_message(str(_panda_beacon_panel_texts().get("removed","パンダビーコンを回収しました")))
-	_refresh_habitat_dev_panel()
-
-func _release_panda_beacon(plant:Dictionary)->void:
-	if plant.is_empty():return
-	var individual_id:=str(plant.get("individual_id",""))
-	plant["panda_beacon_installed"]=false
-	if habitat_notification_service:habitat_notification_service.cancel(individual_id);habitat_notification_service.cancel(_jurejure_notification_key(individual_id))
 
 func _refresh_habitat_wild_badges()->void:
 	for item in habitat_pickups:
@@ -5441,57 +5037,20 @@ func _refresh_habitat_wild_badges()->void:
 
 func _refresh_habitat_dev_panel()->void:
 	if habitat_dev_panel==null or not habitat_dev_panel.visible:return
-	var used:=_panda_beacon_used_count()
-	habitat_dev_panel.refresh({"multiplier":habitat_time_multiplier,"rain":rain_bonus_active,"beacon_total":panda_beacon_count,"beacon_used":used,"beacon_free":maxi(0,panda_beacon_count-used)},habitat_wild_plants,Callable(self,"_habitat_species_name"),Time.get_unix_time_from_system(),habitat_debug_log)
+	habitat_dev_panel.refresh({"multiplier":habitat_time_multiplier,"population":habitat_wild_plants.size(),"max_population":HabitatWildSystemClass.MAX_POPULATION,"settled_count":_habitat_population_candidate_ids().size()},habitat_wild_plants,Callable(self,"_habitat_species_name"),Time.get_unix_time_from_system(),habitat_debug_log)
 
 func _debug_reset_normal_habitat()->void:
 	if not habitat_debug_enabled:return
 	_clear_active_jurejure_event(false)
 	_cancel_all_habitat_notifications()
 	habitat_wild_plants.clear();habitat_wild_initialized=false;habitat_wild_next_spawn_unix=0.0
-	_ensure_habitat_wild_state(Time.get_unix_time_from_system(),false);_reconcile_beacon_notifications();_save()
-	if current_mode=="habitat" and not rain_bonus_active:_build_habitat_items(true)
+	_ensure_habitat_wild_state(Time.get_unix_time_from_system(),false);_save()
+	if current_mode=="habitat":_build_habitat_items(true)
 	_record_habitat_debug_event("原生地の個体だけをランダムリセットしました")
-
-func _debug_prepare_habitat_label_preview()->void:
-	if not habitat_debug_enabled:return
-	_cancel_all_habitat_notifications()
-	var now_unix:=Time.get_unix_time_from_system()
-	var species_ids:=_habitat_population_candidate_ids()
-	if species_ids.is_empty():return
-	var preview_sizes:=[10.0,30.0,60.0,100.0]
-	var preview_x:=[600.0,625.0,650.0,675.0]
-	var preview_y:=[360.0,385.0,445.0,535.0]
-	var raw:Array=[]
-	for index in range(preview_sizes.size()):
-		var diameter:float=preview_sizes[index]
-		raw.append({
-			"individual_id":"habitat_label_preview_%d"%index,
-			"species_id":species_ids[index%species_ids.size()],
-			"diameter_cm":diameter,
-			"jellied":false,
-			"jelly_immune":true,
-			"jelly_threshold":999999.0,
-			"habitat_timing_version":HabitatWildSystemClass.TIMING_VERSION,
-			"last_updated_unix":now_unix,
-			"spawned_unix":now_unix,
-			"harvest_ready_reached_unix":now_unix if diameter>=HabitatWildSystemClass.HARVEST_MIN_CM else 0.0,
-			"panda_beacon_installed":false,
-			"panorama_x":preview_x[index],
-			"panorama_y":preview_y[index],
-			"position_validated":true
-		})
-	habitat_wild_plants=HabitatWildSystemClass.normalize_saved(raw,species_ids,now_unix)
-	_refresh_habitat_growth_profiles()
-	habitat_wild_initialized=true
-	habitat_wild_next_spawn_unix=now_unix+HabitatWildSystemClass.MAX_SPAWN_INTERVAL_SECONDS
-	_reconcile_beacon_notifications();_save()
-	if current_mode=="habitat" and not rain_bonus_active:_build_habitat_items(true)
-	_record_habitat_debug_event("cm表示確認用に 10 / 30 / 60 / 100cm を配置しました")
 
 func _debug_set_habitat_multiplier(multiplier:int)->void:
 	if not habitat_debug_enabled or multiplier not in HABITAT_TIME_MULTIPLIERS:return
-	habitat_time_multiplier=multiplier;_reconcile_beacon_notifications();_record_habitat_debug_event("時間倍率を ×%d に変更"%multiplier)
+	habitat_time_multiplier=multiplier;_record_habitat_debug_event("時間倍率を ×%d に変更"%multiplier)
 
 func _debug_jump_habitat_time(seconds:int)->void:
 	if not habitat_debug_enabled or seconds<=0:return
@@ -5499,14 +5058,14 @@ func _debug_jump_habitat_time(seconds:int)->void:
 	_ensure_habitat_wild_state(wall_now,false)
 	var target:=wall_now+float(seconds)
 	_ensure_habitat_wild_state(target,false)
-	_rebase_habitat_clock(target-wall_now);_reconcile_beacon_notifications();_save()
-	if current_mode=="habitat" and not rain_bonus_active:_build_habitat_items(true)
+	_rebase_habitat_clock(target-wall_now);_save()
+	if current_mode=="habitat":_build_habitat_items(true)
 	_record_habitat_debug_event("通常原生地を %s 進めました"%_format_habitat_debug_duration(seconds))
 
 func _rebase_habitat_clock(offset_seconds:float)->void:
 	if offset_seconds<=0.0:return
 	for plant in habitat_wild_plants:
-		for key in ["spawned_unix","last_updated_unix","harvest_ready_unix","harvest_ready_reached_unix","jelly_eligible_since_unix","jelly_due_unix","jellied_unix"]:
+		for key in ["spawned_unix","last_updated_unix","jelly_eligible_since_unix","jelly_due_unix","jellied_unix"]:
 			var value:=float(plant.get(key,0.0))
 			if value>0.0:plant[key]=value-offset_seconds
 	if habitat_wild_next_spawn_unix>0.0:habitat_wild_next_spawn_unix-=offset_seconds
@@ -5515,19 +5074,12 @@ func _format_habitat_debug_duration(seconds:int)->String:
 	if seconds%86400==0:return "%d日"%(seconds/86400)
 	return "%d時間"%(seconds/3600)
 
-func _debug_start_habitat_rain()->void:
-	if not habitat_debug_enabled or not habitat_awakened or rain_bonus_active:return
-	current_mode="habitat";rain_event_pending=true;rain_bonus_in_progress=false;rain_time_remaining=RAIN_BONUS_DURATION_SECONDS;_apply_mode();_start_rain_bonus();_reconcile_beacon_notifications();_record_habitat_debug_event("本番の原生地雨モード開始処理を実行")
-
-func _debug_stop_habitat_rain()->void:
-	if not habitat_debug_enabled or not rain_bonus_active:return
-	_finish_rain_bonus();_reconcile_beacon_notifications();_record_habitat_debug_event("本番の原生地雨モード終了処理を実行")
-
 func _open_habitat_test_preview()->void:
 	if not habitat_debug_enabled or habitat_dev_panel==null:return
-	intro_story_complete=true;first_colorata_confirmed=true;trio_originals_confirmed=true;total_play_count=maxi(3,total_play_count);formal_play_count=maxi(1,formal_play_count);habitat_unlocked=true;habitat_arrival_started=true;habitat_awakened=true;habitat_awakening_event_complete=true;habitat_tutorial_started=true;habitat_tutorial_complete=true;habitat_tutorial_returned_to_greenhouse=true;seed_shop_open=true;mystery_items_acquired=true;mystery_catalog_tutorial_complete=true;normal_play_tutorial_complete=true;seed_pod_gauge_discovery_complete=true;seed_pod_first_reward_seen=true;initial_seed_stock_notice_complete=true;puku_buyback_tutorial_complete=true;original_catalog_gifted=true;puku_gauge_intro_complete=true;panda_beacon_unlocked=true;panda_beacon_count=maxi(3,panda_beacon_count);puku_points=maxi(10,puku_points);unlocked_series[ORIGINAL_SERIES_ID]=true
+	intro_story_complete=true;first_colorata_confirmed=true;trio_originals_confirmed=true;total_play_count=maxi(3,total_play_count);formal_play_count=maxi(1,formal_play_count);habitat_unlocked=true;habitat_arrival_started=true;habitat_awakened=true;habitat_awakening_event_complete=true;habitat_tutorial_started=true;habitat_tutorial_complete=true;habitat_tutorial_returned_to_greenhouse=true;seed_shop_open=true;mystery_items_acquired=true;mystery_catalog_tutorial_complete=true;normal_play_tutorial_complete=true;seed_pod_gauge_discovery_complete=true;seed_pod_first_reward_seen=true;initial_seed_stock_notice_complete=true;puku_buyback_tutorial_complete=true;original_catalog_gifted=true;puku_gauge_intro_complete=true;puku_points=maxi(10,puku_points);unlocked_series[ORIGINAL_SERIES_ID]=true
+	for story_species_id in [FIRST_STORY_SPECIES_ID,PANDA_STORY_SPECIES_ID,ARMADILLO_STORY_SPECIES_ID]:habitat_returned_species[story_species_id]=true
 	if opening_overlay:opening_overlay.visible=false
-	current_mode="habitat";_apply_saved_unlocks();_apply_mode();_reconcile_beacon_notifications();habitat_dev_panel.open();_refresh_habitat_dev_panel();_save();_update_play_ui()
+	current_mode="habitat";_apply_saved_unlocks();_apply_mode();habitat_dev_panel.open();_refresh_habitat_dev_panel();_save();_update_play_ui()
 
 func _update_greenhouse_pan_follow(delta:float)->void:
 	if current_mode!="greenhouse" or is_equal_approx(greenhouse_pan_x,greenhouse_pan_target_x):return
@@ -5571,7 +5123,6 @@ func _finish_habitat_lookaround(context:String)->void:
 
 func _toggle_mode()->void:
 	if catalog_preview_mode_active:return
-	if rain_bonus_active:return
 	if current_mode=="greenhouse" and not habitat_unlocked:return
 	var leaving_habitat:=current_mode=="habitat"
 	current_mode="habitat" if current_mode=="greenhouse" else "greenhouse"
@@ -5584,8 +5135,6 @@ func _toggle_mode()->void:
 		call_deferred("_start_jurejure_intro_event")
 	elif current_mode=="habitat" and jurejure_intro_complete and original_catalog_complete_event_seen and not jurejure_return_event_complete:
 		call_deferred("_start_jurejure_return_event")
-	elif current_mode=="habitat" and rain_event_pending:
-		call_deferred("_start_rain_bonus")
 	elif current_mode=="habitat" and not habitat_tutorial_complete and not habitat_tutorial_started:
 		call_deferred("_start_first_habitat_tutorial")
 	elif leaving_habitat and habitat_tutorial_complete and not puku_gauge_intro_complete:
@@ -5610,7 +5159,7 @@ func _apply_mode()->void:
 		_print_habitat_memory_snapshot("exit_after")
 	greenhouse_layer.visible=greenhouse_mode
 	habitat_items_root.visible=not greenhouse_mode
-	if habitat_status_label:habitat_status_label.visible=not greenhouse_mode and rain_bonus_active
+	if habitat_status_label:habitat_status_label.visible=false
 	# The official greenhouse artwork already contains the finished pot and soil.
 	# Keep the old geometry disabled so no duplicate rim covers the sprites.
 	pot_root.visible=false
@@ -5619,7 +5168,7 @@ func _apply_mode()->void:
 	if habitat_panorama_mesh:habitat_panorama_mesh.visible=not greenhouse_mode
 	print("HABITAT_BACKGROUND_STATE mode=",habitat_background_mode," screen=",("greenhouse" if greenhouse_mode else "habitat")," background_mode=",habitat_environment.background_mode," sky_present=",habitat_environment.sky!=null," panorama_mesh_visible=",habitat_panorama_mesh!=null and habitat_panorama_mesh.visible)
 	for p in plants:
-		if is_instance_valid(p):p.visible=greenhouse_mode or rain_bonus_active;p.label.visible=false
+		if is_instance_valid(p):p.visible=greenhouse_mode;p.label.visible=false
 	if greenhouse_mode:
 		camera.position=Vector3(0,7.3,8.6);camera.look_at_from_position(camera.position,Vector3(0,1.05,0),Vector3.UP)
 		_update_greenhouse_pan()
@@ -5654,7 +5203,7 @@ func _update_labels()->void:
 		for p in plants:
 			if is_instance_valid(p):p.label.visible=false
 		return
-	if current_mode!="greenhouse" and not rain_bonus_active:
+	if current_mode!="greenhouse":
 		for p in plants:
 			if is_instance_valid(p):p.label.visible=false
 		return
@@ -5678,7 +5227,7 @@ func _update_labels()->void:
 func _greenhouse_area_navigation_available()->bool:
 	if not _tutorial_fully_complete() or current_mode!="greenhouse" or play_active or catalog_preview_mode_active or arrangement_transitioning:return false
 	if arrangement_scene_active and arrangement_ui and arrangement_ui.is_editor_active():return false
-	return not ((opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (panda_beacon_log_panel and panda_beacon_log_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible))
+	return not ((opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible))
 
 func _unhandled_input(event:InputEvent)->void:
 	if greenhouse_area_drag_tracking or (not arrangement_scene_active and _greenhouse_area_navigation_available()):
@@ -5755,7 +5304,7 @@ func _input(event:InputEvent)->void:
 	if audio_manager and (event is InputEventScreenTouch or event is InputEventMouseButton or event is InputEventKey):audio_manager.notify_user_gesture()
 	if habitat_lookaround_active:return
 	if arrangement_scene_active or arrangement_transitioning:return
-	if (opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible and not first_play_harvest_guide_active) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (panda_beacon_log_panel and panda_beacon_log_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible):return
+	if (opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible and not first_play_harvest_guide_active) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible):return
 	if current_mode=="greenhouse" and not play_active and not catalog_preview_mode_active:return
 	if event is InputEventScreenTouch:
 		if event.pressed:
@@ -5803,7 +5352,7 @@ func _end_pointer(screen_pos:Vector2)->void:
 	if not pointer_down:return
 	pointer_down=false
 	if pointer_travel<13.0 and pointer_start.distance_to(screen_pos)<16.0:
-		if current_mode=="greenhouse" or rain_bonus_active:_try_harvest(screen_pos)
+		if current_mode=="greenhouse":_try_harvest(screen_pos)
 		elif current_mode=="habitat":_try_habitat_pick(screen_pos)
 
 func _apply_view_rotation()->void:
@@ -5843,40 +5392,15 @@ func _try_habitat_pick(screen_pos:Vector2)->void:
 
 func _collect_habitat_wild_plant(item:Dictionary)->void:
 	var selected_id:=str(item.get("individual_id",""));var habitat_result:=_ensure_habitat_wild_state(Time.get_unix_time_from_system(),true)
-	if bool(habitat_result.get("population_changed",false)) and current_mode=="habitat" and not rain_bonus_active:
+	if bool(habitat_result.get("population_changed",false)) and current_mode=="habitat":
 		_build_habitat_items(true);item=_habitat_wild_item_by_id(selected_id)
 	var plant:=_habitat_wild_plant_by_id(selected_id)
 	if plant.is_empty():return
-	var node:Node3D=item.get("node");var world_position:=node.global_position if is_instance_valid(node) else Vector3.ZERO
 	if bool(plant.get("jellied",false)):
-		# Defensive cleanup for an inconsistent in-memory entry. Normal gameplay
-		# removes jelly events inside the shared time simulation before they render.
 		if str(active_jurejure_event.get("individual_id",""))==selected_id:_clear_active_jurejure_event(false,false)
-		_release_panda_beacon(plant);HabitatWildSystemClass.remove_individual(habitat_wild_plants,str(plant.get("individual_id","")));_save();_build_habitat_items();return
-	if not HabitatWildSystemClass.can_harvest(plant):
-		audio_manager.play_se("squish",.34)
-		if bool(plant.get("tutorial",false)):_start_scripted_dialog("habitat_too_small",[{"speaker":"","text":Localizer.text(language_code,"habitat_too_small"),"button":Localizer.text(language_code,"continue")}],false)
-		else:_open_habitat_plant_panel(plant)
-		return
-	var species_id:=str(plant.get("species_id",""));var diameter:=float(plant.get("diameter_cm",0.0));var was_tutorial:=bool(plant.get("tutorial",false));var first_discovery:=_register_species_discovery(species_id,true)
-	add_puku_coin_gauge_cm(diameter,false,true,camera.unproject_position(world_position));pending_habitat_species.erase(species_id)
-	var mystery_route:=_mystery_route_for_species(species_id)
-	if not mystery_route.is_empty():mystery_route_completed[mystery_route]=true
-	if str(active_jurejure_event.get("individual_id",""))==selected_id:_clear_active_jurejure_event(true)
-	_release_panda_beacon(plant);HabitatWildSystemClass.remove_individual(habitat_wild_plants,str(plant.get("individual_id","")))
-	if was_tutorial:
-		habitat_tutorial_complete=true;tutorial_steps["habitat_wild_get"]=true;tutorial_steps["habitat_get_dialog"]=true
-	_ensure_habitat_wild_state();audio_manager.play_se("new_species" if first_discovery else "harvest",.7);_save();_build_habitat_items()
-	if was_tutorial:
-		habitat_tutorial_species_id=species_id
-		_queue_species_get_by_id(species_id,first_discovery,"habitat_tutorial")
-	elif first_discovery:
-		var reveal_context:="habitat_new"
-		if not mystery_route.is_empty() and not bool(mystery_route_dialog_seen.get(mystery_route,false)):
-			mystery_route_dialog_seen[mystery_route]=true;reveal_context="habitat_route:"+mystery_route
-		_queue_species_get_by_id(species_id,true,reveal_context)
-	elif not mystery_route.is_empty() and not bool(mystery_route_dialog_seen.get(mystery_route,false)):
-		mystery_route_dialog_seen[mystery_route]=true;call_deferred("_start_mystery_route_dialog",mystery_route)
+		HabitatWildSystemClass.remove_individual(habitat_wild_plants,selected_id);_save();_build_habitat_items();return
+	audio_manager.play_se("squish",.26)
+	_open_habitat_plant_panel(plant)
 
 func _collect_habitat_seed(item:Dictionary)->void:
 	if habitat_mystery_seeds_pending<=0:return
@@ -5889,9 +5413,7 @@ func _collect_habitat_old_catalog_page(item:Dictionary)->void:
 func _start_mystery_route_dialog(route_id:String)->void:
 	tutorial_dialog_kind="mystery_"+route_id;intro_overlay.visible=true;_set_intro_speaker("panda");_position_intro_dialog();intro_speaker_label.visible=true;shop_overlay.visible=false;play_overlay.visible=false;play_open_button.visible=false
 	match route_id:
-		MYSTERY_ROUTE_RAIN:intro_dialogue_label.text=Localizer.text(language_code,"mystery_route_rain")
 		MYSTERY_ROUTE_BEST_100:intro_dialogue_label.text=Localizer.text(language_code,"mystery_route_best")
-		MYSTERY_ROUTE_HABITAT_COMPLETE:intro_dialogue_label.text=Localizer.text(language_code,"mystery_route_complete")
 		_:intro_dialogue_label.text=Localizer.text(language_code,"mystery_route_default")
 	intro_continue_button.text=Localizer.text(language_code,"understood")
 
@@ -5915,8 +5437,7 @@ func _on_harvested(p)->void:
 	if deferred_tovar:tovar_harvested_this_play=true
 	var old:=float(bests.get(p.data.species_id,0.0));var is_record:bool=not deferred_tovar and not story_old_seed and p.diameter_cm>old
 	var first_discovery:=not deferred_tovar and not bool(discovered.get(str(p.data.species_id),false))
-	var rain_discovery_ready:bool=not rain_bonus_active or not first_discovery or p.diameter_cm>=RAIN_DISCOVERY_MIN_CM
-	if not deferred_tovar and rain_discovery_ready:
+	if not deferred_tovar:
 		var harvested_species_id:=str(p.data.species_id);_register_species_discovery(harvested_species_id,true)
 		if first_discovery:result_new_species_queue.append(str(p.data.species_id))
 	if is_record:
@@ -5924,13 +5445,15 @@ func _on_harvested(p)->void:
 		if play_active and (play_share_record.is_empty() or p.diameter_cm>float(play_share_record.get("size",0.0))):play_share_record={"species_id":str(p.data.species_id),"size":p.diameter_cm}
 		_evaluate_best_spawn_unlocks()
 	if not best_100_achieved and p.diameter_cm>=100.0 and _tutorial_fully_complete() and active_seed_type in ["normal","volume","premium","mystery"]:
-		best_100_achieved=true;_assign_mystery_route(MYSTERY_ROUTE_BEST_100,true)
+		best_100_achieved=true
+		var best_route_species:=_grant_mystery_route_reward(MYSTERY_ROUTE_BEST_100)
+		if not best_route_species.is_empty():result_new_species_queue.append(best_route_species)
 	var earned_puku:=0;var harvest_screen_position:=camera.unproject_position(p.global_position)
 	if play_active and active_seed_type!="old":earned_puku=add_puku_coin_gauge_cm(p.diameter_cm,false,true,harvest_screen_position)
 	_evaluate_unlock_rules("harvest_size",p.diameter_cm);_update_main_story_progress(false);_save();_update_best_ui();_update_currency_ui();audio_manager.play_se("harvest",.55)
 	if play_active:
 		play_harvest_cm_total+=p.diameter_cm;play_puku_earned_total+=earned_puku;play_harvest_count+=1;play_max_size=maxf(play_max_size,p.diameter_cm)
-		if not story_old_seed and not rain_bonus_active and p.diameter_cm>play_previous_global_best:play_updated_global_best=true
+		if not story_old_seed and p.diameter_cm>play_previous_global_best:play_updated_global_best=true
 		var species_id:=str(p.data.species_id);var notable=play_notable_species.get(species_id,{})
 		if notable.is_empty() or p.diameter_cm>float(notable.get("size",0.0)):play_notable_species[species_id]={"name":Localizer.species_name(language_code,_catalog_entry(species_id)),"size":p.diameter_cm}
 	if active_seed_type!="old":_show_harvest_result(p)
@@ -5962,10 +5485,7 @@ func _cleanup_later(p,delay:float,track_vacated:=true)->void:
 		recent_vacated_slots.append(p.original_pos)
 		while recent_vacated_slots.size()>12:recent_vacated_slots.pop_front()
 	plants.erase(p)
-	if rain_bonus_active and rain_time_remaining>0.0:
-		rain_spawn_queue=mini(RAIN_MAX_ACTIVE_PLANTS,rain_spawn_queue+2)
-		if rain_spawn_queue<=2:rain_spawn_timer=rng.randf_range(.14,.32)
-	elif play_active and not dev_jelly_test_active:
+	if play_active and not dev_jelly_test_active:
 		_queue_greenhouse_replacements();_update_play_ui()
 		if play_seeds_remaining==0 and play_spawn_queue==0 and play_seed_animations_pending==0 and plants.is_empty():call_deferred("_finish_greenhouse_play")
 	await get_tree().create_timer(delay).timeout

@@ -78,13 +78,9 @@ const TEXT := {
 		"jurejure_intro_mouse_return": "また来るチュー！",
 		"jurejure_intro_name": "落とした札に『ジュレジュレ団』って書いてある……。",
 		"jurejure_target_small": "ジュレジュレ団が%sを狙っています！",
-		"jurejure_target_ready": "ジュレジュレ団が%sの収穫を狙っています！",
 		"jurejure_status_small": "狙われ中・タップで追い払う",
-		"jurejure_status_ready": "収穫競争中",
 		"jurejure_panda_defend": "こらーー！！",
-		"jurejure_race_hint": "先にこの株を収穫しよう！",
 		"jurejure_taken_small": "%sが\nジュレジュレ団に獲られてしまった！",
-		"jurejure_taken_ready": "%sは\nジュレジュレ団に先に収穫された！",
 		"jurejure_mid_peccary": "これ、まだ小さいっぺ……。",
 		"jurejure_mid_skunk": "これまで持っていくんスカ？",
 		"jurejure_mid_mouse_1": "……。",
@@ -151,24 +147,8 @@ const TEXT := {
 		"super_rare": "スーパーレア",
 		"tap_to_close": "タップしてとじる",
 		"habitat_intro_1": "芽が出た！",
-		"habitat_intro_2": "この%sは、もうすぐ30cmだよ。",
-		"habitat_intro_3": "30cm未満の株は安全に育つよ。30cmになったら収穫できるんだ。",
-		"habitat_intro_4": "30cmを超えた株は、時間がたつとジュレて消えることがあるから気をつけてね。",
-		"habitat_intro_5": "おっ、もうすぐ30cmだね。30cmまで育ったら収穫してみよう！",
-		"habitat_intro_6": "小さな多肉は、もう少しここで育ててあげよう。\nこの場所が、ずっと多肉でいっぱいだったらうれしいな。",
-		"habitat_too_small": "まだ小さいみたい。もう少し育つのを待とう。",
-		"original_registered": "%sを不思議な図鑑に記録したよ！",
-		"panda_beacon_event_1": "アルマジロ君と、原生地の株を見守る装置を作ったんだ。",
-		"panda_beacon_event_2": "株が30cmになった瞬間を知らせるように調整したぞ！",
-		"panda_beacon_event_3": "名前は『パンダビーコン』！\n試作品を1個どうぞ。おみせにも並べておくね。",
-		"panda_beacon_event_received": "パンダビーコン ×1 を手に入れた！",
-		"panda_beacon_name": "パンダビーコン",
-		"panda_beacon_preview": "監視枠\n＋1",
-		"panda_beacon_shop_card": "何度でも使える原生地の監視枠\n所持 %d個",
-		"panda_beacon_locked": "パンダビーコンはまだ完成していません",
-		"panda_beacon_bought": "パンダビーコンを追加しました。所持 %d個",
-		"panda_beacon_notification_title": "パンダビーコンが反応しました",
-		"panda_beacon_notification_body": "%sが30cmになりました。収穫できます。",
+		"habitat_observe_size": "現在 %.1fcm",
+		"habitat_observe_note": "自然の中で、ゆっくり育っています。",
 		"puku_intro_1": "これからは育てた多肉をうちのお店で買い取るよ！",
 		"puku_intro_2": "このゲージが満タンになったら3ぷくコインと交換しよう！",
 		"first_habitat_gift_1": "さやの中に、最初のタネができてる！",
@@ -203,9 +183,6 @@ const TEXT := {
 		,"armadillo_seven_species": "%sという品種だよ。\n君にこの株をプレゼントするね！"
 		,"armadillo_seven_catalog": "それから『%s』も一緒に渡すよ。\nこれで仲間を記録できるはずだ。"
 		,"armadillo_seven_end": "やっぱり、あの原生地には\n不思議な力があるのかもしれない。\nよーし、まだまだ研究を続けるぞ！"
-		,"rain_intro_1": "原生地ではときどき、あの時のように雨が降るんだ。"
-		,"rain_intro_2": "雨の間は、この場所の力が強くなって、たくさんの多肉が芽吹くよ！"
-		,"rain_intro_3": "昔の記憶や、珍しい姿が見つかるかもしれないね。"
 		,"catalog": "図鑑"
 		,"best_record": "最高記録\n%.1f cm"
 		,"puku_count": "ぷくコイン ×%d"
@@ -223,7 +200,6 @@ const TEXT := {
 		,"old_seed_name": "古いたね"
 		,"bags_held": "%s %d袋"
 		,"shop_choose_category": "なにを見ますか？"
-		,"shop_category_seed": "どうぐ\nビーコン"
 		,"shop_category_pot": "鉢\n寄せ植え"
 		,"shop_category_catalog": "図鑑\n新シリーズ"
 		,"shop_category_gacha": "森の\nガチャ"
@@ -266,11 +242,8 @@ const TEXT := {
 		,"self_best_none": "自己ベスト　ー"
 		,"undiscovered": "未発見"
 		,"list_back": "一覧へ"
-		,"harvest_ready": "収穫OK\n%.1fcm"
-		,"habitat_rain_remaining": "恵みの雨  残り %d秒"
 		,"harvest_to_gauge": "+%scm\nぷくゲージへ"
 		,"record_update": "収穫記録更新！\nNEW RECORD\n%.1f cm"
-		,"habitat_jellied": "ジュレてしまった株みたい。"
 		,"mystery_seed_get": "謎のたね GET!"
 		,"old_catalog_page_get": "新しいシリーズを図鑑に記録した！"
 		,"gacha_draw_count": "ガチャ %d回"
@@ -374,14 +347,8 @@ const TEXT := {
 		,"research_reward_empty": "今、新しく記録できるシリーズはありません。"
 		,"research_reward_choose": "%s\nこの図鑑をもらう"
 		,"research_reward_claimed": "%sをどうぞ。\n未発見の品種は、図鑑のシルエットを手がかりに探してみてね。"
-		,"rain_pending_notice": "原生地に恵みの雨が降っています"
-		,"rain_started_notice": "恵みの雨が降り始めました"
-		,"rain_finished_notice": "恵みの雨が上がりました"
 		,"result_hidden_registered": "%sを図鑑登録！"
-		,"habitat_wild_guide": "あ、あそこに野生の%sが生えているよ！"
-		,"mystery_route_rain": "……この多肉、すごい。\nこんなの、見たことないよ。\nやっぱりこの原生地、不思議なことがまだまだありそうだね。"
 		,"mystery_route_best": "100cmなんてすごいね！\nなんだか原生地でも、不思議なことが起きてるみたいだよ。"
-		,"mystery_route_complete": "この原生地の多肉、ずいぶん見つけたと思ってたけど……。\nまだこんな秘密があったんだね。"
 		,"mystery_route_default": "不思議な多肉を見つけたね。まだ知らないことがたくさんありそうだよ。"
 		,"arrangement_default_name": "寄せ植え %d"
 		,"shop_rescue_offer": "タネなくなっちゃった？\n少し分けてあげるよ！"
@@ -521,13 +488,9 @@ const TEXT := {
 		"jurejure_intro_mouse_return": "また くるチュー！",
 		"jurejure_intro_name": "おとした ふだに『じゅれじゅれだん』って かいてある……。",
 		"jurejure_target_small": "じゅれじゅれだんが%sを ねらっています！",
-		"jurejure_target_ready": "じゅれじゅれだんが%sの しゅうかくを ねらっています！",
 		"jurejure_status_small": "ねらわれちゅう・おして おいはらう",
-		"jurejure_status_ready": "しゅうかく きょうそうちゅう",
 		"jurejure_panda_defend": "こらーー！！",
-		"jurejure_race_hint": "さきに この かぶを しゅうかくしよう！",
 		"jurejure_taken_small": "%sが\nじゅれじゅれだんに とられてしまった！",
-		"jurejure_taken_ready": "%sは\nじゅれじゅれだんに さきに しゅうかくされた！",
 		"jurejure_mid_peccary": "これ、まだ ちいさいっぺ……。",
 		"jurejure_mid_skunk": "これまで もっていくんスカ？",
 		"jurejure_mid_mouse_1": "……。",
@@ -594,24 +557,8 @@ const TEXT := {
 		"super_rare": "すーぱーれあ",
 		"tap_to_close": "おして とじる",
 		"habitat_intro_1": "めが でた！",
-		"habitat_intro_2": "この%sは、もうすぐ30せんちだよ。",
-		"habitat_intro_3": "30せんちより ちいさい かぶは あんぜんに そだつよ。30せんちに なったら しゅうかくできるんだ。",
-		"habitat_intro_4": "30せんちを こえた かぶは、じかんが たつと じゅれて きえることが あるから きをつけてね。",
-		"habitat_intro_5": "おっ、もうすぐ30せんちだね。30せんちまで そだったら しゅうかくしてみよう！",
-		"habitat_intro_6": "ちいさな たにくは、もうすこし ここで そだててあげよう。\nこのばしょが、ずっと たにくで いっぱいだったら うれしいな。",
-		"habitat_too_small": "まだ ちいさいみたい。もうすこし そだつのを まとう。",
-		"original_registered": "%sを ふしぎな ずかんに きろくしたよ！",
-		"panda_beacon_event_1": "あるまじろくんと、げんせいちの かぶを みまもる そうちを つくったんだ。",
-		"panda_beacon_event_2": "かぶが 30cmに なった しゅんかんを しらせるように ちょうせいしたぞ！",
-		"panda_beacon_event_3": "なまえは『ぱんだびーこん』！\nしさくひんを 1こ どうぞ。おみせにも ならべておくね。",
-		"panda_beacon_event_received": "ぱんだびーこん ×1を てにいれた！",
-		"panda_beacon_name": "ぱんだびーこん",
-		"panda_beacon_preview": "みまもり\n＋1",
-		"panda_beacon_shop_card": "なんどでも つかえる げんせいちの みまもりわく\nもっているのは %dこ",
-		"panda_beacon_locked": "ぱんだびーこんは まだ かんせいしていません",
-		"panda_beacon_bought": "ぱんだびーこんを ついかしました。もっているのは %dこ",
-		"panda_beacon_notification_title": "ぱんだびーこんが はんのうしました",
-		"panda_beacon_notification_body": "%sが 30cmに なりました。しゅうかくできます。",
+		"habitat_observe_size": "いまの おおきさ %.1fcm",
+		"habitat_observe_note": "しぜんの なかで、ゆっくり そだっています。",
 		"puku_intro_1": "これからは そだてた たにくを うちの おみせで かいとるよ！",
 		"puku_intro_2": "この げーじが いっぱいに なったら 3ぷくこいんと こうかんしよう！",
 		"first_habitat_gift_1": "さやの なかに、さいしょの たねが できてる！",
@@ -646,9 +593,6 @@ const TEXT := {
 		,"armadillo_seven_species": "%sという ひんしゅだよ。\nきみに このかぶを ぷれぜんとするね！"
 		,"armadillo_seven_catalog": "それから『%s』も いっしょに わたすよ。\nこれで なかまを きろくできるはずだ。"
 		,"armadillo_seven_end": "やっぱり、あの げんせいちには\nふしぎな ちからが あるのかもしれない。\nよーし、まだまだ けんきゅうを つづけるぞ！"
-		,"rain_intro_1": "げんせいちでは ときどき、あのときのように あめが ふるんだ。"
-		,"rain_intro_2": "あめの あいだは、このばしょの ちからが つよくなって、たくさんの たにくが めぶくよ！"
-		,"rain_intro_3": "むかしの きおくや、めずらしい すがたが みつかるかもしれないね。"
 		,"catalog": "ずかん"
 		,"best_record": "さいこうきろく\n%.1f せんち"
 		,"puku_count": "ぷくこいん ×%d"
@@ -666,7 +610,6 @@ const TEXT := {
 		,"old_seed_name": "ふるい たね"
 		,"bags_held": "%s %dふくろ"
 		,"shop_choose_category": "なにを みますか？"
-		,"shop_category_seed": "どうぐ\nびーこん"
 		,"shop_category_pot": "はち\nよせうえ"
 		,"shop_category_catalog": "ずかん\nあたらしい しりーず"
 		,"shop_category_gacha": "もりの\nがちゃ"
@@ -709,11 +652,8 @@ const TEXT := {
 		,"self_best_none": "じぶんの さいこう　なし"
 		,"undiscovered": "まだ みつけていません"
 		,"list_back": "いちらんへ"
-		,"harvest_ready": "しゅうかく できるよ\n%.1fせんち"
-		,"habitat_rain_remaining": "めぐみの あめ  のこり %dびょう"
 		,"harvest_to_gauge": "+%sせんち\nぷくげーじへ"
 		,"record_update": "しゅうかく きろくこうしん！\nさいこうきろく\n%.1f せんち"
-		,"habitat_jellied": "じゅれてしまった かぶみたい。"
 		,"mystery_seed_get": "なぞの たねを みつけた！"
 		,"old_catalog_page_get": "あたらしい しりーずを ずかんに きろくした！"
 		,"gacha_draw_count": "がちゃ %dかい"
@@ -817,14 +757,8 @@ const TEXT := {
 		,"research_reward_empty": "いま、あたらしく きろくできる しりーずは ありません。"
 		,"research_reward_choose": "%s\nこの ずかんを もらう"
 		,"research_reward_claimed": "%sを どうぞ。\nまだ みつけていない ひんしゅは、ずかんの かげを てがかりに さがしてみてね。"
-		,"rain_pending_notice": "げんせいちに めぐみの あめが ふっています"
-		,"rain_started_notice": "めぐみの あめが ふりはじめました"
-		,"rain_finished_notice": "めぐみの あめが やみました"
 		,"result_hidden_registered": "%sを ずかんに とうろくしたよ！"
-		,"habitat_wild_guide": "あ、あそこに やせいの%sが はえているよ！"
-		,"mystery_route_rain": "……この たにく、すごい。\nこんなの みたことないよ。\nこの げんせいちには まだ ふしぎが ありそうだね。"
 		,"mystery_route_best": "100せんちなんて すごいね！\nげんせいちでも ふしぎなことが おきてるみたいだよ。"
-		,"mystery_route_complete": "この げんせいちの たにくは たくさん みつけたと おもったけど……。\nまだ こんな ひみつが あったんだね。"
 		,"mystery_route_default": "ふしぎな たにくを みつけたね。まだ しらないことが たくさん ありそうだよ。"
 		,"arrangement_default_name": "よせうえ %d"
 		,"shop_rescue_offer": "たね なくなっちゃった？\nすこし わけてあげるよ！"
@@ -964,13 +898,9 @@ const TEXT := {
 		"jurejure_intro_mouse_return": "We'll be back!",
 		"jurejure_intro_name": "They dropped a tag that says 'JureJure Gang'...",
 		"jurejure_target_small": "The JureJure Gang is targeting %s!",
-		"jurejure_target_ready": "The JureJure Gang is racing to harvest %s!",
 		"jurejure_status_small": "Targeted - tap to chase them off",
-		"jurejure_status_ready": "Harvest race in progress",
 		"jurejure_panda_defend": "Hey! Leave it alone!",
-		"jurejure_race_hint": "Harvest this plant before they do!",
 		"jurejure_taken_small": "%s was taken\nby the JureJure Gang!",
-		"jurejure_taken_ready": "The JureJure Gang\nharvested %s first!",
 		"jurejure_mid_peccary": "This one's still tiny...",
 		"jurejure_mid_skunk": "We're taking even this one?",
 		"jurejure_mid_mouse_1": "...",
@@ -1037,24 +967,8 @@ const TEXT := {
 		"super_rare": "SUPER RARE",
 		"tap_to_close": "Tap to close",
 		"habitat_intro_1": "A sprout!",
-		"habitat_intro_2": "This %s is nearly 30 cm.",
-		"habitat_intro_3": "Plants below 30 cm grow safely. Once they reach 30 cm, you can harvest them.",
-		"habitat_intro_4": "Plants over 30 cm may eventually turn to jelly and disappear, so keep an eye on them.",
-		"habitat_intro_5": "It is nearly 30 cm! Try harvesting it when it reaches 30 cm.",
-		"habitat_intro_6": "Let's leave the little succulents here to grow.\nI hope this place always stays full of them.",
-		"habitat_too_small": "It is still small. Let's wait for it to grow a little more.",
-		"original_registered": "%s was recorded in the mysterious catalog!",
-		"panda_beacon_event_1": "Armadillo and I built a device to watch plants in the habitat.",
-		"panda_beacon_event_2": "I tuned it to alert you the instant a plant reaches 30 cm!",
-		"panda_beacon_event_3": "We call it the Panda Beacon!\nHere is our first prototype. More are now in the shop.",
-		"panda_beacon_event_received": "You received 1 Panda Beacon!",
-		"panda_beacon_name": "Panda Beacon",
-		"panda_beacon_preview": "Monitor slot\n+1",
-		"panda_beacon_shop_card": "A reusable habitat monitoring slot\n%d owned",
-		"panda_beacon_locked": "The Panda Beacon has not been invented yet",
-		"panda_beacon_bought": "Panda Beacon added. You now own %d",
-		"panda_beacon_notification_title": "Your Panda Beacon reacted!",
-		"panda_beacon_notification_body": "%s has reached 30 cm and can be harvested.",
+		"habitat_observe_size": "Current size: %.1f cm",
+		"habitat_observe_note": "It is growing slowly in the habitat.",
 		"puku_intro_1": "From now on, my shop will buy the succulents you grow!",
 		"puku_intro_2": "When this gauge fills up, I'll trade it for 3 Puku Coins!",
 		"first_habitat_gift_1": "The first seeds have formed inside the pod!",
@@ -1089,9 +1003,6 @@ const TEXT := {
 		,"armadillo_seven_species": "It is called %s.\nI want you to have this plant!"
 		,"armadillo_seven_catalog": "And here is the %s too.\nNow you can record its family."
 		,"armadillo_seven_end": "Maybe that habitat really does have a mysterious power.\nAll right—my research continues!"
-		,"rain_intro_1": "Sometimes it rains here, just like it did when the habitat awakened."
-		,"rain_intro_2": "The habitat grows stronger in the rain, and many succulents begin to sprout!"
-		,"rain_intro_3": "We may glimpse old memories—or discover a rare new form."
 		,"catalog": "Catalog"
 		,"best_record": "Best Record\n%.1f cm"
 		,"puku_count": "Puku Coins ×%d"
@@ -1109,7 +1020,6 @@ const TEXT := {
 		,"old_seed_name": "Old Seeds"
 		,"bags_held": "%s · %d bags"
 		,"shop_choose_category": "What would you like to see?"
-		,"shop_category_seed": "Tools\nBeacon"
 		,"shop_category_pot": "Pots\nArrangements"
 		,"shop_category_catalog": "Catalogs\nNew Series"
 		,"shop_category_gacha": "Forest\nGacha"
@@ -1152,11 +1062,8 @@ const TEXT := {
 		,"self_best_none": "Personal best —"
 		,"undiscovered": "Not discovered"
 		,"list_back": "Back to list"
-		,"harvest_ready": "READY\n%.1f cm"
-		,"habitat_rain_remaining": "Welcome rain · %d sec left"
 		,"harvest_to_gauge": "+%s cm\nto Puku Gauge"
 		,"record_update": "NEW HARVEST RECORD\n%.1f cm"
-		,"habitat_jellied": "This plant has turned to jelly."
 		,"mystery_seed_get": "Mystery Seed GET!"
 		,"old_catalog_page_get": "A new series was recorded in the catalog!"
 		,"gacha_draw_count": "Gacha %d"
@@ -1260,14 +1167,8 @@ const TEXT := {
 		,"research_reward_empty": "There is no new series to record right now."
 		,"research_reward_choose": "%s\nChoose this catalog"
 		,"research_reward_claimed": "Here is %s.\nUse the silhouettes to look for species you have not found yet."
-		,"rain_pending_notice": "Blessed rain is falling in the habitat"
-		,"rain_started_notice": "Blessed rain has begun"
-		,"rain_finished_notice": "The blessed rain has stopped"
 		,"result_hidden_registered": "%s registered in the catalog!"
-		,"habitat_wild_guide": "Look! A wild %s is growing over there!"
-		,"mystery_route_rain": "This succulent is incredible.\nI've never seen anything like it.\nThis habitat may still hold many mysteries."
 		,"mystery_route_best": "100 cm is amazing!\nSomething mysterious seems to be happening in the habitat too."
-		,"mystery_route_complete": "I thought we had found so many habitat succulents…\nbut another secret was still waiting."
 		,"mystery_route_default": "You found a mysterious succulent. There is still so much we do not know."
 		,"arrangement_default_name": "Arrangement %d"
 		,"shop_rescue_offer": "Run out of seeds?\nI'll share a bag with you!"

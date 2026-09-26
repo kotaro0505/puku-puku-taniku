@@ -9,21 +9,18 @@ func _ready()->void:
 	game.intro_story_complete=true;game.first_colorata_confirmed=true;game.trio_originals_confirmed=true;game.total_play_count=3
 	game.habitat_unlocked=true;game.habitat_awakened=true;game.habitat_awakening_event_complete=true;game.habitat_tutorial_complete=true
 	game.mystery_items_acquired=true;game.mystery_catalog_tutorial_complete=true;game.encyclopedia_unlocked=true;game.seed_shop_open=true
-	game.panda_beacon_unlocked=true;game.panda_beacon_count=1;game.puku_gauge_intro_complete=true
+	game.puku_gauge_intro_complete=true
 	game._update_play_ui();assert(game.shop_button.visible and game.shop_button.text=="パンダのお店")
 	game._open_shop();assert(game.shop_overlay.visible and game.shop_current_page=="categories" and game.shop_category_controls[0].is_visible_in_tree())
 	assert(game.find_child("ShopCategoryCatalog",true,false)==null)
-	assert(game.find_child("ShopCategorySeed",true,false).text=="どうぐ\nビーコン")
+	assert(game.find_child("ShopCategorySeed",true,false)==null)
 	assert(game.find_child("ShopCategoryPot",true,false)!=null and game.find_child("ShopForestGachaButton",true,false)!=null)
 
-	var products:Array=game._seed_shop_products();assert(products.size()==1 and str(products[0].get("seed_type",""))=="panda_beacon")
-	game.puku_points=2;var bags_before:int=game.normal_seed_bags;game._open_shop_seed_category()
-	assert(game.arrangement_ui.visible and game.arrangement_ui.seed_shop_page.visible and game.arrangement_ui.seed_shop_grid.get_child_count()==1)
-	game.arrangement_ui._request_seed_purchase("normal")
-	assert(game.puku_points==2 and game.normal_seed_bags==bags_before and "さやゲージ" in game.arrangement_ui.seed_shop_message.text)
-	game.arrangement_ui._request_seed_purchase("panda_beacon")
-	assert(game.puku_points==1 and game.panda_beacon_count==2 and game.normal_seed_bags==bags_before)
-	game.arrangement_ui.close();game._show_shop_categories()
+	var products:Array=game._seed_shop_products();assert(products.is_empty())
+	game.puku_points=2;var bags_before:int=game.normal_seed_bags
+	game._buy_seed_bag("normal")
+	game._buy_seed_bag("panda_beacon")
+	assert(game.puku_points==2 and game.normal_seed_bags==bags_before and game.panda_beacon_count==0)
 
 	var points_before_catalog:int=game.puku_points;game.unlocked_series.erase("metal");game._on_catalog_purchase_requested("metal")
 	assert(game.puku_points==points_before_catalog and not bool(game.unlocked_series.get("metal",false)))
@@ -43,5 +40,5 @@ func _ready()->void:
 
 	game._save();game.mystery_items_acquired=false;game.encyclopedia_unlocked=false;game.seed_shop_open=false;game._load_save();game._update_play_ui()
 	assert(game.mystery_items_acquired and game.encyclopedia_unlocked and game.seed_shop_open and game.shop_button.visible)
-	print("SHOP_FIX_SMOKE_OK shop=panda items=pots+gacha+beacon normal_seed_sale=removed catalog_sale=removed")
+	print("SHOP_FIX_SMOKE_OK shop=panda items=pots+gacha beacon=retired normal_seed_sale=removed catalog_sale=removed")
 	get_tree().quit()

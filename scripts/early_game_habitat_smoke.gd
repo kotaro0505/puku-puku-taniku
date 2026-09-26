@@ -113,26 +113,22 @@ func _ready() -> void:
 	assert(game.scripted_dialog_kind.is_empty())
 	assert(game.habitat_tutorial_started)
 
-	# The first awakened sprout is nearly ready, but it still uses the real
-	# habitat growth/30cm/jelly logic.
-	var tutorial: Dictionary = game.HabitatWildSystemClass.tutorial_plant(game.habitat_wild_plants)
-	assert(not tutorial.is_empty() and float(tutorial.get("diameter_cm", 0.0)) < 30.1)
-	assert(bool(tutorial.get("jelly_immune", false)))
-	var tutorial_id := str(tutorial.get("individual_id", ""))
-	var now_unix := Time.get_unix_time_from_system()
-	tutorial["last_updated_unix"] = now_unix - 120.0
-	game._ensure_habitat_wild_state(now_unix, false)
-	game._build_habitat_items(true)
-	var tutorial_item: Dictionary = game._habitat_wild_item_by_id(tutorial_id)
-	assert(not tutorial_item.is_empty() and game.HabitatWildSystemClass.can_harvest(tutorial))
-	game._collect_habitat_wild_plant(tutorial_item)
+	# Looking around the first sprouts is the whole habitat introduction. Plants
+	# are observed, never harvested, and the seed-pod story follows directly.
 	assert(game.habitat_tutorial_complete)
-	await get_tree().process_frame
-	await get_tree().process_frame
-	assert(game.species_get_active_context == "habitat_tutorial")
-	game.species_get_overlay.busy = false
-	game.species_get_overlay.close_overlay()
-	await get_tree().create_timer(0.35).timeout
+	for plant in game.habitat_wild_plants:
+		assert(not bool(plant.get("tutorial", false)) and not bool(plant.get("jelly_immune", false)))
+	var now_unix := Time.get_unix_time_from_system()
+	var first_plant_id := str(game.habitat_wild_plants[0].get("individual_id", ""))
+	var first_item: Dictionary = game._habitat_wild_item_by_id(first_plant_id)
+	var first_count := int(game.species_get_counts.get(str(game.habitat_wild_plants[0].get("species_id", "")), 0))
+	game._collect_habitat_wild_plant(first_item)
+	assert(not game._habitat_wild_plant_by_id(first_plant_id).is_empty())
+	assert(int(game.species_get_counts.get(str(game.habitat_wild_plants[0].get("species_id", "")), 0)) == first_count)
+	assert(game.habitat_plant_panel.visible)
+	game.habitat_plant_panel.close()
+	for frame in range(4):
+		await get_tree().process_frame
 	assert(game.seed_pod_story_overlay.visible and game.current_mode == "habitat")
 	assert(game.scripted_dialog_kind.is_empty() and not bool(game.tutorial_steps.get("seed_pod_story_seen", false)))
 	assert(game.seed_pod_story_overlay.DIALOG_KEYS.size() == 3)
@@ -176,21 +172,15 @@ func _ready() -> void:
 	await get_tree().process_frame
 	assert(game.initial_seed_stock_notice_complete and game.tutorial_guide_overlay.visible and str(game.tutorial_guide_button.get_meta("target", "")) == "play_open_normal")
 	game._hide_first_play_tutorial_overlay();game.normal_play_tutorial_complete=true;game._save()
-	game._start_panda_beacon_unlock_event()
-	assert(game.scripted_dialog_kind == "panda_beacon_unlock")
-	while not game.scripted_dialog_kind.is_empty():
-		game._advance_scripted_dialog()
-	await get_tree().process_frame
-	assert(game.panda_beacon_unlocked and game.panda_beacon_count == 1)
+	assert(not game.panda_beacon_unlocked and game.panda_beacon_count == 0)
 	assert(game.puku_gauge_intro_complete and game._tutorial_fully_complete())
 
-	# A legacy/direct modern discovery remains usable for save compatibility,
-	# but it does not run the old "creative era" explanation prematurely. New
-	# creative discoveries are still blocked at every normal acquisition route.
-	assert(game._register_species_discovery("jelly_grape", true))
-	assert(bool(game.habitat_returned_species.get("jelly_grape", false)))
-	assert(not game.pending_special_series_explanation and not game.special_series_explanation_seen)
-	assert("jelly_grape" in game._habitat_population_candidate_ids())
+	# A legitimate greenhouse/event GET becomes settled. Unknown species never
+	# enter the natural population merely because the habitat exists.
+	assert(game._register_species_discovery("lutea", true))
+	assert(bool(game.habitat_returned_species.get("lutea", false)))
+	assert("lutea" in game._habitat_population_candidate_ids())
+	assert("jelly_grape" not in game._habitat_population_candidate_ids())
 
 	# Once awake, the shared offline/spawn engine resumes normally.
 	var population_before: int = game.habitat_wild_plants.size()
@@ -198,7 +188,7 @@ func _ready() -> void:
 	game._ensure_habitat_wild_state(now_unix, false)
 	assert(game.habitat_wild_plants.size() >= population_before)
 
-	print("EARLY_GAME_HABITAT_SMOKE_OK empty=true dormant=true awakening=rain+ghosts+promise sprouts=3 items=pod+catalog stock=4x12 catalog_tutorial=true shop=true beacon=true return_loop=true")
+	print("EARLY_GAME_HABITAT_SMOKE_OK empty=true dormant=true awakening=rain+ghosts+promise sprouts=3 observation=true items=pod+catalog stock=4x12 catalog_tutorial=true shop=true beacon=retired settlement=true")
 	get_tree().quit()
 
 func _prepare_trio_complete(game: Node) -> void:

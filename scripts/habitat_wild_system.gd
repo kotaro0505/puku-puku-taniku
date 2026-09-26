@@ -4,7 +4,8 @@ extends RefCounted
 const INITIAL_POPULATION_MIN := 10
 const INITIAL_POPULATION_MAX := 14
 const MAX_POPULATION := 24
-const HARVEST_MIN_CM := 30.0
+const MATURITY_MIN_CM := 24.0
+const MATURITY_MAX_CM := 36.0
 
 # Normal-habitat balance knobs. Changing these updates live play, offline
 # catch-up, ETA calculation, and development time travel together.
@@ -17,7 +18,7 @@ const NORMAL_HABITAT_JELLY_PROBABILITY_PER_SECOND := MAIN_JELLY_PROBABILITY_PER_
 # Compatibility alias for older callers.
 const NORMAL_GROWTH_SCALE := NORMAL_HABITAT_GROWTH_SCALE
 const TUTORIAL_GROWTH_SCALE := 0.08
-const TIMING_VERSION := 2
+const TIMING_VERSION := 3
 
 # v16 and older saves can contain runaway normal-habitat plants produced by
 # the former real-time growth loop. This is only a migration detector: normal
@@ -72,22 +73,24 @@ static func normalize_saved(source: Variant, valid_species_ids: Array[String], n
 		plant["jelly_risk_curve"] = maxf(0.05, float(plant.get("jelly_risk_curve", 1.0)))
 		plant["last_updated_unix"] = maxf(0.0, float(plant.get("last_updated_unix", now_unix)))
 		plant["spawned_unix"] = maxf(0.0, float(plant.get("spawned_unix", plant["last_updated_unix"])))
-		plant["panda_beacon_installed"] = bool(plant.get("panda_beacon_installed", false))
+		# Panda Beacon and the old 30 cm harvest boundary were retired.  Read old
+		# saves safely, but never carry either state into the observation habitat.
+		plant.erase("panda_beacon_installed")
 		plant["jelly_threshold"] = maxf(0.000001, float(plant.get("jelly_threshold", _stable_jelly_threshold(str(plant["individual_id"])))))
+		plant["mature_diameter_cm"] = clampf(float(plant.get("mature_diameter_cm", _stable_maturity_diameter(str(plant["individual_id"])))), MATURITY_MIN_CM, MATURITY_MAX_CM)
 
 		var saved_timing_version := int(plant.get("habitat_timing_version", 0))
 		if saved_timing_version < TIMING_VERSION:
-			# The former hazard ran below 30 cm and cannot be carried into this rule.
+			# Start the natural-lifetime clock from the loaded state. Legacy 30 cm
+			# readiness and beacon timing fields intentionally do not migrate.
 			plant["jelly_hazard_accumulated"] = 0.0
 			plant["jelly_elapsed_seconds"] = 0.0
-			plant["jelly_eligible_since_unix"] = float(plant["last_updated_unix"]) if float(plant["diameter_cm"]) >= HARVEST_MIN_CM else 0.0
-			plant["harvest_ready_reached_unix"] = float(plant["last_updated_unix"]) if float(plant["diameter_cm"]) >= HARVEST_MIN_CM else 0.0
+			plant["jelly_eligible_since_unix"] = float(plant["last_updated_unix"]) if float(plant["diameter_cm"]) >= float(plant["mature_diameter_cm"]) else 0.0
 			plant["jellied_unix"] = float(plant["last_updated_unix"]) if bool(plant["jellied"]) else 0.0
 		else:
 			plant["jelly_hazard_accumulated"] = maxf(0.0, float(plant.get("jelly_hazard_accumulated", 0.0)))
 			plant["jelly_elapsed_seconds"] = maxf(0.0, float(plant.get("jelly_elapsed_seconds", 0.0)))
 			plant["jelly_eligible_since_unix"] = maxf(0.0, float(plant.get("jelly_eligible_since_unix", 0.0)))
-			plant["harvest_ready_reached_unix"] = maxf(0.0, float(plant.get("harvest_ready_reached_unix", 0.0)))
 			plant["jellied_unix"] = maxf(0.0, float(plant.get("jellied_unix", 0.0)))
 		plant["habitat_timing_version"] = TIMING_VERSION
 
@@ -104,9 +107,6 @@ static func initialize_population(plants: Array[Dictionary], candidate_species_i
 	if not plants.is_empty() or candidate_species_ids.is_empty():
 		return
 	var initial_count := rng.randi_range(INITIAL_POPULATION_MIN, INITIAL_POPULATION_MAX)
-	if not tutorial_complete and not original_species_ids.is_empty():
-		var tutorial_id := original_species_ids[rng.randi_range(0, original_species_ids.size() - 1)]
-		plants.append(_make_plant(tutorial_id, true, rng.randf_range(29.76, 29.84), now_unix, plants, rng, safe_points))
 	while plants.size() < initial_count:
 		var species_id := candidate_species_ids[rng.randi_range(0, candidate_species_ids.size() - 1)]
 		plants.append(_make_plant(species_id, false, rng.randf_range(3.5, 28.9), now_unix, plants, rng, safe_points))
@@ -137,7 +137,7 @@ static func initialize_awakened_population(plants: Array[Dictionary], candidate_
 		spread_points = [Vector2(155, 410), Vector2(625, 455), Vector2(1130, 400)]
 	for index in mini(3, awakening_species.size()):
 		var tutorial := index == 0
-		var diameter := rng.randf_range(29.99970, 29.99985) if tutorial else rng.randf_range(2.0, 5.5)
+		var diameter := rng.randf_range(2.0, 5.5)
 		var plant := _make_plant(awakening_species[index], tutorial, diameter, now_unix, plants, rng, safe_points)
 		plant["panorama_x"] = spread_points[index].x
 		plant["panorama_y"] = spread_points[index].y
@@ -215,8 +215,6 @@ static func advance_time(plants: Array[Dictionary], now_unix: float) -> bool:
 static func advance_time_with_events(plants: Array[Dictionary], now_unix: float) -> Dictionary:
 	var result := {
 		"changed": false,
-		"ready": [],
-		"ready_details": [],
 		"jellied": [],
 		"jellied_details": [],
 		"removed": []
@@ -234,9 +232,6 @@ static func advance_time_with_events(plants: Array[Dictionary], now_unix: float)
 		var events := _advance_plant(plant, now_unix)
 		if bool(events.get("changed", false)):
 			result["changed"] = true
-		if bool(events.get("became_ready", false)):
-			result["ready"].append(str(plant.get("individual_id", "")))
-			result["ready_details"].append(_event_snapshot(plant))
 		if bool(events.get("became_jellied", false)):
 			result["jellied"].append(str(plant.get("individual_id", "")))
 			result["jellied_details"].append(_event_snapshot(plant))
@@ -255,9 +250,7 @@ static func _event_snapshot(plant: Dictionary) -> Dictionary:
 		"individual_id": str(plant.get("individual_id", "")),
 		"species_id": str(plant.get("species_id", "")),
 		"diameter_cm": float(plant.get("diameter_cm", 0.0)),
-		"harvest_ready_reached_unix": float(plant.get("harvest_ready_reached_unix", 0.0)),
-		"jellied_unix": float(plant.get("jellied_unix", 0.0)),
-		"panda_beacon_installed": bool(plant.get("panda_beacon_installed", false))
+		"jellied_unix": float(plant.get("jellied_unix", 0.0))
 	}
 
 
@@ -266,37 +259,36 @@ static func _advance_plant(plant: Dictionary, now_unix: float) -> Dictionary:
 	var elapsed := maxf(0.0, now_unix - previous_update)
 	if elapsed <= 0.0:
 		_refresh_timing_fields(plant, previous_update)
-		return {"changed": false, "became_ready": false, "became_jellied": false}
+		return {"changed": false, "became_jellied": false}
 
-	var was_ready := float(plant.get("diameter_cm", 0.0)) >= HARVEST_MIN_CM
 	var was_jellied := bool(plant.get("jellied", false))
 	plant["last_updated_unix"] = now_unix
 	if was_jellied:
 		_refresh_timing_fields(plant, now_unix)
 		_update_growth_state(plant)
-		return {"changed": true, "became_ready": false, "became_jellied": false}
+		return {"changed": true, "became_jellied": false}
 
 	var tutorial := bool(plant.get("tutorial", false))
 	var growth_rate := growth_rate_cm_per_second(plant)
 	var diameter_before := maxf(1.6, float(plant.get("diameter_cm", 1.6)))
-	var seconds_until_ready := 0.0 if diameter_before >= HARVEST_MIN_CM else (HARVEST_MIN_CM - diameter_before) / maxf(growth_rate, 0.0000000001)
-	var ready_within_interval := seconds_until_ready <= elapsed
+	var mature_diameter := clampf(float(plant.get("mature_diameter_cm", _stable_maturity_diameter(str(plant.get("individual_id", ""))))), MATURITY_MIN_CM, MATURITY_MAX_CM)
+	plant["mature_diameter_cm"] = mature_diameter
+	var seconds_until_mature := 0.0 if diameter_before >= mature_diameter else (mature_diameter - diameter_before) / maxf(growth_rate, 0.0000000001)
+	var matures_within_interval := seconds_until_mature <= elapsed
 	var eligible_seconds := 0.0
 	var eligible_start_unix := previous_update
 	if not tutorial and not bool(plant.get("jelly_immune", false)):
-		if diameter_before >= HARVEST_MIN_CM:
+		if diameter_before >= mature_diameter:
 			eligible_seconds = elapsed
-		elif ready_within_interval:
-			eligible_start_unix = previous_update + seconds_until_ready
-			eligible_seconds = maxf(0.0, elapsed - seconds_until_ready)
+		elif matures_within_interval:
+			eligible_start_unix = previous_update + seconds_until_mature
+			eligible_seconds = maxf(0.0, elapsed - seconds_until_mature)
 
 	var seconds_grown := elapsed
 	var became_jellied := false
 	if eligible_seconds > 0.0:
 		if float(plant.get("jelly_eligible_since_unix", 0.0)) <= 0.0:
 			plant["jelly_eligible_since_unix"] = eligible_start_unix
-		if float(plant.get("harvest_ready_reached_unix", 0.0)) <= 0.0:
-			plant["harvest_ready_reached_unix"] = eligible_start_unix
 		var hazard_rate := jelly_hazard_rate_per_second(float(plant.get("jelly_risk_curve", 1.0)))
 		var accumulated := maxf(0.0, float(plant.get("jelly_hazard_accumulated", 0.0)))
 		var threshold := maxf(0.000001, float(plant.get("jelly_threshold", _stable_jelly_threshold(str(plant.get("individual_id", ""))))))
@@ -315,14 +307,11 @@ static func _advance_plant(plant: Dictionary, now_unix: float) -> Dictionary:
 			plant["jelly_elapsed_seconds"] = maxf(0.0, float(plant.get("jelly_elapsed_seconds", 0.0))) + eligible_seconds
 
 	plant["diameter_cm"] = diameter_before + growth_rate * seconds_grown
-	var became_ready := not was_ready and float(plant["diameter_cm"]) >= HARVEST_MIN_CM
-	if became_ready and float(plant.get("harvest_ready_reached_unix", 0.0)) <= 0.0:
-		plant["harvest_ready_reached_unix"] = previous_update + seconds_until_ready
-	if became_ready and float(plant.get("jelly_eligible_since_unix", 0.0)) <= 0.0 and not tutorial and not bool(plant.get("jelly_immune", false)):
-		plant["jelly_eligible_since_unix"] = previous_update + seconds_until_ready
+	if matures_within_interval and float(plant.get("jelly_eligible_since_unix", 0.0)) <= 0.0 and not tutorial and not bool(plant.get("jelly_immune", false)):
+		plant["jelly_eligible_since_unix"] = previous_update + seconds_until_mature
 	_refresh_timing_fields(plant, now_unix)
 	_update_growth_state(plant)
-	return {"changed": true, "became_ready": became_ready, "became_jellied": became_jellied}
+	return {"changed": true, "became_jellied": became_jellied}
 
 
 static func growth_rate_cm_per_second(plant: Dictionary) -> float:
@@ -330,18 +319,9 @@ static func growth_rate_cm_per_second(plant: Dictionary) -> float:
 	return MAIN_GROWTH_CM_PER_SECOND * maxf(0.05, float(plant.get("base_growth_rate", 1.0))) * scale
 
 
-static func harvest_ready_unix(plant: Dictionary, reference_unix: float = -1.0) -> float:
-	if bool(plant.get("jellied", false)):
-		return 0.0
-	var diameter := float(plant.get("diameter_cm", 0.0))
-	if diameter >= HARVEST_MIN_CM:
-		return maxf(0.0, float(plant.get("harvest_ready_reached_unix", plant.get("last_updated_unix", 0.0))))
-	var anchor := float(plant.get("last_updated_unix", 0.0)) if reference_unix < 0.0 else reference_unix
-	return anchor + (HARVEST_MIN_CM - diameter) / maxf(growth_rate_cm_per_second(plant), 0.0000000001)
-
-
 static func jelly_due_unix(plant: Dictionary, reference_unix: float = -1.0) -> float:
-	if bool(plant.get("jellied", false)) or bool(plant.get("jelly_immune", false)) or float(plant.get("diameter_cm", 0.0)) < HARVEST_MIN_CM:
+	var mature_diameter := float(plant.get("mature_diameter_cm", _stable_maturity_diameter(str(plant.get("individual_id", "")))))
+	if bool(plant.get("jellied", false)) or bool(plant.get("jelly_immune", false)) or float(plant.get("diameter_cm", 0.0)) < mature_diameter:
 		return 0.0
 	var anchor := float(plant.get("last_updated_unix", 0.0)) if reference_unix < 0.0 else reference_unix
 	var threshold := maxf(0.000001, float(plant.get("jelly_threshold", 0.000001)))
@@ -355,16 +335,16 @@ static func jelly_hazard_rate_per_second(risk_curve: float = 1.0) -> float:
 
 
 static func jelly_hazard_for_interval(start_diameter_cm: float, end_diameter_cm: float, elapsed_seconds: float, risk_curve: float = 1.0) -> float:
-	if elapsed_seconds <= 0.0 or maxf(start_diameter_cm, end_diameter_cm) < HARVEST_MIN_CM:
+	# Used by deterministic tests and diagnostics. Natural habitat plants use
+	# their per-individual maturity size. Use the start of the configured
+	# maturity band here so this diagnostic never recreates a fixed 30 cm rule.
+	var maturity := MATURITY_MIN_CM
+	if elapsed_seconds <= 0.0 or maxf(start_diameter_cm, end_diameter_cm) < maturity:
 		return 0.0
 	var eligible_fraction := 1.0
-	if start_diameter_cm < HARVEST_MIN_CM and end_diameter_cm > start_diameter_cm:
-		eligible_fraction = clampf((end_diameter_cm - HARVEST_MIN_CM) / (end_diameter_cm - start_diameter_cm), 0.0, 1.0)
+	if start_diameter_cm < maturity and end_diameter_cm > start_diameter_cm:
+		eligible_fraction = clampf((end_diameter_cm - maturity) / (end_diameter_cm - start_diameter_cm), 0.0, 1.0)
 	return jelly_hazard_rate_per_second(risk_curve) * elapsed_seconds * eligible_fraction
-
-
-static func can_harvest(plant: Dictionary) -> bool:
-	return not bool(plant.get("jellied", false)) and float(plant.get("diameter_cm", 0.0)) >= HARVEST_MIN_CM
 
 
 static func remove_individual(plants: Array[Dictionary], individual_id: String) -> Dictionary:
@@ -398,6 +378,7 @@ static func _make_plant(species_id: String, tutorial: bool, diameter_cm: float, 
 		"jelly_hazard_accumulated": 0.0,
 		"jelly_threshold": -log(1.0 - threshold_roll),
 		"jelly_risk_curve": 1.0,
+		"mature_diameter_cm": rng.randf_range(MATURITY_MIN_CM, MATURITY_MAX_CM),
 		"jelly_eligible_since_unix": 0.0,
 		"jelly_due_unix": 0.0,
 		"tutorial": tutorial,
@@ -405,9 +386,6 @@ static func _make_plant(species_id: String, tutorial: bool, diameter_cm: float, 
 		"growth_rate_cm_per_second": 0.0,
 		"spawned_unix": now_unix,
 		"last_updated_unix": now_unix,
-		"harvest_ready_unix": 0.0,
-		"harvest_ready_reached_unix": 0.0,
-		"panda_beacon_installed": false,
 		"habitat_timing_version": TIMING_VERSION,
 		"panorama_x": point.x,
 		"panorama_y": point.y,
@@ -420,7 +398,6 @@ static func _make_plant(species_id: String, tutorial: bool, diameter_cm: float, 
 
 static func _refresh_timing_fields(plant: Dictionary, reference_unix: float) -> void:
 	plant["growth_rate_cm_per_second"] = growth_rate_cm_per_second(plant)
-	plant["harvest_ready_unix"] = harvest_ready_unix(plant, reference_unix)
 	plant["jelly_due_unix"] = jelly_due_unix(plant, reference_unix)
 
 
@@ -428,20 +405,25 @@ static func _choose_safe_point(plants: Array[Dictionary], rng: RandomNumberGener
 	if safe_points.is_empty():
 		return Vector2(640.0, 410.0)
 	var best := Vector2(safe_points[0])
-	var best_clearance := -1.0
-	for _attempt in range(24):
+	var best_clearance_score := -99999.0
+	var candidate_diameter := maxf(1.6, float(ignored_plant.get("diameter_cm", 4.0)))
+	for _attempt in range(48):
 		var anchor: Vector2 = safe_points[rng.randi_range(0, safe_points.size() - 1)]
 		var candidate := Vector2(anchor.x + rng.randf_range(-24.0, 24.0), anchor.y + rng.randf_range(-9.0, 9.0))
-		var clearance := 99999.0
+		var clearance_score := 99999.0
 		for other in plants:
 			if other == ignored_plant:
 				continue
 			var other_point := Vector2(float(other.get("panorama_x", 0.0)), float(other.get("panorama_y", 0.0)))
-			clearance = minf(clearance, candidate.distance_to(other_point))
-		if clearance > best_clearance:
+			var other_diameter := maxf(1.6, float(other.get("diameter_cm", 4.0)))
+			# Large plants reserve more panorama space.  This remains deliberately
+			# soft so clusters still look natural instead of forming a rigid grid.
+			var desired := 42.0 + minf(54.0, (candidate_diameter + other_diameter) * 0.72)
+			clearance_score = minf(clearance_score, candidate.distance_to(other_point) - desired)
+		if clearance_score > best_clearance_score:
 			best = candidate
-			best_clearance = clearance
-		if clearance >= 58.0:
+			best_clearance_score = clearance_score
+		if clearance_score >= 0.0:
 			break
 	return best
 
@@ -453,10 +435,16 @@ static func _stable_jelly_threshold(individual_id: String) -> float:
 	return -log(1.0 - roll)
 
 
+static func _stable_maturity_diameter(individual_id: String) -> float:
+	var stable_rng := RandomNumberGenerator.new()
+	stable_rng.seed = absi((individual_id + ":maturity").hash()) + 1
+	return stable_rng.randf_range(MATURITY_MIN_CM, MATURITY_MAX_CM)
+
+
 static func _update_growth_state(plant: Dictionary) -> void:
 	if bool(plant.get("jellied", false)):
 		plant["growth_state"] = "jellied"
-	elif float(plant.get("diameter_cm", 0.0)) >= HARVEST_MIN_CM:
-		plant["growth_state"] = "ready"
+	elif float(plant.get("diameter_cm", 0.0)) >= float(plant.get("mature_diameter_cm", MATURITY_MAX_CM)):
+		plant["growth_state"] = "mature"
 	else:
 		plant["growth_state"] = "growing"

@@ -3,11 +3,8 @@ extends Control
 
 signal close_requested
 signal random_reset_requested
-signal label_preview_requested
 signal multiplier_requested(multiplier: int)
 signal time_jump_requested(seconds: int)
-signal rain_start_requested
-signal rain_stop_requested
 
 const MULTIPLIERS := [1, 60, 3600, 21600, 86400]
 
@@ -41,9 +38,9 @@ func refresh(state: Dictionary, plants: Array, species_name_resolver: Callable, 
 	var picker_index := MULTIPLIERS.find(multiplier)
 	if picker_index >= 0:
 		multiplier_picker.select(picker_index)
-	summary_label.text = "原生地時刻: %s\n倍率: ×%s　雨モード: %s\nビーコン: 総数 %d / 使用中 %d / 空き %d" % [
-		_format_unix(now_unix), _format_number(multiplier), "ON" if bool(state.get("rain", false)) else "OFF",
-		int(state.get("beacon_total", 0)), int(state.get("beacon_used", 0)), int(state.get("beacon_free", 0))
+	summary_label.text = "原生地時刻: %s\n倍率: ×%s\n表示個体: %d / %d　定着品種: %d" % [
+		_format_unix(now_unix), _format_number(multiplier), int(state.get("population", 0)),
+		int(state.get("max_population", 0)), int(state.get("settled_count", 0))
 	]
 	for child in plant_list.get_children():
 		child.free()
@@ -53,14 +50,13 @@ func refresh(state: Dictionary, plants: Array, species_name_resolver: Callable, 
 		var plant: Dictionary = plant_value
 		var species_name := str(species_name_resolver.call(str(plant.get("species_id", ""))))
 		var diameter := float(plant.get("diameter_cm", 0.0))
-		var status := "ジュレ済み" if bool(plant.get("jellied", false)) else ("収穫可能" if diameter >= 30.0 else "30cm未満")
-		var eta := float(plant.get("harvest_ready_unix", 0.0))
+		var status := "ジュレ済み" if bool(plant.get("jellied", false)) else ("成熟" if diameter >= float(plant.get("mature_diameter_cm", 30.0)) else "成長中")
 		var age := maxf(0.0, now_unix - float(plant.get("spawned_unix", now_unix)))
 		var label := Label.new()
 		label.name = "HabitatPlantDebug_%s" % str(plant.get("individual_id", ""))
-		label.text = "%s  %.3fcm  [%s]\n  経過 %s / 30cm予定 %s / ジュレ %s / ビーコン %s" % [
-			species_name, diameter, status, _format_duration(age), _format_unix(eta) if eta > 0.0 else "到達済み",
-			"はい" if bool(plant.get("jellied", false)) else "いいえ", "設置中" if bool(plant.get("panda_beacon_installed", false)) else "なし"
+		label.text = "%s  %.3fcm  [%s]\n  経過 %s / 成熟目安 %.1fcm / ジュレ %s" % [
+			species_name, diameter, status, _format_duration(age), float(plant.get("mature_diameter_cm", 30.0)),
+			"はい" if bool(plant.get("jellied", false)) else "いいえ"
 		]
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		label.custom_minimum_size = Vector2(432, 72)
@@ -71,7 +67,7 @@ func refresh(state: Dictionary, plants: Array, species_name_resolver: Callable, 
 	var log_lines: Array[String] = []
 	for index in range(maxi(0, logs.size() - 8), logs.size()):
 		log_lines.append(str(logs[index]))
-	event_log_label.text = "ビーコン発火ログ\n" + ("（まだありません）" if log_lines.is_empty() else "\n".join(log_lines))
+	event_log_label.text = "原生地イベントログ\n" + ("（まだありません）" if log_lines.is_empty() else "\n".join(log_lines))
 
 
 func _build_ui() -> void:
@@ -122,9 +118,6 @@ func _build_ui() -> void:
 	var reset_button := _button("ランダムリセット", "HabitatRandomReset", Color("#d7c3a1"), Vector2(246, 48))
 	reset_button.pressed.connect(func(): random_reset_requested.emit())
 	reset_row.add_child(reset_button)
-	var label_preview_button := _button("cm表示 10/30/60/100", "HabitatLabelPreview", Color("#c9d8c4"), Vector2(246, 48))
-	label_preview_button.pressed.connect(func(): label_preview_requested.emit())
-	reset_row.add_child(label_preview_button)
 
 	var multiplier_row := HBoxContainer.new()
 	multiplier_row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -153,17 +146,6 @@ func _build_ui() -> void:
 		jump_button.pressed.connect(func(): time_jump_requested.emit(int(jump.seconds)))
 		jump_row.add_child(jump_button)
 
-	var rain_row := HBoxContainer.new()
-	rain_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	rain_row.add_theme_constant_override("separation", 10)
-	root.add_child(rain_row)
-	var rain_start := _button("原生地雨モード開始", "HabitatRainStart", Color("#9fc8d8"), Vector2(238, 46))
-	rain_start.pressed.connect(func(): rain_start_requested.emit())
-	rain_row.add_child(rain_start)
-	var rain_stop := _button("原生地雨モード解除", "HabitatRainStop", Color("#d7c3a1"), Vector2(238, 46))
-	rain_stop.pressed.connect(func(): rain_stop_requested.emit())
-	rain_row.add_child(rain_stop)
-
 	var plants_title := Label.new()
 	plants_title.text = "各株の状態"
 	plants_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -183,7 +165,7 @@ func _build_ui() -> void:
 	scroll.add_child(plant_list)
 
 	event_log_label = Label.new()
-	event_log_label.name = "HabitatBeaconDebugLog"
+	event_log_label.name = "HabitatEventDebugLog"
 	event_log_label.custom_minimum_size = Vector2(500, 108)
 	event_log_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	event_log_label.add_theme_font_size_override("font_size", 13)
