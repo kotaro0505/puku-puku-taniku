@@ -52,7 +52,23 @@ func _ready() -> void:
 		assert(not unit.has("jelly_cm"))
 		assert(not unit.has("ai_harvest_cm"))
 		assert(float(unit.get("size_cm", 0.0)) < 2.0)
+		var live_size_label := unit.get("size_label") as Label
+		assert(is_instance_valid(live_size_label))
+		assert(live_size_label.text == "%.1fcm" % float(unit.get("size_cm", 0.0)))
 	assert(player_count == 6 and opponent_count == 6)
+	var growth_unit: Dictionary = battle.units[0]
+	var initial_visual_size: float = float((growth_unit.get("node") as TextureButton).size.x)
+	for unit_index in range(battle.units.size()):
+		var growing_unit: Dictionary = battle.units[unit_index]
+		growing_unit.get("logic").jelly_checks_enabled = false
+		if bool(growing_unit.get("opponent", false)):
+			growing_unit["ai_harvest_age"] = INF
+		battle.units[unit_index] = growing_unit
+	battle._process(4.0)
+	growth_unit = battle.units[0]
+	assert(float(growth_unit.get("size_cm", 0.0)) > 6.4)
+	assert(float((growth_unit.get("node") as TextureButton).size.x) > initial_visual_size + 8.0)
+	assert((growth_unit.get("size_label") as Label).text == "%.1fcm" % float(growth_unit.get("size_cm", 0.0)))
 
 	_verify_shared_growth_source()
 	_verify_clipped_layout(battle)
@@ -107,12 +123,16 @@ func _verify_clipped_layout(battle: Control) -> void:
 		battle.units[unit_index] = unit
 		battle._update_unit_visual(unit_index)
 		var button := unit.get("node") as TextureButton
+		var size_label := unit.get("size_label") as Label
 		var field := unit.get("field") as Control
 		assert(is_equal_approx(float(logic.diameter_cm), 1000.0))
 		assert(button.size.x <= BattleClass.MAX_DISPLAY_SIZE_PX + 0.01)
 		assert(button.position.x >= -0.01 and button.position.y >= -0.01)
 		assert(button.position.x + button.size.x <= field.size.x + 0.01)
 		assert(button.position.y + button.size.y <= field.size.y + 0.01)
+		assert(size_label.position.x >= -0.01 and size_label.position.y >= -0.01)
+		assert(size_label.position.x + size_label.size.x <= field.size.x + 0.01)
+		assert(size_label.position.y + size_label.size.y <= field.size.y + 0.01)
 
 
 func _verify_jelly_precedes_ai_harvest(battle: Control) -> void:
@@ -125,6 +145,7 @@ func _verify_jelly_precedes_ai_harvest(battle: Control) -> void:
 	var unit: Dictionary = battle.units[target_index]
 	var logic = unit.get("logic")
 	logic.state = "growing"
+	logic.jelly_checks_enabled = true
 	logic.age = 1.0
 	logic.growth_time = 1.0
 	logic.jelly_safe_end_seconds = 0.0

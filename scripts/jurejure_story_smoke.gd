@@ -1,6 +1,7 @@
 extends Node
 
 const JureJureSystemClass = preload("res://scripts/jurejure_system.gd")
+const Localizer = preload("res://scripts/game_localizer.gd")
 
 
 func _ready() -> void:
@@ -16,7 +17,7 @@ func _ready() -> void:
 	_test_creative_gate(game)
 	await _test_save_compatibility(game)
 	game._reset_progression_state()
-	print("JUREJURE_STORY_SMOKE_OK group=three spaced=true present=act1+post_second choice=true battle=6v6 sow=manual shared_rules=true win_reward=owned_count pod_respawn=true loss=40_to_80_percent puku_clamped=true softening=disabled save=true")
+	print("JUREJURE_STORY_SMOKE_OK group=three_close first_encounter=camera+bgm+still present=act1+post_second choice=true battle=6v6 sow=manual shared_rules=true win_reward=owned_count pod_respawn=true loss=40_to_80_percent puku_clamped=true softening=disabled save=true")
 	get_tree().quit()
 
 
@@ -39,7 +40,7 @@ func _prepare_act_one(game: Node) -> void:
 	game.habitat_returned_species = {"colorata": true, "affinis": true, "shaviana": true}
 	game.habitat_wild_initialized = true
 	game.habitat_wild_plants = _population(game, 10)
-	game.current_mode = "habitat"
+	game.current_mode = "greenhouse"
 	game.jurejure_intro_complete = false
 	game.jurejure_enabled = false
 	game.jurejure_waiting_for_seed_pod_reward = false
@@ -49,10 +50,15 @@ func _prepare_act_one(game: Node) -> void:
 
 func _test_habitat_group_and_intro(game: Node) -> void:
 	_prepare_act_one(game)
-	assert(game.audio_manager.current_bgm_key == "habitat")
+	assert(game.audio_manager.current_bgm_key == "greenhouse")
 	assert(JureJureSystemClass.should_be_present(true, true, false, false))
 	assert(not JureJureSystemClass.should_be_present(true, true, false, true))
 	assert(JureJureSystemClass.should_be_present(true, true, true, false))
+	game.jurejure_habitat_visit_point = Vector2(995, 418)
+	game._toggle_mode()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert(game.current_mode == "habitat")
 	var group_item := _group_item(game)
 	assert(not group_item.is_empty())
 	var group := group_item.get("group_node") as Node3D
@@ -63,15 +69,41 @@ func _test_habitat_group_and_intro(game: Node) -> void:
 	var skunk := group.get_node("Skunk") as Sprite3D
 	var mouse := group.get_node("Mouse") as Sprite3D
 	var peccary := group.get_node("Peccary") as Sprite3D
-	assert(skunk.position.distance_to(mouse.position) > 1.8)
-	assert(mouse.position.distance_to(peccary.position) > 1.8)
+	assert(skunk.position.distance_to(mouse.position) > 1.25 and skunk.position.distance_to(mouse.position) < 1.75)
+	assert(mouse.position.distance_to(peccary.position) > 1.25 and mouse.position.distance_to(peccary.position) < 1.80)
 	assert(_count_named_nodes(game, "JureJureEventDisplay") == 0)
 	assert(FileAccess.file_exists("res://assets/jurejure/mouse.png"))
 	assert(FileAccess.file_exists("res://assets/jurejure/skunk.png"))
 	assert(FileAccess.file_exists("res://assets/jurejure/peccary.png"))
 	assert(FileAccess.file_exists("res://assets/jurejure/puku-puku-battle-background.jpg"))
+	assert(FileAccess.file_exists("res://assets/story/jurejure-first-encounter.jpg"))
 
-	game._on_jurejure_group_pressed()
+	# The first habitat entry starts with Panda noticing the gang. Only after the
+	# camera captures them does their theme begin and the event still fade in.
+	assert(game.scripted_dialog_kind == "jurejure_first_notice")
+	assert(game.intro_dialogue_label.text == Localizer.text("ja", "jurejure_first_notice"))
+	assert(game.jurejure_first_encounter_active and game.audio_manager.current_bgm_key == "habitat")
+	game._advance_scripted_dialog()
+	await get_tree().process_frame
+	assert(game.jurejure_intro_camera_active)
+	var camera_start_yaw: float = game.view_yaw
+	game._update_habitat_view_follow(.41)
+	assert(game.jurejure_intro_camera_active and not is_equal_approx(game.view_yaw, camera_start_yaw))
+	game._update_habitat_view_follow(.41)
+	assert(not game.jurejure_intro_camera_active and game.audio_manager.current_bgm_key == "jurejure")
+	await get_tree().create_timer(.20).timeout
+	assert(game.jurejure_first_encounter_overlay.visible and game.jurejure_first_encounter_overlay.transitioning)
+	assert(game.jurejure_first_encounter_overlay.STORY_TEXTURE.get_size() == Vector2(720,1280))
+	await get_tree().create_timer(.50).timeout
+	var expected_speakers := ["peccary", "skunk", "mouse"]
+	var expected_keys := ["jurejure_first_peccary", "jurejure_first_skunk", "jurejure_first_mouse"]
+	for page_index in range(3):
+		assert(game.jurejure_first_encounter_overlay.page_index == page_index)
+		assert(game.jurejure_first_encounter_overlay.dialogue_label.text == Localizer.text("ja", expected_keys[page_index]))
+		assert(game.jurejure_first_encounter_overlay.SPEAKER_IDS[page_index] == expected_speakers[page_index])
+		game.jurejure_first_encounter_overlay.advance()
+		await get_tree().create_timer(.24 if page_index < 2 else .45).timeout
+	assert(not game.jurejure_first_encounter_overlay.visible)
 	assert(game.scripted_dialog_kind == "jurejure_intro")
 	assert(game.audio_manager.current_bgm_key == "jurejure")
 	var all_text := ""
@@ -93,6 +125,8 @@ func _test_habitat_group_and_intro(game: Node) -> void:
 	assert(not game.puku_puku_battle.visible)
 	assert(game.audio_manager.current_bgm_key == "habitat")
 	assert(not _group_item(game).is_empty())
+	game.current_mode = "greenhouse";game._apply_mode();game._toggle_mode();await get_tree().process_frame
+	assert(game.scripted_dialog_kind.is_empty() and not game.jurejure_first_encounter_overlay.visible)
 
 	game._on_jurejure_group_pressed()
 	assert(game.scripted_dialog_kind == "jurejure_challenge")

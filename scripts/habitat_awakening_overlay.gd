@@ -135,7 +135,7 @@ func _build_ui() -> void:
 		plant.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		plant.pivot_offset = plant.size * 0.5
 		plant.scale = Vector2(0.08, 0.08)
-		plant.modulate = Color(0.76, 1.12, 0.72, 0.0)
+		plant.modulate = Color(1.0, 1.0, 1.0, 0.0)
 		plant.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		plant.set_meta("story_sprout_plant", true)
 		sprout_group.add_child(plant)
@@ -222,8 +222,8 @@ func start(requested_language := "ja") -> void:
 	for sprout_group in sprout_layer.get_children():
 		sprout_group.modulate = Color.WHITE
 		for sprout_part in sprout_group.get_children():
-			sprout_part.modulate.a = 0.0
-			sprout_part.scale = Vector2(0.1, 0.1)
+			sprout_part.modulate = Color(1.0, 1.0, 1.0, 0.0)
+			sprout_part.scale = Vector2(0.08, 0.08)
 	instruction_label.text = Localizer.text(language_code, "opening_story_tap")
 	_set_dialogue_visible(true)
 	visible = true
@@ -358,7 +358,7 @@ func _begin_three_species_reveal() -> void:
 		sequence.tween_property(glow, "modulate:a", 1.0, 0.20)
 		sequence.parallel().tween_property(glow, "scale", Vector2.ONE, 0.30).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		sequence.tween_property(plant, "modulate:a", 1.0, 0.24)
-		sequence.parallel().tween_property(plant, "scale", Vector2.ONE, 0.42).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		sequence.parallel().tween_property(plant, "scale", Vector2(0.54, 0.54), 0.42).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		sequence.tween_interval(0.08)
 	sequence.tween_interval(0.18)
 	sequence.tween_callback(func():

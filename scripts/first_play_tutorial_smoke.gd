@@ -22,6 +22,10 @@ func _ready() -> void:
 	assert(game.intro_dialogue_label.text == Localizer.text("ja", "intro_old_seed"))
 	assert(not "売れ残った" in game.intro_dialogue_label.text)
 	game._advance_intro_story()
+	assert(game.intro_dialogue_label.text == Localizer.text("ja", "intro_old_seed_get"))
+	assert(not game.intro_portrait_slot.visible and not game.intro_continue_button.visible)
+	assert(game.intro_fullscreen_continue_button.visible)
+	assert(game.intro_dialogue_label.horizontal_alignment == HORIZONTAL_ALIGNMENT_CENTER)
 	game._advance_intro_story()
 	assert(game.intro_story_complete and game.old_seed_bags == 1)
 	assert(game.OLD_SEED_GERMINATION_COUNT == 1)
@@ -55,6 +59,9 @@ func _ready() -> void:
 	assert(game.intro_dialogue_label.text == Localizer.text("ja", "old_seed_reaction_sprout"))
 	game._advance_scripted_dialog()
 	assert(game.intro_dialogue_label.text == Localizer.text("ja", "old_seed_reaction_trio") and game.intro_trio_portraits.visible)
+	assert(game.intro_trio_portraits.get_child_count() == 3)
+	for trio_portrait in game.intro_trio_portraits.get_children():
+		assert((trio_portrait as TextureRect).size.is_equal_approx(Vector2(86, 126)))
 	game._advance_scripted_dialog()
 	assert(game.intro_dialogue_label.text == Localizer.text("ja", "old_seed_reaction_girl"))
 	game._advance_scripted_dialog()
@@ -64,8 +71,17 @@ func _ready() -> void:
 	assert(game.scripted_dialog_pages.size() == 1 and game.scripted_dialog_pages[0].speaker == "panda")
 	assert(game.intro_dialogue_label.text == Localizer.text("ja", "old_seed_reaction_growth"))
 	game._advance_scripted_dialog()
-	first_plant.fast_forward_to_diameter(game.OLD_SEED_AUTO_HARVEST_CM)
+	first_plant.fast_forward_to_diameter(game.TUTORIAL_HARVEST_CM + 4.0)
 	game._process(0.01)
+	assert(game.old_seed_harvest_guide_active and game.tutorial_harvest_plant == first_plant)
+	assert(is_equal_approx(first_plant.diameter_cm, game.TUTORIAL_HARVEST_CM))
+	assert(game.tutorial_guide_overlay.visible and not game.tutorial_panda_portrait.visible)
+	var stopped_old_seed_size: float = first_plant.diameter_cm
+	game._process(1.0)
+	assert(is_equal_approx(first_plant.diameter_cm, stopped_old_seed_size))
+	var old_seed_tap: Vector2 = game.camera.unproject_position(first_plant.global_position + Vector3(0, first_plant.visual_scale * .48, 0))
+	game._try_harvest(old_seed_tap)
+	assert(not game.old_seed_harvest_guide_active)
 	await get_tree().create_timer(1.25).timeout
 	game._poll_greenhouse_play_completion()
 	await get_tree().create_timer(0.65).timeout
@@ -96,7 +112,7 @@ func _ready() -> void:
 		game._advance_scripted_dialog()
 	await get_tree().process_frame
 	assert(game.first_colorata_confirmed and not game.encyclopedia_unlocked)
-	assert(game.best_panel.visible)
+	assert(not game.best_panel.visible)
 	assert(bool(game.unlocked_series.get("base", false)) and not game.encyclopedia_overlay.visible)
 	assert(game.scripted_dialog_kind == "trio_originals")
 	assert(game.scripted_dialog_pages.size() == 7)
@@ -133,10 +149,14 @@ func _ready() -> void:
 	assert(not game.mystery_items_acquired and not game.encyclopedia_unlocked)
 	game._update_play_ui();assert(not game.puku_gauge_area.visible and not game.encyclopedia_icon_button.visible)
 	assert(game.main_story_stage == game.StoryProgressionClass.STAGE_FIND_HABITAT)
+	assert(game.tutorial_guide_overlay.visible and str(game.tutorial_guide_button.get_meta("target", "")) == "habitat")
+	assert(game.tutorial_guide_button.size.is_equal_approx(game.mode_button.size))
+	assert(game.tutorial_guide_button.custom_minimum_size.is_equal_approx(game.mode_button.size))
 
 	# The actual controls tutorial starts only with the first normal bag after
 	# the awakening items have been acquired.
 	game.mystery_items_acquired=true;game.encyclopedia_unlocked=true;game.seed_shop_open=true;game.habitat_awakened=true;game.habitat_tutorial_complete=true;game.mystery_catalog_tutorial_complete=true;game.normal_seed_bags=4;game.current_mode="greenhouse";game.normal_play_tutorial_complete=false;game.seed_pod_gauge_discovery_complete=false;game.puku_buyback_tutorial_complete=false;game.puku_gauge_cm=0.0;game.puku_coin_gauge_cm=0.0
+	game._update_play_ui();assert(game.best_panel.visible)
 	game._hide_first_play_tutorial_overlay();game._start_greenhouse_play("normal")
 	await get_tree().create_timer(.45).timeout
 	assert(game.play_active and game.first_play_tutorial_active and game.normal_seed_bags==3 and game.current_target_count==12)
@@ -159,14 +179,21 @@ func _ready() -> void:
 	assert(game.puku_gauge_cm>0.0 and is_zero_approx(game.puku_coin_gauge_cm))
 	assert(game.seed_pod_gauge_discovery_complete and game.scripted_dialog_kind=="seed_pod_gauge_discovery" and game.scripted_dialog_pages.size()==2)
 	while not game.scripted_dialog_kind.is_empty():game._advance_scripted_dialog()
-	for plant in game.plants:plant.fast_forward_to_diameter(30.1)
+	for plant in game.plants:plant.fast_forward_to_diameter(game.TUTORIAL_HARVEST_CM + .1)
 	game.play_seed_animations_pending=0;game._process(.01)
 	assert(game.first_play_harvest_guide_active and game.tutorial_guide_message.text==Localizer.text("ja","tutorial_harvest_tap"))
-	game.plants[0].harvest();await get_tree().process_frame
-	assert(game.normal_play_tutorial_complete and game.puku_coin_gauge_cm>=30.0 and game.puku_buyback_tutorial_active)
+	assert(is_equal_approx(game.tutorial_harvest_plant.diameter_cm, game.TUTORIAL_HARVEST_CM))
+	game.tutorial_harvest_plant.harvest();await get_tree().process_frame
+	assert(game.normal_play_tutorial_complete and game.puku_coin_gauge_cm>=game.TUTORIAL_HARVEST_CM and game.puku_buyback_tutorial_active)
 	assert(game.tutorial_guide_message.text==Localizer.text("ja","puku_buyback_1"));game._advance_puku_buyback_tutorial()
+	assert(bool(game.first_play_harvest_spotlight_material.get_shader_parameter("focus_ellipse")))
+	var puku_center: Vector2 = game.first_play_harvest_spotlight_material.get_shader_parameter("focus_uv_a")
+	var puku_half_size: Vector2 = game.first_play_harvest_spotlight_material.get_shader_parameter("focus_half_size_uv")
+	var seed_center: Vector2 = (game.seed_pod_gauge_area.global_position + game.seed_pod_gauge_area.size * .5) / game.get_viewport().get_visible_rect().size
+	assert(((seed_center - puku_center) / puku_half_size).length() > 1.0)
 	assert(game.tutorial_guide_message.text==Localizer.text("ja","puku_buyback_2"));game._advance_puku_buyback_tutorial()
 	assert(game.puku_buyback_tutorial_complete and not game.puku_buyback_tutorial_active)
 
-	print("FIRST_PLAY_TUTORIAL_SMOKE_OK old_seed=story_auto_harvest normal=staged_controls pod_discovery=true buyback=true")
+	assert(Localizer.text("ja","puku_buyback_1") == "育てた多肉はうちのお店で買い取るよ！")
+	print("FIRST_PLAY_TUTORIAL_SMOKE_OK old_seed=manual_25cm_harvest normal=staged_25cm_harvest pod_discovery=true buyback=ellipse")
 	get_tree().quit()

@@ -322,6 +322,18 @@ func _create_unit(opponent: bool, point_index: int, entries: Array[Dictionary], 
 	field.add_child(button)
 	var point: Vector2 = (OPPONENT_POINTS if opponent else PLAYER_POINTS)[point_index]
 	button.z_index = int(point.y)
+	var size_label := Label.new()
+	size_label.name = ("Opponent" if opponent else "Player") + "Size%02d" % point_index
+	size_label.size = Vector2(82, 25)
+	size_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	size_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	size_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	size_label.z_index = button.z_index + 200
+	size_label.add_theme_font_size_override("font_size", 13)
+	size_label.add_theme_color_override("font_color", Color("#fff3c8"))
+	size_label.add_theme_color_override("font_outline_color", Color(0.16, 0.07, 0.03, 0.92))
+	size_label.add_theme_constant_override("outline_size", 4)
+	field.add_child(size_label)
 	var logic_seed := int(rng.randi())
 	var logic = SucculentClass.new()
 	logic.name = ("Opponent" if opponent else "Player") + "Logic%02d" % point_index
@@ -335,6 +347,7 @@ func _create_unit(opponent: bool, point_index: int, entries: Array[Dictionary], 
 	) if opponent else {"style": "player", "age": -1.0}
 	var unit := {
 		"node": button,
+		"size_label": size_label,
 		"logic": logic,
 		"opponent": opponent,
 		"field": field,
@@ -356,9 +369,11 @@ func _create_unit(opponent: bool, point_index: int, entries: Array[Dictionary], 
 	if animate_germination:
 		button.scale = Vector2(0.12, 0.12)
 		button.modulate.a = 0.18
+		size_label.modulate.a = 0.0
 		var germinate := create_tween().bind_node(button).set_parallel(true)
 		germinate.tween_property(button, "scale", Vector2.ONE, GERMINATION_SECONDS).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		germinate.tween_property(button, "modulate:a", 1.0, GERMINATION_SECONDS * 0.72)
+		germinate.tween_property(size_label, "modulate:a", 1.0, GERMINATION_SECONDS * 0.72)
 
 
 static func ai_harvest_plan(safe_end: float, ramp_end: float, style_roll: float, timing_roll: float) -> Dictionary:
@@ -438,6 +453,9 @@ func _resolve_unit(unit_index: int, jellied: bool) -> void:
 
 func _show_unit_result(unit: Dictionary, score: float, jellied: bool) -> void:
 	var button := unit.get("node") as TextureButton
+	var size_label := unit.get("size_label") as Label
+	if is_instance_valid(size_label):
+		size_label.queue_free()
 	if is_instance_valid(button):
 		button.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var shrink := create_tween().bind_node(button).set_parallel(true)
@@ -478,10 +496,17 @@ func _update_unit_visual(unit_index: int) -> void:
 	# Only the 2D presentation is capped. The shared Succulent logic retains the
 	# complete real diameter for scoring, however large the plant becomes.
 	var diameter_cm := float(unit.get("size_cm", INITIAL_DIAMETER_CM))
-	var size_px := clampf(30.0 + maxf(0.0, diameter_cm - INITIAL_DIAMETER_CM) * 1.16, 30.0, MAX_DISPLAY_SIZE_PX)
+	var size_px := clampf(30.0 + maxf(0.0, diameter_cm - INITIAL_DIAMETER_CM) * 2.0, 30.0, MAX_DISPLAY_SIZE_PX)
 	button.size = Vector2(size_px, size_px)
 	button.position = Vector2(unit.get("point", Vector2.ZERO)) - button.size * 0.5
 	button.pivot_offset = button.size * 0.5
+	var size_label := unit.get("size_label") as Label
+	var field := unit.get("field") as Control
+	if is_instance_valid(size_label) and is_instance_valid(field):
+		var unit_point:Vector2=unit.get("point",Vector2.ZERO)
+		size_label.text = "%.1fcm" % diameter_cm
+		size_label.position.x = clampf(unit_point.x - size_label.size.x * 0.5, 0.0, field.size.x - size_label.size.x)
+		size_label.position.y = clampf(unit_point.y - size_px * 0.5 - 23.0, 0.0, field.size.y - size_label.size.y)
 
 
 func _complete_battle() -> void:

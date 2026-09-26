@@ -25,6 +25,7 @@ const HabitatAwakeningOverlayClass = preload("res://scripts/habitat_awakening_ov
 const SeedPodStoryOverlayClass = preload("res://scripts/seed_pod_story_overlay.gd")
 const StoryProgressionClass = preload("res://scripts/story_progression.gd")
 const JureJureSystemClass = preload("res://scripts/jurejure_system.gd")
+const JureJureFirstEncounterOverlayClass = preload("res://scripts/jurejure_first_encounter_overlay.gd")
 const PukuPukuBattleClass = preload("res://scripts/puku_puku_battle.gd")
 const HabitatSecondAwakeningOverlayClass = preload("res://scripts/habitat_second_awakening_overlay.gd")
 const SlotMachineScene = preload("res://scenes/slot_machine.tscn")
@@ -51,7 +52,7 @@ const VOLUME_GERMINATION_COUNT := 36
 const PREMIUM_GERMINATION_COUNT := 24
 const MYSTERY_GERMINATION_COUNT := 5
 const OLD_SEED_GERMINATION_COUNT := 1
-const OLD_SEED_AUTO_HARVEST_CM := 30.0
+const TUTORIAL_HARVEST_CM := 25.0
 const OLD_SEED_REACTION_SPROUT_CM := 2.2
 const OLD_SEED_REACTION_GROWTH_CM := 12.0
 const PLAY_INITIAL_MIN_PLANTS := 9
@@ -358,7 +359,9 @@ var intro_dialogue_label: Label
 var intro_continue_button: Button
 var intro_speaker_label: Label
 var intro_panda_portrait: TextureRect
-var intro_trio_portraits: VBoxContainer
+var intro_portrait_slot: Control
+var intro_trio_portraits: Control
+var intro_fullscreen_continue_button: Button
 var intro_story_step := 0
 var intro_is_daily_gift := false
 var tutorial_dialog_kind := ""
@@ -381,6 +384,7 @@ var first_play_tutorial_message_index := 0
 var first_play_tutorial_wait_remaining := 0.0
 var first_play_tutorial_sequence_complete := false
 var first_play_harvest_guide_active := false
+var old_seed_harvest_guide_active := false
 var first_play_has_harvested := false
 var old_seed_reaction_stage := 0
 var first_tutorial_species_id := ""
@@ -595,7 +599,14 @@ var opening_story_overlay: OpeningStoryOverlay
 var habitat_awakening_overlay: Control
 var seed_pod_story_overlay: Control
 var habitat_second_awakening_overlay: Control
+var jurejure_first_encounter_overlay: Control
 var puku_puku_battle: Control
+var scene_transition_fade: ColorRect
+var jurejure_first_encounter_active := false
+var jurejure_intro_camera_active := false
+var jurejure_intro_camera_elapsed := 0.0
+var jurejure_intro_camera_start_yaw := 0.0
+var jurejure_intro_camera_target_yaw := 0.0
 
 func _ready() -> void:
 	if _slot_preview_requested():
@@ -1320,7 +1331,9 @@ func _build_ui() -> void:
 	_build_seed_pod_story(hud)
 	_build_habitat_second_awakening(hud)
 	_build_habitat_plant_panel(hud)
+	_build_jurejure_first_encounter(hud)
 	_build_puku_puku_battle(hud)
+	_build_scene_transition_fade(hud)
 	if habitat_debug_enabled:_build_habitat_dev_panel(hud)
 	_update_best_ui()
 	_update_puku_ui()
@@ -1402,6 +1415,11 @@ func _build_habitat_second_awakening(hud:Control)->void:
 	hud.add_child(habitat_second_awakening_overlay)
 	habitat_second_awakening_overlay.awakening_finished.connect(_on_habitat_second_awakening_finished)
 
+func _build_jurejure_first_encounter(hud:Control)->void:
+	jurejure_first_encounter_overlay=JureJureFirstEncounterOverlayClass.new()
+	hud.add_child(jurejure_first_encounter_overlay)
+	jurejure_first_encounter_overlay.story_finished.connect(_on_jurejure_first_encounter_still_finished)
+
 func _build_puku_puku_battle(hud:Control)->void:
 	puku_puku_battle=PukuPukuBattleClass.new()
 	hud.add_child(puku_puku_battle)
@@ -1409,6 +1427,9 @@ func _build_puku_puku_battle(hud:Control)->void:
 	puku_puku_battle.battle_declined.connect(_on_jurejure_battle_declined)
 	puku_puku_battle.battle_resolved.connect(_on_puku_puku_battle_resolved)
 	puku_puku_battle.return_requested.connect(_on_puku_puku_battle_return_requested)
+
+func _build_scene_transition_fade(hud:Control)->void:
+	scene_transition_fade=ColorRect.new();scene_transition_fade.name="SceneTransitionFade";scene_transition_fade.color=Color.BLACK;scene_transition_fade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);scene_transition_fade.mouse_filter=Control.MOUSE_FILTER_STOP;scene_transition_fade.z_index=940;scene_transition_fade.visible=false;hud.add_child(scene_transition_fade)
 
 func _start_opening_story(as_replay:=false,start_page:=0)->void:
 	if opening_story_overlay==null:return
@@ -1798,15 +1819,17 @@ func _build_intro_story(hud:Control)->void:
 	var shade:=ColorRect.new();shade.color=Color(0.08,0.05,0.025,.18);shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);shade.mouse_filter=Control.MOUSE_FILTER_STOP;intro_overlay.add_child(shade)
 	intro_dialog_panel=PanelContainer.new();intro_dialog_panel.position=Vector2(40,690);intro_dialog_panel.size=Vector2(496,255);intro_dialog_panel.add_theme_stylebox_override("panel",_box(Color(0.97,0.90,0.75,.96),Color("#a86f36"),24,4));intro_overlay.add_child(intro_dialog_panel)
 	var dialog_row:=HBoxContainer.new();dialog_row.alignment=BoxContainer.ALIGNMENT_CENTER;dialog_row.add_theme_constant_override("separation",12);intro_dialog_panel.add_child(dialog_row)
-	var portrait_slot:=Control.new();portrait_slot.custom_minimum_size=Vector2(132,205);portrait_slot.mouse_filter=Control.MOUSE_FILTER_IGNORE;dialog_row.add_child(portrait_slot)
-	intro_panda_portrait=TextureRect.new();intro_panda_portrait.texture=_panda_portrait_texture();intro_panda_portrait.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);intro_panda_portrait.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;intro_panda_portrait.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;intro_panda_portrait.mouse_filter=Control.MOUSE_FILTER_IGNORE;intro_panda_portrait.visible=false;portrait_slot.add_child(intro_panda_portrait)
-	intro_trio_portraits=VBoxContainer.new();intro_trio_portraits.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);intro_trio_portraits.alignment=BoxContainer.ALIGNMENT_CENTER;intro_trio_portraits.add_theme_constant_override("separation",-4);intro_trio_portraits.mouse_filter=Control.MOUSE_FILTER_IGNORE;intro_trio_portraits.visible=false;portrait_slot.add_child(intro_trio_portraits)
-	for trio_speaker in ["panda","girl","armadillo"]:
-		var trio_portrait:=TextureRect.new();trio_portrait.texture=_speaker_portrait_texture(trio_speaker);trio_portrait.custom_minimum_size=Vector2(124,68);trio_portrait.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;trio_portrait.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;trio_portrait.mouse_filter=Control.MOUSE_FILTER_IGNORE;intro_trio_portraits.add_child(trio_portrait)
+	intro_portrait_slot=Control.new();intro_portrait_slot.custom_minimum_size=Vector2(132,205);intro_portrait_slot.mouse_filter=Control.MOUSE_FILTER_IGNORE;dialog_row.add_child(intro_portrait_slot)
+	intro_panda_portrait=TextureRect.new();intro_panda_portrait.texture=_panda_portrait_texture();intro_panda_portrait.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);intro_panda_portrait.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;intro_panda_portrait.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;intro_panda_portrait.mouse_filter=Control.MOUSE_FILTER_IGNORE;intro_panda_portrait.visible=false;intro_portrait_slot.add_child(intro_panda_portrait)
+	intro_trio_portraits=Control.new();intro_trio_portraits.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);intro_trio_portraits.mouse_filter=Control.MOUSE_FILTER_IGNORE;intro_trio_portraits.visible=false;intro_portrait_slot.add_child(intro_trio_portraits)
+	var trio_layout:=[{"speaker":"panda","position":Vector2(0,70)},{"speaker":"armadillo","position":Vector2(76,70)},{"speaker":"girl","position":Vector2(38,4)}]
+	for trio_entry in trio_layout:
+		var trio_position:Vector2=trio_entry.get("position",Vector2.ZERO);var trio_portrait:=TextureRect.new();trio_portrait.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;trio_portrait.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;trio_portrait.texture=_speaker_portrait_texture(str(trio_entry.speaker));trio_portrait.position=trio_position;trio_portrait.size=Vector2(86,126);trio_portrait.mouse_filter=Control.MOUSE_FILTER_IGNORE;intro_trio_portraits.add_child(trio_portrait)
 	var content:=VBoxContainer.new();content.alignment=BoxContainer.ALIGNMENT_CENTER;content.add_theme_constant_override("separation",12);content.size_flags_horizontal=Control.SIZE_EXPAND_FILL;dialog_row.add_child(content)
 	intro_speaker_label=Label.new();intro_speaker_label.text=Localizer.text(language_code,"story_speaker_panda");intro_speaker_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;intro_speaker_label.add_theme_font_size_override("font_size",20);intro_speaker_label.add_theme_color_override("font_color",Color("#8b5528"));content.add_child(intro_speaker_label)
 	intro_dialogue_label=Label.new();intro_dialogue_label.custom_minimum_size=Vector2(300,90);intro_dialogue_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;intro_dialogue_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;intro_dialogue_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;intro_dialogue_label.add_theme_font_size_override("font_size",20);intro_dialogue_label.add_theme_color_override("font_color",UI_BROWN);intro_dialogue_label.size_flags_horizontal=Control.SIZE_EXPAND_FILL;content.add_child(intro_dialogue_label)
 	intro_continue_button=Button.new();intro_continue_button.text=Localizer.text(language_code,"next");intro_continue_button.custom_minimum_size=Vector2(250,55);_skin_button(intro_continue_button,Color("#d8b56b"),19);intro_continue_button.pressed.connect(_advance_intro_story);content.add_child(intro_continue_button)
+	intro_fullscreen_continue_button=Button.new();intro_fullscreen_continue_button.name="OldSeedGetContinueArea";intro_fullscreen_continue_button.flat=true;intro_fullscreen_continue_button.focus_mode=Control.FOCUS_NONE;intro_fullscreen_continue_button.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);intro_fullscreen_continue_button.visible=false;intro_fullscreen_continue_button.pressed.connect(_advance_intro_story);intro_overlay.add_child(intro_fullscreen_continue_button)
 
 func _current_dialog_avoid_rect()->Rect2:
 	if is_instance_valid(tutorial_harvest_plant):
@@ -1828,7 +1851,7 @@ func _position_tutorial_dialog(avoid:Rect2)->void:
 	tutorial_dialog_panel.position=center if Rect2(bottom,tutorial_dialog_panel.size).intersects(avoid) else bottom
 
 func _start_intro_story()->void:
-	intro_is_daily_gift=false;tutorial_dialog_kind="";intro_story_step=0;current_mode="greenhouse";_apply_mode();_set_shop_purchase_visible(false);shop_overlay.visible=false;intro_overlay.visible=true;_set_intro_speaker("panda");_position_intro_dialog();intro_speaker_label.visible=true;play_overlay.visible=false;play_open_button.visible=false;audio_manager.play_bgm("greenhouse");_advance_intro_story()
+	intro_is_daily_gift=false;tutorial_dialog_kind="";intro_story_step=0;current_mode="greenhouse";_apply_mode();_set_shop_purchase_visible(false);shop_overlay.visible=false;intro_overlay.visible=true;intro_continue_button.visible=true;intro_fullscreen_continue_button.visible=false;_set_intro_speaker("panda");_position_intro_dialog();intro_speaker_label.visible=true;play_overlay.visible=false;play_open_button.visible=false;audio_manager.play_bgm("greenhouse");_advance_intro_story()
 
 func _start_daily_seed_gift()->void:
 	intro_is_daily_gift=true;current_mode="greenhouse";_apply_mode();_set_shop_purchase_visible(false);shop_overlay.visible=true;intro_overlay.visible=true;_set_intro_speaker("panda");_position_intro_dialog();intro_speaker_label.visible=true;play_overlay.visible=false;play_open_button.visible=false;audio_manager.play_bgm("shop")
@@ -1850,6 +1873,7 @@ func _advance_intro_story()->void:
 	if intro_is_daily_gift:
 		intro_is_daily_gift=false;intro_overlay.visible=false;shop_overlay.visible=false;intro_speaker_label.visible=true;intro_dialogue_label.add_theme_font_size_override("font_size",20);intro_dialogue_label.add_theme_color_override("font_color",UI_BROWN);intro_continue_button.text=Localizer.text(language_code,"next");_update_play_ui();audio_manager.play_bgm("greenhouse");return
 	intro_story_step+=1
+	intro_continue_button.visible=true;intro_fullscreen_continue_button.visible=false
 	match intro_story_step:
 		1:
 			intro_speaker_label.visible=true
@@ -1857,10 +1881,10 @@ func _advance_intro_story()->void:
 		2:
 			intro_speaker_label.visible=false;_set_intro_speaker("")
 			intro_dialogue_label.text=Localizer.text(language_code,"intro_old_seed_get")
-			intro_dialogue_label.add_theme_font_size_override("font_size",29);intro_dialogue_label.add_theme_color_override("font_color",Color("#b66d20"));intro_continue_button.text=Localizer.text(language_code,"main_greenhouse")
+			intro_dialogue_label.add_theme_font_size_override("font_size",29);intro_dialogue_label.add_theme_color_override("font_color",Color("#b66d20"));intro_continue_button.visible=false;intro_fullscreen_continue_button.visible=true
 			_show_intro_gift_effect()
 		_:
-			intro_story_complete=true;old_seed_bags=1;login_bonus_date=Time.get_date_string_from_system();intro_overlay.visible=false;shop_overlay.visible=false;intro_speaker_label.visible=true;intro_dialogue_label.add_theme_font_size_override("font_size",20);intro_dialogue_label.add_theme_color_override("font_color",UI_BROWN);intro_continue_button.text=Localizer.text(language_code,"next");_save();_update_main_story_progress(false);_update_play_ui();audio_manager.play_bgm("greenhouse");_show_tutorial_guide("play_open")
+			intro_story_complete=true;old_seed_bags=1;login_bonus_date=Time.get_date_string_from_system();intro_overlay.visible=false;intro_fullscreen_continue_button.visible=false;shop_overlay.visible=false;intro_speaker_label.visible=true;intro_dialogue_label.add_theme_font_size_override("font_size",20);intro_dialogue_label.add_theme_color_override("font_color",UI_BROWN);intro_continue_button.visible=true;intro_continue_button.text=Localizer.text(language_code,"next");_save();_update_main_story_progress(false);_update_play_ui();audio_manager.play_bgm("greenhouse");_show_tutorial_guide("play_open")
 
 func _start_scripted_dialog(kind:String,pages:Array,shop_context:=false)->void:
 	scripted_dialog_kind=kind;scripted_dialog_pages.clear();scripted_dialog_index=-1;scripted_dialog_shop_context=shop_context
@@ -1896,7 +1920,7 @@ func _advance_scripted_dialog()->void:
 func _finish_scripted_dialog()->void:
 	var finished_kind:=scripted_dialog_kind;var keep_shop:=scripted_dialog_shop_context
 	scripted_dialog_kind="";scripted_dialog_pages.clear();scripted_dialog_index=-1;scripted_dialog_shop_context=false;intro_overlay.visible=false
-	var acquired:Array[String]=[];var open_puku_intro:=false;var open_catalog:=false;var guide_habitat:=false;var guide_catalog:=false;var show_pinwheel_get:=false;var show_armadillo_gift:=false;var start_second_awakening:=false;var start_trio_event:=false;var show_jurejure_choice:=false;var queue_jurejure_reward:=false
+	var acquired:Array[String]=[];var open_puku_intro:=false;var open_catalog:=false;var guide_habitat:=false;var guide_catalog:=false;var show_pinwheel_get:=false;var show_armadillo_gift:=false;var start_second_awakening:=false;var start_trio_event:=false;var start_jurejure_reveal:=false;var show_jurejure_choice:=false;var queue_jurejure_reward:=false
 	match finished_kind:
 		"first_colorata_discovery":
 			first_colorata_confirmed=true;start_trio_event=true
@@ -1913,6 +1937,8 @@ func _finish_scripted_dialog()->void:
 			initial_seed_stock_notice_complete=true
 		"special_origin":
 			special_series_explanation_seen=true;pending_special_series_explanation=false
+		"jurejure_first_notice":
+			start_jurejure_reveal=true
 		"jurejure_intro":
 			jurejure_intro_complete=true;jurejure_enabled=true;jurejure_next_check_unix=0.0;show_jurejure_choice=true
 		"jurejure_challenge":
@@ -1951,6 +1977,7 @@ func _finish_scripted_dialog()->void:
 			audio_manager.play_bgm("habitat" if current_mode=="habitat" else "greenhouse")
 	_update_play_ui()
 	if start_trio_event:call_deferred("_start_trio_originals_event")
+	elif start_jurejure_reveal:call_deferred("_focus_jurejure_first_encounter")
 	elif guide_catalog:call_deferred("_show_tutorial_guide","encyclopedia")
 	elif finished_kind=="initial_seed_stock":call_deferred("_show_tutorial_guide","play_open_normal")
 	elif show_jurejure_choice and puku_puku_battle:call_deferred("_show_jurejure_battle_choice")
@@ -2019,7 +2046,16 @@ func _on_seed_pod_story_finished()->void:
 	mystery_items_acquired=true;encyclopedia_unlocked=true;seed_shop_open=true;original_catalog_gifted=true;puku_gauge_intro_complete=true
 	habitat_tutorial_returned_to_greenhouse=true;unlocked_series[ORIGINAL_SERIES_ID]=true
 	_claim_first_habitat_gift_once()
-	current_mode="greenhouse";_apply_mode();_save();_update_play_ui();call_deferred("_start_mystery_catalog_tutorial")
+	if scene_transition_fade:
+		scene_transition_fade.color.a=1.0;scene_transition_fade.visible=true;scene_transition_fade.move_to_front()
+	seed_pod_story_overlay.visible=false
+	current_mode="greenhouse";_apply_mode();_save();_update_play_ui()
+	await get_tree().process_frame
+	if scene_transition_fade:
+		var greenhouse_fade:=create_tween();greenhouse_fade.tween_property(scene_transition_fade,"color:a",0.0,.78).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		await greenhouse_fade.finished
+		scene_transition_fade.visible=false
+	_start_mystery_catalog_tutorial()
 
 func _start_initial_seed_stock_notice()->void:
 	if normal_play_tutorial_complete:return
@@ -2075,6 +2111,43 @@ func _start_jurejure_intro_event()->void:
 		{"speaker":"girl","text":Localizer.text(language_code,"jurejure_confront_girl_2")},
 		{"speaker":"mouse","text":Localizer.text(language_code,"jurejure_confront_mouse_battle")}
 	],false)
+
+func _start_jurejure_first_encounter()->void:
+	if jurejure_intro_complete or jurejure_first_encounter_active or current_mode!="habitat" or not _should_show_jurejure_group() or not scripted_dialog_kind.is_empty():return
+	jurejure_first_encounter_active=true
+	_start_scripted_dialog("jurejure_first_notice",[
+		{"speaker":"panda","text":Localizer.text(language_code,"jurejure_first_notice")}
+	],false)
+
+func _focus_jurejure_first_encounter()->void:
+	if jurejure_intro_complete or current_mode!="habitat":
+		jurejure_first_encounter_active=false
+		return
+	var group_node:Node3D
+	for item in habitat_pickups:
+		if str(item.get("kind",""))=="jurejure_group":
+			group_node=item.get("group_node") as Node3D
+			break
+	if not is_instance_valid(group_node):
+		jurejure_first_encounter_active=false
+		_start_jurejure_intro_event()
+		return
+	var target:=group_node.global_position
+	jurejure_intro_camera_start_yaw=view_yaw
+	jurejure_intro_camera_target_yaw=view_yaw+wrapf(rad_to_deg(atan2(-target.x,-target.z))-view_yaw,-180.0,180.0)
+	jurejure_intro_camera_elapsed=0.0;jurejure_intro_camera_active=true
+	pointer_down=false;greenhouse_drag_accumulator=0.0;greenhouse_drag_started=false
+
+func _show_jurejure_first_encounter_still()->void:
+	if jurejure_intro_complete or current_mode!="habitat":
+		jurejure_first_encounter_active=false
+		return
+	await get_tree().create_timer(.18).timeout
+	if jurejure_first_encounter_overlay:jurejure_first_encounter_overlay.start(language_code)
+
+func _on_jurejure_first_encounter_still_finished()->void:
+	jurejure_first_encounter_active=false
+	_start_jurejure_intro_event()
 
 func _start_jurejure_challenge_event()->void:
 	if not jurejure_intro_complete or current_mode!="habitat" or not scripted_dialog_kind.is_empty():return
@@ -2168,11 +2241,18 @@ uniform float focus_radius_a = 0.11;
 uniform float focus_radius_b = 0.11;
 uniform float focus_radius_c = 0.11;
 uniform float viewport_aspect = 0.5625;
+uniform bool focus_ellipse = false;
+uniform vec2 focus_half_size_uv = vec2(0.15, 0.035);
 void fragment(){
 	float shade=1.0;
 	if(focus_count>0){
-		vec2 offset=UV-focus_uv_a;
-		shade=min(shade,smoothstep(focus_radius_a*0.58,focus_radius_a,length(vec2(offset.x*viewport_aspect,offset.y))));
+		if(focus_ellipse){
+			vec2 ellipse_offset=(UV-focus_uv_a)/max(focus_half_size_uv,vec2(0.001));
+			shade=min(shade,smoothstep(0.76,1.0,length(ellipse_offset)));
+		}else{
+			vec2 offset=UV-focus_uv_a;
+			shade=min(shade,smoothstep(focus_radius_a*0.58,focus_radius_a,length(vec2(offset.x*viewport_aspect,offset.y))));
+		}
 	}
 	if(focus_count>1){
 		vec2 offset=UV-focus_uv_b;
@@ -2200,13 +2280,14 @@ func _show_tutorial_guide(target:String)->void:
 	elif target=="normal_seed":source=normal_play_button
 	else:return
 	_prepare_standard_tutorial_guide();tutorial_guide_button.icon=null;tutorial_guide_button.expand_icon=false;tutorial_dialog_panel.visible=false
-	tutorial_guide_button.position=source.global_position;tutorial_guide_button.size=source.size;tutorial_guide_button.text=source.text;tutorial_guide_button.set_meta("target",target);_skin_button(tutorial_guide_button,Color("#fff0cf"),17 if target=="encyclopedia" else 15)
+	tutorial_guide_button.position=source.global_position;tutorial_guide_button.custom_minimum_size=source.size;tutorial_guide_button.size=source.size;tutorial_guide_button.text=source.text;tutorial_guide_button.set_meta("target",target);_skin_button(tutorial_guide_button,Color("#fff0cf"),17 if target=="encyclopedia" else (16 if target=="habitat" else 15))
 	for connection in tutorial_guide_button.pressed.get_connections():tutorial_guide_button.pressed.disconnect(connection.callable)
 	tutorial_guide_button.pressed.connect(_complete_tutorial_guide)
 	tutorial_guide_overlay.visible=true;_start_tutorial_target_pulse(tutorial_guide_button,Color(1.25,1.18,.7,1))
 
 func _prepare_standard_tutorial_guide()->void:
 	tutorial_guide_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_shade.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_shade.material=null;tutorial_guide_shade.color=Color(0.05,0.035,0.025,.72)
+	first_play_harvest_spotlight_material.set_shader_parameter("focus_ellipse",false)
 	tutorial_guide_button.visible=true;tutorial_guide_button.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_button.flat=false;tutorial_guide_button.focus_mode=Control.FOCUS_ALL
 
 func _start_tutorial_target_pulse(target:Control,glow_color:Color)->void:
@@ -2234,7 +2315,7 @@ func _complete_tutorial_guide()->void:
 	elif target=="normal_seed":_start_greenhouse_play("normal")
 
 func _begin_first_play_tutorial()->void:
-	first_play_tutorial_active=true;first_play_tutorial_dialog_visible=false;first_play_tutorial_message_index=0;first_play_tutorial_wait_remaining=FIRST_PLAY_TUTORIAL_INITIAL_DELAY;first_play_tutorial_sequence_complete=false;first_play_harvest_guide_active=false;first_play_has_harvested=false;tutorial_harvest_plant=null
+	first_play_tutorial_active=true;first_play_tutorial_dialog_visible=false;first_play_tutorial_message_index=0;first_play_tutorial_wait_remaining=FIRST_PLAY_TUTORIAL_INITIAL_DELAY;first_play_tutorial_sequence_complete=false;first_play_harvest_guide_active=false;old_seed_harvest_guide_active=false;first_play_has_harvested=false;tutorial_harvest_plant=null
 	_hide_first_play_tutorial_overlay()
 
 func _update_first_play_tutorial(delta:float)->bool:
@@ -2287,7 +2368,7 @@ func _dismiss_first_play_tutorial_dialog()->void:
 
 func _hide_first_play_tutorial_overlay()->void:
 	if tutorial_guide_overlay==null:return
-	tutorial_guide_overlay.visible=false;tutorial_dialog_panel.visible=false;tutorial_guide_button.visible=false;tutorial_guide_shade.material=null
+	tutorial_guide_overlay.visible=false;tutorial_dialog_panel.visible=false;tutorial_guide_button.visible=false;tutorial_guide_shade.material=null;first_play_harvest_spotlight_material.set_shader_parameter("focus_ellipse",false)
 
 func _start_puku_buyback_tutorial()->void:
 	if puku_buyback_tutorial_complete or puku_buyback_tutorial_active or puku_gauge_area==null:return
@@ -2302,7 +2383,8 @@ func _show_puku_buyback_tutorial_page()->void:
 	var viewport_size:=get_viewport().get_visible_rect().size
 	var center:=puku_gauge_area.global_position+puku_gauge_area.size*.5
 	tutorial_guide_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_shade.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_shade.material=first_play_harvest_spotlight_material;tutorial_guide_shade.color=Color(.025,.02,.01,.86)
-	first_play_harvest_spotlight_material.set_shader_parameter("focus_count",1);first_play_harvest_spotlight_material.set_shader_parameter("focus_uv_a",center/viewport_size);first_play_harvest_spotlight_material.set_shader_parameter("focus_radius_a",.10);first_play_harvest_spotlight_material.set_shader_parameter("viewport_aspect",viewport_size.x/viewport_size.y)
+	var focus_half_size:=(puku_gauge_area.size*.5+Vector2(9,5))/viewport_size
+	first_play_harvest_spotlight_material.set_shader_parameter("focus_ellipse",true);first_play_harvest_spotlight_material.set_shader_parameter("focus_half_size_uv",focus_half_size);first_play_harvest_spotlight_material.set_shader_parameter("focus_count",1);first_play_harvest_spotlight_material.set_shader_parameter("focus_uv_a",center/viewport_size);first_play_harvest_spotlight_material.set_shader_parameter("focus_radius_a",.10);first_play_harvest_spotlight_material.set_shader_parameter("viewport_aspect",viewport_size.x/viewport_size.y)
 	tutorial_guide_button.visible=true;tutorial_guide_button.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_button.position=Vector2.ZERO;tutorial_guide_button.size=viewport_size;tutorial_guide_button.text="";tutorial_guide_button.icon=null;tutorial_guide_button.flat=true;tutorial_guide_button.focus_mode=Control.FOCUS_NONE;tutorial_guide_button.set_meta("target","puku_buyback")
 	var empty_style:=StyleBoxEmpty.new()
 	for state in ["normal","hover","pressed","disabled","focus"]:tutorial_guide_button.add_theme_stylebox_override(state,empty_style)
@@ -2345,7 +2427,7 @@ func _maybe_start_old_seed_reaction(max_diameter:float)->bool:
 func _first_play_harvestable_plants()->Array:
 	var harvestable:Array=[]
 	for plant in _first_play_growing_plants():
-		if float(plant.diameter_cm)>=30.0:harvestable.append(plant)
+		if float(plant.diameter_cm)>=TUTORIAL_HARVEST_CM:harvestable.append(plant)
 	return harvestable
 
 func _maybe_activate_first_play_harvest_guide()->bool:
@@ -2356,27 +2438,46 @@ func _maybe_activate_first_play_harvest_guide()->bool:
 	if play_seed_animations_pending>0:return false
 	var growing:=_first_play_harvestable_plants()
 	if growing.is_empty():return false
-	first_play_harvest_guide_active=true;tutorial_harvest_plant=null
-	if tutorial_highlight_tween and tutorial_highlight_tween.is_valid():tutorial_highlight_tween.kill()
-	tutorial_highlight_tween=null;tutorial_guide_overlay.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_guide_shade.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_guide_shade.material=first_play_harvest_spotlight_material;tutorial_guide_shade.color=Color(0.025,0.035,0.045,.82)
-	tutorial_guide_button.visible=false;tutorial_guide_button.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_guide_message.text=Localizer.text(language_code,"tutorial_harvest_tap");tutorial_dialog_panel.visible=true;tutorial_guide_overlay.visible=true;_update_first_play_harvest_guide_focus()
-	tutorial_panda_portrait.visible=false
+	first_play_harvest_guide_active=true;tutorial_harvest_plant=growing[0]
+	_clamp_tutorial_harvest_plant(tutorial_harvest_plant)
+	_show_tutorial_harvest_spotlight()
 	return true
 
+func _maybe_activate_old_seed_harvest_guide()->bool:
+	if not _old_seed_story_active() or old_seed_reaction_stage<2 or old_seed_harvest_guide_active:return false
+	var harvestable:Array=[]
+	for plant in plants:
+		if is_instance_valid(plant) and plant.state=="growing" and float(plant.diameter_cm)>=TUTORIAL_HARVEST_CM:harvestable.append(plant)
+	if harvestable.is_empty():return false
+	old_seed_harvest_guide_active=true;tutorial_harvest_plant=harvestable[0]
+	_clamp_tutorial_harvest_plant(tutorial_harvest_plant)
+	_show_tutorial_harvest_spotlight()
+	return true
+
+func _clamp_tutorial_harvest_plant(plant)->void:
+	if not is_instance_valid(plant) or float(plant.diameter_cm)<=TUTORIAL_HARVEST_CM:return
+	plant.diameter_cm=TUTORIAL_HARVEST_CM
+	plant.visual_scale=.18+(TUTORIAL_HARVEST_CM-1.6)*.058
+	plant._update_visual(0.0)
+
+func _show_tutorial_harvest_spotlight()->void:
+	if tutorial_highlight_tween and tutorial_highlight_tween.is_valid():tutorial_highlight_tween.kill()
+	tutorial_highlight_tween=null;tutorial_guide_overlay.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_guide_shade.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_guide_shade.material=first_play_harvest_spotlight_material;tutorial_guide_shade.color=Color(0.025,0.035,0.045,.82)
+	first_play_harvest_spotlight_material.set_shader_parameter("focus_ellipse",false)
+	tutorial_guide_button.visible=false;tutorial_guide_button.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_guide_message.text=Localizer.text(language_code,"tutorial_harvest_tap");tutorial_dialog_panel.visible=true;tutorial_guide_overlay.visible=true;_update_first_play_harvest_guide_focus()
+	tutorial_panda_portrait.visible=false
+
 func _update_first_play_harvest_guide_focus()->void:
-	if not first_play_harvest_guide_active:return
-	var growing:=_first_play_harvestable_plants()
-	if growing.is_empty():return
+	if not first_play_harvest_guide_active and not old_seed_harvest_guide_active:return
+	if not is_instance_valid(tutorial_harvest_plant) or tutorial_harvest_plant.state!="growing":return
 	var viewport_size:=get_viewport().get_visible_rect().size
-	var avoid:=Rect2()
-	for index in range(mini(3,growing.size())):
-		var plant=growing[index];var center:=camera.unproject_position(plant.global_position+Vector3(0,plant.visual_scale*.48,0));var top:=camera.unproject_position(plant.global_position+Vector3(0,plant.visual_scale*1.25,0));var radius:=clampf(center.distance_to(top)*1.42,64.0,180.0);var key:=char(97+index)
-		first_play_harvest_spotlight_material.set_shader_parameter("focus_uv_"+key,center/viewport_size);first_play_harvest_spotlight_material.set_shader_parameter("focus_radius_"+key,radius/viewport_size.y)
-		var plant_rect:=Rect2(center-Vector2(radius,radius),Vector2(radius*2.0,radius*2.0));avoid=plant_rect if index==0 else avoid.merge(plant_rect)
-	first_play_harvest_spotlight_material.set_shader_parameter("focus_count",mini(3,growing.size()));first_play_harvest_spotlight_material.set_shader_parameter("viewport_aspect",viewport_size.x/viewport_size.y);_position_tutorial_dialog(avoid)
+	var plant=tutorial_harvest_plant;var center:=camera.unproject_position(plant.global_position+Vector3(0,plant.visual_scale*.48,0));var top:=camera.unproject_position(plant.global_position+Vector3(0,plant.visual_scale*1.25,0));var radius:=clampf(center.distance_to(top)*1.42,64.0,180.0)
+	first_play_harvest_spotlight_material.set_shader_parameter("focus_ellipse",false);first_play_harvest_spotlight_material.set_shader_parameter("focus_uv_a",center/viewport_size);first_play_harvest_spotlight_material.set_shader_parameter("focus_radius_a",radius/viewport_size.y)
+	var avoid:=Rect2(center-Vector2(radius,radius),Vector2(radius*2.0,radius*2.0))
+	first_play_harvest_spotlight_material.set_shader_parameter("focus_count",1);first_play_harvest_spotlight_material.set_shader_parameter("viewport_aspect",viewport_size.x/viewport_size.y);_position_tutorial_dialog(avoid)
 
 func _end_first_play_tutorial_context()->void:
-	first_play_tutorial_active=false;first_play_tutorial_dialog_visible=false;first_play_harvest_guide_active=false;tutorial_harvest_plant=null;_hide_first_play_tutorial_overlay()
+	first_play_tutorial_active=false;first_play_tutorial_dialog_visible=false;first_play_harvest_guide_active=false;old_seed_harvest_guide_active=false;tutorial_harvest_plant=null;_hide_first_play_tutorial_overlay()
 
 func _show_intro_gift_effect()->void:
 	for i in range(7):
@@ -2907,7 +3008,7 @@ func _change_audio_volume(value:float,is_bgm:bool)->void:
 
 func _reset_progression_state()->void:
 	_end_first_play_tutorial_context()
-	old_seed_reaction_stage=0;habitat_lookaround_active=false;habitat_lookaround_elapsed=0.0;habitat_lookaround_context=""
+	old_seed_reaction_stage=0;old_seed_harvest_guide_active=false;habitat_lookaround_active=false;habitat_lookaround_elapsed=0.0;habitat_lookaround_context="";jurejure_first_encounter_active=false;jurejure_intro_camera_active=false;jurejure_intro_camera_elapsed=0.0
 	_cancel_all_habitat_notifications()
 	old_catalog_pages=0;old_catalog_page_inventory.clear();old_catalog_intro_seen=false;old_catalog_intro_pending=false;habitat_old_catalog_page_pending=false;habitat_old_catalog_page_series_id="";old_catalog_page_roll_play_count=-1;research_catalog_reward_pending=false
 	JellyBalanceClass.reset_formal();jelly_trait_display_enabled=false;dev_jelly_test_active=false;last_jelly_claim_msec=-1000000000
@@ -3002,7 +3103,7 @@ func _start_greenhouse_play(seed_type:String)->void:
 		if normal_seed_bags<1:return
 		normal_seed_bags-=1;current_target_count=NORMAL_GERMINATION_COUNT
 	if seed_type=="old" and total_play_count==0:_ensure_first_tutorial_species()
-	active_seed_type=seed_type;old_seed_reaction_stage=0;play_time_remaining=0.0;play_active=true;play_modal_open=false;play_harvest_cm_total=0.0;play_puku_earned_total=0;play_harvest_count=0;play_max_size=0.0;play_previous_global_best=_global_best_size();play_updated_global_best=false;play_share_record.clear();play_notable_species.clear();play_hidden_species_unlocked="";result_new_species_queue.clear();result_deferred_species_queue.clear();opening_species.clear();play_seeds_remaining=current_target_count;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=1 if seed_type.begins_with("series:") else (OLD_SEED_GERMINATION_COUNT if seed_type=="old" else mini(current_target_count,rng.randi_range(PLAY_INITIAL_MIN_PLANTS,PLAY_INITIAL_MAX_PLANTS)));greenhouse_finish_attempt_count=0;greenhouse_finish_completed_count=0;greenhouse_finish_last_block_reason="";greenhouse_finish_last_snapshot.clear();_clear_greenhouse_plants()
+	active_seed_type=seed_type;old_seed_reaction_stage=0;old_seed_harvest_guide_active=false;tutorial_harvest_plant=null;play_time_remaining=0.0;play_active=true;play_modal_open=false;play_harvest_cm_total=0.0;play_puku_earned_total=0;play_harvest_count=0;play_max_size=0.0;play_previous_global_best=_global_best_size();play_updated_global_best=false;play_share_record.clear();play_notable_species.clear();play_hidden_species_unlocked="";result_new_species_queue.clear();result_deferred_species_queue.clear();opening_species.clear();play_seeds_remaining=current_target_count;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=1 if seed_type.begins_with("series:") else (OLD_SEED_GERMINATION_COUNT if seed_type=="old" else mini(current_target_count,rng.randi_range(PLAY_INITIAL_MIN_PLANTS,PLAY_INITIAL_MAX_PLANTS)));greenhouse_finish_attempt_count=0;greenhouse_finish_completed_count=0;greenhouse_finish_last_block_reason="";greenhouse_finish_last_snapshot.clear();_clear_greenhouse_plants()
 	if result_overlay:result_overlay.visible=false
 	for i in range(play_concurrent_target):_spawn_greenhouse_seed()
 	_prepare_tovar_event_for_play()
@@ -3159,7 +3260,7 @@ func _update_play_ui()->void:
 	var arrangement_hud_hidden:bool=arrangement_scene_active or arrangement_transitioning
 	if main_status_hud:main_status_hud.visible=not arrangement_hud_hidden and not battle_open
 	if labels_layer:labels_layer.visible=not arrangement_hud_hidden and not battle_open
-	if best_panel:best_panel.visible=first_colorata_confirmed and not _old_seed_story_active()
+	if best_panel:best_panel.visible=mystery_catalog_tutorial_complete and not _old_seed_story_active()
 	if puku_gauge_area:puku_gauge_area.visible=mystery_items_acquired
 	if seed_pod_gauge_area:seed_pod_gauge_area.visible=mystery_items_acquired
 	play_overlay.visible=current_mode=="greenhouse" and not play_active and play_modal_open
@@ -4036,7 +4137,7 @@ func _update_main_story_progress(schedule_completion:=true)->void:
 	if schedule_completion and StoryProgressionClass.originals_complete(discovered) and not original_catalog_complete_event_seen and scripted_dialog_kind.is_empty():call_deferred("_start_original_catalog_complete_event")
 
 func _try_start_pending_story_event()->void:
-	if not scripted_dialog_kind.is_empty() or play_active or opening_story_overlay and opening_story_overlay.visible or seed_pod_story_overlay and seed_pod_story_overlay.visible:return
+	if not scripted_dialog_kind.is_empty() or play_active or opening_story_overlay and opening_story_overlay.visible or seed_pod_story_overlay and seed_pod_story_overlay.visible or jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible or jurejure_first_encounter_active:return
 	if puku_puku_battle and puku_puku_battle.visible:return
 	if species_get_overlay and species_get_overlay.visible:return
 	if result_overlay and result_overlay.visible:return
@@ -4482,9 +4583,9 @@ func _add_jurejure_habitat_group()->void:
 	var base_position:=_panorama_point_to_world(jurejure_habitat_visit_point,HABITAT_ITEM_RADIUS-.35);group.position=base_position;habitat_items_root.add_child(group)
 	var tangent:=Vector3(base_position.z,0.0,-base_position.x).normalized()
 	var members:=[
-		{"name":"Skunk","path":"res://assets/jurejure/skunk.png","offset":-2.05,"height":2.35},
+		{"name":"Skunk","path":"res://assets/jurejure/skunk.png","offset":-1.48,"height":2.35},
 		{"name":"Mouse","path":"res://assets/jurejure/mouse.png","offset":0.0,"height":2.15},
-		{"name":"Peccary","path":"res://assets/jurejure/peccary.png","offset":2.12,"height":2.75}
+		{"name":"Peccary","path":"res://assets/jurejure/peccary.png","offset":1.52,"height":2.75}
 	]
 	for member in members:
 		var texture:=load(str(member.path)) as Texture2D
@@ -4651,6 +4752,9 @@ func _speaker_portrait_texture(speaker_id:String)->Texture2D:
 		_:return null
 
 func _set_intro_speaker(speaker_id:String)->void:
+	if intro_portrait_slot:
+		intro_portrait_slot.visible=not speaker_id.is_empty()
+		intro_portrait_slot.custom_minimum_size=Vector2(162,205) if speaker_id=="trio" else Vector2(132,205)
 	intro_panda_portrait.texture=_speaker_portrait_texture(speaker_id)
 	intro_panda_portrait.visible=intro_panda_portrait.texture!=null and speaker_id!="trio"
 	if intro_trio_portraits:intro_trio_portraits.visible=speaker_id=="trio"
@@ -4970,12 +5074,14 @@ func _process(delta:float)->void:
 	if scripted_dialog_kind=="old_seed_growth_reaction":
 		_update_labels()
 		return
+	if old_seed_harvest_guide_active:
+		_update_first_play_harvest_guide_focus();_update_labels()
+		return
 	if puku_buyback_tutorial_active or scripted_dialog_kind in ["seed_pod_gauge_discovery","seed_pod_first_reward"]:
 		_update_labels()
 		return
 	if current_mode=="greenhouse" and (play_active or dev_jelly_test_active or catalog_preview_mode_active):
 		var seed_pod_growth:=0.0
-		var old_seed_ready:Array=[]
 		var old_seed_max_diameter:=0.0
 		for p in plants:
 			if is_instance_valid(p):
@@ -4984,14 +5090,14 @@ func _process(delta:float)->void:
 				if play_active and active_seed_type!="old" and mystery_items_acquired and p.state=="growing":seed_pod_growth+=maxf(0.0,float(p.diameter_cm)-previous_diameter)
 				if play_active and active_seed_type=="old" and p.state=="growing":
 					old_seed_max_diameter=maxf(old_seed_max_diameter,float(p.diameter_cm))
-					if float(p.diameter_cm)>=OLD_SEED_AUTO_HARVEST_CM:old_seed_ready.append(p)
 			if first_play_harvest_guide_active:break
 		if seed_pod_growth>0.0:add_seed_pod_gauge_cm(seed_pod_growth,false,true)
 		if _maybe_start_old_seed_reaction(old_seed_max_diameter):
 			_update_labels()
 			return
-		for old_plant in old_seed_ready:
-			if is_instance_valid(old_plant) and old_plant.state=="growing":old_plant.harvest()
+		if _maybe_activate_old_seed_harvest_guide():
+			_update_labels()
+			return
 		if first_play_harvest_guide_active:
 			_update_first_play_harvest_guide_focus();_update_labels()
 			return
@@ -5026,11 +5132,12 @@ func _update_habitat_wild_growth(delta:float)->void:
 	_refresh_habitat_dev_panel()
 
 func _on_jurejure_group_pressed()->void:
-	if current_mode!="habitat" or not _should_show_jurejure_group() or not scripted_dialog_kind.is_empty():return
+	if current_mode!="habitat" or not _should_show_jurejure_group() or not scripted_dialog_kind.is_empty() or jurejure_first_encounter_active:return
 	if puku_puku_battle and puku_puku_battle.visible:return
-	if audio_manager:audio_manager.play_bgm("jurejure")
-	if not jurejure_intro_complete:_start_jurejure_intro_event()
-	else:_start_jurejure_challenge_event()
+	if not jurejure_intro_complete:_start_jurejure_first_encounter()
+	else:
+		if audio_manager:audio_manager.play_bgm("jurejure")
+		_start_jurejure_challenge_event()
 
 func _show_jurejure_battle_choice()->void:
 	if puku_puku_battle==null:return
@@ -5211,6 +5318,16 @@ func _update_greenhouse_pan_follow(delta:float)->void:
 
 func _update_habitat_view_follow(delta:float)->void:
 	if current_mode!="habitat":return
+	if jurejure_intro_camera_active:
+		jurejure_intro_camera_elapsed=minf(.82,jurejure_intro_camera_elapsed+delta)
+		var focus_progress:=clampf(jurejure_intro_camera_elapsed/.82,0.0,1.0)
+		var focus_eased:=0.5-0.5*cos(PI*focus_progress)
+		view_yaw=lerpf(jurejure_intro_camera_start_yaw,jurejure_intro_camera_target_yaw,focus_eased);habitat_target_yaw=view_yaw;view_pitch=lerpf(view_pitch,-3.0,focus_eased);habitat_target_pitch=view_pitch;_apply_view_rotation()
+		if focus_progress>=1.0:
+			jurejure_intro_camera_active=false;jurejure_intro_camera_elapsed=0.0
+			if audio_manager:audio_manager.play_bgm("jurejure")
+			call_deferred("_show_jurejure_first_encounter_still")
+		return
 	if habitat_lookaround_active:
 		habitat_lookaround_elapsed=minf(HABITAT_LOOKAROUND_DURATION_SECONDS,habitat_lookaround_elapsed+delta)
 		var progress:=clampf(habitat_lookaround_elapsed/HABITAT_LOOKAROUND_DURATION_SECONDS,0.0,1.0)
@@ -5254,6 +5371,8 @@ func _toggle_mode()->void:
 		call_deferred("_start_habitat_second_awakening")
 	elif current_mode=="habitat" and not habitat_tutorial_complete and not habitat_tutorial_started:
 		call_deferred("_start_first_habitat_tutorial")
+	elif current_mode=="habitat" and not jurejure_intro_complete and _should_show_jurejure_group():
+		call_deferred("_start_jurejure_first_encounter")
 	elif leaving_habitat and habitat_tutorial_complete and not puku_gauge_intro_complete:
 		call_deferred("_start_puku_gauge_intro_after_greenhouse_frame")
 	_save()
@@ -5344,7 +5463,7 @@ func _update_labels()->void:
 func _greenhouse_area_navigation_available()->bool:
 	if not _tutorial_fully_complete() or current_mode!="greenhouse" or play_active or catalog_preview_mode_active or arrangement_transitioning:return false
 	if arrangement_scene_active and arrangement_ui and arrangement_ui.is_editor_active():return false
-	return not ((opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (puku_puku_battle and puku_puku_battle.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible))
+	return not ((opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible) or jurejure_first_encounter_active or (puku_puku_battle and puku_puku_battle.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible))
 
 func _unhandled_input(event:InputEvent)->void:
 	if greenhouse_area_drag_tracking or (not arrangement_scene_active and _greenhouse_area_navigation_available()):
@@ -5419,9 +5538,9 @@ func _cancel_greenhouse_area_drag(update_ui:=true)->void:
 
 func _input(event:InputEvent)->void:
 	if audio_manager and (event is InputEventScreenTouch or event is InputEventMouseButton or event is InputEventKey):audio_manager.notify_user_gesture()
-	if habitat_lookaround_active:return
+	if habitat_lookaround_active or jurejure_intro_camera_active:return
 	if arrangement_scene_active or arrangement_transitioning:return
-	if (opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (puku_puku_battle and puku_puku_battle.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible and not first_play_harvest_guide_active) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible):return
+	if (opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible) or (puku_puku_battle and puku_puku_battle.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible and not first_play_harvest_guide_active and not old_seed_harvest_guide_active) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible):return
 	if current_mode=="greenhouse" and not play_active and not catalog_preview_mode_active:return
 	if event is InputEventScreenTouch:
 		if event.pressed:
@@ -5477,12 +5596,13 @@ func _apply_view_rotation()->void:
 
 func _try_harvest(screen_pos:Vector2)->void:
 	# label-aware screen selection favors small visible plants when overlap occurs
-	if play_active and active_seed_type=="old":return
+	if play_active and active_seed_type=="old" and not old_seed_harvest_guide_active:return
 	if first_play_tutorial_active and not first_play_tutorial_sequence_complete:return
 	if first_play_tutorial_active and not first_play_has_harvested and not first_play_harvest_guide_active:return
 	var candidates:Array=[]
 	for p in plants:
 		if not is_instance_valid(p) or p.state!="growing" or camera.is_position_behind(p.global_position):continue
+		if (first_play_harvest_guide_active or old_seed_harvest_guide_active) and p!=tutorial_harvest_plant:continue
 		var center: Vector2 = camera.unproject_position(p.global_position+Vector3(0,p.visual_scale*.48,0))
 		var top: Vector2 = camera.unproject_position(p.global_position+Vector3(0,p.visual_scale*1.25,0))
 		var radius: float=clamp(center.distance_to(top)*1.15,30.0,180.0)
@@ -5542,6 +5662,8 @@ func _on_harvested(p)->void:
 	if dev_jelly_test_active:
 		plants.erase(p);var tween:=create_tween().bind_node(p);tween.tween_property(p,"scale",Vector3.ONE*.01,.2);_cleanup_later(p,.25);return
 	if first_play_tutorial_active:first_play_has_harvested=true
+	if old_seed_harvest_guide_active:
+		old_seed_harvest_guide_active=false;tutorial_harvest_plant=null;_hide_first_play_tutorial_overlay()
 	if first_play_harvest_guide_active:
 		first_play_harvest_guide_active=false;tutorial_steps["first_harvest_guide"]=true;normal_play_tutorial_complete=true;tutorial_harvest_plant=null;_hide_first_play_tutorial_overlay()
 		for remaining_plant in plants:

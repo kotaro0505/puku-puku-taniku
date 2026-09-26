@@ -89,6 +89,8 @@ func _ready() -> void:
 		var glow := sprout_group.get_node("GreenGlow") as Control
 		var story_plant := sprout_group.get_node("Plant") as Control
 		assert(glow.modulate.a > 0.95 and story_plant.modulate.a > 0.95)
+		assert(story_plant.scale.is_equal_approx(Vector2(.54, .54)))
+		assert(is_equal_approx(story_plant.modulate.r, 1.0) and is_equal_approx(story_plant.modulate.g, 1.0) and is_equal_approx(story_plant.modulate.b, 1.0))
 	assert(Localizer.text("ja", "awakening_sprout_panda") == "あ、芽が出てる！")
 	assert(game.habitat_wild_plants.size() == 3)
 	assert(game.habitat_pickups.filter(func(item): return str(item.get("kind", "")) == "wild_plant").size() == 3)
@@ -133,7 +135,7 @@ func _ready() -> void:
 	assert(seed_pod_story_image.size.is_equal_approx(Vector2(558.0, 744.0)))
 	assert(seed_pod_story_image.position.is_equal_approx(Vector2(9.0, 0.0)))
 	assert(game.seed_pod_story_overlay.modulate.a < 1.0 and game.seed_pod_story_overlay.transitioning)
-	await get_tree().create_timer(.35).timeout
+	await get_tree().create_timer(.58).timeout
 	assert(is_equal_approx(game.seed_pod_story_overlay.modulate.a, 1.0) and not game.seed_pod_story_overlay.transitioning)
 	for locale in Localizer.SUPPORTED_LANGUAGES:
 		for key in game.seed_pod_story_overlay.DIALOG_KEYS:
@@ -146,11 +148,15 @@ func _ready() -> void:
 		game.seed_pod_story_overlay.advance()
 		if expected_page < 2:
 			await get_tree().create_timer(0.25).timeout
-	await get_tree().process_frame
+	assert(game.seed_pod_story_overlay.visible and game.seed_pod_story_overlay.transitioning)
+	await get_tree().create_timer(.50).timeout
+	assert(not game.seed_pod_story_overlay.visible and game.current_mode == "greenhouse")
+	assert(game.scene_transition_fade.visible and game.scripted_dialog_kind.is_empty())
+	await get_tree().create_timer(.82).timeout
 	assert(not game.seed_pod_story_overlay.visible and bool(game.tutorial_steps.get("seed_pod_story_seen", false)))
 	assert(game.mystery_items_acquired and game.seed_shop_open and game.normal_seed_bags == 4 and game.puku_points == 0)
 	assert(game.current_mode == "greenhouse" and game.seed_pod_gauge_area.visible and game.puku_gauge_area.visible and game.encyclopedia_icon_button.visible)
-	assert(game.scripted_dialog_kind == "mystery_catalog_prompt")
+	assert(not game.scene_transition_fade.visible and game.scripted_dialog_kind == "mystery_catalog_prompt")
 	assert(game.intro_dialogue_label.text == Localizer.text("ja", "mystery_catalog_prompt"))
 	game._advance_scripted_dialog()
 	await get_tree().process_frame

@@ -28,6 +28,7 @@ var tap_hint: Label
 var text_tween: Tween
 var fade_tween: Tween
 var transitioning := false
+var exit_fade: ColorRect
 
 
 func _ready() -> void:
@@ -144,6 +145,14 @@ func _build_ui() -> void:
 	tap_area.pressed.connect(advance)
 	add_child(tap_area)
 
+	exit_fade = ColorRect.new()
+	exit_fade.name = "ExitFade"
+	exit_fade.color = Color(0.0, 0.0, 0.0, 0.0)
+	exit_fade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	exit_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	exit_fade.z_index = 20
+	add_child(exit_fade)
+
 
 func start(requested_language := "ja") -> void:
 	if text_tween and text_tween.is_valid():
@@ -153,13 +162,14 @@ func start(requested_language := "ja") -> void:
 	language_code = Localizer.normalize_language(requested_language)
 	page_index = 0
 	transitioning = true
+	exit_fade.color.a = 0.0
 	tap_hint.text = Localizer.text(language_code, "opening_story_tap")
 	modulate.a = 0.0
 	visible = true
 	move_to_front()
 	_show_page()
 	fade_tween = create_tween()
-	fade_tween.tween_property(self, "modulate:a", 1.0, 0.30).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	fade_tween.tween_property(self, "modulate:a", 1.0, 0.52).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	fade_tween.finished.connect(func(): transitioning = false, CONNECT_ONE_SHOT)
 
 
@@ -167,8 +177,10 @@ func advance() -> void:
 	if not visible or transitioning:
 		return
 	if page_index >= DIALOG_KEYS.size() - 1:
-		visible = false
-		story_finished.emit()
+		transitioning = true
+		fade_tween = create_tween()
+		fade_tween.tween_property(exit_fade, "color:a", 1.0, 0.42).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		fade_tween.tween_callback(func(): story_finished.emit())
 		return
 	transitioning = true
 	page_index += 1
