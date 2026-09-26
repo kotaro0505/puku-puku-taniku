@@ -86,13 +86,9 @@ func _test_objective_sequence(game: Node) -> void:
 	assert(game.original_catalog_complete_event_seen and not game.main_story_complete)
 	game.current_mode = "habitat"
 	game.jurejure_intro_complete = true
-	game._start_jurejure_return_event()
-	assert(game.scripted_dialog_kind == "jurejure_return")
-	while not game.scripted_dialog_kind.is_empty():
-		game._advance_scripted_dialog()
-	assert(game.jurejure_return_event_complete and not game.main_story_complete)
 	game._start_habitat_second_awakening()
 	assert(game.habitat_second_awakening_overlay.visible)
+	assert(not game.jurejure_return_event_complete)
 	var overlay_guard := 0
 	while game.habitat_second_awakening_overlay.visible and overlay_guard < 10:
 		var expects_story_portrait: bool = game.habitat_second_awakening_overlay.page_index in [1, 2]
@@ -102,10 +98,11 @@ func _test_objective_sequence(game: Node) -> void:
 			assert(game.habitat_second_awakening_overlay.speaker_portrait.position.x < game.habitat_second_awakening_overlay.dialogue_label.position.x)
 		game.habitat_second_awakening_overlay.advance()
 		overlay_guard += 1
-	assert(overlay_guard == 5)
+	assert(overlay_guard == 4)
 	assert(game.habitat_second_awakened and game.habitat_second_awakening_complete)
 	assert(game.main_story_stage == StoryProgressionClass.STAGE_COMPLETE)
 	assert(game.main_story_completion_seen and game.main_story_complete)
+	assert(not game.jurejure_return_event_complete)
 
 func _test_legacy_migration(game: Node) -> void:
 	game._reset_progression_state()

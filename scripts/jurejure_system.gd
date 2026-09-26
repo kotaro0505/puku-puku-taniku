@@ -33,12 +33,11 @@ static func growth_stage(original_count: int) -> int:
 static func should_be_present(
 		habitat_awakened: bool,
 		returned_to_greenhouse: bool,
-		habitat_second_awakened: bool,
+		_habitat_second_awakened: bool,
 		waiting_for_seed_pod_reward: bool
 	) -> bool:
 	return habitat_awakened \
 		and returned_to_greenhouse \
-		and not habitat_second_awakened \
 		and not waiting_for_seed_pod_reward
 
 

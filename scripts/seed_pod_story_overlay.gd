@@ -6,7 +6,7 @@ signal story_finished
 const Localizer = preload("res://scripts/game_localizer.gd")
 const DialoguePortraits = preload("res://scripts/dialogue_portraits.gd")
 const STORY_TEXTURE: Texture2D = preload("res://assets/story/first-awakening-seed-pod.jpg")
-const IMAGE_AREA_SIZE := Vector2(576, 650)
+const IMAGE_AREA_SIZE := Vector2(576, 744)
 const DIALOG_KEYS := [
 	"seed_pod_story_1",
 	"seed_pod_story_2",
@@ -26,6 +26,7 @@ var speaker_portrait: TextureRect
 var page_count_label: Label
 var tap_hint: Label
 var text_tween: Tween
+var fade_tween: Tween
 var transitioning := false
 
 
@@ -61,8 +62,8 @@ func _build_ui() -> void:
 
 	var text_panel := Panel.new()
 	text_panel.name = "StoryTextPanel"
-	text_panel.position = Vector2(0, 650)
-	text_panel.size = Vector2(576, 374)
+	text_panel.position = Vector2(0, 744)
+	text_panel.size = Vector2(576, 226)
 	text_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var panel_style := StyleBoxFlat.new()
 	panel_style.bg_color = Color(0.105, 0.055, 0.035, 0.92)
@@ -77,8 +78,8 @@ func _build_ui() -> void:
 
 	speaker_portrait = TextureRect.new()
 	speaker_portrait.name = "SpeakerPortrait"
-	speaker_portrait.position = Vector2(36, 718)
-	speaker_portrait.size = Vector2(120, 190)
+	speaker_portrait.position = Vector2(40, 786)
+	speaker_portrait.size = Vector2(116, 126)
 	speaker_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	speaker_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	speaker_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -87,7 +88,7 @@ func _build_ui() -> void:
 
 	speaker_label = Label.new()
 	speaker_label.name = "StorySpeaker"
-	speaker_label.position = Vector2(170, 674)
+	speaker_label.position = Vector2(170, 757)
 	speaker_label.size = Vector2(370, 32)
 	speaker_label.add_theme_font_size_override("font_size", 16)
 	speaker_label.add_theme_color_override("font_color", Color("#f2cf92"))
@@ -97,8 +98,8 @@ func _build_ui() -> void:
 
 	story_text = Label.new()
 	story_text.name = "StoryText"
-	story_text.position = Vector2(170, 708)
-	story_text.size = Vector2(370, 220)
+	story_text.position = Vector2(170, 784)
+	story_text.size = Vector2(354, 131)
 	story_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	story_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	story_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -147,13 +148,19 @@ func _build_ui() -> void:
 func start(requested_language := "ja") -> void:
 	if text_tween and text_tween.is_valid():
 		text_tween.kill()
+	if fade_tween and fade_tween.is_valid():
+		fade_tween.kill()
 	language_code = Localizer.normalize_language(requested_language)
 	page_index = 0
-	transitioning = false
+	transitioning = true
 	tap_hint.text = Localizer.text(language_code, "opening_story_tap")
+	modulate.a = 0.0
 	visible = true
 	move_to_front()
 	_show_page()
+	fade_tween = create_tween()
+	fade_tween.tween_property(self, "modulate:a", 1.0, 0.30).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	fade_tween.finished.connect(func(): transitioning = false, CONNECT_ONE_SHOT)
 
 
 func advance() -> void:

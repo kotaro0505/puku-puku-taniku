@@ -9,12 +9,10 @@ const DIALOG_KEYS := [
 	"second_awakening_light",
 	"second_awakening_panda",
 	"second_awakening_armadillo",
-	"second_awakening_mouse",
 	"second_awakening_future"
 ]
 const SPEAKER_KEYS := [
-	"", "story_speaker_panda", "story_speaker_armadillo",
-	"jurejure_mouse_name", ""
+	"", "story_speaker_panda", "story_speaker_armadillo", ""
 ]
 
 var language_code := "ja"

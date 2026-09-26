@@ -111,10 +111,6 @@ const HABITAT_SAFE_SEED_POINTS := [Vector2(45,430),Vector2(115,445),Vector2(190,
 const UI_CREAM := Color("#fff1d2")
 const UI_BROWN := Color("#4a2618")
 const UI_GOLD := Color("#e8aa35")
-const TUTORIAL_FINGER_SIZE := Vector2(58,64)
-const TUTORIAL_FINGER_TIP_LOCAL := Vector2(27,5)
-const TUTORIAL_FINGER_PRESS_RATIO := Vector2(.58,.30)
-const TUTORIAL_FINGER_RELEASE_OFFSET := Vector2(-3,-7)
 const FIRST_PLAY_TUTORIAL_MESSAGE_KEYS := ["tutorial_normal_sow_1","tutorial_normal_sow_2","tutorial_normal_sprout","tutorial_normal_growth","tutorial_normal_jelly"]
 const FIRST_PLAY_TUTORIAL_SPEAKERS := ["girl","panda","panda","girl","armadillo"]
 const FIRST_PLAY_TUTORIAL_INITIAL_DELAY := 0.65
@@ -361,6 +357,7 @@ var intro_dialogue_label: Label
 var intro_continue_button: Button
 var intro_speaker_label: Label
 var intro_panda_portrait: TextureRect
+var intro_trio_portraits: VBoxContainer
 var intro_story_step := 0
 var intro_is_daily_gift := false
 var tutorial_dialog_kind := ""
@@ -371,8 +368,7 @@ var scripted_dialog_shop_context := false
 var tutorial_guide_overlay: Control
 var tutorial_guide_shade: ColorRect
 var tutorial_guide_button: Button
-var tutorial_guide_finger: Control
-var tutorial_finger_tween: Tween
+var tutorial_highlight_tween: Tween
 var tutorial_guide_message: Label
 var tutorial_panda_portrait: TextureRect
 var tutorial_dialog_panel: PanelContainer
@@ -433,6 +429,7 @@ var species_get_overlay
 var species_get_queue:Array[Dictionary]=[]
 var species_get_active_context:=""
 var language_code:="ja"
+var language_selected:=false
 var first_habitat_gift_claimed:=false
 var old_catalog_pages:=0
 var old_catalog_page_inventory:Dictionary={}
@@ -590,6 +587,8 @@ var opening_prompt_localized: PanelContainer
 var opening_prompt_localized_label: Label
 var opening_prompt_tween: Tween
 var opening_finished := false
+var opening_tap_area: Button
+var opening_language_panel: PanelContainer
 var opening_story_overlay: OpeningStoryOverlay
 var habitat_awakening_overlay: Control
 var seed_pod_story_overlay: Control
@@ -838,7 +837,6 @@ func _load_save() -> void:
 			active_jurejure_event={};jurejure_next_check_unix=0.0;jurejure_cooldown_until_unix=0.0
 			jurejure_return_event_complete=bool(value.get("jurejure_return_event_complete",false));jurejure_waiting_for_seed_pod_reward=bool(value.get("jurejure_waiting_for_seed_pod_reward",false));jurejure_battle_count=maxi(0,int(value.get("jurejure_battle_count",0)));jurejure_battle_win_count=maxi(0,int(value.get("jurejure_battle_win_count",0)))
 			habitat_second_awakened=bool(value.get("habitat_second_awakened",false));habitat_second_awakening_complete=bool(value.get("habitat_second_awakening_complete",habitat_second_awakened))
-			if habitat_second_awakened:jurejure_waiting_for_seed_pod_reward=false
 			if not habitat_returned_species is Dictionary:habitat_returned_species={}
 			# Post-awakening rain bonus mode was retired in v22. Legacy fields are
 			# accepted but deliberately normalized to an inactive state.
@@ -877,6 +875,7 @@ func _load_save() -> void:
 				habitat_wild_next_spawn_unix=maxf(0.0,float(value.get("habitat_wild_next_spawn_unix",0.0)))
 			armadillo_intro_event_3_completed=bool(value.get("armadillo_intro_event_3_completed",false));armadillo_series_event_7_completed=bool(value.get("armadillo_series_event_7_completed",false));pending_armadillo_story_event=str(value.get("pending_armadillo_story_event",""));armadillo_gift_series_id=str(value.get("armadillo_gift_series_id",""));armadillo_gift_species_id=str(value.get("armadillo_gift_species_id",""))
 			language_code=Localizer.normalize_language(str(value.get("language_code","ja")))
+			language_selected=bool(value.get("language_selected",value.has("language_code")))
 			first_habitat_gift_claimed=bool(value.get("first_habitat_gift_claimed",saved_progression_version<15 and habitat_tutorial_complete))
 			secret_gacha_active=bool(value.get("secret_gacha_active",false));secret_gacha_draws_remaining=maxi(0,int(value.get("secret_gacha_draws_remaining",0)));secret_gacha_last_roll_play_count=int(value.get("secret_gacha_last_roll_play_count",-1))
 			if secret_gacha_draws_remaining<=0:secret_gacha_active=false
@@ -969,7 +968,7 @@ func _save() -> void:
 		"habitat_tutorial_species_id":habitat_tutorial_species_id,"original_catalog_gifted":original_catalog_gifted,
 		"armadillo_intro_event_3_completed":armadillo_intro_event_3_completed,"armadillo_series_event_7_completed":armadillo_series_event_7_completed,
 		"pending_armadillo_story_event":pending_armadillo_story_event,"armadillo_gift_series_id":armadillo_gift_series_id,"armadillo_gift_species_id":armadillo_gift_species_id,
-		"language_code":language_code,"first_habitat_gift_claimed":first_habitat_gift_claimed,
+		"language_code":language_code,"language_selected":language_selected,"first_habitat_gift_claimed":first_habitat_gift_claimed,
 		"secret_gacha_active":secret_gacha_active,"secret_gacha_draws_remaining":secret_gacha_draws_remaining,"secret_gacha_last_roll_play_count":secret_gacha_last_roll_play_count
 	}
 	f.store_string(JSON.stringify(payload))
@@ -1269,12 +1268,12 @@ func _build_ui() -> void:
 	puku_gain_label=Label.new();puku_gain_label.position=Vector2(138,246);puku_gain_label.size=Vector2(300,60);puku_gain_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;puku_gain_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;puku_gain_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_gain_label.add_theme_font_size_override("font_size",27);puku_gain_label.add_theme_color_override("font_color",Color("#fff49a"));puku_gain_label.add_theme_color_override("font_outline_color",Color("#31553c"));puku_gain_label.add_theme_constant_override("outline_size",7);puku_gain_label.visible=false;effects_layer.add_child(puku_gain_label)
 	main_story_objective_panel=PanelContainer.new();main_story_objective_panel.name="MainStoryObjective";main_story_objective_panel.position=Vector2(24,250);main_story_objective_panel.size=Vector2(348,66);main_story_objective_panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;main_story_objective_panel.add_theme_stylebox_override("panel",_box(Color(0.15,.09,.055,.83),Color(0.88,.70,.40,.72),14,1));main_status_hud.add_child(main_story_objective_panel)
 	main_story_objective_label=Label.new();main_story_objective_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;main_story_objective_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;main_story_objective_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;main_story_objective_label.add_theme_font_size_override("font_size",13);main_story_objective_label.add_theme_color_override("font_color",Color("#fff3d2"));main_story_objective_panel.add_child(main_story_objective_label)
-	for entry in [{"x":398,"t":"図鑑"},{"x":483,"t":"設定"}]:
-		var b:=Button.new(); b.text=entry.t; b.position=Vector2(entry.x,116); b.size=Vector2(68,73); _skin_button(b,Color("#fff0cf"),17); hud.add_child(b)
+	for entry in [{"x":398,"t":"図鑑"},{"x":478,"t":"設定"}]:
+		var b:=Button.new(); b.text=entry.t; b.position=Vector2(entry.x,134); b.size=Vector2(73,55); _skin_button(b,Color("#fff0cf"),16); hud.add_child(b)
 		external_navigation_controls.append(b)
 		if entry.t=="図鑑":encyclopedia_icon_button=b;encyclopedia_navigation_controls.append(b);b.mouse_filter=Control.MOUSE_FILTER_STOP;b.pressed.connect(_open_encyclopedia)
 		else:settings_button=b;b.pressed.connect(_open_settings)
-	mode_button=Button.new();mode_button.text="原生地";mode_button.position=Vector2(435,198);mode_button.size=Vector2(116,55);_skin_button(mode_button,Color("#fff0cf"),16);mode_button.mouse_filter=Control.MOUSE_FILTER_STOP;mode_button.pressed.connect(_toggle_mode);hud.add_child(mode_button)
+	mode_button=Button.new();mode_button.text="原生地";mode_button.position=Vector2(398,198);mode_button.size=Vector2(153,55);_skin_button(mode_button,Color("#fff0cf"),16);mode_button.mouse_filter=Control.MOUSE_FILTER_STOP;mode_button.pressed.connect(_toggle_mode);hud.add_child(mode_button)
 	external_navigation_controls.append(mode_button)
 	if habitat_debug_enabled:
 		habitat_dev_open_button=Button.new();habitat_dev_open_button.name="HabitatDevQuickOpen";habitat_dev_open_button.text="原生地テスト";habitat_dev_open_button.position=Vector2(398,262);habitat_dev_open_button.size=Vector2(153,55);_skin_button(habitat_dev_open_button,Color("#adcbb8"),15);habitat_dev_open_button.mouse_filter=Control.MOUSE_FILTER_STOP;habitat_dev_open_button.pressed.connect(_open_habitat_dev);hud.add_child(habitat_dev_open_button)
@@ -1325,24 +1324,48 @@ func _build_opening_screen(hud:Control)->void:
 	opening_prompt=TextureRect.new();opening_prompt.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;opening_prompt.texture=load("res://assets/opening-tap.png");opening_prompt.position=Vector2(86,820);opening_prompt.size=Vector2(404,136);opening_prompt.pivot_offset=opening_prompt.size*.5;opening_prompt.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;opening_prompt.mouse_filter=Control.MOUSE_FILTER_IGNORE;opening_overlay.add_child(opening_prompt)
 	opening_prompt_localized=PanelContainer.new();opening_prompt_localized.position=Vector2(86,834);opening_prompt_localized.size=Vector2(404,108);opening_prompt_localized.pivot_offset=opening_prompt_localized.size*.5;opening_prompt_localized.mouse_filter=Control.MOUSE_FILTER_IGNORE;opening_prompt_localized.add_theme_stylebox_override("panel",_box(Color("#b86e2d"),Color("#ffe18a"),38,5));opening_overlay.add_child(opening_prompt_localized)
 	opening_prompt_localized_label=Label.new();opening_prompt_localized_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;opening_prompt_localized_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;opening_prompt_localized_label.add_theme_font_size_override("font_size",30);opening_prompt_localized_label.add_theme_color_override("font_color",Color("#fff8df"));opening_prompt_localized_label.add_theme_color_override("font_outline_color",Color("#63331c"));opening_prompt_localized_label.add_theme_constant_override("outline_size",7);opening_prompt_localized_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;opening_prompt_localized.add_child(opening_prompt_localized_label)
-	var tap_area:=Button.new();tap_area.flat=true;tap_area.focus_mode=Control.FOCUS_NONE;tap_area.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);tap_area.mouse_default_cursor_shape=Control.CURSOR_POINTING_HAND;tap_area.pressed.connect(_finish_opening);opening_overlay.add_child(tap_area)
+	opening_tap_area=Button.new();opening_tap_area.flat=true;opening_tap_area.focus_mode=Control.FOCUS_NONE;opening_tap_area.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);opening_tap_area.mouse_default_cursor_shape=Control.CURSOR_POINTING_HAND;opening_tap_area.pressed.connect(_finish_opening);opening_overlay.add_child(opening_tap_area)
+	opening_language_panel=PanelContainer.new();opening_language_panel.name="InitialLanguagePanel";opening_language_panel.position=Vector2(68,610);opening_language_panel.size=Vector2(440,340);opening_language_panel.add_theme_stylebox_override("panel",_box(Color(0.16,0.085,0.045,.96),Color("#f1c36f"),28,4));opening_overlay.add_child(opening_language_panel)
+	var language_content:=VBoxContainer.new();language_content.alignment=BoxContainer.ALIGNMENT_CENTER;language_content.add_theme_constant_override("separation",12);opening_language_panel.add_child(language_content)
+	var language_title:=Label.new();language_title.text="ことばを えらんでください\nChoose your language";language_title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;language_title.add_theme_font_size_override("font_size",22);language_title.add_theme_color_override("font_color",Color("#fff4d8"));language_content.add_child(language_title)
+	for language_entry in [{"code":"ja","label":"日本語"},{"code":"hiragana","label":"ひらがな"},{"code":"en","label":"English"}]:
+		var language_button:=Button.new();language_button.text=str(language_entry.label);language_button.custom_minimum_size=Vector2(330,64);_skin_button(language_button,Color("#f0d29b"),20);language_button.pressed.connect(_select_initial_language.bind(str(language_entry.code)));language_content.add_child(language_button)
 	_show_opening()
 
 func _show_opening()->void:
 	opening_finished=false;opening_overlay.visible=true;_refresh_opening_prompt();opening_prompt.scale=Vector2.ONE;opening_prompt_localized.scale=Vector2.ONE
+	opening_language_panel.visible=not language_selected
+	opening_tap_area.disabled=not language_selected
+	opening_tap_area.mouse_filter=Control.MOUSE_FILTER_IGNORE if not language_selected else Control.MOUSE_FILTER_STOP
+	if opening_prompt_tween and opening_prompt_tween.is_valid():opening_prompt_tween.kill()
+	if not language_selected:
+		if audio_manager:audio_manager.play_bgm("opening")
+		return
+	_start_opening_prompt_pulse()
+	if audio_manager:audio_manager.play_bgm("opening")
+
+func _start_opening_prompt_pulse()->void:
 	if opening_prompt_tween and opening_prompt_tween.is_valid():opening_prompt_tween.kill()
 	var prompt_control:Control=opening_prompt if opening_prompt.visible else opening_prompt_localized
 	opening_prompt_tween=create_tween().set_loops();opening_prompt_tween.tween_property(prompt_control,"scale",Vector2(1.035,1.035),1.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT);opening_prompt_tween.tween_property(prompt_control,"scale",Vector2.ONE,1.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	if audio_manager:audio_manager.play_bgm("opening")
+
+func _select_initial_language(value:String)->void:
+	language_code=Localizer.normalize_language(value);language_selected=true
+	_save();_apply_language_to_ui()
+	opening_language_panel.visible=false;opening_tap_area.disabled=false;opening_tap_area.mouse_filter=Control.MOUSE_FILTER_STOP
+	_refresh_opening_prompt();_start_opening_prompt_pulse()
 
 func _refresh_opening_prompt()->void:
 	if opening_prompt==null or opening_prompt_localized==null:return
+	if not language_selected:
+		opening_prompt.visible=false;opening_prompt_localized.visible=false
+		return
 	var use_art_prompt:=language_code=="ja"
 	opening_prompt.visible=use_art_prompt;opening_prompt_localized.visible=not use_art_prompt
 	if opening_prompt_localized_label:opening_prompt_localized_label.text=Localizer.text(language_code,"opening_tap")
 
 func _finish_opening()->void:
-	if opening_finished:return
+	if opening_finished or not language_selected:return
 	opening_finished=true
 	if audio_manager:audio_manager.notify_user_gesture()
 	if opening_prompt_tween:opening_prompt_tween.kill()
@@ -1766,9 +1789,13 @@ func _build_intro_story(hud:Control)->void:
 	var shade:=ColorRect.new();shade.color=Color(0.08,0.05,0.025,.18);shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);shade.mouse_filter=Control.MOUSE_FILTER_STOP;intro_overlay.add_child(shade)
 	intro_dialog_panel=PanelContainer.new();intro_dialog_panel.position=Vector2(40,690);intro_dialog_panel.size=Vector2(496,255);intro_dialog_panel.add_theme_stylebox_override("panel",_box(Color(0.97,0.90,0.75,.96),Color("#a86f36"),24,4));intro_overlay.add_child(intro_dialog_panel)
 	var dialog_row:=HBoxContainer.new();dialog_row.alignment=BoxContainer.ALIGNMENT_CENTER;dialog_row.add_theme_constant_override("separation",12);intro_dialog_panel.add_child(dialog_row)
-	intro_panda_portrait=TextureRect.new();intro_panda_portrait.texture=_panda_portrait_texture();intro_panda_portrait.custom_minimum_size=Vector2(132,205);intro_panda_portrait.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;intro_panda_portrait.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;intro_panda_portrait.mouse_filter=Control.MOUSE_FILTER_IGNORE;intro_panda_portrait.visible=false;dialog_row.add_child(intro_panda_portrait)
+	var portrait_slot:=Control.new();portrait_slot.custom_minimum_size=Vector2(132,205);portrait_slot.mouse_filter=Control.MOUSE_FILTER_IGNORE;dialog_row.add_child(portrait_slot)
+	intro_panda_portrait=TextureRect.new();intro_panda_portrait.texture=_panda_portrait_texture();intro_panda_portrait.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);intro_panda_portrait.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;intro_panda_portrait.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;intro_panda_portrait.mouse_filter=Control.MOUSE_FILTER_IGNORE;intro_panda_portrait.visible=false;portrait_slot.add_child(intro_panda_portrait)
+	intro_trio_portraits=VBoxContainer.new();intro_trio_portraits.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);intro_trio_portraits.alignment=BoxContainer.ALIGNMENT_CENTER;intro_trio_portraits.add_theme_constant_override("separation",-4);intro_trio_portraits.mouse_filter=Control.MOUSE_FILTER_IGNORE;intro_trio_portraits.visible=false;portrait_slot.add_child(intro_trio_portraits)
+	for trio_speaker in ["panda","girl","armadillo"]:
+		var trio_portrait:=TextureRect.new();trio_portrait.texture=_speaker_portrait_texture(trio_speaker);trio_portrait.custom_minimum_size=Vector2(124,68);trio_portrait.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;trio_portrait.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;trio_portrait.mouse_filter=Control.MOUSE_FILTER_IGNORE;intro_trio_portraits.add_child(trio_portrait)
 	var content:=VBoxContainer.new();content.alignment=BoxContainer.ALIGNMENT_CENTER;content.add_theme_constant_override("separation",12);content.size_flags_horizontal=Control.SIZE_EXPAND_FILL;dialog_row.add_child(content)
-	intro_speaker_label=Label.new();intro_speaker_label.text=Localizer.text(language_code,"panda_shop_name");intro_speaker_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;intro_speaker_label.add_theme_font_size_override("font_size",20);intro_speaker_label.add_theme_color_override("font_color",Color("#8b5528"));content.add_child(intro_speaker_label)
+	intro_speaker_label=Label.new();intro_speaker_label.text=Localizer.text(language_code,"story_speaker_panda");intro_speaker_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;intro_speaker_label.add_theme_font_size_override("font_size",20);intro_speaker_label.add_theme_color_override("font_color",Color("#8b5528"));content.add_child(intro_speaker_label)
 	intro_dialogue_label=Label.new();intro_dialogue_label.custom_minimum_size=Vector2(300,90);intro_dialogue_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;intro_dialogue_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;intro_dialogue_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;intro_dialogue_label.add_theme_font_size_override("font_size",20);intro_dialogue_label.add_theme_color_override("font_color",UI_BROWN);intro_dialogue_label.size_flags_horizontal=Control.SIZE_EXPAND_FILL;content.add_child(intro_dialogue_label)
 	intro_continue_button=Button.new();intro_continue_button.text=Localizer.text(language_code,"next");intro_continue_button.custom_minimum_size=Vector2(250,55);_skin_button(intro_continue_button,Color("#d8b56b"),19);intro_continue_button.pressed.connect(_advance_intro_story);content.add_child(intro_continue_button)
 
@@ -1792,7 +1819,7 @@ func _position_tutorial_dialog(avoid:Rect2)->void:
 	tutorial_dialog_panel.position=center if Rect2(bottom,tutorial_dialog_panel.size).intersects(avoid) else bottom
 
 func _start_intro_story()->void:
-	intro_is_daily_gift=false;tutorial_dialog_kind="";intro_story_step=0;current_mode="greenhouse";_apply_mode();_set_shop_purchase_visible(false);shop_overlay.visible=true;intro_overlay.visible=true;_set_intro_speaker("panda");_position_intro_dialog();intro_speaker_label.visible=true;play_overlay.visible=false;play_open_button.visible=false;audio_manager.play_bgm("shop");_advance_intro_story()
+	intro_is_daily_gift=false;tutorial_dialog_kind="";intro_story_step=0;current_mode="greenhouse";_apply_mode();_set_shop_purchase_visible(false);shop_overlay.visible=false;intro_overlay.visible=true;_set_intro_speaker("panda");_position_intro_dialog();intro_speaker_label.visible=true;play_overlay.visible=false;play_open_button.visible=false;audio_manager.play_bgm("greenhouse");_advance_intro_story()
 
 func _start_daily_seed_gift()->void:
 	intro_is_daily_gift=true;current_mode="greenhouse";_apply_mode();_set_shop_purchase_visible(false);shop_overlay.visible=true;intro_overlay.visible=true;_set_intro_speaker("panda");_position_intro_dialog();intro_speaker_label.visible=true;play_overlay.visible=false;play_open_button.visible=false;audio_manager.play_bgm("shop")
@@ -1842,7 +1869,6 @@ func _start_scripted_dialog(kind:String,pages:Array,shop_context:=false)->void:
 	_advance_scripted_dialog()
 
 func _advance_scripted_dialog()->void:
-	if scripted_dialog_kind=="first_habitat_intro" and habitat_lookaround_active:return
 	scripted_dialog_index+=1
 	if scripted_dialog_index>=scripted_dialog_pages.size():
 		_finish_scripted_dialog()
@@ -1861,20 +1887,17 @@ func _advance_scripted_dialog()->void:
 func _finish_scripted_dialog()->void:
 	var finished_kind:=scripted_dialog_kind;var keep_shop:=scripted_dialog_shop_context
 	scripted_dialog_kind="";scripted_dialog_pages.clear();scripted_dialog_index=-1;scripted_dialog_shop_context=false;intro_overlay.visible=false
-	var acquired:Array[String]=[];var open_puku_intro:=false;var open_catalog:=false;var guide_habitat:=false;var show_pinwheel_get:=false;var show_armadillo_gift:=false;var start_second_awakening:=false;var start_trio_event:=false;var show_jurejure_choice:=false;var queue_jurejure_reward:=false
+	var acquired:Array[String]=[];var open_puku_intro:=false;var open_catalog:=false;var guide_habitat:=false;var guide_catalog:=false;var show_pinwheel_get:=false;var show_armadillo_gift:=false;var start_second_awakening:=false;var start_trio_event:=false;var show_jurejure_choice:=false;var queue_jurejure_reward:=false
 	match finished_kind:
 		"first_colorata_discovery":
 			first_colorata_confirmed=true;start_trio_event=true
 		"trio_originals":
 			_register_species_discovery(PANDA_STORY_SPECIES_ID,false);_register_species_discovery(ARMADILLO_STORY_SPECIES_ID,false)
 			trio_originals_confirmed=true;habitat_unlocked=true;guide_habitat=true
-		"first_habitat_intro":
-			habitat_tutorial_started=true;habitat_tutorial_complete=true
-			for habitat_plant in habitat_wild_plants:
-				habitat_plant["tutorial"]=false;habitat_plant["jelly_immune"]=false
-			tutorial_steps["habitat_observation_intro"]=true
 		"seed_origin":
 			seed_shop_open=true;original_catalog_gifted=true;unlocked_series[ORIGINAL_SERIES_ID]=true;habitat_tutorial_returned_to_greenhouse=true
+		"mystery_catalog_prompt":
+			guide_catalog=true
 		"mystery_catalog_tutorial":
 			mystery_catalog_tutorial_complete=true;tutorial_steps["mystery_catalog_tutorial_complete"]=true
 		"initial_seed_stock":
@@ -1892,9 +1915,9 @@ func _finish_scripted_dialog()->void:
 		"jurejure_growth_late":
 			jurejure_growth_event_mask|=2
 		"original_catalog_complete":
-			original_catalog_complete_event_seen=true
+			original_catalog_complete_event_seen=true;start_second_awakening=current_mode=="habitat"
 		"jurejure_return":
-			jurejure_return_event_complete=true;start_second_awakening=true
+			jurejure_return_event_complete=true
 			_clear_active_jurejure_event(true)
 		"armadillo_3":
 			if _grant_hidden_species(HIDDEN_PINWHEEL_ID):acquired.append(HIDDEN_PINWHEEL_ID)
@@ -1919,7 +1942,7 @@ func _finish_scripted_dialog()->void:
 			audio_manager.play_bgm("habitat" if current_mode=="habitat" else "greenhouse")
 	_update_play_ui()
 	if start_trio_event:call_deferred("_start_trio_originals_event")
-	elif finished_kind=="first_habitat_intro":call_deferred("_start_seed_pod_story")
+	elif guide_catalog:call_deferred("_show_tutorial_guide","encyclopedia")
 	elif finished_kind=="initial_seed_stock":call_deferred("_show_tutorial_guide","play_open_normal")
 	elif show_jurejure_choice and puku_puku_battle:call_deferred("_show_jurejure_battle_choice")
 	elif queue_jurejure_reward:
@@ -2000,14 +2023,18 @@ func _start_initial_seed_stock_notice()->void:
 
 func _start_mystery_catalog_tutorial()->void:
 	if not mystery_items_acquired or mystery_catalog_tutorial_complete or not scripted_dialog_kind.is_empty():return
-	current_mode="greenhouse";_apply_mode();_update_play_ui();_show_tutorial_guide("encyclopedia")
+	current_mode="greenhouse";_apply_mode();_update_play_ui()
+	_start_scripted_dialog("mystery_catalog_prompt",[
+		{"speaker":"armadillo","text":Localizer.text(language_code,"mystery_catalog_prompt")}
+	],false)
 
 func _start_mystery_catalog_tutorial_dialog()->void:
 	if not mystery_items_acquired or mystery_catalog_tutorial_complete or not scripted_dialog_kind.is_empty():return
 	_start_scripted_dialog("mystery_catalog_tutorial",[
 		{"speaker":"armadillo","text":Localizer.text(language_code,"mystery_catalog_tutorial_1")},
 		{"speaker":"girl","text":Localizer.text(language_code,"mystery_catalog_tutorial_2")},
-		{"speaker":"armadillo","text":Localizer.text(language_code,"mystery_catalog_tutorial_3")}
+		{"speaker":"armadillo","text":Localizer.text(language_code,"mystery_catalog_tutorial_3")},
+		{"speaker":"armadillo","text":Localizer.text(language_code,"mystery_catalog_tutorial_4")}
 	],false)
 
 func _start_special_origin_event()->void:
@@ -2054,17 +2081,14 @@ func _start_jurejure_growth_event(stage:int)->void:
 	if stage>=JureJureSystemClass.GROWTH_LATE:jurejure_growth_event_mask|=2
 
 func _start_jurejure_return_event()->void:
-	if jurejure_return_event_complete or not original_catalog_complete_event_seen or not jurejure_intro_complete or current_mode!="habitat" or not scripted_dialog_kind.is_empty():return
-	_start_scripted_dialog("jurejure_return",[
-		{"speaker":"panda","text":Localizer.text(language_code,"jurejure_return_assume")},
-		{"speaker":"mouse","text":Localizer.text(language_code,"jurejure_return_mouse")},
-		{"speaker":"skunk","text":Localizer.text(language_code,"jurejure_return_skunk")},
-		{"speaker":"peccary","text":Localizer.text(language_code,"jurejure_return_peccary")},
-		{"speaker":"","text":Localizer.text(language_code,"jurejure_return_narration")}
-	],false)
+	# Compatibility entry point for older call sites. The gang's return is no
+	# longer a prerequisite; restored originals awaken the habitat directly.
+	_start_habitat_second_awakening()
 
 func _start_habitat_second_awakening()->void:
-	if habitat_second_awakened or not jurejure_return_event_complete or habitat_second_awakening_overlay==null:return
+	if habitat_second_awakened or habitat_second_awakening_overlay==null:return
+	if not habitat_awakened or not original_catalog_complete_event_seen or not StoryProgressionClass.originals_complete(discovered):return
+	if current_mode!="habitat" or not scripted_dialog_kind.is_empty():return
 	habitat_second_awakening_overlay.start(language_code)
 
 func _on_habitat_second_awakening_finished()->void:
@@ -2079,15 +2103,11 @@ func _start_first_habitat_tutorial()->void:
 	if not habitat_awakened or habitat_tutorial_complete or not scripted_dialog_kind.is_empty():return
 	var habitat_result:=_ensure_habitat_wild_state()
 	if bool(habitat_result.get("population_changed",false)):_build_habitat_items(true)
-	tutorial_habitat_item={}
-	for item in habitat_pickups:
-		if str(item.get("kind",""))!="wild_plant":continue
-		var plant:=_habitat_wild_plant_by_id(str(item.get("individual_id","")))
-		if bool(plant.get("tutorial",false)):tutorial_habitat_item=item;break
-	habitat_tutorial_started=true
-	_start_scripted_dialog("first_habitat_intro",[
-		{"speaker":"panda","text":Localizer.text(language_code,"habitat_intro_1"),"lookaround":"sprouts"}
-	],false)
+	tutorial_habitat_item={};habitat_tutorial_started=true;habitat_tutorial_complete=true
+	for habitat_plant in habitat_wild_plants:
+		habitat_plant["tutorial"]=false;habitat_plant["jelly_immune"]=false
+	tutorial_steps["habitat_observation_intro"]=true
+	_update_main_story_progress(false);_save();_update_play_ui();call_deferred("_start_seed_pod_story")
 
 func _start_habitat_awakening_event()->void:
 	if habitat_awakened or not trio_originals_confirmed or habitat_awakening_overlay==null:return
@@ -2157,7 +2177,6 @@ void fragment(){
 	COLOR=vec4(COLOR.rgb,shade_alpha);
 }""";first_play_harvest_spotlight_material=ShaderMaterial.new();first_play_harvest_spotlight_material.shader=spotlight_shader
 	tutorial_guide_button=Button.new();tutorial_guide_button.pivot_offset=Vector2(50,35);tutorial_guide_overlay.add_child(tutorial_guide_button)
-	tutorial_guide_finger=UISymbolIcon.new();tutorial_guide_finger.symbol="pointer";tutorial_guide_finger.icon_color=Color("#fff1b0");tutorial_guide_finger.size=TUTORIAL_FINGER_SIZE;tutorial_guide_finger.rotation_degrees=28.0;tutorial_guide_finger.pivot_offset=TUTORIAL_FINGER_SIZE*.5;tutorial_guide_finger.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_guide_overlay.add_child(tutorial_guide_finger)
 	tutorial_dialog_panel=PanelContainer.new();tutorial_dialog_panel.position=Vector2(40,790);tutorial_dialog_panel.size=Vector2(496,190);tutorial_dialog_panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_dialog_panel.add_theme_stylebox_override("panel",_box(Color(0.97,0.90,0.75,.97),Color("#a86f36"),24,4));tutorial_dialog_panel.visible=false;tutorial_guide_overlay.add_child(tutorial_dialog_panel)
 	var tutorial_row:=HBoxContainer.new();tutorial_row.alignment=BoxContainer.ALIGNMENT_CENTER;tutorial_row.add_theme_constant_override("separation",12);tutorial_row.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_dialog_panel.add_child(tutorial_row)
 	tutorial_panda_portrait=TextureRect.new();tutorial_panda_portrait.texture=_panda_portrait_texture();tutorial_panda_portrait.custom_minimum_size=Vector2(126,164);tutorial_panda_portrait.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;tutorial_panda_portrait.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;tutorial_panda_portrait.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_row.add_child(tutorial_panda_portrait)
@@ -2175,33 +2194,24 @@ func _show_tutorial_guide(target:String)->void:
 	tutorial_guide_button.position=source.global_position;tutorial_guide_button.size=source.size;tutorial_guide_button.text=source.text;tutorial_guide_button.set_meta("target",target);_skin_button(tutorial_guide_button,Color("#fff0cf"),17 if target=="encyclopedia" else 15)
 	for connection in tutorial_guide_button.pressed.get_connections():tutorial_guide_button.pressed.disconnect(connection.callable)
 	tutorial_guide_button.pressed.connect(_complete_tutorial_guide)
-	tutorial_guide_overlay.visible=true;_start_tutorial_finger_press(tutorial_guide_button,Color(1.25,1.18,.7,1))
+	tutorial_guide_overlay.visible=true;_start_tutorial_target_pulse(tutorial_guide_button,Color(1.25,1.18,.7,1))
 
 func _prepare_standard_tutorial_guide()->void:
 	tutorial_guide_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_shade.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_shade.material=null;tutorial_guide_shade.color=Color(0.05,0.035,0.025,.72)
-	tutorial_guide_button.visible=true;tutorial_guide_button.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_button.flat=false;tutorial_guide_button.focus_mode=Control.FOCUS_ALL;tutorial_guide_finger.visible=true
+	tutorial_guide_button.visible=true;tutorial_guide_button.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_button.flat=false;tutorial_guide_button.focus_mode=Control.FOCUS_ALL
 
-func _tutorial_finger_position_for(target:Control,pressed:bool)->Vector2:
-	var contact_point:=target.global_position+target.size*TUTORIAL_FINGER_PRESS_RATIO
-	var desired_tip:=contact_point if pressed else contact_point+TUTORIAL_FINGER_RELEASE_OFFSET
-	var rotated_tip_offset:=(TUTORIAL_FINGER_TIP_LOCAL-tutorial_guide_finger.pivot_offset).rotated(tutorial_guide_finger.rotation)
-	return desired_tip-tutorial_guide_finger.pivot_offset-rotated_tip_offset
-
-func _start_tutorial_finger_press(target:Control,glow_color:Color)->void:
-	if tutorial_finger_tween and tutorial_finger_tween.is_valid():tutorial_finger_tween.kill()
-	var released_position:=_tutorial_finger_position_for(target,false)
-	var pressed_position:=_tutorial_finger_position_for(target,true)
-	tutorial_guide_finger.position=released_position;tutorial_guide_button.self_modulate=Color.WHITE
-	tutorial_finger_tween=create_tween().set_loops()
-	tutorial_finger_tween.tween_property(tutorial_guide_finger,"position",pressed_position,.34).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tutorial_finger_tween.parallel().tween_property(tutorial_guide_button,"self_modulate",glow_color,.34).set_trans(Tween.TRANS_SINE)
-	tutorial_finger_tween.tween_interval(.12)
-	tutorial_finger_tween.tween_property(tutorial_guide_finger,"position",released_position,.46).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tutorial_finger_tween.parallel().tween_property(tutorial_guide_button,"self_modulate",Color.WHITE,.46)
+func _start_tutorial_target_pulse(target:Control,glow_color:Color)->void:
+	if tutorial_highlight_tween and tutorial_highlight_tween.is_valid():tutorial_highlight_tween.kill()
+	target.pivot_offset=target.size*.5;target.scale=Vector2.ONE;target.self_modulate=Color.WHITE
+	tutorial_highlight_tween=create_tween().set_loops()
+	tutorial_highlight_tween.tween_property(target,"scale",Vector2(1.045,1.045),.46).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tutorial_highlight_tween.parallel().tween_property(target,"self_modulate",glow_color,.46).set_trans(Tween.TRANS_SINE)
+	tutorial_highlight_tween.tween_property(target,"scale",Vector2.ONE,.46).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tutorial_highlight_tween.parallel().tween_property(target,"self_modulate",Color.WHITE,.46).set_trans(Tween.TRANS_SINE)
 
 func _complete_tutorial_guide()->void:
-	if tutorial_finger_tween and tutorial_finger_tween.is_valid():tutorial_finger_tween.kill()
-	tutorial_finger_tween=null;tutorial_guide_button.self_modulate=Color.WHITE
+	if tutorial_highlight_tween and tutorial_highlight_tween.is_valid():tutorial_highlight_tween.kill()
+	tutorial_highlight_tween=null;tutorial_guide_button.self_modulate=Color.WHITE;tutorial_guide_button.scale=Vector2.ONE
 	var target:=str(tutorial_guide_button.get_meta("target",""));tutorial_guide_overlay.visible=false;tutorial_steps[target+"_guide"]=true;_save()
 	if target=="encyclopedia":
 		_open_encyclopedia()
@@ -2245,13 +2255,13 @@ func _first_play_tutorial_stage_ready()->bool:
 func _show_first_play_tutorial_dialog()->void:
 	if first_play_tutorial_message_index<0 or first_play_tutorial_message_index>=FIRST_PLAY_TUTORIAL_MESSAGE_KEYS.size():return
 	first_play_tutorial_dialog_visible=true;tutorial_harvest_plant=null
-	if tutorial_finger_tween and tutorial_finger_tween.is_valid():tutorial_finger_tween.kill()
-	tutorial_finger_tween=null;tutorial_guide_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_shade.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_shade.material=null;tutorial_guide_shade.color=Color(0.035,0.025,0.02,.34)
+	if tutorial_highlight_tween and tutorial_highlight_tween.is_valid():tutorial_highlight_tween.kill()
+	tutorial_highlight_tween=null;tutorial_guide_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_shade.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_shade.material=null;tutorial_guide_shade.color=Color(0.035,0.025,0.02,.34)
 	tutorial_guide_button.visible=true;tutorial_guide_button.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_button.position=Vector2.ZERO;tutorial_guide_button.size=get_viewport().get_visible_rect().size;tutorial_guide_button.text="";tutorial_guide_button.icon=null;tutorial_guide_button.expand_icon=false;tutorial_guide_button.flat=true;tutorial_guide_button.focus_mode=Control.FOCUS_NONE;tutorial_guide_button.set_meta("target","first_play_dialog")
 	var empty_style:=StyleBoxEmpty.new()
 	for state in ["normal","hover","pressed","disabled","focus"]:tutorial_guide_button.add_theme_stylebox_override(state,empty_style)
 	for connection in tutorial_guide_button.pressed.get_connections():tutorial_guide_button.pressed.disconnect(connection.callable)
-	tutorial_guide_button.pressed.connect(_dismiss_first_play_tutorial_dialog);tutorial_guide_finger.visible=false;tutorial_panda_portrait.texture=_speaker_portrait_texture(str(FIRST_PLAY_TUTORIAL_SPEAKERS[first_play_tutorial_message_index]));tutorial_panda_portrait.visible=true;tutorial_guide_message.text=Localizer.text(language_code,str(FIRST_PLAY_TUTORIAL_MESSAGE_KEYS[first_play_tutorial_message_index]));tutorial_dialog_panel.visible=true;tutorial_dialog_panel.position=Vector2(40,790);tutorial_guide_overlay.visible=true
+	tutorial_guide_button.pressed.connect(_dismiss_first_play_tutorial_dialog);tutorial_panda_portrait.texture=_speaker_portrait_texture(str(FIRST_PLAY_TUTORIAL_SPEAKERS[first_play_tutorial_message_index]));tutorial_panda_portrait.visible=true;tutorial_guide_message.text=Localizer.text(language_code,str(FIRST_PLAY_TUTORIAL_MESSAGE_KEYS[first_play_tutorial_message_index]));tutorial_dialog_panel.visible=true;tutorial_dialog_panel.position=Vector2(40,790);tutorial_guide_overlay.visible=true
 
 func _dismiss_first_play_tutorial_dialog()->void:
 	if not first_play_tutorial_dialog_visible:return
@@ -2268,7 +2278,7 @@ func _dismiss_first_play_tutorial_dialog()->void:
 
 func _hide_first_play_tutorial_overlay()->void:
 	if tutorial_guide_overlay==null:return
-	tutorial_guide_overlay.visible=false;tutorial_dialog_panel.visible=false;tutorial_guide_button.visible=false;tutorial_guide_finger.visible=false;tutorial_guide_shade.material=null
+	tutorial_guide_overlay.visible=false;tutorial_dialog_panel.visible=false;tutorial_guide_button.visible=false;tutorial_guide_shade.material=null
 
 func _start_puku_buyback_tutorial()->void:
 	if puku_buyback_tutorial_complete or puku_buyback_tutorial_active or puku_gauge_area==null:return
@@ -2279,7 +2289,7 @@ func _show_puku_buyback_tutorial_page()->void:
 	var keys:=["puku_buyback_1","puku_buyback_2"]
 	if puku_buyback_tutorial_index>=keys.size():
 		puku_buyback_tutorial_active=false;puku_buyback_tutorial_complete=true;_hide_first_play_tutorial_overlay();_save();return
-	if tutorial_finger_tween and tutorial_finger_tween.is_valid():tutorial_finger_tween.kill()
+	if tutorial_highlight_tween and tutorial_highlight_tween.is_valid():tutorial_highlight_tween.kill()
 	var viewport_size:=get_viewport().get_visible_rect().size
 	var center:=puku_gauge_area.global_position+puku_gauge_area.size*.5
 	tutorial_guide_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_shade.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_shade.material=first_play_harvest_spotlight_material;tutorial_guide_shade.color=Color(.025,.02,.01,.86)
@@ -2288,7 +2298,7 @@ func _show_puku_buyback_tutorial_page()->void:
 	var empty_style:=StyleBoxEmpty.new()
 	for state in ["normal","hover","pressed","disabled","focus"]:tutorial_guide_button.add_theme_stylebox_override(state,empty_style)
 	for connection in tutorial_guide_button.pressed.get_connections():tutorial_guide_button.pressed.disconnect(connection.callable)
-	tutorial_guide_button.pressed.connect(_advance_puku_buyback_tutorial);tutorial_guide_finger.visible=false;tutorial_panda_portrait.texture=_speaker_portrait_texture("panda");tutorial_panda_portrait.visible=true;tutorial_guide_message.text=Localizer.text(language_code,str(keys[puku_buyback_tutorial_index]));tutorial_dialog_panel.visible=true;tutorial_dialog_panel.position=Vector2(40,790);tutorial_guide_overlay.visible=true
+	tutorial_guide_button.pressed.connect(_advance_puku_buyback_tutorial);tutorial_panda_portrait.texture=_speaker_portrait_texture("panda");tutorial_panda_portrait.visible=true;tutorial_guide_message.text=Localizer.text(language_code,str(keys[puku_buyback_tutorial_index]));tutorial_dialog_panel.visible=true;tutorial_dialog_panel.position=Vector2(40,790);tutorial_guide_overlay.visible=true
 
 func _advance_puku_buyback_tutorial()->void:
 	if not puku_buyback_tutorial_active:return
@@ -2309,14 +2319,19 @@ func _old_seed_story_active()->bool:
 
 func _maybe_start_old_seed_reaction(max_diameter:float)->bool:
 	if not _old_seed_story_active() or not scripted_dialog_kind.is_empty():return false
-	var speaker:="";var text_key:=""
 	if old_seed_reaction_stage==0 and max_diameter>=OLD_SEED_REACTION_SPROUT_CM:
-		old_seed_reaction_stage=1;speaker="armadillo";text_key="old_seed_reaction_sprout"
+		old_seed_reaction_stage=1
+		_start_scripted_dialog("old_seed_growth_reaction",[
+			{"speaker":"armadillo","text":Localizer.text(language_code,"old_seed_reaction_sprout")},
+			{"speaker":"trio","text":Localizer.text(language_code,"old_seed_reaction_trio")},
+			{"speaker":"girl","text":Localizer.text(language_code,"old_seed_reaction_girl")}
+		],false)
+		return true
 	elif old_seed_reaction_stage==1 and max_diameter>=OLD_SEED_REACTION_GROWTH_CM:
-		old_seed_reaction_stage=2;speaker="panda";text_key="old_seed_reaction_growth"
-	if text_key.is_empty():return false
-	_start_scripted_dialog("old_seed_growth_reaction",[{"speaker":speaker,"text":Localizer.text(language_code,text_key)}],false)
-	return true
+		old_seed_reaction_stage=2
+		_start_scripted_dialog("old_seed_growth_reaction",[{"speaker":"panda","text":Localizer.text(language_code,"old_seed_reaction_growth")}],false)
+		return true
+	return false
 
 func _first_play_harvestable_plants()->Array:
 	var harvestable:Array=[]
@@ -2333,9 +2348,9 @@ func _maybe_activate_first_play_harvest_guide()->bool:
 	var growing:=_first_play_harvestable_plants()
 	if growing.is_empty():return false
 	first_play_harvest_guide_active=true;tutorial_harvest_plant=null
-	if tutorial_finger_tween and tutorial_finger_tween.is_valid():tutorial_finger_tween.kill()
-	tutorial_finger_tween=null;tutorial_guide_overlay.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_guide_shade.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_guide_shade.material=first_play_harvest_spotlight_material;tutorial_guide_shade.color=Color(0.025,0.035,0.045,.82)
-	tutorial_guide_button.visible=false;tutorial_guide_button.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_guide_finger.visible=false;tutorial_guide_message.text=Localizer.text(language_code,"tutorial_harvest_tap");tutorial_dialog_panel.visible=true;tutorial_guide_overlay.visible=true;_update_first_play_harvest_guide_focus()
+	if tutorial_highlight_tween and tutorial_highlight_tween.is_valid():tutorial_highlight_tween.kill()
+	tutorial_highlight_tween=null;tutorial_guide_overlay.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_guide_shade.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_guide_shade.material=first_play_harvest_spotlight_material;tutorial_guide_shade.color=Color(0.025,0.035,0.045,.82)
+	tutorial_guide_button.visible=false;tutorial_guide_button.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_guide_message.text=Localizer.text(language_code,"tutorial_harvest_tap");tutorial_dialog_panel.visible=true;tutorial_guide_overlay.visible=true;_update_first_play_harvest_guide_focus()
 	tutorial_panda_portrait.visible=false
 	return true
 
@@ -2599,7 +2614,7 @@ func _close_settings()->void:
 	settings_overlay.visible=false;_save();_update_play_ui()
 
 func _set_language(value:String)->void:
-	language_code=Localizer.normalize_language(value);_save();_apply_language_to_ui()
+	language_code=Localizer.normalize_language(value);language_selected=true;_save();_apply_language_to_ui()
 	if settings_language_status:settings_language_status.text=Localizer.text(language_code,"language_saved")
 
 func _apply_language_to_ui()->void:
@@ -2616,7 +2631,7 @@ func _apply_language_to_ui()->void:
 	if settings_title_label:settings_title_label.text=Localizer.text(language_code,"settings")
 	if settings_language_heading:settings_language_heading.text=Localizer.text(language_code,"language_heading")
 	if settings_close_button:settings_close_button.text=Localizer.text(language_code,"close")
-	if intro_speaker_label:intro_speaker_label.text=Localizer.text(language_code,"panda_shop_name")
+	if intro_speaker_label:intro_speaker_label.text=Localizer.text(language_code,"story_speaker_panda")
 	for code in language_buttons:
 		var button:Button=language_buttons[code];button.disabled=str(code)==language_code
 	var tab_keys:={"normal":"shop_tab_normal","volume":"shop_tab_volume","premium":"shop_tab_premium","mystery":"shop_tab_mystery"}
@@ -3135,7 +3150,7 @@ func _update_play_ui()->void:
 	var arrangement_hud_hidden:bool=arrangement_scene_active or arrangement_transitioning
 	if main_status_hud:main_status_hud.visible=not arrangement_hud_hidden and not battle_open
 	if labels_layer:labels_layer.visible=not arrangement_hud_hidden and not battle_open
-	if best_panel:best_panel.visible=not _old_seed_story_active()
+	if best_panel:best_panel.visible=first_colorata_confirmed and not _old_seed_story_active()
 	if puku_gauge_area:puku_gauge_area.visible=mystery_items_acquired
 	if seed_pod_gauge_area:seed_pod_gauge_area.visible=mystery_items_acquired
 	play_overlay.visible=current_mode=="greenhouse" and not play_active and play_modal_open
@@ -4002,7 +4017,7 @@ func _register_species_discovery(species_id:String,count_get:=true)->bool:
 
 func _update_main_story_progress(schedule_completion:=true)->void:
 	main_story_stage=StoryProgressionClass.infer_stage(first_colorata_confirmed,trio_originals_confirmed,habitat_unlocked,habitat_arrival_started,habitat_awakened,discovered,bests,habitat_second_awakened)
-	main_story_complete=main_story_stage==StoryProgressionClass.STAGE_COMPLETE and jurejure_return_event_complete and habitat_second_awakening_complete
+	main_story_complete=main_story_stage==StoryProgressionClass.STAGE_COMPLETE and habitat_second_awakening_complete
 	if main_story_complete:main_story_completion_seen=true
 	var new_growth_stage:=JureJureSystemClass.growth_stage(StoryProgressionClass.original_count(discovered))
 	if new_growth_stage>jurejure_growth_stage:
@@ -4021,9 +4036,9 @@ func _try_start_pending_story_event()->void:
 	if forest_gacha_ui and forest_gacha_ui.visible:return
 	if secret_gacha_ui and secret_gacha_ui.visible:return
 	if arrangement_ui and arrangement_ui.visible:return
-	if habitat_second_awakened and pending_special_series_explanation and not special_series_explanation_seen:_start_special_origin_event()
+	if current_mode=="habitat" and original_catalog_complete_event_seen and not habitat_second_awakened:_start_habitat_second_awakening()
+	elif habitat_second_awakened and pending_special_series_explanation and not special_series_explanation_seen:_start_special_origin_event()
 	elif StoryProgressionClass.originals_complete(discovered) and not original_catalog_complete_event_seen:_start_original_catalog_complete_event()
-	elif current_mode=="habitat" and jurejure_intro_complete and original_catalog_complete_event_seen and not jurejure_return_event_complete:_start_jurejure_return_event()
 
 func _update_main_story_objective()->void:
 	if main_story_objective_panel==null or main_story_objective_label==null:return
@@ -4458,9 +4473,9 @@ func _add_jurejure_habitat_group()->void:
 	var base_position:=_panorama_point_to_world(jurejure_habitat_visit_point,HABITAT_ITEM_RADIUS-.35);group.position=base_position;habitat_items_root.add_child(group)
 	var tangent:=Vector3(base_position.z,0.0,-base_position.x).normalized()
 	var members:=[
-		{"name":"Skunk","path":"res://assets/jurejure/skunk.png","offset":-1.05,"height":2.55},
-		{"name":"Mouse","path":"res://assets/jurejure/mouse.png","offset":0.0,"height":2.35},
-		{"name":"Peccary","path":"res://assets/jurejure/peccary.png","offset":1.12,"height":2.85}
+		{"name":"Skunk","path":"res://assets/jurejure/skunk.png","offset":-2.05,"height":2.35},
+		{"name":"Mouse","path":"res://assets/jurejure/mouse.png","offset":0.0,"height":2.15},
+		{"name":"Peccary","path":"res://assets/jurejure/peccary.png","offset":2.12,"height":2.75}
 	]
 	for member in members:
 		var texture:=load(str(member.path)) as Texture2D
@@ -4628,12 +4643,14 @@ func _speaker_portrait_texture(speaker_id:String)->Texture2D:
 
 func _set_intro_speaker(speaker_id:String)->void:
 	intro_panda_portrait.texture=_speaker_portrait_texture(speaker_id)
-	intro_panda_portrait.visible=intro_panda_portrait.texture!=null
+	intro_panda_portrait.visible=intro_panda_portrait.texture!=null and speaker_id!="trio"
+	if intro_trio_portraits:intro_trio_portraits.visible=speaker_id=="trio"
 	if intro_speaker_label:
-		var speaker_key:="panda_shop_name"
+		var speaker_key:="story_speaker_panda"
 		match speaker_id:
 			"girl":speaker_key="story_speaker_girl"
 			"armadillo":speaker_key="armadillo_name"
+			"trio":speaker_key="story_speaker_trio"
 			"mouse":speaker_key="jurejure_mouse_name"
 			"skunk":speaker_key="jurejure_skunk_name"
 			"peccary":speaker_key="jurejure_peccary_name"
@@ -5050,7 +5067,7 @@ func _jurejure_reward_candidates()->Array[Dictionary]:
 	var candidates:Array[Dictionary]=[]
 	for entry in catalog_species:
 		var species_id:=str(entry.get("species_id",""))
-		if species_id.is_empty() or bool(discovered.get(species_id,false)):continue
+		if species_id.is_empty() or _species_get_count(species_id)>0:continue
 		if not _species_available_in_current_era(entry) or bool(entry.get("special_route_only",false)):continue
 		if _seed_new_species_blocked(species_id) or str(entry.get("rarity","")) in ["隠し原種","謎品種"]:continue
 		if not _species_is_in_unlocked_series(species_id):continue
@@ -5213,8 +5230,6 @@ func _start_habitat_lookaround(context:String)->void:
 func _finish_habitat_lookaround(context:String)->void:
 	if context=="arrival" and habitat_awakening_overlay and habitat_awakening_overlay.visible:
 		habitat_awakening_overlay.complete_lookaround(context)
-	elif context=="sprouts" and scripted_dialog_kind=="first_habitat_intro":
-		_advance_scripted_dialog()
 
 func _toggle_mode()->void:
 	if catalog_preview_mode_active:return
@@ -5226,8 +5241,8 @@ func _toggle_mode()->void:
 	_apply_mode()
 	if current_mode=="habitat" and not habitat_awakened:
 		call_deferred("_start_habitat_awakening_event")
-	elif current_mode=="habitat" and jurejure_intro_complete and original_catalog_complete_event_seen and not jurejure_return_event_complete:
-		call_deferred("_start_jurejure_return_event")
+	elif current_mode=="habitat" and original_catalog_complete_event_seen and not habitat_second_awakened:
+		call_deferred("_start_habitat_second_awakening")
 	elif current_mode=="habitat" and not habitat_tutorial_complete and not habitat_tutorial_started:
 		call_deferred("_start_first_habitat_tutorial")
 	elif leaving_habitat and habitat_tutorial_complete and not puku_gauge_intro_complete:

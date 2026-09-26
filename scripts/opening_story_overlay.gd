@@ -12,7 +12,7 @@ const PAGE_TEXTURES: Array[Texture2D] = [
 	preload("res://assets/opening_story/page-4.jpg")
 ]
 const PAGE_TEXT_KEYS := ["opening_story_1", "opening_story_2", "opening_story_3", "opening_story_4"]
-const PAGE_FONT_SIZES := [20, 20, 17, 14]
+const PAGE_FONT_SIZES := [18, 18, 16, 14]
 
 var current_page_index := -1
 var replay_mode := false
@@ -68,9 +68,9 @@ func _build_ui() -> void:
 
 	story_text = Label.new()
 	story_text.name = "StoryText"
-	story_text.position = Vector2(36, 604)
-	story_text.size = Vector2(504, 358)
-	story_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	story_text.position = Vector2(26, 604)
+	story_text.size = Vector2(524, 358)
+	story_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	story_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	story_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	story_text.add_theme_color_override("font_color", Color("#fff6df"))
@@ -120,6 +120,8 @@ func start(as_replay := false, start_page := 0, requested_language := "ja") -> v
 	language_code = Localizer.normalize_language(requested_language)
 	tap_hint.text = Localizer.text(language_code, "opening_story_tap")
 	transitioning = false
+	modulate = Color.WHITE
+	tap_area.disabled = false
 	visible = true
 	move_to_front()
 	_show_page(clampi(start_page, 0, PAGE_TEXTURES.size() - 1))
@@ -128,8 +130,11 @@ func advance_page() -> void:
 	if not visible or transitioning:
 		return
 	if current_page_index >= PAGE_TEXTURES.size() - 1:
-		visible = false
-		story_finished.emit(replay_mode)
+		transitioning = true
+		tap_area.disabled = true
+		page_tween = create_tween()
+		page_tween.tween_property(self, "modulate:a", 0.0, 0.28).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+		page_tween.finished.connect(_finish_story, CONNECT_ONE_SHOT)
 		return
 	transitioning = true
 	page_tween = create_tween().set_parallel()
@@ -148,6 +153,13 @@ func _swap_to_next_page() -> void:
 
 func _finish_page_transition() -> void:
 	transitioning = false
+
+func _finish_story() -> void:
+	visible = false
+	modulate = Color.WHITE
+	transitioning = false
+	tap_area.disabled = false
+	story_finished.emit(replay_mode)
 
 func _show_page(index: int) -> void:
 	current_page_index = index

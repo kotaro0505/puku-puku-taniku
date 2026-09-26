@@ -10,13 +10,15 @@ const DIALOG_KEYS := [
 	"awakening_empty_1", "awakening_empty_2", "awakening_overharvest", "awakening_sow",
 	"_pause_before_memory", "awakening_surprise", "awakening_memory", "awakening_thanks",
 	"awakening_apology", "awakening_promise_1", "awakening_promise_2",
-	"awakening_rain_stopping", "_pause_before_sprout", "awakening_sprout_look"
+	"awakening_rain_stopping", "_pause_before_sprout", "awakening_sprout_look",
+	"awakening_sprout_panda"
 ]
 const SPEAKER_KEYS := [
 	"story_speaker_armadillo", "story_speaker_panda", "story_speaker_armadillo",
 	"story_speaker_panda", "", "story_speaker_panda", "story_speaker_armadillo",
 	"story_speaker_girl", "story_speaker_girl", "story_speaker_armadillo",
-	"story_speaker_girl", "story_speaker_panda", "", "story_speaker_girl"
+	"story_speaker_girl", "story_speaker_panda", "", "story_speaker_girl",
+	"story_speaker_panda"
 ]
 const GHOST_TEXTURES: Array[Texture2D] = [
 	preload("res://assets/plants/habitat/sprite-colorata.png"),
@@ -29,6 +31,12 @@ const GHOST_CENTER_RATIOS := [
 	Vector2(0.115, 0.34), Vector2(0.30, 0.52), Vector2(0.50, 0.29),
 	Vector2(0.70, 0.49), Vector2(0.885, 0.36)
 ]
+const SPROUT_TEXTURES: Array[Texture2D] = [
+	preload("res://assets/plants/habitat/sprite-colorata.png"),
+	preload("res://assets/plants/habitat/sprite-affinis.png"),
+	preload("res://assets/plants/habitat/sprite-shaviana.png")
+]
+const SPROUT_CENTERS := [Vector2(105, 635), Vector2(288, 570), Vector2(470, 642)]
 
 var language_code := "ja"
 var page_index := 0
@@ -93,21 +101,44 @@ func _build_ui() -> void:
 	sprout_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	sprout_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(sprout_layer)
-	for position in [Vector2(110, 680), Vector2(250, 635), Vector2(405, 690)]:
+	for index in SPROUT_TEXTURES.size():
+		var sprout_group := Control.new()
+		sprout_group.name = "StorySprout%d" % index
+		sprout_group.position = SPROUT_CENTERS[index] - Vector2(66, 66)
+		sprout_group.size = Vector2(132, 132)
+		sprout_group.pivot_offset = sprout_group.size * 0.5
+		sprout_group.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		sprout_group.set_meta("story_sprout_group", true)
+		sprout_layer.add_child(sprout_group)
 		var glow := Panel.new()
-		glow.position = position
+		glow.name = "GreenGlow"
+		glow.position = Vector2(39, 96)
 		glow.size = Vector2(54, 26)
 		glow.scale = Vector2(0.1, 0.1)
 		glow.modulate.a = 0.0
 		glow.pivot_offset = glow.size * 0.5
 		glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		glow.set_meta("story_sprout_glow", true)
 		var style := StyleBoxFlat.new()
 		style.bg_color = Color(0.62, 1.0, 0.58, 0.8)
 		style.set_corner_radius_all(18)
 		style.shadow_color = Color(0.42, 1.0, 0.5, 0.65)
 		style.shadow_size = 14
 		glow.add_theme_stylebox_override("panel", style)
-		sprout_layer.add_child(glow)
+		sprout_group.add_child(glow)
+		var plant := TextureRect.new()
+		plant.name = "Plant"
+		plant.texture = SPROUT_TEXTURES[index]
+		plant.position = Vector2.ZERO
+		plant.size = Vector2(132, 132)
+		plant.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		plant.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		plant.pivot_offset = plant.size * 0.5
+		plant.scale = Vector2(0.08, 0.08)
+		plant.modulate = Color(0.76, 1.12, 0.72, 0.0)
+		plant.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		plant.set_meta("story_sprout_plant", true)
+		sprout_group.add_child(plant)
 
 	text_back = Panel.new()
 	text_back.position = Vector2(24, 744)
@@ -188,9 +219,11 @@ func start(requested_language := "ja") -> void:
 	for ghost in ghosts:
 		ghost.modulate.a = 0.0
 		ghost.scale = Vector2.ONE
-	for sprout in sprout_layer.get_children():
-		sprout.modulate.a = 0.0
-		sprout.scale = Vector2(0.1, 0.1)
+	for sprout_group in sprout_layer.get_children():
+		sprout_group.modulate = Color.WHITE
+		for sprout_part in sprout_group.get_children():
+			sprout_part.modulate.a = 0.0
+			sprout_part.scale = Vector2(0.1, 0.1)
 	instruction_label.text = Localizer.text(language_code, "opening_story_tap")
 	_set_dialogue_visible(true)
 	visible = true
@@ -238,6 +271,9 @@ func _show_page() -> void:
 		return
 	if page_index == 12:
 		_begin_sprout_reveal()
+		return
+	if page_index == 14:
+		_begin_three_species_reveal()
 		return
 	_show_current_dialogue()
 
@@ -305,16 +341,29 @@ func _begin_sprout_reveal() -> void:
 		reveal.tween_property(ghost, "modulate", Color(1.15, 1.08, 0.72, 0.0), 0.75)
 	reveal.set_parallel(false)
 	reveal.tween_interval(0.45)
-	reveal.set_parallel(true)
-	for sprout in sprout_layer.get_children():
-		reveal.tween_property(sprout, "modulate:a", 1.0, 0.55)
-		reveal.tween_property(sprout, "scale", Vector2.ONE, 0.55).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	reveal.set_parallel(false)
-	reveal.tween_interval(0.20)
 	reveal.tween_callback(func():
 		page_index += 1
 		transitioning = false
 		_show_page()
+	)
+
+func _begin_three_species_reveal() -> void:
+	transitioning = true
+	_set_dialogue_visible(false)
+	var sequence := create_tween()
+	for index in sprout_layer.get_child_count():
+		var sprout_group: Control = sprout_layer.get_child(index)
+		var glow: Control = sprout_group.get_node("GreenGlow")
+		var plant: Control = sprout_group.get_node("Plant")
+		sequence.tween_property(glow, "modulate:a", 1.0, 0.20)
+		sequence.parallel().tween_property(glow, "scale", Vector2.ONE, 0.30).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		sequence.tween_property(plant, "modulate:a", 1.0, 0.24)
+		sequence.parallel().tween_property(plant, "scale", Vector2.ONE, 0.42).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		sequence.tween_interval(0.08)
+	sequence.tween_interval(0.18)
+	sequence.tween_callback(func():
+		transitioning = false
+		_show_current_dialogue()
 	)
 
 func _process(delta: float) -> void:

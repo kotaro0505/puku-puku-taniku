@@ -4,7 +4,11 @@ func _ready()->void:
 	var scene:PackedScene=load("res://main.tscn");var game:Node=scene.instantiate();add_child(game)
 	await get_tree().process_frame
 	await get_tree().process_frame
-	assert(game.opening_overlay.visible and game.opening_prompt.size==Vector2(404,136) and game.opening_prompt.stretch_mode==TextureRect.STRETCH_KEEP_ASPECT_CENTERED and game.audio_manager.current_bgm_key=="opening");game.opening_story_complete=true;game._finish_opening();assert(not game.opening_overlay.visible)
+	assert(game.opening_overlay.visible and game.audio_manager.current_bgm_key=="opening")
+	if not game.language_selected:
+		assert(game.opening_language_panel.visible and game.opening_tap_area.disabled)
+		game._select_initial_language("ja")
+	assert(game.opening_prompt.size==Vector2(404,136) and game.opening_prompt.stretch_mode==TextureRect.STRETCH_KEEP_ASPECT_CENTERED);game.opening_story_complete=true;game._finish_opening();assert(not game.opening_overlay.visible)
 	game._reset_progression_state();game.bests={"colorata":39.9};game._evaluate_best_spawn_unlocks();assert(not bool(game.greenhouse_available.get("hyalina_san_luis_de_la_paz",false)));game.bests["colorata"]=40.0;game._evaluate_best_spawn_unlocks();assert(bool(game.greenhouse_available.get("hyalina_san_luis_de_la_paz",false)) and not bool(game.discovered.get("hyalina_san_luis_de_la_paz",false)))
 	game.greenhouse_available.erase("purpusorum");game.unlocked_species.erase("purpusorum");game.completed_unlock_conditions.erase("three_species_best_60_purpusorum");game.bests={"colorata":60.0,"lutea":60.0};game._evaluate_best_spawn_unlocks();assert(not bool(game.greenhouse_available.get("purpusorum",false)));game.bests["shaviana"]=60.0;game._evaluate_best_spawn_unlocks();assert(bool(game.greenhouse_available.get("purpusorum",false)) and not bool(game.discovered.get("purpusorum",false)));game._spawn_specific_plant("hyalina_san_luis_de_la_paz");var harvested_hyalina=game.plants.back();harvested_hyalina.diameter_cm=22.0;harvested_hyalina.harvest();assert(bool(game.discovered.get("hyalina_san_luis_de_la_paz",false)));game._clear_greenhouse_plants();game._save();game.greenhouse_available.erase("hyalina_san_luis_de_la_paz");game.greenhouse_available.erase("purpusorum");game.unlocked_species=game.greenhouse_available.duplicate(true);game._load_save();assert(bool(game.greenhouse_available.get("hyalina_san_luis_de_la_paz",false)) and bool(game.greenhouse_available.get("purpusorum",false)))
 	game._reset_progression_state();game._set_language("ja");game.intro_story_complete=true;game._prepare_shop_visit(true);assert(game.shop_visit_count==0 and not game.armadillo_present);game.opening_story_complete=true;game.intro_story_complete=true;game.first_colorata_confirmed=true;game.trio_originals_confirmed=true;game.total_play_count=3;game.habitat_unlocked=true;game.habitat_arrival_started=true;game.habitat_awakened=true;game.habitat_awakening_event_complete=true;game.habitat_second_awakened=true;game.habitat_tutorial_started=true;game.habitat_tutorial_complete=true;game.mystery_items_acquired=true;game.mystery_catalog_tutorial_complete=true;game.normal_play_tutorial_complete=true;game.seed_pod_gauge_discovery_complete=true;game.seed_pod_first_reward_seen=true;game.initial_seed_stock_notice_complete=true;game.puku_buyback_tutorial_complete=true;game.seed_shop_open=true;game.panda_beacon_unlocked=true;game.panda_beacon_count=1;game.encyclopedia_unlocked=true;game.puku_gauge_intro_complete=true;game.special_series_explanation_seen=true;game.pending_special_series_explanation=false;game.armadillo_intro_event_3_completed=true;game.armadillo_research_intro_seen=true;game.unlocked_series={"base":true};game.intro_overlay.visible=false;game.shop_overlay.visible=false;game._update_play_ui()
@@ -33,18 +37,14 @@ func _ready()->void:
 	assert(game.opening_overlay.visible and game.audio_manager.current_bgm_key=="opening" and opening_players<=1 and opening_stream is AudioStreamOggVorbis and opening_stream.loop and game.audio_manager._bgm_target_db("opening")<game.audio_manager._bgm_target_db("greenhouse"));game.opening_story_complete=true;game._finish_opening();assert(not game.opening_overlay.visible)
 	assert(game.best_label.get_parent().position==Vector2(204,54))
 	var habitat_sky:Sky=game.habitat_environment.sky;var habitat_panorama:PanoramaSkyMaterial=habitat_sky.sky_material;assert(habitat_sky.radiance_size==Sky.RADIANCE_SIZE_512 and habitat_panorama.panorama.resource_path=="res://assets/highland-panorama.jpg" and habitat_panorama.panorama.get_width()==1280 and habitat_panorama.panorama.get_height()==640)
-	assert(game.mode_button.position==Vector2(435,198) and game.mode_button.size==Vector2(116,55));assert(game.shop_button.position==Vector2(398,262) and game.shop_button.size==Vector2(153,55));assert(game.result_confetti_layer.get_parent()==game.result_overlay)
+	assert(game.mode_button.position==Vector2(398,198) and game.mode_button.size==Vector2(153,55));assert(game.shop_button.position==Vector2(398,262) and game.shop_button.size==Vector2(153,55));assert(game.result_confetti_layer.get_parent()==game.result_overlay)
 	game._toggle_mode()
 	assert(game.current_mode=="habitat" and game.audio_manager.current_bgm_key=="habitat")
 	assert(not game.shop_button.visible and not game.habitat_status_label.visible and game.habitat_status_label.text.is_empty())
 	game.habitat_tutorial_complete=false;game.habitat_tutorial_started=false
 	game._start_first_habitat_tutorial()
-	assert(game.scripted_dialog_kind=="first_habitat_intro" and game.intro_panda_portrait.visible)
-	assert(game.scripted_dialog_pages.size()==1 and game.intro_panda_portrait.stretch_mode==TextureRect.STRETCH_KEEP_ASPECT_CENTERED and game.intro_dialog_panel.position in [Vector2(40,725),Vector2(40,385)] and game.intro_dialogue_label.text=="芽が出た！")
-	await get_tree().process_frame
-	assert(game.habitat_lookaround_active and game.habitat_lookaround_context=="sprouts")
-	var tutorial_look_start:float=game.habitat_lookaround_start_yaw;game._update_habitat_view_follow(game.HABITAT_LOOKAROUND_DURATION_SECONDS*.5);assert(absf(game.view_yaw-tutorial_look_start)>170.0);game._update_habitat_view_follow(game.HABITAT_LOOKAROUND_DURATION_SECONDS);await get_tree().process_frame
-	assert(not game.habitat_lookaround_active and is_equal_approx(game.view_yaw,tutorial_look_start) and game.scripted_dialog_kind.is_empty())
+	assert(game.habitat_tutorial_started and game.habitat_tutorial_complete)
+	assert(game.scripted_dialog_kind.is_empty() and not game.habitat_lookaround_active)
 	game.habitat_tutorial_complete=true;game.original_catalog_gifted=true;game.unlocked_series["base"]=true;game._toggle_mode()
 	assert(game.current_mode=="greenhouse" and game.audio_manager.current_bgm_key=="greenhouse" and game.shop_button.visible)
 	game._toggle_mode();var habitat_stream:AudioStream=game.audio_manager._stream_for("bgm","habitat");var habitat_players:=0

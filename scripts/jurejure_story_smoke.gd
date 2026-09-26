@@ -16,7 +16,7 @@ func _ready() -> void:
 	_test_creative_gate(game)
 	await _test_save_compatibility(game)
 	game._reset_progression_state()
-	print("JUREJURE_STORY_SMOKE_OK group=three present=100_percent choice=true battle=6v6 sow=manual shared_rules=true win_reward=true pod_respawn=true loss=40_to_80_percent puku_clamped=true softening=disabled save=true")
+	print("JUREJURE_STORY_SMOKE_OK group=three spaced=true present=act1+post_second choice=true battle=6v6 sow=manual shared_rules=true win_reward=owned_count pod_respawn=true loss=40_to_80_percent puku_clamped=true softening=disabled save=true")
 	get_tree().quit()
 
 
@@ -52,7 +52,7 @@ func _test_habitat_group_and_intro(game: Node) -> void:
 	assert(game.audio_manager.current_bgm_key == "habitat")
 	assert(JureJureSystemClass.should_be_present(true, true, false, false))
 	assert(not JureJureSystemClass.should_be_present(true, true, false, true))
-	assert(not JureJureSystemClass.should_be_present(true, true, true, false))
+	assert(JureJureSystemClass.should_be_present(true, true, true, false))
 	var group_item := _group_item(game)
 	assert(not group_item.is_empty())
 	var group := group_item.get("group_node") as Node3D
@@ -60,6 +60,11 @@ func _test_habitat_group_and_intro(game: Node) -> void:
 	assert(group.get_node_or_null("Skunk") is Sprite3D)
 	assert(group.get_node_or_null("Mouse") is Sprite3D)
 	assert(group.get_node_or_null("Peccary") is Sprite3D)
+	var skunk := group.get_node("Skunk") as Sprite3D
+	var mouse := group.get_node("Mouse") as Sprite3D
+	var peccary := group.get_node("Peccary") as Sprite3D
+	assert(skunk.position.distance_to(mouse.position) > 1.8)
+	assert(mouse.position.distance_to(peccary.position) > 1.8)
 	assert(_count_named_nodes(game, "JureJureEventDisplay") == 0)
 	assert(FileAccess.file_exists("res://assets/jurejure/mouse.png"))
 	assert(FileAccess.file_exists("res://assets/jurejure/skunk.png"))
@@ -109,6 +114,10 @@ func _test_habitat_group_and_intro(game: Node) -> void:
 
 
 func _test_battle_win_and_respawn(game: Node) -> void:
+	var pre_reward_ids: Array[String] = []
+	for entry in game._jurejure_reward_candidates():
+		pre_reward_ids.append(str(entry.get("species_id", "")))
+	assert("affinis" in pre_reward_ids and "shaviana" in pre_reward_ids)
 	game.puku_puku_battle._accept_battle()
 	await get_tree().process_frame
 	assert(game.audio_manager.current_bgm_key == "puku_battle")
