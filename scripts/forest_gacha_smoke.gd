@@ -12,7 +12,7 @@ func _ready()->void:
 	await _test_spin_capsule_and_reveal(game)
 	_test_encounter_save_and_unlock(game)
 	game._reset_progression_state();game.queue_free()
-	print("FOREST_GACHA_SMOKE_OK routes=2 first5=unlocked locked=18% jurejure=per_species capsule=reveal encounter=save+autoregister checker=backed")
+	print("FOREST_GACHA_SMOKE_OK routes=2 first5=unlocked locked=18% jurejure=pool_all_10 capsule=reveal encounter=save+autoregister checker=backed")
 	get_tree().quit()
 
 func _test_assets_and_routes(game)->void:
@@ -37,6 +37,8 @@ func _test_assets_and_routes(game)->void:
 	game._open_forest_gacha();assert(game.forest_gacha_ui.visible);game._close_forest_gacha()
 
 func _test_draw_rules(game)->void:
+	assert(game.forest_gacha_system.GUARANTEED_UNLOCKED_DRAWS==5)
+	assert(is_equal_approx(game.forest_gacha_system.LOCKED_SERIES_CHANCE,.18))
 	var test_rng:=RandomNumberGenerator.new();test_rng.seed=20260909
 	var unlocked:Dictionary={"base":true};var encountered:Dictionary={};var known:Dictionary={"colorata":true}
 	var pre_act_two_series:Array[Dictionary]=game.forest_gacha_system.eligible_series(true,unlocked,false)
@@ -59,22 +61,20 @@ func _test_jurejure_species_gate(game)->void:
 	var jurejure_entries:Array[Dictionary]=game._series_species_entries("jurejure")
 	assert(jurejure_entries.size()==10)
 	assert(game.forest_gacha_system.eligible_species("jurejure",true,{}).is_empty())
-	var unlocked_id:=str(jurejure_entries[6].get("species_id",""))
-	var individual_unlocks:Dictionary={unlocked_id:true}
-	var eligible:Array[Dictionary]=game.forest_gacha_system.eligible_species("jurejure",true,individual_unlocks)
-	assert(eligible.size()==1 and str(eligible[0].get("species_id",""))==unlocked_id)
-	assert(game.forest_gacha_system.eligible_species("jurejure",false,individual_unlocks).is_empty())
+	var pool_unlocks:Dictionary={}
+	for entry in jurejure_entries:pool_unlocks[str(entry.get("species_id",""))]=true
+	var eligible:Array[Dictionary]=game.forest_gacha_system.eligible_species("jurejure",true,pool_unlocks)
+	assert(eligible.size()==10)
+	assert(game.forest_gacha_system.eligible_species("jurejure",false,pool_unlocks).is_empty())
 	var known:Dictionary={}
 	for base_entry in game.forest_gacha_system.eligible_species("base",true):known[str(base_entry.get("species_id",""))]=true
 	var test_rng:=RandomNumberGenerator.new();test_rng.seed=20260927
-	var saw_unlocked_jurejure:=false
+	var seen_jurejure:Dictionary={}
 	for sample_index in range(200):
-		var result:Dictionary=game.forest_gacha_system.draw(1,{"base":true,"jurejure":true},known,{},test_rng,.99,true,individual_unlocks)
+		var result:Dictionary=game.forest_gacha_system.draw(1,{"base":true,"jurejure":true},known,{},test_rng,.99,true,pool_unlocks)
 		if str(result.get("series_id",""))=="jurejure":
-			assert(str(result.get("species_id",""))==unlocked_id)
-			saw_unlocked_jurejure=true
-			break
-	assert(saw_unlocked_jurejure)
+			seen_jurejure[str(result.get("species_id",""))]=true
+	assert(seen_jurejure.size()>1)
 
 func _test_spin_capsule_and_reveal(game)->void:
 	game.puku_points=2;game.forest_gacha_draw_count=0;game.forest_gacha_encountered.clear();game.discovered={"colorata":true};game.greenhouse_available={"colorata":true};game.unlocked_species=game.greenhouse_available.duplicate(true);game.unlocked_series={"base":true};game._apply_saved_unlocks();game.forest_gacha_ui.animation_time_scale=.02;game._open_forest_gacha()

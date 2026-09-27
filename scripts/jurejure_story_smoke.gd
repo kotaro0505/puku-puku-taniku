@@ -26,7 +26,7 @@ func _ready() -> void:
 	_test_first_loss_unlocks_act_two(game)
 	await _test_save_compatibility(game)
 	game._reset_progression_state()
-	print("JUREJURE_STORY_SMOKE_OK group=three_close first_encounter=camera+bgm+still_present=act1+act2 battle=6v6 act3_reward=random_10_then_9 species_get=true first_event=true save_fresh=true crisis=7_no_8_pending")
+	print("JUREJURE_STORY_SMOKE_OK group=three_close first_encounter=camera+bgm+still_present=act1+act2 battle=12v12 act3=always_present pool_unlock=all_10 ownership=exact reward=random species_get=true first_event=true save_fresh=true crisis=7_no_8_pending")
 	get_tree().quit()
 
 
@@ -55,6 +55,8 @@ func _prepare_act_one(game: Node) -> void:
 	game.jurejure_intro_complete = false
 	game.jurejure_enabled = false
 	game.jurejure_waiting_for_seed_pod_reward = false
+	game.jurejure_pool_unlocked = false
+	game.jurejure_species_unlocked.clear()
 	game.habitat_second_awakened = false
 	game.act2_unlocked = false
 	game.forest_gacha_unlocked = false
@@ -105,10 +107,17 @@ func _test_habitat_group_and_intro(game: Node) -> void:
 	assert(game.jurejure_intro_camera_active and not is_equal_approx(game.view_yaw, camera_start_yaw))
 	game._update_habitat_view_follow(.41)
 	assert(not game.jurejure_intro_camera_active and game.audio_manager.current_bgm_key == "jurejure")
-	await get_tree().create_timer(.20).timeout
+	for _frame in range(90):
+		if game.jurejure_first_encounter_overlay.visible:
+			break
+		await get_tree().process_frame
 	assert(game.jurejure_first_encounter_overlay.visible and game.jurejure_first_encounter_overlay.transitioning)
 	assert(game.jurejure_first_encounter_overlay.STORY_TEXTURE.get_size() == Vector2(720,1280))
-	await get_tree().create_timer(.50).timeout
+	for _frame in range(90):
+		if not game.jurejure_first_encounter_overlay.transitioning:
+			break
+		await get_tree().process_frame
+	assert(not game.jurejure_first_encounter_overlay.transitioning)
 	var expected_speakers := ["peccary", "skunk", "mouse"]
 	var expected_keys := ["jurejure_first_peccary", "jurejure_first_skunk", "jurejure_first_mouse"]
 	for page_index in range(3):
@@ -116,7 +125,12 @@ func _test_habitat_group_and_intro(game: Node) -> void:
 		assert(game.jurejure_first_encounter_overlay.dialogue_label.text == Localizer.text("ja", expected_keys[page_index]))
 		assert(game.jurejure_first_encounter_overlay.SPEAKER_IDS[page_index] == expected_speakers[page_index])
 		game.jurejure_first_encounter_overlay.advance()
-		await get_tree().create_timer(.24 if page_index < 2 else .45).timeout
+		for _frame in range(90):
+			if page_index < 2 and not game.jurejure_first_encounter_overlay.transitioning:
+				break
+			if page_index == 2 and not game.jurejure_first_encounter_overlay.visible:
+				break
+			await get_tree().process_frame
 	assert(not game.jurejure_first_encounter_overlay.visible)
 	assert(game.scripted_dialog_kind == "jurejure_intro")
 	assert(game.audio_manager.current_bgm_key == "jurejure")
@@ -186,7 +200,7 @@ func _test_battle_win_and_respawn(game: Node) -> void:
 			opponent_units += 1
 		else:
 			player_units += 1
-	assert(player_units == 6 and opponent_units == 6)
+	assert(player_units == 12 and opponent_units == 12)
 	assert(game.puku_puku_battle.battle_layer.get_node_or_null("BattleBackground") is TextureRect)
 
 	game.puku_puku_battle.debug_force_result(420.0, 180.0)
@@ -223,7 +237,10 @@ func _test_battle_win_and_respawn(game: Node) -> void:
 	assert(game.normal_seed_bags == bags_before + game.SEED_POD_GAUGE_REWARD_BAGS)
 	assert(not game.jurejure_waiting_for_seed_pod_reward)
 	game._toggle_mode()
-	await get_tree().process_frame
+	for _frame in range(90):
+		if game.current_mode == "greenhouse" and game.scripted_dialog_kind == "forest_gacha_intro":
+			break
+		await get_tree().process_frame
 	assert(game.current_mode=="greenhouse" and game.scripted_dialog_kind=="forest_gacha_intro")
 	_finish_dialog(game)
 	await get_tree().process_frame
@@ -361,7 +378,9 @@ func _test_act_three_reward_flow(game: Node) -> void:
 	_prepare_act_three_reward(game)
 	var sampled: Dictionary = {}
 	for sample_seed in range(1, 17):
+		game.jurejure_pool_unlocked = false
 		game.jurejure_species_unlocked.clear()
+		game.unlocked_series.erase("jurejure")
 		for species_id in JUREJURE_SPECIES_IDS:
 			game.discovered.erase(species_id);game.species_get_counts.erase(species_id)
 			game.greenhouse_available.erase(species_id);game.unlocked_species.erase(species_id)
@@ -387,11 +406,23 @@ func _test_act_three_reward_flow(game: Node) -> void:
 	game.puku_puku_battle.debug_sow_immediately()
 	game.puku_puku_battle.debug_force_result(420.0, 180.0)
 	await get_tree().process_frame
+	assert(not game.jurejure_waiting_for_seed_pod_reward)
+	assert(game._should_show_jurejure_group() and not _group_item(game).is_empty())
 	var reward_id: String = game.jurejure_pending_reward_species_id
 	assert(reward_id in JUREJURE_SPECIES_IDS)
-	assert(game._is_jurejure_species_unlocked(reward_id))
+	assert(game.jurejure_pool_unlocked)
 	assert(bool(game.discovered.get(reward_id, false)) and game._species_get_count(reward_id) == 1)
 	assert(not bool(game.habitat_returned_species.get(reward_id, false)))
+	assert(game.jurejure_species_unlocked.size() == 10)
+	for species_id in JUREJURE_SPECIES_IDS:
+		assert(game._is_jurejure_species_unlocked(species_id))
+		if species_id != reward_id:
+			assert(not bool(game.discovered.get(species_id, false)))
+			assert(game._species_get_count(species_id) == 0)
+	var normal_route_candidates: Array[Dictionary] = game._series_seed_draw_candidates("jurejure")
+	assert(normal_route_candidates.size() == 10)
+	var forest_route_candidates: Array[Dictionary] = game.forest_gacha_system.eligible_species("jurejure", true, game.jurejure_species_unlocked)
+	assert(forest_route_candidates.size() == 10)
 	var remaining: Array[Dictionary] = game._jurejure_reward_candidates()
 	assert(remaining.size() == 9)
 	for entry in remaining:
@@ -407,43 +438,53 @@ func _test_act_three_reward_flow(game: Node) -> void:
 	while game.species_get_overlay.busy:
 		await get_tree().process_frame
 	await game.species_get_overlay.close_overlay()
-	await get_tree().process_frame
-	await get_tree().process_frame
+	for _frame in range(120):
+		if game.scripted_dialog_kind == "jurejure_species_first":
+			break
+		await get_tree().process_frame
 	assert(game.scripted_dialog_kind == "jurejure_species_first")
 	assert(str(game.scripted_dialog_pages[0].get("text", "")) == "なにこの多肉！")
 	assert(str(game.scripted_dialog_pages[1].get("text", "")) == "…………。")
 	_finish_dialog(game)
 	assert(game.jurejure_species_first_seen)
 
-	# A genuinely fresh game instance must recover the exact individual unlock.
+	# A genuinely fresh instance recovers the pool gate, while ownership remains
+	# exact: only the actually awarded species is marked GET/discovered.
 	game._save()
 	var fresh_game = load("res://main.tscn").instantiate()
 	add_child(fresh_game)
 	await get_tree().process_frame
 	await get_tree().process_frame
-	assert(fresh_game._is_jurejure_species_unlocked(reward_id))
+	assert(fresh_game.jurejure_pool_unlocked and fresh_game.jurejure_species_unlocked.size() == 10)
 	assert(fresh_game._species_get_count(reward_id) == 1 and bool(fresh_game.discovered.get(reward_id, false)))
 	for species_id in JUREJURE_SPECIES_IDS:
-		if species_id != reward_id:assert(not fresh_game._is_jurejure_species_unlocked(species_id))
+		assert(fresh_game._is_jurejure_species_unlocked(species_id))
+		if species_id != reward_id:
+			assert(fresh_game._species_get_count(species_id) == 0)
+			assert(not bool(fresh_game.discovered.get(species_id, false)))
 	fresh_game.queue_free()
 	await get_tree().process_frame
+
+	# Act III ignores the old post-victory seed-pod wait, including stale saves.
+	game.jurejure_waiting_for_seed_pod_reward = true
+	assert(game._should_show_jurejure_group())
+	game._build_habitat_items(true)
+	assert(not _group_item(game).is_empty())
 
 
 func _test_jurejure_crisis_threshold(game: Node) -> void:
 	_prepare_act_three_reward(game)
+	assert(game._unlock_jurejure_pool())
 	for index in range(7):
-		assert(game._unlock_jurejure_species(JUREJURE_SPECIES_IDS[index]))
 		game._register_species_discovery(JUREJURE_SPECIES_IDS[index], true)
 	assert(game._unique_jurejure_species_get_count() == 7)
 	assert(not game.habitat_crisis_pending and not game.habitat_crisis_started)
 	game._register_species_discovery(JUREJURE_SPECIES_IDS[0], true)
 	assert(game._unique_jurejure_species_get_count() == 7 and not game.habitat_crisis_pending)
-	assert(game._unlock_jurejure_species(JUREJURE_SPECIES_IDS[7]))
 	game._register_species_discovery(JUREJURE_SPECIES_IDS[7], true)
 	assert(game._unique_jurejure_species_get_count() == 8)
 	assert(game.habitat_crisis_pending and not game.habitat_crisis_started)
 	for index in range(8, 10):
-		assert(game._unlock_jurejure_species(JUREJURE_SPECIES_IDS[index]))
 		game._register_species_discovery(JUREJURE_SPECIES_IDS[index], true)
 	assert(game._jurejure_reward_candidates().size() == 10)
 	var total_gets_before := 0

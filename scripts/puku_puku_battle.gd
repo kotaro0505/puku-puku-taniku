@@ -9,25 +9,36 @@ signal return_requested
 const Localizer = preload("res://scripts/game_localizer.gd")
 const SucculentClass = preload("res://scripts/succulent.gd")
 const BACKGROUND_PATH := "res://assets/jurejure/puku-puku-battle-background.jpg"
-const PLANTS_PER_SIDE := 6
+const PLANTS_PER_SIDE := 12
 const INITIAL_DIAMETER_CM := 1.6
-const MAX_DISPLAY_SIZE_PX := 106.0
+const MAIN_VISUAL_SCALE_BASE := 0.18
+const MAIN_VISUAL_SCALE_PER_CM := 0.058
+const BATTLE_PIXELS_PER_VISUAL_SCALE := 96.0
+const MAX_DISPLAY_SIZE_PX := 320.0
+const MIN_POINT_SPACING_PX := 48.0
 const SOW_SECONDS := 0.46
 const GERMINATION_SECONDS := 0.54
 
-# Coordinates are local to clipped soil-only fields. The generous margins keep
-# a normally grown plant's complete visual on dirt, while clipping guarantees
-# that an exceptionally large plant can never cross the central VS divider.
+# Coordinates are local to clipped soil-only fields. These polygons follow the
+# photographed dirt mounds rather than treating their bounding boxes as soil.
+# The polygons are deliberately inset from the rock edge, leaving visual growth
+# room before field clipping becomes the final protection at the VS divider.
 const OPPONENT_FIELD_RECT := Rect2(30, 260, 516, 218)
 const PLAYER_FIELD_RECT := Rect2(30, 690, 516, 300)
-const OPPONENT_POINTS := [
-	Vector2(78, 66), Vector2(258, 53), Vector2(438, 68),
-	Vector2(126, 158), Vector2(310, 148), Vector2(438, 162)
+const OPPONENT_SAFE_SOIL_POLYGON := [
+	Vector2(58, 82), Vector2(116, 54), Vector2(208, 40),
+	Vector2(308, 40), Vector2(400, 54), Vector2(458, 82),
+	Vector2(462, 122), Vector2(430, 146), Vector2(340, 158),
+	Vector2(176, 158), Vector2(86, 146), Vector2(54, 122)
 ]
-const PLAYER_POINTS := [
-	Vector2(80, 76), Vector2(258, 58), Vector2(436, 80),
-	Vector2(128, 210), Vector2(310, 192), Vector2(436, 214)
+const PLAYER_SAFE_SOIL_POLYGON := [
+	Vector2(60, 60), Vector2(120, 36), Vector2(210, 24),
+	Vector2(306, 24), Vector2(396, 36), Vector2(456, 60),
+	Vector2(462, 100), Vector2(430, 126), Vector2(340, 140),
+	Vector2(176, 140), Vector2(86, 126), Vector2(54, 100)
 ]
+const OPPONENT_SAMPLE_BOUNDS := Rect2(54, 40, 408, 118)
+const PLAYER_SAMPLE_BOUNDS := Rect2(54, 24, 408, 116)
 
 var language_code := "ja"
 var choice_layer: Control
@@ -52,6 +63,8 @@ var units: Array[Dictionary] = []
 var battle_phase := "idle"
 var pending_entries: Array[Dictionary] = []
 var pending_textures: Dictionary = {}
+var opponent_points: Array[Vector2] = []
+var player_points: Array[Vector2] = []
 var rng := RandomNumberGenerator.new()
 
 
@@ -195,6 +208,8 @@ func start_battle(entries: Array[Dictionary], textures: Dictionary, language: St
 		rng.randomize()
 	else:
 		rng.seed = random_seed
+	opponent_points = _generate_side_points(true)
+	player_points = _generate_side_points(false)
 	visible = true
 	choice_layer.visible = false
 	battle_layer.visible = true
@@ -259,8 +274,8 @@ func debug_sow_immediately() -> void:
 
 func _spawn_seed_markers() -> void:
 	for index in range(PLANTS_PER_SIDE):
-		_spawn_seed_marker(opponent_field, OPPONENT_POINTS[index], true, index)
-		_spawn_seed_marker(player_field, PLAYER_POINTS[index], false, index)
+		_spawn_seed_marker(opponent_field, opponent_points[index], true, index)
+		_spawn_seed_marker(player_field, player_points[index], false, index)
 
 
 func _spawn_seed_marker(field: Control, point: Vector2, opponent: bool, index: int) -> void:
@@ -272,6 +287,8 @@ func _spawn_seed_marker(field: Control, point: Vector2, opponent: bool, index: i
 	marker.scale = Vector2(0.2, 0.2)
 	marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	marker.add_to_group("battle_seed_marker")
+	marker.set_meta("soil_point", point)
+	marker.set_meta("opponent", opponent)
 	var seed_style := StyleBoxFlat.new()
 	seed_style.bg_color = Color("#604021") if opponent else Color("#dfb85b")
 	seed_style.border_color = Color("#f4d58a")
@@ -320,7 +337,7 @@ func _create_unit(opponent: bool, point_index: int, entries: Array[Dictionary], 
 	button.mouse_filter = Control.MOUSE_FILTER_IGNORE if opponent else Control.MOUSE_FILTER_STOP
 	var field := opponent_field if opponent else player_field
 	field.add_child(button)
-	var point: Vector2 = (OPPONENT_POINTS if opponent else PLAYER_POINTS)[point_index]
+	var point: Vector2 = (opponent_points if opponent else player_points)[point_index]
 	button.z_index = int(point.y)
 	var size_label := Label.new()
 	size_label.name = ("Opponent" if opponent else "Player") + "Size%02d" % point_index
@@ -493,10 +510,8 @@ func _update_unit_visual(unit_index: int) -> void:
 	var button := unit.get("node") as TextureButton
 	if not is_instance_valid(button):
 		return
-	# Only the 2D presentation is capped. The shared Succulent logic retains the
-	# complete real diameter for scoring, however large the plant becomes.
 	var diameter_cm := float(unit.get("size_cm", INITIAL_DIAMETER_CM))
-	var size_px := clampf(30.0 + maxf(0.0, diameter_cm - INITIAL_DIAMETER_CM) * 2.0, 30.0, MAX_DISPLAY_SIZE_PX)
+	var size_px := display_size_for_diameter(diameter_cm)
 	button.size = Vector2(size_px, size_px)
 	button.position = Vector2(unit.get("point", Vector2.ZERO)) - button.size * 0.5
 	button.pivot_offset = button.size * 0.5
@@ -570,6 +585,54 @@ func _clear_units() -> void:
 	units.clear()
 	pending_entries.clear()
 	pending_textures.clear()
+	opponent_points.clear()
+	player_points.clear()
+
+
+static func display_size_for_diameter(diameter_cm: float) -> float:
+	# Match the greenhouse's visual_scale curve, translated to this 2D canvas.
+	# The pixel conversion reflects each half-field's denser canvas; scoring and
+	# jelly still use the uncapped Succulent diameter.
+	var visual_scale := MAIN_VISUAL_SCALE_BASE + maxf(0.0, diameter_cm - INITIAL_DIAMETER_CM) * MAIN_VISUAL_SCALE_PER_CM
+	return clampf(visual_scale * BATTLE_PIXELS_PER_VISUAL_SCALE, 30.0, MAX_DISPLAY_SIZE_PX)
+
+
+static func safe_soil_polygon(opponent: bool) -> PackedVector2Array:
+	return PackedVector2Array(OPPONENT_SAFE_SOIL_POLYGON if opponent else PLAYER_SAFE_SOIL_POLYGON)
+
+
+static func point_is_in_safe_soil(point: Vector2, opponent: bool) -> bool:
+	return Geometry2D.is_point_in_polygon(point, safe_soil_polygon(opponent))
+
+
+func _generate_side_points(opponent: bool) -> Array[Vector2]:
+	var points: Array[Vector2] = []
+	var bounds := OPPONENT_SAMPLE_BOUNDS if opponent else PLAYER_SAMPLE_BOUNDS
+	for _point_index in range(PLANTS_PER_SIDE):
+		var selected := Vector2.ZERO
+		var best := Vector2.ZERO
+		var best_clearance := -1.0
+		for _attempt in range(720):
+			var candidate := Vector2(
+				rng.randf_range(bounds.position.x, bounds.end.x),
+				rng.randf_range(bounds.position.y, bounds.end.y)
+			)
+			if not point_is_in_safe_soil(candidate, opponent):
+				continue
+			var clearance := INF
+			for existing in points:
+				clearance = minf(clearance, candidate.distance_to(existing))
+			if points.is_empty():
+				clearance = INF
+			if clearance > best_clearance:
+				best_clearance = clearance
+				best = candidate
+			if clearance >= MIN_POINT_SPACING_PX:
+				selected = candidate
+				break
+		selected = best if selected == Vector2.ZERO else selected
+		points.append(selected)
+	return points
 
 
 func debug_force_result(forced_player_score: float, forced_opponent_score: float) -> void:

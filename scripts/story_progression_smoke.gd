@@ -161,14 +161,13 @@ func _test_three_act_sequence(game: Node) -> void:
 	var jurejure_ids: Array[String] = []
 	for entry in game._series_species_entries("jurejure"):
 		jurejure_ids.append(str(entry.get("species_id", "")))
+	assert(game._unlock_jurejure_pool())
 	for index in range(7):
-		assert(game._unlock_jurejure_species(jurejure_ids[index]))
 		assert(game._register_species_discovery(jurejure_ids[index], true))
 	assert(game._unique_jurejure_species_get_count() == 7)
 	assert(not game.habitat_crisis_pending and not game.habitat_crisis_started)
 	game._register_species_discovery(jurejure_ids[0], true)
 	assert(game._unique_jurejure_species_get_count() == 7 and not game.habitat_crisis_pending)
-	assert(game._unlock_jurejure_species(jurejure_ids[7]))
 	assert(game._register_species_discovery(jurejure_ids[7], true))
 	assert(game._unique_jurejure_species_get_count() == 8)
 	assert(game.habitat_crisis_pending and not game.habitat_crisis_started)
@@ -278,7 +277,7 @@ func _test_legacy_three_act_migration(game: Node) -> void:
 	var payload = JSON.parse_string(FileAccess.get_file_as_string("user://records.json"))
 	assert(payload is Dictionary)
 	payload["progression_version"] = 24
-	for key in ["act2_unlocked", "forest_gacha_unlocked", "forest_gacha_intro_seen", "fantasy_first_discovery_seen", "fantasy_realization_seen", "act3_unlocked", "act3_intro_pending", "act3_intro_seen", "jurejure_species_unlocked", "jurejure_species_first_seen", "habitat_crisis_pending", "habitat_crisis_started", "finale_complete"]:
+	for key in ["act2_unlocked", "forest_gacha_unlocked", "forest_gacha_intro_seen", "fantasy_first_discovery_seen", "fantasy_realization_seen", "act3_unlocked", "act3_intro_pending", "act3_intro_seen", "jurejure_pool_unlocked", "jurejure_species_unlocked", "jurejure_species_first_seen", "habitat_crisis_pending", "habitat_crisis_started", "finale_complete"]:
 		payload.erase(key)
 	var file := FileAccess.open("user://records.json", FileAccess.WRITE)
 	file.store_string(JSON.stringify(payload))
@@ -296,6 +295,12 @@ func _test_legacy_three_act_migration(game: Node) -> void:
 	assert(bool(game.discovered.get("transparent_succulent", false)) and game._species_get_count("transparent_succulent") == 1)
 	assert(bool(game.habitat_returned_species.get("laui", false)) and bool(game.habitat_returned_species.get("transparent_succulent", false)))
 	assert(game._is_jurejure_species_unlocked(migrated_jurejure_id))
+	assert(game.jurejure_pool_unlocked and game.jurejure_species_unlocked.size() == 10)
+	for jure_entry in game._series_species_entries("jurejure"):
+		var jure_id := str(jure_entry.get("species_id", ""))
+		assert(game._is_jurejure_species_unlocked(jure_id))
+		if jure_id != migrated_jurejure_id:
+			assert(game._species_get_count(jure_id) == 0 and not bool(game.discovered.get(jure_id, false)))
 	assert(bool(game.greenhouse_available.get(migrated_jurejure_id, false)) and game._species_get_count(migrated_jurejure_id) == 2)
 	assert(not bool(game.habitat_returned_species.get(migrated_jurejure_id, false)))
 	assert(bool(game.completed_unlock_conditions.get("legacy_40cm", false)) and bool(game.completed_unlock_conditions.get("legacy_play_13", false)))

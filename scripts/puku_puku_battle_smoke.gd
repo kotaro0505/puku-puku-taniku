@@ -22,6 +22,22 @@ func _ready() -> void:
 	await get_tree().process_frame
 	var texture := load("res://assets/plants/sprite-colorata.png") as Texture2D
 	battle.start_battle([SAMPLE_SPECIES], {"colorata": texture}, "ja", 20260926)
+	assert(battle.player_points.size() == 12 and battle.opponent_points.size() == 12)
+	_verify_soil_points(battle.player_points, false)
+	_verify_soil_points(battle.opponent_points, true)
+	var first_player_layout: Array[Vector2] = battle.player_points.duplicate()
+	var layout_probe := BattleClass.new()
+	add_child(layout_probe)
+	await get_tree().process_frame
+	layout_probe.start_battle([SAMPLE_SPECIES], {"colorata": texture}, "ja", 20260927)
+	_verify_soil_points(layout_probe.player_points, false)
+	_verify_soil_points(layout_probe.opponent_points, true)
+	assert(layout_probe.player_points != first_player_layout)
+	for layout_seed in range(40):
+		layout_probe.rng.seed = 310000 + layout_seed
+		_verify_soil_points(layout_probe._generate_side_points(false), false)
+		_verify_soil_points(layout_probe._generate_side_points(true), true)
+	layout_probe.queue_free()
 
 	# The dedicated screen starts on two empty dirt fields. No plant or score is
 	# created until the player explicitly sows the battle seeds.
@@ -34,6 +50,7 @@ func _ready() -> void:
 	battle._on_sow_pressed()
 	assert(battle.battle_phase == "sowing")
 	assert(_marker_count(battle) == BattleClass.PLANTS_PER_SIDE * 2)
+	_verify_seed_markers_match_points(battle)
 	assert(is_zero_approx(battle.opponent_score) and is_zero_approx(battle.player_score))
 	await get_tree().create_timer(BattleClass.SOW_SECONDS + BattleClass.GERMINATION_SECONDS + 0.08).timeout
 	assert(battle.battle_phase == "growing" and battle.battle_active)
@@ -55,7 +72,7 @@ func _ready() -> void:
 		var live_size_label := unit.get("size_label") as Label
 		assert(is_instance_valid(live_size_label))
 		assert(live_size_label.text == "%.1fcm" % float(unit.get("size_cm", 0.0)))
-	assert(player_count == 6 and opponent_count == 6)
+	assert(player_count == 12 and opponent_count == 12)
 	var growth_unit: Dictionary = battle.units[0]
 	var initial_visual_size: float = float((growth_unit.get("node") as TextureButton).size.x)
 	for unit_index in range(battle.units.size()):
@@ -83,8 +100,8 @@ func _ready() -> void:
 	assert(is_equal_approx(float(ai_stats.average_score), float(same_policy_reference.average_score)))
 
 	print(
-		"PUKU_PUKU_BATTLE_SMOKE_OK sow=manual plants=6v6 shared_growth=true shared_jelly=true " +
-		"ai_jelly_rate=%.3f ai_average_harvest_cm=%.3f ai_average_score=%.3f condition_delta=0.000 clipped_fields=true" % [
+		"PUKU_PUKU_BATTLE_SMOKE_OK sow=manual plants=12v12 random_soil=true shared_growth=true shared_jelly=true " +
+		"ai_jelly_rate=%.3f ai_average_harvest_cm=%.3f ai_average_score=%.3f condition_delta=0.000 main_scale_visual=true clipped_fields=true" % [
 			float(ai_stats.jelly_rate),
 			float(ai_stats.average_harvest_cm),
 			float(ai_stats.average_score)
@@ -117,19 +134,27 @@ func _verify_clipped_layout(battle: Control) -> void:
 	assert(BattleClass.OPPONENT_FIELD_RECT.end.y < BattleClass.PLAYER_FIELD_RECT.position.y)
 	for unit_index in range(battle.units.size()):
 		var unit: Dictionary = battle.units[unit_index]
+		var opponent := bool(unit.get("opponent", false))
+		var point: Vector2 = unit.get("point", Vector2.ZERO)
+		assert(BattleClass.point_is_in_safe_soil(point, opponent))
 		var logic = unit.get("logic")
+		logic.diameter_cm = 20.0
+		unit["size_cm"] = 20.0
+		battle.units[unit_index] = unit
+		battle._update_unit_visual(unit_index)
+		var button := unit.get("node") as TextureButton
+		assert(button.size.x > 106.0)
+		assert(is_equal_approx(button.size.x, BattleClass.display_size_for_diameter(20.0)))
 		logic.diameter_cm = 1000.0
 		unit["size_cm"] = 1000.0
 		battle.units[unit_index] = unit
 		battle._update_unit_visual(unit_index)
-		var button := unit.get("node") as TextureButton
 		var size_label := unit.get("size_label") as Label
 		var field := unit.get("field") as Control
 		assert(is_equal_approx(float(logic.diameter_cm), 1000.0))
-		assert(button.size.x <= BattleClass.MAX_DISPLAY_SIZE_PX + 0.01)
-		assert(button.position.x >= -0.01 and button.position.y >= -0.01)
-		assert(button.position.x + button.size.x <= field.size.x + 0.01)
-		assert(button.position.y + button.size.y <= field.size.y + 0.01)
+		assert(is_equal_approx(button.size.x, BattleClass.MAX_DISPLAY_SIZE_PX))
+		assert(button.size.x > 106.0)
+		assert((button.position + button.size * 0.5).is_equal_approx(point))
 		assert(size_label.position.x >= -0.01 and size_label.position.y >= -0.01)
 		assert(size_label.position.x + size_label.size.x <= field.size.x + 0.01)
 		assert(size_label.position.y + size_label.size.y <= field.size.y + 0.01)
@@ -208,3 +233,26 @@ func _marker_count(battle: Control) -> int:
 			if child.is_in_group("battle_seed_marker"):
 				count += 1
 	return count
+
+
+func _verify_soil_points(points: Array[Vector2], opponent: bool) -> void:
+	assert(points.size() == BattleClass.PLANTS_PER_SIDE)
+	for index in range(points.size()):
+		assert(BattleClass.point_is_in_safe_soil(points[index], opponent))
+		for other_index in range(index):
+			assert(points[index].distance_to(points[other_index]) >= BattleClass.MIN_POINT_SPACING_PX - 0.01)
+
+
+func _verify_seed_markers_match_points(battle: Control) -> void:
+	var opponent_seen := 0
+	var player_seen := 0
+	for field in [battle.opponent_field, battle.player_field]:
+		for child in field.get_children():
+			if not child.is_in_group("battle_seed_marker"):continue
+			var opponent := bool(child.get_meta("opponent", false))
+			var point: Vector2 = child.get_meta("soil_point", Vector2.ZERO)
+			var expected: Array[Vector2] = battle.opponent_points if opponent else battle.player_points
+			assert(point in expected)
+			if opponent:opponent_seen += 1
+			else:player_seen += 1
+	assert(opponent_seen == 12 and player_seen == 12)

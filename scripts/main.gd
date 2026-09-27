@@ -32,7 +32,7 @@ const HabitatCrisisAtmosphereClass = preload("res://scripts/habitat_crisis_atmos
 const SlotMachineScene = preload("res://scenes/slot_machine.tscn")
 const DEVELOPMENT_CATALOG_PREVIEW_ENABLED := true
 const SECRET_GACHA_ALWAYS_PLAYABLE := true
-const PROGRESSION_VERSION := 25
+const PROGRESSION_VERSION := 26
 const SAVE_PATH := "user://records.json"
 const LEGACY_HABITAT_REGENERATION_VERSION := 17
 const INITIAL_SERIES_ID := "base"
@@ -109,6 +109,7 @@ const FANTASY_SERIES_IDS := [
 	"stone", "sea", "yumekawa", "forest_amber", "neon"
 ]
 const JUREJURE_STORY_GROUP := "jurejure"
+const JUREJURE_SERIES_ID := "jurejure"
 const SHOP_CHATTER_KEYS := [
 	"shop_chatter_touch","shop_chatter_welcome","shop_chatter_edible","shop_chatter_encounter",
 	"shop_chatter_seasons","shop_chatter_water","shop_chatter_growing","shop_chatter_world",
@@ -208,6 +209,7 @@ var fantasy_realization_seen := false
 var act3_unlocked := false
 var act3_intro_pending := false
 var act3_intro_seen := false
+var jurejure_pool_unlocked := false
 var jurejure_species_unlocked: Dictionary = {}
 var jurejure_species_first_seen := false
 var habitat_crisis_pending := false
@@ -875,6 +877,7 @@ func _load_save() -> void:
 			act2_unlocked=bool(value.get("act2_unlocked",false));forest_gacha_unlocked=bool(value.get("forest_gacha_unlocked",false));forest_gacha_intro_seen=bool(value.get("forest_gacha_intro_seen",false))
 			fantasy_first_discovery_seen=bool(value.get("fantasy_first_discovery_seen",false));fantasy_realization_seen=bool(value.get("fantasy_realization_seen",false))
 			act3_unlocked=bool(value.get("act3_unlocked",false));act3_intro_pending=bool(value.get("act3_intro_pending",false));act3_intro_seen=bool(value.get("act3_intro_seen",false))
+			jurejure_pool_unlocked=bool(value.get("jurejure_pool_unlocked",false))
 			jurejure_species_unlocked=value.get("jurejure_species_unlocked",{})
 			if not jurejure_species_unlocked is Dictionary:jurejure_species_unlocked={}
 			jurejure_species_first_seen=bool(value.get("jurejure_species_first_seen",false));habitat_crisis_pending=bool(value.get("habitat_crisis_pending",false));habitat_crisis_started=bool(value.get("habitat_crisis_started",false));finale_complete=bool(value.get("finale_complete",false))
@@ -998,7 +1001,7 @@ func _save() -> void:
 		"jurejure_return_event_complete":jurejure_return_event_complete,"habitat_second_awakened":habitat_second_awakened,"habitat_second_awakening_complete":habitat_second_awakening_complete,
 		"act2_unlocked":act2_unlocked,"forest_gacha_unlocked":forest_gacha_unlocked,"forest_gacha_intro_seen":forest_gacha_intro_seen,
 		"fantasy_first_discovery_seen":fantasy_first_discovery_seen,"fantasy_realization_seen":fantasy_realization_seen,
-		"act3_unlocked":act3_unlocked,"act3_intro_pending":act3_intro_pending,"act3_intro_seen":act3_intro_seen,"jurejure_species_unlocked":jurejure_species_unlocked,
+		"act3_unlocked":act3_unlocked,"act3_intro_pending":act3_intro_pending,"act3_intro_seen":act3_intro_seen,"jurejure_pool_unlocked":jurejure_pool_unlocked,"jurejure_species_unlocked":jurejure_species_unlocked,
 		"jurejure_species_first_seen":jurejure_species_first_seen,"habitat_crisis_pending":habitat_crisis_pending,"habitat_crisis_started":habitat_crisis_started,"finale_complete":finale_complete,"habitat_return_dialog_seen":habitat_return_dialog_seen,
 		"old_seed_bags":old_seed_bags,"puku_gauge_intro_complete":puku_gauge_intro_complete,"habitat_seed_date":habitat_seed_date,"habitat_seeds_collected":habitat_seeds_collected,
 		"habitat_mystery_seeds_pending":habitat_mystery_seeds_pending,"mystery_seed_count":mystery_seed_count,"armadillo_research_total":armadillo_research_total,
@@ -1144,17 +1147,22 @@ func _migrate_story_progress(saved_progression_version:int)->void:
 
 func _migrate_three_act_progress(saved_progression_version:int)->void:
 	var sanitized_jurejure_unlocks:Dictionary={}
+	var legacy_jurejure_unlock_found:=false
 	for species_id_value in jurejure_species_unlocked:
 		var saved_species_id:=str(species_id_value);var saved_entry:=_catalog_entry(saved_species_id)
-		if bool(jurejure_species_unlocked.get(species_id_value,false)) and _is_jurejure_species(saved_entry):sanitized_jurejure_unlocks[saved_species_id]=true
+		if bool(jurejure_species_unlocked.get(species_id_value,false)) and _is_jurejure_species(saved_entry):
+			sanitized_jurejure_unlocks[saved_species_id]=true;legacy_jurejure_unlock_found=true
 	jurejure_species_unlocked=sanitized_jurejure_unlocks
-	# A real GET in an older save is authoritative evidence that this exact
-	# JureJure species was unlocked. Never infer the other nine from it.
+	# Any real legacy JureJure GET/unlock is authoritative evidence that the
+	# player already crossed the new one-time pool gate. Keep ownership exact,
+	# while opening all ten only as future acquisition candidates.
 	for raw_entry in catalog_species:
 		if raw_entry is Dictionary and _is_jurejure_species(raw_entry):
 			var owned_jurejure_id:=str(raw_entry.get("species_id",""))
 			if _species_get_count(owned_jurejure_id)>0:
-				jurejure_species_unlocked[owned_jurejure_id]=true;unlocked_series[str(raw_entry.get("series_id","jurejure"))]=true
+				legacy_jurejure_unlock_found=true
+	jurejure_pool_unlocked=jurejure_pool_unlocked or legacy_jurejure_unlock_found
+	if jurejure_pool_unlocked:_sync_jurejure_pool_unlock_state()
 	var fantasy_count:=_unique_fantasy_species_get_count()
 	var jurejure_count:=_unique_jurejure_species_get_count()
 	if jurejure_battle_count>=1 or habitat_second_awakened or fantasy_count>0:
@@ -1169,7 +1177,11 @@ func _migrate_three_act_progress(saved_progression_version:int)->void:
 	if fantasy_count>=24:
 		act3_unlocked=true
 		if not act3_intro_seen:act3_intro_pending=true
-	if act3_intro_seen:act3_intro_pending=false
+	if act3_intro_seen:
+		act3_intro_pending=false
+		# Act III makes the gang a permanent habitat presence; retire any stale
+		# Act I/II victory cooldown carried by an older save.
+		jurejure_waiting_for_seed_pod_reward=false
 	if jurejure_count>=1 and saved_progression_version<PROGRESSION_VERSION:jurejure_species_first_seen=true
 	if jurejure_count>=8 and not habitat_crisis_started:habitat_crisis_pending=true
 	if habitat_crisis_started:habitat_crisis_pending=false
@@ -1177,7 +1189,7 @@ func _migrate_three_act_progress(saved_progression_version:int)->void:
 		if raw_entry is Dictionary and _is_jurejure_species(raw_entry):
 			var jurejure_species_id:=str(raw_entry.get("species_id",""))
 			habitat_returned_species.erase(jurejure_species_id)
-			if _is_jurejure_species_unlocked(jurejure_species_id):greenhouse_available[jurejure_species_id]=true;unlocked_species[jurejure_species_id]=true
+			if _species_get_count(jurejure_species_id)>0:greenhouse_available[jurejure_species_id]=true;unlocked_species[jurejure_species_id]=true
 			else:greenhouse_available.erase(jurejure_species_id);unlocked_species.erase(jurejure_species_id)
 
 func _migrate_catalog_unlocks_without_puku()->void:
@@ -2003,7 +2015,7 @@ func _finish_scripted_dialog()->void:
 		"fantasy_realization":
 			fantasy_realization_seen=true
 		"act3_intro":
-			act3_intro_seen=true;act3_intro_pending=false
+			act3_intro_seen=true;act3_intro_pending=false;jurejure_waiting_for_seed_pod_reward=false
 			if habitat_crisis_pending:habitat_crisis_eligible_visit_id=habitat_visit_id
 		"jurejure_species_first":
 			jurejure_species_first_seen=true
@@ -2042,6 +2054,7 @@ func _finish_scripted_dialog()->void:
 		"puku_gauge_first_gift":
 			puku_gauge_intro_complete=true;tutorial_steps["puku_gauge_intro_complete"]=true;shop_current_page="categories";_set_shop_purchase_visible(true)
 	_update_main_story_progress(false);_save();shop_overlay.visible=keep_shop
+	if finished_kind=="act3_intro" and current_mode=="habitat":_build_habitat_items(true)
 	if keep_shop:
 		armadillo_tap_button.visible=armadillo_present;_update_shop_ui()
 		if show_pinwheel_get:call_deferred("_queue_species_get_by_id",HIDDEN_PINWHEEL_ID,true,"pinwheel_gift")
@@ -3114,7 +3127,7 @@ func _reset_progression_state()->void:
 	mystery_route_assignments.clear();mystery_route_completed.clear();mystery_route_dialog_seen.clear();rain_completion_count=0;best_100_achieved=false;shop_selected_seed_type="normal"
 	first_tutorial_species_id="";habitat_wild_plants.clear();habitat_wild_initialized=false;habitat_wild_next_spawn_unix=0.0;habitat_tutorial_started=false;habitat_tutorial_complete=false;habitat_tutorial_species_id="";original_catalog_gifted=false;panda_beacon_unlocked=false;panda_beacon_count=0;panda_beacon_unread_log.clear();first_habitat_gift_claimed=false;armadillo_intro_event_3_completed=false;armadillo_series_event_7_completed=false;pending_armadillo_story_event="";armadillo_gift_series_id="";armadillo_gift_species_id="";scripted_dialog_kind="";scripted_dialog_pages.clear();scripted_dialog_index=-1
 	first_colorata_confirmed=false;trio_originals_confirmed=false;habitat_arrival_started=false;habitat_awakened=false;habitat_awakening_event_complete=false;seed_shop_open=false;mystery_items_acquired=false;mystery_catalog_tutorial_complete=false;normal_play_tutorial_complete=false;seed_pod_gauge_discovery_complete=false;seed_pod_first_reward_seen=false;initial_seed_stock_notice_complete=false;puku_buyback_tutorial_complete=false;puku_buyback_tutorial_active=false;puku_buyback_tutorial_index=0;habitat_returned_species.clear();special_series_explanation_seen=false;pending_special_series_explanation=false;main_story_stage=StoryProgressionClass.ACT_1;main_story_complete=false;main_story_completion_seen=false
-	act2_unlocked=false;forest_gacha_unlocked=false;forest_gacha_intro_seen=false;fantasy_first_discovery_seen=false;fantasy_realization_seen=false;act3_unlocked=false;act3_intro_pending=false;act3_intro_seen=false;jurejure_species_unlocked.clear();jurejure_species_first_seen=false;habitat_crisis_pending=false;habitat_crisis_started=false;finale_complete=false;habitat_return_dialog_seen=false
+	act2_unlocked=false;forest_gacha_unlocked=false;forest_gacha_intro_seen=false;fantasy_first_discovery_seen=false;fantasy_realization_seen=false;act3_unlocked=false;act3_intro_pending=false;act3_intro_seen=false;jurejure_pool_unlocked=false;jurejure_species_unlocked.clear();jurejure_species_first_seen=false;habitat_crisis_pending=false;habitat_crisis_started=false;finale_complete=false;habitat_return_dialog_seen=false
 	original_catalog_complete_event_seen=false;habitat_tutorial_returned_to_greenhouse=false;jurejure_intro_complete=false;jurejure_enabled=false;jurejure_growth_stage=JureJureSystemClass.GROWTH_EARLY;jurejure_growth_event_mask=0;active_jurejure_event={};jurejure_next_check_unix=0.0;jurejure_cooldown_until_unix=0.0;jurejure_return_event_complete=false;jurejure_waiting_for_seed_pod_reward=false;jurejure_battle_count=0;jurejure_battle_win_count=0;jurejure_habitat_visit_point=Vector2(-1.0,-1.0);jurejure_pending_reward_species_id="";jurejure_last_battle_result.clear();habitat_second_awakened=false;habitat_second_awakening_complete=false;jurejure_update_accumulator=0.0
 	first_seed_pod_reward_event_active=false;habitat_visit_id=0;act3_intro_eligible_visit_id=0;habitat_crisis_eligible_visit_id=0
 	if habitat_crisis_atmosphere:habitat_crisis_atmosphere.deactivate()
@@ -4148,15 +4161,25 @@ func _is_jurejure_species(entry:Dictionary)->bool:
 	return not entry.is_empty() and str(entry.get("story_group","")).to_lower()==JUREJURE_STORY_GROUP
 
 func _is_jurejure_species_unlocked(species_id:String)->bool:
-	return bool(jurejure_species_unlocked.get(species_id,false))
+	return jurejure_pool_unlocked and _is_jurejure_species(_catalog_entry(species_id))
+
+func _sync_jurejure_pool_unlock_state()->void:
+	if not jurejure_pool_unlocked:return
+	unlocked_series[JUREJURE_SERIES_ID]=true
+	for entry in catalog_species:
+		if entry is Dictionary and _is_jurejure_species(entry):
+			jurejure_species_unlocked[str(entry.get("species_id",""))]=true
+
+func _unlock_jurejure_pool()->bool:
+	var newly_unlocked:=not jurejure_pool_unlocked
+	jurejure_pool_unlocked=true
+	_sync_jurejure_pool_unlock_state()
+	return newly_unlocked
 
 func _unlock_jurejure_species(species_id:String)->bool:
 	var entry:=_catalog_entry(species_id)
 	if not _is_jurejure_species(entry):return false
-	var newly_unlocked:=not _is_jurejure_species_unlocked(species_id)
-	jurejure_species_unlocked[species_id]=true
-	greenhouse_available[species_id]=true;unlocked_species[species_id]=true
-	return newly_unlocked
+	return _unlock_jurejure_pool()
 
 func _is_fantasy_species(entry:Dictionary)->bool:
 	if entry.is_empty():return false
@@ -4732,7 +4755,8 @@ func _add_habitat_wild_plant(plant:Dictionary)->void:
 	var item={"node":sprite,"kind":"wild_plant","species_id":str(plant.get("species_id","")),"individual_id":str(plant.get("individual_id",""))};habitat_pickups.append(item);_refresh_habitat_wild_item(item,plant)
 
 func _should_show_jurejure_group()->bool:
-	return JureJureSystemClass.should_be_present(habitat_awakened,habitat_tutorial_returned_to_greenhouse,act2_unlocked,jurejure_waiting_for_seed_pod_reward)
+	var waiting_for_reward:=false if act3_intro_seen else jurejure_waiting_for_seed_pod_reward
+	return JureJureSystemClass.should_be_present(habitat_awakened,habitat_tutorial_returned_to_greenhouse,act2_unlocked,waiting_for_reward)
 
 func _add_jurejure_habitat_group()->void:
 	if jurejure_habitat_visit_point.x<0.0:
@@ -5338,14 +5362,14 @@ func _jurejure_reward_candidates()->Array[Dictionary]:
 		if act3_intro_seen:
 			if not _is_jurejure_species(entry):continue
 			all_jurejure.append(entry)
-			if not _is_jurejure_species_unlocked(species_id):candidates.append(entry)
+			if _species_get_count(species_id)<=0:candidates.append(entry)
 			continue
 		if _species_get_count(species_id)>0:continue
 		if _is_jurejure_species(entry) or not _species_available_in_current_era(entry) or bool(entry.get("special_route_only",false)):continue
 		if _seed_new_species_blocked(species_id) or str(entry.get("rarity","")) in ["隠し原種","謎品種"]:continue
 		if not _species_is_in_unlocked_series(species_id):continue
 		candidates.append(entry)
-	# After all ten have been unlocked, repeat wins may award any of the ten.
+	# After all ten have actually been obtained, repeat wins may award any one.
 	if act3_intro_seen and candidates.is_empty():candidates=all_jurejure
 	return candidates
 
@@ -5353,7 +5377,7 @@ func _grant_jurejure_battle_reward()->String:
 	var candidates:=_jurejure_reward_candidates()
 	if candidates.is_empty():return ""
 	var chosen:Dictionary=candidates[rng.randi_range(0,candidates.size()-1)];var species_id:=str(chosen.get("species_id",""))
-	if act3_intro_seen:_unlock_jurejure_species(species_id)
+	if act3_intro_seen:_unlock_jurejure_pool()
 	_register_species_discovery(species_id,true);_apply_saved_unlocks();_sync_arrangement_ui()
 	return species_id
 
@@ -5370,7 +5394,7 @@ func _on_puku_puku_battle_resolved(result:Dictionary)->void:
 	var first_resolved_battle:=jurejure_battle_count==0
 	jurejure_battle_count+=1;jurejure_last_battle_result=result.duplicate(true)
 	if bool(result.get("won",false)):
-		jurejure_battle_win_count+=1;jurejure_waiting_for_seed_pod_reward=true
+		jurejure_battle_win_count+=1;jurejure_waiting_for_seed_pod_reward=not act3_intro_seen
 		jurejure_pending_reward_species_id=_grant_jurejure_battle_reward()
 	else:
 		var penalty:=_apply_jurejure_battle_loss()
