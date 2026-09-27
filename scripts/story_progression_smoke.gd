@@ -22,7 +22,12 @@ func _test_catalog_contract(game: Node) -> void:
 	assert(game.INITIAL_SERIES_ID == "base")
 	assert(game._series_entry("common").is_empty())
 	assert(bool(game.unlocked_series.get("base", false)))
-	assert(game.catalog_species.size() == 124)
+	assert(game.catalog_species.size() == 134)
+	var jurejure_entries: Array[Dictionary] = game._series_species_entries("jurejure")
+	assert(jurejure_entries.size() == 10)
+	for entry in jurejure_entries:
+		assert(game._is_jurejure_species(entry) and game._is_fantasy_species(entry))
+		assert(FileAccess.file_exists(str(entry.get("image_path", ""))))
 	for removed_id in StoryProgressionClass.REMOVED_COMMON_SPECIES_IDS:
 		assert(game._catalog_entry(str(removed_id)).is_empty())
 	var originals: Array[String] = []
@@ -100,7 +105,7 @@ func _test_three_act_sequence(game: Node) -> void:
 
 	var fantasy_ids: Array[String] = []
 	for entry in game.catalog_species:
-		if game._is_fantasy_species(entry):
+		if game._is_fantasy_species(entry) and not game._is_jurejure_species(entry):
 			fantasy_ids.append(str(entry.get("species_id", "")))
 	assert(fantasy_ids.size() >= 24)
 	# Encyclopedia discovery by itself is not a real GET.
@@ -150,13 +155,31 @@ func _test_three_act_sequence(game: Node) -> void:
 	_finish_dialog(game)
 	assert(game.act3_intro_seen and not game.act3_intro_pending)
 
+	# JureJure progress is based on unique real GETs. A repeat does not advance
+	# the threshold; the eighth distinct species schedules (but does not start)
+	# the crisis for the next safe habitat visit.
+	var jurejure_ids: Array[String] = []
+	for entry in game._series_species_entries("jurejure"):
+		jurejure_ids.append(str(entry.get("species_id", "")))
+	for index in range(7):
+		assert(game._unlock_jurejure_species(jurejure_ids[index]))
+		assert(game._register_species_discovery(jurejure_ids[index], true))
+	assert(game._unique_jurejure_species_get_count() == 7)
+	assert(not game.habitat_crisis_pending and not game.habitat_crisis_started)
+	game._register_species_discovery(jurejure_ids[0], true)
+	assert(game._unique_jurejure_species_get_count() == 7 and not game.habitat_crisis_pending)
+	assert(game._unlock_jurejure_species(jurejure_ids[7]))
+	assert(game._register_species_discovery(jurejure_ids[7], true))
+	assert(game._unique_jurejure_species_get_count() == 8)
+	assert(game.habitat_crisis_pending and not game.habitat_crisis_started)
+	game.jurejure_species_first_seen = true
+
 	# The crisis also waits for a later habitat visit and changes presentation
 	# only. It must not revive the retired rain bonus or mutate collection state.
 	var settled_before: Dictionary = game.habitat_returned_species.duplicate(true)
 	var discovered_before: Dictionary = game.discovered.duplicate(true)
 	var get_counts_before: Dictionary = game.species_get_counts.duplicate(true)
 	var seeds_before: int = game.normal_seed_bags
-	game.habitat_crisis_pending = true
 	game.habitat_crisis_started = false
 	game.finale_complete = false
 	game.habitat_crisis_eligible_visit_id = game.habitat_visit_id
@@ -238,19 +261,24 @@ func _test_legacy_three_act_migration(game: Node) -> void:
 	game.habitat_returned_species = {"colorata": true, "laui": true, "transparent_succulent": true}
 	var fantasy_ids: Array[String] = []
 	for entry in game.catalog_species:
-		if game._is_fantasy_species(entry):
+		if game._is_fantasy_species(entry) and not game._is_jurejure_species(entry):
 			fantasy_ids.append(str(entry.get("species_id", "")))
 	for index in range(24):
 		game.discovered[fantasy_ids[index]] = true
 		game.species_get_counts[fantasy_ids[index]] = 1
 		game.greenhouse_available[fantasy_ids[index]] = true
 		game.habitat_returned_species[fantasy_ids[index]] = true
+	var migrated_jurejure_id := "jurejure_luxury_watch"
+	game.discovered[migrated_jurejure_id] = true
+	game.species_get_counts[migrated_jurejure_id] = 2
+	game.greenhouse_available[migrated_jurejure_id] = true
+	game.habitat_returned_species[migrated_jurejure_id] = true
 	game.completed_unlock_conditions = {"legacy_40cm": true, "legacy_play_13": true}
 	game._save()
 	var payload = JSON.parse_string(FileAccess.get_file_as_string("user://records.json"))
 	assert(payload is Dictionary)
-	payload["progression_version"] = 23
-	for key in ["act2_unlocked", "forest_gacha_unlocked", "forest_gacha_intro_seen", "fantasy_first_discovery_seen", "fantasy_realization_seen", "act3_unlocked", "act3_intro_pending", "act3_intro_seen", "jurejure_species_first_seen", "habitat_crisis_pending", "habitat_crisis_started", "finale_complete"]:
+	payload["progression_version"] = 24
+	for key in ["act2_unlocked", "forest_gacha_unlocked", "forest_gacha_intro_seen", "fantasy_first_discovery_seen", "fantasy_realization_seen", "act3_unlocked", "act3_intro_pending", "act3_intro_seen", "jurejure_species_unlocked", "jurejure_species_first_seen", "habitat_crisis_pending", "habitat_crisis_started", "finale_complete"]:
 		payload.erase(key)
 	var file := FileAccess.open("user://records.json", FileAccess.WRITE)
 	file.store_string(JSON.stringify(payload))
@@ -260,13 +288,16 @@ func _test_legacy_three_act_migration(game: Node) -> void:
 	game._load_save()
 	assert(game.act2_unlocked and game.forest_gacha_unlocked)
 	assert(game.fantasy_first_discovery_seen and game.fantasy_realization_seen)
-	assert(game._unique_fantasy_species_get_count() == 24)
+	assert(game._unique_fantasy_species_get_count() == 25)
 	assert(game.act3_unlocked and game.act3_intro_pending and not game.act3_intro_seen)
 	assert(game.scripted_dialog_kind.is_empty())
 	assert(game.normal_seed_bags == 6 and game.volume_seed_bags == 2 and game.premium_seed_bags == 1 and game.mystery_seed_bags == 3)
 	assert(bool(game.discovered.get("pinwheel", false)) and game._species_get_count("pinwheel") == 1)
 	assert(bool(game.discovered.get("transparent_succulent", false)) and game._species_get_count("transparent_succulent") == 1)
 	assert(bool(game.habitat_returned_species.get("laui", false)) and bool(game.habitat_returned_species.get("transparent_succulent", false)))
+	assert(game._is_jurejure_species_unlocked(migrated_jurejure_id))
+	assert(bool(game.greenhouse_available.get(migrated_jurejure_id, false)) and game._species_get_count(migrated_jurejure_id) == 2)
+	assert(not bool(game.habitat_returned_species.get(migrated_jurejure_id, false)))
 	assert(bool(game.completed_unlock_conditions.get("legacy_40cm", false)) and bool(game.completed_unlock_conditions.get("legacy_play_13", false)))
 	game._evaluate_unlock_rules("harvest_size", 100.0)
 	assert(game._species_get_count("pinwheel") == 1 and game._species_get_count("transparent_succulent") == 1)

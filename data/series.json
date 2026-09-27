@@ -303,5 +303,31 @@
     "unlock_condition": {"display_text": "ゲームを進めると出現"},
     "iap_product_id": "",
     "sort_order": 120
+  },
+  {
+    "series_id": "jurejure",
+    "display_name": "ジュレジュレ団多肉",
+    "subtitle": "欲望から生まれた特別な多肉たち",
+    "description": "ジュレジュレ団とのぷくぷくバトルで解放された品種を、一種ずつ記録するページです。",
+    "cover_image_path": "res://assets/jurejure_species/pure-gold.jpg",
+    "species_ids": [
+      "jurejure_pure_gold",
+      "jurejure_guilty_burger",
+      "jurejure_motemote",
+      "jurejure_compressed_cash",
+      "jurejure_chateaubriand",
+      "jurejure_crown",
+      "jurejure_luxury_watch",
+      "jurejure_luxury_cruise_ship",
+      "jurejure_pool_mansion",
+      "jurejure_supercar"
+    ],
+    "field_id": "",
+    "unlock_type": "future",
+    "preview_catalog_when_locked": true,
+    "catalog_purchase_enabled": false,
+    "unlock_condition": {"display_text": "ジュレジュレ団とのバトルで1種ずつ解放"},
+    "iap_product_id": "",
+    "sort_order": 130
   }
 ]
