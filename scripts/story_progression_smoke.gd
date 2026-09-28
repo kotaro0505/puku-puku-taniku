@@ -14,7 +14,7 @@ func _ready() -> void:
 	_test_retired_unlock_conditions(game)
 	_test_legacy_three_act_migration(game)
 	game._reset_progression_state()
-	print("STORY_PROGRESSION_SMOKE_OK acts=3 first_battle=act2 fantasy=1+6+24 act3=next_habitat crisis=visual_only old_objectives=removed old_gates=retired migration=preserved")
+	print("STORY_PROGRESSION_SMOKE_OK acts=3 first_battle=act2 original_guarantee=true fantasy_gate=original_get fantasy_guarantee=true forest_gate=2 fantasy=1+6+24 safe_queue=true exploitation=permanent secret_gacha=installed migration=preserved")
 	get_tree().quit()
 
 
@@ -27,7 +27,12 @@ func _test_catalog_contract(game: Node) -> void:
 	assert(jurejure_entries.size() == 10)
 	for entry in jurejure_entries:
 		assert(game._is_jurejure_species(entry) and game._is_fantasy_species(entry))
-		assert(FileAccess.file_exists(str(entry.get("image_path", ""))))
+		var image_path := str(entry.get("image_path", ""))
+		assert(image_path.ends_with(".png") and FileAccess.file_exists(image_path))
+		var texture := load(image_path) as Texture2D
+		var image := texture.get_image()
+		assert(image != null and image.detect_alpha() != Image.ALPHA_NONE)
+		assert(image.get_pixel(0, 0).a < 0.02 and image.get_pixel(image.get_width() - 1, image.get_height() - 1).a < 0.02)
 	for removed_id in StoryProgressionClass.REMOVED_COMMON_SPECIES_IDS:
 		assert(game._catalog_entry(str(removed_id)).is_empty())
 	var originals: Array[String] = []
@@ -99,9 +104,32 @@ func _test_three_act_sequence(game: Node) -> void:
 	# Any normally resolved first battle, including a loss, opens Act 2.
 	game._on_puku_puku_battle_resolved({"won": false, "player_score": 1.0, "opponent_score": 2.0})
 	assert(game.jurejure_battle_count == 1 and game.jurejure_battle_win_count == 0)
-	assert(game.act2_unlocked and game.forest_gacha_unlocked and not game.forest_gacha_intro_seen)
+	assert(game.act2_unlocked and not game.forest_gacha_unlocked and not game.forest_gacha_intro_seen)
+	assert(not StoryProgressionClass.fantasy_is_unlocked(game.story_progression_state))
+	assert(bool(game.story_progression_state.get("original_new_guarantee_pending", false)))
 	assert(game.main_story_stage == StoryProgressionClass.ACT_2)
-	game.forest_gacha_intro_seen = true
+
+	# The first normal game after the battle consumes one appearance guarantee,
+	# without awarding ownership. A later real GET of an unowned original opens
+	# fantasy and arms the separate fantasy appearance guarantee.
+	game.opening_species.clear()
+	game._prepare_story_spawn_guarantee()
+	assert(game.opening_species.size() == 1)
+	var guaranteed_original: Dictionary = game.opening_species[0]
+	assert(bool(guaranteed_original.get("main_story_original", false)))
+	assert(game._species_get_count(str(guaranteed_original.get("species_id", ""))) == 0)
+	assert(not bool(game.story_progression_state.get("original_new_guarantee_pending", true)))
+	game.opening_species.clear()
+	game._record_species_get(str(guaranteed_original.get("species_id", "")))
+	assert(StoryProgressionClass.fantasy_is_unlocked(game.story_progression_state))
+	assert(bool(game.story_progression_state.get("fantasy_new_guarantee_pending", false)))
+	assert(not game.forest_gacha_unlocked)
+	game._prepare_story_spawn_guarantee()
+	assert(game.opening_species.size() == 1)
+	var guaranteed_fantasy: Dictionary = game.opening_species[0]
+	assert(game._is_fantasy_species(guaranteed_fantasy) and not game._is_jurejure_species(guaranteed_fantasy))
+	assert(game._species_get_count(str(guaranteed_fantasy.get("species_id", ""))) == 0)
+	game.opening_species.clear()
 
 	var fantasy_ids: Array[String] = []
 	for entry in game.catalog_species:
@@ -114,17 +142,36 @@ func _test_three_act_sequence(game: Node) -> void:
 	assert(game._unique_fantasy_species_get_count() == 0)
 	assert(not game.act3_unlocked)
 
+	# A GET reached during another flow is queued, never injected into that
+	# flow. Closing the battle surface exposes the same event immediately.
+	game.puku_puku_battle.visible = true
 	game._record_species_get(fantasy_ids[0])
 	assert(game._unique_fantasy_species_get_count() == 1)
+	assert(not game.forest_gacha_unlocked)
+	game._try_start_pending_story_event()
+	assert(game.scripted_dialog_kind.is_empty())
+	game.puku_puku_battle.visible = false
 	game._try_start_pending_story_event()
 	assert(game.scripted_dialog_kind == "fantasy_first_discovery")
 	assert(game.scripted_dialog_pages.size() == 3)
 	assert(str(game.scripted_dialog_pages[0].get("text", "")) == "……なにこれ！？")
 	_finish_dialog(game)
 	assert(game.fantasy_first_discovery_seen)
+	game._record_species_get(fantasy_ids[1])
+	assert(game._unique_fantasy_species_get_count() == 2)
+	assert(game.forest_gacha_unlocked and not game.forest_gacha_intro_seen)
+	game._try_start_pending_story_event()
+	assert(game.scripted_dialog_kind == "forest_gacha_intro")
+	_finish_dialog(game)
+	assert(game.forest_gacha_intro_seen)
 
-	for index in range(1, 6):
+	for index in range(2, 5):
 		game._record_species_get(fantasy_ids[index])
+	game.puku_puku_battle.visible = true
+	game._record_species_get(fantasy_ids[5])
+	game._try_start_pending_story_event()
+	assert(game.scripted_dialog_kind.is_empty())
+	game.puku_puku_battle.visible = false
 	game._try_start_pending_story_event()
 	assert(game.scripted_dialog_kind == "fantasy_realization")
 	assert(game.scripted_dialog_pages.size() == 3)
@@ -188,18 +235,30 @@ func _test_three_act_sequence(game: Node) -> void:
 	game._toggle_mode()
 	await get_tree().process_frame
 	await get_tree().process_frame
-	assert(game.current_mode == "habitat" and game.scripted_dialog_kind == "habitat_crisis")
+	assert(game.current_mode == "habitat" and game.jurejure_intro_camera_active)
+	game._update_habitat_view_follow(1.0)
+	await get_tree().process_frame
+	assert(game.scripted_dialog_kind == "habitat_crisis")
 	assert(game.habitat_crisis_started and not game.habitat_crisis_pending)
 	assert(game.habitat_crisis_atmosphere.crisis_active and game.habitat_crisis_atmosphere.visible)
-	assert(str(game.scripted_dialog_pages[0].get("text", "")) == "……おかしい。")
-	assert("自然の中で創造していることを" in str(game.scripted_dialog_pages[5].get("text", "")))
+	assert(str(game.scripted_dialog_pages[0].get("text", "")) == "原生地は道具じゃないぞ…！")
+	for page in game.scripted_dialog_pages:
+		assert("自然の中で創造していることを" not in str(page.get("text", "")))
 	assert(not game.rain_bonus_active and not game.rain_bonus_in_progress and game.rain_bag_count == 0)
 	assert(game.rain_visual == null)
 	assert(game.habitat_returned_species == settled_before)
 	assert(game.discovered == discovered_before and game.species_get_counts == get_counts_before)
 	assert(game.normal_seed_bags == seeds_before)
 	_finish_dialog(game)
-	assert(game.finale_complete and game.main_story_stage == StoryProgressionClass.ACT_FINALE)
+	assert(not game.finale_complete and game.main_story_stage == StoryProgressionClass.ACT_3)
+	assert(StoryProgressionClass.peek_story_event(game.story_progression_state) == StoryProgressionClass.EVENT_SECRET_GACHA_INSTALL)
+	game._try_start_pending_story_event()
+	assert(game.scripted_dialog_kind == "secret_gacha_install")
+	_finish_dialog(game)
+	assert(StoryProgressionClass.secret_gacha_is_unlocked(game.story_progression_state))
+	assert(game.secret_gacha_active and game.secret_gacha_draws_remaining > 0)
+	game.jurejure_waiting_for_seed_pod_reward = true
+	assert(game._should_show_jurejure_group())
 
 
 func _test_retired_unlock_conditions(game: Node) -> void:

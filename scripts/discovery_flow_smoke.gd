@@ -4,9 +4,9 @@ func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
 	game._reset_progression_state();game.intro_story_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.habitat_tutorial_complete=true;game.puku_gauge_intro_complete=true;game.total_play_count=3
-	# This regression test exercises the established creative-series flow, which
-	# is intentionally available only after Act 2 for new saves.
-	game.habitat_awakened=true;game.habitat_awakening_event_complete=true;game.act2_unlocked=true
+	# This regression test exercises the established creative-series flow after
+	# the separate post-Act-II fantasy gate has opened.
+	game.habitat_awakened=true;game.habitat_awakening_event_complete=true;game.act2_unlocked=true;game.story_progression_state["fantasy_unlocked"]=true
 	game.unlocked_series["sweets"]=true
 	var candidates:Array[Dictionary]=game._habitat_new_species_candidates()
 	assert(candidates.is_empty())

@@ -14,6 +14,27 @@ const BATTLE_PLANTS_PER_SIDE := 12
 const LOSS_TAKE_MIN_RATIO := 0.40
 const LOSS_TAKE_MAX_RATIO := 0.80
 
+const EXPLOITATION_DIALOG_PATTERNS := [
+	[
+		{"speaker":"mouse","text_key":"jurejure_exploit_mouse_treasure"},
+		{"speaker":"peccary","text_key":"jurejure_exploit_peccary_more"},
+	],
+	[
+		{"speaker":"skunk","text_key":"jurejure_exploit_skunk_price"},
+		{"speaker":"mouse","text_key":"jurejure_exploit_mouse_no_rest"},
+	],
+	[
+		{"speaker":"peccary","text_key":"jurejure_exploit_peccary_imagine"},
+		{"speaker":"skunk","text_key":"jurejure_exploit_skunk_money"},
+	],
+]
+
+const CRISIS_CONCERN_PATTERNS := [
+	{"speaker":"panda","text_key":"habitat_exploit_concern_panda"},
+	{"speaker":"armadillo","text_key":"habitat_exploit_concern_armadillo"},
+	{"speaker":"girl","text_key":"habitat_exploit_concern_girl"},
+]
+
 # Ground-tested panorama positions. A visit chooses one point and keeps it
 # until the player leaves, so a habitat refresh cannot teleport the group.
 const HABITAT_GROUP_POINTS := [
@@ -33,12 +54,38 @@ static func growth_stage(original_count: int) -> int:
 static func should_be_present(
 		habitat_awakened: bool,
 		returned_to_greenhouse: bool,
-		_habitat_second_awakened: bool,
+		exploitation_started: bool,
 		waiting_for_seed_pod_reward: bool
 	) -> bool:
 	return habitat_awakened \
 		and returned_to_greenhouse \
-		and not waiting_for_seed_pod_reward
+		and (exploitation_started or not waiting_for_seed_pod_reward)
+
+
+static func focus_yaw(current_yaw: float, target_position: Vector3) -> float:
+	return current_yaw + wrapf(rad_to_deg(atan2(-target_position.x, -target_position.z)) - current_yaw, -180.0, 180.0)
+
+
+static func choose_exploitation_dialog(last_index: int, rng: RandomNumberGenerator) -> Dictionary:
+	if EXPLOITATION_DIALOG_PATTERNS.is_empty():
+		return {"index": -1, "pages": []}
+	var candidates: Array[int] = []
+	for index in range(EXPLOITATION_DIALOG_PATTERNS.size()):
+		if index != last_index or EXPLOITATION_DIALOG_PATTERNS.size() == 1:
+			candidates.append(index)
+	var chosen_index := candidates[rng.randi_range(0, candidates.size() - 1)]
+	return {"index": chosen_index, "pages": EXPLOITATION_DIALOG_PATTERNS[chosen_index].duplicate(true)}
+
+
+static func concern_for_visit(state: Dictionary, visit_id: int) -> Dictionary:
+	if visit_id <= 0 or int(state.get("last_crisis_concern_visit", -1)) == visit_id:
+		return {}
+	# Keep normal visits light: one short reaction every third new visit.
+	if visit_id % 3 != 0:
+		return {}
+	state["last_crisis_concern_visit"] = visit_id
+	var pattern_index := posmod(int(visit_id / 3) - 1, CRISIS_CONCERN_PATTERNS.size())
+	return CRISIS_CONCERN_PATTERNS[pattern_index].duplicate(true)
 
 
 static func choose_visit_point(

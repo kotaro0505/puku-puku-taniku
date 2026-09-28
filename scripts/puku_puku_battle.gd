@@ -10,19 +10,19 @@ const Localizer = preload("res://scripts/game_localizer.gd")
 const SucculentClass = preload("res://scripts/succulent.gd")
 const BACKGROUND_PATH := "res://assets/jurejure/puku-puku-battle-background.jpg"
 const PLANTS_PER_SIDE := 12
+const MAX_ACTIVE_PER_SIDE := 6
 const INITIAL_DIAMETER_CM := 1.6
 const MAIN_VISUAL_SCALE_BASE := 0.18
 const MAIN_VISUAL_SCALE_PER_CM := 0.058
 const BATTLE_PIXELS_PER_VISUAL_SCALE := 96.0
-const MAX_DISPLAY_SIZE_PX := 320.0
+const MAX_DISPLAY_SIZE_PX := 720.0
 const MIN_POINT_SPACING_PX := 48.0
 const SOW_SECONDS := 0.46
 const GERMINATION_SECONDS := 0.54
 
-# Coordinates are local to clipped soil-only fields. These polygons follow the
+# Coordinates are local to soil-root layers. These polygons follow the
 # photographed dirt mounds rather than treating their bounding boxes as soil.
-# The polygons are deliberately inset from the rock edge, leaving visual growth
-# room before field clipping becomes the final protection at the VS divider.
+# Only roots are constrained; the rosettes may extend beyond these rectangles.
 const OPPONENT_FIELD_RECT := Rect2(30, 260, 516, 218)
 const PLAYER_FIELD_RECT := Rect2(30, 690, 516, 300)
 const OPPONENT_SAFE_SOIL_POLYGON := [
@@ -58,6 +58,8 @@ var player_score := 0.0
 var opponent_score := 0.0
 var player_resolved := 0
 var opponent_resolved := 0
+var player_spawned := 0
+var opponent_spawned := 0
 var resolution_emitted := false
 var units: Array[Dictionary] = []
 var battle_phase := "idle"
@@ -218,6 +220,8 @@ func start_battle(entries: Array[Dictionary], textures: Dictionary, language: St
 	opponent_score = 0.0
 	player_resolved = 0
 	opponent_resolved = 0
+	player_spawned = 0
+	opponent_spawned = 0
 	resolution_emitted = false
 	battle_active = false
 	battle_phase = "awaiting_sow"
@@ -273,12 +277,12 @@ func debug_sow_immediately() -> void:
 
 
 func _spawn_seed_markers() -> void:
-	for index in range(PLANTS_PER_SIDE):
+	for index in range(MAX_ACTIVE_PER_SIDE):
 		_spawn_seed_marker(opponent_field, opponent_points[index], true, index)
 		_spawn_seed_marker(player_field, player_points[index], false, index)
 
 
-func _spawn_seed_marker(field: Control, point: Vector2, opponent: bool, index: int) -> void:
+func _spawn_seed_marker(field: Control, point: Vector2, opponent: bool, index: int) -> Panel:
 	var marker := Panel.new()
 	marker.name = ("Opponent" if opponent else "Player") + "Seed%02d" % index
 	marker.position = point - Vector2(7, 34)
@@ -299,6 +303,7 @@ func _spawn_seed_marker(field: Control, point: Vector2, opponent: bool, index: i
 	var fall := create_tween().bind_node(marker).set_parallel(true)
 	fall.tween_property(marker, "position", point - marker.size * 0.5, SOW_SECONDS).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	fall.tween_property(marker, "scale", Vector2.ONE, SOW_SECONDS * 0.72).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	return marker
 
 
 func _clear_seed_markers() -> void:
@@ -313,9 +318,11 @@ func _clear_seed_markers() -> void:
 func _create_all_units(animate_germination: bool) -> void:
 	if not units.is_empty():
 		return
-	for index in range(PLANTS_PER_SIDE):
+	for index in range(MAX_ACTIVE_PER_SIDE):
 		_create_unit(false, index, pending_entries, pending_textures, animate_germination)
+		player_spawned += 1
 		_create_unit(true, index, pending_entries, pending_textures, animate_germination)
+		opponent_spawned += 1
 
 
 func _create_unit(opponent: bool, point_index: int, entries: Array[Dictionary], textures: Dictionary, animate_germination: bool) -> void:
@@ -328,7 +335,8 @@ func _create_unit(opponent: bool, point_index: int, entries: Array[Dictionary], 
 				texture = candidate
 				break
 	var button := TextureButton.new()
-	button.name = ("Opponent" if opponent else "Player") + "Plant%02d" % point_index
+	var serial := opponent_spawned if opponent else player_spawned
+	button.name = ("Opponent" if opponent else "Player") + "Plant%02d_%02d" % [point_index, serial]
 	button.ignore_texture_size = true
 	button.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
 	button.texture_normal = texture
@@ -369,6 +377,7 @@ func _create_unit(opponent: bool, point_index: int, entries: Array[Dictionary], 
 		"opponent": opponent,
 		"field": field,
 		"point": point,
+		"point_index": point_index,
 		"size_cm": float(logic.diameter_cm),
 		"logic_seed": logic_seed,
 		"ai_style": str(harvest_plan.get("style", "player")),
@@ -464,8 +473,37 @@ func _resolve_unit(unit_index: int, jellied: bool) -> void:
 		player_score += score
 	_update_scores()
 	_show_unit_result(unit, score, resolved_as_jelly)
+	_queue_replacement(opponent, int(unit.get("point_index", -1)), Vector2(unit.get("point", Vector2.ZERO)))
 	if player_resolved >= PLANTS_PER_SIDE and opponent_resolved >= PLANTS_PER_SIDE:
 		_complete_battle()
+
+
+func _queue_replacement(opponent: bool, point_index: int, point: Vector2) -> void:
+	if not battle_active or battle_phase != "growing" or point_index < 0:
+		return
+	if opponent:
+		if opponent_spawned >= PLANTS_PER_SIDE:
+			return
+		opponent_spawned += 1
+	else:
+		if player_spawned >= PLANTS_PER_SIDE:
+			return
+		player_spawned += 1
+	_sow_replacement(opponent, point_index, point)
+
+
+func _sow_replacement(opponent: bool, point_index: int, point: Vector2) -> void:
+	var field := opponent_field if opponent else player_field
+	if not is_instance_valid(field):
+		return
+	var serial := opponent_spawned if opponent else player_spawned
+	var marker := _spawn_seed_marker(field, point, opponent, 100 + serial)
+	await get_tree().create_timer(SOW_SECONDS * 0.62).timeout
+	if is_instance_valid(marker):
+		marker.queue_free()
+	if not battle_active or battle_phase != "growing":
+		return
+	_create_unit(opponent, point_index, pending_entries, pending_textures, true)
 
 
 func _show_unit_result(unit: Dictionary, score: float, jellied: bool) -> void:
@@ -583,6 +621,8 @@ func _clear_units() -> void:
 		for child in logic_root.get_children():
 			child.free()
 	units.clear()
+	player_spawned = 0
+	opponent_spawned = 0
 	pending_entries.clear()
 	pending_textures.clear()
 	opponent_points.clear()
@@ -608,7 +648,7 @@ static func point_is_in_safe_soil(point: Vector2, opponent: bool) -> bool:
 func _generate_side_points(opponent: bool) -> Array[Vector2]:
 	var points: Array[Vector2] = []
 	var bounds := OPPONENT_SAMPLE_BOUNDS if opponent else PLAYER_SAMPLE_BOUNDS
-	for _point_index in range(PLANTS_PER_SIDE):
+	for _point_index in range(MAX_ACTIVE_PER_SIDE):
 		var selected := Vector2.ZERO
 		var best := Vector2.ZERO
 		var best_clearance := -1.0
@@ -669,7 +709,9 @@ func _field_control(field_name: String, field_rect: Rect2) -> Control:
 	field.name = field_name
 	field.position = field_rect.position
 	field.size = field_rect.size
-	field.clip_contents = true
+	# The soil point anchors the root, but the rosette itself may grow freely.
+	# Score panels are later siblings and remain readable above giant plants.
+	field.clip_contents = false
 	field.mouse_filter = Control.MOUSE_FILTER_PASS
 	return field
 

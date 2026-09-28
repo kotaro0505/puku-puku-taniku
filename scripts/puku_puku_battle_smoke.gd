@@ -22,7 +22,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	var texture := load("res://assets/plants/sprite-colorata.png") as Texture2D
 	battle.start_battle([SAMPLE_SPECIES], {"colorata": texture}, "ja", 20260926)
-	assert(battle.player_points.size() == 12 and battle.opponent_points.size() == 12)
+	assert(battle.player_points.size() == BattleClass.MAX_ACTIVE_PER_SIDE and battle.opponent_points.size() == BattleClass.MAX_ACTIVE_PER_SIDE)
 	_verify_soil_points(battle.player_points, false)
 	_verify_soil_points(battle.opponent_points, true)
 	var first_player_layout: Array[Vector2] = battle.player_points.duplicate()
@@ -49,12 +49,12 @@ func _ready() -> void:
 	assert(is_zero_approx(battle.opponent_score) and is_zero_approx(battle.player_score))
 	battle._on_sow_pressed()
 	assert(battle.battle_phase == "sowing")
-	assert(_marker_count(battle) == BattleClass.PLANTS_PER_SIDE * 2)
+	assert(_marker_count(battle) == BattleClass.MAX_ACTIVE_PER_SIDE * 2)
 	_verify_seed_markers_match_points(battle)
 	assert(is_zero_approx(battle.opponent_score) and is_zero_approx(battle.player_score))
 	await get_tree().create_timer(BattleClass.SOW_SECONDS + BattleClass.GERMINATION_SECONDS + 0.08).timeout
 	assert(battle.battle_phase == "growing" and battle.battle_active)
-	assert(battle.units.size() == BattleClass.PLANTS_PER_SIDE * 2)
+	assert(battle.units.size() == BattleClass.MAX_ACTIVE_PER_SIDE * 2)
 	assert(is_zero_approx(battle.opponent_score) and is_zero_approx(battle.player_score))
 
 	var player_count := 0
@@ -72,7 +72,8 @@ func _ready() -> void:
 		var live_size_label := unit.get("size_label") as Label
 		assert(is_instance_valid(live_size_label))
 		assert(live_size_label.text == "%.1fcm" % float(unit.get("size_cm", 0.0)))
-	assert(player_count == 12 and opponent_count == 12)
+	assert(player_count == BattleClass.MAX_ACTIVE_PER_SIDE and opponent_count == BattleClass.MAX_ACTIVE_PER_SIDE)
+	assert(battle.player_spawned == BattleClass.MAX_ACTIVE_PER_SIDE and battle.opponent_spawned == BattleClass.MAX_ACTIVE_PER_SIDE)
 	var growth_unit: Dictionary = battle.units[0]
 	var initial_visual_size: float = float((growth_unit.get("node") as TextureButton).size.x)
 	for unit_index in range(battle.units.size()):
@@ -88,8 +89,9 @@ func _ready() -> void:
 	assert((growth_unit.get("size_label") as Label).text == "%.1fcm" % float(growth_unit.get("size_cm", 0.0)))
 
 	_verify_shared_growth_source()
-	_verify_clipped_layout(battle)
+	_verify_unclipped_layout(battle)
 	_verify_jelly_precedes_ai_harvest(battle)
+	await _verify_sequential_refill(texture)
 
 	var ai_stats := _simulate_ai_population(73000)
 	var same_policy_reference := _simulate_ai_population(73000)
@@ -100,8 +102,8 @@ func _ready() -> void:
 	assert(is_equal_approx(float(ai_stats.average_score), float(same_policy_reference.average_score)))
 
 	print(
-		"PUKU_PUKU_BATTLE_SMOKE_OK sow=manual plants=12v12 random_soil=true shared_growth=true shared_jelly=true " +
-		"ai_jelly_rate=%.3f ai_average_harvest_cm=%.3f ai_average_score=%.3f condition_delta=0.000 main_scale_visual=true clipped_fields=true" % [
+		"PUKU_PUKU_BATTLE_SMOKE_OK sow=manual active=6v6 total=12v12 refill=true random_soil=true shared_growth=true shared_jelly=true " +
+		"ai_jelly_rate=%.3f ai_average_harvest_cm=%.3f ai_average_score=%.3f condition_delta=0.000 main_scale_visual=true unclipped_plants=true" % [
 			float(ai_stats.jelly_rate),
 			float(ai_stats.average_harvest_cm),
 			float(ai_stats.average_score)
@@ -128,9 +130,49 @@ func _verify_shared_growth_source() -> void:
 	battle_reference.free()
 
 
-func _verify_clipped_layout(battle: Control) -> void:
-	assert(battle.opponent_field.clip_contents)
-	assert(battle.player_field.clip_contents)
+func _verify_sequential_refill(texture: Texture2D) -> void:
+	var battle := BattleClass.new()
+	add_child(battle)
+	await get_tree().process_frame
+	battle.start_battle([SAMPLE_SPECIES], {"colorata": texture}, "ja", 20260928)
+	battle.debug_sow_immediately()
+	var first_player_index := _first_live_unit_index(battle, false)
+	var first_opponent_index := _first_live_unit_index(battle, true)
+	assert(first_player_index >= 0 and first_opponent_index >= 0)
+	battle._resolve_unit(first_player_index, false)
+	battle._resolve_unit(first_opponent_index, true)
+	assert(battle.player_resolved == 1 and battle.opponent_resolved == 1)
+	assert(battle.player_spawned == 7 and battle.opponent_spawned == 7)
+	assert(_marker_count(battle) == 2)
+	await get_tree().create_timer(BattleClass.SOW_SECONDS * 0.72).timeout
+	assert(_live_unit_count(battle, false) == BattleClass.MAX_ACTIVE_PER_SIDE)
+	assert(_live_unit_count(battle, true) == BattleClass.MAX_ACTIVE_PER_SIDE)
+	assert(battle.units.size() == BattleClass.MAX_ACTIVE_PER_SIDE * 2 + 2)
+	# Drain both queues one slot at a time. Each side must create and resolve all
+	# twelve plants without ever exceeding six simultaneously alive.
+	while battle.player_resolved < BattleClass.PLANTS_PER_SIDE or battle.opponent_resolved < BattleClass.PLANTS_PER_SIDE:
+		if battle.player_resolved < BattleClass.PLANTS_PER_SIDE:
+			var player_index := _first_live_unit_index(battle, false)
+			assert(player_index >= 0)
+			battle._resolve_unit(player_index, false)
+		if battle.opponent_resolved < BattleClass.PLANTS_PER_SIDE:
+			var opponent_index := _first_live_unit_index(battle, true)
+			assert(opponent_index >= 0)
+			battle._resolve_unit(opponent_index, false)
+		assert(_live_unit_count(battle, false) <= BattleClass.MAX_ACTIVE_PER_SIDE)
+		assert(_live_unit_count(battle, true) <= BattleClass.MAX_ACTIVE_PER_SIDE)
+		if battle.player_resolved < BattleClass.PLANTS_PER_SIDE or battle.opponent_resolved < BattleClass.PLANTS_PER_SIDE:
+			await get_tree().create_timer(BattleClass.SOW_SECONDS * 0.72).timeout
+	assert(battle.player_spawned == BattleClass.PLANTS_PER_SIDE)
+	assert(battle.opponent_spawned == BattleClass.PLANTS_PER_SIDE)
+	assert(battle.player_resolved == BattleClass.PLANTS_PER_SIDE)
+	assert(battle.opponent_resolved == BattleClass.PLANTS_PER_SIDE)
+	battle.queue_free()
+
+
+func _verify_unclipped_layout(battle: Control) -> void:
+	assert(not battle.opponent_field.clip_contents)
+	assert(not battle.player_field.clip_contents)
 	assert(BattleClass.OPPONENT_FIELD_RECT.end.y < BattleClass.PLAYER_FIELD_RECT.position.y)
 	for unit_index in range(battle.units.size()):
 		var unit: Dictionary = battle.units[unit_index]
@@ -158,6 +200,7 @@ func _verify_clipped_layout(battle: Control) -> void:
 		assert(size_label.position.x >= -0.01 and size_label.position.y >= -0.01)
 		assert(size_label.position.x + size_label.size.x <= field.size.x + 0.01)
 		assert(size_label.position.y + size_label.size.y <= field.size.y + 0.01)
+		assert(button.position.y < 0.0 or button.position.x < 0.0 or button.position.x + button.size.x > field.size.x)
 
 
 func _verify_jelly_precedes_ai_harvest(battle: Control) -> void:
@@ -236,7 +279,7 @@ func _marker_count(battle: Control) -> int:
 
 
 func _verify_soil_points(points: Array[Vector2], opponent: bool) -> void:
-	assert(points.size() == BattleClass.PLANTS_PER_SIDE)
+	assert(points.size() == BattleClass.MAX_ACTIVE_PER_SIDE)
 	for index in range(points.size()):
 		assert(BattleClass.point_is_in_safe_soil(points[index], opponent))
 		for other_index in range(index):
@@ -255,4 +298,20 @@ func _verify_seed_markers_match_points(battle: Control) -> void:
 			assert(point in expected)
 			if opponent:opponent_seen += 1
 			else:player_seen += 1
-	assert(opponent_seen == 12 and player_seen == 12)
+	assert(opponent_seen == BattleClass.MAX_ACTIVE_PER_SIDE and player_seen == BattleClass.MAX_ACTIVE_PER_SIDE)
+
+
+func _first_live_unit_index(battle: Control, opponent: bool) -> int:
+	for unit_index in range(battle.units.size()):
+		var unit: Dictionary = battle.units[unit_index]
+		if bool(unit.get("opponent", false)) == opponent and not bool(unit.get("done", false)):
+			return unit_index
+	return -1
+
+
+func _live_unit_count(battle: Control, opponent: bool) -> int:
+	var count := 0
+	for unit in battle.units:
+		if bool(unit.get("opponent", false)) == opponent and not bool(unit.get("done", false)):
+			count += 1
+	return count

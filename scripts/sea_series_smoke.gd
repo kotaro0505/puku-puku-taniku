@@ -19,6 +19,7 @@ func _ready() -> void:
 	get_tree().paused = false
 	game._reset_progression_state()
 	game.act2_unlocked = true
+	game.story_progression_state["fantasy_unlocked"] = true
 	game.intro_story_complete = true
 	game.mystery_items_acquired = true
 	game.encyclopedia_unlocked = true

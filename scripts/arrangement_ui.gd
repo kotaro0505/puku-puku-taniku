@@ -13,8 +13,10 @@ const PotPlaceholderClass = preload("res://scripts/arrangement_pot_placeholder.g
 const MAX_PLANTS_PER_ARRANGEMENT := 24
 const PLANT_CONTROL_SIZE := Vector2(150,150)
 const PLANT_SCALE_MIN := 0.45
-const ARRANGEMENT_CM_AT_SCALE_ONE := 30.0
-const PLANT_SCALE_SAFETY_MAX := 6.0
+# This is only a technical guard against accidental infinite transforms.  It
+# is deliberately unrelated to harvest records and sits well beyond ordinary
+# editor gestures.
+const PLANT_SCALE_SAFETY_MAX := 12.0
 const PLANT_SCALE_STEP := 0.10
 const PLANT_ROTATION_STEP := 15.0
 const PLANT_GESTURE_MOVE_THRESHOLD := 12.0
@@ -161,10 +163,10 @@ func sync_species_bests(best_records:Dictionary)->void:
 	species_bests=best_records
 	if visible and editor_page.visible and not current_arrangement.is_empty():_rebuild_editor_scene()
 
-func _species_scale_max(species_id:String)->float:
-	var best_cm:=maxf(0.0,float(species_bests.get(species_id,0.0)))
-	if best_cm<=0.0:return PLANT_SCALE_MIN
-	return clampf(best_cm/ARRANGEMENT_CM_AT_SCALE_ONE,PLANT_SCALE_MIN,PLANT_SCALE_SAFETY_MAX)
+func _species_scale_max(_species_id:String)->float:
+	# Harvest bests remain display-only metadata.  Arrangement composition is a
+	# creative tool and must never be capped by a species' historical best cm.
+	return PLANT_SCALE_SAFETY_MAX
 
 func _plant_scale_max(plant:Dictionary)->float:
 	return _species_scale_max(str(plant.get("species_id","")))
