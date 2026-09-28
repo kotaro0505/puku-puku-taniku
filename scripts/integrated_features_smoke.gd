@@ -102,7 +102,7 @@ func _test_language_and_symbol_safety(game)->void:
 		"armadillo_idle_1","research_intro_1","research_return_offer","restore_offer","restore_success",
 		"research_status_sprouted","research_status_first","research_milestone_catalog","research_milestone_species",
 		"research_transfer","audio_se_on","story_colorata_1","story_trio_1","awakening_memory","habitat_return_panda","initial_seed_stock_received","tutorial_normal_pre_sow","seed_pod_tutorial_received","forest_gacha_intro_system","fantasy_first_girl","fantasy_six_girl_2","act3_mouse_realizes","habitat_crisis_armadillo_1","jelly_float",
-		"jurejure_after_encounter_panda","jurejure_after_encounter_armadillo","jurejure_exploit_mouse_treasure","habitat_exploit_start_panda","habitat_exploit_concern_girl","secret_gacha_install_mouse","secret_gacha_install_system"
+		"jurejure_after_encounter_panda","jurejure_after_encounter_armadillo","jurejure_exploit_mouse_treasure","habitat_exploit_start_panda","habitat_exploit_midpoint_panda","habitat_exploit_concern_girl","secret_gacha_install_mouse","secret_gacha_install_system"
 	]
 	var numeric_format_keys:=["research_status_first","research_transfer"]
 	var string_format_keys:=["restore_success","research_milestone_species","story_trio_1"]

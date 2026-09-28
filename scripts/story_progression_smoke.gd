@@ -14,7 +14,7 @@ func _ready() -> void:
 	_test_retired_unlock_conditions(game)
 	_test_legacy_three_act_migration(game)
 	game._reset_progression_state()
-	print("STORY_PROGRESSION_SMOKE_OK acts=3 first_battle=act2 original_guarantee=true fantasy_gate=original_get fantasy_guarantee=true forest_gate=2 fantasy=1+6+24 safe_queue=true exploitation=permanent secret_gacha=installed migration=preserved")
+	print("STORY_PROGRESSION_SMOKE_OK acts=3 first_battle=act2 original_guarantee=true fantasy_gate=original_get fantasy_guarantee=true forest_gate=2 fantasy=1+6+24 safe_queue=true exploitation=act3 midpoint=4 crisis=8 secret_gacha=midpoint migration=preserved")
 	get_tree().quit()
 
 
@@ -200,16 +200,66 @@ func _test_three_act_sequence(game: Node) -> void:
 	assert(str(game.scripted_dialog_pages[0].get("text", "")) == "つまり、欲しいものを想像すればいいんだチュー！？")
 	assert(str(game.scripted_dialog_pages[1].get("text", "")) == "だったら、もっともっと作らせるチュー！")
 	_finish_dialog(game)
+	await get_tree().process_frame
+	await get_tree().process_frame
 	assert(game.act3_intro_seen and not game.act3_intro_pending)
+	assert(StoryProgressionClass.exploitation_is_started(game.story_progression_state))
+	assert(not game.habitat_crisis_started)
+	assert(game.jurejure_intro_camera_active)
+	game._update_habitat_view_follow(1.0)
+	await get_tree().process_frame
+	assert(game.puku_puku_battle.visible and game.puku_puku_battle.choice_layer.visible)
+	assert(not game.puku_puku_battle.battle_active)
+	game.puku_puku_battle._decline_battle()
+	game.jurejure_waiting_for_seed_pod_reward = true
+	assert(game._should_show_jurejure_group())
+	game.habitat_visit_id = 3
+	game._maybe_start_habitat_exploitation_concern()
+	assert(game.scripted_dialog_kind == "habitat_exploitation_concern")
+	assert(not game.scripted_dialog_pages.is_empty())
+	_finish_dialog(game)
 
-	# JureJure progress is based on unique real GETs. A repeat does not advance
-	# the threshold; the eighth distinct species schedules (but does not start)
-	# the crisis for the next safe habitat visit.
+	# JureJure progress now has three distinct phases: Act III starts
+	# exploitation, four unique GETs trigger the clash/install midpoint, and only
+	# eight unique GETs schedule the weakening/rain crisis.
 	var jurejure_ids: Array[String] = []
 	for entry in game._series_species_entries("jurejure"):
 		jurejure_ids.append(str(entry.get("species_id", "")))
 	assert(game._unlock_jurejure_pool())
-	for index in range(7):
+	game.jurejure_species_first_seen = true
+	for index in range(3):
+		assert(game._register_species_discovery(jurejure_ids[index], true))
+	assert(game._unique_jurejure_species_get_count() == 3)
+	assert(not bool(game.story_progression_state.get("exploitation_midpoint_pending", false)))
+	assert(not game.habitat_crisis_pending and not game.habitat_crisis_started)
+	game._register_species_discovery(jurejure_ids[0], true)
+	assert(game._unique_jurejure_species_get_count() == 3 and not game.habitat_crisis_pending)
+	assert(game._register_species_discovery(jurejure_ids[3], true))
+	assert(game._unique_jurejure_species_get_count() == 4)
+	assert(bool(game.story_progression_state.get("exploitation_midpoint_pending", false)))
+	assert(not game.habitat_crisis_pending and not game.habitat_crisis_started)
+	game._try_start_pending_story_event()
+	assert(game.scripted_dialog_kind == "exploitation_midpoint")
+	var midpoint_text := ""
+	for page in game.scripted_dialog_pages:
+		midpoint_text += str(page.get("text", ""))
+	assert("原生地は道具じゃないぞ" in midpoint_text)
+	assert("苦しんでるように見える" in midpoint_text)
+	assert("休ませる必要なんかない" in midpoint_text)
+	assert("このままにはしておけないぞ" in midpoint_text)
+	_finish_dialog(game)
+	assert(StoryProgressionClass.exploitation_midpoint_is_seen(game.story_progression_state))
+	StoryProgressionClass.update_jurejure_progress(game.story_progression_state, 4)
+	assert(not bool(game.story_progression_state.get("exploitation_midpoint_pending", false)))
+	assert(StoryProgressionClass.peek_story_event(game.story_progression_state) == StoryProgressionClass.EVENT_SECRET_GACHA_INSTALL)
+	game._try_start_pending_story_event()
+	assert(game.scripted_dialog_kind == "secret_gacha_install")
+	_finish_dialog(game)
+	assert(StoryProgressionClass.secret_gacha_is_unlocked(game.story_progression_state))
+	assert(game.secret_gacha_active and game.secret_gacha_draws_remaining > 0)
+	assert(not game.habitat_crisis_started and not game.habitat_crisis_atmosphere.crisis_active)
+
+	for index in range(4, 7):
 		assert(game._register_species_discovery(jurejure_ids[index], true))
 	assert(game._unique_jurejure_species_get_count() == 7)
 	assert(not game.habitat_crisis_pending and not game.habitat_crisis_started)
@@ -218,7 +268,6 @@ func _test_three_act_sequence(game: Node) -> void:
 	assert(game._register_species_discovery(jurejure_ids[7], true))
 	assert(game._unique_jurejure_species_get_count() == 8)
 	assert(game.habitat_crisis_pending and not game.habitat_crisis_started)
-	game.jurejure_species_first_seen = true
 
 	# The crisis also waits for a later habitat visit and changes presentation
 	# only. It must not revive the retired rain bonus or mutate collection state.
@@ -241,9 +290,14 @@ func _test_three_act_sequence(game: Node) -> void:
 	assert(game.scripted_dialog_kind == "habitat_crisis")
 	assert(game.habitat_crisis_started and not game.habitat_crisis_pending)
 	assert(game.habitat_crisis_atmosphere.crisis_active and game.habitat_crisis_atmosphere.visible)
-	assert(str(game.scripted_dialog_pages[0].get("text", "")) == "原生地は道具じゃないぞ…！")
+	assert(str(game.scripted_dialog_pages[0].get("text", "")) == "……おかしい。")
+	var crisis_text := ""
 	for page in game.scripted_dialog_pages:
-		assert("自然の中で創造していることを" not in str(page.get("text", "")))
+		crisis_text += str(page.get("text", ""))
+	assert("また多肉が絶滅してしまう" in crisis_text)
+	assert("作らせすぎた" in crisis_text)
+	assert("原生地は道具じゃないぞ" not in crisis_text)
+	assert("休ませる必要なんかない" not in crisis_text)
 	assert(not game.rain_bonus_active and not game.rain_bonus_in_progress and game.rain_bag_count == 0)
 	assert(game.rain_visual == null)
 	assert(game.habitat_returned_species == settled_before)
@@ -251,14 +305,18 @@ func _test_three_act_sequence(game: Node) -> void:
 	assert(game.normal_seed_bags == seeds_before)
 	_finish_dialog(game)
 	assert(not game.finale_complete and game.main_story_stage == StoryProgressionClass.ACT_3)
-	assert(StoryProgressionClass.peek_story_event(game.story_progression_state) == StoryProgressionClass.EVENT_SECRET_GACHA_INSTALL)
-	game._try_start_pending_story_event()
-	assert(game.scripted_dialog_kind == "secret_gacha_install")
-	_finish_dialog(game)
 	assert(StoryProgressionClass.secret_gacha_is_unlocked(game.story_progression_state))
 	assert(game.secret_gacha_active and game.secret_gacha_draws_remaining > 0)
+	assert(StoryProgressionClass.peek_story_event(game.story_progression_state) != StoryProgressionClass.EVENT_SECRET_GACHA_INSTALL)
 	game.jurejure_waiting_for_seed_pod_reward = true
 	assert(game._should_show_jurejure_group())
+	game._save()
+	var phase_payload = JSON.parse_string(FileAccess.get_file_as_string("user://records.json"))
+	assert(phase_payload is Dictionary and bool(phase_payload.get("habitat_crisis_started", false)))
+	var saved_phase_state := StoryProgressionClass.normalize_runtime_state(phase_payload.get("story_progression_state", {}))
+	assert(StoryProgressionClass.exploitation_is_started(saved_phase_state))
+	assert(StoryProgressionClass.exploitation_midpoint_is_seen(saved_phase_state))
+	assert(StoryProgressionClass.secret_gacha_is_unlocked(saved_phase_state))
 
 
 func _test_retired_unlock_conditions(game: Node) -> void:
@@ -365,6 +423,37 @@ func _test_legacy_three_act_migration(game: Node) -> void:
 	assert(bool(game.completed_unlock_conditions.get("legacy_40cm", false)) and bool(game.completed_unlock_conditions.get("legacy_play_13", false)))
 	game._evaluate_unlock_rules("harvest_size", 100.0)
 	assert(game._species_get_count("pinwheel") == 1 and game._species_get_count("transparent_succulent") == 1)
+
+	# v27 saves used habitat_crisis_started as both exploitation and crisis.
+	# Preserve their reached content while translating it into all three durable
+	# phase states and never replay the relocated post-encounter warning.
+	var old_crisis_state := StoryProgressionClass.normalize_runtime_state({"version": 1}, {
+		"legacy": true,
+		"act3_intro_seen": true,
+		"jurejure_get_count": 8,
+		"jurejure_intro_complete": true,
+		"habitat_crisis_started": true,
+		"secret_gacha_evidence": false,
+	})
+	assert(StoryProgressionClass.exploitation_is_started(old_crisis_state))
+	assert(StoryProgressionClass.exploitation_midpoint_is_seen(old_crisis_state))
+	assert(StoryProgressionClass.secret_gacha_is_unlocked(old_crisis_state))
+	assert(bool(old_crisis_state.get("post_encounter_greenhouse_seen", false)))
+	assert(not bool(old_crisis_state.get("post_encounter_greenhouse_pending", false)))
+
+	# A save that saw Act III and reached four species, but not the old crisis,
+	# resumes at the new midpoint rather than skipping forward to rain.
+	var old_midpoint_state := StoryProgressionClass.normalize_runtime_state({"version": 1}, {
+		"legacy": true,
+		"act3_intro_seen": true,
+		"jurejure_get_count": 4,
+		"habitat_crisis_started": false,
+		"secret_gacha_evidence": false,
+	})
+	assert(StoryProgressionClass.exploitation_is_started(old_midpoint_state))
+	assert(bool(old_midpoint_state.get("exploitation_midpoint_pending", false)))
+	assert(StoryProgressionClass.peek_story_event(old_midpoint_state) == StoryProgressionClass.EVENT_EXPLOITATION_MIDPOINT)
+	assert(not StoryProgressionClass.secret_gacha_is_unlocked(old_midpoint_state))
 
 
 func _finish_dialog(game: Node) -> void:

@@ -1,6 +1,7 @@
 extends Node
 
 const JureJureSystemClass = preload("res://scripts/jurejure_system.gd")
+const StoryProgressionClass = preload("res://scripts/story_progression.gd")
 const Localizer = preload("res://scripts/game_localizer.gd")
 const JUREJURE_SPECIES_IDS: Array[String] = [
 	"jurejure_pure_gold", "jurejure_guilty_burger", "jurejure_motemote",
@@ -26,7 +27,7 @@ func _ready() -> void:
 	_test_first_loss_unlocks_act_two(game)
 	await _test_save_compatibility(game)
 	game._reset_progression_state()
-	print("JUREJURE_STORY_SMOKE_OK group=three_close first_encounter=camera+bgm+post_warning battle=active6_total12 act2_only=true crisis=always_present exploit_dialog=nonrepeat pool_unlock=all_10 ownership=exact reward=random save_fresh=true")
+	print("JUREJURE_STORY_SMOKE_OK group=three_close first_encounter=camera+bgm home_warning=once battle=active6_total12 act2_only=true exploitation=act3+choice+permanent midpoint=4 crisis=8 exploit_dialog=nonrepeat pool_unlock=all_10 ownership=exact reward=random save_fresh=true")
 	get_tree().quit()
 
 
@@ -141,7 +142,8 @@ func _test_habitat_group_and_intro(game: Node) -> void:
 	assert("勝手に持っていくなよ" in all_text)
 	assert("絶滅したのよ" in all_text)
 	assert("ぷくぷくバトル" in all_text)
-	assert("定期的に原生地へ行こう" in all_text)
+	assert("定期的に原生地へ行こう" not in all_text)
+	assert(str(game.scripted_dialog_pages[-1].get("text", "")) == Localizer.text("ja", "jurejure_confront_mouse_battle"))
 	assert("まだ小さい" not in all_text)
 	assert("守ってるわけじゃない" not in all_text)
 	_finish_dialog(game)
@@ -155,8 +157,16 @@ func _test_habitat_group_and_intro(game: Node) -> void:
 	assert(not game.puku_puku_battle.visible)
 	assert(game.audio_manager.current_bgm_key == "habitat")
 	assert(not _group_item(game).is_empty())
-	game.current_mode = "greenhouse";game._apply_mode();game._toggle_mode();await get_tree().process_frame
-	assert(game.scripted_dialog_kind.is_empty() and not game.jurejure_first_encounter_overlay.visible)
+	assert(bool(game.story_progression_state.get("post_encounter_greenhouse_pending", false)))
+	game._toggle_mode();await get_tree().process_frame;await get_tree().process_frame
+	assert(game.current_mode == "greenhouse" and game.scripted_dialog_kind == "post_jurejure_encounter_home")
+	assert(game.scripted_dialog_pages.size() == 2)
+	assert(str(game.scripted_dialog_pages[0].get("text", "")) == Localizer.text("ja", "jurejure_after_encounter_panda"))
+	assert(str(game.scripted_dialog_pages[1].get("text", "")) == Localizer.text("ja", "jurejure_after_encounter_armadillo"))
+	_finish_dialog(game)
+	assert(bool(game.story_progression_state.get("post_encounter_greenhouse_seen", false)))
+	game._toggle_mode();await get_tree().process_frame
+	assert(game.current_mode == "habitat" and game.scripted_dialog_kind.is_empty() and not game.jurejure_first_encounter_overlay.visible)
 
 	game._on_jurejure_group_pressed()
 	assert(game.scripted_dialog_kind == "jurejure_challenge")
@@ -366,6 +376,7 @@ func _prepare_act_three_reward(game: Node) -> void:
 	game.act3_unlocked = true
 	game.act3_intro_pending = false
 	game.act3_intro_seen = true
+	StoryProgressionClass.begin_exploitation(game.story_progression_state, game._unique_jurejure_species_get_count())
 	game.current_mode = "habitat"
 	game._update_main_story_progress(false)
 	game._apply_mode()
@@ -396,7 +407,7 @@ func _test_act_three_reward_flow(game: Node) -> void:
 	game.rng.seed = 20260927
 	assert(game._should_show_jurejure_group())
 	game._on_jurejure_group_pressed()
-	assert(game.scripted_dialog_kind == "jurejure_challenge")
+	assert(game.scripted_dialog_kind == "jurejure_exploitation_challenge")
 	_finish_dialog(game)
 	await get_tree().process_frame
 	assert(game.puku_puku_battle.visible and game.puku_puku_battle.choice_layer.visible)
@@ -405,8 +416,8 @@ func _test_act_three_reward_flow(game: Node) -> void:
 	game.puku_puku_battle.debug_sow_immediately()
 	game.puku_puku_battle.debug_force_result(420.0, 180.0)
 	await get_tree().process_frame
-	assert(game.jurejure_waiting_for_seed_pod_reward)
-	assert(not game._should_show_jurejure_group() and _group_item(game).is_empty())
+	assert(not game.jurejure_waiting_for_seed_pod_reward)
+	assert(game._should_show_jurejure_group() and not _group_item(game).is_empty())
 	var reward_id: String = game.jurejure_pending_reward_species_id
 	assert(reward_id in JUREJURE_SPECIES_IDS)
 	assert(game.jurejure_pool_unlocked)
@@ -464,12 +475,11 @@ func _test_act_three_reward_flow(game: Node) -> void:
 	fresh_game.queue_free()
 	await get_tree().process_frame
 
-	# Act III alone keeps the ordinary post-victory rest. Permanent presence
-	# starts only when the eight-species exploitation/crisis phase begins.
+	# Exploitation starts at the Act III intro, so a victory and an old pod-wait
+	# flag can no longer remove the gang before the eight-species rain crisis.
 	game.jurejure_waiting_for_seed_pod_reward = true
-	assert(not game._should_show_jurejure_group())
-	game.habitat_crisis_started = true
 	assert(game._should_show_jurejure_group())
+	assert(not game.habitat_crisis_started)
 	game._build_habitat_items(true)
 	assert(not _group_item(game).is_empty())
 
@@ -479,17 +489,12 @@ func _test_jurejure_crisis_threshold(game: Node) -> void:
 	# This case isolates the exploitation encounter. The separate first-Jure
 	# acquisition flow is covered above and must not pre-empt this dialogue.
 	game.jurejure_species_first_seen = true
+	assert(StoryProgressionClass.exploitation_is_started(game.story_progression_state))
 	assert(game._unlock_jurejure_pool())
-	for index in range(7):
+	for index in range(3):
 		game._register_species_discovery(JUREJURE_SPECIES_IDS[index], true)
-	assert(game._unique_jurejure_species_get_count() == 7)
+	assert(game._unique_jurejure_species_get_count() == 3)
 	assert(not game.habitat_crisis_pending and not game.habitat_crisis_started)
-	game._register_species_discovery(JUREJURE_SPECIES_IDS[0], true)
-	assert(game._unique_jurejure_species_get_count() == 7 and not game.habitat_crisis_pending)
-	game._register_species_discovery(JUREJURE_SPECIES_IDS[7], true)
-	assert(game._unique_jurejure_species_get_count() == 8)
-	assert(game.habitat_crisis_pending and not game.habitat_crisis_started)
-	game.habitat_crisis_started = true
 	game.jurejure_waiting_for_seed_pod_reward = true
 	assert(game._should_show_jurejure_group())
 	var dialog_rng := RandomNumberGenerator.new()
@@ -506,9 +511,9 @@ func _test_jurejure_crisis_threshold(game: Node) -> void:
 	_finish_dialog(game)
 	await get_tree().process_frame
 	await get_tree().process_frame
-	assert(game.puku_puku_battle.visible and game.puku_puku_battle.battle_phase == "awaiting_sow")
-	game.puku_puku_battle.visible = false
-	game.puku_puku_battle._clear_units()
+	assert(game.puku_puku_battle.visible and game.puku_puku_battle.choice_layer.visible)
+	assert(not game.puku_puku_battle.battle_active)
+	game.puku_puku_battle._decline_battle()
 	assert(game.current_mode == "habitat")
 	assert(game.scripted_dialog_kind.is_empty())
 	assert(game._should_show_jurejure_group())
@@ -516,7 +521,31 @@ func _test_jurejure_crisis_threshold(game: Node) -> void:
 	game._on_jurejure_group_pressed()
 	assert(game.scripted_dialog_kind == "jurejure_exploitation_challenge")
 	assert(int(game.story_progression_state.get("last_exploitation_dialog_index", -1)) != first_live_pattern)
-	game.scripted_dialog_kind = "";game.scripted_dialog_pages.clear();game.intro_overlay.visible = false
+	_finish_dialog(game)
+	await get_tree().process_frame
+	assert(game.puku_puku_battle.visible and game.puku_puku_battle.choice_layer.visible)
+	game.puku_puku_battle._decline_battle()
+
+	# Four unique GETs schedule the one-off midpoint, but rain remains off.
+	game._register_species_discovery(JUREJURE_SPECIES_IDS[3], true)
+	assert(game._unique_jurejure_species_get_count() == 4)
+	assert(bool(game.story_progression_state.get("exploitation_midpoint_pending", false)))
+	assert(not game.habitat_crisis_pending and not game.habitat_crisis_started)
+	game._try_start_pending_story_event()
+	assert(game.scripted_dialog_kind == "exploitation_midpoint")
+	_finish_dialog(game)
+	game._try_start_pending_story_event()
+	assert(game.scripted_dialog_kind == "secret_gacha_install")
+	_finish_dialog(game)
+	assert(StoryProgressionClass.secret_gacha_is_unlocked(game.story_progression_state))
+	assert(not game.habitat_crisis_started)
+
+	for index in range(4, 8):
+		game._register_species_discovery(JUREJURE_SPECIES_IDS[index], true)
+	assert(game._unique_jurejure_species_get_count() == 8)
+	assert(game.habitat_crisis_pending and not game.habitat_crisis_started)
+	game._register_species_discovery(JUREJURE_SPECIES_IDS[0], true)
+	assert(game._unique_jurejure_species_get_count() == 8)
 	for index in range(8, 10):
 		game._register_species_discovery(JUREJURE_SPECIES_IDS[index], true)
 	assert(game._jurejure_reward_candidates().size() == 10)

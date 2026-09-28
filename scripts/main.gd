@@ -1176,6 +1176,9 @@ func _migrate_three_act_progress(saved_progression_version:int)->void:
 		"legacy":saved_progression_version<PROGRESSION_VERSION,
 		"act2_unlocked":act2_unlocked,
 		"fantasy_get_count":fantasy_count,
+		"act3_intro_seen":act3_intro_seen,
+		"jurejure_get_count":jurejure_count,
+		"jurejure_intro_complete":jurejure_intro_complete,
 		"habitat_crisis_started":habitat_crisis_started,
 		"secret_gacha_evidence":secret_gacha_active or secret_gacha_draws_remaining>0 or secret_gacha_last_roll_play_count>=0,
 	})
@@ -2007,7 +2010,7 @@ func _advance_scripted_dialog()->void:
 func _finish_scripted_dialog()->void:
 	var finished_kind:=scripted_dialog_kind;var keep_shop:=scripted_dialog_shop_context
 	scripted_dialog_kind="";scripted_dialog_pages.clear();scripted_dialog_index=-1;scripted_dialog_shop_context=false;intro_overlay.visible=false
-	var acquired:Array[String]=[];var open_puku_intro:=false;var open_catalog:=false;var guide_habitat:=false;var guide_catalog:=false;var show_pinwheel_get:=false;var show_armadillo_gift:=false;var start_second_awakening:=false;var start_trio_event:=false;var start_jurejure_reveal:=false;var show_jurejure_choice:=false;var queue_jurejure_reward:=false;var show_trio_cards:=false
+	var acquired:Array[String]=[];var open_puku_intro:=false;var open_catalog:=false;var guide_habitat:=false;var guide_catalog:=false;var show_pinwheel_get:=false;var show_armadillo_gift:=false;var start_second_awakening:=false;var start_trio_event:=false;var start_jurejure_reveal:=false;var show_jurejure_choice:=false;var queue_jurejure_reward:=false;var show_trio_cards:=false;var focus_act3_exploitation:=false
 	match finished_kind:
 		"first_colorata_discovery":
 			first_colorata_confirmed=true;start_trio_event=true
@@ -2032,15 +2035,18 @@ func _finish_scripted_dialog()->void:
 			fantasy_first_discovery_seen=true;StoryProgressionClass.consume_story_event(story_progression_state,StoryProgressionClass.EVENT_FANTASY_FIRST)
 		"fantasy_realization":
 			fantasy_realization_seen=true;StoryProgressionClass.consume_story_event(story_progression_state,StoryProgressionClass.EVENT_FANTASY_SIX)
+		"post_jurejure_encounter_home":
+			StoryProgressionClass.complete_post_encounter_greenhouse(story_progression_state)
 		"act3_intro":
-			act3_intro_seen=true;act3_intro_pending=false
+			act3_intro_seen=true;act3_intro_pending=false;jurejure_waiting_for_seed_pod_reward=false
+			StoryProgressionClass.begin_exploitation(story_progression_state,_unique_jurejure_species_get_count());focus_act3_exploitation=current_mode=="habitat"
 			if habitat_crisis_pending:habitat_crisis_eligible_visit_id=habitat_visit_id
 		"jurejure_species_first":
 			jurejure_species_first_seen=true
 		"habitat_crisis":
-			# Enter the ongoing exploitation phase. The story's final reflection is
-			# intentionally not completed here; this scene establishes the crisis.
-			StoryProgressionClass.begin_exploitation(story_progression_state)
+			pass
+		"exploitation_midpoint":
+			StoryProgressionClass.complete_exploitation_midpoint(story_progression_state)
 		"secret_gacha_install":
 			StoryProgressionClass.complete_secret_gacha_install(story_progression_state)
 			secret_gacha_active=true;secret_gacha_draws_remaining=secret_gacha_system.setting_int("max_draws_per_event",3);secret_gacha_last_roll_play_count=formal_play_count
@@ -2049,11 +2055,11 @@ func _finish_scripted_dialog()->void:
 		"jurejure_first_notice":
 			start_jurejure_reveal=true
 		"jurejure_intro":
-			jurejure_intro_complete=true;jurejure_enabled=true;jurejure_next_check_unix=0.0;show_jurejure_choice=true
+			jurejure_intro_complete=true;jurejure_enabled=true;jurejure_next_check_unix=0.0;show_jurejure_choice=true;StoryProgressionClass.queue_post_encounter_greenhouse(story_progression_state)
 		"jurejure_challenge":
 			show_jurejure_choice=true
 		"jurejure_exploitation_challenge":
-			pass
+			show_jurejure_choice=true
 		"jurejure_battle_win":
 			queue_jurejure_reward=not jurejure_pending_reward_species_id.is_empty()
 		"jurejure_growth_mid":
@@ -2088,7 +2094,8 @@ func _finish_scripted_dialog()->void:
 		if finished_kind not in ["jurejure_intro","jurejure_challenge","jurejure_exploitation_challenge"]:
 			audio_manager.play_bgm("habitat" if current_mode=="habitat" else "greenhouse")
 	_update_play_ui()
-	if start_trio_event:call_deferred("_start_trio_originals_event")
+	if focus_act3_exploitation:call_deferred("_focus_jurejure_group","act3_exploitation_start")
+	elif start_trio_event:call_deferred("_start_trio_originals_event")
 	elif show_trio_cards:call_deferred("_queue_species_get_by_id",PANDA_STORY_SPECIES_ID,true,"trio_affinis_catalog")
 	elif start_jurejure_reveal:call_deferred("_focus_jurejure_first_encounter")
 	elif guide_catalog:call_deferred("_show_tutorial_guide","encyclopedia")
@@ -2099,7 +2106,6 @@ func _finish_scripted_dialog()->void:
 		if first_play_has_harvested and not puku_buyback_tutorial_complete:_start_puku_buyback_tutorial()
 		else:call_deferred("_finish_greenhouse_play")
 	elif show_jurejure_choice and puku_puku_battle:call_deferred("_show_jurejure_battle_choice")
-	elif finished_kind=="jurejure_exploitation_challenge":call_deferred("_start_puku_puku_battle")
 	elif queue_jurejure_reward:
 		var reward_species_id:=jurejure_pending_reward_species_id;jurejure_pending_reward_species_id="";call_deferred("_queue_species_get_by_id",reward_species_id,true,"jurejure_battle")
 	else:call_deferred("_try_start_pending_story_event")
@@ -2233,9 +2239,7 @@ func _start_jurejure_intro_event()->void:
 		{"speaker":"mouse","text":Localizer.text(language_code,"jurejure_confront_mouse_panda")},
 		{"speaker":"panda","text":Localizer.text(language_code,"jurejure_confront_panda")},
 		{"speaker":"girl","text":Localizer.text(language_code,"jurejure_confront_girl_2")},
-		{"speaker":"mouse","text":Localizer.text(language_code,"jurejure_confront_mouse_battle")},
-		{"speaker":"panda","text":Localizer.text(language_code,"jurejure_after_encounter_panda")},
-		{"speaker":"armadillo","text":Localizer.text(language_code,"jurejure_after_encounter_armadillo")}
+		{"speaker":"mouse","text":Localizer.text(language_code,"jurejure_confront_mouse_battle")}
 	],false)
 
 func _start_jurejure_first_encounter()->void:
@@ -2264,6 +2268,7 @@ func _focus_jurejure_group(context:String)->void:
 		if context=="first_encounter":
 			jurejure_first_encounter_active=false;_start_jurejure_intro_event()
 		elif context=="habitat_crisis":_begin_habitat_crisis_dialog()
+		elif context=="act3_exploitation_start":_show_jurejure_battle_choice()
 		return
 	var target:=group_node.global_position
 	jurejure_intro_camera_start_yaw=view_yaw
@@ -2284,7 +2289,7 @@ func _on_jurejure_first_encounter_still_finished()->void:
 
 func _start_jurejure_challenge_event()->void:
 	if not jurejure_intro_complete or current_mode!="habitat" or not scripted_dialog_kind.is_empty():return
-	if habitat_crisis_started:
+	if StoryProgressionClass.exploitation_is_started(story_progression_state):
 		var pattern:=JureJureSystemClass.choose_exploitation_dialog(int(story_progression_state.get("last_exploitation_dialog_index",-1)),rng)
 		story_progression_state["last_exploitation_dialog_index"]=int(pattern.get("index",-1))
 		var exploitation_pages:Array=[]
@@ -4252,6 +4257,7 @@ func _refresh_narrative_species_progress()->void:
 	if fantasy_count>=24 and not act3_unlocked:
 		act3_unlocked=true;act3_intro_pending=not act3_intro_seen;act3_intro_eligible_visit_id=habitat_visit_id
 	var jurejure_count:=_unique_jurejure_species_get_count()
+	StoryProgressionClass.update_jurejure_progress(story_progression_state,jurejure_count)
 	if jurejure_count>=8 and not habitat_crisis_started and not habitat_crisis_pending:
 		habitat_crisis_pending=true;habitat_crisis_eligible_visit_id=habitat_visit_id
 	_update_main_story_progress(false)
@@ -4360,22 +4366,34 @@ func _try_start_pending_story_event()->void:
 	if habitat_plant_panel and habitat_plant_panel.visible:return
 	if habitat_dev_panel and habitat_dev_panel.visible:return
 	if settings_overlay and settings_overlay.visible:return
+	var queued_story_event:=StoryProgressionClass.peek_story_event(story_progression_state)
 	if current_mode=="habitat" and act3_intro_pending and not act3_intro_seen and habitat_visit_id>act3_intro_eligible_visit_id:
 		_start_act3_intro_event()
+	elif current_mode=="greenhouse" and queued_story_event==StoryProgressionClass.EVENT_POST_ENCOUNTER_HOME:
+		_start_post_jurejure_encounter_home_event()
+	elif current_mode=="habitat" and queued_story_event==StoryProgressionClass.EVENT_EXPLOITATION_MIDPOINT:
+		_start_exploitation_midpoint_event()
 	elif current_mode=="habitat" and habitat_crisis_pending and not habitat_crisis_started and habitat_visit_id>habitat_crisis_eligible_visit_id:
 		_start_habitat_crisis_event()
-	elif StoryProgressionClass.peek_story_event(story_progression_state)==StoryProgressionClass.EVENT_FANTASY_FIRST:
+	elif queued_story_event==StoryProgressionClass.EVENT_FANTASY_FIRST:
 		_start_fantasy_first_discovery_event()
-	elif StoryProgressionClass.peek_story_event(story_progression_state)==StoryProgressionClass.EVENT_FANTASY_SIX:
+	elif queued_story_event==StoryProgressionClass.EVENT_FANTASY_SIX:
 		_start_fantasy_realization_event()
-	elif current_mode=="habitat" and StoryProgressionClass.peek_story_event(story_progression_state)==StoryProgressionClass.EVENT_SECRET_GACHA_INSTALL:
+	elif current_mode=="habitat" and queued_story_event==StoryProgressionClass.EVENT_SECRET_GACHA_INSTALL:
 		_start_secret_gacha_install_event()
 	elif current_mode=="greenhouse" and forest_gacha_unlocked and not forest_gacha_intro_seen:
 		_start_forest_gacha_intro_event()
 	elif _unique_jurejure_species_get_count()>=1 and not jurejure_species_first_seen:
 		_start_jurejure_species_first_event()
-	elif current_mode=="habitat" and habitat_crisis_started:
+	elif current_mode=="habitat" and StoryProgressionClass.exploitation_is_started(story_progression_state) and not habitat_crisis_started:
 		_maybe_start_habitat_exploitation_concern()
+
+func _start_post_jurejure_encounter_home_event()->void:
+	if current_mode!="greenhouse" or not bool(story_progression_state.get("post_encounter_greenhouse_pending",false)):return
+	_start_scripted_dialog("post_jurejure_encounter_home",[
+		{"speaker":"panda","text":Localizer.text(language_code,"jurejure_after_encounter_panda")},
+		{"speaker":"armadillo","text":Localizer.text(language_code,"jurejure_after_encounter_armadillo")}
+	],false)
 
 func _start_forest_gacha_intro_event()->void:
 	if not forest_gacha_unlocked or forest_gacha_intro_seen or current_mode!="greenhouse":return
@@ -4406,6 +4424,16 @@ func _start_secret_gacha_install_event()->void:
 		{"speaker":"mouse","text":Localizer.text(language_code,"secret_gacha_install_mouse")},
 		{"speaker":"panda","text":Localizer.text(language_code,"secret_gacha_install_panda")},
 		{"speaker":"","text":Localizer.text(language_code,"secret_gacha_install_system")}
+	],false)
+
+func _start_exploitation_midpoint_event()->void:
+	if current_mode!="habitat" or not bool(story_progression_state.get("exploitation_midpoint_pending",false)):return
+	_start_scripted_dialog("exploitation_midpoint",[
+		{"speaker":"panda","text":Localizer.text(language_code,"habitat_exploit_start_panda")},
+		{"speaker":"girl","text":Localizer.text(language_code,"habitat_exploit_start_girl")},
+		{"speaker":"mouse","text":Localizer.text(language_code,"jurejure_exploit_mouse_no_rest")},
+		{"speaker":"peccary","text":Localizer.text(language_code,"jurejure_exploit_peccary_more")},
+		{"speaker":"panda","text":Localizer.text(language_code,"habitat_exploit_midpoint_panda")}
 	],false)
 
 func _maybe_start_habitat_exploitation_concern()->void:
@@ -4448,10 +4476,11 @@ func _start_habitat_crisis_event()->void:
 func _begin_habitat_crisis_dialog()->void:
 	if current_mode!="habitat" or not habitat_crisis_started or not scripted_dialog_kind.is_empty():return
 	_start_scripted_dialog("habitat_crisis",[
-		{"speaker":"panda","text":Localizer.text(language_code,"habitat_exploit_start_panda")},
 		{"speaker":"armadillo","text":Localizer.text(language_code,"habitat_crisis_armadillo_1")},
-		{"speaker":"girl","text":Localizer.text(language_code,"habitat_exploit_start_girl")},
-		{"speaker":"mouse","text":Localizer.text(language_code,"jurejure_exploit_mouse_no_rest")}
+		{"speaker":"armadillo","text":Localizer.text(language_code,"habitat_crisis_armadillo_2")},
+		{"speaker":"mouse","text":Localizer.text(language_code,"habitat_crisis_mouse")},
+		{"speaker":"peccary","text":Localizer.text(language_code,"habitat_crisis_peccary")},
+		{"speaker":"skunk","text":Localizer.text(language_code,"habitat_crisis_skunk")}
 	],false)
 
 func _series_found_count(series_id:String)->int:
@@ -4841,7 +4870,7 @@ func _add_habitat_wild_plant(plant:Dictionary)->void:
 	var item={"node":sprite,"kind":"wild_plant","species_id":str(plant.get("species_id","")),"individual_id":str(plant.get("individual_id",""))};habitat_pickups.append(item);_refresh_habitat_wild_item(item,plant)
 
 func _should_show_jurejure_group()->bool:
-	return JureJureSystemClass.should_be_present(habitat_awakened,habitat_tutorial_returned_to_greenhouse,habitat_crisis_started,jurejure_waiting_for_seed_pod_reward)
+	return JureJureSystemClass.should_be_present(habitat_awakened,habitat_tutorial_returned_to_greenhouse,StoryProgressionClass.exploitation_is_started(story_progression_state),jurejure_waiting_for_seed_pod_reward)
 
 func _add_jurejure_habitat_group()->void:
 	if jurejure_habitat_visit_point.x<0.0:
@@ -5505,7 +5534,7 @@ func _on_puku_puku_battle_resolved(result:Dictionary)->void:
 	var first_resolved_battle:=jurejure_battle_count==0
 	jurejure_battle_count+=1;jurejure_last_battle_result=result.duplicate(true)
 	if bool(result.get("won",false)):
-		jurejure_battle_win_count+=1;jurejure_waiting_for_seed_pod_reward=not habitat_crisis_started
+		jurejure_battle_win_count+=1;jurejure_waiting_for_seed_pod_reward=not StoryProgressionClass.exploitation_is_started(story_progression_state)
 		jurejure_pending_reward_species_id=_grant_jurejure_battle_reward()
 	else:
 		var penalty:=_apply_jurejure_battle_loss()
@@ -5627,6 +5656,7 @@ func _update_habitat_view_follow(delta:float)->void:
 			jurejure_intro_camera_active=false;jurejure_intro_camera_elapsed=0.0;jurejure_camera_focus_context=""
 			if audio_manager:audio_manager.play_bgm("jurejure")
 			if focus_context=="habitat_crisis":call_deferred("_begin_habitat_crisis_dialog")
+			elif focus_context=="act3_exploitation_start":call_deferred("_show_jurejure_battle_choice")
 			else:call_deferred("_show_jurejure_first_encounter_still")
 		return
 	if habitat_lookaround_active:
