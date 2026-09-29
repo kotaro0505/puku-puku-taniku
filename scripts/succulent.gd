@@ -212,8 +212,59 @@ func setup(species: Dictionary, seed_value: int, screen_label: Label, _danger: L
 func _apply_external_plant_texture(texture:Texture2D)->void:
 	if not is_instance_valid(plant_sprite) or texture==null:return
 	plant_sprite.texture=texture
+	plant_sprite.remove_meta("screen_hit_used_rect")
 	plant_sprite.offset.y=-float(texture.get_height())*.18
 	plant_sprite.pixel_size=1.42/maxf(1.0,float(texture.get_width()))
+
+func _screen_hit_used_rect()->Rect2:
+	if plant_sprite==null or plant_sprite.texture==null:return Rect2()
+	if plant_sprite.has_meta("screen_hit_used_rect"):
+		var cached:Variant=plant_sprite.get_meta("screen_hit_used_rect")
+		if cached is Rect2:return cached
+	var texture_size:=plant_sprite.texture.get_size()
+	var result:=Rect2(Vector2.ZERO,texture_size)
+	var image:=plant_sprite.texture.get_image()
+	if image!=null and not image.is_empty():
+		var used:=image.get_used_rect()
+		if used.size.x>0 and used.size.y>0:result=Rect2(used)
+	plant_sprite.set_meta("screen_hit_used_rect",result)
+	return result
+
+func screen_hit_test(camera:Camera3D,screen_point:Vector2)->Dictionary:
+	# Sprite3D's billboard rotation is applied by the renderer and is not present
+	# in its Node3D transform. Reconstruct the rendered quad in the camera plane
+	# from the actual texture, pixel size, offset, and current sprite scale. This
+	# keeps touch input aligned with leaves even when a 100+ cm plant's root and
+	# old center-radius test sit far outside the visible part of the artwork.
+	if camera==null or plant_sprite==null or plant_sprite.texture==null:return {"hit":false}
+	if camera.is_position_behind(plant_sprite.global_position):return {"hit":false}
+	var texture_size:=plant_sprite.texture.get_size()
+	if texture_size.x<=0.0 or texture_size.y<=0.0:return {"hit":false}
+	var used:=_screen_hit_used_rect()
+	if used.size.x<=0.0 or used.size.y<=0.0:used=Rect2(Vector2.ZERO,texture_size)
+	var basis:=camera.global_transform.basis
+	var angle:=plant_sprite.rotation.z
+	var plane_right:Vector3=basis.x*cos(angle)+basis.y*sin(angle)
+	var plane_up:Vector3=-basis.x*sin(angle)+basis.y*cos(angle)
+	var global_scale:=plant_sprite.global_transform.basis.get_scale()
+	var origin:=plant_sprite.global_position
+	var points:=PackedVector2Array()
+	for pixel_point in [used.position,Vector2(used.end.x,used.position.y),used.end,Vector2(used.position.x,used.end.y)]:
+		var local_pixels:=Vector2(
+			pixel_point.x-texture_size.x*.5+plant_sprite.offset.x,
+			-(pixel_point.y-texture_size.y*.5+plant_sprite.offset.y)
+		)
+		var world_point:=origin+plane_right*local_pixels.x*plant_sprite.pixel_size*global_scale.x+plane_up*local_pixels.y*plant_sprite.pixel_size*global_scale.y
+		points.append(camera.unproject_position(world_point))
+	var visible_rect:=Rect2(points[0],Vector2.ZERO)
+	for point in points:visible_rect=visible_rect.expand(point)
+	var padding:=clampf(minf(visible_rect.size.x,visible_rect.size.y)*.08,14.0,36.0)
+	var inside_artwork_bounds:=Geometry2D.is_point_in_polygon(screen_point,points)
+	if not inside_artwork_bounds and not visible_rect.grow(padding).has_point(screen_point):return {"hit":false,"rect":visible_rect,"polygon":points}
+	var half_size:=Vector2(maxf(visible_rect.size.x*.5,1.0),maxf(visible_rect.size.y*.5,1.0))
+	var normalized_delta:=(screen_point-visible_rect.get_center())/half_size
+	var score:=normalized_delta.length()+(0.0 if inside_artwork_bounds else .85)
+	return {"hit":true,"score":score,"rect":visible_rect,"polygon":points,"center":visible_rect.get_center(),"inside_artwork_bounds":inside_artwork_bounds}
 
 func _play_special_birth_glow() -> void:
 	# A brief warm bloom announces the 10% roll without leaving a permanent mark.

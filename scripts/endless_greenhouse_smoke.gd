@@ -77,6 +77,7 @@ func _ready() -> void:
 	await _test_navigation_pause_resume(game)
 	_test_gauges(game)
 	await _test_restoration_pending_until_habitat(game)
+	_test_large_plant_screen_hits(game)
 
 	game.puku_points = 88
 	game.bests["colorata"] = 101.0
@@ -240,8 +241,22 @@ func _test_gauges(game: Node) -> void:
 	game.puku_points = 0
 	assert(game.add_seed_pod_gauge_cm(700.0, false, false) == 0)
 	assert(is_equal_approx(game.puku_gauge_cm, 123.0))
-	assert(game.add_puku_coin_gauge_cm(game.PUKU_GAUGE_TARGET_CM, false, false) == game.PUKU_GAUGE_REWARD_PUKU)
-	assert(game.puku_points == game.PUKU_GAUGE_REWARD_PUKU)
+	assert(is_equal_approx(game._puku_gauge_target_cm(), 750.0))
+	assert(game._puku_gauge_reward_puku() == 1)
+	game.jurejure_waiting_for_seed_pod_reward = true
+	assert(not game._should_show_jurejure_group())
+	assert(game.add_seed_pod_gauge_cm(2000.0, false, false) == 0)
+	assert(game.jurejure_waiting_for_seed_pod_reward)
+	assert(game.add_puku_coin_gauge_cm(749.0, false, false) == 0)
+	assert(game.jurejure_waiting_for_seed_pod_reward)
+	assert(game.add_puku_coin_gauge_cm(1.0, false, false) == 1)
+	assert(game.puku_points == 1)
+	assert(not game.jurejure_waiting_for_seed_pod_reward)
+	assert(game._should_show_jurejure_group())
+	game.puku_coin_gauge_cm = 0.0
+	game.puku_points = 0
+	assert(game.add_puku_coin_gauge_cm(1500.0, false, false) == 2)
+	assert(game.puku_points == 2 and is_zero_approx(game.puku_coin_gauge_cm))
 	assert(not game._queue_first_seed_pod_max_event())
 
 
@@ -281,6 +296,68 @@ func _test_restoration_pending_until_habitat(game: Node) -> void:
 	game._apply_mode()
 
 
+func _test_large_plant_screen_hits(game: Node) -> void:
+	game._clear_greenhouse_plants()
+	game.play_active = false
+	game.current_mode = "greenhouse"
+	game._apply_mode()
+	game.bests["colorata"] = 1000.0
+	for diameter in [30.0, 60.0, 100.0, 155.0]:
+		game._spawn_specific_plant("colorata")
+		var plant = game.plants.back()
+		plant.jelly_checks_enabled = false
+		plant.fast_forward_to_diameter(diameter)
+		var center_probe: Dictionary = plant.screen_hit_test(game.camera, Vector2(-10000, -10000))
+		var visible_rect: Rect2 = center_probe.get("rect", Rect2())
+		assert(visible_rect.size.x > 0.0 and visible_rect.size.y > 0.0)
+		var leaf_point := visible_rect.get_center()
+		assert(bool(plant.screen_hit_test(game.camera, leaf_point).get("hit", false)))
+		game._try_harvest(leaf_point)
+		assert(plant.state == "harvested")
+		game._clear_greenhouse_plants()
+
+	# Move a 155 cm plant until its root projects beyond the left edge while a
+	# substantial part of the billboard remains visible, then harvest that part.
+	game._spawn_specific_plant("colorata")
+	var edge_plant = game.plants.back()
+	edge_plant.jelly_checks_enabled = false
+	edge_plant.fast_forward_to_diameter(155.0)
+	var edge_rect := Rect2()
+	var edge_found := false
+	for world_x in [-2.0, -3.0, -4.0, -5.0, -6.0, -7.0, -8.0, -9.0, -10.0]:
+		edge_plant.position.x = world_x
+		var probe: Dictionary = edge_plant.screen_hit_test(game.camera, Vector2(-10000, -10000))
+		edge_rect = probe.get("rect", Rect2())
+		var root_screen: Vector2 = game.camera.unproject_position(edge_plant.global_position)
+		if root_screen.x < 0.0 and edge_rect.end.x > 40.0:
+			edge_found = true
+			break
+	assert(edge_found)
+	var visible_viewport := Rect2(Vector2.ZERO, get_viewport().get_visible_rect().size)
+	var visible_part := edge_rect.intersection(visible_viewport)
+	assert(visible_part.size.x > 20.0 and visible_part.size.y > 20.0)
+	var visible_leaf_point := visible_part.get_center()
+	assert(bool(edge_plant.screen_hit_test(game.camera, visible_leaf_point).get("hit", false)))
+	game._try_harvest(visible_leaf_point)
+	assert(edge_plant.state == "harvested")
+	game._clear_greenhouse_plants()
+
+	# When a normal plant is visibly centered over a giant, the normalized
+	# screen-space score should select the plant the player actually touched.
+	game._spawn_specific_plant("colorata")
+	var giant = game.plants.back()
+	giant.fast_forward_to_diameter(155.0)
+	game._spawn_specific_plant("colorata")
+	var normal = game.plants.back()
+	normal.position = giant.position
+	normal.fast_forward_to_diameter(30.0)
+	var normal_probe: Dictionary = normal.screen_hit_test(game.camera, Vector2(-10000, -10000))
+	var normal_rect: Rect2 = normal_probe.get("rect", Rect2())
+	game._try_harvest(normal_rect.get_center())
+	assert(normal.state == "harvested" and giant.state == "growing")
+	game._clear_greenhouse_plants()
+
+
 func _test_finite_mode_unchanged(game: Node) -> void:
 	game._clear_greenhouse_plants()
 	game.play_active = false
@@ -291,6 +368,7 @@ func _test_finite_mode_unchanged(game: Node) -> void:
 	game._apply_mode()
 	game._start_greenhouse_play("normal")
 	assert(game.play_active and game.normal_seed_bags == 0)
+	assert(is_equal_approx(game._puku_gauge_target_cm(), 500.0) and game._puku_gauge_reward_puku() == 3)
 	assert(game.play_seeds_remaining < game.NORMAL_GERMINATION_COUNT)
 	assert(game.seed_pod_gauge_area.visible)
 	game._clear_greenhouse_plants()
@@ -303,6 +381,14 @@ func _test_finite_mode_unchanged(game: Node) -> void:
 	assert(not game.play_active and game.result_overlay.visible)
 	assert(game.add_seed_pod_gauge_cm(10.0, false, false) == 0)
 	assert(is_equal_approx(game.puku_gauge_cm, 10.0))
+	game.puku_points = 0
+	game.puku_coin_gauge_cm = 0.0
+	assert(game.add_puku_coin_gauge_cm(500.0, false, false) == 3)
+	assert(game.puku_points == 3)
+	game.jurejure_waiting_for_seed_pod_reward = true
+	game.puku_gauge_cm = 740.0
+	assert(game.add_seed_pod_gauge_cm(10.0, false, false) == game.SEED_POD_GAUGE_REWARD_BAGS)
+	assert(not game.jurejure_waiting_for_seed_pod_reward)
 
 
 func _remove_test_file(path: String) -> void:

@@ -53,6 +53,8 @@ const SEED_POD_GAUGE_TARGET_CM := 750.0
 const SEED_POD_GAUGE_REWARD_BAGS := 3
 const PUKU_GAUGE_TARGET_CM := 500.0
 const PUKU_GAUGE_REWARD_PUKU := 3
+const ENDLESS_PUKU_GAUGE_TARGET_CM := 750.0
+const ENDLESS_PUKU_GAUGE_REWARD_PUKU := 1
 const HABITAT_TIME_MULTIPLIERS := [1, 60, 3600, 21600, 86400]
 const DEFAULT_POT_ID := "shallow_terracotta"
 const NORMAL_GERMINATION_COUNT := 12
@@ -863,7 +865,7 @@ func _load_save() -> void:
 				puku_coin_gauge_cm=0.0
 			else:
 				puku_gauge_cm=fposmod(puku_gauge_cm,SEED_POD_GAUGE_TARGET_CM)
-				puku_coin_gauge_cm=fposmod(puku_coin_gauge_cm,PUKU_GAUGE_TARGET_CM)
+				puku_coin_gauge_cm=fposmod(puku_coin_gauge_cm,_puku_gauge_target_cm())
 			species_get_counts=value.get("species_get_counts",{});unlocked_series=value.get("unlocked_series",{INITIAL_SERIES_ID:true})
 			owned_pots=value.get("owned_pots",{DEFAULT_POT_ID:true});saved_arrangements=value.get("saved_arrangements",[]);arrangement_save_capacity=maxi(1,int(value.get("arrangement_save_capacity",20)))
 			if not species_get_counts is Dictionary:species_get_counts={}
@@ -1060,6 +1062,20 @@ func _is_endless_greenhouse_enabled()->bool:
 
 func _is_endless_normal_play()->bool:
 	return _is_endless_greenhouse_enabled() and play_active and active_seed_type=="normal"
+
+func _puku_gauge_target_cm()->float:
+	return ENDLESS_PUKU_GAUGE_TARGET_CM if _is_endless_greenhouse_enabled() else PUKU_GAUGE_TARGET_CM
+
+func _puku_gauge_reward_puku()->int:
+	return ENDLESS_PUKU_GAUGE_REWARD_PUKU if _is_endless_greenhouse_enabled() else PUKU_GAUGE_REWARD_PUKU
+
+func _resolve_jurejure_progress_reward(reward_kind:String)->void:
+	# The legacy save field is kept for rollback compatibility. Its release event
+	# is mode-specific: finite play waits for a seed-pod payout; ENDLESS waits for
+	# the next real Puku Gauge payout.
+	if not jurejure_waiting_for_seed_pod_reward:return
+	if (_is_endless_greenhouse_enabled() and reward_kind=="puku") or (not _is_endless_greenhouse_enabled() and reward_kind=="seed_pod"):
+		jurejure_waiting_for_seed_pod_reward=false
 
 func _should_simulate_endless_greenhouse()->bool:
 	if not _is_endless_normal_play():return true
@@ -1438,7 +1454,7 @@ func _build_ui() -> void:
 	puku_gauge_area=Control.new();puku_gauge_area.name="PukuGaugeArea";puku_gauge_area.position=Vector2(42,190);puku_gauge_area.size=Vector2(158,60);puku_gauge_area.mouse_filter=Control.MOUSE_FILTER_IGNORE;main_status_hud.add_child(puku_gauge_area)
 	var puku_content:=VBoxContainer.new();puku_content.position=Vector2(13,0);puku_content.size=Vector2(132,60);puku_content.alignment=BoxContainer.ALIGNMENT_CENTER;puku_content.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_content.add_theme_constant_override("separation",2);puku_gauge_area.add_child(puku_content)
 	puku_gauge_label=Label.new();puku_gauge_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;puku_gauge_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_gauge_label.add_theme_font_size_override("font_size",14);puku_gauge_label.add_theme_color_override("font_color",Color("#fff8cf"));puku_gauge_label.add_theme_color_override("font_outline_color",Color("#173622"));puku_gauge_label.add_theme_constant_override("outline_size",4);puku_content.add_child(puku_gauge_label)
-	puku_gauge_meter=ProgressBar.new();puku_gauge_meter.custom_minimum_size=Vector2(132,10);puku_gauge_meter.max_value=PUKU_GAUGE_TARGET_CM;puku_gauge_meter.show_percentage=false;puku_gauge_meter.mouse_filter=Control.MOUSE_FILTER_IGNORE;var meter_bg:=StyleBoxFlat.new();meter_bg.bg_color=Color(.025,.09,.045,.9);meter_bg.set_corner_radius_all(5);meter_bg.border_color=Color(.16,.34,.19,.76);meter_bg.set_border_width_all(1);puku_gauge_fill_style=StyleBoxFlat.new();puku_gauge_fill_style.bg_color=Color("#1f6840");puku_gauge_fill_style.border_color=Color("#76aa78");puku_gauge_fill_style.set_border_width_all(1);puku_gauge_fill_style.set_corner_radius_all(5);puku_gauge_meter.add_theme_stylebox_override("background",meter_bg);puku_gauge_meter.add_theme_stylebox_override("fill",puku_gauge_fill_style);puku_content.add_child(puku_gauge_meter)
+	puku_gauge_meter=ProgressBar.new();puku_gauge_meter.custom_minimum_size=Vector2(132,10);puku_gauge_meter.max_value=_puku_gauge_target_cm();puku_gauge_meter.show_percentage=false;puku_gauge_meter.mouse_filter=Control.MOUSE_FILTER_IGNORE;var meter_bg:=StyleBoxFlat.new();meter_bg.bg_color=Color(.025,.09,.045,.9);meter_bg.set_corner_radius_all(5);meter_bg.border_color=Color(.16,.34,.19,.76);meter_bg.set_border_width_all(1);puku_gauge_fill_style=StyleBoxFlat.new();puku_gauge_fill_style.bg_color=Color("#1f6840");puku_gauge_fill_style.border_color=Color("#76aa78");puku_gauge_fill_style.set_border_width_all(1);puku_gauge_fill_style.set_corner_radius_all(5);puku_gauge_meter.add_theme_stylebox_override("background",meter_bg);puku_gauge_meter.add_theme_stylebox_override("fill",puku_gauge_fill_style);puku_content.add_child(puku_gauge_meter)
 	puku_gauge_glow=Panel.new();puku_gauge_glow.name="PukuGaugeGlow";puku_gauge_glow.show_behind_parent=true;puku_gauge_glow.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_gauge_glow.position=Vector2(1,1);puku_gauge_glow.size=Vector2(2,8);puku_gauge_glow_style=StyleBoxFlat.new();puku_gauge_glow_style.bg_color=Color(0,0,0,0);puku_gauge_glow_style.border_color=Color(1.0,.82,.22,.0);puku_gauge_glow_style.set_border_width_all(1);puku_gauge_glow_style.set_corner_radius_all(5);puku_gauge_glow_style.shadow_color=Color(1.0,.67,.08,0.0);puku_gauge_glow_style.shadow_size=2;puku_gauge_glow.add_theme_stylebox_override("panel",puku_gauge_glow_style);puku_gauge_meter.add_child(puku_gauge_glow);call_deferred("_start_puku_gauge_glow");call_deferred("_update_puku_ui")
 	puku_point_label=Label.new();puku_point_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;puku_point_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_point_label.add_theme_font_size_override("font_size",14);puku_point_label.add_theme_color_override("font_color",Color("#fff7c2"));puku_point_label.add_theme_color_override("font_outline_color",Color("#193923"));puku_point_label.add_theme_constant_override("outline_size",4);puku_content.add_child(puku_point_label)
 	puku_gain_label=Label.new();puku_gain_label.position=Vector2(138,246);puku_gain_label.size=Vector2(300,60);puku_gain_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;puku_gain_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;puku_gain_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_gain_label.add_theme_font_size_override("font_size",27);puku_gain_label.add_theme_color_override("font_color",Color("#fff49a"));puku_gain_label.add_theme_color_override("font_outline_color",Color("#31553c"));puku_gain_label.add_theme_constant_override("outline_size",7);puku_gain_label.visible=false;effects_layer.add_child(puku_gain_label)
@@ -2692,7 +2708,7 @@ func _start_puku_buyback_tutorial()->void:
 	_show_puku_buyback_tutorial_page()
 
 func _show_puku_buyback_tutorial_page()->void:
-	var keys:=["puku_buyback_1","puku_buyback_2"]
+	var keys:=["puku_buyback_1","puku_buyback_2_endless" if _is_endless_greenhouse_enabled() else "puku_buyback_2"]
 	if puku_buyback_tutorial_index>=keys.size():
 		puku_buyback_tutorial_active=false;puku_buyback_tutorial_complete=true;_hide_first_play_tutorial_overlay();_save()
 		if first_seed_pod_reward_event_active:call_deferred("_start_first_seed_pod_max_event")
@@ -3847,7 +3863,7 @@ func add_seed_pod_gauge_cm(amount_cm:float,save_immediately:=true,show_effect:=t
 		normal_seed_bags+=earned_bags
 		# A victory buys peace until the next actual pod reward, even when the
 		# gauge was already almost full at the moment of the battle.
-		if jurejure_waiting_for_seed_pod_reward:jurejure_waiting_for_seed_pod_reward=false
+		_resolve_jurejure_progress_reward("seed_pod")
 		if show_effect:_play_seed_pod_reward(earned_bags)
 	_update_puku_ui();_update_play_ui()
 	if save_immediately or completed_gauges>0:_save()
@@ -3855,12 +3871,15 @@ func add_seed_pod_gauge_cm(amount_cm:float,save_immediately:=true,show_effect:=t
 
 func add_puku_coin_gauge_cm(amount_cm:float,save_immediately:=true,show_effect:=true,source_position:=Vector2(-10000,-10000))->int:
 	if amount_cm<=0.0 or not mystery_items_acquired:return 0
+	var target_cm:=_puku_gauge_target_cm()
+	var reward_puku:=_puku_gauge_reward_puku()
 	var previous_cm:=puku_coin_gauge_cm
 	var accumulated:=previous_cm+amount_cm
-	var completed_gauges:=floori(accumulated/PUKU_GAUGE_TARGET_CM)
-	var earned_puku:=completed_gauges*PUKU_GAUGE_REWARD_PUKU
-	puku_coin_gauge_cm=accumulated-completed_gauges*PUKU_GAUGE_TARGET_CM
+	var completed_gauges:=floori(accumulated/target_cm)
+	var earned_puku:=completed_gauges*reward_puku
+	puku_coin_gauge_cm=accumulated-completed_gauges*target_cm
 	puku_points+=earned_puku
+	if completed_gauges>0:_resolve_jurejure_progress_reward("puku")
 	if show_effect and puku_gauge_meter and effects_layer:
 		if not puku_gauge_animation_running and puku_gauge_animation_queue.is_empty():puku_gauge_display_cm=previous_cm;puku_points_display=puku_points-earned_puku
 		puku_gauge_animation_queue.append({"amount_cm":amount_cm})
@@ -3898,7 +3917,7 @@ func _update_puku_ui()->void:
 	if puku_gauge_label:puku_gauge_label.text=Localizer.text(language_code,"puku_gauge")
 	if seed_pod_gauge_label:seed_pod_gauge_label.text=Localizer.text(language_code,"seed_pod_gauge")
 	if seed_pod_gauge_meter:seed_pod_gauge_meter.max_value=SEED_POD_GAUGE_TARGET_CM
-	if puku_gauge_meter:puku_gauge_meter.max_value=PUKU_GAUGE_TARGET_CM
+	if puku_gauge_meter:puku_gauge_meter.max_value=_puku_gauge_target_cm()
 	if not puku_gauge_animation_running and puku_gauge_animation_queue.is_empty():puku_gauge_display_cm=puku_coin_gauge_cm;puku_points_display=puku_points
 	_render_seed_pod_gauge(puku_gauge_cm)
 	_render_puku_gauge(puku_gauge_display_cm)
@@ -3919,12 +3938,13 @@ func _render_seed_pod_gauge(display_cm:float)->void:
 		seed_pod_gauge_glow_style.shadow_size=roundi(2.0+5.0*ratio);seed_pod_gauge_glow_style.shadow_color=Color(.28,1.0,.55,lerpf(.12,.42,ratio))
 
 func _render_puku_gauge(display_cm:float)->void:
-	var ratio:=clampf(display_cm/PUKU_GAUGE_TARGET_CM,0.0,1.0)
+	var target_cm:=_puku_gauge_target_cm()
+	var ratio:=clampf(display_cm/target_cm,0.0,1.0)
 	var gold_progress:=clampf((ratio-.70)/.30,0.0,1.0)
 	var glow_strength:=pow(gold_progress,1.28)
 	var fill_color:=Color("#174b31").lerp(Color("#348a4a"),ratio/.70) if ratio<=.70 else Color("#78c943").lerp(Color("#ffe657"),minf(1.0,gold_progress*1.35))
 	if gold_progress>.72:fill_color=fill_color.lerp(Color("#f4ac22"),(gold_progress-.72)/.28)
-	if puku_gauge_meter:puku_gauge_meter.value=clampf(display_cm,0.0,PUKU_GAUGE_TARGET_CM)
+	if puku_gauge_meter:puku_gauge_meter.value=clampf(display_cm,0.0,target_cm)
 	if puku_gauge_glow:
 		puku_gauge_glow.visible=ratio>.70
 		var meter_width:=maxf(puku_gauge_meter.size.x,puku_gauge_meter.custom_minimum_size.x)
@@ -3940,7 +3960,7 @@ func _render_puku_gauge(display_cm:float)->void:
 		puku_gauge_fill_style.border_color=Color("#73a77b").lerp(Color("#fff2a0"),gold_progress)
 
 func _set_puku_gauge_display_cm(value:float)->void:
-	puku_gauge_display_cm=clampf(value,0.0,PUKU_GAUGE_TARGET_CM)
+	puku_gauge_display_cm=clampf(value,0.0,_puku_gauge_target_cm())
 	_render_puku_gauge(puku_gauge_display_cm)
 
 func _launch_harvest_cm_fly(amount_cm:float,source_position:Vector2)->void:
@@ -3965,9 +3985,10 @@ func _run_puku_gauge_animation_queue()->void:
 
 func _animate_puku_gauge_amount(amount_cm:float,generation:int)->void:
 	var remaining:=maxf(0.0,amount_cm)
-	var total_duration:=clampf(.40+minf(1.0,remaining/PUKU_GAUGE_TARGET_CM)*.40,.40,.80)*puku_gauge_animation_speed_scale
+	var target_cm:=_puku_gauge_target_cm()
+	var total_duration:=clampf(.40+minf(1.0,remaining/target_cm)*.40,.40,.80)*puku_gauge_animation_speed_scale
 	while remaining>.0001 and generation==puku_gauge_animation_generation:
-		var room:=PUKU_GAUGE_TARGET_CM-puku_gauge_display_cm
+		var room:=target_cm-puku_gauge_display_cm
 		if room<=.0001:
 			await _play_puku_gauge_threshold(generation)
 			continue
@@ -3976,11 +3997,11 @@ func _animate_puku_gauge_amount(amount_cm:float,generation:int)->void:
 		await puku_gauge_active_tween.finished
 		if generation!=puku_gauge_animation_generation:return
 		remaining-=segment
-		if puku_gauge_display_cm>=PUKU_GAUGE_TARGET_CM-.001:await _play_puku_gauge_threshold(generation)
+		if puku_gauge_display_cm>=target_cm-.001:await _play_puku_gauge_threshold(generation)
 
 func _play_puku_gauge_threshold(generation:int)->void:
 	if generation!=puku_gauge_animation_generation:return
-	puku_gauge_threshold_flash_count+=1;puku_points_display+=PUKU_GAUGE_REWARD_PUKU;_set_puku_gauge_display_cm(PUKU_GAUGE_TARGET_CM);if puku_point_label:puku_point_label.text=Localizer.text(language_code,"puku_count",[puku_points_display]);_show_puku_gauge_reward(PUKU_GAUGE_REWARD_PUKU)
+	var reward_puku:=_puku_gauge_reward_puku();puku_gauge_threshold_flash_count+=1;puku_points_display+=reward_puku;_set_puku_gauge_display_cm(_puku_gauge_target_cm());if puku_point_label:puku_point_label.text=Localizer.text(language_code,"puku_count",[puku_points_display]);_show_puku_gauge_reward(reward_puku)
 	puku_gauge_meter.pivot_offset=puku_gauge_meter.size*.5;puku_gauge_active_tween=create_tween();puku_gauge_active_tween.tween_property(puku_gauge_meter,"scale",Vector2(1.08,1.32),maxf(.001,.08*puku_gauge_animation_speed_scale)).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT);puku_gauge_active_tween.tween_property(puku_gauge_meter,"scale",Vector2.ONE,maxf(.001,.12*puku_gauge_animation_speed_scale)).set_trans(Tween.TRANS_QUAD)
 	await puku_gauge_active_tween.finished
 	if generation==puku_gauge_animation_generation:_set_puku_gauge_display_cm(0.0)
@@ -4042,7 +4063,7 @@ func _start_first_seed_pod_max_event()->void:
 func _claim_first_seed_pod_reward_once()->void:
 	if seed_pod_first_reward_seen:return
 	seed_pod_first_reward_seen=true;seed_pod_gauge_discovery_complete=true;puku_gauge_cm=0.0;normal_seed_bags+=SEED_POD_GAUGE_REWARD_BAGS
-	if jurejure_waiting_for_seed_pod_reward:jurejure_waiting_for_seed_pod_reward=false
+	_resolve_jurejure_progress_reward("seed_pod")
 	_play_seed_pod_reward(SEED_POD_GAUGE_REWARD_BAGS);_save();_update_currency_ui();_update_play_ui();audio_manager.play_se("daily",.62)
 
 func _show_puku_gauge_reward(puku_amount:int)->void:
@@ -6427,7 +6448,8 @@ func _apply_view_rotation()->void:
 	if camera:camera.rotation_degrees=Vector3(view_pitch,view_yaw,0.0)
 
 func _try_harvest(screen_pos:Vector2)->void:
-	# label-aware screen selection favors small visible plants when overlap occurs
+	# Each plant reconstructs its rendered Sprite3D quad in screen space. Unlike a
+	# capped radius around the root, this remains aligned with huge visible leaves.
 	if play_active and active_seed_type=="old" and not old_seed_harvest_guide_active:return
 	if first_play_tutorial_active and not first_play_tutorial_sequence_complete:return
 	if first_play_tutorial_active and not first_play_has_harvested and not first_play_harvest_guide_active:return
@@ -6435,11 +6457,8 @@ func _try_harvest(screen_pos:Vector2)->void:
 	for p in plants:
 		if not is_instance_valid(p) or p.state!="growing" or camera.is_position_behind(p.global_position):continue
 		if (first_play_harvest_guide_active or old_seed_harvest_guide_active) and p!=tutorial_harvest_plant:continue
-		var center: Vector2 = camera.unproject_position(p.global_position+Vector3(0,p.visual_scale*.48,0))
-		var top: Vector2 = camera.unproject_position(p.global_position+Vector3(0,p.visual_scale*1.25,0))
-		var radius: float=clamp(center.distance_to(top)*1.15,30.0,180.0)
-		var dist: float=center.distance_to(screen_pos)
-		if dist<radius:candidates.append({"p":p,"score":dist/max(radius,1.0)+p.visual_scale*.08})
+		var hit:Dictionary=p.screen_hit_test(camera,screen_pos)
+		if bool(hit.get("hit",false)):candidates.append({"p":p,"score":float(hit.get("score",INF))})
 	if candidates.size()>0:
 		candidates.sort_custom(func(a,b):return a.score<b.score);candidates[0].p.harvest()
 
