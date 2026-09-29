@@ -167,7 +167,10 @@ func _test_progression_thresholds() -> void:
 func _test_phase_bgm_policy(game: Node) -> void:
 	assert(JureJureSystem.habitat_bgm_key(false, false) == "habitat")
 	assert(JureJureSystem.habitat_bgm_key(true, false) == "jurejure")
-	assert(JureJureSystem.habitat_bgm_key(true, true) == "habitat")
+	assert(JureJureSystem.habitat_bgm_key(true, true) == "habitat_crisis")
+	assert(JureJureSystem.habitat_bgm_key(false, true) == "habitat_crisis")
+	var crisis_stream: AudioStream = game.audio_manager._stream_for("bgm", "habitat_crisis")
+	assert(crisis_stream is AudioStreamMP3 and crisis_stream.loop)
 	game.current_mode = "habitat"
 	game.story_progression_state["exploitation_started"] = true
 	game.habitat_crisis_started = false
@@ -175,4 +178,4 @@ func _test_phase_bgm_policy(game: Node) -> void:
 	assert(game.audio_manager.current_bgm_key == "jurejure")
 	game.habitat_crisis_started = true
 	game._play_current_area_bgm()
-	assert(game.audio_manager.current_bgm_key == "habitat")
+	assert(game.audio_manager.current_bgm_key == "habitat_crisis")

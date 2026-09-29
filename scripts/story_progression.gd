@@ -73,6 +73,8 @@ static func default_runtime_state() -> Dictionary:
 		"secret_gacha_install_seen": false,
 		"last_exploitation_dialog_index": -1,
 		"last_crisis_concern_visit": -1,
+		"last_exploitation_concern_phase": "",
+		"last_exploitation_concern_index": -1,
 	}
 
 
@@ -95,6 +97,8 @@ static func normalize_runtime_state(raw_state: Variant, migration: Dictionary = 
 	state["version"] = RUNTIME_STATE_VERSION
 	state["last_exploitation_dialog_index"] = int(state.get("last_exploitation_dialog_index", -1))
 	state["last_crisis_concern_visit"] = int(state.get("last_crisis_concern_visit", -1))
+	state["last_exploitation_concern_phase"] = str(state.get("last_exploitation_concern_phase", ""))
+	state["last_exploitation_concern_index"] = int(state.get("last_exploitation_concern_index", -1))
 
 	# Saves made before this payload existed must not lose already available
 	# content.  New games never enter this branch and follow the new gates.

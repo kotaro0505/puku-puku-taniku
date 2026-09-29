@@ -506,6 +506,33 @@ func _test_jurejure_crisis_threshold(game: Node) -> void:
 	assert(not game.habitat_crisis_pending and not game.habitat_crisis_started)
 	game.jurejure_waiting_for_seed_pod_reward = true
 	assert(game._should_show_jurejure_group())
+	# Normal visit reactions retain the one-in-three frequency, but the eligible
+	# visit now samples its phase pool rather than deriving an index from visit_id.
+	var sampled_early_keys: Dictionary = {}
+	var early_keys: Array[String] = []
+	for pattern in JureJureSystemClass.EXPLOITATION_EARLY_VISIT_PATTERNS:
+		early_keys.append(str(pattern.get("text_key", "")))
+	var late_keys: Array[String] = []
+	for pattern in JureJureSystemClass.EXPLOITATION_LATE_VISIT_PATTERNS:
+		late_keys.append(str(pattern.get("text_key", "")))
+	for sample_seed in range(1, 25):
+		var sample_state := StoryProgressionClass.default_runtime_state()
+		var sample_rng := RandomNumberGenerator.new()
+		sample_rng.seed = sample_seed
+		var sampled := JureJureSystemClass.concern_for_visit(sample_state, 3, false, sample_rng)
+		assert(str(sampled.get("text_key", "")) in early_keys)
+		sampled_early_keys[str(sampled.get("text_key", ""))] = true
+	assert(sampled_early_keys.size() > 1)
+	var concern_state := StoryProgressionClass.default_runtime_state()
+	var concern_rng := RandomNumberGenerator.new()
+	concern_rng.seed = 20260929
+	assert(JureJureSystemClass.concern_for_visit(concern_state, 1, false, concern_rng).is_empty())
+	var first_concern := JureJureSystemClass.concern_for_visit(concern_state, 3, false, concern_rng)
+	var second_concern := JureJureSystemClass.concern_for_visit(concern_state, 6, false, concern_rng)
+	assert(not first_concern.is_empty() and not second_concern.is_empty())
+	assert(str(first_concern.get("text_key", "")) != str(second_concern.get("text_key", "")))
+	var late_concern := JureJureSystemClass.concern_for_visit(concern_state, 9, true, concern_rng)
+	assert(str(late_concern.get("text_key", "")) in late_keys)
 	var dialog_rng := RandomNumberGenerator.new()
 	dialog_rng.seed = 20260928
 	var first_pattern := JureJureSystemClass.choose_exploitation_dialog(-1, dialog_rng)
@@ -580,10 +607,10 @@ func _test_jurejure_crisis_threshold(game: Node) -> void:
 	assert(repeat_id in JUREJURE_SPECIES_IDS and total_gets_after == total_gets_before + 1)
 
 	# Eight unique species begin the distinct rain/crisis phase. Tapping the
-	# resident gang then produces one subdued line only: no Jure theme, choice,
-	# or battle can be started.
+	# resident gang then produces one subdued line only: the crisis theme stays
+	# active and no Jure theme, choice, or battle can be started.
 	game._start_habitat_crisis_event()
-	assert(game.habitat_crisis_started and game.audio_manager.current_bgm_key == "habitat")
+	assert(game.habitat_crisis_started and game.audio_manager.current_bgm_key == "habitat_crisis")
 	assert(game.jurejure_intro_camera_active)
 	game._update_habitat_view_follow(1.0)
 	await get_tree().process_frame
@@ -600,10 +627,20 @@ func _test_jurejure_crisis_threshold(game: Node) -> void:
 	game._on_jurejure_group_pressed()
 	assert(game.scripted_dialog_kind == "jurejure_crisis_unavailable")
 	assert(game.intro_dialogue_label.text == Localizer.text("ja", "habitat_crisis_no_battle"))
-	assert(game.audio_manager.current_bgm_key == "habitat")
+	assert(game.audio_manager.current_bgm_key == "habitat_crisis")
 	_finish_dialog(game)
 	await get_tree().process_frame
 	assert(not game.puku_puku_battle.visible)
+	assert(game.audio_manager.current_bgm_key == "habitat_crisis")
+	game._toggle_mode()
+	await get_tree().process_frame
+	assert(game.current_mode == "greenhouse" and game.audio_manager.current_bgm_key == "greenhouse")
+	if game.scripted_dialog_kind == "post_crisis_greenhouse":
+		_finish_dialog(game)
+		await get_tree().process_frame
+	game._toggle_mode()
+	await get_tree().process_frame
+	assert(game.current_mode == "habitat" and game.audio_manager.current_bgm_key == "habitat_crisis")
 
 
 func _test_first_loss_unlocks_act_two(game: Node) -> void:

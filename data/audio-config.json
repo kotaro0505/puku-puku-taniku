@@ -3,6 +3,7 @@
     "opening": "res://assets/audio/morning-garden-jingle.ogg",
     "greenhouse": "res://assets/audio/puku-puku-taniku-main.ogg",
     "habitat": "res://assets/audio/mexico-habitat.ogg",
+    "habitat_crisis": "res://assets/audio/habitat-weakened-theme.mp3",
     "jurejure": "res://assets/audio/jurejure-gang-theme.mp3",
     "puku_battle": "res://assets/audio/puku-puku-battle.mp3",
     "shop": "res://assets/audio/puku-puku-taniku-main.ogg"

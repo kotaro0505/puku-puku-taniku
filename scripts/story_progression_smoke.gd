@@ -1,6 +1,8 @@
 extends Node
 
 const StoryProgressionClass = preload("res://scripts/story_progression.gd")
+const JureJureSystemClass = preload("res://scripts/jurejure_system.gd")
+const Localizer = preload("res://scripts/game_localizer.gd")
 
 
 func _ready() -> void:
@@ -213,6 +215,8 @@ func _test_three_act_sequence(game: Node) -> void:
 	await get_tree().process_frame
 	assert(game.current_mode == "habitat" and game.scripted_dialog_kind == "act3_intro")
 	assert(game.audio_manager.current_bgm_key == "jurejure")
+	assert(game.scripted_dialog_index == 0)
+	assert(game.intro_dialogue_label.text == "つまり、欲しいものを想像すればいいんだチュー！？")
 	assert(game.scripted_dialog_pages.size() == 4)
 	assert(str(game.scripted_dialog_pages[0].get("text", "")) == "つまり、欲しいものを想像すればいいんだチュー！？")
 	assert(str(game.scripted_dialog_pages[1].get("text", "")) == "だったら、もっともっと作らせるチュー！")
@@ -246,7 +250,10 @@ func _test_three_act_sequence(game: Node) -> void:
 	game._maybe_start_habitat_exploitation_concern()
 	assert(game.scripted_dialog_kind == "habitat_exploitation_concern")
 	assert(game.scripted_dialog_pages.size() == 1)
-	assert(str(game.scripted_dialog_pages[0].get("text", "")) == "……また、ジュレジュレ団がいるみたいだ。")
+	var early_visit_texts: Array[String] = []
+	for pattern in JureJureSystemClass.EXPLOITATION_EARLY_VISIT_PATTERNS:
+		early_visit_texts.append(Localizer.text("ja", str(pattern.get("text_key", ""))))
+	assert(str(game.scripted_dialog_pages[0].get("text", "")) in early_visit_texts)
 	assert(not game.jurejure_intro_camera_active and is_equal_approx(game.view_yaw, early_visit_yaw))
 	_finish_dialog(game)
 
@@ -298,7 +305,10 @@ func _test_three_act_sequence(game: Node) -> void:
 	game._maybe_start_habitat_exploitation_concern()
 	assert(game.scripted_dialog_kind == "habitat_exploitation_concern")
 	assert(game.scripted_dialog_pages.size() == 1)
-	assert(str(game.scripted_dialog_pages[0].get("text", "")) == "原生地の力が、少しずつ弱くなってる気がする……。")
+	var late_visit_texts: Array[String] = []
+	for pattern in JureJureSystemClass.EXPLOITATION_LATE_VISIT_PATTERNS:
+		late_visit_texts.append(Localizer.text("ja", str(pattern.get("text_key", ""))))
+	assert(str(game.scripted_dialog_pages[0].get("text", "")) in late_visit_texts)
 	assert(not game.jurejure_intro_camera_active and is_equal_approx(game.view_yaw, late_visit_yaw))
 	_finish_dialog(game)
 

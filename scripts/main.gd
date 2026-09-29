@@ -4507,7 +4507,7 @@ func _start_exploitation_midpoint_event()->void:
 	],false)
 
 func _maybe_start_habitat_exploitation_concern()->void:
-	var concern:=JureJureSystemClass.concern_for_visit(story_progression_state,habitat_visit_id,StoryProgressionClass.exploitation_midpoint_is_seen(story_progression_state))
+	var concern:=JureJureSystemClass.concern_for_visit(story_progression_state,habitat_visit_id,StoryProgressionClass.exploitation_midpoint_is_seen(story_progression_state),rng)
 	if concern.is_empty():return
 	_start_scripted_dialog("habitat_exploitation_concern",[
 		{"speaker":str(concern.get("speaker","")),"text":Localizer.text(language_code,str(concern.get("text_key","")))}

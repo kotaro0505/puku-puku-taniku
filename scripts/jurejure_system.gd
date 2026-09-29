@@ -77,7 +77,9 @@ static func habitat_bgm_key(exploitation_started: bool, habitat_crisis_started: 
 	# Exploitation owns the habitat's soundscape until the separate rain/crisis
 	# phase begins. Keeping this decision here prevents screen-return paths from
 	# drifting back to different interpretations of the same story phase.
-	return "jurejure" if exploitation_started and not habitat_crisis_started else "habitat"
+	if habitat_crisis_started:
+		return "habitat_crisis"
+	return "jurejure" if exploitation_started else "habitat"
 
 
 static func focus_yaw(current_yaw: float, target_position: Vector3) -> float:
@@ -95,7 +97,12 @@ static func choose_exploitation_dialog(last_index: int, rng: RandomNumberGenerat
 	return {"index": chosen_index, "pages": EXPLOITATION_DIALOG_PATTERNS[chosen_index].duplicate(true)}
 
 
-static func concern_for_visit(state: Dictionary, visit_id: int, midpoint_seen: bool = false) -> Dictionary:
+static func concern_for_visit(
+	state: Dictionary,
+	visit_id: int,
+	midpoint_seen: bool,
+	rng: RandomNumberGenerator
+	) -> Dictionary:
 	if visit_id <= 0 or int(state.get("last_crisis_concern_visit", -1)) == visit_id:
 		return {}
 	# Keep normal visits light: one short reaction every third new visit.
@@ -103,7 +110,18 @@ static func concern_for_visit(state: Dictionary, visit_id: int, midpoint_seen: b
 		return {}
 	state["last_crisis_concern_visit"] = visit_id
 	var patterns: Array = EXPLOITATION_LATE_VISIT_PATTERNS if midpoint_seen else EXPLOITATION_EARLY_VISIT_PATTERNS
-	var pattern_index := posmod(int(visit_id / 3) - 1, patterns.size())
+	if patterns.is_empty():
+		return {}
+	var phase := "late" if midpoint_seen else "early"
+	var previous_index := int(state.get("last_exploitation_concern_index", -1)) \
+		if str(state.get("last_exploitation_concern_phase", "")) == phase else -1
+	var candidates: Array[int] = []
+	for index in range(patterns.size()):
+		if patterns.size() == 1 or index != previous_index:
+			candidates.append(index)
+	var pattern_index := candidates[rng.randi_range(0, candidates.size() - 1)]
+	state["last_exploitation_concern_phase"] = phase
+	state["last_exploitation_concern_index"] = pattern_index
 	return (patterns[pattern_index] as Dictionary).duplicate(true)
 
 
