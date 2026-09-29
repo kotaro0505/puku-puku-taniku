@@ -62,13 +62,25 @@ func _ready() -> void:
 	assert(Localizer.text("ja", "awakening_overharvest") == "乱獲や密猟も、絶滅の大きな原因だったみたいだ……。")
 	assert(Localizer.text("ja", "awakening_promise_2") == "これから新しく見つけた品種は、\nここにお返していきます。")
 	assert(Localizer.text("ja", "awakening_promise_3") == "だから、また沢山の可愛い多肉植物を\n私たちにも見せてください！")
-	for expected_page in range(1, 4):
+	for expected_page in range(1, 3):
 		assert(game.habitat_awakening_overlay.page_index == expected_page)
 		assert(game.habitat_awakening_overlay.speaker_portrait.visible)
 		assert(game.habitat_awakening_overlay.speaker_portrait.texture != null)
 		assert(game.habitat_awakening_overlay.speaker_portrait.position.x < game.habitat_awakening_overlay.dialogue_label.position.x)
 		game.habitat_awakening_overlay.advance()
 		await get_tree().process_frame
+	assert(game.habitat_awakening_overlay.page_index == 3)
+	assert(game.habitat_awakening_overlay.dialogue_label.text == Localizer.text("ja", "awakening_sow"))
+	assert(game.habitat_awakening_overlay.dialogue_label.visible and game.habitat_awakening_overlay.transitioning)
+	await get_tree().process_frame
+	assert(game.habitat_awakening_overlay.seed_layer.get_child_count() == 3)
+	game.habitat_awakening_overlay.advance()
+	assert(game.habitat_awakening_overlay.page_index == 3)
+	while game.habitat_awakening_overlay.transitioning:
+		await get_tree().create_timer(0.15).timeout
+	assert(game.habitat_awakening_overlay.dialogue_label.text == Localizer.text("ja", "awakening_sow"))
+	game.habitat_awakening_overlay.advance()
+	await get_tree().process_frame
 	assert(game.habitat_awakening_overlay.page_index == 4 and game.habitat_awakening_overlay.transitioning)
 	assert(not game.habitat_awakening_overlay.text_back.visible)
 	while game.habitat_awakening_overlay.transitioning:

@@ -62,6 +62,13 @@ static func should_be_present(
 		and (exploitation_started or not waiting_for_seed_pod_reward)
 
 
+static func habitat_bgm_key(exploitation_started: bool, habitat_crisis_started: bool) -> String:
+	# Exploitation owns the habitat's soundscape until the separate rain/crisis
+	# phase begins. Keeping this decision here prevents screen-return paths from
+	# drifting back to different interpretations of the same story phase.
+	return "jurejure" if exploitation_started and not habitat_crisis_started else "habitat"
+
+
 static func focus_yaw(current_yaw: float, target_position: Vector3) -> float:
 	return current_yaw + wrapf(rad_to_deg(atan2(-target_position.x, -target_position.z)) - current_yaw, -180.0, 180.0)
 

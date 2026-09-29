@@ -255,6 +255,11 @@ func _show_page(page:Control)->void:
 func is_editor_active()->bool:
 	return visible and editor_page!=null and editor_page.visible
 
+func is_navigation_hint_safe()->bool:
+	# The edge hint belongs only on the passive arrangement views; it should not
+	# cover pot selection, editing, shops, or the completion presentation.
+	return visible and not completion_overlay.visible and ((home_page and home_page.visible) or (viewer_page and viewer_page.visible))
+
 func _input(event:InputEvent)->void:
 	# Web/mobile browsers do not reliably route the second finger of a
 	# multi-touch gesture through a Control's gui_input signal. Track touch

@@ -373,13 +373,20 @@ func _prepare_act_three_reward(game: Node) -> void:
 	game.forest_gacha_intro_seen = true
 	game.fantasy_first_discovery_seen = true
 	game.fantasy_realization_seen = true
+	game.story_progression_state["arrangement_unlocked"] = true
+	game.story_progression_state["arrangement_intro_seen"] = true
+	game.story_progression_state["arrangement_intro_pending"] = false
 	game.act3_unlocked = true
 	game.act3_intro_pending = false
 	game.act3_intro_seen = true
 	StoryProgressionClass.begin_exploitation(game.story_progression_state, game._unique_jurejure_species_get_count())
+	# These tests exercise repeat exploitation battles; the dedicated one-time
+	# Act III camera introduction is covered by story_progression_smoke.
+	StoryProgressionClass.complete_act3_battle_intro(game.story_progression_state)
 	game.current_mode = "habitat"
 	game._update_main_story_progress(false)
 	game._apply_mode()
+	assert(game.audio_manager.current_bgm_key == "jurejure")
 
 
 func _test_act_three_reward_flow(game: Node) -> void:
@@ -516,6 +523,7 @@ func _test_jurejure_crisis_threshold(game: Node) -> void:
 	game.puku_puku_battle._decline_battle()
 	assert(game.current_mode == "habitat")
 	assert(game.scripted_dialog_kind.is_empty())
+	assert(game.audio_manager.current_bgm_key == "jurejure")
 	assert(game._should_show_jurejure_group())
 	assert(not game.jurejure_first_encounter_active)
 	game._on_jurejure_group_pressed()
@@ -555,6 +563,27 @@ func _test_jurejure_crisis_threshold(game: Node) -> void:
 	var total_gets_after := 0
 	for species_id in JUREJURE_SPECIES_IDS:total_gets_after += game._species_get_count(species_id)
 	assert(repeat_id in JUREJURE_SPECIES_IDS and total_gets_after == total_gets_before + 1)
+
+	# Eight unique species begin the distinct rain/crisis phase. Tapping the
+	# resident gang then produces one subdued line only: no Jure theme, choice,
+	# or battle can be started.
+	game._start_habitat_crisis_event()
+	assert(game.habitat_crisis_started and game.audio_manager.current_bgm_key == "habitat")
+	assert(game.jurejure_intro_camera_active)
+	game._update_habitat_view_follow(1.0)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert(game.scripted_dialog_kind == "habitat_crisis")
+	_finish_dialog(game)
+	await get_tree().process_frame
+	assert(not game.puku_puku_battle.visible)
+	game._on_jurejure_group_pressed()
+	assert(game.scripted_dialog_kind == "jurejure_crisis_unavailable")
+	assert(game.intro_dialogue_label.text == Localizer.text("ja", "habitat_crisis_no_battle"))
+	assert(game.audio_manager.current_bgm_key == "habitat")
+	_finish_dialog(game)
+	await get_tree().process_frame
+	assert(not game.puku_puku_battle.visible)
 
 
 func _test_first_loss_unlocks_act_two(game: Node) -> void:

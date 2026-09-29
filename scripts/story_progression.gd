@@ -16,16 +16,20 @@ const ACT_FINALE := 4
 # New Act II/III gates live in one versioned payload instead of adding another
 # row of unrelated booleans to main.gd.  The root scene only forwards gameplay
 # milestones and persists this dictionary.
-const RUNTIME_STATE_VERSION := 2
+const RUNTIME_STATE_VERSION := 3
 const EVENT_POST_ENCOUNTER_HOME := "post_jurejure_encounter_home"
 const EVENT_FANTASY_FIRST := "fantasy_first_discovery"
+const EVENT_ARRANGEMENT_INTRO := "arrangement_intro"
 const EVENT_FANTASY_SIX := "fantasy_realization"
+const EVENT_ACT3_BATTLE_INTRO := "act3_exploitation_battle_intro"
 const EVENT_EXPLOITATION_MIDPOINT := "exploitation_midpoint"
 const EVENT_SECRET_GACHA_INSTALL := "secret_gacha_install"
 const RUNTIME_EVENT_IDS := [
 	EVENT_POST_ENCOUNTER_HOME,
 	EVENT_FANTASY_FIRST,
+	EVENT_ARRANGEMENT_INTRO,
 	EVENT_FANTASY_SIX,
+	EVENT_ACT3_BATTLE_INTRO,
 	EVENT_EXPLOITATION_MIDPOINT,
 	EVENT_SECRET_GACHA_INSTALL,
 ]
@@ -47,7 +51,13 @@ static func default_runtime_state() -> Dictionary:
 		"fantasy_new_guarantee_consumed": false,
 		"post_encounter_greenhouse_pending": false,
 		"post_encounter_greenhouse_seen": false,
+		"arrangement_unlocked": false,
+		"arrangement_intro_pending": false,
+		"arrangement_intro_seen": false,
+		"forest_gacha_unlock_pending": false,
 		"exploitation_started": false,
+		"act3_battle_intro_pending": false,
+		"act3_battle_intro_seen": false,
 		"exploitation_midpoint_pending": false,
 		"exploitation_midpoint_seen": false,
 		"pending_story_events": [],
@@ -99,8 +109,25 @@ static func normalize_runtime_state(raw_state: Variant, migration: Dictionary = 
 		var old_secret_evidence := bool(migration.get("secret_gacha_evidence", false))
 		var old_act3_intro_seen := bool(migration.get("act3_intro_seen", false))
 		var old_jurejure_count := maxi(0, int(migration.get("jurejure_get_count", 0)))
+		var old_fantasy_count := maxi(0, int(migration.get("fantasy_get_count", 0)))
+		var old_arrangement_evidence := bool(migration.get("arrangement_evidence", false))
+		var old_forest_gacha_evidence := bool(migration.get("forest_gacha_evidence", false))
+		if old_fantasy_count >= 1 or old_arrangement_evidence:
+			# Arrangement play existed before this state was introduced. Do not
+			# take it away or replay the new gift tutorial for established saves.
+			state["arrangement_unlocked"] = true
+			state["arrangement_intro_pending"] = false
+			state["arrangement_intro_seen"] = true
+			state["pending_story_events"].erase(EVENT_ARRANGEMENT_INTRO)
+		if old_forest_gacha_evidence:
+			state["forest_gacha_unlock_pending"] = false
 		if old_act3_intro_seen or old_crisis_started or old_secret_evidence:
 			state["exploitation_started"] = true
+			# The dedicated camera/battle introduction is new in v3. Existing
+			# Act III saves have already crossed this story beat.
+			state["act3_battle_intro_pending"] = false
+			state["act3_battle_intro_seen"] = true
+			state["pending_story_events"].erase(EVENT_ACT3_BATTLE_INTRO)
 		if old_crisis_started or old_secret_evidence:
 			state["exploitation_midpoint_pending"] = false
 			state["exploitation_midpoint_seen"] = true
@@ -124,6 +151,17 @@ static func normalize_runtime_state(raw_state: Variant, migration: Dictionary = 
 		state["pending_story_events"].erase(EVENT_POST_ENCOUNTER_HOME)
 	elif bool(state.get("post_encounter_greenhouse_pending", false)):
 		queue_story_event(state, EVENT_POST_ENCOUNTER_HOME)
+	if bool(state.get("arrangement_intro_seen", false)):
+		state["arrangement_unlocked"] = true
+		state["arrangement_intro_pending"] = false
+		state["pending_story_events"].erase(EVENT_ARRANGEMENT_INTRO)
+	elif bool(state.get("arrangement_intro_pending", false)):
+		queue_story_event(state, EVENT_ARRANGEMENT_INTRO)
+	if bool(state.get("act3_battle_intro_seen", false)):
+		state["act3_battle_intro_pending"] = false
+		state["pending_story_events"].erase(EVENT_ACT3_BATTLE_INTRO)
+	elif bool(state.get("act3_battle_intro_pending", false)):
+		queue_story_event(state, EVENT_ACT3_BATTLE_INTRO)
 	if bool(state.get("exploitation_midpoint_seen", false)):
 		state["exploitation_midpoint_pending"] = false
 		state["pending_story_events"].erase(EVENT_EXPLOITATION_MIDPOINT)
@@ -165,7 +203,8 @@ static func take_normal_play_guarantee(
 static func record_new_get(state: Dictionary, milestone: Dictionary) -> Dictionary:
 	var actions := {
 		"fantasy_unlocked_now": false,
-		"forest_gacha_unlocked_now": false,
+		"arrangement_intro_queued_now": false,
+		"forest_gacha_unlock_ready": false,
 	}
 	if not bool(milestone.get("act2_unlocked", false)):
 		return actions
@@ -179,11 +218,32 @@ static func record_new_get(state: Dictionary, milestone: Dictionary) -> Dictiona
 	var fantasy_count := maxi(0, int(milestone.get("fantasy_get_count", 0)))
 	if fantasy_count >= 1 and not bool(milestone.get("fantasy_first_seen", false)):
 		queue_story_event(state, EVENT_FANTASY_FIRST)
+	if fantasy_count >= 1 \
+			and not bool(state.get("arrangement_unlocked", false)) \
+			and not bool(state.get("arrangement_intro_pending", false)):
+		state["arrangement_intro_pending"] = true
+		queue_story_event(state, EVENT_ARRANGEMENT_INTRO)
+		actions["arrangement_intro_queued_now"] = true
 	if fantasy_count >= 6 and not bool(milestone.get("fantasy_six_seen", false)):
 		queue_story_event(state, EVENT_FANTASY_SIX)
-	if bool(state.get("fantasy_unlocked", false)) and fantasy_count >= 2 and not bool(milestone.get("forest_gacha_unlocked", false)):
-		actions["forest_gacha_unlocked_now"] = true
+	if bool(state.get("fantasy_unlocked", false)) and fantasy_count >= 6 and not bool(milestone.get("forest_gacha_unlocked", false)):
+		state["forest_gacha_unlock_pending"] = true
+		actions["forest_gacha_unlock_ready"] = true
 	return actions
+
+
+static func complete_arrangement_intro(state: Dictionary) -> void:
+	consume_story_event(state, EVENT_ARRANGEMENT_INTRO)
+	state["arrangement_intro_pending"] = false
+	state["arrangement_intro_seen"] = true
+	state["arrangement_unlocked"] = true
+
+
+static func take_forest_gacha_unlock(state: Dictionary) -> bool:
+	if not bool(state.get("forest_gacha_unlock_pending", false)):
+		return false
+	state["forest_gacha_unlock_pending"] = false
+	return true
 
 
 static func queue_story_event(state: Dictionary, event_id: String) -> void:
@@ -221,7 +281,16 @@ static func complete_post_encounter_greenhouse(state: Dictionary) -> void:
 
 static func begin_exploitation(state: Dictionary, jurejure_get_count: int = 0) -> void:
 	state["exploitation_started"] = true
+	if not bool(state.get("act3_battle_intro_seen", false)):
+		state["act3_battle_intro_pending"] = true
+		queue_story_event(state, EVENT_ACT3_BATTLE_INTRO)
 	update_jurejure_progress(state, jurejure_get_count)
+
+
+static func complete_act3_battle_intro(state: Dictionary) -> void:
+	consume_story_event(state, EVENT_ACT3_BATTLE_INTRO)
+	state["act3_battle_intro_pending"] = false
+	state["act3_battle_intro_seen"] = true
 
 
 static func update_jurejure_progress(state: Dictionary, jurejure_get_count: int) -> void:
@@ -249,6 +318,10 @@ static func complete_secret_gacha_install(state: Dictionary) -> void:
 
 static func fantasy_is_unlocked(state: Dictionary) -> bool:
 	return bool(state.get("fantasy_unlocked", false))
+
+
+static func arrangement_is_unlocked(state: Dictionary) -> bool:
+	return bool(state.get("arrangement_unlocked", false))
 
 
 static func exploitation_is_started(state: Dictionary) -> bool:

@@ -14,7 +14,7 @@ func _ready() -> void:
 	_test_retired_unlock_conditions(game)
 	_test_legacy_three_act_migration(game)
 	game._reset_progression_state()
-	print("STORY_PROGRESSION_SMOKE_OK acts=3 first_battle=act2 original_guarantee=true fantasy_gate=original_get fantasy_guarantee=true forest_gate=2 fantasy=1+6+24 safe_queue=true exploitation=act3 midpoint=4 crisis=8 secret_gacha=midpoint migration=preserved")
+	print("STORY_PROGRESSION_SMOKE_OK acts=3 first_battle=act2 original_guarantee=true fantasy_gate=original_get fantasy_guarantee=true arrangement_gate=1 forest_gate=6 fantasy=1+6+24 safe_queue=true exploitation=act3 midpoint=4 crisis=8 secret_gacha=midpoint migration=preserved")
 	get_tree().quit()
 
 
@@ -155,18 +155,28 @@ func _test_three_act_sequence(game: Node) -> void:
 	assert(game.scripted_dialog_kind == "fantasy_first_discovery")
 	assert(game.scripted_dialog_pages.size() == 3)
 	assert(str(game.scripted_dialog_pages[0].get("text", "")) == "……なにこれ！？")
+	assert(str(game.scripted_dialog_pages[1].get("text", "")) == "こんな多肉、あの本には載ってないよ…。")
 	_finish_dialog(game)
+	await get_tree().process_frame
 	assert(game.fantasy_first_discovery_seen)
+	assert(game.scripted_dialog_kind == "arrangement_intro")
+	assert(str(game.scripted_dialog_pages[0].get("text", "")) == "品種も集まって来たね！\n鉢をプレゼントするから寄せ植えしてみてよ！")
+	_finish_dialog(game)
+	await get_tree().process_frame
+	assert(StoryProgressionClass.arrangement_is_unlocked(game.story_progression_state))
+	assert(bool(game.story_progression_state.get("arrangement_intro_seen", false)))
+	assert(game.arrangement_button == null and game.arrangement_navigation_hint.intro_playing)
+	if game.arrangement_navigation_hint.intro_tween and game.arrangement_navigation_hint.intro_tween.is_valid():
+		game.arrangement_navigation_hint.intro_tween.kill()
+	game.arrangement_navigation_hint._finish_intro()
+	await get_tree().process_frame
 	game._record_species_get(fantasy_ids[1])
 	assert(game._unique_fantasy_species_get_count() == 2)
-	assert(game.forest_gacha_unlocked and not game.forest_gacha_intro_seen)
-	game._try_start_pending_story_event()
-	assert(game.scripted_dialog_kind == "forest_gacha_intro")
-	_finish_dialog(game)
-	assert(game.forest_gacha_intro_seen)
+	assert(not game.forest_gacha_unlocked and not game.forest_gacha_intro_seen)
 
 	for index in range(2, 5):
 		game._record_species_get(fantasy_ids[index])
+		assert(not game.forest_gacha_unlocked)
 	game.puku_puku_battle.visible = true
 	game._record_species_get(fantasy_ids[5])
 	game._try_start_pending_story_event()
@@ -177,7 +187,12 @@ func _test_three_act_sequence(game: Node) -> void:
 	assert(game.scripted_dialog_pages.size() == 3)
 	assert("想像したものが、多肉になってる？" in str(game.scripted_dialog_pages[2].get("text", "")))
 	_finish_dialog(game)
+	await get_tree().process_frame
 	assert(game.fantasy_realization_seen)
+	assert(game.forest_gacha_unlocked and not game.forest_gacha_intro_seen)
+	assert(game.scripted_dialog_kind == "forest_gacha_intro")
+	_finish_dialog(game)
+	assert(game.forest_gacha_intro_seen)
 
 	for index in range(6, 24):
 		game._record_species_get(fantasy_ids[index])
@@ -197,6 +212,7 @@ func _test_three_act_sequence(game: Node) -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	assert(game.current_mode == "habitat" and game.scripted_dialog_kind == "act3_intro")
+	assert(game.audio_manager.current_bgm_key == "jurejure")
 	assert(str(game.scripted_dialog_pages[0].get("text", "")) == "つまり、欲しいものを想像すればいいんだチュー！？")
 	assert(str(game.scripted_dialog_pages[1].get("text", "")) == "だったら、もっともっと作らせるチュー！")
 	_finish_dialog(game)
@@ -208,9 +224,15 @@ func _test_three_act_sequence(game: Node) -> void:
 	assert(game.jurejure_intro_camera_active)
 	game._update_habitat_view_follow(1.0)
 	await get_tree().process_frame
+	assert(game.scripted_dialog_kind == "act3_exploitation_battle_intro")
+	assert(game.intro_dialogue_label.text == "まだまだ原生地に作らせるチュー！\n邪魔するなら、ぷくぷくバトルで勝負だチュー！")
+	assert(not game.puku_puku_battle.visible)
+	_finish_dialog(game)
+	await get_tree().process_frame
 	assert(game.puku_puku_battle.visible and game.puku_puku_battle.choice_layer.visible)
-	assert(not game.puku_puku_battle.battle_active)
+	assert(not game.puku_puku_battle.battle_active and bool(game.story_progression_state.get("act3_battle_intro_seen", false)))
 	game.puku_puku_battle._decline_battle()
+	assert(game.audio_manager.current_bgm_key == "jurejure")
 	game.jurejure_waiting_for_seed_pod_reward = true
 	assert(game._should_show_jurejure_group())
 	game.habitat_visit_id = 3

@@ -6,6 +6,7 @@ signal lookaround_requested(context: String)
 
 const Localizer = preload("res://scripts/game_localizer.gd")
 const DialoguePortraits = preload("res://scripts/dialogue_portraits.gd")
+const UISymbolIconClass = preload("res://scripts/ui_symbol_icon.gd")
 const DIALOG_KEYS := [
 	"awakening_empty_1", "awakening_empty_2", "awakening_overharvest", "awakening_sow",
 	"_pause_before_memory", "awakening_surprise", "awakening_memory", "awakening_thanks",
@@ -53,9 +54,11 @@ var darkness: ColorRect
 var rain_tint: ColorRect
 var ghost_layer: Control
 var sprout_layer: Control
+var seed_layer: Control
 var ghosts: Array[TextureRect] = []
 var rain_drops: Array[Dictionary] = []
 var rng := RandomNumberGenerator.new()
+var sow_animation_played := false
 
 func _ready() -> void:
 	name = "HabitatAwakeningOverlay"
@@ -140,6 +143,12 @@ func _build_ui() -> void:
 		plant.set_meta("story_sprout_plant", true)
 		sprout_group.add_child(plant)
 
+	seed_layer = Control.new()
+	seed_layer.name = "StorySeedLayer"
+	seed_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	seed_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(seed_layer)
+
 	text_back = Panel.new()
 	text_back.position = Vector2(24, 744)
 	text_back.size = Vector2(528, 226)
@@ -213,6 +222,7 @@ func start(requested_language := "ja") -> void:
 	rain_active = false
 	rain_soft = false
 	transitioning = false
+	sow_animation_played = false
 	waiting_for_arrival_lookaround = true
 	darkness.color.a = 0.12
 	rain_tint.color.a = 0.0
@@ -224,6 +234,8 @@ func start(requested_language := "ja") -> void:
 		for sprout_part in sprout_group.get_children():
 			sprout_part.modulate = Color(1.0, 1.0, 1.0, 0.0)
 			sprout_part.scale = Vector2(0.08, 0.08)
+	for seed in seed_layer.get_children():
+		seed.queue_free()
 	instruction_label.text = Localizer.text(language_code, "opening_story_tap")
 	_set_dialogue_visible(true)
 	visible = true
@@ -263,6 +275,11 @@ func _layout_ghosts() -> void:
 		ghost.position = Vector2(area.x * GHOST_CENTER_RATIOS[index].x, area.y * GHOST_CENTER_RATIOS[index].y) - ghost.size * 0.5
 
 func _show_page() -> void:
+	if page_index == 3:
+		_show_current_dialogue()
+		if not sow_animation_played:
+			_begin_sow_animation()
+		return
 	if page_index == 4:
 		_begin_memory_reveal()
 		return
@@ -276,6 +293,37 @@ func _show_page() -> void:
 		_begin_three_species_reveal()
 		return
 	_show_current_dialogue()
+
+
+func _begin_sow_animation() -> void:
+	sow_animation_played = true
+	transitioning = true
+	# The seeds are story-only sprites. They deliberately do not touch the
+	# player's seed inventory or the habitat population.
+	var destinations := [Vector2(118, 646), Vector2(286, 594), Vector2(458, 648)]
+	for index in destinations.size():
+		var seed := UISymbolIconClass.new()
+		seed.name = "StorySeed%d" % index
+		seed.symbol = "seed"
+		seed.icon_color = Color("#8b5629")
+		seed.size = Vector2(20, 20)
+		seed.position = Vector2(390 + index * 22, 436 - index * 7)
+		seed.modulate.a = 0.0
+		seed_layer.add_child(seed)
+		var destination: Vector2 = destinations[index] - seed.size * 0.5
+		var midpoint := Vector2(lerpf(seed.position.x, destination.x, 0.48), minf(seed.position.y, destination.y) - 58.0)
+		var flight := create_tween().bind_node(seed)
+		flight.tween_interval(float(index) * 0.14)
+		flight.tween_property(seed, "modulate:a", 1.0, 0.08)
+		flight.tween_property(seed, "position", midpoint, 0.25).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		flight.tween_property(seed, "position", destination, 0.25).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		flight.tween_property(seed, "scale", Vector2(0.72, 0.72), 0.10).set_trans(Tween.TRANS_BACK)
+		flight.tween_interval(0.24)
+		flight.tween_property(seed, "modulate:a", 0.0, 0.20)
+		flight.tween_callback(seed.queue_free)
+	await get_tree().create_timer(1.28).timeout
+	if visible and page_index == 3:
+		transitioning = false
 
 func _show_current_dialogue() -> void:
 	_set_dialogue_visible(true)

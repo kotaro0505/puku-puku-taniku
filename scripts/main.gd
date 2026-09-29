@@ -6,6 +6,7 @@ const SucculentClass = preload("res://scripts/succulent.gd")
 const AudioManagerClass = preload("res://scripts/audio_manager.gd")
 const JellyBalanceClass = preload("res://scripts/jelly_balance.gd")
 const ArrangementUIClass = preload("res://scripts/arrangement_ui.gd")
+const ArrangementNavigationHintClass = preload("res://scripts/arrangement_navigation_hint.gd")
 const CatalogPreviewDevClass = preload("res://scripts/catalog_preview_dev.gd")
 const ForestGachaSystemClass = preload("res://scripts/forest_gacha_system.gd")
 const ForestGachaUIClass = preload("res://scripts/forest_gacha_ui.gd")
@@ -32,7 +33,7 @@ const HabitatCrisisAtmosphereClass = preload("res://scripts/habitat_crisis_atmos
 const SlotMachineScene = preload("res://scenes/slot_machine.tscn")
 const DEVELOPMENT_CATALOG_PREVIEW_ENABLED := true
 const SECRET_GACHA_PREVIEW_UNLIMITED := true
-const PROGRESSION_VERSION := 27
+const PROGRESSION_VERSION := 28
 const SAVE_PATH := "user://records.json"
 const LEGACY_HABITAT_REGENERATION_VERSION := 17
 const INITIAL_SERIES_ID := "base"
@@ -500,6 +501,7 @@ var owned_pots: Dictionary = {DEFAULT_POT_ID:true}
 var saved_arrangements: Array = []
 var arrangement_save_capacity := 20
 var arrangement_ui
+var arrangement_navigation_hint
 var unlocked_species: Dictionary = {}
 var greenhouse_available: Dictionary = {}
 var best_spawn_unlocks_dirty := false
@@ -1176,6 +1178,8 @@ func _migrate_three_act_progress(saved_progression_version:int)->void:
 		"legacy":saved_progression_version<PROGRESSION_VERSION,
 		"act2_unlocked":act2_unlocked,
 		"fantasy_get_count":fantasy_count,
+		"arrangement_evidence":not saved_arrangements.is_empty(),
+		"forest_gacha_evidence":forest_gacha_unlocked or forest_gacha_draw_count>0,
 		"act3_intro_seen":act3_intro_seen,
 		"jurejure_get_count":jurejure_count,
 		"jurejure_intro_complete":jurejure_intro_complete,
@@ -1184,8 +1188,12 @@ func _migrate_three_act_progress(saved_progression_version:int)->void:
 	})
 	if fantasy_first_discovery_seen:StoryProgressionClass.consume_story_event(story_progression_state,StoryProgressionClass.EVENT_FANTASY_FIRST)
 	if fantasy_realization_seen:StoryProgressionClass.consume_story_event(story_progression_state,StoryProgressionClass.EVENT_FANTASY_SIX)
-	if saved_progression_version<PROGRESSION_VERSION and act2_unlocked:forest_gacha_unlocked=true
-	if StoryProgressionClass.fantasy_is_unlocked(story_progression_state) and fantasy_count>=2:forest_gacha_unlocked=true
+	# Existing access or a completed six-species milestone is durable evidence;
+	# never revoke Forest Gacha from a legacy save. New v28 games wait for the
+	# six-species realization dialogue before this flag is set.
+	if saved_progression_version<PROGRESSION_VERSION and (forest_gacha_unlocked or forest_gacha_draw_count>0 or fantasy_count>=6):
+		forest_gacha_unlocked=true
+		story_progression_state["forest_gacha_unlock_pending"]=false
 	if saved_progression_version<26:
 		# Earlier builds had no safe post-GET discovery events. Do not replay a
 		# backlog on load; acknowledge thresholds the player already passed.
@@ -1383,8 +1391,6 @@ func _build_ui() -> void:
 		habitat_dev_open_button=Button.new();habitat_dev_open_button.name="HabitatDevQuickOpen";habitat_dev_open_button.text="原生地テスト";habitat_dev_open_button.position=Vector2(398,262);habitat_dev_open_button.size=Vector2(153,55);_skin_button(habitat_dev_open_button,Color("#adcbb8"),15);habitat_dev_open_button.mouse_filter=Control.MOUSE_FILTER_STOP;habitat_dev_open_button.pressed.connect(_open_habitat_dev);hud.add_child(habitat_dev_open_button)
 	shop_button=Button.new();shop_button.text="おみせ";shop_button.position=Vector2(398,262);shop_button.size=Vector2(153,55);_skin_button(shop_button,Color("#fff0cf"),16);shop_button.mouse_filter=Control.MOUSE_FILTER_STOP;shop_button.pressed.connect(_open_shop);hud.add_child(shop_button)
 	external_navigation_controls.append(shop_button)
-	arrangement_button=Button.new();arrangement_button.text="寄せ植え";arrangement_button.position=Vector2(398,326);arrangement_button.size=Vector2(153,55);_skin_button(arrangement_button,Color("#fff0cf"),16);arrangement_button.mouse_filter=Control.MOUSE_FILTER_STOP;arrangement_button.pressed.connect(_open_arrangements);hud.add_child(arrangement_button)
-	external_navigation_controls.append(arrangement_button)
 	forest_gacha_button=Button.new();forest_gacha_button.name="ForestGachaButton";forest_gacha_button.text="森のガチャ\n1ぷく";forest_gacha_button.position=Vector2(398,390);forest_gacha_button.size=Vector2(153,67);_skin_button(forest_gacha_button,Color("#d9c77d"),15);forest_gacha_button.mouse_filter=Control.MOUSE_FILTER_STOP;forest_gacha_button.pressed.connect(_open_forest_gacha);hud.add_child(forest_gacha_button)
 	external_navigation_controls.append(forest_gacha_button)
 	secret_gacha_button=Button.new();secret_gacha_button.name="SecretGachaButton";secret_gacha_button.text="秘密のガチャ\n1ぷく";secret_gacha_button.position=Vector2(398,466);secret_gacha_button.size=Vector2(153,67);_skin_button(secret_gacha_button,Color("#b88348"),15);secret_gacha_button.mouse_filter=Control.MOUSE_FILTER_STOP;secret_gacha_button.pressed.connect(_open_secret_gacha);secret_gacha_button.visible=false;hud.add_child(secret_gacha_button)
@@ -1399,6 +1405,7 @@ func _build_ui() -> void:
 	_build_play_overlay(hud)
 	_build_shop(hud)
 	_build_arrangement_ui(hud)
+	_build_arrangement_navigation_hint(hud)
 	_build_result_overlay(hud)
 	_build_settings(hud)
 	_build_research_catalog_reward(hud)
@@ -1531,7 +1538,7 @@ func _start_opening_story(as_replay:=false,start_page:=0)->void:
 
 func _on_opening_story_finished(as_replay:bool)->void:
 	if as_replay:
-		if audio_manager:audio_manager.play_bgm("habitat" if current_mode=="habitat" else "greenhouse")
+		_play_current_area_bgm()
 		_update_play_ui()
 		return
 	opening_story_complete=true
@@ -1648,6 +1655,11 @@ func _build_arrangement_ui(hud:Control)->void:
 	arrangement_ui.completion_confetti_requested.connect(_on_arrangement_completion_confetti_requested)
 	_sync_arrangement_ui()
 
+func _build_arrangement_navigation_hint(hud:Control)->void:
+	arrangement_navigation_hint=ArrangementNavigationHintClass.new()
+	hud.add_child(arrangement_navigation_hint)
+	arrangement_navigation_hint.intro_finished.connect(_on_arrangement_swipe_intro_finished)
+
 func _sync_arrangement_ui()->void:
 	if arrangement_ui==null:return
 	arrangement_ui.configure(catalog_species,[],pot_catalog,discovered,owned_pots,saved_arrangements,arrangement_save_capacity,puku_points,_species_texture,_request_species_texture,bests,language_code)
@@ -1660,11 +1672,22 @@ func _seed_shop_products()->Array:
 	return []
 
 func _open_arrangements()->void:
-	if not _tutorial_fully_complete() or current_mode!="greenhouse" or play_active or catalog_preview_mode_active or arrangement_scene_active or arrangement_transitioning:return
+	if not StoryProgressionClass.arrangement_is_unlocked(story_progression_state) or not _tutorial_fully_complete() or current_mode!="greenhouse" or play_active or catalog_preview_mode_active or arrangement_scene_active or arrangement_transitioning:return
 	play_modal_open=false;pointer_down=false;greenhouse_drag_accumulator=0.0;greenhouse_drag_started=false;_cancel_greenhouse_area_drag()
 	saved_greenhouse_pan_x=greenhouse_pan_x;greenhouse_pan_target_x=greenhouse_pan_x
 	_sync_arrangement_ui();arrangement_ui.set_world_backdrop_mode(true,_arrangement_pot_anchor_screen());arrangement_ui.visible=false
 	_snap_greenhouse_area(true)
+
+func _play_arrangement_swipe_intro()->void:
+	if arrangement_navigation_hint==null or current_mode!="greenhouse":
+		call_deferred("_try_start_pending_story_event")
+		return
+	arrangement_navigation_hint.play_intro(language_code,_arrangement_focus_transition_for_pan(saved_greenhouse_pan_x))
+	_update_play_ui()
+
+func _on_arrangement_swipe_intro_finished()->void:
+	_update_play_ui()
+	call_deferred("_try_start_pending_story_event")
 
 func _open_pot_shop()->void:
 	if not _tutorial_fully_complete():return
@@ -1955,7 +1978,7 @@ func _advance_intro_story()->void:
 		_advance_scripted_dialog()
 		return
 	if not tutorial_dialog_kind.is_empty():
-		var finished_kind:=tutorial_dialog_kind;tutorial_dialog_kind="";tutorial_steps[finished_kind+"_dialog"]=true;intro_overlay.visible=false;shop_overlay.visible=false;intro_speaker_label.visible=true;intro_dialogue_label.add_theme_font_size_override("font_size",20);intro_dialogue_label.add_theme_color_override("font_color",UI_BROWN);intro_continue_button.text=Localizer.text(language_code,"next");_save();_update_play_ui();audio_manager.play_bgm("habitat" if current_mode=="habitat" else "greenhouse")
+		var finished_kind:=tutorial_dialog_kind;tutorial_dialog_kind="";tutorial_steps[finished_kind+"_dialog"]=true;intro_overlay.visible=false;shop_overlay.visible=false;intro_speaker_label.visible=true;intro_dialogue_label.add_theme_font_size_override("font_size",20);intro_dialogue_label.add_theme_color_override("font_color",UI_BROWN);intro_continue_button.text=Localizer.text(language_code,"next");_save();_update_play_ui();_play_current_area_bgm()
 		if finished_kind=="play3":_show_tutorial_guide("habitat")
 		elif finished_kind=="habitat_scroll":habitat_scroll_tutorial_active=true
 		elif finished_kind=="puku_gauge":puku_gauge_intro_complete=true;tutorial_steps["puku_gauge_intro_complete"]=true;_save();_update_currency_ui()
@@ -1986,12 +2009,26 @@ func _start_scripted_dialog(kind:String,pages:Array,shop_context:=false)->void:
 		shop_background.texture=load("res://assets/shop-background-armadillo.jpg" if armadillo_present else "res://assets/shop-background-final.jpg")
 		armadillo_tap_button.visible=false;audio_manager.play_bgm("shop")
 	else:
-		# Keep the gang's theme through its dialogue and the battle choice.
-		if kind not in ["jurejure_intro","jurejure_challenge","jurejure_exploitation_challenge"]:
-			audio_manager.play_bgm("habitat" if current_mode=="habitat" else "greenhouse")
+		# Gang confrontations deliberately take over the habitat theme. Act III's
+		# opening does so before exploitation_started is persisted.
+		_play_current_area_bgm(kind in ["jurejure_intro","jurejure_challenge","jurejure_exploitation_challenge","act3_intro","act3_exploitation_battle_intro"])
 	_advance_scripted_dialog()
 
 func _advance_scripted_dialog()->void:
+	# A dialogue page can hand off to a catalog card, then resume at the next
+	# page when that card closes. This keeps species introductions adjacent to
+	# their spoken names without adding event-specific dialogue branches.
+	if scripted_dialog_index>=0 and scripted_dialog_index<scripted_dialog_pages.size():
+		var previous_page:Dictionary=scripted_dialog_pages[scripted_dialog_index]
+		var card_species_id:=str(previous_page.get("after_species_card",""))
+		if not card_species_id.is_empty() and not bool(previous_page.get("after_species_card_shown",false)):
+			previous_page["after_species_card_shown"]=true
+			scripted_dialog_pages[scripted_dialog_index]=previous_page
+			_register_story_catalog_species(card_species_id)
+			intro_continue_button.disabled=true
+			_save()
+			_queue_species_get_by_id(card_species_id,true,"scripted_dialog_card:%s"%card_species_id)
+			return
 	scripted_dialog_index+=1
 	if scripted_dialog_index>=scripted_dialog_pages.size():
 		_finish_scripted_dialog()
@@ -2010,13 +2047,12 @@ func _advance_scripted_dialog()->void:
 func _finish_scripted_dialog()->void:
 	var finished_kind:=scripted_dialog_kind;var keep_shop:=scripted_dialog_shop_context
 	scripted_dialog_kind="";scripted_dialog_pages.clear();scripted_dialog_index=-1;scripted_dialog_shop_context=false;intro_overlay.visible=false
-	var acquired:Array[String]=[];var open_puku_intro:=false;var open_catalog:=false;var guide_habitat:=false;var guide_catalog:=false;var show_pinwheel_get:=false;var show_armadillo_gift:=false;var start_second_awakening:=false;var start_trio_event:=false;var start_jurejure_reveal:=false;var show_jurejure_choice:=false;var queue_jurejure_reward:=false;var show_trio_cards:=false;var focus_act3_exploitation:=false
+	var acquired:Array[String]=[];var open_puku_intro:=false;var open_catalog:=false;var guide_habitat:=false;var guide_catalog:=false;var show_pinwheel_get:=false;var show_armadillo_gift:=false;var start_second_awakening:=false;var start_trio_event:=false;var start_jurejure_reveal:=false;var show_jurejure_choice:=false;var queue_jurejure_reward:=false;var focus_act3_exploitation:=false;var show_arrangement_swipe_intro:=false
 	match finished_kind:
 		"first_colorata_discovery":
 			first_colorata_confirmed=true;start_trio_event=true
 		"trio_originals":
-			_register_story_catalog_species(PANDA_STORY_SPECIES_ID);_register_story_catalog_species(ARMADILLO_STORY_SPECIES_ID)
-			trio_originals_confirmed=true;habitat_unlocked=true;show_trio_cards=true
+			trio_originals_confirmed=true;habitat_unlocked=true;guide_habitat=true
 		"mystery_catalog_prompt":
 			guide_catalog=true
 		"habitat_return":
@@ -2033,14 +2069,19 @@ func _finish_scripted_dialog()->void:
 			forest_gacha_intro_seen=true
 		"fantasy_first_discovery":
 			fantasy_first_discovery_seen=true;StoryProgressionClass.consume_story_event(story_progression_state,StoryProgressionClass.EVENT_FANTASY_FIRST)
+		"arrangement_intro":
+			StoryProgressionClass.complete_arrangement_intro(story_progression_state);show_arrangement_swipe_intro=true
 		"fantasy_realization":
 			fantasy_realization_seen=true;StoryProgressionClass.consume_story_event(story_progression_state,StoryProgressionClass.EVENT_FANTASY_SIX)
+			if StoryProgressionClass.take_forest_gacha_unlock(story_progression_state):forest_gacha_unlocked=true;forest_gacha_intro_seen=false
 		"post_jurejure_encounter_home":
 			StoryProgressionClass.complete_post_encounter_greenhouse(story_progression_state)
 		"act3_intro":
 			act3_intro_seen=true;act3_intro_pending=false;jurejure_waiting_for_seed_pod_reward=false
 			StoryProgressionClass.begin_exploitation(story_progression_state,_unique_jurejure_species_get_count());focus_act3_exploitation=current_mode=="habitat"
 			if habitat_crisis_pending:habitat_crisis_eligible_visit_id=habitat_visit_id
+		"act3_exploitation_battle_intro":
+			StoryProgressionClass.complete_act3_battle_intro(story_progression_state);show_jurejure_choice=true
 		"jurejure_species_first":
 			jurejure_species_first_seen=true
 		"habitat_crisis":
@@ -2092,11 +2133,10 @@ func _finish_scripted_dialog()->void:
 		elif show_armadillo_gift and not armadillo_gift_species_id.is_empty():call_deferred("_queue_species_get_by_id",armadillo_gift_species_id,true,"armadillo_gift")
 	else:
 		if finished_kind not in ["jurejure_intro","jurejure_challenge","jurejure_exploitation_challenge"]:
-			audio_manager.play_bgm("habitat" if current_mode=="habitat" else "greenhouse")
+			_play_current_area_bgm()
 	_update_play_ui()
 	if focus_act3_exploitation:call_deferred("_focus_jurejure_group","act3_exploitation_start")
 	elif start_trio_event:call_deferred("_start_trio_originals_event")
-	elif show_trio_cards:call_deferred("_queue_species_get_by_id",PANDA_STORY_SPECIES_ID,true,"trio_affinis_catalog")
 	elif start_jurejure_reveal:call_deferred("_focus_jurejure_first_encounter")
 	elif guide_catalog:call_deferred("_show_tutorial_guide","encyclopedia")
 	elif finished_kind=="initial_seed_stock":call_deferred("_show_tutorial_guide","play_open_normal")
@@ -2108,6 +2148,7 @@ func _finish_scripted_dialog()->void:
 	elif show_jurejure_choice and puku_puku_battle:call_deferred("_show_jurejure_battle_choice")
 	elif queue_jurejure_reward:
 		var reward_species_id:=jurejure_pending_reward_species_id;jurejure_pending_reward_species_id="";call_deferred("_queue_species_get_by_id",reward_species_id,true,"jurejure_battle")
+	elif show_arrangement_swipe_intro:call_deferred("_play_arrangement_swipe_intro")
 	else:call_deferred("_try_start_pending_story_event")
 	if finished_kind=="armadillo_mystery_intro" and mystery_seed_count>0:call_deferred("_show_shop_chatter",Localizer.text(language_code,"mystery_seed_request"),false,"research_offer","armadillo")
 	if open_catalog:
@@ -2142,8 +2183,8 @@ func _start_trio_originals_event()->void:
 	var panda_name:=Localizer.species_name(language_code,_catalog_entry(PANDA_STORY_SPECIES_ID))
 	var armadillo_name:=Localizer.species_name(language_code,_catalog_entry(ARMADILLO_STORY_SPECIES_ID))
 	_start_scripted_dialog("trio_originals",[
-		{"speaker":"panda","text":Localizer.text(language_code,"story_trio_1",[panda_name])},
-		{"speaker":"armadillo","text":Localizer.text(language_code,"story_trio_2",[armadillo_name])},
+		{"speaker":"panda","text":Localizer.text(language_code,"story_trio_1",[panda_name]),"after_species_card":PANDA_STORY_SPECIES_ID},
+		{"speaker":"armadillo","text":Localizer.text(language_code,"story_trio_2",[armadillo_name]),"after_species_card":ARMADILLO_STORY_SPECIES_ID},
 		{"speaker":"armadillo","text":Localizer.text(language_code,"story_trio_3")},
 		{"speaker":"girl","text":Localizer.text(language_code,"story_trio_4")},
 		{"speaker":"panda","text":Localizer.text(language_code,"story_trio_5")},
@@ -2268,7 +2309,7 @@ func _focus_jurejure_group(context:String)->void:
 		if context=="first_encounter":
 			jurejure_first_encounter_active=false;_start_jurejure_intro_event()
 		elif context=="habitat_crisis":_begin_habitat_crisis_dialog()
-		elif context=="act3_exploitation_start":_show_jurejure_battle_choice()
+		elif context=="act3_exploitation_start":_start_act3_exploitation_battle_intro_event()
 		return
 	var target:=group_node.global_position
 	jurejure_intro_camera_start_yaw=view_yaw
@@ -2344,7 +2385,7 @@ func _start_habitat_awakening_event()->void:
 	current_mode="habitat"
 	_cancel_all_habitat_notifications()
 	habitat_wild_plants.clear();habitat_wild_initialized=false;habitat_wild_next_spawn_unix=0.0
-	_clear_habitat_items();_apply_mode();_update_play_ui();audio_manager.play_bgm("habitat")
+	_clear_habitat_items();_apply_mode();_update_play_ui();_play_current_area_bgm()
 	habitat_awakening_overlay.start(language_code)
 
 func _on_habitat_awakening_finished()->void:
@@ -3017,7 +3058,7 @@ func _open_puku_puku_battle_preview()->void:
 
 func _close_forest_gacha()->void:
 	if forest_gacha_ui:forest_gacha_ui.close_gacha()
-	audio_manager.play_bgm("greenhouse" if current_mode=="greenhouse" else "habitat");_update_play_ui();call_deferred("_try_start_pending_story_event")
+	_play_current_area_bgm();_update_play_ui();call_deferred("_try_start_pending_story_event")
 
 func _spin_forest_gacha()->void:
 	if forest_gacha_ui==null or not forest_gacha_ui.visible or forest_gacha_ui.is_busy():return
@@ -3089,10 +3130,6 @@ func _on_species_get_overlay_closed(context:String)->void:
 	match context:
 		"first_colorata":
 			followup_started=true;call_deferred("_start_first_colorata_discovery_event")
-		"trio_affinis_catalog":
-			followup_started=true;call_deferred("_queue_species_get_by_id",ARMADILLO_STORY_SPECIES_ID,true,"trio_shaviana_catalog")
-		"trio_shaviana_catalog":
-			followup_started=true;call_deferred("_show_tutorial_guide","habitat")
 		"forest_gacha":
 			if forest_gacha_ui:forest_gacha_ui.resume_after_species_reveal()
 		"secret_gacha":
@@ -3101,6 +3138,12 @@ func _on_species_get_overlay_closed(context:String)->void:
 			followup_started=true;call_deferred("_start_seed_pod_story")
 		"pinwheel_gift":
 			call_deferred("_continue_armadillo_mystery_intro")
+	if context.begins_with("scripted_dialog_card:"):
+		followup_started=true
+		intro_continue_button.disabled=false
+		intro_overlay.visible=true
+		intro_overlay.move_to_front()
+		call_deferred("_advance_scripted_dialog")
 	if context.begins_with("habitat_route:"):
 		var route_id:=context.trim_prefix("habitat_route:")
 		if not route_id.is_empty():call_deferred("_start_mystery_route_dialog",route_id)
@@ -3114,7 +3157,7 @@ func _open_secret_gacha()->void:
 
 func _close_secret_gacha()->void:
 	if secret_gacha_ui:secret_gacha_ui.close_gacha()
-	audio_manager.play_bgm("greenhouse" if current_mode=="greenhouse" else "habitat");_update_play_ui();call_deferred("_try_start_pending_story_event")
+	_play_current_area_bgm();_update_play_ui();call_deferred("_try_start_pending_story_event")
 
 func _spin_secret_gacha()->void:
 	if secret_gacha_ui==null or not secret_gacha_ui.visible or secret_gacha_ui.is_busy() or not _secret_gacha_is_playable():return
@@ -3399,12 +3442,17 @@ func _update_play_ui()->void:
 	if mode_button:mode_button.visible=not play_active and not arrangement_navigation_suspended and habitat_unlocked
 	if habitat_dev_open_button:habitat_dev_open_button.visible=current_mode=="habitat" and not play_active and not arrangement_navigation_suspended
 	if shop_button:shop_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete()
-	if arrangement_button:arrangement_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete()
 	if forest_gacha_button:forest_gacha_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete() and forest_gacha_unlocked and forest_gacha_intro_seen
 	if shop_forest_gacha_button:shop_forest_gacha_button.visible=forest_gacha_unlocked and forest_gacha_intro_seen
 	if secret_gacha_button:
 		secret_gacha_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete() and StoryProgressionClass.secret_gacha_is_unlocked(story_progression_state) and secret_gacha_active
 		_update_secret_gacha_button_state()
+	if arrangement_navigation_hint:
+		var arrangement_hint_safe:=current_mode=="greenhouse" and not play_active and not arrangement_transitioning and not catalog_preview_mode_active and not preview_overlay_open and not gacha_open and not habitat_modal_open
+		arrangement_hint_safe=arrangement_hint_safe and not ((intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible) or (shop_overlay and shop_overlay.visible) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible))
+		if arrangement_scene_active:arrangement_hint_safe=arrangement_hint_safe and arrangement_ui!=null and arrangement_ui.is_navigation_hint_safe()
+		arrangement_navigation_hint.update_hint(language_code,arrangement_scene_active,_arrangement_focus_transition_for_pan(saved_greenhouse_pan_x),StoryProgressionClass.arrangement_is_unlocked(story_progression_state) and arrangement_hint_safe)
+	_update_habitat_button_glow()
 	play_timer_label.text=Localizer.text(language_code,"series_seed_remaining" if active_seed_type.begins_with("series:") else "seed_remaining",[play_seeds_remaining]) if play_timer_label.visible else ""
 	var held:Array[String]=[]
 	if old_seed_bags>0:held.append(Localizer.text(language_code,"bags_held",[Localizer.text(language_code,"old_seed_name"),old_seed_bags]))
@@ -3558,7 +3606,7 @@ func _grant_hidden_species(species_id:String)->bool:
 func _close_shop()->void:
 	_hide_shop_chatter(true);shop_current_page="categories";shop_overlay.visible=false;shop_background.texture=null
 	if shop_buy_pulse_tween and shop_buy_pulse_tween.is_valid():shop_buy_pulse_tween.kill()
-	shop_buy_pulse_tween=null;audio_manager.play_bgm("greenhouse" if current_mode=="greenhouse" else "habitat");_update_play_ui();call_deferred("_try_start_pending_story_event")
+	shop_buy_pulse_tween=null;_play_current_area_bgm();_update_play_ui();call_deferred("_try_start_pending_story_event")
 
 func _buy_seed_bag(seed_type:String)->void:
 	if not _tutorial_fully_complete():return
@@ -4292,8 +4340,6 @@ func _record_species_get(species_id:String,amount:int=1)->void:
 			"forest_gacha_unlocked":forest_gacha_unlocked,
 		})
 		if bool(transition.get("fantasy_unlocked_now",false)):_apply_saved_unlocks()
-		if bool(transition.get("forest_gacha_unlocked_now",false)):
-			forest_gacha_unlocked=true;forest_gacha_intro_seen=false
 		call_deferred("_try_start_pending_story_event")
 	_refresh_narrative_species_progress()
 
@@ -4348,7 +4394,7 @@ func _update_main_story_progress(schedule_completion:=true)->void:
 	if schedule_completion:call_deferred("_try_start_pending_story_event")
 
 func _try_start_pending_story_event()->void:
-	if not scripted_dialog_kind.is_empty() or play_active or opening_story_overlay and opening_story_overlay.visible or seed_pod_story_overlay and seed_pod_story_overlay.visible or jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible or jurejure_first_encounter_active:return
+	if not scripted_dialog_kind.is_empty() or play_active or jurejure_intro_camera_active or opening_story_overlay and opening_story_overlay.visible or seed_pod_story_overlay and seed_pod_story_overlay.visible or jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible or jurejure_first_encounter_active:return
 	if intro_overlay and intro_overlay.visible:return
 	if habitat_awakening_overlay and habitat_awakening_overlay.visible:return
 	if habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible:return
@@ -4371,6 +4417,10 @@ func _try_start_pending_story_event()->void:
 		_start_act3_intro_event()
 	elif current_mode=="greenhouse" and queued_story_event==StoryProgressionClass.EVENT_POST_ENCOUNTER_HOME:
 		_start_post_jurejure_encounter_home_event()
+	elif current_mode=="greenhouse" and queued_story_event==StoryProgressionClass.EVENT_ARRANGEMENT_INTRO:
+		_start_arrangement_intro_event()
+	elif current_mode=="habitat" and queued_story_event==StoryProgressionClass.EVENT_ACT3_BATTLE_INTRO:
+		_focus_jurejure_group("act3_exploitation_start")
 	elif current_mode=="habitat" and queued_story_event==StoryProgressionClass.EVENT_EXPLOITATION_MIDPOINT:
 		_start_exploitation_midpoint_event()
 	elif current_mode=="habitat" and habitat_crisis_pending and not habitat_crisis_started and habitat_visit_id>habitat_crisis_eligible_visit_id:
@@ -4408,6 +4458,12 @@ func _start_fantasy_first_discovery_event()->void:
 		{"speaker":"girl","text":Localizer.text(language_code,"fantasy_first_girl")},
 		{"speaker":"armadillo","text":Localizer.text(language_code,"fantasy_first_armadillo")},
 		{"speaker":"panda","text":Localizer.text(language_code,"fantasy_first_panda")}
+	],false)
+
+func _start_arrangement_intro_event()->void:
+	if current_mode!="greenhouse" or not bool(story_progression_state.get("arrangement_intro_pending",false)):return
+	_start_scripted_dialog("arrangement_intro",[
+		{"speaker":"panda","text":Localizer.text(language_code,"arrangement_unlock_panda")}
 	],false)
 
 func _start_fantasy_realization_event()->void:
@@ -4452,6 +4508,12 @@ func _start_act3_intro_event()->void:
 		{"speaker":"skunk","text":Localizer.text(language_code,"act3_skunk_wants")}
 	],false)
 
+func _start_act3_exploitation_battle_intro_event()->void:
+	if current_mode!="habitat" or not bool(story_progression_state.get("act3_battle_intro_pending",false)):return
+	_start_scripted_dialog("act3_exploitation_battle_intro",[
+		{"speaker":"mouse","text":Localizer.text(language_code,"act3_exploitation_battle_intro")}
+	],false)
+
 func _start_jurejure_species_first_event()->void:
 	if jurejure_species_first_seen or _unique_jurejure_species_get_count()<1:return
 	_start_scripted_dialog("jurejure_species_first",[
@@ -4471,6 +4533,7 @@ func _start_habitat_crisis_event()->void:
 		habitat_crisis_atmosphere.activate()
 		habitat_crisis_atmosphere.set_habitat_visible(true)
 	jurejure_waiting_for_seed_pod_reward=false;_save()
+	_play_current_area_bgm()
 	_focus_jurejure_group("habitat_crisis")
 
 func _begin_habitat_crisis_dialog()->void:
@@ -4985,8 +5048,13 @@ func _roll_habitat_new_species()->String:
 
 func _update_habitat_button_glow()->void:
 	if not mode_button:return
-	var has_pending:=habitat_mystery_seeds_pending>0 or habitat_old_catalog_page_pending
+	# Mystery seeds are ordinary habitat scenery and no longer summon the player.
+	# A catalog page or the gang's actual presence still deserves attention.
+	var has_pending:=current_mode=="greenhouse" and (habitat_old_catalog_page_pending or _should_show_jurejure_group())
+	if bool(mode_button.get_meta("habitat_glow_active",false))==has_pending:return
+	mode_button.set_meta("habitat_glow_active",has_pending)
 	if habitat_glow_tween and habitat_glow_tween.is_valid():habitat_glow_tween.kill()
+	habitat_glow_tween=null
 	mode_button.self_modulate=Color.WHITE
 	if habitat_sparkle and is_instance_valid(habitat_sparkle):habitat_sparkle.queue_free()
 	if not has_pending:return
@@ -5450,7 +5518,12 @@ func _on_jurejure_group_pressed()->void:
 	if puku_puku_battle and puku_puku_battle.visible:return
 	if not jurejure_intro_complete:_start_jurejure_first_encounter()
 	else:
-		if audio_manager:audio_manager.play_bgm("jurejure")
+		if habitat_crisis_started:
+			_start_scripted_dialog("jurejure_crisis_unavailable",[
+				{"speaker":"mouse","text":Localizer.text(language_code,"habitat_crisis_no_battle")}
+			],false)
+			return
+		_play_current_area_bgm(true)
 		_start_jurejure_challenge_event()
 
 func _show_jurejure_battle_choice()->void:
@@ -5458,7 +5531,7 @@ func _show_jurejure_battle_choice()->void:
 	puku_puku_battle.show_choice(language_code);_update_play_ui()
 
 func _on_jurejure_battle_declined()->void:
-	if audio_manager:audio_manager.play_bgm("habitat")
+	_play_current_area_bgm()
 	_update_play_ui()
 
 func _jurejure_battle_species_entries()->Array[Dictionary]:
@@ -5487,7 +5560,7 @@ func _start_puku_puku_battle()->void:
 	var entries:=_jurejure_battle_species_entries();var textures:=_jurejure_battle_textures(entries)
 	if entries.is_empty() or textures.is_empty():
 		puku_puku_battle.visible=false
-		if audio_manager:audio_manager.play_bgm("habitat")
+		_play_current_area_bgm()
 		_update_play_ui();return
 	jurejure_last_battle_result.clear();jurejure_pending_reward_species_id=""
 	if audio_manager:audio_manager.play_bgm("puku_battle")
@@ -5654,10 +5727,12 @@ func _update_habitat_view_follow(delta:float)->void:
 		if focus_progress>=1.0:
 			var focus_context:=jurejure_camera_focus_context
 			jurejure_intro_camera_active=false;jurejure_intro_camera_elapsed=0.0;jurejure_camera_focus_context=""
-			if audio_manager:audio_manager.play_bgm("jurejure")
-			if focus_context=="habitat_crisis":call_deferred("_begin_habitat_crisis_dialog")
-			elif focus_context=="act3_exploitation_start":call_deferred("_show_jurejure_battle_choice")
-			else:call_deferred("_show_jurejure_first_encounter_still")
+			if focus_context=="habitat_crisis":
+				_play_current_area_bgm();call_deferred("_begin_habitat_crisis_dialog")
+			elif focus_context=="act3_exploitation_start":
+				_play_current_area_bgm();call_deferred("_start_act3_exploitation_battle_intro_event")
+			else:
+				_play_current_area_bgm(true);call_deferred("_show_jurejure_first_encounter_still")
 		return
 	if habitat_lookaround_active:
 		habitat_lookaround_elapsed=minf(HABITAT_LOOKAROUND_DURATION_SECONDS,habitat_lookaround_elapsed+delta)
@@ -5709,6 +5784,14 @@ func _toggle_mode()->void:
 		call_deferred("_try_start_pending_story_event")
 	_save()
 
+func _play_current_area_bgm(force_jurejure:=false)->void:
+	if audio_manager==null:return
+	if current_mode=="habitat":
+		var key:="jurejure" if force_jurejure else JureJureSystemClass.habitat_bgm_key(StoryProgressionClass.exploitation_is_started(story_progression_state),habitat_crisis_started)
+		audio_manager.play_bgm(key)
+	else:
+		audio_manager.play_bgm("greenhouse")
+
 func _update_habitat_scroll_tutorial()->void:
 	# The original "pan until a pickup appears" tutorial is retired. Panning
 	# remains available, while the first wild plant is explained by dialogue.
@@ -5748,7 +5831,7 @@ func _apply_mode()->void:
 		camera.position=Vector3.ZERO;habitat_target_yaw=view_yaw;habitat_target_pitch=view_pitch;_apply_view_rotation()
 	if mode_button:
 		mode_button.text=Localizer.text(language_code,"main_habitat" if greenhouse_mode else "main_greenhouse")
-	if audio_manager:audio_manager.play_bgm("greenhouse" if greenhouse_mode else "habitat")
+	_play_current_area_bgm()
 	_update_play_ui()
 
 func _resolve_crowding(_delta:float)->void:
@@ -5796,7 +5879,7 @@ func _update_labels()->void:
 		p.label.position=r.position;p.label.size=label_size+Vector2(0,26 if not new_prefix.is_empty() else 0);p.label.add_theme_font_size_override("font_size",12 if show_traits else 17);p.label.text=new_prefix+(("%.1f cm\n%s"%[p.diameter_cm,p.development_trait_text()]) if show_traits else "%.1f cm"%p.diameter_cm);p.label.add_theme_color_override("font_color",Color("#ffe56f") if not new_prefix.is_empty() else Color.WHITE);p.label.visible=p.state=="growing" and Rect2(Vector2.ZERO,get_viewport().get_visible_rect().size).grow(80).has_point(screen)
 
 func _greenhouse_area_navigation_available()->bool:
-	if not _tutorial_fully_complete() or current_mode!="greenhouse" or play_active or catalog_preview_mode_active or arrangement_transitioning:return false
+	if not StoryProgressionClass.arrangement_is_unlocked(story_progression_state) or not _tutorial_fully_complete() or current_mode!="greenhouse" or play_active or catalog_preview_mode_active or arrangement_transitioning:return false
 	if arrangement_scene_active and arrangement_ui and arrangement_ui.is_editor_active():return false
 	return not ((opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible) or jurejure_first_encounter_active or (puku_puku_battle and puku_puku_battle.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible))
 

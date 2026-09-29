@@ -136,6 +136,30 @@ func _ready() -> void:
 	assert("この世界が多肉植物でいっぱいになってほしいね" in trio_text)
 	assert("はじめまして" not in trio_text)
 	assert("昔、多肉が生えていたと言われる場所" in trio_text)
+	# Each companion's catalog-only card appears immediately after that
+	# companion names the species, then the same dialogue resumes.
+	assert(game.scripted_dialog_index == 0)
+	game._advance_scripted_dialog()
+	await get_tree().create_timer(.65).timeout
+	assert(game.species_get_overlay.visible)
+	assert(game.species_get_overlay.name_label.text == Localizer.species_name("ja", game._catalog_entry("affinis")))
+	assert(game.species_get_overlay.badge_label.text == Localizer.text("ja", "original_catalog_new"))
+	assert(bool(game.discovered.get("affinis", false)))
+	assert(game._species_get_count("affinis") == 0 and not bool(game.greenhouse_available.get("affinis", false)))
+	game.species_get_overlay.close_overlay()
+	await get_tree().create_timer(.45).timeout
+	assert(game.scripted_dialog_kind == "trio_originals" and game.scripted_dialog_index == 1)
+	assert(Localizer.species_name("ja", game._catalog_entry("shaviana")) in game.intro_dialogue_label.text)
+	game._advance_scripted_dialog()
+	await get_tree().create_timer(.65).timeout
+	assert(game.species_get_overlay.visible)
+	assert(game.species_get_overlay.name_label.text == Localizer.species_name("ja", game._catalog_entry("shaviana")))
+	assert(game.species_get_overlay.badge_label.text == Localizer.text("ja", "original_catalog_new"))
+	assert(bool(game.discovered.get("shaviana", false)))
+	assert(game._species_get_count("shaviana") == 0 and not bool(game.greenhouse_available.get("shaviana", false)))
+	game.species_get_overlay.close_overlay()
+	await get_tree().create_timer(.45).timeout
+	assert(game.scripted_dialog_kind == "trio_originals" and game.scripted_dialog_index == 2)
 	while not game.scripted_dialog_kind.is_empty():
 		var speaker_id := str(game.scripted_dialog_pages[game.scripted_dialog_index].get("speaker", ""))
 		if speaker_id in ["girl", "panda", "armadillo"]:
@@ -148,18 +172,7 @@ func _ready() -> void:
 	assert(bool(game.discovered.get("shaviana", false)))
 	assert(game._species_get_count("affinis") == 0 and game._species_get_count("shaviana") == 0)
 	assert(not bool(game.greenhouse_available.get("affinis", false)) and not bool(game.greenhouse_available.get("shaviana", false)))
-	assert(game.species_get_overlay.visible)
-	assert(game.species_get_overlay.name_label.text == Localizer.species_name("ja", game._catalog_entry("affinis")))
-	assert(game.species_get_overlay.badge_label.text == Localizer.text("ja", "original_catalog_new"))
-	await get_tree().create_timer(.65).timeout
-	game.species_get_overlay.close_overlay()
-	await get_tree().create_timer(.45).timeout
-	assert(game.species_get_overlay.visible)
-	assert(game.species_get_overlay.name_label.text == Localizer.species_name("ja", game._catalog_entry("shaviana")))
-	assert(game.species_get_overlay.badge_label.text == Localizer.text("ja", "original_catalog_new"))
-	await get_tree().create_timer(.65).timeout
-	game.species_get_overlay.close_overlay()
-	await get_tree().create_timer(.45).timeout
+	assert(not game.species_get_overlay.visible)
 	assert(not game.mystery_items_acquired and not game.encyclopedia_unlocked)
 	game._update_play_ui();assert(not game.puku_gauge_area.visible and not game.encyclopedia_icon_button.visible)
 	assert(game.main_story_stage == game.StoryProgressionClass.ACT_1)
@@ -242,6 +255,6 @@ func _ready() -> void:
 	assert(game.result_overlay.visible and not game.first_seed_pod_reward_event_active)
 	assert(game.normal_seed_bags == 3)
 
-	assert(Localizer.text("ja","puku_buyback_1") == "育てた多肉はうちのお店で買い取るよ！")
+	assert(Localizer.text("ja","puku_buyback_1") == "そうだ！育った多肉はうちで買い取るよ！")
 	print("FIRST_PLAY_TUTORIAL_SMOKE_OK trio_cards=catalog_only pre_sow=true old_seed=manual_25cm_harvest normal=harvest_only_gauges forced_pod_max=true reward=3sets result_after_reward=true")
 	get_tree().quit()

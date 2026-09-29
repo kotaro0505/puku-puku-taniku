@@ -35,7 +35,7 @@ func _ready()->void:
 
 func show_species(entry:Dictionary,texture:Texture2D,is_new:bool,context:String,language:String="ja")->void:
 	current_context=context;current_language=Localizer.normalize_language(language);visible=true;busy=true
-	var story_catalog_card:=context in ["first_colorata_catalog","trio_affinis_catalog","trio_shaviana_catalog"]
+	var story_catalog_card:=context=="first_colorata_catalog" or context.begins_with("scripted_dialog_card:")
 	result_image.texture=texture;badge_label.text=Localizer.text(current_language,"original_catalog_new" if story_catalog_card else ("new" if is_new else "get"));name_label.text=Localizer.species_name(current_language,entry)
 	var stars:=clampi(int(entry.get("gold_star_count",0)),0,2);star_rating.star_count=stars;rarity_label.text=Localizer.text(current_language,"super_rare") if stars>0 else "";star_rating.visible=stars>0;hint_label.text=Localizer.text(current_language,"tap_to_close")
 	card.scale=Vector2(.56,.56);card.rotation=-.035;flash.color.a=.94
