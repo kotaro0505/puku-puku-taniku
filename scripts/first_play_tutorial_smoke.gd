@@ -137,28 +137,49 @@ func _ready() -> void:
 	assert("はじめまして" not in trio_text)
 	assert("昔、多肉が生えていたと言われる場所" in trio_text)
 	# Each companion's catalog-only card appears immediately after that
-	# companion names the species, then the same dialogue resumes.
+	# companion names the species, then the same dialogue resumes. Full-screen
+	# input closes both the card center and dim background exactly once.
+	var species_card_closes:Array[String]=[]
+	game.species_get_overlay.closed.connect(func(context:String):species_card_closes.append(context))
 	assert(game.scripted_dialog_index == 0)
 	game._advance_scripted_dialog()
+	await get_tree().process_frame
+	assert(game.species_get_overlay.visible and game.species_get_overlay.busy)
+	_press_species_overlay(game.species_get_overlay,game.species_get_overlay.card.position+game.species_get_overlay.card.size*.5,true)
+	assert(game.species_get_overlay.visible and game.species_get_overlay.busy)
 	await get_tree().create_timer(.65).timeout
 	assert(game.species_get_overlay.visible)
 	assert(game.species_get_overlay.name_label.text == Localizer.species_name("ja", game._catalog_entry("affinis")))
 	assert(game.species_get_overlay.badge_label.text == Localizer.text("ja", "original_catalog_new"))
 	assert(bool(game.discovered.get("affinis", false)))
 	assert(game._species_get_count("affinis") == 0 and not bool(game.greenhouse_available.get("affinis", false)))
-	game.species_get_overlay.close_overlay()
+	_press_species_overlay(game.species_get_overlay,game.species_get_overlay.card.position+game.species_get_overlay.card.size*.5,true)
 	await get_tree().create_timer(.45).timeout
+	assert(species_card_closes.count("scripted_dialog_card:affinis")==1)
+	_press_species_overlay(game.species_get_overlay,Vector2(8,8),false)
+	assert(species_card_closes.count("scripted_dialog_card:affinis")==1)
 	assert(game.scripted_dialog_kind == "trio_originals" and game.scripted_dialog_index == 1)
 	assert(Localizer.species_name("ja", game._catalog_entry("shaviana")) in game.intro_dialogue_label.text)
+	# Re-open an Affinis probe to verify that the dimmed edge is the same close
+	# target as the card itself, without changing the story sequence.
+	game.species_get_overlay.show_species(game._catalog_entry("affinis"),game._species_texture(game._catalog_entry("affinis")),true,"input_probe_affinis","ja")
+	await get_tree().create_timer(.65).timeout
+	_press_species_overlay(game.species_get_overlay,Vector2(8,8),false)
+	await get_tree().create_timer(.35).timeout
+	assert(species_card_closes.count("input_probe_affinis")==1)
+	assert(game.scripted_dialog_kind == "trio_originals" and game.scripted_dialog_index == 1)
 	game._advance_scripted_dialog()
+	await get_tree().process_frame
+	assert(game.species_get_overlay.visible and game.species_get_overlay.busy)
 	await get_tree().create_timer(.65).timeout
 	assert(game.species_get_overlay.visible)
 	assert(game.species_get_overlay.name_label.text == Localizer.species_name("ja", game._catalog_entry("shaviana")))
 	assert(game.species_get_overlay.badge_label.text == Localizer.text("ja", "original_catalog_new"))
 	assert(bool(game.discovered.get("shaviana", false)))
 	assert(game._species_get_count("shaviana") == 0 and not bool(game.greenhouse_available.get("shaviana", false)))
-	game.species_get_overlay.close_overlay()
+	_press_species_overlay(game.species_get_overlay,game.species_get_overlay.card.position+game.species_get_overlay.card.size*.5,true)
 	await get_tree().create_timer(.45).timeout
+	assert(species_card_closes.count("scripted_dialog_card:shaviana")==1)
 	assert(game.scripted_dialog_kind == "trio_originals" and game.scripted_dialog_index == 2)
 	while not game.scripted_dialog_kind.is_empty():
 		var speaker_id := str(game.scripted_dialog_pages[game.scripted_dialog_index].get("speaker", ""))
@@ -258,3 +279,12 @@ func _ready() -> void:
 	assert(Localizer.text("ja","puku_buyback_1") == "そうだ！育った多肉はうちで買い取るよ！")
 	print("FIRST_PLAY_TUTORIAL_SMOKE_OK trio_cards=catalog_only pre_sow=true old_seed=manual_25cm_harvest normal=harvest_only_gauges forced_pod_max=true reward=3sets result_after_reward=true")
 	get_tree().quit()
+
+
+func _press_species_overlay(overlay:Control,position:Vector2,touch:bool)->void:
+	if touch:
+		var event:=InputEventScreenTouch.new();event.pressed=true;event.position=position
+		overlay._input(event)
+	else:
+		var event:=InputEventMouseButton.new();event.button_index=MOUSE_BUTTON_LEFT;event.pressed=true;event.position=position
+		overlay._input(event)

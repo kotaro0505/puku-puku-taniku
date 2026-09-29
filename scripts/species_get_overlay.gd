@@ -20,7 +20,7 @@ var busy:=false
 
 func _ready()->void:
 	name="SpeciesGetOverlay";set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);mouse_filter=Control.MOUSE_FILTER_STOP;visible=false;z_index=900
-	var dim:=ColorRect.new();dim.color=Color(0.018,.012,.03,.86);dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);dim.mouse_filter=Control.MOUSE_FILTER_STOP;dim.gui_input.connect(_on_background_input);add_child(dim)
+	var dim:=ColorRect.new();dim.color=Color(0.018,.012,.03,.86);dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);dim.mouse_filter=Control.MOUSE_FILTER_STOP;add_child(dim)
 	flash=ColorRect.new();flash.color=Color(1.0,.94,.62,0.0);flash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);flash.mouse_filter=Control.MOUSE_FILTER_IGNORE;add_child(flash)
 	card=PanelContainer.new();card.position=Vector2(34,112);card.size=Vector2(508,770);card.pivot_offset=card.size*.5;var style:=StyleBoxFlat.new();style.bg_color=Color(.10,.055,.12,.97);style.border_color=Color("#efc65e");style.set_border_width_all(4);style.set_corner_radius_all(34);style.shadow_color=Color(1.0,.63,.18,.28);style.shadow_size=24;card.add_theme_stylebox_override("panel",style);add_child(card)
 	var content:=VBoxContainer.new();content.alignment=BoxContainer.ALIGNMENT_CENTER;content.add_theme_constant_override("separation",10);content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);content.offset_left=28;content.offset_top=24;content.offset_right=-28;content.offset_bottom=-24;card.add_child(content)
@@ -43,8 +43,16 @@ func show_species(entry:Dictionary,texture:Texture2D,is_new:bool,context:String,
 	await reveal.finished
 	busy=false
 
-func _on_background_input(event:InputEvent)->void:
-	if (event is InputEventScreenTouch and event.pressed) or (event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed):close_overlay()
+func _input(event:InputEvent)->void:
+	if not visible:return
+	var close_press:bool=event is InputEventScreenTouch and event.pressed
+	close_press=close_press or (event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed)
+	if not close_press:return
+	# Capture the press above every child Control, so the card, image, labels and
+	# dimmed background all behave as one full-screen close target. busy guards
+	# both the reveal animation and duplicate touch/mouse events from one tap.
+	get_viewport().set_input_as_handled()
+	if not busy:close_overlay()
 
 func close_overlay()->void:
 	if not visible or busy:return

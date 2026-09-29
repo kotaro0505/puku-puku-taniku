@@ -64,26 +64,25 @@ func _build_ui() -> void:
 	intro_panel.add_child(intro_pointer)
 
 
-func update_hint(locale: String, arrangement_active: bool, transition_direction: float, should_show: bool) -> void:
+func update_hint(locale: String, arrangement_active: bool, should_show: bool) -> void:
 	if intro_playing:
-		visible = true
+		visible = should_show
 		persistent_panel.visible = false
+		intro_panel.visible = should_show
 		return
 	visible = should_show
 	if not should_show:
+		persistent_panel.visible = false
+		intro_panel.visible = false
 		return
 	intro_panel.visible = false
 	persistent_panel.visible = true
-	var direction := signf(transition_direction)
-	if is_zero_approx(direction):
-		direction = 1.0
 	if arrangement_active:
-		direction *= -1.0
-	var arrow := "→" if direction > 0.0 else "←"
-	var key := "main_game_mode_hint" if arrangement_active else "arrangement_mode_hint"
-	var title := Localizer.text(locale, key)
-	persistent_label.text = "%s  %s" % [title, arrow] if direction > 0.0 else "%s  %s" % [arrow, title]
-	persistent_panel.position = Vector2(326, 956) if direction > 0.0 else Vector2(18, 956)
+		persistent_label.text = "%s →" % Localizer.text(locale, "main_game_mode_hint")
+		persistent_panel.position = Vector2(326, 956)
+	else:
+		persistent_label.text = "← %s" % Localizer.text(locale, "arrangement_mode_hint")
+		persistent_panel.position = Vector2(18, 956)
 
 
 func play_intro(locale: String, transition_direction: float) -> void:

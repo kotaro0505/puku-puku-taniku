@@ -3448,10 +3448,7 @@ func _update_play_ui()->void:
 		secret_gacha_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete() and StoryProgressionClass.secret_gacha_is_unlocked(story_progression_state) and secret_gacha_active
 		_update_secret_gacha_button_state()
 	if arrangement_navigation_hint:
-		var arrangement_hint_safe:=current_mode=="greenhouse" and not play_active and not arrangement_transitioning and not catalog_preview_mode_active and not preview_overlay_open and not gacha_open and not habitat_modal_open
-		arrangement_hint_safe=arrangement_hint_safe and not ((intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible) or (shop_overlay and shop_overlay.visible) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible))
-		if arrangement_scene_active:arrangement_hint_safe=arrangement_hint_safe and arrangement_ui!=null and arrangement_ui.is_navigation_hint_safe()
-		arrangement_navigation_hint.update_hint(language_code,arrangement_scene_active,_arrangement_focus_transition_for_pan(saved_greenhouse_pan_x),StoryProgressionClass.arrangement_is_unlocked(story_progression_state) and arrangement_hint_safe)
+		arrangement_navigation_hint.update_hint(language_code,arrangement_scene_active,_arrangement_navigation_hint_safe())
 	_update_habitat_button_glow()
 	play_timer_label.text=Localizer.text(language_code,"series_seed_remaining" if active_seed_type.begins_with("series:") else "seed_remaining",[play_seeds_remaining]) if play_timer_label.visible else ""
 	var held:Array[String]=[]
@@ -5882,6 +5879,14 @@ func _greenhouse_area_navigation_available()->bool:
 	if not StoryProgressionClass.arrangement_is_unlocked(story_progression_state) or not _tutorial_fully_complete() or current_mode!="greenhouse" or play_active or catalog_preview_mode_active or arrangement_transitioning:return false
 	if arrangement_scene_active and arrangement_ui and arrangement_ui.is_editor_active():return false
 	return not ((opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible) or jurejure_first_encounter_active or (puku_puku_battle and puku_puku_battle.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible))
+
+func _arrangement_navigation_hint_safe()->bool:
+	# Navigation availability covers gameplay overlays. The opening screen is a
+	# separate boot layer, so explicitly require it to be completed and hidden.
+	if opening_overlay==null or not opening_finished or opening_overlay.visible:return false
+	if not _greenhouse_area_navigation_available():return false
+	if arrangement_scene_active:return arrangement_ui!=null and arrangement_ui.is_navigation_hint_safe()
+	return true
 
 func _unhandled_input(event:InputEvent)->void:
 	if greenhouse_area_drag_tracking or (not arrangement_scene_active and _greenhouse_area_navigation_available()):

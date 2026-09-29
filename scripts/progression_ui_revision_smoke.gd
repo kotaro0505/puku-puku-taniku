@@ -32,6 +32,7 @@ func _prepare_safe_greenhouse(game: Node) -> void:
 	game.settings_overlay.visible = false
 	game.encyclopedia_overlay.visible = false
 	game.play_overlay.visible = false
+	game.opening_finished = true
 	game.intro_story_complete = true
 	game.habitat_unlocked = true
 	game.habitat_awakened = true
@@ -91,22 +92,34 @@ func _test_arrangement_gate_and_direction(game: Node) -> void:
 
 	game.story_progression_state["arrangement_unlocked"] = true
 	game.story_progression_state["arrangement_intro_seen"] = true
+	# A progressed save still starts on the title screen. Unlock state alone must
+	# never make the persistent hint leak over that boot layer or Opening Story.
+	game.opening_finished = false
+	game.opening_overlay.visible = true
+	game._update_play_ui()
+	assert(not game.arrangement_navigation_hint.visible)
+	game.opening_finished = true
+	game.opening_overlay.visible = false
+	game.opening_story_overlay.visible = true
+	game._update_play_ui()
+	assert(not game.arrangement_navigation_hint.visible)
+	game.opening_story_overlay.visible = false
 	game._update_play_ui()
 	assert(game._greenhouse_area_navigation_available())
 	var transition: float = game._arrangement_focus_transition_for_pan(game.saved_greenhouse_pan_x)
 	assert(not is_zero_approx(transition))
-	var toward_arrangement := "→" if transition > 0.0 else "←"
 	assert(game.arrangement_navigation_hint.visible)
-	assert(Localizer.text("ja", "arrangement_mode_hint") in game.arrangement_navigation_hint.persistent_label.text)
-	assert(toward_arrangement in game.arrangement_navigation_hint.persistent_label.text)
+	assert(game.arrangement_navigation_hint.persistent_label.text == "← 寄せ植えモード")
+	assert(game.arrangement_navigation_hint.persistent_panel.position.is_equal_approx(Vector2(18, 956)))
+	assert(is_equal_approx(transition, game._arrangement_focus_transition_for_pan(game.saved_greenhouse_pan_x)))
 
 	game.arrangement_scene_active = true
 	game.arrangement_ui.set_world_backdrop_mode(true, game._arrangement_pot_anchor_screen())
 	game.arrangement_ui.open_home()
 	game._update_play_ui()
-	var toward_main := "←" if transition > 0.0 else "→"
-	assert(Localizer.text("ja", "main_game_mode_hint") in game.arrangement_navigation_hint.persistent_label.text)
-	assert(toward_main in game.arrangement_navigation_hint.persistent_label.text)
+	assert(game.arrangement_navigation_hint.persistent_label.text == "メインゲーム画面 →")
+	assert(game.arrangement_navigation_hint.persistent_panel.position.is_equal_approx(Vector2(326, 956)))
+	assert(is_equal_approx(transition, game._arrangement_focus_transition_for_pan(game.saved_greenhouse_pan_x)))
 	game.arrangement_scene_active = false
 	game.arrangement_ui.visible = false
 	game._update_play_ui()
