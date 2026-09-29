@@ -12,7 +12,7 @@ func _ready()->void:
 	_test_one_time_gift_arrangement_and_share(game)
 	_test_removed_mystery_pod()
 	game._reset_progression_state();game.queue_free();await get_tree().process_frame
-	print("INTEGRATED_FEATURES_SMOKE_OK rarity=1x2+2x1 secret=exploitation-gated localization=3 gift=once arrangement=free-scale share=record-only mystery_pod=removed")
+	print("INTEGRATED_FEATURES_SMOKE_OK rarity=1x2+2x1 secret=feature-flagged-off+implementation+preview-retained localization=3 gift=once arrangement=free-scale share=record-only mystery_pod=removed")
 	get_tree().quit()
 
 func _test_catalog_and_collection_rarity(game)->void:
@@ -60,11 +60,12 @@ func _test_secret_gacha(game)->void:
 	assert(bool(game.unlocked_series.get(page_series_id,false)) and int(game.old_catalog_page_inventory.get(page_series_id,0))==0 and game.puku_points==points_before_page)
 	assert(game.forest_gacha_button.position.y<game.secret_gacha_button.position.y and game.forest_gacha_button.size==game.secret_gacha_button.size)
 	assert(game.shop_overlay.find_child("SecretGachaButton",true,false)==null)
+	assert(not game.StoryProgressionClass.secret_gacha_feature_enabled())
 	game.secret_gacha_active=false;game.secret_gacha_draws_remaining=0;game._update_secret_gacha_button_state()
 	assert(not game._secret_gacha_is_playable())
 	game.story_progression_state["secret_gacha_unlocked"]=true;game.story_progression_state["secret_gacha_install_seen"]=true
-	game.secret_gacha_active=true;game.secret_gacha_draws_remaining=3;game._update_secret_gacha_button_state()
-	assert(game._secret_gacha_is_playable() and not game.secret_gacha_button.disabled and game.secret_gacha_button.text==Localizer.text(game.language_code,"main_secret_gacha"))
+	game.secret_gacha_active=true;game.secret_gacha_draws_remaining=2;game.secret_gacha_last_roll_play_count=7;game._update_secret_gacha_button_state();game._update_play_ui()
+	assert(not game._secret_gacha_is_playable() and game.secret_gacha_button.disabled and not game.secret_gacha_button.visible)
 	var background:=game.secret_gacha_ui.find_child("SecretGachaBackground",true,false) as TextureRect
 	var dial:=game.secret_gacha_ui.find_child("ReplaceableTemporaryDial",true,false) as TextureRect
 	assert(background!=null and background.texture.resource_path=="res://assets/secret_gacha/secret-gacha-background.png")
@@ -84,16 +85,17 @@ func _test_secret_gacha(game)->void:
 	await game.secret_gacha_ui._reveal_result();assert(game.secret_gacha_ui.result_overlay.visible and not game.secret_gacha_ui.busy)
 	game.secret_gacha_ui._close_result();game.secret_gacha_ui.close_gacha();game.secret_gacha_ui.animation_time_scale=1.0
 	game.opening_story_complete=true;game.intro_story_complete=true;game.first_colorata_confirmed=true;game.trio_originals_confirmed=true;game.habitat_unlocked=true;game.habitat_arrival_started=true;game.habitat_awakened=true;game.habitat_awakening_event_complete=true;game.habitat_tutorial_started=true;game.habitat_tutorial_complete=true;game.mystery_items_acquired=true;game.mystery_catalog_tutorial_complete=true;game.encyclopedia_unlocked=true;game.seed_shop_open=true;game.panda_beacon_unlocked=true;game.panda_beacon_count=1;game.puku_gauge_intro_complete=true;game.total_play_count=3;game.current_mode="greenhouse";game.play_active=false;game.puku_points=2;game._update_play_ui()
-	assert(game.secret_gacha_button.visible and not game.secret_gacha_button.disabled)
-	game.secret_gacha_ui.animation_time_scale=.01;game.secret_gacha_button.pressed.emit();assert(game.secret_gacha_ui.visible and not game.secret_gacha_ui.unlimited_play)
-	var points_before_actual_spin:int=game.puku_points;game.secret_gacha_ui.spin_button.pressed.emit()
-	var spin_guard:=0
-	while not game.secret_gacha_ui.capsule_ready and spin_guard<120:await get_tree().process_frame;spin_guard+=1
-	assert(game.secret_gacha_ui.capsule_ready and game.puku_points==points_before_actual_spin-1 and game.secret_gacha_draws_remaining==2 and game.secret_gacha_active)
-	game.secret_gacha_ui.close_gacha();game.secret_gacha_ui.animation_time_scale=1.0
-	game.secret_gacha_active=false;game.secret_gacha_draws_remaining=0;game.secret_gacha_last_roll_play_count=-1;game.formal_play_count=5;game.habitat_tutorial_complete=true
-	assert(game._maybe_activate_secret_gacha(0.0) and game.secret_gacha_draws_remaining==3)
-	var saved=JSON.parse_string(FileAccess.get_file_as_string("user://records.json"));assert(saved is Dictionary and bool(saved.get("secret_gacha_active",false)) and int(saved.get("secret_gacha_draws_remaining",0))==3)
+	assert(not game.secret_gacha_button.visible and game.secret_gacha_button.disabled)
+	game.formal_play_count=8
+	assert(not game._maybe_activate_secret_gacha(0.0))
+	assert(game.secret_gacha_active and game.secret_gacha_draws_remaining==2 and game.secret_gacha_last_roll_play_count==7)
+	game._save()
+	var saved=JSON.parse_string(FileAccess.get_file_as_string("user://records.json"))
+	assert(saved is Dictionary and bool(saved.get("secret_gacha_active",false)) and int(saved.get("secret_gacha_draws_remaining",0))==2)
+	assert(bool((saved.get("story_progression_state",{}) as Dictionary).get("secret_gacha_unlocked",false)))
+	game._open_secret_gacha_preview()
+	assert(game.secret_gacha_ui.visible and game.secret_gacha_ui.unlimited_play)
+	game.secret_gacha_ui.close_gacha()
 
 func _test_language_and_symbol_safety(game)->void:
 	var major_runtime_keys:=[
@@ -102,7 +104,9 @@ func _test_language_and_symbol_safety(game)->void:
 		"armadillo_idle_1","research_intro_1","research_return_offer","restore_offer","restore_success",
 		"research_status_sprouted","research_status_first","research_milestone_catalog","research_milestone_species",
 		"research_transfer","audio_se_on","story_colorata_1","story_trio_1","awakening_memory","habitat_return_panda","initial_seed_stock_received","tutorial_normal_pre_sow","seed_pod_tutorial_received","forest_gacha_intro_system","fantasy_first_girl","fantasy_six_girl_2","act3_mouse_realizes","habitat_crisis_armadillo_1","jelly_float",
-		"jurejure_after_encounter_panda","jurejure_after_encounter_armadillo","jurejure_exploit_mouse_treasure","habitat_exploit_start_panda","habitat_exploit_midpoint_panda","habitat_exploit_concern_girl","secret_gacha_install_mouse","secret_gacha_install_system"
+		"jurejure_after_encounter_panda","jurejure_after_encounter_armadillo","jurejure_exploit_mouse_treasure","habitat_exploit_start_panda","habitat_exploit_midpoint_panda","habitat_exploit_concern_girl","secret_gacha_install_mouse","secret_gacha_install_system",
+		"act3_exploitation_battle_intro_panda","act3_exploitation_battle_intro_mouse_2","jurejure_species_first_girl_2","habitat_crisis_girl","jurejure_exploit_touch_mouse_more","jurejure_exploit_touch_panda_tool","jurejure_exploit_touch_mouse_battle","jurejure_exploit_touch_peccary_more","jurejure_exploit_touch_girl_overwork","jurejure_exploit_touch_peccary_fine","jurejure_exploit_touch_skunk_price","jurejure_exploit_touch_armadillo_greed","jurejure_exploit_touch_skunk_obvious",
+		"habitat_exploit_visit_early_panda_1","habitat_exploit_visit_early_girl_1","habitat_exploit_visit_early_armadillo","habitat_exploit_visit_early_girl_2","habitat_exploit_visit_early_panda_2","habitat_exploit_visit_late_panda","habitat_exploit_visit_late_armadillo","habitat_exploit_visit_late_girl","habitat_exploit_midpoint_panda_1","habitat_exploit_midpoint_girl","habitat_exploit_midpoint_mouse_1","habitat_exploit_midpoint_peccary","habitat_exploit_midpoint_armadillo","habitat_exploit_midpoint_mouse_2","post_crisis_greenhouse_panda_1","post_crisis_greenhouse_armadillo","post_crisis_greenhouse_girl","post_crisis_greenhouse_panda_2"
 	]
 	var numeric_format_keys:=["research_status_first","research_transfer"]
 	var string_format_keys:=["restore_success","research_milestone_species","story_trio_1"]

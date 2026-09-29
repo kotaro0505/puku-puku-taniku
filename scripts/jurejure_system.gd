@@ -16,23 +16,34 @@ const LOSS_TAKE_MAX_RATIO := 0.80
 
 const EXPLOITATION_DIALOG_PATTERNS := [
 	[
-		{"speaker":"mouse","text_key":"jurejure_exploit_mouse_treasure"},
-		{"speaker":"peccary","text_key":"jurejure_exploit_peccary_more"},
+		{"speaker":"mouse","text_key":"jurejure_exploit_touch_mouse_more"},
+		{"speaker":"panda","text_key":"jurejure_exploit_touch_panda_tool"},
+		{"speaker":"mouse","text_key":"jurejure_exploit_touch_mouse_battle"},
 	],
 	[
-		{"speaker":"skunk","text_key":"jurejure_exploit_skunk_price"},
-		{"speaker":"mouse","text_key":"jurejure_exploit_mouse_no_rest"},
+		{"speaker":"peccary","text_key":"jurejure_exploit_touch_peccary_more"},
+		{"speaker":"girl","text_key":"jurejure_exploit_touch_girl_overwork"},
+		{"speaker":"peccary","text_key":"jurejure_exploit_touch_peccary_fine"},
 	],
 	[
-		{"speaker":"peccary","text_key":"jurejure_exploit_peccary_imagine"},
-		{"speaker":"skunk","text_key":"jurejure_exploit_skunk_money"},
+		{"speaker":"skunk","text_key":"jurejure_exploit_touch_skunk_price"},
+		{"speaker":"armadillo","text_key":"jurejure_exploit_touch_armadillo_greed"},
+		{"speaker":"skunk","text_key":"jurejure_exploit_touch_skunk_obvious"},
 	],
 ]
 
-const CRISIS_CONCERN_PATTERNS := [
-	{"speaker":"panda","text_key":"habitat_exploit_concern_panda"},
-	{"speaker":"armadillo","text_key":"habitat_exploit_concern_armadillo"},
-	{"speaker":"girl","text_key":"habitat_exploit_concern_girl"},
+const EXPLOITATION_EARLY_VISIT_PATTERNS := [
+	{"speaker":"panda","text_key":"habitat_exploit_visit_early_panda_1"},
+	{"speaker":"girl","text_key":"habitat_exploit_visit_early_girl_1"},
+	{"speaker":"armadillo","text_key":"habitat_exploit_visit_early_armadillo"},
+	{"speaker":"girl","text_key":"habitat_exploit_visit_early_girl_2"},
+	{"speaker":"panda","text_key":"habitat_exploit_visit_early_panda_2"},
+]
+
+const EXPLOITATION_LATE_VISIT_PATTERNS := [
+	{"speaker":"panda","text_key":"habitat_exploit_visit_late_panda"},
+	{"speaker":"armadillo","text_key":"habitat_exploit_visit_late_armadillo"},
+	{"speaker":"girl","text_key":"habitat_exploit_visit_late_girl"},
 ]
 
 # Ground-tested panorama positions. A visit chooses one point and keeps it
@@ -84,15 +95,16 @@ static func choose_exploitation_dialog(last_index: int, rng: RandomNumberGenerat
 	return {"index": chosen_index, "pages": EXPLOITATION_DIALOG_PATTERNS[chosen_index].duplicate(true)}
 
 
-static func concern_for_visit(state: Dictionary, visit_id: int) -> Dictionary:
+static func concern_for_visit(state: Dictionary, visit_id: int, midpoint_seen: bool = false) -> Dictionary:
 	if visit_id <= 0 or int(state.get("last_crisis_concern_visit", -1)) == visit_id:
 		return {}
 	# Keep normal visits light: one short reaction every third new visit.
 	if visit_id % 3 != 0:
 		return {}
 	state["last_crisis_concern_visit"] = visit_id
-	var pattern_index := posmod(int(visit_id / 3) - 1, CRISIS_CONCERN_PATTERNS.size())
-	return CRISIS_CONCERN_PATTERNS[pattern_index].duplicate(true)
+	var patterns: Array = EXPLOITATION_LATE_VISIT_PATTERNS if midpoint_seen else EXPLOITATION_EARLY_VISIT_PATTERNS
+	var pattern_index := posmod(int(visit_id / 3) - 1, patterns.size())
+	return (patterns[pattern_index] as Dictionary).duplicate(true)
 
 
 static func choose_visit_point(

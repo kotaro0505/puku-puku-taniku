@@ -51,13 +51,16 @@ func _test_localized_copy() -> void:
 	assert(Localizer.text("ja", "puku_buyback_1") == "そうだ！育った多肉はうちで買い取るよ！")
 	assert(Localizer.text("ja", "jurejure_first_peccary") == "いっぱい生えてるッペー！\nぜーんぶ頂きだッペー！")
 	assert(Localizer.text("ja", "fantasy_first_armadillo") == "こんな多肉、あの本には載ってないよ…。")
-	assert(Localizer.text("ja", "habitat_crisis_no_battle") == "今はバトルする気にならないチュー…")
+	assert(Localizer.text("ja", "habitat_crisis_no_battle") == "……今はバトルする気にならないチュー……。")
 	for locale in Localizer.SUPPORTED_LANGUAGES:
 		for key in [
 			"puku_buyback_1", "jurejure_first_peccary", "fantasy_first_armadillo",
 			"arrangement_unlock_panda", "arrangement_swipe_intro",
 			"arrangement_mode_hint", "main_game_mode_hint",
-			"act3_exploitation_battle_intro", "habitat_crisis_no_battle",
+			"act3_exploitation_battle_intro", "act3_exploitation_battle_intro_panda",
+			"act3_exploitation_battle_intro_mouse_2", "habitat_crisis_no_battle",
+			"post_crisis_greenhouse_panda_1", "post_crisis_greenhouse_armadillo",
+			"post_crisis_greenhouse_girl", "post_crisis_greenhouse_panda_2",
 		]:
 			assert(not Localizer.text(locale, key).is_empty())
 

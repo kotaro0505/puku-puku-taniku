@@ -1391,7 +1391,7 @@ func _build_ui() -> void:
 		habitat_dev_open_button=Button.new();habitat_dev_open_button.name="HabitatDevQuickOpen";habitat_dev_open_button.text="原生地テスト";habitat_dev_open_button.position=Vector2(398,262);habitat_dev_open_button.size=Vector2(153,55);_skin_button(habitat_dev_open_button,Color("#adcbb8"),15);habitat_dev_open_button.mouse_filter=Control.MOUSE_FILTER_STOP;habitat_dev_open_button.pressed.connect(_open_habitat_dev);hud.add_child(habitat_dev_open_button)
 	shop_button=Button.new();shop_button.text="おみせ";shop_button.position=Vector2(398,262);shop_button.size=Vector2(153,55);_skin_button(shop_button,Color("#fff0cf"),16);shop_button.mouse_filter=Control.MOUSE_FILTER_STOP;shop_button.pressed.connect(_open_shop);hud.add_child(shop_button)
 	external_navigation_controls.append(shop_button)
-	forest_gacha_button=Button.new();forest_gacha_button.name="ForestGachaButton";forest_gacha_button.text="森のガチャ\n1ぷく";forest_gacha_button.position=Vector2(398,390);forest_gacha_button.size=Vector2(153,67);_skin_button(forest_gacha_button,Color("#d9c77d"),15);forest_gacha_button.mouse_filter=Control.MOUSE_FILTER_STOP;forest_gacha_button.pressed.connect(_open_forest_gacha);hud.add_child(forest_gacha_button)
+	forest_gacha_button=Button.new();forest_gacha_button.name="ForestGachaButton";forest_gacha_button.text="森のガチャ";forest_gacha_button.position=Vector2(398,326);forest_gacha_button.size=Vector2(153,67);_skin_button(forest_gacha_button,Color("#d9c77d"),15);forest_gacha_button.mouse_filter=Control.MOUSE_FILTER_STOP;forest_gacha_button.pressed.connect(_open_forest_gacha);hud.add_child(forest_gacha_button)
 	external_navigation_controls.append(forest_gacha_button)
 	secret_gacha_button=Button.new();secret_gacha_button.name="SecretGachaButton";secret_gacha_button.text="秘密のガチャ\n1ぷく";secret_gacha_button.position=Vector2(398,466);secret_gacha_button.size=Vector2(153,67);_skin_button(secret_gacha_button,Color("#b88348"),15);secret_gacha_button.mouse_filter=Control.MOUSE_FILTER_STOP;secret_gacha_button.pressed.connect(_open_secret_gacha);secret_gacha_button.visible=false;hud.add_child(secret_gacha_button)
 	external_navigation_controls.append(secret_gacha_button)
@@ -2085,12 +2085,15 @@ func _finish_scripted_dialog()->void:
 		"jurejure_species_first":
 			jurejure_species_first_seen=true
 		"habitat_crisis":
-			pass
+			StoryProgressionClass.mark_habitat_crisis_dialog_complete(story_progression_state)
+		"post_crisis_greenhouse":
+			StoryProgressionClass.complete_post_crisis_greenhouse(story_progression_state)
 		"exploitation_midpoint":
 			StoryProgressionClass.complete_exploitation_midpoint(story_progression_state)
 		"secret_gacha_install":
-			StoryProgressionClass.complete_secret_gacha_install(story_progression_state)
-			secret_gacha_active=true;secret_gacha_draws_remaining=secret_gacha_system.setting_int("max_draws_per_event",3);secret_gacha_last_roll_play_count=formal_play_count
+			if StoryProgressionClass.secret_gacha_feature_enabled():
+				StoryProgressionClass.complete_secret_gacha_install(story_progression_state)
+				secret_gacha_active=true;secret_gacha_draws_remaining=secret_gacha_system.setting_int("max_draws_per_event",3);secret_gacha_last_roll_play_count=formal_play_count
 		"special_origin":
 			special_series_explanation_seen=true;pending_special_series_explanation=false
 		"jurejure_first_notice":
@@ -2310,6 +2313,7 @@ func _focus_jurejure_group(context:String)->void:
 			jurejure_first_encounter_active=false;_start_jurejure_intro_event()
 		elif context=="habitat_crisis":_begin_habitat_crisis_dialog()
 		elif context=="act3_exploitation_start":_start_act3_exploitation_battle_intro_event()
+		elif context=="exploitation_midpoint":_start_exploitation_midpoint_event()
 		return
 	var target:=group_node.global_position
 	jurejure_intro_camera_start_yaw=view_yaw
@@ -3187,6 +3191,7 @@ func _on_secret_gacha_species_reveal(result:Dictionary)->void:
 	_queue_species_get(result.get("species_entry",{}),not bool(result.get("was_discovered",false)),"secret_gacha")
 
 func _maybe_activate_secret_gacha(forced_roll:float=-1.0)->bool:
+	if not StoryProgressionClass.secret_gacha_feature_enabled():return false
 	if not StoryProgressionClass.secret_gacha_is_unlocked(story_progression_state):return false
 	if secret_gacha_active or secret_gacha_last_roll_play_count==formal_play_count:return false
 	secret_gacha_last_roll_play_count=formal_play_count
@@ -3194,7 +3199,7 @@ func _maybe_activate_secret_gacha(forced_roll:float=-1.0)->bool:
 	secret_gacha_active=true;secret_gacha_draws_remaining=secret_gacha_system.setting_int("max_draws_per_event",3);_save();_update_play_ui();return true
 
 func _secret_gacha_is_playable()->bool:
-	return _secret_gacha_preview_requested() or (StoryProgressionClass.secret_gacha_is_unlocked(story_progression_state) and secret_gacha_active and secret_gacha_draws_remaining>0)
+	return _secret_gacha_preview_requested() or (StoryProgressionClass.secret_gacha_feature_enabled() and StoryProgressionClass.secret_gacha_is_unlocked(story_progression_state) and secret_gacha_active and secret_gacha_draws_remaining>0)
 
 func _continue_armadillo_mystery_intro()->void:
 	var pages:Array=[
@@ -3445,7 +3450,7 @@ func _update_play_ui()->void:
 	if forest_gacha_button:forest_gacha_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete() and forest_gacha_unlocked and forest_gacha_intro_seen
 	if shop_forest_gacha_button:shop_forest_gacha_button.visible=forest_gacha_unlocked and forest_gacha_intro_seen
 	if secret_gacha_button:
-		secret_gacha_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete() and StoryProgressionClass.secret_gacha_is_unlocked(story_progression_state) and secret_gacha_active
+		secret_gacha_button.visible=StoryProgressionClass.secret_gacha_feature_enabled() and not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete() and StoryProgressionClass.secret_gacha_is_unlocked(story_progression_state) and secret_gacha_active
 		_update_secret_gacha_button_state()
 	if arrangement_navigation_hint:
 		arrangement_navigation_hint.update_hint(language_code,arrangement_scene_active,_arrangement_navigation_hint_safe())
@@ -4414,19 +4419,21 @@ func _try_start_pending_story_event()->void:
 		_start_act3_intro_event()
 	elif current_mode=="greenhouse" and queued_story_event==StoryProgressionClass.EVENT_POST_ENCOUNTER_HOME:
 		_start_post_jurejure_encounter_home_event()
+	elif current_mode=="greenhouse" and queued_story_event==StoryProgressionClass.EVENT_POST_CRISIS_GREENHOUSE:
+		_start_post_crisis_greenhouse_event()
 	elif current_mode=="greenhouse" and queued_story_event==StoryProgressionClass.EVENT_ARRANGEMENT_INTRO:
 		_start_arrangement_intro_event()
 	elif current_mode=="habitat" and queued_story_event==StoryProgressionClass.EVENT_ACT3_BATTLE_INTRO:
 		_focus_jurejure_group("act3_exploitation_start")
 	elif current_mode=="habitat" and queued_story_event==StoryProgressionClass.EVENT_EXPLOITATION_MIDPOINT:
-		_start_exploitation_midpoint_event()
+		_focus_jurejure_group("exploitation_midpoint")
 	elif current_mode=="habitat" and habitat_crisis_pending and not habitat_crisis_started and habitat_visit_id>habitat_crisis_eligible_visit_id:
 		_start_habitat_crisis_event()
 	elif queued_story_event==StoryProgressionClass.EVENT_FANTASY_FIRST:
 		_start_fantasy_first_discovery_event()
 	elif queued_story_event==StoryProgressionClass.EVENT_FANTASY_SIX:
 		_start_fantasy_realization_event()
-	elif current_mode=="habitat" and queued_story_event==StoryProgressionClass.EVENT_SECRET_GACHA_INSTALL:
+	elif StoryProgressionClass.secret_gacha_feature_enabled() and current_mode=="habitat" and queued_story_event==StoryProgressionClass.EVENT_SECRET_GACHA_INSTALL:
 		_start_secret_gacha_install_event()
 	elif current_mode=="greenhouse" and forest_gacha_unlocked and not forest_gacha_intro_seen:
 		_start_forest_gacha_intro_event()
@@ -4440,6 +4447,15 @@ func _start_post_jurejure_encounter_home_event()->void:
 	_start_scripted_dialog("post_jurejure_encounter_home",[
 		{"speaker":"panda","text":Localizer.text(language_code,"jurejure_after_encounter_panda")},
 		{"speaker":"armadillo","text":Localizer.text(language_code,"jurejure_after_encounter_armadillo")}
+	],false)
+
+func _start_post_crisis_greenhouse_event()->void:
+	if current_mode!="greenhouse" or not bool(story_progression_state.get("post_crisis_greenhouse_pending",false)):return
+	_start_scripted_dialog("post_crisis_greenhouse",[
+		{"speaker":"panda","text":Localizer.text(language_code,"post_crisis_greenhouse_panda_1")},
+		{"speaker":"armadillo","text":Localizer.text(language_code,"post_crisis_greenhouse_armadillo")},
+		{"speaker":"girl","text":Localizer.text(language_code,"post_crisis_greenhouse_girl")},
+		{"speaker":"panda","text":Localizer.text(language_code,"post_crisis_greenhouse_panda_2")}
 	],false)
 
 func _start_forest_gacha_intro_event()->void:
@@ -4472,7 +4488,7 @@ func _start_fantasy_realization_event()->void:
 	],false)
 
 func _start_secret_gacha_install_event()->void:
-	if StoryProgressionClass.secret_gacha_is_unlocked(story_progression_state) or current_mode!="habitat":return
+	if not StoryProgressionClass.secret_gacha_feature_enabled() or StoryProgressionClass.secret_gacha_is_unlocked(story_progression_state) or current_mode!="habitat":return
 	_start_scripted_dialog("secret_gacha_install",[
 		{"speaker":"mouse","text":Localizer.text(language_code,"secret_gacha_install_mouse")},
 		{"speaker":"panda","text":Localizer.text(language_code,"secret_gacha_install_panda")},
@@ -4482,15 +4498,16 @@ func _start_secret_gacha_install_event()->void:
 func _start_exploitation_midpoint_event()->void:
 	if current_mode!="habitat" or not bool(story_progression_state.get("exploitation_midpoint_pending",false)):return
 	_start_scripted_dialog("exploitation_midpoint",[
-		{"speaker":"panda","text":Localizer.text(language_code,"habitat_exploit_start_panda")},
-		{"speaker":"girl","text":Localizer.text(language_code,"habitat_exploit_start_girl")},
-		{"speaker":"mouse","text":Localizer.text(language_code,"jurejure_exploit_mouse_no_rest")},
-		{"speaker":"peccary","text":Localizer.text(language_code,"jurejure_exploit_peccary_more")},
-		{"speaker":"panda","text":Localizer.text(language_code,"habitat_exploit_midpoint_panda")}
+		{"speaker":"panda","text":Localizer.text(language_code,"habitat_exploit_midpoint_panda_1")},
+		{"speaker":"girl","text":Localizer.text(language_code,"habitat_exploit_midpoint_girl")},
+		{"speaker":"mouse","text":Localizer.text(language_code,"habitat_exploit_midpoint_mouse_1")},
+		{"speaker":"peccary","text":Localizer.text(language_code,"habitat_exploit_midpoint_peccary")},
+		{"speaker":"armadillo","text":Localizer.text(language_code,"habitat_exploit_midpoint_armadillo")},
+		{"speaker":"mouse","text":Localizer.text(language_code,"habitat_exploit_midpoint_mouse_2")}
 	],false)
 
 func _maybe_start_habitat_exploitation_concern()->void:
-	var concern:=JureJureSystemClass.concern_for_visit(story_progression_state,habitat_visit_id)
+	var concern:=JureJureSystemClass.concern_for_visit(story_progression_state,habitat_visit_id,StoryProgressionClass.exploitation_midpoint_is_seen(story_progression_state))
 	if concern.is_empty():return
 	_start_scripted_dialog("habitat_exploitation_concern",[
 		{"speaker":str(concern.get("speaker","")),"text":Localizer.text(language_code,str(concern.get("text_key","")))}
@@ -4508,13 +4525,16 @@ func _start_act3_intro_event()->void:
 func _start_act3_exploitation_battle_intro_event()->void:
 	if current_mode!="habitat" or not bool(story_progression_state.get("act3_battle_intro_pending",false)):return
 	_start_scripted_dialog("act3_exploitation_battle_intro",[
-		{"speaker":"mouse","text":Localizer.text(language_code,"act3_exploitation_battle_intro")}
+		{"speaker":"mouse","text":Localizer.text(language_code,"act3_exploitation_battle_intro")},
+		{"speaker":"panda","text":Localizer.text(language_code,"act3_exploitation_battle_intro_panda")},
+		{"speaker":"mouse","text":Localizer.text(language_code,"act3_exploitation_battle_intro_mouse_2")}
 	],false)
 
 func _start_jurejure_species_first_event()->void:
 	if jurejure_species_first_seen or _unique_jurejure_species_get_count()<1:return
 	_start_scripted_dialog("jurejure_species_first",[
 		{"speaker":"girl","text":Localizer.text(language_code,"jurejure_species_first_girl")},
+		{"speaker":"girl","text":Localizer.text(language_code,"jurejure_species_first_girl_2")},
 		{"speaker":"armadillo","text":Localizer.text(language_code,"jurejure_species_first_armadillo")}
 	],false)
 
@@ -4538,6 +4558,7 @@ func _begin_habitat_crisis_dialog()->void:
 	_start_scripted_dialog("habitat_crisis",[
 		{"speaker":"armadillo","text":Localizer.text(language_code,"habitat_crisis_armadillo_1")},
 		{"speaker":"armadillo","text":Localizer.text(language_code,"habitat_crisis_armadillo_2")},
+		{"speaker":"girl","text":Localizer.text(language_code,"habitat_crisis_girl")},
 		{"speaker":"mouse","text":Localizer.text(language_code,"habitat_crisis_mouse")},
 		{"speaker":"peccary","text":Localizer.text(language_code,"habitat_crisis_peccary")},
 		{"speaker":"skunk","text":Localizer.text(language_code,"habitat_crisis_skunk")}
@@ -5728,6 +5749,8 @@ func _update_habitat_view_follow(delta:float)->void:
 				_play_current_area_bgm();call_deferred("_begin_habitat_crisis_dialog")
 			elif focus_context=="act3_exploitation_start":
 				_play_current_area_bgm();call_deferred("_start_act3_exploitation_battle_intro_event")
+			elif focus_context=="exploitation_midpoint":
+				_play_current_area_bgm();call_deferred("_start_exploitation_midpoint_event")
 			else:
 				_play_current_area_bgm(true);call_deferred("_show_jurejure_first_encounter_still")
 		return
@@ -5768,6 +5791,7 @@ func _toggle_mode()->void:
 	if current_mode=="habitat":habitat_visit_id+=1
 	if leaving_habitat and habitat_tutorial_complete:
 		habitat_tutorial_returned_to_greenhouse=true
+		StoryProgressionClass.queue_post_crisis_greenhouse_on_return(story_progression_state)
 	_apply_mode()
 	if current_mode=="habitat" and not habitat_awakened:
 		call_deferred("_start_habitat_awakening_event")

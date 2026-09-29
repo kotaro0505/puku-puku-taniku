@@ -27,7 +27,7 @@ func _ready() -> void:
 	_test_first_loss_unlocks_act_two(game)
 	await _test_save_compatibility(game)
 	game._reset_progression_state()
-	print("JUREJURE_STORY_SMOKE_OK group=three_close first_encounter=camera+bgm home_warning=once battle=active6_total12 act2_only=true exploitation=act3+choice+permanent midpoint=4 crisis=8 exploit_dialog=nonrepeat pool_unlock=all_10 ownership=exact reward=random save_fresh=true")
+	print("JUREJURE_STORY_SMOKE_OK group=three_close first_encounter=camera+bgm home_warning=once battle=active6_total12 act2_only=true exploitation=act3+choice+permanent midpoint=4+camera crisis=8 exploit_dialog=three-pattern-nonrepeat secret_gacha=disabled pool_unlock=all_10 ownership=exact reward=random save_fresh=true")
 	get_tree().quit()
 
 
@@ -460,8 +460,10 @@ func _test_act_three_reward_flow(game: Node) -> void:
 			break
 		await get_tree().process_frame
 	assert(game.scripted_dialog_kind == "jurejure_species_first")
-	assert(str(game.scripted_dialog_pages[0].get("text", "")) == "なにこの多肉！")
-	assert(str(game.scripted_dialog_pages[1].get("text", "")) == "…………。")
+	assert(game.scripted_dialog_pages.size() == 3)
+	assert(str(game.scripted_dialog_pages[0].get("text", "")) == "なにこの多肉！？")
+	assert(str(game.scripted_dialog_pages[1].get("text", "")) == "ジュレジュレ団の頭の中がそのまま多肉になってるようだね……。")
+	assert(str(game.scripted_dialog_pages[2].get("text", "")) == "……。")
 	_finish_dialog(game)
 	assert(game.jurejure_species_first_seen)
 
@@ -509,12 +511,16 @@ func _test_jurejure_crisis_threshold(game: Node) -> void:
 	var first_pattern := JureJureSystemClass.choose_exploitation_dialog(-1, dialog_rng)
 	var second_pattern := JureJureSystemClass.choose_exploitation_dialog(int(first_pattern.get("index", -1)), dialog_rng)
 	assert(int(first_pattern.get("index", -1)) != int(second_pattern.get("index", -1)))
-	assert((first_pattern.get("pages", []) as Array).size() >= 1 and (second_pattern.get("pages", []) as Array).size() >= 1)
+	assert((first_pattern.get("pages", []) as Array).size() == 3 and (second_pattern.get("pages", []) as Array).size() == 3)
+	assert(JureJureSystemClass.EXPLOITATION_DIALOG_PATTERNS.size() == 3)
+	assert(str(JureJureSystemClass.EXPLOITATION_DIALOG_PATTERNS[0][0].get("text_key", "")) == "jurejure_exploit_touch_mouse_more")
+	assert(str(JureJureSystemClass.EXPLOITATION_DIALOG_PATTERNS[1][0].get("text_key", "")) == "jurejure_exploit_touch_peccary_more")
+	assert(str(JureJureSystemClass.EXPLOITATION_DIALOG_PATTERNS[2][0].get("text_key", "")) == "jurejure_exploit_touch_skunk_price")
 	game._build_habitat_items(true)
 	game._on_jurejure_group_pressed()
 	assert(game.scripted_dialog_kind == "jurejure_exploitation_challenge")
 	var first_live_pattern := int(game.story_progression_state.get("last_exploitation_dialog_index", -1))
-	assert(game.scripted_dialog_pages.size() >= 1 and game.scripted_dialog_pages.size() <= 3)
+	assert(game.scripted_dialog_pages.size() == 3)
 	_finish_dialog(game)
 	await get_tree().process_frame
 	await get_tree().process_frame
@@ -539,13 +545,22 @@ func _test_jurejure_crisis_threshold(game: Node) -> void:
 	assert(game._unique_jurejure_species_get_count() == 4)
 	assert(bool(game.story_progression_state.get("exploitation_midpoint_pending", false)))
 	assert(not game.habitat_crisis_pending and not game.habitat_crisis_started)
-	game._try_start_pending_story_event()
+	await get_tree().process_frame
+	assert(game.jurejure_intro_camera_active and game.jurejure_camera_focus_context == "exploitation_midpoint")
+	assert(game.scripted_dialog_kind.is_empty())
+	game._update_habitat_view_follow(1.0)
+	await get_tree().process_frame
 	assert(game.scripted_dialog_kind == "exploitation_midpoint")
+	assert(game.scripted_dialog_pages.size() == 6)
+	assert(str(game.scripted_dialog_pages[0].get("text", "")) == Localizer.text("ja", "habitat_exploit_midpoint_panda_1"))
+	assert(str(game.scripted_dialog_pages[5].get("text", "")) == Localizer.text("ja", "habitat_exploit_midpoint_mouse_2"))
 	_finish_dialog(game)
 	game._try_start_pending_story_event()
-	assert(game.scripted_dialog_kind == "secret_gacha_install")
-	_finish_dialog(game)
-	assert(StoryProgressionClass.secret_gacha_is_unlocked(game.story_progression_state))
+	assert(game.scripted_dialog_kind.is_empty())
+	assert(not StoryProgressionClass.secret_gacha_feature_enabled())
+	assert(StoryProgressionClass.peek_story_event(game.story_progression_state) != StoryProgressionClass.EVENT_SECRET_GACHA_INSTALL)
+	assert(not StoryProgressionClass.secret_gacha_is_unlocked(game.story_progression_state))
+	assert(not game.secret_gacha_button.visible)
 	assert(not game.habitat_crisis_started)
 
 	for index in range(4, 8):
@@ -574,8 +589,13 @@ func _test_jurejure_crisis_threshold(game: Node) -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	assert(game.scripted_dialog_kind == "habitat_crisis")
+	assert(game.scripted_dialog_pages.size() == 6)
+	assert(str(game.scripted_dialog_pages[0].get("text", "")) == Localizer.text("ja", "habitat_crisis_armadillo_1"))
+	assert(str(game.scripted_dialog_pages[5].get("text", "")) == Localizer.text("ja", "habitat_crisis_skunk"))
 	_finish_dialog(game)
 	await get_tree().process_frame
+	assert(bool(game.story_progression_state.get("post_crisis_greenhouse_pending", false)))
+	assert(not bool(game.story_progression_state.get("post_crisis_greenhouse_seen", false)))
 	assert(not game.puku_puku_battle.visible)
 	game._on_jurejure_group_pressed()
 	assert(game.scripted_dialog_kind == "jurejure_crisis_unavailable")

@@ -1,6 +1,7 @@
 extends Node
 
 const FIRST_FIVE:=5
+const Localizer=preload("res://scripts/game_localizer.gd")
 
 func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
@@ -17,6 +18,12 @@ func _ready()->void:
 
 func _test_assets_and_routes(game)->void:
 	assert(game.forest_gacha_button!=null and game.forest_gacha_button.position.y<game.secret_gacha_button.position.y and game.forest_gacha_button.size==game.secret_gacha_button.size)
+	assert(is_equal_approx(game.forest_gacha_button.position.y,326.0))
+	assert(is_equal_approx(game.forest_gacha_button.position.y-(game.shop_button.position.y+game.shop_button.size.y),9.0))
+	assert(game.forest_gacha_button.text=="森のガチャ" and "ぷく" not in game.forest_gacha_button.text)
+	assert(Localizer.text("ja","main_forest_gacha")=="森のガチャ")
+	assert(Localizer.text("hiragana","main_forest_gacha")=="もりの がちゃ")
+	assert(Localizer.text("en","main_forest_gacha")=="Forest Gacha")
 	var shop_route:=game.shop_overlay.find_child("ShopForestGachaButton",true,false) as Button;assert(shop_route!=null and shop_route.text.contains("ガチャ"))
 	var background:=game.forest_gacha_ui.find_child("Background",true,false) as TextureRect;assert(background!=null and background.texture.resource_path=="res://assets/forest_gacha/forest-gacha-background.jpg")
 	assert(background.material is ShaderMaterial and (background.material as ShaderMaterial).shader.code.contains("dial_backing_color"))
