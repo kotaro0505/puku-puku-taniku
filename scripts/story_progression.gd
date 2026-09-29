@@ -18,7 +18,7 @@ const ACT_FINALE := 4
 # New Act II/III gates live in one versioned payload instead of adding another
 # row of unrelated booleans to main.gd.  The root scene only forwards gameplay
 # milestones and persists this dictionary.
-const RUNTIME_STATE_VERSION := 5
+const RUNTIME_STATE_VERSION := 6
 # Keep the complete Secret Gacha implementation and saved state intact while
 # disconnecting it from normal progression.  Preview routes remain available,
 # and changing this one flag reconnects the midpoint install flow.
@@ -32,6 +32,9 @@ const EVENT_ACT3_BATTLE_INTRO := "act3_exploitation_battle_intro"
 const EVENT_EXPLOITATION_MIDPOINT := "exploitation_midpoint"
 const EVENT_SECRET_GACHA_INSTALL := "secret_gacha_install"
 const EVENT_RESTORATION_JOIN_HOME := "restoration_join_home"
+const CRISIS_ROUTE_NONE := ""
+const CRISIS_ROUTE_SAME_HABITAT := "same_habitat"
+const CRISIS_ROUTE_FORCE_TRAVEL := "force_travel"
 const RUNTIME_EVENT_IDS := [
 	EVENT_POST_ENCOUNTER_HOME,
 	EVENT_POST_CRISIS_GREENHOUSE,
@@ -79,6 +82,7 @@ static func default_runtime_state() -> Dictionary:
 		"last_crisis_concern_visit": -1,
 		"last_exploitation_concern_phase": "",
 		"last_exploitation_concern_index": -1,
+		"habitat_crisis_route": CRISIS_ROUTE_NONE,
 		"restoration": HabitatRestorationClass.default_state(),
 	}
 
@@ -104,6 +108,16 @@ static func normalize_runtime_state(raw_state: Variant, migration: Dictionary = 
 	state["last_crisis_concern_visit"] = int(state.get("last_crisis_concern_visit", -1))
 	state["last_exploitation_concern_phase"] = str(state.get("last_exploitation_concern_phase", ""))
 	state["last_exploitation_concern_index"] = int(state.get("last_exploitation_concern_index", -1))
+	var crisis_route := str(state.get("habitat_crisis_route", CRISIS_ROUTE_NONE))
+	if crisis_route not in [CRISIS_ROUTE_NONE, CRISIS_ROUTE_SAME_HABITAT, CRISIS_ROUTE_FORCE_TRAVEL]:
+		crisis_route = CRISIS_ROUTE_NONE
+	if bool(migration.get("habitat_crisis_started", false)):
+		crisis_route = CRISIS_ROUTE_NONE
+	elif crisis_route.is_empty() and bool(migration.get("habitat_crisis_pending", false)):
+		# The outer save never persisted the active screen. Loading resumes in the
+		# greenhouse, so a legacy pending crisis uses the new guided travel route.
+		crisis_route = CRISIS_ROUTE_FORCE_TRAVEL
+	state["habitat_crisis_route"] = crisis_route
 	state["restoration"] = HabitatRestorationClass.normalize_state(
 		state.get("restoration", {}),
 		{"habitat_crisis_started": bool(migration.get("habitat_crisis_started", false))}
@@ -348,9 +362,24 @@ static func complete_post_crisis_greenhouse(state: Dictionary) -> void:
 
 
 static func begin_habitat_crisis(state: Dictionary) -> void:
+	state["habitat_crisis_route"] = CRISIS_ROUTE_NONE
 	var restoration: Dictionary = state.get("restoration", HabitatRestorationClass.default_state())
 	HabitatRestorationClass.begin_tracking(restoration)
 	state["restoration"] = restoration
+
+
+static func queue_habitat_crisis_transition(state: Dictionary, acquired_in_habitat: bool) -> void:
+	state["habitat_crisis_route"] = CRISIS_ROUTE_SAME_HABITAT \
+		if acquired_in_habitat else CRISIS_ROUTE_FORCE_TRAVEL
+
+
+static func habitat_crisis_route(state: Dictionary) -> String:
+	var route := str(state.get("habitat_crisis_route", CRISIS_ROUTE_NONE))
+	return route if route in [CRISIS_ROUTE_SAME_HABITAT, CRISIS_ROUTE_FORCE_TRAVEL] else CRISIS_ROUTE_NONE
+
+
+static func clear_habitat_crisis_transition(state: Dictionary) -> void:
+	state["habitat_crisis_route"] = CRISIS_ROUTE_NONE
 
 
 static func record_restoration_new_get(

@@ -8,6 +8,7 @@ signal thank_you_closed
 const Localizer = preload("res://scripts/game_localizer.gd")
 const DialoguePortraitsClass = preload("res://scripts/dialogue_portraits.gd")
 const REQUIRED_PLANTS := 5
+const LAMP_PANEL_POSITION := Vector2(93, 772)
 
 var language_code := "ja"
 var lamp_panel: PanelContainer
@@ -57,7 +58,7 @@ func _build_lamps() -> void:
 	lamp_panel.name = "HabitatRestorationLamps"
 	# Keep the final-chapter progress clear of both the lower-right record card
 	# and the persistent arrangement swipe hint at the screen edge.
-	lamp_panel.position = Vector2(93, 724)
+	lamp_panel.position = LAMP_PANEL_POSITION
 	lamp_panel.size = Vector2(390, 82)
 	lamp_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	lamp_panel.add_theme_stylebox_override("panel", _panel_style(Color(0.12, 0.20, 0.16, 0.93), Color("#bde8b0"), 22, 2))

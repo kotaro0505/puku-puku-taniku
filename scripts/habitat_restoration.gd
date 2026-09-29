@@ -6,10 +6,13 @@ const Localizer = preload("res://scripts/game_localizer.gd")
 # Durable state for the post-crisis final chapter.  It is stored as one nested
 # payload in StoryProgression rather than spreading one-off flags through
 # main.gd.
-const STATE_VERSION := 1
+const STATE_VERSION := 2
 const REQUIRED_NEW_SPECIES := 3
 const REQUIRED_RETURNED_PLANTS := 5
 const MIN_RETURN_DIAMETER_CM := 100.0
+const JUREJURE_PHASE_CRISIS := "crisis"
+const JUREJURE_PHASE_RESTORATION := "restoration"
+const JUREJURE_PHASE_POST_ENDING := "post_ending"
 
 
 static func dialog_pages(language_code: String, kind: String, stage := 0) -> Array[Dictionary]:
@@ -99,10 +102,12 @@ static func default_state() -> Dictionary:
 		"started": false,
 		"returned_plants": [],
 		"return_event_pending_stage": 0,
+		"return_event_pending_stages": [],
 		"full_recovery_revealed": false,
 		"ending_phase": "",
 		"ending_seen": false,
 		"thank_you_seen": false,
+		"last_post_ending_dialog_index": -1,
 	}
 
 
@@ -143,9 +148,24 @@ static func normalize_state(raw_state: Variant, migration: Dictionary = {}) -> D
 				"slot": returned.size(),
 			})
 	state["returned_plants"] = returned
-	state["return_event_pending_stage"] = clampi(
+	# v1 could keep only the latest stage. v2 keeps every stage reached during a
+	# single greenhouse play so the rooted-plant scenes can run in order after
+	# the normal result card closes.
+	var pending_stages: Array[int] = []
+	var raw_pending_stages: Variant = state.get("return_event_pending_stages", [])
+	if raw_pending_stages is Array:
+		for value in raw_pending_stages:
+			var pending_stage := int(value)
+			if pending_stage >= 1 and pending_stage <= returned.size() and pending_stage not in pending_stages:
+				pending_stages.append(pending_stage)
+	var legacy_pending_stage := clampi(
 		int(state.get("return_event_pending_stage", 0)), 0, returned.size()
 	)
+	if pending_stages.is_empty() and legacy_pending_stage > 0:
+		pending_stages.append(legacy_pending_stage)
+	state["return_event_pending_stages"] = pending_stages
+	state["return_event_pending_stage"] = pending_stages[0] if not pending_stages.is_empty() else 0
+	state["last_post_ending_dialog_index"] = int(state.get("last_post_ending_dialog_index", -1))
 	var ending_phase := str(state.get("ending_phase", ""))
 	if ending_phase not in ["", "slides", "final", "epilogue", "thank_you", "complete"]:
 		ending_phase = ""
@@ -253,23 +273,52 @@ static func add_returned_plant(state: Dictionary, snapshot: Dictionary) -> int:
 	}
 	returned.append(stored)
 	state["returned_plants"] = returned
-	state["return_event_pending_stage"] = returned.size()
+	var stage := returned.size()
+	var pending_stages: Array = state.get("return_event_pending_stages", [])
+	if stage not in pending_stages:
+		pending_stages.append(stage)
+	state["return_event_pending_stages"] = pending_stages
+	state["return_event_pending_stage"] = int(pending_stages[0])
 	return returned.size()
 
 
 static func pending_return_stage(state: Dictionary) -> int:
+	var pending_stages: Variant = state.get("return_event_pending_stages", [])
+	if pending_stages is Array and not pending_stages.is_empty():
+		return clampi(int(pending_stages[0]), 0, returned_count(state))
 	return clampi(int(state.get("return_event_pending_stage", 0)), 0, returned_count(state))
 
 
+static func pending_return_stages(state: Dictionary) -> Array[int]:
+	var result: Array[int] = []
+	var value: Variant = state.get("return_event_pending_stages", [])
+	if value is Array:
+		for raw_stage in value:
+			var stage := clampi(int(raw_stage), 0, returned_count(state))
+			if stage > 0 and stage not in result:
+				result.append(stage)
+	if result.is_empty():
+		var legacy_stage := clampi(int(state.get("return_event_pending_stage", 0)), 0, returned_count(state))
+		if legacy_stage > 0:
+			result.append(legacy_stage)
+	return result
+
+
 static func complete_return_event(state: Dictionary, stage: int) -> void:
-	if pending_return_stage(state) == stage:
-		state["return_event_pending_stage"] = 0
+	var pending_stages := pending_return_stages(state)
+	if not pending_stages.is_empty() and pending_stages[0] == stage:
+		pending_stages.remove_at(0)
+	else:
+		pending_stages.erase(stage)
+	state["return_event_pending_stages"] = pending_stages
+	state["return_event_pending_stage"] = pending_stages[0] if not pending_stages.is_empty() else 0
 
 
 static func begin_recovery_slides(state: Dictionary) -> void:
 	if returned_count(state) < REQUIRED_RETURNED_PLANTS:
 		return
 	state["return_event_pending_stage"] = 0
+	state["return_event_pending_stages"] = []
 	state["ending_phase"] = "slides"
 
 
@@ -302,6 +351,23 @@ static func restoration_stage(state: Dictionary) -> int:
 
 static func is_complete(state: Dictionary) -> bool:
 	return bool(state.get("full_recovery_revealed", false))
+
+
+static func jurejure_interaction_phase(state: Dictionary) -> String:
+	var phase := ending_phase(state)
+	if bool(state.get("ending_seen", false)) or phase in ["thank_you", "complete"]:
+		return JUREJURE_PHASE_POST_ENDING
+	if bool(state.get("jurejure_joined", false)) and is_started(state):
+		return JUREJURE_PHASE_RESTORATION
+	return JUREJURE_PHASE_CRISIS
+
+
+static func last_post_ending_dialog_index(state: Dictionary) -> int:
+	return int(state.get("last_post_ending_dialog_index", -1))
+
+
+static func set_last_post_ending_dialog_index(state: Dictionary, index: int) -> void:
+	state["last_post_ending_dialog_index"] = index
 
 
 static func complete_ending(state: Dictionary) -> void:

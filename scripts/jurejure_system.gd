@@ -46,6 +46,21 @@ const EXPLOITATION_LATE_VISIT_PATTERNS := [
 	{"speaker":"girl","text_key":"habitat_exploit_visit_late_girl"},
 ]
 
+const POST_ENDING_DIALOG_PATTERNS := [
+	[{"speaker":"mouse","text_key":"jurejure_post_ending_mouse_sprout"}],
+	[{"speaker":"mouse","text_key":"jurejure_post_ending_mouse_water"}],
+	[{"speaker":"mouse","text_key":"jurejure_post_ending_mouse_patrol"}],
+	[{"speaker":"peccary","text_key":"jurejure_post_ending_peccary_patrol"}],
+	[{"speaker":"peccary","text_key":"jurejure_post_ending_peccary_chateaubriand"}],
+	[{"speaker":"peccary","text_key":"jurejure_post_ending_peccary_growth"}],
+	[{"speaker":"skunk","text_key":"jurejure_post_ending_skunk_value"}],
+	[{"speaker":"skunk","text_key":"jurejure_post_ending_skunk_fee"}],
+	[{"speaker":"skunk","text_key":"jurejure_post_ending_skunk_land"}],
+	[{"speaker":"mouse","text_key":"jurejure_post_ending_mouse_restricted"}],
+	[{"speaker":"peccary","text_key":"jurejure_post_ending_peccary_sprouts"}],
+	[{"speaker":"skunk","text_key":"jurejure_post_ending_skunk_club"}],
+]
+
 # Ground-tested panorama positions. A visit chooses one point and keeps it
 # until the player leaves, so a habitat refresh cannot teleport the group.
 const HABITAT_GROUP_POINTS := [
@@ -66,11 +81,13 @@ static func should_be_present(
 		habitat_awakened: bool,
 		returned_to_greenhouse: bool,
 		exploitation_started: bool,
-		waiting_for_seed_pod_reward: bool
-	) -> bool:
+		waiting_for_seed_pod_reward: bool,
+		restoration_started: bool = false,
+		restoration_complete: bool = false
+		) -> bool:
 	return habitat_awakened \
 		and returned_to_greenhouse \
-		and (exploitation_started or not waiting_for_seed_pod_reward)
+		and (exploitation_started or restoration_started or restoration_complete or not waiting_for_seed_pod_reward)
 
 
 static func habitat_bgm_key(
@@ -101,6 +118,17 @@ static func choose_exploitation_dialog(last_index: int, rng: RandomNumberGenerat
 			candidates.append(index)
 	var chosen_index := candidates[rng.randi_range(0, candidates.size() - 1)]
 	return {"index": chosen_index, "pages": EXPLOITATION_DIALOG_PATTERNS[chosen_index].duplicate(true)}
+
+
+static func choose_post_ending_dialog(last_index: int, rng: RandomNumberGenerator) -> Dictionary:
+	if POST_ENDING_DIALOG_PATTERNS.is_empty():
+		return {"index": -1, "pages": []}
+	var candidates: Array[int] = []
+	for index in range(POST_ENDING_DIALOG_PATTERNS.size()):
+		if index != last_index or POST_ENDING_DIALOG_PATTERNS.size() == 1:
+			candidates.append(index)
+	var chosen_index := candidates[rng.randi_range(0, candidates.size() - 1)]
+	return {"index": chosen_index, "pages": POST_ENDING_DIALOG_PATTERNS[chosen_index].duplicate(true)}
 
 
 static func concern_for_visit(

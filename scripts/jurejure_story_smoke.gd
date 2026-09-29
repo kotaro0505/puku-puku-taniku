@@ -24,6 +24,7 @@ func _ready() -> void:
 	_test_creative_gate(game)
 	await _test_act_three_reward_flow(game)
 	await _test_jurejure_crisis_threshold(game)
+	await _test_external_crisis_transition(game)
 	_test_first_loss_unlocks_act_two(game)
 	await _test_save_compatibility(game)
 	game._reset_progression_state()
@@ -590,10 +591,27 @@ func _test_jurejure_crisis_threshold(game: Node) -> void:
 	assert(not game.secret_gacha_button.visible)
 	assert(not game.habitat_crisis_started)
 
-	for index in range(4, 8):
+	for index in range(4, 7):
 		game._register_species_discovery(JUREJURE_SPECIES_IDS[index], true)
+	assert(game._unique_jurejure_species_get_count() == 7)
+	assert(not game.habitat_crisis_pending and not game.habitat_crisis_started)
+	# Mirror the safe boundary of a real habitat battle: while its full-screen UI
+	# is open the deferred story check cannot pre-empt the reward card. Closing
+	# that eighth Species GET card starts rain in this same habitat stay.
+	game.puku_puku_battle.visible = true
+	game._register_species_discovery(JUREJURE_SPECIES_IDS[7], true)
 	assert(game._unique_jurejure_species_get_count() == 8)
 	assert(game.habitat_crisis_pending and not game.habitat_crisis_started)
+	assert(StoryProgressionClass.habitat_crisis_route(game.story_progression_state) == StoryProgressionClass.CRISIS_ROUTE_SAME_HABITAT)
+	await get_tree().process_frame
+	assert(not game.habitat_crisis_started)
+	game.puku_puku_battle.visible = false
+	game._queue_species_get_by_id(JUREJURE_SPECIES_IDS[7], true, "jurejure_battle")
+	await get_tree().process_frame
+	assert(game.species_get_overlay.visible)
+	while game.species_get_overlay.busy:
+		await get_tree().process_frame
+	assert(not game.habitat_crisis_started)
 	game._register_species_discovery(JUREJURE_SPECIES_IDS[0], true)
 	assert(game._unique_jurejure_species_get_count() == 8)
 	for index in range(8, 10):
@@ -606,10 +624,14 @@ func _test_jurejure_crisis_threshold(game: Node) -> void:
 	for species_id in JUREJURE_SPECIES_IDS:total_gets_after += game._species_get_count(species_id)
 	assert(repeat_id in JUREJURE_SPECIES_IDS and total_gets_after == total_gets_before + 1)
 
-	# Eight unique species begin the distinct rain/crisis phase. Tapping the
+	game.species_get_overlay.close_overlay()
+	while game.species_get_overlay.visible:
+		await get_tree().process_frame
+	await get_tree().process_frame
+	# Eight unique species begin the distinct rain/crisis phase without a
+	# greenhouse round trip. Tapping the
 	# resident gang then produces one subdued line only: the crisis theme stays
 	# active and no Jure theme, choice, or battle can be started.
-	game._start_habitat_crisis_event()
 	assert(game.habitat_crisis_started and game.audio_manager.current_bgm_key == "habitat_crisis")
 	assert(game.jurejure_intro_camera_active)
 	game._update_habitat_view_follow(1.0)
@@ -641,6 +663,45 @@ func _test_jurejure_crisis_threshold(game: Node) -> void:
 	game._toggle_mode()
 	await get_tree().process_frame
 	assert(game.current_mode == "habitat" and game.audio_manager.current_bgm_key == "habitat_crisis")
+
+
+func _test_external_crisis_transition(game: Node) -> void:
+	_prepare_act_three_reward(game)
+	game.jurejure_species_first_seen = true
+	assert(game._unlock_jurejure_pool())
+	game.current_mode = "greenhouse"
+	game._apply_mode()
+	for index in range(7):
+		game._register_species_discovery(JUREJURE_SPECIES_IDS[index], true)
+	assert(game._unique_jurejure_species_get_count() == 7)
+	# The Species card may close before Today's Harvest. The pending route must
+	# wait for both, then present Panda's line instead of silently jumping modes.
+	game.result_overlay.visible = true
+	game._register_species_discovery(JUREJURE_SPECIES_IDS[7], true)
+	assert(game.habitat_crisis_pending and not game.habitat_crisis_started)
+	assert(StoryProgressionClass.habitat_crisis_route(game.story_progression_state) == StoryProgressionClass.CRISIS_ROUTE_FORCE_TRAVEL)
+	game._queue_species_get_by_id(JUREJURE_SPECIES_IDS[7], true, "main_result")
+	await get_tree().process_frame
+	while game.species_get_overlay.busy:
+		await get_tree().process_frame
+	game.species_get_overlay.close_overlay()
+	while game.species_get_overlay.visible:
+		await get_tree().process_frame
+	await get_tree().process_frame
+	assert(game.scripted_dialog_kind.is_empty() and game.result_overlay.visible)
+	game._close_result()
+	await get_tree().process_frame
+	assert(game.scripted_dialog_kind == "habitat_crisis_departure")
+	assert(str(game.scripted_dialog_pages[0].get("text", "")) == Localizer.text("ja", "habitat_crisis_departure_panda"))
+	assert(game.current_mode == "greenhouse")
+	_finish_dialog(game)
+	await get_tree().create_timer(1.2).timeout
+	assert(game.current_mode == "habitat" and game.habitat_crisis_started)
+	assert(game.jurejure_intro_camera_active)
+	game._update_habitat_view_follow(1.0)
+	await get_tree().process_frame
+	assert(game.scripted_dialog_kind == "habitat_crisis")
+	_finish_dialog(game)
 
 
 func _test_first_loss_unlocks_act_two(game: Node) -> void:

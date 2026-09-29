@@ -107,6 +107,11 @@ var background_press_event:InputEvent
 var background_start_position:=Vector2.ZERO
 var background_forwarded:=false
 var plant_selection_shader:Shader
+var web_touch_canvas
+var web_touch_callback
+var web_touch_listener_options
+var web_multitouch_active:=false
+var web_multitouch_suppress_native:=false
 
 func _ready()->void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -129,8 +134,12 @@ void fragment() {
 	vec3 cool_glow = vec3(0.70, 0.93, 1.0);
 	COLOR = vec4(mix(base.rgb, cool_glow, halo * 0.48), max(base.a, halo * 0.32));
 }
-"""
+	"""
 	_build_ui()
+	_install_web_multitouch_fallback()
+
+func _exit_tree()->void:
+	_remove_web_multitouch_fallback()
 
 func configure(species_data:Array,series_data:Array,pots_data:Array,discovery:Dictionary,purchased_pots:Dictionary,arrangements:Array,capacity:int,puku_points:int,resolver:Callable,requester:Callable=Callable(),best_records:Dictionary={},locale:String="ja")->void:
 	catalog_species=species_data
@@ -266,23 +275,30 @@ func _input(event:InputEvent)->void:
 	# events at viewport level while the editor is active so both fingers use
 	# the same path. Mouse input remains owned by editor_canvas.gui_input.
 	if not is_editor_active() or editor_canvas==null:return
+	if event is InputEventScreenTouch or event is InputEventScreenDrag:
+		if web_multitouch_suppress_native:
+			# The capture-phase DOM bridge already applied this exact Web gesture.
+			# Claim the Godot mirror event without applying the transform twice.
+			get_viewport().set_input_as_handled()
+			return
+		if _route_editor_touch_event(event,false):get_viewport().set_input_as_handled()
+
+func _route_editor_touch_event(event:InputEvent,position_is_editor_local:bool)->bool:
+	if not is_editor_active() or editor_canvas==null:return false
 	if event is InputEventScreenTouch:
 		var touch:=event as InputEventScreenTouch
-		var local_position:=_editor_local_touch_position(touch.position)
-		if touch.pressed and not _editor_canvas_has_point(local_position):return
-		if not touch.pressed and not touch_positions.has(touch.index):return
-		var local_touch:=touch.duplicate() as InputEventScreenTouch
-		local_touch.position=local_position
-		_handle_editor_touch(local_touch)
-		get_viewport().set_input_as_handled()
-	elif event is InputEventScreenDrag:
+		var local_position:=touch.position if position_is_editor_local else _editor_local_touch_position(touch.position)
+		if touch.pressed and not _editor_canvas_has_point(local_position):return false
+		if not touch.pressed and not touch_positions.has(touch.index):return false
+		var local_touch:=touch.duplicate() as InputEventScreenTouch;local_touch.position=local_position;_handle_editor_touch(local_touch)
+		return true
+	if event is InputEventScreenDrag:
 		var drag:=event as InputEventScreenDrag
-		var local_position:=_editor_local_touch_position(drag.position)
-		if not touch_positions.has(drag.index) and not _editor_canvas_has_point(local_position):return
-		var local_drag:=drag.duplicate() as InputEventScreenDrag
-		local_drag.position=local_position
-		_handle_editor_touch(local_drag)
-		get_viewport().set_input_as_handled()
+		var local_position:=drag.position if position_is_editor_local else _editor_local_touch_position(drag.position)
+		if not touch_positions.has(drag.index) and not _editor_canvas_has_point(local_position):return false
+		var local_drag:=drag.duplicate() as InputEventScreenDrag;local_drag.position=local_position;_handle_editor_touch(local_drag)
+		return true
+	return false
 
 func _editor_local_touch_position(screen_position:Vector2)->Vector2:
 	return editor_canvas.get_global_transform_with_canvas().affine_inverse()*screen_position
@@ -406,6 +422,90 @@ func _on_editor_canvas_gui_input(event:InputEvent)->void:
 		accept_event()
 	elif event is InputEventMouseMotion:
 		_update_canvas_pointer(-1,event.position,event);accept_event()
+	elif event is InputEventScreenTouch or event is InputEventScreenDrag:
+		# Fallback for mobile ports which deliver a finger only to the Control. The
+		# viewport path marks handled events, so the same event cannot run twice.
+		if _route_editor_touch_event(event,true):accept_event()
+
+func _install_web_multitouch_fallback()->void:
+	if not OS.has_feature("web"):return
+	var document=JavaScriptBridge.get_interface("document")
+	if document==null:return
+	web_touch_canvas=document.getElementById("canvas")
+	if web_touch_canvas==null:return
+	web_touch_canvas.style.touchAction="none";web_touch_canvas.style.overscrollBehavior="none"
+	web_touch_callback=JavaScriptBridge.create_callback(_on_web_touch_event)
+	web_touch_listener_options=JavaScriptBridge.eval("({capture:true,passive:false})",true)
+	for event_name in ["touchstart","touchmove","touchend","touchcancel"]:
+		web_touch_canvas.addEventListener(event_name,web_touch_callback,web_touch_listener_options)
+
+func _remove_web_multitouch_fallback()->void:
+	if web_touch_canvas!=null and web_touch_callback!=null:
+		for event_name in ["touchstart","touchmove","touchend","touchcancel"]:
+			web_touch_canvas.removeEventListener(event_name,web_touch_callback,web_touch_listener_options)
+	web_touch_canvas=null;web_touch_callback=null;web_touch_listener_options=null
+
+func _on_web_touch_event(arguments:Array)->void:
+	if arguments.is_empty() or web_touch_canvas==null:return
+	var event=arguments[0]
+	if event==null:return
+	var touches=event.touches
+	if touches==null:return
+	var touch_count:=int(touches.length)
+	var event_type:=str(event.type)
+	if not is_editor_active():
+		if web_multitouch_active or web_multitouch_suppress_native:_reset_web_multitouch_state()
+		return
+	if touch_count<2 and not web_multitouch_active:
+		if web_multitouch_suppress_native and event_type=="touchstart":
+			# Keep suppression through the trailing native touchend mirror, then let
+			# the first finger of the next gesture resume the normal Godot path.
+			web_multitouch_suppress_native=false
+			return
+		if not web_multitouch_suppress_native:return
+	if bool(event.cancelable):event.preventDefault()
+	var rect=web_touch_canvas.getBoundingClientRect();var rect_size:=Vector2(maxf(1.0,float(rect.width)),maxf(1.0,float(rect.height)));var viewport_size:=get_viewport().get_visible_rect().size
+	var positions:Dictionary={}
+	for index in range(touch_count):
+		var touch=touches.item(index)
+		if touch==null:continue
+		var screen_position:=_web_touch_viewport_position(Vector2(float(touch.clientX),float(touch.clientY)),Vector2(float(rect.left),float(rect.top)),rect_size,viewport_size)
+		positions[int(touch.identifier)]=_editor_local_touch_position(screen_position)
+	_handle_web_multitouch_snapshot(positions)
+
+func _web_touch_viewport_position(client_position:Vector2,canvas_position:Vector2,canvas_size:Vector2,viewport_size:Vector2)->Vector2:
+	# Godot keeps the 576x1024 game aspect inside the browser canvas. The canvas
+	# itself includes any pillar/letterbox area, so independently scaling X/Y
+	# distorts pinch distance and rotation on phones and wide desktop windows.
+	var content_scale:=minf(canvas_size.x/maxf(1.0,viewport_size.x),canvas_size.y/maxf(1.0,viewport_size.y))
+	content_scale=maxf(content_scale,0.0001)
+	var content_offset:=(canvas_size-viewport_size*content_scale)*0.5
+	return (client_position-canvas_position-content_offset)/content_scale
+
+func _handle_web_multitouch_snapshot(positions:Dictionary)->void:
+	if positions.size()>=2:
+		if not web_multitouch_active:
+			var inside_count:=0
+			for point_value in positions.values():
+				if _editor_canvas_has_point(point_value as Vector2):inside_count+=1
+			if inside_count<2:return
+			if selected_plant_index<0:
+				for point_value in positions.values():
+					var hit_index:=_plant_index_at(point_value as Vector2)
+					if hit_index>=0:_select_plant(hit_index);break
+			if selected_plant_index<0:return
+			web_multitouch_active=true;web_multitouch_suppress_native=true;touch_positions=positions.duplicate(true);pinch_target_index=selected_plant_index;_cancel_background_for_pinch();_begin_pinch()
+		else:
+			touch_positions=positions.duplicate(true);_update_pinch_transform()
+		return
+	if web_multitouch_active:
+		web_multitouch_active=false
+		if pinch_active:_finish_selected_gesture(GameLocalizer.text(language_code,"arrangement_gesture_transform"))
+		touch_positions.clear();pinch_target_index=-1
+
+func _reset_web_multitouch_state()->void:
+	web_multitouch_active=false;web_multitouch_suppress_native=false;touch_positions.clear();pinch_target_index=-1
+	if pinch_active:_finish_selected_gesture(GameLocalizer.text(language_code,"arrangement_gesture_transform"))
 
 func _handle_editor_touch(event:InputEvent)->void:
 	if event is InputEventScreenTouch:
@@ -498,7 +598,7 @@ func _cancel_background_for_pinch()->void:
 	_clear_background_pointer()
 
 func _cancel_editor_gesture()->void:
-	drag_active=false;drag_pointer_id=-999;pinch_active=false;pinch_touch_ids.clear();touch_positions.clear();pinch_target_index=-1;pinch_start_angle=0.0;pinch_start_rotation=0.0;_clear_background_pointer()
+	drag_active=false;drag_pointer_id=-999;pinch_active=false;pinch_touch_ids.clear();touch_positions.clear();pinch_target_index=-1;pinch_start_angle=0.0;pinch_start_rotation=0.0;web_multitouch_active=false;web_multitouch_suppress_native=false;_clear_background_pointer()
 
 func _plant_index_at(canvas_position:Vector2)->int:
 	var canvas_global:=editor_canvas.get_global_transform_with_canvas()*canvas_position;var selected_index:=-1;var selected_z:=-1000000

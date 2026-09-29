@@ -4,7 +4,7 @@ func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
 	game._reset_progression_state();game.story_progression_state["arrangement_unlocked"]=true;game.story_progression_state["arrangement_intro_seen"]=true;game.intro_story_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.habitat_awakened=true;game.habitat_awakening_event_complete=true;game.habitat_tutorial_complete=true;game.seed_shop_open=true;game.panda_beacon_unlocked=true;game.puku_gauge_intro_complete=true;game.total_play_count=3;game.formal_play_count=3
-	game.discovered={"colorata":true,"laui":false};game.species_get_counts={"colorata":4};game.bests={"colorata":62.5};game.puku_points=12;game._sync_arrangement_ui();game._update_play_ui()
+	game.discovered={"colorata":true,"laui":false};game.species_get_counts={"colorata":4};game.bests={"colorata":11.1};game.puku_points=12;game._sync_arrangement_ui();game._update_play_ui()
 	var ui=game.arrangement_ui
 	assert(game.pot_catalog.size()==8 and bool(game.owned_pots.get("shallow_terracotta",false)))
 	for pot_value in game.pot_catalog:
@@ -38,9 +38,30 @@ func _ready()->void:
 	_send_editor_touch(ui,_screen_drag(1,pinch_origin+Vector2(41.1,0)));assert(is_equal_approx(float(ui.editor_plants[0].scale),1.37) and is_equal_approx(float(ui.editor_plants[0].rotation),0.0))
 	_send_editor_touch(ui,_screen_drag(1,pinch_origin+Vector2(0,41.1)));assert(is_equal_approx(float(ui.editor_plants[0].scale),1.37) and is_equal_approx(float(ui.editor_plants[0].rotation),90.0))
 	_send_editor_touch(ui,_screen_touch(1,pinch_origin+Vector2(0,41.1),false));_send_editor_touch(ui,_screen_touch(0,pinch_origin,false));assert(not ui.pinch_active and is_equal_approx(float(ui.editor_plants[0].scale),1.37) and is_equal_approx(float(ui.editor_plants[0].rotation),90.0))
+	# A Control-level delivery path is also accepted when a mobile port bypasses
+	# viewport _input for one of the fingers.
+	ui._on_editor_canvas_gui_input(_screen_touch(4,pinch_origin,true));ui._on_editor_canvas_gui_input(_screen_touch(5,pinch_origin+Vector2(40,0),true));assert(ui.pinch_active)
+	ui._on_editor_canvas_gui_input(_screen_drag(5,pinch_origin+Vector2(0,60)));assert(float(ui.editor_plants[0].scale)>1.9 and absf(float(ui.editor_plants[0].rotation)-180.0)<.1)
+	ui._on_editor_canvas_gui_input(_screen_touch(5,pinch_origin+Vector2(0,60),false));ui._on_editor_canvas_gui_input(_screen_touch(4,pinch_origin,false));assert(not ui.pinch_active)
+	# The Web DOM fallback consumes complete touch snapshots and suppresses the
+	# mirrored Godot events, applying scale and rotation only once.
+	ui._handle_web_multitouch_snapshot({21:pinch_origin,22:pinch_origin+Vector2(50,0)});assert(ui.web_multitouch_active and ui.web_multitouch_suppress_native and ui.pinch_active)
+	var web_start_scale:=float(ui.editor_plants[0].scale)
+	ui._handle_web_multitouch_snapshot({21:pinch_origin,22:pinch_origin+Vector2(0,75)});assert(is_equal_approx(float(ui.editor_plants[0].scale),web_start_scale*1.5) and absf(float(ui.editor_plants[0].rotation)-270.0)<.1)
+	ui._handle_web_multitouch_snapshot({21:pinch_origin});ui._handle_web_multitouch_snapshot({});assert(not ui.web_multitouch_active and ui.web_multitouch_suppress_native and not ui.pinch_active)
+	# Suppression intentionally survives the mirrored native touchend and is
+	# released when the next Web touchstart begins.
+	ui._reset_web_multitouch_state();assert(not ui.web_multitouch_suppress_native)
+	# Browser canvases include the black pillar/letterbox region. Equal physical
+	# X/Y finger travel must remain equal after mapping into the game viewport.
+	var mapped_origin:Vector2=ui._web_touch_viewport_position(Vector2(590,390),Vector2.ZERO,Vector2(1262,624),Vector2(576,1024))
+	var mapped_x:Vector2=ui._web_touch_viewport_position(Vector2(660,390),Vector2.ZERO,Vector2(1262,624),Vector2(576,1024))
+	var mapped_y:Vector2=ui._web_touch_viewport_position(Vector2(590,460),Vector2.ZERO,Vector2(1262,624),Vector2(576,1024))
+	assert(is_equal_approx(mapped_origin.distance_to(mapped_x),mapped_origin.distance_to(mapped_y)))
 	var tracked_before:int=ui.touch_positions.size();_send_editor_touch(ui,_screen_touch(3,Vector2(-12,-12),true));assert(ui.touch_positions.size()==tracked_before)
+	var rotation_before_buttons:=float(ui.editor_plants[0].rotation)
 	for rotation_step in range(18):ui._adjust_selected_rotation(15.0)
-	assert(is_equal_approx(float(ui.editor_plants[0].rotation),0.0))
+	assert(is_equal_approx(float(ui.editor_plants[0].rotation),fposmod(rotation_before_buttons+270.0,360.0)))
 	ui._add_species_to_editor("colorata");assert(ui.editor_plants.size()==2)
 	# Empty space only clears the selection; it never jumps a plant to the tap position.
 	var second_position:=Vector2(float(ui.editor_plants[1].x),float(ui.editor_plants[1].y))
@@ -51,6 +72,7 @@ func _ready()->void:
 	assert(ui.editor_plant_layer.z_index+int(ui.editor_plants[0].z_index)>ui.editor_pot_layer.z_index and ui.editor_plant_layer.z_index+int(ui.editor_plants[1].z_index)>ui.editor_pot_layer.z_index)
 	ui._select_plant(1);ui._delete_selected_plant();assert(ui.editor_plants.size()==1)
 	ui._add_species_to_editor("colorata");ui._select_plant(0);ui._change_selected_depth(1);assert(ui.editor_plants.size()==2 and int(ui.editor_plants[0].z_index)>int(ui.editor_plants[1].z_index))
+	var large_plant:Dictionary=ui.editor_plants[0];large_plant["scale"]=2.35;large_plant["rotation"]=123.0;large_plant["x"]=214.0;large_plant["y"]=268.0;ui.editor_plants[0]=large_plant;ui._apply_plant_transform(0)
 	var rear_plant:Dictionary=ui.editor_plants[1];rear_plant["scale"]=.78;rear_plant["rotation"]=27.0;rear_plant["x"]=356.0;rear_plant["y"]=310.0;ui.editor_plants[1]=rear_plant;ui._apply_plant_transform(1)
 	var get_before:Dictionary=game.species_get_counts.duplicate(true);var best_before:Dictionary=game.bests.duplicate(true);var discovered_before:Dictionary=game.discovered.duplicate(true)
 	var edit_snapshots:Array=[];var editor_pot:Control=ui.editor_pot_layer.get_child(0);var edit_pot_position:=editor_pot.position
@@ -64,7 +86,7 @@ func _ready()->void:
 		assert(viewed_plant.position.is_equal_approx(edit_snapshot.position) and viewed_plant.scale.is_equal_approx(edit_snapshot.scale) and is_equal_approx(viewed_plant.rotation_degrees,float(edit_snapshot.rotation)) and viewed_plant.z_index==int(edit_snapshot.z))
 	assert(ui.editor_canvas.position==ui.viewer_canvas.position and ui.viewer_plant_layer.z_index==ui.PLANT_LAYER_Z and ui.viewer_canvas.get_theme_stylebox("panel") is StyleBoxEmpty)
 	assert(game.species_get_counts==get_before and game.bests==best_before and game.discovered==discovered_before)
-	var saved:Dictionary=game.saved_arrangements[0];assert(saved.has("arrangement_id") and saved.has("name") and saved.has("pot_id") and saved.has("created_at") and saved.has("plants") and bool(saved.completed));assert(saved.plants.size()==2 and int(saved.plants[0].z_index)>int(saved.plants[1].z_index))
+	var saved:Dictionary=game.saved_arrangements[0];assert(saved.has("arrangement_id") and saved.has("name") and saved.has("pot_id") and saved.has("created_at") and saved.has("plants") and bool(saved.completed));assert(saved.plants.size()==2 and int(saved.plants[0].z_index)>int(saved.plants[1].z_index) and is_equal_approx(float(saved.plants[0].scale),2.35))
 	for plant_key in ["species_id","x","y","scale","rotation","z_index"]:assert(saved.plants[0].has(plant_key))
 	var saved_id:=str(saved.arrangement_id);var saved_position:=Vector2(float(saved.plants[0].x),float(saved.plants[0].y));var saved_scale:=float(saved.plants[0].scale)
 	game._save();game.saved_arrangements.clear();game._load_save();assert(game.saved_arrangements.size()==1 and str(game.saved_arrangements[0].arrangement_id)==saved_id)
@@ -76,6 +98,8 @@ func _ready()->void:
 	game._sync_arrangement_ui();ui.open_home();ui._start_new_arrangement();assert(ui.pot_select_grid.get_child_count()==2);ui._select_editor_pot("classic_terracotta");assert(ui.editor_page.visible and str(ui.current_arrangement.pot_id)=="classic_terracotta")
 	assert(game.species_get_counts==get_before and game.bests==best_before and game.discovered==discovered_before)
 	var migrated:Dictionary=game._normalize_arrangement({"arrangement_id":"legacy","name":"旧作品","pot_id":"starter_terracotta","plants":[]});assert(str(migrated.pot_id)=="shallow_terracotta")
+	var free_scale:Dictionary=game._normalize_arrangement({"arrangement_id":"free_scale","name":"自由拡大","pot_id":"shallow_terracotta","plants":[{"species_id":"colorata","x":211.0,"y":287.0,"scale":2.75,"rotation":73.0,"z_index":4}]})
+	assert(is_equal_approx(float(free_scale.plants[0].scale),2.75) and is_equal_approx(float(free_scale.plants[0].rotation),73.0) and int(free_scale.plants[0].z_index)==4)
 	for species_entry in game.catalog_species:game.discovered[str(species_entry.get("species_id",""))]=true
 	game._sync_arrangement_ui();ui._open_species_picker();await get_tree().process_frame;await get_tree().process_frame
 	assert(ui.picker_page.visible and ui.picker_scroll.vertical_scroll_mode==ScrollContainer.SCROLL_MODE_AUTO and ui.picker_scroll.get_v_scroll_bar().max_value>ui.picker_scroll.size.y)

@@ -1191,6 +1191,7 @@ func _migrate_three_act_progress(saved_progression_version:int)->void:
 		"jurejure_get_count":jurejure_count,
 		"jurejure_intro_complete":jurejure_intro_complete,
 		"habitat_crisis_started":habitat_crisis_started,
+		"habitat_crisis_pending":habitat_crisis_pending,
 		"secret_gacha_evidence":secret_gacha_active or secret_gacha_draws_remaining>0 or secret_gacha_last_roll_play_count>=0,
 	})
 	if fantasy_first_discovery_seen:StoryProgressionClass.consume_story_event(story_progression_state,StoryProgressionClass.EVENT_FANTASY_FIRST)
@@ -1216,9 +1217,12 @@ func _migrate_three_act_progress(saved_progression_version:int)->void:
 	if act3_intro_seen:
 		act3_intro_pending=false
 	if jurejure_count>=1 and saved_progression_version<PROGRESSION_VERSION:jurejure_species_first_seen=true
-	if jurejure_count>=8 and not habitat_crisis_started:habitat_crisis_pending=true
+	if jurejure_count>=8 and not habitat_crisis_started:
+		habitat_crisis_pending=true
+		if StoryProgressionClass.habitat_crisis_route(story_progression_state).is_empty():
+			StoryProgressionClass.queue_habitat_crisis_transition(story_progression_state,false)
 	if habitat_crisis_started:
-		habitat_crisis_pending=false;jurejure_waiting_for_seed_pod_reward=false
+		habitat_crisis_pending=false;jurejure_waiting_for_seed_pod_reward=false;StoryProgressionClass.clear_habitat_crisis_transition(story_progression_state)
 	if not StoryProgressionClass.secret_gacha_is_unlocked(story_progression_state):
 		secret_gacha_active=false;secret_gacha_draws_remaining=0
 	for raw_entry in catalog_species:
@@ -1800,8 +1804,9 @@ func _normalize_arrangement(source:Dictionary)->Dictionary:
 			if not plant_value is Dictionary:continue
 			var species_id:=str(plant_value.get("species_id",""))
 			if _catalog_entry(species_id).is_empty() or not bool(discovered.get(species_id,false)):continue
-			var best_cm:=maxf(0.0,float(bests.get(species_id,0.0)));var record_scale_max:=clampf(best_cm/30.0,.45,6.0) if best_cm>0.0 else .45
-			plants_data.append({"species_id":species_id,"x":clampf(float(plant_value.get("x",268.0)),0.0,536.0),"y":clampf(float(plant_value.get("y",276.0)),0.0,552.0),"scale":clampf(float(plant_value.get("scale",.45)),.45,record_scale_max),"rotation":fposmod(float(plant_value.get("rotation",0.0)),360.0),"z_index":clampi(int(plant_value.get("z_index",plants_data.size())),-100,100)})
+			# Arrangement scale is creative metadata. Never reinterpret it through the
+			# plant's greenhouse best record while saving or loading a finished piece.
+			plants_data.append({"species_id":species_id,"x":clampf(float(plant_value.get("x",268.0)),0.0,536.0),"y":clampf(float(plant_value.get("y",276.0)),0.0,552.0),"scale":clampf(float(plant_value.get("scale",ArrangementUIClass.PLANT_SCALE_MIN)),ArrangementUIClass.PLANT_SCALE_MIN,ArrangementUIClass.PLANT_SCALE_SAFETY_MAX),"rotation":fposmod(float(plant_value.get("rotation",0.0)),360.0),"z_index":clampi(int(plant_value.get("z_index",plants_data.size())),-100,100)})
 	var arrangement_id:=str(source.get("arrangement_id",""))
 	if arrangement_id.is_empty():arrangement_id="arrangement_%d_%d"%[Time.get_unix_time_from_system(),Time.get_ticks_msec()%100000]
 	var arrangement_name:=str(source.get("name","")).strip_edges()
@@ -2067,12 +2072,13 @@ func _finish_scripted_dialog()->void:
 	var finished_kind:=scripted_dialog_kind;var keep_shop:=scripted_dialog_shop_context
 	scripted_dialog_kind="";scripted_dialog_pages.clear();scripted_dialog_index=-1;scripted_dialog_shop_context=false;intro_overlay.visible=false
 	var acquired:Array[String]=[];var open_puku_intro:=false;var open_catalog:=false;var guide_habitat:=false;var guide_catalog:=false;var show_pinwheel_get:=false;var show_armadillo_gift:=false;var start_second_awakening:=false;var start_trio_event:=false;var start_jurejure_reveal:=false;var show_jurejure_choice:=false;var queue_jurejure_reward:=false;var focus_act3_exploitation:=false;var show_arrangement_swipe_intro:=false
-	var begin_restoration_join_habitat:=false;var restoration_return_stage:=0;var start_restoration_epilogue:=false;var show_restoration_thank_you:=false
+	var begin_restoration_join_habitat:=false;var restoration_return_stage:=0;var next_restoration_return_stage:=0;var start_restoration_epilogue:=false;var show_restoration_thank_you:=false;var start_habitat_crisis_travel:=false
 	if finished_kind.begins_with("restoration_return_"):
 		restoration_return_stage=int(finished_kind.trim_prefix("restoration_return_"))
 		var restoration:=_restoration_state()
 		if restoration_return_stage>=HabitatRestorationClass.REQUIRED_RETURNED_PLANTS:HabitatRestorationClass.begin_recovery_slides(restoration)
 		else:HabitatRestorationClass.complete_return_event(restoration,restoration_return_stage)
+		next_restoration_return_stage=HabitatRestorationClass.pending_return_stage(restoration)
 		story_progression_state["restoration"]=restoration
 	match finished_kind:
 		"first_colorata_discovery":
@@ -2105,13 +2111,14 @@ func _finish_scripted_dialog()->void:
 		"act3_intro":
 			act3_intro_seen=true;act3_intro_pending=false;jurejure_waiting_for_seed_pod_reward=false
 			StoryProgressionClass.begin_exploitation(story_progression_state,_unique_jurejure_species_get_count());focus_act3_exploitation=current_mode=="habitat"
-			if habitat_crisis_pending:habitat_crisis_eligible_visit_id=habitat_visit_id
 		"act3_exploitation_battle_intro":
 			StoryProgressionClass.complete_act3_battle_intro(story_progression_state);show_jurejure_choice=true
 		"jurejure_species_first":
 			jurejure_species_first_seen=true
 		"habitat_crisis":
 			StoryProgressionClass.mark_habitat_crisis_dialog_complete(story_progression_state)
+		"habitat_crisis_departure":
+			start_habitat_crisis_travel=true
 		"post_crisis_greenhouse":
 			StoryProgressionClass.complete_post_crisis_greenhouse(story_progression_state)
 		"restoration_join_home":
@@ -2172,9 +2179,12 @@ func _finish_scripted_dialog()->void:
 		if finished_kind not in ["jurejure_intro","jurejure_challenge","jurejure_exploitation_challenge"]:
 			_play_current_area_bgm()
 	_update_play_ui()
-	if begin_restoration_join_habitat:call_deferred("_transition_to_restoration_habitat","join",0)
+	if start_habitat_crisis_travel:call_deferred("_transition_to_habitat_crisis")
+	elif begin_restoration_join_habitat:call_deferred("_transition_to_restoration_habitat","join",0)
 	elif restoration_return_stage>0:
-		if restoration_return_stage>=HabitatRestorationClass.REQUIRED_RETURNED_PLANTS:
+		if next_restoration_return_stage>0:
+			call_deferred("_start_restoration_return_event",next_restoration_return_stage)
+		elif restoration_return_stage>=HabitatRestorationClass.REQUIRED_RETURNED_PLANTS:
 			call_deferred("_begin_restoration_recovery_slides")
 		else:call_deferred("_transition_back_to_greenhouse_after_restoration")
 	elif start_restoration_epilogue:call_deferred("_start_restoration_epilogue_event")
@@ -2379,9 +2389,7 @@ func _start_jurejure_challenge_event()->void:
 	if StoryProgressionClass.exploitation_is_started(story_progression_state):
 		var pattern:=JureJureSystemClass.choose_exploitation_dialog(int(story_progression_state.get("last_exploitation_dialog_index",-1)),rng)
 		story_progression_state["last_exploitation_dialog_index"]=int(pattern.get("index",-1))
-		var exploitation_pages:Array=[]
-		for raw_page in pattern.get("pages",[]):
-			if raw_page is Dictionary:exploitation_pages.append({"speaker":str(raw_page.get("speaker","")),"text":Localizer.text(language_code,str(raw_page.get("text_key","")))})
+		var exploitation_pages:=_localized_jurejure_pattern_pages(pattern)
 		if not exploitation_pages.is_empty():
 			_start_scripted_dialog("jurejure_exploitation_challenge",exploitation_pages,false)
 			return
@@ -2389,6 +2397,12 @@ func _start_jurejure_challenge_event()->void:
 		{"speaker":"mouse","text":Localizer.text(language_code,"jurejure_challenge_1")},
 		{"speaker":"mouse","text":Localizer.text(language_code,"jurejure_challenge_2")}
 	],false)
+
+func _localized_jurejure_pattern_pages(pattern:Dictionary)->Array:
+	var pages:Array=[]
+	for raw_page in pattern.get("pages",[]):
+		if raw_page is Dictionary:pages.append({"speaker":str(raw_page.get("speaker","")),"text":Localizer.text(language_code,str(raw_page.get("text_key","")))})
+	return pages
 
 func _start_jurejure_growth_event(stage:int)->void:
 	# Act I keeps the gang consistently selfish. Legacy MID/LATE story masks are
@@ -3424,7 +3438,7 @@ func _finish_greenhouse_play()->void:
 	_clear_greenhouse_plants();_save();_update_play_ui();_show_play_result();audio_manager.play_se("result",.7)
 
 func _greenhouse_finish_block_reason()->String:
-	if not pending_restoration_snapshot.is_empty() or (habitat_restoration_ui and habitat_restoration_ui.is_modal_visible()):return "habitat_restoration_event"
+	if habitat_restoration_ui and habitat_restoration_ui.is_modal_visible():return "habitat_restoration_event"
 	if first_seed_pod_reward_event_active:return "first_seed_pod_reward_event"
 	if puku_buyback_tutorial_active:return "puku_buyback_tutorial"
 	if first_play_tutorial_active and not first_play_tutorial_sequence_complete:return "first_play_tutorial_sequence_incomplete"
@@ -4385,7 +4399,8 @@ func _refresh_narrative_species_progress()->void:
 	var jurejure_count:=_unique_jurejure_species_get_count()
 	StoryProgressionClass.update_jurejure_progress(story_progression_state,jurejure_count)
 	if jurejure_count>=8 and not habitat_crisis_started and not habitat_crisis_pending:
-		habitat_crisis_pending=true;habitat_crisis_eligible_visit_id=habitat_visit_id
+		habitat_crisis_pending=true
+		StoryProgressionClass.queue_habitat_crisis_transition(story_progression_state,current_mode=="habitat")
 	_update_main_story_progress(false)
 
 func _series_get_count(series_id:String)->int:
@@ -4493,6 +4508,7 @@ func _try_start_pending_story_event()->void:
 	if story_dev_panel and story_dev_panel.visible:return
 	if settings_overlay and settings_overlay.visible:return
 	if habitat_restoration_ui and habitat_restoration_ui.is_modal_visible():return
+	if _try_start_pending_habitat_crisis_transition():return
 	var queued_story_event:=StoryProgressionClass.peek_story_event(story_progression_state)
 	if current_mode=="habitat" and act3_intro_pending and not act3_intro_seen and habitat_visit_id>act3_intro_eligible_visit_id:
 		_start_act3_intro_event()
@@ -4514,8 +4530,6 @@ func _try_start_pending_story_event()->void:
 		_focus_jurejure_group("act3_exploitation_start")
 	elif current_mode=="habitat" and queued_story_event==StoryProgressionClass.EVENT_EXPLOITATION_MIDPOINT:
 		_focus_jurejure_group("exploitation_midpoint")
-	elif current_mode=="habitat" and habitat_crisis_pending and not habitat_crisis_started and habitat_visit_id>habitat_crisis_eligible_visit_id:
-		_start_habitat_crisis_event()
 	elif queued_story_event==StoryProgressionClass.EVENT_FANTASY_FIRST:
 		_start_fantasy_first_discovery_event()
 	elif queued_story_event==StoryProgressionClass.EVENT_FANTASY_SIX:
@@ -4528,6 +4542,37 @@ func _try_start_pending_story_event()->void:
 		_start_jurejure_species_first_event()
 	elif current_mode=="habitat" and StoryProgressionClass.exploitation_is_started(story_progression_state) and not habitat_crisis_started:
 		_maybe_start_habitat_exploitation_concern()
+
+func _try_start_pending_habitat_crisis_transition()->bool:
+	if not habitat_crisis_pending or habitat_crisis_started:return false
+	var route:=StoryProgressionClass.habitat_crisis_route(story_progression_state)
+	if route.is_empty():
+		StoryProgressionClass.queue_habitat_crisis_transition(story_progression_state,current_mode=="habitat")
+		route=StoryProgressionClass.habitat_crisis_route(story_progression_state)
+	if current_mode=="habitat":
+		_start_habitat_crisis_event()
+		return true
+	if current_mode=="greenhouse" and route==StoryProgressionClass.CRISIS_ROUTE_FORCE_TRAVEL:
+		_start_habitat_crisis_departure_event()
+		return true
+	return false
+
+func _start_habitat_crisis_departure_event()->void:
+	if current_mode!="greenhouse" or not habitat_crisis_pending or habitat_crisis_started:return
+	_start_scripted_dialog("habitat_crisis_departure",[
+		{"speaker":"panda","text":Localizer.text(language_code,"habitat_crisis_departure_panda")}
+	],false)
+
+func _transition_to_habitat_crisis()->void:
+	if scene_transition_fade==null or scene_transition_fade.visible or not habitat_crisis_pending or habitat_crisis_started:return
+	scene_transition_fade.visible=true;scene_transition_fade.color.a=0.0;scene_transition_fade.move_to_front()
+	var fade_out:=create_tween();fade_out.tween_property(scene_transition_fade,"color:a",1.0,.42).set_trans(Tween.TRANS_SINE)
+	await fade_out.finished
+	current_mode="habitat";habitat_visit_id+=1;_apply_mode();_build_habitat_items(true)
+	var fade_in:=create_tween();fade_in.tween_property(scene_transition_fade,"color:a",0.0,.62).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	await fade_in.finished
+	scene_transition_fade.visible=false
+	_start_habitat_crisis_event()
 
 func _start_post_jurejure_encounter_home_event()->void:
 	if current_mode!="greenhouse" or not bool(story_progression_state.get("post_encounter_greenhouse_pending",false)):return
@@ -4636,7 +4681,7 @@ func _on_restoration_return_decided(accepted:bool)->void:
 		_update_play_ui();call_deferred("_poll_greenhouse_play_completion")
 		return
 	_save();_update_play_ui()
-	call_deferred("_transition_to_restoration_habitat","return",stage)
+	call_deferred("_poll_greenhouse_play_completion");call_deferred("_try_start_pending_story_event")
 
 func _on_restoration_slides_finished()->void:
 	if scene_transition_fade:
@@ -5175,7 +5220,8 @@ func _add_restoration_recovery_sprouts()->void:
 		sprite.pixel_size=.72/maxf(1.0,float(texture.get_width()));sprite.offset.y=-float(texture.get_height())*.18;sprite.position=_panorama_point_to_world(points[index],HABITAT_ITEM_RADIUS);sprite.scale=Vector3.ONE*(.58+.12*stage);habitat_items_root.add_child(sprite)
 
 func _should_show_jurejure_group()->bool:
-	return JureJureSystemClass.should_be_present(habitat_awakened,habitat_tutorial_returned_to_greenhouse,StoryProgressionClass.exploitation_is_started(story_progression_state),jurejure_waiting_for_seed_pod_reward)
+	var restoration:=_restoration_state()
+	return JureJureSystemClass.should_be_present(habitat_awakened,habitat_tutorial_returned_to_greenhouse,StoryProgressionClass.exploitation_is_started(story_progression_state),jurejure_waiting_for_seed_pod_reward,HabitatRestorationClass.is_started(restoration),HabitatRestorationClass.is_complete(restoration))
 
 func _add_jurejure_habitat_group()->void:
 	if jurejure_habitat_visit_point.x<0.0:
@@ -5762,9 +5808,20 @@ func _on_jurejure_group_pressed()->void:
 	if not jurejure_intro_complete:_start_jurejure_first_encounter()
 	else:
 		if habitat_crisis_started:
-			_start_scripted_dialog("jurejure_crisis_unavailable",[
-				{"speaker":"mouse","text":Localizer.text(language_code,"habitat_crisis_no_battle")}
-			],false)
+			var restoration:=_restoration_state()
+			match HabitatRestorationClass.jurejure_interaction_phase(restoration):
+				HabitatRestorationClass.JUREJURE_PHASE_POST_ENDING:
+					var pattern:=JureJureSystemClass.choose_post_ending_dialog(HabitatRestorationClass.last_post_ending_dialog_index(restoration),rng)
+					HabitatRestorationClass.set_last_post_ending_dialog_index(restoration,int(pattern.get("index",-1)));story_progression_state["restoration"]=restoration;_save()
+					_start_scripted_dialog("jurejure_post_ending",_localized_jurejure_pattern_pages(pattern),false)
+				HabitatRestorationClass.JUREJURE_PHASE_RESTORATION:
+					_start_scripted_dialog("jurejure_restoration_hurry",[
+						{"speaker":"mouse","text":Localizer.text(language_code,"restoration_jurejure_hurry")}
+					],false)
+				_:
+					_start_scripted_dialog("jurejure_crisis_unavailable",[
+						{"speaker":"mouse","text":Localizer.text(language_code,"habitat_crisis_no_battle")}
+					],false)
 			return
 		_play_current_area_bgm(true)
 		_start_jurejure_challenge_event()
@@ -6351,7 +6408,7 @@ func _on_harvested(p)->void:
 	var old:=float(bests.get(p.data.species_id,0.0));var is_record:bool=not deferred_tovar and not story_old_seed and p.diameter_cm>old
 	var first_discovery:=not deferred_tovar and _species_get_count(str(p.data.species_id))<=0
 	var restoration_snapshot:Dictionary={}
-	if not deferred_tovar and pending_restoration_snapshot.is_empty() and (habitat_restoration_ui==null or not habitat_restoration_ui.is_modal_visible()) and HabitatRestorationClass.can_offer_return(_restoration_state(),float(p.diameter_cm)):
+	if not deferred_tovar and HabitatRestorationClass.can_offer_return(_restoration_state(),float(p.diameter_cm)):
 		restoration_snapshot={
 			"species_id":str(p.data.get("species_id","")),
 			"display_name":Localizer.species_name(language_code,p.data),
@@ -6380,8 +6437,10 @@ func _on_harvested(p)->void:
 	if active_seed_type!="old" and not terminal_first_tutorial_harvest:_show_harvest_result(p)
 	if is_record:_show_record(p)
 	if play_active and active_seed_type=="normal" and normal_play_tutorial_complete and not terminal_first_tutorial_harvest and not puku_buyback_tutorial_complete and not puku_buyback_tutorial_active:call_deferred("_start_puku_buyback_tutorial")
-	if not restoration_snapshot.is_empty() and habitat_restoration_ui:
-		pending_restoration_snapshot=restoration_snapshot;habitat_restoration_ui.set_language(language_code);habitat_restoration_ui.show_return_prompt(restoration_snapshot);_update_play_ui()
+	if not restoration_snapshot.is_empty():
+		var restoration:=_restoration_state();var return_stage:=HabitatRestorationClass.add_returned_plant(restoration,restoration_snapshot)
+		if return_stage>0:
+			story_progression_state["restoration"]=restoration;_save();_update_play_ui()
 	var tween:=create_tween().bind_node(p).set_parallel();tween.tween_property(p,"position:y",p.position.y+2.0,.42).set_trans(Tween.TRANS_BACK);tween.tween_property(p,"scale",p.scale*1.2,.22);tween.chain().tween_property(p,"scale",Vector3.ONE*0.01,.24)
 	_cleanup_later(p,.68)
 

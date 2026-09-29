@@ -132,20 +132,16 @@ func _test_restoration_and_101cm_presets() -> void:
 	assert(plant.state == "growing")
 	assert(not plant.jelly_checks_enabled)
 	plant.harvest()
-	assert(game.habitat_restoration_ui.prompt_layer.visible)
-	assert(HabitatRestorationClass.returned_count(restoration) == 4)
-	game.habitat_restoration_ui._decide(false)
-	assert(HabitatRestorationClass.returned_count(restoration) == 4)
-
-	game._spawn_story_dev_101_colorata()
-	plant = game.plants[0]
-	plant.harvest()
-	assert(game.habitat_restoration_ui.prompt_layer.visible)
-	game.habitat_restoration_ui._decide(true)
+	assert(not game.habitat_restoration_ui.prompt_layer.visible)
 	assert(HabitatRestorationClass.returned_count(restoration) == 5)
 	assert(str(HabitatRestorationClass.returned_plants(restoration)[4].get("species_id", "")) == "colorata")
 	assert(float(HabitatRestorationClass.returned_plants(restoration)[4].get("diameter_cm", 0.0)) >= 100.0)
 	assert(HabitatRestorationClass.pending_return_stage(restoration) == 5)
+	assert(game.current_mode == "greenhouse")
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert(game.result_overlay.visible)
+	game._close_result()
 	await get_tree().create_timer(1.2).timeout
 	assert(game.current_mode == "habitat")
 	assert(game.scripted_dialog_kind == "restoration_return_5")

@@ -321,22 +321,17 @@ func _test_three_act_sequence(game: Node) -> void:
 	assert(game._register_species_discovery(jurejure_ids[7], true))
 	assert(game._unique_jurejure_species_get_count() == 8)
 	assert(game.habitat_crisis_pending and not game.habitat_crisis_started)
+	assert(StoryProgressionClass.habitat_crisis_route(game.story_progression_state) == StoryProgressionClass.CRISIS_ROUTE_SAME_HABITAT)
 
-	# The crisis also waits for a later habitat visit and changes presentation
-	# only. It must not revive the retired rain bonus or mutate collection state.
+	# At the first safe boundary after the eighth habitat GET, rain starts in the
+	# same stay. It must not revive the retired rain bonus or mutate collection.
 	var settled_before: Dictionary = game.habitat_returned_species.duplicate(true)
 	var discovered_before: Dictionary = game.discovered.duplicate(true)
 	var get_counts_before: Dictionary = game.species_get_counts.duplicate(true)
 	var seeds_before: int = game.normal_seed_bags
 	game.habitat_crisis_started = false
 	game.finale_complete = false
-	game.habitat_crisis_eligible_visit_id = game.habitat_visit_id
 	game._try_start_pending_story_event()
-	assert(game.scripted_dialog_kind.is_empty())
-	game._toggle_mode()
-	game._toggle_mode()
-	await get_tree().process_frame
-	await get_tree().process_frame
 	assert(game.current_mode == "habitat" and game.jurejure_intro_camera_active)
 	game._update_habitat_view_follow(1.0)
 	await get_tree().process_frame
