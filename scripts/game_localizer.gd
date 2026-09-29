@@ -340,6 +340,8 @@ const TEXT := {
 		"initial_seed_stock_girl": "……あれ？ さやの中に種ができてる。",
 		"initial_seed_stock_armadillo": "12粒あるみたいだね。まずは育ててみよう。",
 		"initial_seed_stock_received": "たね（12粒）×1セット　GET！",
+		"initial_seed_stock_endless_girl": "原生地がくれた不思議なさやから種がどんどんでてくるよ！",
+		"initial_seed_stock_endless_armadillo": "すごい！さっそくまいてみようよ！",
 		"seed_pod_tutorial_girl": "さやが光ってる！",
 		"seed_pod_tutorial_armadillo": "育てると少しずつ光が溜まっていくみたいだね。",
 		"seed_pod_tutorial_panda": "見て！ 種がたくさん出てきたよ！",
@@ -380,6 +382,8 @@ const TEXT := {
 		,"series_seed_remaining": "シリーズ種\n残り %d粒"
 		,"play_old_seed": "古いたねをまく　1粒　残り%d袋"
 		,"play_normal_seed": "たねをまく　12粒　残り%dセット"
+		,"play_normal_seed_endless": "たねをまく"
+		,"normal_sets_endless": "通常のたね：∞"
 		,"normal_sets_held": "たね（12粒）×%dセット"
 		,"play_volume_seed": "ボリュームパックをまく　36粒　残り%d袋"
 		,"play_premium_seed": "プレミアムたねをまく　24粒　残り%d袋"
@@ -430,6 +434,7 @@ const TEXT := {
 		,"list_back": "一覧へ"
 		,"harvest_to_gauge": "+%scm\nぷくゲージへ"
 		,"record_update": "収穫記録更新！\nNEW RECORD\n%.1f cm"
+		,"endless_record_update": "最大サイズ更新！\n%.1f cm"
 		,"mystery_seed_get": "謎のたね GET!"
 		,"old_catalog_page_get": "新しいシリーズを図鑑に記録した！"
 		,"gacha_draw_count": "ガチャ %d回"
@@ -935,6 +940,8 @@ const TEXT := {
 		"initial_seed_stock_girl": "……あれ？ さやの なかに たねが できてる。",
 		"initial_seed_stock_armadillo": "12つぶ あるみたいだね。まずは そだててみよう。",
 		"initial_seed_stock_received": "たね（12つぶ）×1せっと　げっと！",
+		"initial_seed_stock_endless_girl": "げんせいちが くれた ふしぎな さやから たねが どんどん でてくるよ！",
+		"initial_seed_stock_endless_armadillo": "すごい！さっそく まいてみようよ！",
 		"seed_pod_tutorial_girl": "さやが ひかってる！",
 		"seed_pod_tutorial_armadillo": "そだてると すこしずつ ひかりが たまっていくみたいだね。",
 		"seed_pod_tutorial_panda": "みて！ たねが たくさん でてきたよ！",
@@ -975,6 +982,8 @@ const TEXT := {
 		,"series_seed_remaining": "しりーずの たね\nのこり %dつぶ"
 		,"play_old_seed": "ふるい たねを まく　1つぶ　のこり%dふくろ"
 		,"play_normal_seed": "たねを まく　12つぶ　のこり%dせっと"
+		,"play_normal_seed_endless": "たねを まく"
+		,"normal_sets_endless": "ふつうの たね：むげん"
 		,"normal_sets_held": "たね（12つぶ）×%dせっと"
 		,"play_volume_seed": "ぼりゅーむぱっくを まく　36つぶ　のこり%dふくろ"
 		,"play_premium_seed": "ぷれみあむたねを まく　24つぶ　のこり%dふくろ"
@@ -1025,6 +1034,7 @@ const TEXT := {
 		,"list_back": "いちらんへ"
 		,"harvest_to_gauge": "+%sせんち\nぷくげーじへ"
 		,"record_update": "しゅうかく きろくこうしん！\nさいこうきろく\n%.1f せんち"
+		,"endless_record_update": "さいだい さいず こうしん！\n%.1f せんち"
 		,"mystery_seed_get": "なぞの たねを みつけた！"
 		,"old_catalog_page_get": "あたらしい しりーずを ずかんに きろくした！"
 		,"gacha_draw_count": "がちゃ %dかい"
@@ -1530,6 +1540,8 @@ const TEXT := {
 		"initial_seed_stock_girl": "...Huh? There are seeds inside the pod.",
 		"initial_seed_stock_armadillo": "There seem to be 12. Let's try growing them first.",
 		"initial_seed_stock_received": "Seeds (12) × 1 set — GET!",
+		"initial_seed_stock_endless_girl": "Seeds keep coming out of the mysterious pod the habitat gave us!",
+		"initial_seed_stock_endless_armadillo": "Amazing! Let's plant some right away!",
 		"seed_pod_tutorial_girl": "The pod is glowing!",
 		"seed_pod_tutorial_armadillo": "Growing succulents seems to fill it with light little by little.",
 		"seed_pod_tutorial_panda": "Look! Lots of seeds came out!",
@@ -1570,6 +1582,8 @@ const TEXT := {
 		,"series_seed_remaining": "Series Seed\n%d seeds left"
 		,"play_old_seed": "Plant the old seed · 1 seed · %d bags"
 		,"play_normal_seed": "Plant seeds · 12 seeds · %d sets"
+		,"play_normal_seed_endless": "Plant seeds"
+		,"normal_sets_endless": "Normal seeds: unlimited"
 		,"normal_sets_held": "Seeds (12) × %d sets"
 		,"play_volume_seed": "Plant Volume Pack · 36 seeds · %d bags"
 		,"play_premium_seed": "Plant Premium Seeds · 24 seeds · %d bags"
@@ -1620,6 +1634,7 @@ const TEXT := {
 		,"list_back": "Back to list"
 		,"harvest_to_gauge": "+%s cm\nto Puku Gauge"
 		,"record_update": "NEW HARVEST RECORD\n%.1f cm"
+		,"endless_record_update": "NEW MAX SIZE!\n%.1f cm"
 		,"mystery_seed_get": "Mystery Seed GET!"
 		,"old_catalog_page_get": "A new series was recorded in the catalog!"
 		,"gacha_draw_count": "Gacha %d"

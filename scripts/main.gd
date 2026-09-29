@@ -1053,10 +1053,43 @@ func _save() -> void:
 	f.close()
 
 func _active_save_path()->String:
-	return endless_greenhouse.active_save_path(NORMAL_SAVE_PATH,ENDLESS_EXPERIMENT_SAVE_PATH)
+	return endless_greenhouse.active_save_path()
 
 func _is_endless_greenhouse_enabled()->bool:
 	return endless_greenhouse.enabled
+
+func _is_endless_normal_play()->bool:
+	return _is_endless_greenhouse_enabled() and play_active and active_seed_type=="normal"
+
+func _should_simulate_endless_greenhouse()->bool:
+	if not _is_endless_normal_play():return true
+	if current_mode!="greenhouse" or arrangement_scene_active or arrangement_transitioning:return false
+	if not species_get_queue.is_empty() or not scripted_dialog_kind.is_empty():return false
+	if scene_transition_fade and scene_transition_fade.visible:return false
+	if opening_overlay and opening_overlay.visible:return false
+	if opening_story_overlay and opening_story_overlay.visible:return false
+	if habitat_awakening_overlay and habitat_awakening_overlay.visible:return false
+	if seed_pod_story_overlay and seed_pod_story_overlay.visible:return false
+	if habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible:return false
+	if jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible:return false
+	if puku_puku_battle and puku_puku_battle.visible:return false
+	if tutorial_guide_overlay and tutorial_guide_overlay.visible:return false
+	if intro_overlay and intro_overlay.visible:return false
+	if settings_overlay and settings_overlay.visible:return false
+	if encyclopedia_overlay and encyclopedia_overlay.visible:return false
+	if shop_overlay and shop_overlay.visible:return false
+	if play_overlay and play_overlay.visible:return false
+	if result_overlay and result_overlay.visible:return false
+	if forest_gacha_ui and forest_gacha_ui.visible:return false
+	if secret_gacha_ui and secret_gacha_ui.visible:return false
+	if species_get_overlay and species_get_overlay.visible:return false
+	if catalog_preview_ui and catalog_preview_ui.is_overlay_open():return false
+	if habitat_plant_panel and habitat_plant_panel.visible:return false
+	if habitat_dev_panel and habitat_dev_panel.visible:return false
+	if story_dev_panel and story_dev_panel.visible:return false
+	if jelly_dev_overlay and jelly_dev_overlay.visible:return false
+	if habitat_restoration_ui and habitat_restoration_ui.is_modal_visible():return false
+	return true
 
 func _queue_stale_jellied_habitat_cleanup(source:Variant)->void:
 	if not source is Array:return
@@ -1713,7 +1746,7 @@ func _seed_shop_products()->Array:
 	return []
 
 func _open_arrangements()->void:
-	if not StoryProgressionClass.arrangement_is_unlocked(story_progression_state) or not _tutorial_fully_complete() or current_mode!="greenhouse" or play_active or catalog_preview_mode_active or arrangement_scene_active or arrangement_transitioning:return
+	if not StoryProgressionClass.arrangement_is_unlocked(story_progression_state) or not _tutorial_fully_complete() or current_mode!="greenhouse" or (play_active and not _is_endless_normal_play()) or catalog_preview_mode_active or arrangement_scene_active or arrangement_transitioning:return
 	play_modal_open=false;pointer_down=false;greenhouse_drag_accumulator=0.0;greenhouse_drag_started=false;_cancel_greenhouse_area_drag()
 	saved_greenhouse_pan_x=greenhouse_pan_x;greenhouse_pan_target_x=greenhouse_pan_x
 	_sync_arrangement_ui();arrangement_ui.set_world_backdrop_mode(true,_arrangement_pot_anchor_screen());arrangement_ui.visible=false
@@ -1934,6 +1967,7 @@ func _is_japan_region()->bool:
 	return locale=="ja" or locale.begins_with("ja_") or locale.ends_with("_jp")
 
 func _has_any_playable_seed_stock()->bool:
+	if _is_endless_greenhouse_enabled():return true
 	if normal_seed_bags>0:return true
 	if volume_seed_bags>0 and _volume_seed_unlocked():return true
 	if premium_seed_bags>0 and _premium_seed_unlocked():return true
@@ -2301,6 +2335,12 @@ func _start_initial_seed_stock_notice()->void:
 	if initial_seed_stock_notice_complete:
 		call_deferred("_show_tutorial_guide","play_open_normal")
 		return
+	if _is_endless_greenhouse_enabled():
+		_start_scripted_dialog("initial_seed_stock",[
+			{"speaker":"girl","text":Localizer.text(language_code,"initial_seed_stock_endless_girl")},
+			{"speaker":"armadillo","text":Localizer.text(language_code,"initial_seed_stock_endless_armadillo")}
+		],false)
+		return
 	_start_scripted_dialog("initial_seed_stock",[
 		{"speaker":"girl","text":Localizer.text(language_code,"initial_seed_stock_girl")},
 		{"speaker":"armadillo","text":Localizer.text(language_code,"initial_seed_stock_armadillo")},
@@ -2488,7 +2528,8 @@ func _start_puku_gauge_intro_dialog()->void:
 
 func _claim_first_habitat_gift_once()->void:
 	if first_habitat_gift_claimed:return
-	first_habitat_gift_claimed=true;normal_seed_bags+=1
+	first_habitat_gift_claimed=true
+	if not _is_endless_greenhouse_enabled():normal_seed_bags+=1
 	_save();_update_currency_ui();_update_play_ui();audio_manager.play_se("daily",.62)
 
 func _start_puku_gauge_intro_after_greenhouse_frame()->void:
@@ -2646,6 +2687,7 @@ func _hide_first_play_tutorial_overlay()->void:
 
 func _start_puku_buyback_tutorial()->void:
 	if puku_buyback_tutorial_complete or puku_buyback_tutorial_active or puku_gauge_area==null:return
+	if not species_get_queue.is_empty() or species_get_overlay and species_get_overlay.visible:return
 	puku_buyback_tutorial_active=true;puku_buyback_tutorial_index=0
 	_show_puku_buyback_tutorial_page()
 
@@ -3254,6 +3296,8 @@ func _on_species_get_overlay_closed(context:String)->void:
 		var route_id:=context.trim_prefix("habitat_route:")
 		if not route_id.is_empty():call_deferred("_start_mystery_route_dialog",route_id)
 	if not species_get_queue.is_empty():call_deferred("_show_next_species_get")
+	elif _is_endless_normal_play() and first_play_has_harvested and not puku_buyback_tutorial_complete:
+		followup_started=true;call_deferred("_start_puku_buyback_tutorial")
 	elif not followup_started:call_deferred("_try_start_pending_story_event")
 
 func _open_secret_gacha()->void:
@@ -3418,10 +3462,12 @@ func _start_greenhouse_play(seed_type:String)->void:
 		if not _mystery_seed_pack_unlocked() or mystery_seed_bags<1:return
 		mystery_seed_bags-=1;current_target_count=MYSTERY_GERMINATION_COUNT
 	else:
-		if normal_seed_bags<1:return
-		normal_seed_bags-=1;current_target_count=NORMAL_GERMINATION_COUNT
+		if normal_seed_bags<1 and not _is_endless_greenhouse_enabled():return
+		if not _is_endless_greenhouse_enabled():normal_seed_bags-=1
+		current_target_count=NORMAL_GERMINATION_COUNT
 	if seed_type=="old" and total_play_count==0:_ensure_first_tutorial_species()
-	active_seed_type=seed_type;old_seed_reaction_stage=0;old_seed_harvest_guide_active=false;tutorial_harvest_plant=null;play_time_remaining=0.0;play_active=true;play_modal_open=false;play_harvest_cm_total=0.0;play_puku_earned_total=0;play_harvest_count=0;play_max_size=0.0;play_previous_global_best=_global_best_size();play_updated_global_best=false;play_share_record.clear();play_notable_species.clear();play_hidden_species_unlocked="";result_new_species_queue.clear();result_deferred_species_queue.clear();opening_species.clear();play_seeds_remaining=current_target_count;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=1 if seed_type.begins_with("series:") else (OLD_SEED_GERMINATION_COUNT if seed_type=="old" else mini(current_target_count,rng.randi_range(PLAY_INITIAL_MIN_PLANTS,PLAY_INITIAL_MAX_PLANTS)));greenhouse_finish_attempt_count=0;greenhouse_finish_completed_count=0;greenhouse_finish_last_block_reason="";greenhouse_finish_last_snapshot.clear();_clear_greenhouse_plants()
+	active_seed_type=seed_type;old_seed_reaction_stage=0;old_seed_harvest_guide_active=false;tutorial_harvest_plant=null;play_time_remaining=0.0;play_active=true;play_modal_open=false;play_harvest_cm_total=0.0;play_puku_earned_total=0;play_harvest_count=0;play_max_size=0.0;play_previous_global_best=_global_best_size();play_updated_global_best=false;play_share_record.clear();play_notable_species.clear();play_hidden_species_unlocked="";result_new_species_queue.clear();result_deferred_species_queue.clear();opening_species.clear();play_seeds_remaining=0 if seed_type=="normal" and _is_endless_greenhouse_enabled() else current_target_count;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=1 if seed_type.begins_with("series:") else (OLD_SEED_GERMINATION_COUNT if seed_type=="old" else mini(current_target_count,rng.randi_range(PLAY_INITIAL_MIN_PLANTS,PLAY_INITIAL_MAX_PLANTS)));greenhouse_finish_attempt_count=0;greenhouse_finish_completed_count=0;greenhouse_finish_last_block_reason="";greenhouse_finish_last_snapshot.clear();_clear_greenhouse_plants()
+	if seed_type=="normal" and _is_endless_greenhouse_enabled():endless_greenhouse.begin_play()
 	if seed_type=="normal":_prepare_story_spawn_guarantee()
 	if result_overlay:result_overlay.visible=false
 	for i in range(play_concurrent_target):_spawn_greenhouse_seed()
@@ -3435,6 +3481,9 @@ func _ensure_first_tutorial_species()->String:
 	return first_tutorial_species_id
 
 func _finish_greenhouse_play()->void:
+	if _is_endless_normal_play():
+		greenhouse_finish_last_block_reason="endless_greenhouse"
+		return
 	greenhouse_finish_attempt_count+=1
 	greenhouse_finish_last_snapshot={"play_active":play_active,"plants_size":plants.size(),"play_seeds_remaining":play_seeds_remaining,"play_spawn_queue":play_spawn_queue,"play_seed_animations_pending":play_seed_animations_pending,"first_play_tutorial_active":first_play_tutorial_active,"first_play_tutorial_sequence_complete":first_play_tutorial_sequence_complete,"result_overlay_visible":result_overlay.visible if result_overlay else false}
 	greenhouse_finish_last_block_reason=_greenhouse_finish_block_reason()
@@ -3456,6 +3505,7 @@ func _finish_greenhouse_play()->void:
 	_clear_greenhouse_plants();_save();_update_play_ui();_show_play_result();audio_manager.play_se("result",.7)
 
 func _greenhouse_finish_block_reason()->String:
+	if _is_endless_normal_play():return "endless_greenhouse"
 	if habitat_restoration_ui and habitat_restoration_ui.is_modal_visible():return "habitat_restoration_event"
 	if first_seed_pod_reward_event_active:return "first_seed_pod_reward_event"
 	if puku_buyback_tutorial_active:return "puku_buyback_tutorial"
@@ -3469,6 +3519,7 @@ func _greenhouse_finish_block_reason()->String:
 
 func _poll_greenhouse_play_completion()->void:
 	if current_mode!="greenhouse" or not play_active or dev_jelly_test_active or catalog_preview_mode_active:return
+	if _is_endless_normal_play():return
 	greenhouse_finish_last_block_reason=_greenhouse_finish_block_reason()
 	if greenhouse_finish_last_block_reason.is_empty():_finish_greenhouse_play()
 
@@ -3542,14 +3593,14 @@ func _update_play_ui()->void:
 	if labels_layer:labels_layer.visible=not arrangement_hud_hidden and not battle_open
 	if best_panel:best_panel.visible=mystery_catalog_tutorial_complete and not _old_seed_story_active()
 	if puku_gauge_area:puku_gauge_area.visible=mystery_items_acquired
-	if seed_pod_gauge_area:seed_pod_gauge_area.visible=mystery_items_acquired
+	if seed_pod_gauge_area:seed_pod_gauge_area.visible=mystery_items_acquired and not _is_endless_greenhouse_enabled()
 	play_overlay.visible=current_mode=="greenhouse" and not play_active and play_modal_open
 	play_open_button.visible=current_mode=="greenhouse" and intro_story_complete and not play_active and not play_modal_open and not arrangement_navigation_suspended and (not result_overlay or not result_overlay.visible) and (not shop_overlay or not shop_overlay.visible) and (not encyclopedia_overlay or not encyclopedia_overlay.visible) and (not settings_overlay or not settings_overlay.visible) and (not arrangement_ui or not arrangement_ui.visible)
-	seed_bag_panel.visible=current_mode=="greenhouse" and play_active and active_seed_type!="old"
+	seed_bag_panel.visible=current_mode=="greenhouse" and play_active and active_seed_type!="old" and not _is_endless_normal_play()
 	play_timer_label.visible=seed_bag_panel.visible
 	for control in external_navigation_controls:control.visible=not play_active and not arrangement_navigation_suspended
 	for control in encyclopedia_navigation_controls:control.visible=not play_active and not arrangement_navigation_suspended and mystery_items_acquired and encyclopedia_unlocked
-	if mode_button:mode_button.visible=not play_active and not arrangement_navigation_suspended and habitat_unlocked
+	if mode_button:mode_button.visible=(not play_active or _is_endless_normal_play()) and not arrangement_navigation_suspended and habitat_unlocked
 	if habitat_dev_open_button:habitat_dev_open_button.visible=current_mode=="habitat" and not play_active and not arrangement_navigation_suspended
 	if shop_button:shop_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete()
 	if forest_gacha_button:forest_gacha_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete() and forest_gacha_unlocked and forest_gacha_intro_seen
@@ -3566,13 +3617,14 @@ func _update_play_ui()->void:
 	play_timer_label.text=Localizer.text(language_code,"series_seed_remaining" if active_seed_type.begins_with("series:") else "seed_remaining",[play_seeds_remaining]) if play_timer_label.visible else ""
 	var held:Array[String]=[]
 	if old_seed_bags>0:held.append(Localizer.text(language_code,"bags_held",[Localizer.text(language_code,"old_seed_name"),old_seed_bags]))
-	if normal_seed_bags>0:held.append(Localizer.text(language_code,"normal_sets_held",[normal_seed_bags]))
+	if _is_endless_greenhouse_enabled():held.append(Localizer.text(language_code,"normal_sets_endless"))
+	elif normal_seed_bags>0:held.append(Localizer.text(language_code,"normal_sets_held",[normal_seed_bags]))
 	if volume_seed_bags>0 and _volume_seed_unlocked():held.append(Localizer.text(language_code,"bags_held",[Localizer.seed_name(language_code,"volume","ボリューム"),volume_seed_bags]))
 	if premium_seed_bags>0 and _premium_seed_unlocked():held.append(Localizer.text(language_code,"bags_held",[Localizer.seed_name(language_code,"premium","プレミアムたね"),premium_seed_bags]))
 	if mystery_seed_bags>0 and _mystery_seed_pack_unlocked():held.append(Localizer.text(language_code,"bags_held",[Localizer.seed_name(language_code,"mystery","謎種"),mystery_seed_bags]))
 	play_bag_summary.text="　".join(held)
 	old_seed_play_button.visible=old_seed_bags>0;old_seed_play_button.text=Localizer.text(language_code,"play_old_seed",[old_seed_bags])
-	normal_play_button.visible=normal_seed_bags>0;normal_play_button.text=Localizer.text(language_code,"play_normal_seed",[normal_seed_bags]);normal_play_button.disabled=normal_seed_bags<1
+	normal_play_button.visible=_is_endless_greenhouse_enabled() or normal_seed_bags>0;normal_play_button.text=Localizer.text(language_code,"play_normal_seed_endless") if _is_endless_greenhouse_enabled() else Localizer.text(language_code,"play_normal_seed",[normal_seed_bags]);normal_play_button.disabled=not _is_endless_greenhouse_enabled() and normal_seed_bags<1
 	volume_play_button.visible=volume_seed_bags>0 and _volume_seed_unlocked();volume_play_button.text=Localizer.text(language_code,"play_volume_seed",[volume_seed_bags]);volume_play_button.disabled=not _volume_seed_unlocked() or volume_seed_bags<1
 	premium_play_button.visible=premium_seed_bags>0 and _premium_seed_unlocked();premium_play_button.text=Localizer.text(language_code,"play_premium_seed",[premium_seed_bags]);premium_play_button.disabled=not _premium_seed_unlocked() or premium_seed_bags<1
 	mystery_play_button.visible=mystery_seed_bags>0 and _mystery_seed_pack_unlocked();mystery_play_button.text=Localizer.text(language_code,"play_mystery_seed",[mystery_seed_bags]);mystery_play_button.disabled=not _mystery_seed_pack_unlocked() or mystery_seed_bags<1
@@ -3778,6 +3830,7 @@ func _mystery_seed_pack_unlocked()->bool:
 	return mystery_seed_pack_unlocked
 
 func add_seed_pod_gauge_cm(amount_cm:float,save_immediately:=true,show_effect:=true)->int:
+	if _is_endless_greenhouse_enabled():return 0
 	if amount_cm<=0.0 or not mystery_items_acquired:return 0
 	var accumulated:=puku_gauge_cm+amount_cm
 	if first_play_tutorial_active and not seed_pod_first_reward_seen:
@@ -3960,6 +4013,7 @@ func _play_seed_pod_reward(bag_count:int)->void:
 	puku_gain_tween=create_tween().bind_node(puku_gain_label);puku_gain_tween.tween_property(puku_gain_label,"scale",Vector2.ONE,.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT);puku_gain_tween.tween_interval(.7);puku_gain_tween.tween_property(puku_gain_label,"modulate:a",0.0,.25);puku_gain_tween.tween_callback(func():puku_gain_label.visible=false;puku_gain_label.modulate=Color.WHITE)
 
 func _queue_first_seed_pod_max_event()->bool:
+	if _is_endless_greenhouse_enabled():return false
 	if not first_play_tutorial_active or seed_pod_first_reward_seen or first_seed_pod_reward_event_active:return false
 	first_seed_pod_reward_event_active=true
 	call_deferred("_start_first_seed_pod_max_event")
@@ -4506,7 +4560,8 @@ func _update_main_story_progress(schedule_completion:=true)->void:
 	if schedule_completion:call_deferred("_try_start_pending_story_event")
 
 func _try_start_pending_story_event()->void:
-	if not scripted_dialog_kind.is_empty() or play_active or jurejure_intro_camera_active or opening_story_overlay and opening_story_overlay.visible or seed_pod_story_overlay and seed_pod_story_overlay.visible or jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible or jurejure_first_encounter_active:return
+	if play_active and not _is_endless_normal_play():return
+	if not scripted_dialog_kind.is_empty() or jurejure_intro_camera_active or opening_story_overlay and opening_story_overlay.visible or seed_pod_story_overlay and seed_pod_story_overlay.visible or jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible or jurejure_first_encounter_active:return
 	if intro_overlay and intro_overlay.visible:return
 	if habitat_awakening_overlay and habitat_awakening_overlay.visible:return
 	if habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible:return
@@ -4539,7 +4594,9 @@ func _try_start_pending_story_event()->void:
 	elif bool(_restoration_state().get("join_habitat_pending",false)):
 		call_deferred("_transition_to_restoration_habitat","join",0)
 	elif HabitatRestorationClass.pending_return_stage(_restoration_state())>0:
-		call_deferred("_transition_to_restoration_habitat","return",HabitatRestorationClass.pending_return_stage(_restoration_state()))
+		var pending_return_stage:=HabitatRestorationClass.pending_return_stage(_restoration_state())
+		if not _is_endless_normal_play():call_deferred("_transition_to_restoration_habitat","return",pending_return_stage)
+		elif current_mode=="habitat":call_deferred("_start_restoration_return_event",pending_return_stage)
 	elif _resume_restoration_ending():
 		pass
 	elif current_mode=="greenhouse" and queued_story_event==StoryProgressionClass.EVENT_ARRANGEMENT_INTRO:
@@ -5524,8 +5581,11 @@ func spawn_plant(force_golden := false,spawn_position:Variant=null) -> void:
 	if audio_manager:audio_manager.play_se("sprout",.28)
 
 func _spawn_greenhouse_seed()->void:
-	if not play_active or play_seeds_remaining<=0:return
-	var spawn_position:=_find_spawn_position();pending_seed_positions.append(spawn_position);play_seeds_remaining-=1;play_seed_animations_pending+=1;_update_play_ui();_animate_and_spawn_greenhouse_seed(spawn_position)
+	var endless_normal:=_is_endless_normal_play()
+	if not play_active or (not endless_normal and play_seeds_remaining<=0):return
+	var spawn_position:=_find_spawn_position();pending_seed_positions.append(spawn_position)
+	if not endless_normal:play_seeds_remaining-=1
+	play_seed_animations_pending+=1;_update_play_ui();_animate_and_spawn_greenhouse_seed(spawn_position)
 
 func _animate_and_spawn_greenhouse_seed(spawn_position:Vector3)->void:
 	var seed:=UISymbolIcon.new();seed.symbol="seed";seed.icon_color=Color("#6b3f20");seed.size=Vector2(22,22);seed.mouse_filter=Control.MOUSE_FILTER_IGNORE
@@ -5534,18 +5594,41 @@ func _animate_and_spawn_greenhouse_seed(spawn_position:Vector3)->void:
 	var tween:=create_tween();tween.tween_property(seed,"position",midpoint,.14).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT);tween.tween_property(seed,"position",destination,.13).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	await tween.finished
 	if is_instance_valid(seed):seed.queue_free()
+	while _is_endless_normal_play() and not _should_simulate_endless_greenhouse():
+		await get_tree().process_frame
 	pending_seed_positions.erase(spawn_position)
 	play_seed_animations_pending=maxi(0,play_seed_animations_pending-1)
-	if play_active:spawn_plant(false,spawn_position)
-	if play_active and play_seeds_remaining==0 and play_spawn_queue==0 and play_seed_animations_pending==0 and plants.is_empty():call_deferred("_finish_greenhouse_play")
+	if play_active:
+		spawn_plant(false,spawn_position)
+		_register_endless_greenhouse_spawn()
+	if play_active and not _is_endless_normal_play() and play_seeds_remaining==0 and play_spawn_queue==0 and play_seed_animations_pending==0 and plants.is_empty():call_deferred("_finish_greenhouse_play")
 
 func _queue_greenhouse_replacements()->void:
-	if not play_active or active_seed_type=="old" or play_seeds_remaining<=play_spawn_queue:return
+	if not play_active or active_seed_type=="old":return
 	var open_slots:=maxi(0,play_concurrent_target-(plants.size()+play_spawn_queue+play_seed_animations_pending))
-	var add_count:=mini(open_slots,play_seeds_remaining-play_spawn_queue)
+	var add_count:=open_slots if _is_endless_normal_play() else mini(open_slots,play_seeds_remaining-play_spawn_queue)
 	if add_count<=0:return
 	var was_empty:=play_spawn_queue==0;play_spawn_queue+=add_count
 	if was_empty:play_spawn_timer=_next_greenhouse_spawn_interval()
+
+func _register_endless_greenhouse_spawn()->void:
+	if not _is_endless_normal_play() or not endless_greenhouse.register_spawn():return
+	_complete_endless_virtual_batch()
+
+func _complete_endless_virtual_batch()->void:
+	# One invisible batch preserves the old 12-seed progression hooks without
+	# clearing plants, opening results, or interrupting the greenhouse.
+	total_play_count+=1
+	var formal_play:=_tutorial_fully_complete()
+	if formal_play:
+		formal_play_count+=1
+		habitat_mystery_seeds_pending+=rng.randi_range(0,3)
+		_refresh_seed_pack_unlocks()
+	_resolve_tovar_event_after_play()
+	_evaluate_unlock_rules("play_count",float(total_play_count))
+	if formal_play:_maybe_activate_secret_gacha()
+	_prepare_story_spawn_guarantee()
+	_save();_update_play_ui()
 
 func _next_greenhouse_spawn_interval()->float:
 	if plants.size()<=3:return rng.randf_range(.04,.18)
@@ -5773,7 +5856,7 @@ func _process(delta:float)->void:
 	if puku_buyback_tutorial_active or first_seed_pod_reward_event_active:
 		_update_labels()
 		return
-	if current_mode=="greenhouse" and (play_active or dev_jelly_test_active or catalog_preview_mode_active):
+	if current_mode=="greenhouse" and (play_active or dev_jelly_test_active or catalog_preview_mode_active) and (not _is_endless_normal_play() or _should_simulate_endless_greenhouse()):
 		var old_seed_max_diameter:=0.0
 		for p in plants:
 			if is_instance_valid(p):
@@ -6201,7 +6284,7 @@ func _update_labels()->void:
 		p.label.position=r.position;p.label.size=label_size+Vector2(0,26 if not new_prefix.is_empty() else 0);p.label.add_theme_font_size_override("font_size",12 if show_traits else 17);p.label.text=new_prefix+(("%.1f cm\n%s"%[p.diameter_cm,p.development_trait_text()]) if show_traits else "%.1f cm"%p.diameter_cm);p.label.add_theme_color_override("font_color",Color("#ffe56f") if not new_prefix.is_empty() else Color.WHITE);p.label.visible=p.state=="growing" and Rect2(Vector2.ZERO,get_viewport().get_visible_rect().size).grow(80).has_point(screen)
 
 func _greenhouse_area_navigation_available()->bool:
-	if not StoryProgressionClass.arrangement_is_unlocked(story_progression_state) or not _tutorial_fully_complete() or current_mode!="greenhouse" or play_active or catalog_preview_mode_active or arrangement_transitioning:return false
+	if not StoryProgressionClass.arrangement_is_unlocked(story_progression_state) or not _tutorial_fully_complete() or current_mode!="greenhouse" or (play_active and not _is_endless_normal_play()) or catalog_preview_mode_active or arrangement_transitioning:return false
 	if arrangement_scene_active and arrangement_ui and arrangement_ui.is_editor_active():return false
 	return not ((opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible) or jurejure_first_encounter_active or (puku_puku_battle and puku_puku_battle.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (story_dev_panel and story_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible))
 
@@ -6418,6 +6501,7 @@ func _on_harvested(p)->void:
 		first_play_harvest_guide_active=false;tutorial_steps["first_harvest_guide"]=true;normal_play_tutorial_complete=true;tutorial_harvest_plant=null;_hide_first_play_tutorial_overlay()
 		for remaining_plant in plants:
 			if is_instance_valid(remaining_plant) and remaining_plant!=p and remaining_plant.state=="growing":remaining_plant.jelly_checks_enabled=true
+		if _is_endless_normal_play():_end_first_play_tutorial_context()
 		_save()
 	else:_maybe_activate_first_play_harvest_guide()
 	var story_old_seed:=_old_seed_story_active()
@@ -6437,14 +6521,16 @@ func _on_harvested(p)->void:
 		}
 	if not deferred_tovar:
 		var harvested_species_id:=str(p.data.species_id);_register_species_discovery(harvested_species_id,true)
-		if first_discovery:result_new_species_queue.append(str(p.data.species_id))
+		if first_discovery:
+			if _is_endless_normal_play():_queue_species_get_by_id(harvested_species_id,true,"endless_greenhouse")
+			else:result_new_species_queue.append(harvested_species_id)
 	if is_record:
 		bests[p.data.species_id]=p.diameter_cm
 		if play_active and (play_share_record.is_empty() or p.diameter_cm>float(play_share_record.get("size",0.0))):play_share_record={"species_id":str(p.data.species_id),"size":p.diameter_cm}
 		_evaluate_best_spawn_unlocks()
 	var earned_puku:=0;var harvest_screen_position:=camera.unproject_position(p.global_position)
 	if play_active and active_seed_type!="old":
-		add_seed_pod_gauge_cm(p.diameter_cm,false,true)
+		if not _is_endless_greenhouse_enabled():add_seed_pod_gauge_cm(p.diameter_cm,false,true)
 		earned_puku=add_puku_coin_gauge_cm(p.diameter_cm,false,true,harvest_screen_position)
 	_evaluate_unlock_rules("harvest_size",p.diameter_cm);_update_main_story_progress(false);_save();_update_best_ui();_update_currency_ui();audio_manager.play_se("harvest",.55)
 	if play_active:
@@ -6463,6 +6549,7 @@ func _on_harvested(p)->void:
 	_cleanup_later(p,.68)
 
 func _is_terminal_first_tutorial_plant(plant)->bool:
+	if _is_endless_normal_play():return false
 	return first_play_tutorial_active and not seed_pod_first_reward_seen and play_active and active_seed_type=="normal" and play_seeds_remaining==0 and play_spawn_queue==0 and play_seed_animations_pending==0 and plants.size()==1 and plants[0]==plant
 
 func _on_jellied(p)->void:
@@ -6490,7 +6577,7 @@ func _cleanup_later(p,delay:float,track_vacated:=true)->void:
 	plants.erase(p)
 	if play_active and not dev_jelly_test_active:
 		_queue_greenhouse_replacements();_update_play_ui()
-		if play_seeds_remaining==0 and play_spawn_queue==0 and play_seed_animations_pending==0 and plants.is_empty():
+		if not _is_endless_normal_play() and play_seeds_remaining==0 and play_spawn_queue==0 and play_seed_animations_pending==0 and plants.is_empty():
 			if not _queue_first_seed_pod_max_event():call_deferred("_finish_greenhouse_play")
 	await get_tree().create_timer(delay).timeout
 	if is_instance_valid(p):p.label.queue_free();p.queue_free()
@@ -6508,7 +6595,7 @@ func _show_harvest_result(plant)->void:
 
 func _show_record(p)->void:
 	audio_manager.play_se("result_new_best",.5)
-	record_text.text=Localizer.text(language_code,"record_update",[p.diameter_cm]);record_card.visible=true;record_card.scale=Vector2(.72,.72);record_card.pivot_offset=record_card.size/2
+	record_text.text=Localizer.text(language_code,"endless_record_update" if _is_endless_normal_play() else "record_update",[p.diameter_cm]);record_card.visible=true;record_card.scale=Vector2(.72,.72);record_card.pivot_offset=record_card.size/2
 	var tw:=create_tween();tw.tween_property(record_card,"scale",Vector2.ONE,.24).set_trans(Tween.TRANS_BACK);tw.tween_interval(2.2);tw.tween_property(record_card,"modulate:a",0.0,.25);tw.tween_callback(func():record_card.visible=false;record_card.modulate.a=1.0)
 
 func _update_best_ui()->void:
