@@ -21,6 +21,8 @@ const HabitatWildSystemClass = preload("res://scripts/habitat_wild_system.gd")
 const HabitatNotificationServiceClass = preload("res://scripts/habitat_notification_service.gd")
 const HabitatPlantPanelClass = preload("res://scripts/habitat_plant_panel.gd")
 const HabitatDevPanelClass = preload("res://scripts/habitat_dev_panel.gd")
+const StoryDevPresetsClass = preload("res://scripts/story_dev_presets.gd")
+const StoryDevPanelClass = preload("res://scripts/story_dev_panel.gd")
 const OpeningStoryOverlayClass = preload("res://scripts/opening_story_overlay.gd")
 const HabitatAwakeningOverlayClass = preload("res://scripts/habitat_awakening_overlay.gd")
 const SeedPodStoryOverlayClass = preload("res://scripts/seed_pod_story_overlay.gd")
@@ -526,6 +528,7 @@ var habitat_notification_service
 var habitat_plant_panel
 var habitat_dev_panel
 var habitat_dev_open_button: Button
+var story_dev_panel
 var habitat_debug_enabled := false
 var habitat_time_multiplier := 1
 var habitat_simulation_unix := 0.0
@@ -1431,7 +1434,9 @@ func _build_ui() -> void:
 	_build_jurejure_first_encounter(hud)
 	_build_puku_puku_battle(hud)
 	_build_scene_transition_fade(hud)
-	if habitat_debug_enabled:_build_habitat_dev_panel(hud)
+	if habitat_debug_enabled:
+		_build_habitat_dev_panel(hud)
+		_build_story_dev_panel(hud)
 	_update_best_ui()
 	_update_puku_ui()
 	_apply_language_to_ui()
@@ -2742,6 +2747,7 @@ func _build_settings(hud:Control)->void:
 	if habitat_debug_enabled:
 		var habitat_test:=Button.new();habitat_test.name="HabitatDevOpen";habitat_test.text="開発用：通常原生地テスト";habitat_test.custom_minimum_size=Vector2(370,58);_skin_button(habitat_test,Color("#adcbb8"),16);habitat_test.pressed.connect(_open_habitat_dev);content.add_child(habitat_test)
 		var opening_story_replay:=Button.new();opening_story_replay.name="OpeningStoryReplay";opening_story_replay.text="開発用：オープニングストーリー再表示";opening_story_replay.custom_minimum_size=Vector2(370,58);_skin_button(opening_story_replay,Color("#d8c29e"),15);opening_story_replay.pressed.connect(_replay_opening_story_for_development);content.add_child(opening_story_replay)
+		var story_jump:=Button.new();story_jump.name="StoryDevOpen";story_jump.text="開発用：ストーリージャンプ";story_jump.custom_minimum_size=Vector2(370,58);_skin_button(story_jump,Color("#c7d6ad"),16);story_jump.pressed.connect(_open_story_dev);content.add_child(story_jump)
 	var reset:=Button.new();reset.text="開発用：進行を初期状態へ戻す";reset.custom_minimum_size=Vector2(370,58);_skin_button(reset,Color("#d9c49d"),16);reset.pressed.connect(_reset_progression_for_development.bind(reset));content.add_child(reset)
 	_add_progression_dev_counter(content,"old_page","古びた図鑑のページ")
 	_add_progression_dev_counter(content,"puku_coin","ぷくコイン")
@@ -2761,6 +2767,32 @@ func _build_habitat_dev_panel(hud:Control)->void:
 	habitat_dev_panel.multiplier_requested.connect(_debug_set_habitat_multiplier)
 	habitat_dev_panel.time_jump_requested.connect(_debug_jump_habitat_time)
 	habitat_dev_panel.close_requested.connect(_update_play_ui)
+
+func _build_story_dev_panel(hud:Control)->void:
+	story_dev_panel=StoryDevPanelClass.new();hud.add_child(story_dev_panel)
+	story_dev_panel.preset_requested.connect(_apply_story_dev_preset)
+	story_dev_panel.spawn_101_requested.connect(_spawn_story_dev_101_colorata)
+	story_dev_panel.close_requested.connect(_update_play_ui)
+
+func _open_story_dev()->void:
+	if not StoryDevPresetsClass.available(habitat_debug_enabled) or story_dev_panel==null:return
+	settings_overlay.visible=false;story_dev_panel.open();_update_play_ui()
+
+func _apply_story_dev_preset(preset_id:String)->Dictionary:
+	if not StoryDevPresetsClass.available(habitat_debug_enabled):return {"ok":false,"error":"development_only"}
+	var result:Dictionary=StoryDevPresetsClass.apply(self,preset_id)
+	if not bool(result.get("ok",false)):return result
+	if story_dev_panel and story_dev_panel.visible:story_dev_panel.close()
+	if settings_overlay:settings_overlay.visible=false
+	_apply_saved_unlocks();_sync_arrangement_ui();_update_main_story_progress(false);_apply_mode();_update_currency_ui();_update_best_ui();_save();_update_play_ui()
+	if bool(result.get("resume_story",true)):call_deferred("_try_start_pending_story_event")
+	return result
+
+func _spawn_story_dev_101_colorata()->void:
+	if not StoryDevPresetsClass.available(habitat_debug_enabled):return
+	if story_dev_panel and story_dev_panel.visible:story_dev_panel.close()
+	if settings_overlay:settings_overlay.visible=false
+	if StoryDevPresetsClass.spawn_101cm_colorata(self):_apply_mode();_update_play_ui()
 
 func _open_habitat_dev()->void:
 	if not habitat_debug_enabled or habitat_dev_panel==null:return
@@ -3471,7 +3503,7 @@ func _update_play_ui()->void:
 	var preview_overlay_open:bool=catalog_preview_ui!=null and catalog_preview_ui.is_overlay_open()
 	var gacha_open:bool=(forest_gacha_ui!=null and forest_gacha_ui.visible) or (secret_gacha_ui!=null and secret_gacha_ui.visible) or (species_get_overlay!=null and species_get_overlay.visible)
 	var battle_open:bool=puku_puku_battle!=null and puku_puku_battle.visible
-	var habitat_modal_open:bool=battle_open or (habitat_plant_panel!=null and habitat_plant_panel.visible) or (habitat_dev_panel!=null and habitat_dev_panel.visible) or (habitat_awakening_overlay!=null and habitat_awakening_overlay.visible) or (seed_pod_story_overlay!=null and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay!=null and habitat_second_awakening_overlay.visible)
+	var habitat_modal_open:bool=battle_open or (habitat_plant_panel!=null and habitat_plant_panel.visible) or (habitat_dev_panel!=null and habitat_dev_panel.visible) or (story_dev_panel!=null and story_dev_panel.visible) or (habitat_awakening_overlay!=null and habitat_awakening_overlay.visible) or (seed_pod_story_overlay!=null and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay!=null and habitat_second_awakening_overlay.visible)
 	var arrangement_navigation_suspended:bool=arrangement_scene_active or arrangement_transitioning or catalog_preview_mode_active or preview_overlay_open or gacha_open or habitat_modal_open
 	var arrangement_hud_hidden:bool=arrangement_scene_active or arrangement_transitioning
 	if main_status_hud:main_status_hud.visible=not arrangement_hud_hidden and not battle_open
@@ -4458,6 +4490,7 @@ func _try_start_pending_story_event()->void:
 	if catalog_preview_ui and catalog_preview_ui.is_overlay_open():return
 	if habitat_plant_panel and habitat_plant_panel.visible:return
 	if habitat_dev_panel and habitat_dev_panel.visible:return
+	if story_dev_panel and story_dev_panel.visible:return
 	if settings_overlay and settings_overlay.visible:return
 	if habitat_restoration_ui and habitat_restoration_ui.is_modal_visible():return
 	var queued_story_event:=StoryProgressionClass.peek_story_event(story_progression_state)
@@ -6095,7 +6128,7 @@ func _update_labels()->void:
 func _greenhouse_area_navigation_available()->bool:
 	if not StoryProgressionClass.arrangement_is_unlocked(story_progression_state) or not _tutorial_fully_complete() or current_mode!="greenhouse" or play_active or catalog_preview_mode_active or arrangement_transitioning:return false
 	if arrangement_scene_active and arrangement_ui and arrangement_ui.is_editor_active():return false
-	return not ((opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible) or jurejure_first_encounter_active or (puku_puku_battle and puku_puku_battle.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible))
+	return not ((opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible) or jurejure_first_encounter_active or (puku_puku_battle and puku_puku_battle.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (story_dev_panel and story_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible))
 
 func _arrangement_navigation_hint_safe()->bool:
 	# Navigation availability covers gameplay overlays. The opening screen is a
@@ -6181,7 +6214,7 @@ func _input(event:InputEvent)->void:
 	if habitat_lookaround_active or jurejure_intro_camera_active:return
 	if habitat_restoration_ui and habitat_restoration_ui.is_modal_visible():return
 	if arrangement_scene_active or arrangement_transitioning:return
-	if (opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible) or (puku_puku_battle and puku_puku_battle.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible and not first_play_harvest_guide_active and not old_seed_harvest_guide_active) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible):return
+	if (opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible) or (puku_puku_battle and puku_puku_battle.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible and not first_play_harvest_guide_active and not old_seed_harvest_guide_active) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (story_dev_panel and story_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible):return
 	if current_mode=="greenhouse" and not play_active and not catalog_preview_mode_active:return
 	if event is InputEventScreenTouch:
 		if event.pressed:
