@@ -34,11 +34,13 @@ const HabitatSecondAwakeningOverlayClass = preload("res://scripts/habitat_second
 const HabitatCrisisAtmosphereClass = preload("res://scripts/habitat_crisis_atmosphere.gd")
 const HabitatRestorationClass = preload("res://scripts/habitat_restoration.gd")
 const HabitatRestorationUIClass = preload("res://scripts/habitat_restoration_ui.gd")
+const EndlessGreenhouseExperimentClass = preload("res://scripts/endless_greenhouse_experiment.gd")
 const SlotMachineScene = preload("res://scenes/slot_machine.tscn")
 const DEVELOPMENT_CATALOG_PREVIEW_ENABLED := true
 const SECRET_GACHA_PREVIEW_UNLIMITED := true
 const PROGRESSION_VERSION := 28
-const SAVE_PATH := "user://records.json"
+const NORMAL_SAVE_PATH := EndlessGreenhouseExperimentClass.NORMAL_SAVE_PATH
+const ENDLESS_EXPERIMENT_SAVE_PATH := EndlessGreenhouseExperimentClass.EXPERIMENT_SAVE_PATH
 const LEGACY_HABITAT_REGENERATION_VERSION := 17
 const INITIAL_SERIES_ID := "base"
 const ORIGINAL_SERIES_ID := "base"
@@ -137,6 +139,7 @@ const SERIES_CAROUSEL_SWIPE_THRESHOLD := 78.0
 const SERIES_CAROUSEL_SLIDE_SECONDS := 0.28
 
 var rng := RandomNumberGenerator.new()
+var endless_greenhouse := EndlessGreenhouseExperimentClass.new()
 var catalog_preview_rng := RandomNumberGenerator.new()
 var forest_gacha_rng := RandomNumberGenerator.new()
 var secret_gacha_rng := RandomNumberGenerator.new()
@@ -649,6 +652,10 @@ func _ready() -> void:
 		set_process_unhandled_input(false)
 		add_child(SlotMachineScene.instantiate())
 		return
+	endless_greenhouse.configure(EndlessGreenhouseExperimentClass.requested_by_runtime())
+	var endless_save_setup:=endless_greenhouse.prepare_save_namespace()
+	if int(endless_save_setup.get("error",OK))!=OK:
+		push_error("ENDLESS save namespace setup failed: %s"%error_string(int(endless_save_setup.get("error",FAILED))))
 	habitat_debug_enabled=_habitat_debug_requested()
 	_configure_habitat_texture_ab()
 	_configure_habitat_background_ab()
@@ -840,8 +847,9 @@ func _load_save() -> void:
 	legacy_habitat_migration_dirty=false;legacy_habitat_notification_ids_to_cancel.clear();panda_beacon_unread_log.clear()
 	save_file_present_on_boot=false
 	language_selected=false
-	if FileAccess.file_exists(SAVE_PATH):
-		var value = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
+	var save_path:=_active_save_path()
+	if FileAccess.file_exists(save_path):
+		var value = JSON.parse_string(FileAccess.get_file_as_string(save_path))
 		if value is Dictionary:
 			save_file_present_on_boot=true
 			var saved_progression_version:=int(value.get("progression_version",0))
@@ -995,7 +1003,10 @@ func _load_save() -> void:
 			_migrate_mystery_route_progress()
 
 func _save() -> void:
-	var f := FileAccess.open(SAVE_PATH,FileAccess.WRITE)
+	var f := FileAccess.open(_active_save_path(),FileAccess.WRITE)
+	if f==null:
+		push_error("Unable to open active save path: %s"%_active_save_path())
+		return
 	if audio_manager:audio_settings=audio_manager.settings_dictionary()
 	var payload:={
 		"progression_version":PROGRESSION_VERSION,"bests":bests,"discovered":discovered,"species_get_counts":species_get_counts,
@@ -1039,6 +1050,13 @@ func _save() -> void:
 		"secret_gacha_active":secret_gacha_active,"secret_gacha_draws_remaining":secret_gacha_draws_remaining,"secret_gacha_last_roll_play_count":secret_gacha_last_roll_play_count
 	}
 	f.store_string(JSON.stringify(payload))
+	f.close()
+
+func _active_save_path()->String:
+	return endless_greenhouse.active_save_path(NORMAL_SAVE_PATH,ENDLESS_EXPERIMENT_SAVE_PATH)
+
+func _is_endless_greenhouse_enabled()->bool:
+	return endless_greenhouse.enabled
 
 func _queue_stale_jellied_habitat_cleanup(source:Variant)->void:
 	if not source is Array:return
