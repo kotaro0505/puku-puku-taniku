@@ -369,11 +369,14 @@ func _test_three_act_sequence(game: Node) -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	assert(game.current_mode == "greenhouse" and game.scripted_dialog_kind == "post_crisis_greenhouse")
-	assert(game.scripted_dialog_pages.size() == 4)
+	assert(game.scripted_dialog_pages.size() == 7)
 	assert(str(game.scripted_dialog_pages[0].get("text", "")) == "原生地は限界だったんだ…")
 	assert(str(game.scripted_dialog_pages[1].get("text", "")) == "これじゃあ歴史の繰り返しだ…")
-	assert(str(game.scripted_dialog_pages[2].get("text", "")) == "私たちにできる事は原生地からもらった種をとにかく蒔き続ける事…")
-	assert(str(game.scripted_dialog_pages[3].get("text", "")) == "うん、そうだね！とにかく蒔こう。多肉植物を絶やさないように！")
+	assert(str(game.scripted_dialog_pages[2].get("text", "")) == "私たちにできる事は、原生地からもらった種をとにかく蒔き続ける事…")
+	assert(str(game.scripted_dialog_pages[3].get("text", "")) == "育った多肉は、今までどおり原生地にぼくが持って行くよ。")
+	assert(str(game.scripted_dialog_pages[4].get("text", "")) == "ぼくも一緒に行くよ！")
+	assert(str(game.scripted_dialog_pages[5].get("text", "")) == "私はどんどん種を蒔くね！")
+	assert(str(game.scripted_dialog_pages[6].get("text", "")) == "うん！とにかくやってみよう！")
 	_finish_dialog(game)
 	assert(bool(game.story_progression_state.get("post_crisis_greenhouse_seen", false)))
 	assert(not bool(game.story_progression_state.get("post_crisis_greenhouse_pending", true)))

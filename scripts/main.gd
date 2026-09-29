@@ -30,6 +30,8 @@ const JureJureFirstEncounterOverlayClass = preload("res://scripts/jurejure_first
 const PukuPukuBattleClass = preload("res://scripts/puku_puku_battle.gd")
 const HabitatSecondAwakeningOverlayClass = preload("res://scripts/habitat_second_awakening_overlay.gd")
 const HabitatCrisisAtmosphereClass = preload("res://scripts/habitat_crisis_atmosphere.gd")
+const HabitatRestorationClass = preload("res://scripts/habitat_restoration.gd")
+const HabitatRestorationUIClass = preload("res://scripts/habitat_restoration_ui.gd")
 const SlotMachineScene = preload("res://scenes/slot_machine.tscn")
 const DEVELOPMENT_CATALOG_PREVIEW_ENABLED := true
 const SECRET_GACHA_PREVIEW_UNLIMITED := true
@@ -622,6 +624,8 @@ var habitat_awakening_overlay: Control
 var seed_pod_story_overlay: Control
 var habitat_second_awakening_overlay: Control
 var habitat_crisis_atmosphere: Control
+var habitat_restoration_ui: HabitatRestorationUI
+var pending_restoration_snapshot: Dictionary = {}
 var jurejure_first_encounter_overlay: Control
 var puku_puku_battle: Control
 var scene_transition_fade: ColorRect
@@ -1422,6 +1426,7 @@ func _build_ui() -> void:
 	_build_seed_pod_story(hud)
 	_build_habitat_second_awakening(hud)
 	_build_habitat_crisis_atmosphere(hud)
+	_build_habitat_restoration_ui(hud)
 	_build_habitat_plant_panel(hud)
 	_build_jurejure_first_encounter(hud)
 	_build_puku_puku_battle(hud)
@@ -1511,6 +1516,15 @@ func _build_habitat_crisis_atmosphere(hud:Control)->void:
 	habitat_crisis_atmosphere=HabitatCrisisAtmosphereClass.new()
 	hud.add_child(habitat_crisis_atmosphere)
 	if habitat_crisis_started:habitat_crisis_atmosphere.activate()
+	habitat_crisis_atmosphere.set_restoration_stage(_restoration_stage())
+
+func _build_habitat_restoration_ui(hud:Control)->void:
+	habitat_restoration_ui=HabitatRestorationUIClass.new()
+	hud.add_child(habitat_restoration_ui)
+	habitat_restoration_ui.set_language(language_code)
+	habitat_restoration_ui.return_decided.connect(_on_restoration_return_decided)
+	habitat_restoration_ui.slides_finished.connect(_on_restoration_slides_finished)
+	habitat_restoration_ui.thank_you_closed.connect(_on_restoration_thank_you_closed)
 
 func _build_jurejure_first_encounter(hud:Control)->void:
 	jurejure_first_encounter_overlay=JureJureFirstEncounterOverlayClass.new()
@@ -1526,7 +1540,7 @@ func _build_puku_puku_battle(hud:Control)->void:
 	puku_puku_battle.return_requested.connect(_on_puku_puku_battle_return_requested)
 
 func _build_scene_transition_fade(hud:Control)->void:
-	scene_transition_fade=ColorRect.new();scene_transition_fade.name="SceneTransitionFade";scene_transition_fade.color=Color.BLACK;scene_transition_fade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);scene_transition_fade.mouse_filter=Control.MOUSE_FILTER_STOP;scene_transition_fade.z_index=940;scene_transition_fade.visible=false;hud.add_child(scene_transition_fade)
+	scene_transition_fade=ColorRect.new();scene_transition_fade.name="SceneTransitionFade";scene_transition_fade.color=Color.BLACK;scene_transition_fade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);scene_transition_fade.mouse_filter=Control.MOUSE_FILTER_STOP;scene_transition_fade.z_index=980;scene_transition_fade.visible=false;hud.add_child(scene_transition_fade)
 
 func _start_opening_story(as_replay:=false,start_page:=0)->void:
 	if opening_story_overlay==null:return
@@ -2048,6 +2062,13 @@ func _finish_scripted_dialog()->void:
 	var finished_kind:=scripted_dialog_kind;var keep_shop:=scripted_dialog_shop_context
 	scripted_dialog_kind="";scripted_dialog_pages.clear();scripted_dialog_index=-1;scripted_dialog_shop_context=false;intro_overlay.visible=false
 	var acquired:Array[String]=[];var open_puku_intro:=false;var open_catalog:=false;var guide_habitat:=false;var guide_catalog:=false;var show_pinwheel_get:=false;var show_armadillo_gift:=false;var start_second_awakening:=false;var start_trio_event:=false;var start_jurejure_reveal:=false;var show_jurejure_choice:=false;var queue_jurejure_reward:=false;var focus_act3_exploitation:=false;var show_arrangement_swipe_intro:=false
+	var begin_restoration_join_habitat:=false;var restoration_return_stage:=0;var start_restoration_epilogue:=false;var show_restoration_thank_you:=false
+	if finished_kind.begins_with("restoration_return_"):
+		restoration_return_stage=int(finished_kind.trim_prefix("restoration_return_"))
+		var restoration:=_restoration_state()
+		if restoration_return_stage>=HabitatRestorationClass.REQUIRED_RETURNED_PLANTS:HabitatRestorationClass.begin_recovery_slides(restoration)
+		else:HabitatRestorationClass.complete_return_event(restoration,restoration_return_stage)
+		story_progression_state["restoration"]=restoration
 	match finished_kind:
 		"first_colorata_discovery":
 			first_colorata_confirmed=true;start_trio_event=true
@@ -2088,6 +2109,14 @@ func _finish_scripted_dialog()->void:
 			StoryProgressionClass.mark_habitat_crisis_dialog_complete(story_progression_state)
 		"post_crisis_greenhouse":
 			StoryProgressionClass.complete_post_crisis_greenhouse(story_progression_state)
+		"restoration_join_home":
+			StoryProgressionClass.complete_restoration_join_home(story_progression_state);begin_restoration_join_habitat=true
+		"restoration_join_habitat":
+			StoryProgressionClass.complete_restoration_join_habitat(story_progression_state)
+		"restoration_final":
+			var restoration:=_restoration_state();HabitatRestorationClass.mark_final_dialog_complete(restoration);story_progression_state["restoration"]=restoration;start_restoration_epilogue=true
+		"restoration_epilogue":
+			var restoration:=_restoration_state();HabitatRestorationClass.mark_epilogue_complete(restoration);story_progression_state["restoration"]=restoration;show_restoration_thank_you=true
 		"exploitation_midpoint":
 			StoryProgressionClass.complete_exploitation_midpoint(story_progression_state)
 		"secret_gacha_install":
@@ -2138,7 +2167,15 @@ func _finish_scripted_dialog()->void:
 		if finished_kind not in ["jurejure_intro","jurejure_challenge","jurejure_exploitation_challenge"]:
 			_play_current_area_bgm()
 	_update_play_ui()
-	if focus_act3_exploitation:call_deferred("_focus_jurejure_group","act3_exploitation_start")
+	if begin_restoration_join_habitat:call_deferred("_transition_to_restoration_habitat","join",0)
+	elif restoration_return_stage>0:
+		if restoration_return_stage>=HabitatRestorationClass.REQUIRED_RETURNED_PLANTS:
+			call_deferred("_begin_restoration_recovery_slides")
+		else:call_deferred("_transition_back_to_greenhouse_after_restoration")
+	elif start_restoration_epilogue:call_deferred("_start_restoration_epilogue_event")
+	elif show_restoration_thank_you:
+		call_deferred("_show_restoration_thank_you")
+	elif focus_act3_exploitation:call_deferred("_focus_jurejure_group","act3_exploitation_start")
 	elif start_trio_event:call_deferred("_start_trio_originals_event")
 	elif start_jurejure_reveal:call_deferred("_focus_jurejure_first_encounter")
 	elif guide_catalog:call_deferred("_show_tutorial_guide","encyclopedia")
@@ -2956,6 +2993,7 @@ func _apply_language_to_ui()->void:
 	if forest_gacha_ui:forest_gacha_ui.set_language(language_code)
 	if secret_gacha_ui:secret_gacha_ui.set_language(language_code)
 	if arrangement_ui and arrangement_ui.has_method("set_language"):arrangement_ui.set_language(language_code)
+	if habitat_restoration_ui:habitat_restoration_ui.set_language(language_code)
 	_set_named_localized_text("PlayChooseTitle","play_choose_seed")
 	_set_named_localized_text("PlayCloseButton","close")
 	_set_named_localized_text("ShopCloseButton","back")
@@ -3219,6 +3257,8 @@ func _change_audio_volume(value:float,is_bgm:bool)->void:
 
 func _reset_progression_state()->void:
 	_end_first_play_tutorial_context()
+	pending_restoration_snapshot.clear()
+	if habitat_restoration_ui:habitat_restoration_ui.reset_view()
 	old_seed_reaction_stage=0;old_seed_harvest_guide_active=false;habitat_lookaround_active=false;habitat_lookaround_elapsed=0.0;habitat_lookaround_context="";jurejure_first_encounter_active=false;jurejure_intro_camera_active=false;jurejure_intro_camera_elapsed=0.0;jurejure_camera_focus_context=""
 	_cancel_all_habitat_notifications()
 	old_catalog_pages=0;old_catalog_page_inventory.clear();old_catalog_intro_seen=false;old_catalog_intro_pending=false;habitat_old_catalog_page_pending=false;habitat_old_catalog_page_series_id="";old_catalog_page_roll_play_count=-1;research_catalog_reward_pending=false
@@ -3352,6 +3392,7 @@ func _finish_greenhouse_play()->void:
 	_clear_greenhouse_plants();_save();_update_play_ui();_show_play_result();audio_manager.play_se("result",.7)
 
 func _greenhouse_finish_block_reason()->String:
+	if not pending_restoration_snapshot.is_empty() or (habitat_restoration_ui and habitat_restoration_ui.is_modal_visible()):return "habitat_restoration_event"
 	if first_seed_pod_reward_event_active:return "first_seed_pod_reward_event"
 	if puku_buyback_tutorial_active:return "puku_buyback_tutorial"
 	if first_play_tutorial_active and not first_play_tutorial_sequence_complete:return "first_play_tutorial_sequence_incomplete"
@@ -3454,6 +3495,9 @@ func _update_play_ui()->void:
 		_update_secret_gacha_button_state()
 	if arrangement_navigation_hint:
 		arrangement_navigation_hint.update_hint(language_code,arrangement_scene_active,_arrangement_navigation_hint_safe())
+	if habitat_restoration_ui:
+		var restoration_hud_safe:=current_mode=="greenhouse" and not arrangement_navigation_suspended and not arrangement_scene_active and (not opening_overlay or not opening_overlay.visible) and (not opening_story_overlay or not opening_story_overlay.visible) and (not intro_overlay or not intro_overlay.visible) and (not result_overlay or not result_overlay.visible) and (not shop_overlay or not shop_overlay.visible) and (not encyclopedia_overlay or not encyclopedia_overlay.visible) and (not settings_overlay or not settings_overlay.visible) and (not play_overlay or not play_overlay.visible)
+		habitat_restoration_ui.update_lamps(HabitatRestorationClass.returned_count(_restoration_state()),StoryProgressionClass.restoration_is_started(story_progression_state) and restoration_hud_safe)
 	_update_habitat_button_glow()
 	play_timer_label.text=Localizer.text(language_code,"series_seed_remaining" if active_seed_type.begins_with("series:") else "seed_remaining",[play_seeds_remaining]) if play_timer_label.visible else ""
 	var held:Array[String]=[]
@@ -4342,6 +4386,7 @@ func _record_species_get(species_id:String,amount:int=1)->void:
 			"forest_gacha_unlocked":forest_gacha_unlocked,
 		})
 		if bool(transition.get("fantasy_unlocked_now",false)):_apply_saved_unlocks()
+		StoryProgressionClass.record_restoration_new_get(story_progression_state,species_id,habitat_crisis_started)
 		call_deferred("_try_start_pending_story_event")
 	_refresh_narrative_species_progress()
 
@@ -4414,6 +4459,7 @@ func _try_start_pending_story_event()->void:
 	if habitat_plant_panel and habitat_plant_panel.visible:return
 	if habitat_dev_panel and habitat_dev_panel.visible:return
 	if settings_overlay and settings_overlay.visible:return
+	if habitat_restoration_ui and habitat_restoration_ui.is_modal_visible():return
 	var queued_story_event:=StoryProgressionClass.peek_story_event(story_progression_state)
 	if current_mode=="habitat" and act3_intro_pending and not act3_intro_seen and habitat_visit_id>act3_intro_eligible_visit_id:
 		_start_act3_intro_event()
@@ -4421,6 +4467,14 @@ func _try_start_pending_story_event()->void:
 		_start_post_jurejure_encounter_home_event()
 	elif current_mode=="greenhouse" and queued_story_event==StoryProgressionClass.EVENT_POST_CRISIS_GREENHOUSE:
 		_start_post_crisis_greenhouse_event()
+	elif current_mode=="greenhouse" and queued_story_event==StoryProgressionClass.EVENT_RESTORATION_JOIN_HOME:
+		_start_restoration_join_home_event()
+	elif bool(_restoration_state().get("join_habitat_pending",false)):
+		call_deferred("_transition_to_restoration_habitat","join",0)
+	elif HabitatRestorationClass.pending_return_stage(_restoration_state())>0:
+		call_deferred("_transition_to_restoration_habitat","return",HabitatRestorationClass.pending_return_stage(_restoration_state()))
+	elif _resume_restoration_ending():
+		pass
 	elif current_mode=="greenhouse" and queued_story_event==StoryProgressionClass.EVENT_ARRANGEMENT_INTRO:
 		_start_arrangement_intro_event()
 	elif current_mode=="habitat" and queued_story_event==StoryProgressionClass.EVENT_ACT3_BATTLE_INTRO:
@@ -4451,12 +4505,122 @@ func _start_post_jurejure_encounter_home_event()->void:
 
 func _start_post_crisis_greenhouse_event()->void:
 	if current_mode!="greenhouse" or not bool(story_progression_state.get("post_crisis_greenhouse_pending",false)):return
-	_start_scripted_dialog("post_crisis_greenhouse",[
-		{"speaker":"panda","text":Localizer.text(language_code,"post_crisis_greenhouse_panda_1")},
-		{"speaker":"armadillo","text":Localizer.text(language_code,"post_crisis_greenhouse_armadillo")},
-		{"speaker":"girl","text":Localizer.text(language_code,"post_crisis_greenhouse_girl")},
-		{"speaker":"panda","text":Localizer.text(language_code,"post_crisis_greenhouse_panda_2")}
-	],false)
+	_start_scripted_dialog("post_crisis_greenhouse",HabitatRestorationClass.dialog_pages(language_code,"post_crisis_greenhouse"),false)
+
+func _restoration_state()->Dictionary:
+	return StoryProgressionClass.restoration_state(story_progression_state)
+
+func _restoration_stage()->int:
+	return HabitatRestorationClass.restoration_stage(_restoration_state())
+
+func _start_restoration_join_home_event()->void:
+	if current_mode!="greenhouse":return
+	_start_scripted_dialog("restoration_join_home",HabitatRestorationClass.dialog_pages(language_code,"join_home"),false)
+
+func _start_restoration_join_habitat_event()->void:
+	if current_mode!="habitat":return
+	_start_scripted_dialog("restoration_join_habitat",HabitatRestorationClass.dialog_pages(language_code,"join_habitat"),false)
+
+func _restoration_return_pages(stage:int)->Array[Dictionary]:
+	return HabitatRestorationClass.dialog_pages(language_code,"return",stage)
+
+func _start_restoration_return_event(stage:int)->void:
+	if current_mode!="habitat" or stage<1 or stage>5:return
+	_start_scripted_dialog("restoration_return_%d"%stage,_restoration_return_pages(stage),false)
+
+func _start_restoration_final_event()->void:
+	_start_scripted_dialog("restoration_final",HabitatRestorationClass.dialog_pages(language_code,"final"),false)
+
+func _start_restoration_epilogue_event()->void:
+	_start_scripted_dialog("restoration_epilogue",HabitatRestorationClass.dialog_pages(language_code,"epilogue"),false)
+
+func _transition_to_restoration_habitat(event_kind:String,stage:int=0)->void:
+	if scene_transition_fade==null or scene_transition_fade.visible:return
+	scene_transition_fade.visible=true;scene_transition_fade.color.a=0.0;scene_transition_fade.move_to_front()
+	var fade_out:=create_tween();fade_out.tween_property(scene_transition_fade,"color:a",1.0,.42).set_trans(Tween.TRANS_SINE)
+	await fade_out.finished
+	current_mode="habitat";habitat_visit_id+=1;_apply_mode();_build_habitat_items(true)
+	var fade_in:=create_tween();fade_in.tween_property(scene_transition_fade,"color:a",0.0,.62).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	await fade_in.finished
+	scene_transition_fade.visible=false
+	if event_kind=="join":_start_restoration_join_habitat_event()
+	elif event_kind=="return":_start_restoration_return_event(stage)
+	elif event_kind=="slides":_begin_restoration_recovery_slides()
+	elif event_kind=="final":_start_restoration_final_event()
+	elif event_kind=="epilogue":_start_restoration_epilogue_event()
+
+func _transition_back_to_greenhouse_after_restoration()->void:
+	if scene_transition_fade==null or scene_transition_fade.visible:return
+	scene_transition_fade.visible=true;scene_transition_fade.color.a=0.0;scene_transition_fade.move_to_front()
+	var fade_out:=create_tween();fade_out.tween_property(scene_transition_fade,"color:a",1.0,.38).set_trans(Tween.TRANS_SINE)
+	await fade_out.finished
+	current_mode="greenhouse";_apply_mode()
+	var fade_in:=create_tween();fade_in.tween_property(scene_transition_fade,"color:a",0.0,.58).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	await fade_in.finished
+	scene_transition_fade.visible=false
+	_update_play_ui();call_deferred("_poll_greenhouse_play_completion");call_deferred("_try_start_pending_story_event")
+
+func _begin_restoration_recovery_slides()->void:
+	if habitat_restoration_ui==null or habitat_restoration_ui.is_modal_visible():return
+	if scene_transition_fade:
+		scene_transition_fade.visible=true;scene_transition_fade.color.a=0.0;scene_transition_fade.move_to_front()
+		var fade_out:=create_tween();fade_out.tween_property(scene_transition_fade,"color:a",1.0,.42).set_trans(Tween.TRANS_SINE)
+		await fade_out.finished
+	habitat_restoration_ui.set_language(language_code);habitat_restoration_ui.start_recovery_slides()
+	if scene_transition_fade:
+		var fade_in:=create_tween();fade_in.tween_property(scene_transition_fade,"color:a",0.0,.58).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		await fade_in.finished
+		scene_transition_fade.visible=false
+
+func _show_restoration_thank_you()->void:
+	audio_manager.play_bgm("greenhouse");habitat_restoration_ui.set_language(language_code);habitat_restoration_ui.show_thank_you();_update_play_ui()
+
+func _resume_restoration_ending()->bool:
+	var phase:=HabitatRestorationClass.ending_phase(_restoration_state())
+	match phase:
+		"slides":
+			if current_mode=="habitat":call_deferred("_begin_restoration_recovery_slides")
+			else:call_deferred("_transition_to_restoration_habitat","slides",0)
+		"final":
+			if current_mode=="habitat":call_deferred("_start_restoration_final_event")
+			else:call_deferred("_transition_to_restoration_habitat","final",0)
+		"epilogue":
+			if current_mode=="habitat":call_deferred("_start_restoration_epilogue_event")
+			else:call_deferred("_transition_to_restoration_habitat","epilogue",0)
+		"thank_you":call_deferred("_show_restoration_thank_you")
+		_:return false
+	return true
+
+func _on_restoration_return_decided(accepted:bool)->void:
+	var snapshot:=pending_restoration_snapshot.duplicate(true);pending_restoration_snapshot.clear()
+	if not accepted:
+		_update_play_ui();call_deferred("_poll_greenhouse_play_completion")
+		return
+	var restoration:=_restoration_state()
+	var stage:=HabitatRestorationClass.add_returned_plant(restoration,snapshot)
+	story_progression_state["restoration"]=restoration
+	if stage<=0:
+		_update_play_ui();call_deferred("_poll_greenhouse_play_completion")
+		return
+	_save();_update_play_ui()
+	call_deferred("_transition_to_restoration_habitat","return",stage)
+
+func _on_restoration_slides_finished()->void:
+	if scene_transition_fade:
+		scene_transition_fade.visible=true;scene_transition_fade.color.a=1.0;scene_transition_fade.move_to_front()
+	var restoration:=_restoration_state();HabitatRestorationClass.reveal_full_recovery(restoration);story_progression_state["restoration"]=restoration
+	if habitat_crisis_atmosphere:habitat_crisis_atmosphere.set_restoration_stage(5)
+	_build_habitat_items(true);_play_current_area_bgm();_save();_update_play_ui()
+	if scene_transition_fade:
+		var fade_in:=create_tween();fade_in.tween_property(scene_transition_fade,"color:a",0.0,.78).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		await fade_in.finished
+		scene_transition_fade.visible=false
+	call_deferred("_start_restoration_final_event")
+
+func _on_restoration_thank_you_closed()->void:
+	var restoration:=_restoration_state();HabitatRestorationClass.complete_ending(restoration);story_progression_state["restoration"]=restoration
+	finale_complete=true;current_mode="greenhouse";_apply_mode();_update_main_story_progress(false);_save();_update_play_ui()
+	call_deferred("_poll_greenhouse_play_completion")
 
 func _start_forest_gacha_intro_event()->void:
 	if not forest_gacha_unlocked or forest_gacha_intro_seen or current_mode!="greenhouse":return
@@ -4540,7 +4704,7 @@ func _start_jurejure_species_first_event()->void:
 
 func _start_habitat_crisis_event()->void:
 	if not habitat_crisis_pending or habitat_crisis_started or current_mode!="habitat":return
-	habitat_crisis_pending=false;habitat_crisis_started=true
+	habitat_crisis_pending=false;habitat_crisis_started=true;StoryProgressionClass.begin_habitat_crisis(story_progression_state)
 	story_progression_state["last_crisis_concern_visit"]=habitat_visit_id
 	# Rebuild only the presentation nodes so the living collection is visibly
 	# subdued. The saved population, growth clocks, ownership and GET history are
@@ -4829,6 +4993,8 @@ func _build_habitat_items(force:=false)->void:
 	_ensure_habitat_old_catalog_page_roll()
 	_begin_habitat_texture_build()
 	for plant in habitat_wild_plants:_add_habitat_wild_plant(plant)
+	_add_restoration_habitat_plants()
+	_add_restoration_recovery_sprouts()
 	if _should_show_jurejure_group():_add_jurejure_habitat_group()
 	var seed_points:Array=HABITAT_SAFE_SEED_POINTS.duplicate();var daily_rng:=RandomNumberGenerator.new();daily_rng.seed=("%d:%d"%[formal_play_count,habitat_mystery_seeds_pending]).hash()
 	for i in range(seed_points.size()-1,0,-1):
@@ -4950,6 +5116,31 @@ func _add_habitat_wild_plant(plant:Dictionary)->void:
 	if bool(plant.get("tutorial",false)):sprite.modulate=Color(1.15,1.10,.78,1.0)
 	var item={"node":sprite,"kind":"wild_plant","species_id":str(plant.get("species_id","")),"individual_id":str(plant.get("individual_id",""))};habitat_pickups.append(item);_refresh_habitat_wild_item(item,plant)
 
+func _add_restoration_habitat_plants()->void:
+	var returned:Array=HabitatRestorationClass.returned_plants(_restoration_state())
+	var points:=[Vector2(132,405),Vector2(335,423),Vector2(625,410),Vector2(910,423),Vector2(1135,405)]
+	for index in range(mini(returned.size(),points.size())):
+		var snapshot:Dictionary=returned[index];var entry:=_catalog_entry(str(snapshot.get("species_id","")))
+		if entry.is_empty():continue
+		var texture:=_habitat_species_texture(entry)
+		if texture==null:continue
+		var sprite:=Sprite3D.new();sprite.name="RestorationMedalPlant%d"%(index+1);sprite.texture=texture;sprite.billboard=BaseMaterial3D.BILLBOARD_ENABLED;sprite.no_depth_test=true;sprite.texture_filter=BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+		sprite.pixel_size=1.22/maxf(1.0,float(texture.get_width()));sprite.offset.y=-float(texture.get_height())*.18;sprite.position=_panorama_point_to_world(points[index],HABITAT_ITEM_RADIUS-.18)
+		var diameter:=float(snapshot.get("diameter_cm",100.0));var compressed_scale:=clampf(2.15+(diameter-100.0)*.012,2.15,3.65);sprite.scale=Vector3.ONE*compressed_scale
+		sprite.modulate=Color(1.08,1.08,1.02,1.0);habitat_items_root.add_child(sprite)
+
+func _add_restoration_recovery_sprouts()->void:
+	var stage:=_restoration_stage()
+	if stage<3:return
+	var points:=[Vector2(245,420),Vector2(745,425),Vector2(1030,415)]
+	var species_ids:=[FIRST_STORY_SPECIES_ID,PANDA_STORY_SPECIES_ID,ARMADILLO_STORY_SPECIES_ID]
+	var count:=3 if stage>=5 else (2 if stage>=4 else 1)
+	for index in count:
+		var entry:=_catalog_entry(species_ids[index]);var texture:=_habitat_species_texture(entry)
+		if texture==null:continue
+		var sprite:=Sprite3D.new();sprite.name="RestorationWildSprout%d"%(index+1);sprite.texture=texture;sprite.billboard=BaseMaterial3D.BILLBOARD_ENABLED;sprite.no_depth_test=true;sprite.texture_filter=BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+		sprite.pixel_size=.72/maxf(1.0,float(texture.get_width()));sprite.offset.y=-float(texture.get_height())*.18;sprite.position=_panorama_point_to_world(points[index],HABITAT_ITEM_RADIUS);sprite.scale=Vector3.ONE*(.58+.12*stage);habitat_items_root.add_child(sprite)
+
 func _should_show_jurejure_group()->bool:
 	return JureJureSystemClass.should_be_present(habitat_awakened,habitat_tutorial_returned_to_greenhouse,StoryProgressionClass.exploitation_is_started(story_progression_state),jurejure_waiting_for_seed_pod_reward)
 
@@ -4981,7 +5172,8 @@ func _refresh_habitat_wild_item(item:Dictionary,plant:Dictionary,animate_beacon:
 	var node:Sprite3D=item.get("node")
 	if not is_instance_valid(node):return
 	var diameter:=float(plant.get("diameter_cm",1.6));var visual_scale:=_habitat_wild_visual_scale(diameter);node.scale=Vector3.ONE*visual_scale
-	if habitat_crisis_started:node.modulate=Color(.56,.63,.59,1.0)
+	if habitat_crisis_started:
+		var recovery:=float(_restoration_stage())/5.0;node.modulate=Color(.56+.44*recovery,.63+.37*recovery,.59+.41*recovery,1.0)
 	elif bool(plant.get("tutorial",false)):node.modulate=Color(1.15,1.10,.78,1.0)
 	else:node.modulate=Color.WHITE
 
@@ -5808,7 +6000,7 @@ func _toggle_mode()->void:
 func _play_current_area_bgm(force_jurejure:=false)->void:
 	if audio_manager==null:return
 	if current_mode=="habitat":
-		var key:="jurejure" if force_jurejure else JureJureSystemClass.habitat_bgm_key(StoryProgressionClass.exploitation_is_started(story_progression_state),habitat_crisis_started)
+		var key:="jurejure" if force_jurejure else JureJureSystemClass.habitat_bgm_key(StoryProgressionClass.exploitation_is_started(story_progression_state),habitat_crisis_started,StoryProgressionClass.restoration_is_complete(story_progression_state))
 		audio_manager.play_bgm(key)
 	else:
 		audio_manager.play_bgm("greenhouse")
@@ -5834,6 +6026,7 @@ func _apply_mode()->void:
 	habitat_items_root.visible=not greenhouse_mode
 	if habitat_crisis_atmosphere:
 		if habitat_crisis_started:habitat_crisis_atmosphere.activate()
+		habitat_crisis_atmosphere.set_restoration_stage(_restoration_stage())
 		habitat_crisis_atmosphere.set_habitat_visible(not greenhouse_mode and habitat_crisis_started)
 	if habitat_status_label:habitat_status_label.visible=false
 	# The official greenhouse artwork already contains the finished pot and soil.
@@ -5986,6 +6179,7 @@ func _cancel_greenhouse_area_drag(update_ui:=true)->void:
 func _input(event:InputEvent)->void:
 	if audio_manager and (event is InputEventScreenTouch or event is InputEventMouseButton or event is InputEventKey):audio_manager.notify_user_gesture()
 	if habitat_lookaround_active or jurejure_intro_camera_active:return
+	if habitat_restoration_ui and habitat_restoration_ui.is_modal_visible():return
 	if arrangement_scene_active or arrangement_transitioning:return
 	if (opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible) or (puku_puku_battle and puku_puku_battle.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible and not first_play_harvest_guide_active and not old_seed_harvest_guide_active) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible):return
 	if current_mode=="greenhouse" and not play_active and not catalog_preview_mode_active:return
@@ -6123,6 +6317,16 @@ func _on_harvested(p)->void:
 	if deferred_tovar:tovar_harvested_this_play=true
 	var old:=float(bests.get(p.data.species_id,0.0));var is_record:bool=not deferred_tovar and not story_old_seed and p.diameter_cm>old
 	var first_discovery:=not deferred_tovar and _species_get_count(str(p.data.species_id))<=0
+	var restoration_snapshot:Dictionary={}
+	if not deferred_tovar and pending_restoration_snapshot.is_empty() and (habitat_restoration_ui==null or not habitat_restoration_ui.is_modal_visible()) and HabitatRestorationClass.can_offer_return(_restoration_state(),float(p.diameter_cm)):
+		restoration_snapshot={
+			"species_id":str(p.data.get("species_id","")),
+			"display_name":Localizer.species_name(language_code,p.data),
+			"diameter_cm":float(p.diameter_cm),
+			"visual_scale":float(p.visual_scale),
+			"rarity":str(p.data.get("rarity","")),
+			"gold_star_count":int(p.data.get("gold_star_count",0)),
+		}
 	if not deferred_tovar:
 		var harvested_species_id:=str(p.data.species_id);_register_species_discovery(harvested_species_id,true)
 		if first_discovery:result_new_species_queue.append(str(p.data.species_id))
@@ -6143,6 +6347,8 @@ func _on_harvested(p)->void:
 	if active_seed_type!="old" and not terminal_first_tutorial_harvest:_show_harvest_result(p)
 	if is_record:_show_record(p)
 	if play_active and active_seed_type=="normal" and normal_play_tutorial_complete and not terminal_first_tutorial_harvest and not puku_buyback_tutorial_complete and not puku_buyback_tutorial_active:call_deferred("_start_puku_buyback_tutorial")
+	if not restoration_snapshot.is_empty() and habitat_restoration_ui:
+		pending_restoration_snapshot=restoration_snapshot;habitat_restoration_ui.set_language(language_code);habitat_restoration_ui.show_return_prompt(restoration_snapshot);_update_play_ui()
 	var tween:=create_tween().bind_node(p).set_parallel();tween.tween_property(p,"position:y",p.position.y+2.0,.42).set_trans(Tween.TRANS_BACK);tween.tween_property(p,"scale",p.scale*1.2,.22);tween.chain().tween_property(p,"scale",Vector3.ONE*0.01,.24)
 	_cleanup_later(p,.68)
 

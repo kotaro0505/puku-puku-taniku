@@ -73,10 +73,16 @@ static func should_be_present(
 		and (exploitation_started or not waiting_for_seed_pod_reward)
 
 
-static func habitat_bgm_key(exploitation_started: bool, habitat_crisis_started: bool) -> String:
+static func habitat_bgm_key(
+		exploitation_started: bool,
+		habitat_crisis_started: bool,
+		restoration_complete: bool = false
+	) -> String:
 	# Exploitation owns the habitat's soundscape until the separate rain/crisis
 	# phase begins. Keeping this decision here prevents screen-return paths from
 	# drifting back to different interpretations of the same story phase.
+	if restoration_complete:
+		return "habitat"
 	if habitat_crisis_started:
 		return "habitat_crisis"
 	return "jurejure" if exploitation_started else "habitat"

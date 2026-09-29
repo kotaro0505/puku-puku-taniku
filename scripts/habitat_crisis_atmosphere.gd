@@ -6,6 +6,7 @@ extends Control
 
 var crisis_active := false
 var habitat_visible := false
+var restoration_stage := 0
 var rain_drops: Array[Dictionary] = []
 var rng := RandomNumberGenerator.new()
 
@@ -42,8 +43,13 @@ func set_habitat_visible(value: bool) -> void:
 	_refresh_visibility()
 
 
+func set_restoration_stage(value: int) -> void:
+	restoration_stage = clampi(value, 0, 5)
+	_refresh_visibility()
+
+
 func _refresh_visibility() -> void:
-	visible = crisis_active and habitat_visible
+	visible = crisis_active and habitat_visible and restoration_stage < 5
 	if visible:
 		move_to_front()
 	queue_redraw()
@@ -63,9 +69,14 @@ func _process(delta: float) -> void:
 func _draw() -> void:
 	if not visible:
 		return
-	draw_rect(Rect2(Vector2.ZERO, size), Color(0.025, 0.045, 0.07, 0.50))
-	draw_rect(Rect2(Vector2.ZERO, size), Color(0.18, 0.24, 0.32, 0.18))
-	for drop in rain_drops:
+	var darkness: float = [0.50, 0.43, 0.32, 0.21, 0.10, 0.0][restoration_stage]
+	var blue_wash: float = [0.18, 0.16, 0.13, 0.09, 0.04, 0.0][restoration_stage]
+	var rain_ratio: float = [1.0, 0.88, 0.64, 0.42, 0.20, 0.0][restoration_stage]
+	draw_rect(Rect2(Vector2.ZERO, size), Color(0.025, 0.045, 0.07, darkness))
+	draw_rect(Rect2(Vector2.ZERO, size), Color(0.18, 0.24, 0.32, blue_wash))
+	var visible_drop_count := int(round(float(rain_drops.size()) * rain_ratio))
+	for index in visible_drop_count:
+		var drop: Dictionary = rain_drops[index]
 		var start := Vector2(float(drop["x"]), float(drop["y"]))
 		var finish := start + Vector2(-7.0, float(drop["length"]))
 		draw_line(start, finish, Color(0.72, 0.86, 1.0, 0.58), 1.5)

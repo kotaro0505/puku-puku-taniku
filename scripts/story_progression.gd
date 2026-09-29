@@ -1,6 +1,8 @@
 class_name StoryProgression
 extends RefCounted
 
+const HabitatRestorationClass = preload("res://scripts/habitat_restoration.gd")
+
 # Older saves may still contain an integer `main_story_stage`. Keep only its
 # numeric bounds for tolerant deserialization; it is never consulted to decide
 # current progression.
@@ -16,7 +18,7 @@ const ACT_FINALE := 4
 # New Act II/III gates live in one versioned payload instead of adding another
 # row of unrelated booleans to main.gd.  The root scene only forwards gameplay
 # milestones and persists this dictionary.
-const RUNTIME_STATE_VERSION := 4
+const RUNTIME_STATE_VERSION := 5
 # Keep the complete Secret Gacha implementation and saved state intact while
 # disconnecting it from normal progression.  Preview routes remain available,
 # and changing this one flag reconnects the midpoint install flow.
@@ -29,6 +31,7 @@ const EVENT_FANTASY_SIX := "fantasy_realization"
 const EVENT_ACT3_BATTLE_INTRO := "act3_exploitation_battle_intro"
 const EVENT_EXPLOITATION_MIDPOINT := "exploitation_midpoint"
 const EVENT_SECRET_GACHA_INSTALL := "secret_gacha_install"
+const EVENT_RESTORATION_JOIN_HOME := "restoration_join_home"
 const RUNTIME_EVENT_IDS := [
 	EVENT_POST_ENCOUNTER_HOME,
 	EVENT_POST_CRISIS_GREENHOUSE,
@@ -38,6 +41,7 @@ const RUNTIME_EVENT_IDS := [
 	EVENT_ACT3_BATTLE_INTRO,
 	EVENT_EXPLOITATION_MIDPOINT,
 	EVENT_SECRET_GACHA_INSTALL,
+	EVENT_RESTORATION_JOIN_HOME,
 ]
 
 static func act_stage(act2_unlocked:bool,act3_unlocked:bool,finale_complete:bool)->int:
@@ -75,6 +79,7 @@ static func default_runtime_state() -> Dictionary:
 		"last_crisis_concern_visit": -1,
 		"last_exploitation_concern_phase": "",
 		"last_exploitation_concern_index": -1,
+		"restoration": HabitatRestorationClass.default_state(),
 	}
 
 
@@ -99,6 +104,10 @@ static func normalize_runtime_state(raw_state: Variant, migration: Dictionary = 
 	state["last_crisis_concern_visit"] = int(state.get("last_crisis_concern_visit", -1))
 	state["last_exploitation_concern_phase"] = str(state.get("last_exploitation_concern_phase", ""))
 	state["last_exploitation_concern_index"] = int(state.get("last_exploitation_concern_index", -1))
+	state["restoration"] = HabitatRestorationClass.normalize_state(
+		state.get("restoration", {}),
+		{"habitat_crisis_started": bool(migration.get("habitat_crisis_started", false))}
+	)
 
 	# Saves made before this payload existed must not lose already available
 	# content.  New games never enter this branch and follow the new gates.
@@ -189,6 +198,10 @@ static func normalize_runtime_state(raw_state: Variant, migration: Dictionary = 
 		state["pending_story_events"].erase(EVENT_EXPLOITATION_MIDPOINT)
 	elif bool(state.get("exploitation_midpoint_pending", false)):
 		queue_story_event(state, EVENT_EXPLOITATION_MIDPOINT)
+	var restoration: Dictionary = state.get("restoration", {})
+	if HabitatRestorationClass.can_queue_join_home(
+			restoration, bool(state.get("post_crisis_greenhouse_seen", false))):
+		queue_story_event(state, EVENT_RESTORATION_JOIN_HOME)
 	if bool(state.get("secret_gacha_unlocked", false)) or bool(state.get("secret_gacha_install_seen", false)):
 		state["secret_gacha_unlocked"] = true
 		state["secret_gacha_install_seen"] = true
@@ -312,6 +325,7 @@ static func complete_post_encounter_greenhouse(state: Dictionary) -> void:
 
 
 static func mark_habitat_crisis_dialog_complete(state: Dictionary) -> void:
+	begin_habitat_crisis(state)
 	if bool(state.get("post_crisis_greenhouse_seen", false)):
 		return
 	state["post_crisis_greenhouse_pending"] = true
@@ -328,6 +342,59 @@ static func complete_post_crisis_greenhouse(state: Dictionary) -> void:
 	consume_story_event(state, EVENT_POST_CRISIS_GREENHOUSE)
 	state["post_crisis_greenhouse_pending"] = false
 	state["post_crisis_greenhouse_seen"] = true
+	var restoration: Dictionary = state.get("restoration", {})
+	if HabitatRestorationClass.can_queue_join_home(restoration, true):
+		queue_story_event(state, EVENT_RESTORATION_JOIN_HOME)
+
+
+static func begin_habitat_crisis(state: Dictionary) -> void:
+	var restoration: Dictionary = state.get("restoration", HabitatRestorationClass.default_state())
+	HabitatRestorationClass.begin_tracking(restoration)
+	state["restoration"] = restoration
+
+
+static func record_restoration_new_get(
+		state: Dictionary, species_id: String, habitat_crisis_started: bool
+	) -> bool:
+	if not habitat_crisis_started:
+		return false
+	var restoration: Dictionary = state.get("restoration", HabitatRestorationClass.default_state())
+	HabitatRestorationClass.begin_tracking(restoration)
+	var became_ready := HabitatRestorationClass.record_new_species(restoration, species_id)
+	state["restoration"] = restoration
+	if HabitatRestorationClass.can_queue_join_home(
+			restoration, bool(state.get("post_crisis_greenhouse_seen", false))):
+		queue_story_event(state, EVENT_RESTORATION_JOIN_HOME)
+	return became_ready
+
+
+static func complete_restoration_join_home(state: Dictionary) -> void:
+	consume_story_event(state, EVENT_RESTORATION_JOIN_HOME)
+	var restoration: Dictionary = state.get("restoration", HabitatRestorationClass.default_state())
+	HabitatRestorationClass.complete_join_home(restoration)
+	state["restoration"] = restoration
+
+
+static func complete_restoration_join_habitat(state: Dictionary) -> void:
+	var restoration: Dictionary = state.get("restoration", HabitatRestorationClass.default_state())
+	HabitatRestorationClass.complete_join_habitat(restoration)
+	state["restoration"] = restoration
+
+
+static func restoration_state(state: Dictionary) -> Dictionary:
+	var restoration: Variant = state.get("restoration", {})
+	if not restoration is Dictionary:
+		restoration = HabitatRestorationClass.default_state()
+		state["restoration"] = restoration
+	return restoration
+
+
+static func restoration_is_started(state: Dictionary) -> bool:
+	return HabitatRestorationClass.is_started(restoration_state(state))
+
+
+static func restoration_is_complete(state: Dictionary) -> bool:
+	return HabitatRestorationClass.is_complete(restoration_state(state))
 
 
 static func begin_exploitation(state: Dictionary, jurejure_get_count: int = 0) -> void:
