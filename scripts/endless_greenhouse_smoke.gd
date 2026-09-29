@@ -31,6 +31,7 @@ func _ready() -> void:
 	assert(FileAccess.get_file_as_bytes(EXPERIMENT_PATH) == normal_bytes_before)
 
 	_test_localized_trial_tutorial(game)
+	await _test_endless_first_play_tutorial(game)
 	game.normal_play_tutorial_complete = true
 	game.initial_seed_stock_notice_complete = true
 	game.puku_buyback_tutorial_complete = true
@@ -175,8 +176,45 @@ func _test_localized_trial_tutorial(game: Node) -> void:
 	game.intro_overlay.visible = false
 	game.first_habitat_gift_claimed = false
 	game.normal_seed_bags = 0
+	assert(not game._normal_seed_play_available())
 	game._claim_first_habitat_gift_once()
-	assert(game.first_habitat_gift_claimed and game.normal_seed_bags == 0)
+	assert(game.first_habitat_gift_claimed and game.normal_seed_bags == 0 and game._normal_seed_play_available())
+
+
+func _test_endless_first_play_tutorial(game: Node) -> void:
+	game._clear_greenhouse_plants()
+	game.play_active = false
+	game.normal_play_tutorial_complete = false
+	game.puku_buyback_tutorial_complete = false
+	game.seed_pod_first_reward_seen = false
+	game.first_seed_pod_reward_event_active = false
+	game._start_greenhouse_play("normal")
+	await get_tree().create_timer(.72).timeout
+	assert(game.play_active and game.first_play_tutorial_active)
+	var tutorial_plant = game.plants[0]
+	var tutorial_species_id := str(tutorial_plant.data.get("species_id", ""))
+	game.discovered[tutorial_species_id] = true
+	game.species_get_counts[tutorial_species_id] = 1
+	game.first_play_tutorial_sequence_complete = true
+	game.first_play_harvest_guide_active = true
+	game.tutorial_harvest_plant = tutorial_plant
+	tutorial_plant.diameter_cm = 25.0
+	tutorial_plant.harvest()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert(game.play_active and game.normal_play_tutorial_complete)
+	assert(not game.first_play_tutorial_active)
+	assert(not game.first_seed_pod_reward_event_active and not game.result_overlay.visible)
+	assert(game.puku_buyback_tutorial_active)
+	assert(game.tutorial_guide_message.text == Localizer.text("ja", "puku_buyback_1"))
+	game._advance_puku_buyback_tutorial()
+	assert(game.tutorial_guide_message.text == Localizer.text("ja", "puku_buyback_2_endless"))
+	game._advance_puku_buyback_tutorial()
+	assert(game.puku_buyback_tutorial_complete and not game.puku_buyback_tutorial_active)
+	game.play_active = false
+	game.play_spawn_queue = 0
+	game.play_seed_animations_pending = 0
+	game._clear_greenhouse_plants()
 
 
 func _test_immediate_species_get_and_pause(game: Node) -> void:

@@ -658,6 +658,7 @@ func _ready() -> void:
 	var endless_save_setup:=endless_greenhouse.prepare_save_namespace()
 	if int(endless_save_setup.get("error",OK))!=OK:
 		push_error("ENDLESS save namespace setup failed: %s"%error_string(int(endless_save_setup.get("error",FAILED))))
+	print("ENDLESS_GREENHOUSE_BOOT enabled=",endless_greenhouse.enabled," save_path=",endless_greenhouse.active_save_path()," copied_normal_save=",bool(endless_save_setup.get("copied",false)))
 	habitat_debug_enabled=_habitat_debug_requested()
 	_configure_habitat_texture_ab()
 	_configure_habitat_background_ab()
@@ -1062,6 +1063,11 @@ func _is_endless_greenhouse_enabled()->bool:
 
 func _is_endless_normal_play()->bool:
 	return _is_endless_greenhouse_enabled() and play_active and active_seed_type=="normal"
+
+func _normal_seed_play_available()->bool:
+	# Unlimited supply begins only after the story actually grants the mysterious
+	# pod. The URL flag must not expose normal seeds during the old-seed prologue.
+	return normal_seed_bags>0 or (_is_endless_greenhouse_enabled() and first_habitat_gift_claimed)
 
 func _puku_gauge_target_cm()->float:
 	return ENDLESS_PUKU_GAUGE_TARGET_CM if _is_endless_greenhouse_enabled() else PUKU_GAUGE_TARGET_CM
@@ -1983,8 +1989,7 @@ func _is_japan_region()->bool:
 	return locale=="ja" or locale.begins_with("ja_") or locale.ends_with("_jp")
 
 func _has_any_playable_seed_stock()->bool:
-	if _is_endless_greenhouse_enabled():return true
-	if normal_seed_bags>0:return true
+	if _normal_seed_play_available():return true
 	if volume_seed_bags>0 and _volume_seed_unlocked():return true
 	if premium_seed_bags>0 and _premium_seed_unlocked():return true
 	if mystery_seed_bags>0 and _mystery_seed_pack_unlocked():return true
@@ -3478,7 +3483,7 @@ func _start_greenhouse_play(seed_type:String)->void:
 		if not _mystery_seed_pack_unlocked() or mystery_seed_bags<1:return
 		mystery_seed_bags-=1;current_target_count=MYSTERY_GERMINATION_COUNT
 	else:
-		if normal_seed_bags<1 and not _is_endless_greenhouse_enabled():return
+		if not _normal_seed_play_available():return
 		if not _is_endless_greenhouse_enabled():normal_seed_bags-=1
 		current_target_count=NORMAL_GERMINATION_COUNT
 	if seed_type=="old" and total_play_count==0:_ensure_first_tutorial_species()
@@ -3640,7 +3645,7 @@ func _update_play_ui()->void:
 	if mystery_seed_bags>0 and _mystery_seed_pack_unlocked():held.append(Localizer.text(language_code,"bags_held",[Localizer.seed_name(language_code,"mystery","謎種"),mystery_seed_bags]))
 	play_bag_summary.text="　".join(held)
 	old_seed_play_button.visible=old_seed_bags>0;old_seed_play_button.text=Localizer.text(language_code,"play_old_seed",[old_seed_bags])
-	normal_play_button.visible=_is_endless_greenhouse_enabled() or normal_seed_bags>0;normal_play_button.text=Localizer.text(language_code,"play_normal_seed_endless") if _is_endless_greenhouse_enabled() else Localizer.text(language_code,"play_normal_seed",[normal_seed_bags]);normal_play_button.disabled=not _is_endless_greenhouse_enabled() and normal_seed_bags<1
+	var normal_seed_available:=_normal_seed_play_available();normal_play_button.visible=normal_seed_available;normal_play_button.text=Localizer.text(language_code,"play_normal_seed_endless") if _is_endless_greenhouse_enabled() else Localizer.text(language_code,"play_normal_seed",[normal_seed_bags]);normal_play_button.disabled=not normal_seed_available
 	volume_play_button.visible=volume_seed_bags>0 and _volume_seed_unlocked();volume_play_button.text=Localizer.text(language_code,"play_volume_seed",[volume_seed_bags]);volume_play_button.disabled=not _volume_seed_unlocked() or volume_seed_bags<1
 	premium_play_button.visible=premium_seed_bags>0 and _premium_seed_unlocked();premium_play_button.text=Localizer.text(language_code,"play_premium_seed",[premium_seed_bags]);premium_play_button.disabled=not _premium_seed_unlocked() or premium_seed_bags<1
 	mystery_play_button.visible=mystery_seed_bags>0 and _mystery_seed_pack_unlocked();mystery_play_button.text=Localizer.text(language_code,"play_mystery_seed",[mystery_seed_bags]);mystery_play_button.disabled=not _mystery_seed_pack_unlocked() or mystery_seed_bags<1
@@ -4582,6 +4587,9 @@ func _update_main_story_progress(schedule_completion:=true)->void:
 
 func _try_start_pending_story_event()->void:
 	if play_active and not _is_endless_normal_play():return
+	# A newly harvested species owns the foreground first. Its story transition
+	# is reconsidered by _on_species_get_overlay_closed after the full card queue.
+	if not species_get_queue.is_empty():return
 	if not scripted_dialog_kind.is_empty() or jurejure_intro_camera_active or opening_story_overlay and opening_story_overlay.visible or seed_pod_story_overlay and seed_pod_story_overlay.visible or jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible or jurejure_first_encounter_active:return
 	if intro_overlay and intro_overlay.visible:return
 	if habitat_awakening_overlay and habitat_awakening_overlay.visible:return
@@ -5865,7 +5873,8 @@ func _process(delta:float)->void:
 	_update_habitat_view_follow(delta)
 	_update_habitat_wild_growth(delta)
 	_update_habitat_scroll_tutorial()
-	if _update_first_play_tutorial(delta):
+	var endless_simulation_paused:=_is_endless_normal_play() and not _should_simulate_endless_greenhouse()
+	if not endless_simulation_paused and _update_first_play_tutorial(delta):
 		_update_labels()
 		return
 	if scripted_dialog_kind=="old_seed_growth_reaction":
@@ -5877,7 +5886,7 @@ func _process(delta:float)->void:
 	if puku_buyback_tutorial_active or first_seed_pod_reward_event_active:
 		_update_labels()
 		return
-	if current_mode=="greenhouse" and (play_active or dev_jelly_test_active or catalog_preview_mode_active) and (not _is_endless_normal_play() or _should_simulate_endless_greenhouse()):
+	if current_mode=="greenhouse" and (play_active or dev_jelly_test_active or catalog_preview_mode_active) and not endless_simulation_paused:
 		var old_seed_max_diameter:=0.0
 		for p in plants:
 			if is_instance_valid(p):
