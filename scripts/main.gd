@@ -53,8 +53,6 @@ const SEED_POD_GAUGE_TARGET_CM := 750.0
 const SEED_POD_GAUGE_REWARD_BAGS := 3
 const PUKU_GAUGE_TARGET_CM := 500.0
 const PUKU_GAUGE_REWARD_PUKU := 3
-const ENDLESS_PUKU_GAUGE_TARGET_CM := 750.0
-const ENDLESS_PUKU_GAUGE_REWARD_PUKU := 1
 const ENDLESS_AUTO_SOW_TUTORIAL_STEP := "endless_auto_sow_prompt_seen"
 const HABITAT_TIME_MULTIPLIERS := [1, 60, 3600, 21600, 86400]
 const DEFAULT_POT_ID := "shallow_terracotta"
@@ -1005,6 +1003,8 @@ func _load_save() -> void:
 			best_spawn_unlocks_dirty=false
 			_refresh_seed_pack_unlocks()
 			_migrate_mystery_route_progress()
+			if _is_endless_greenhouse_enabled():
+				endless_greenhouse.restore_discovery_state(value.get("endless_discovery_state",{}))
 
 func _save() -> void:
 	var f := FileAccess.open(_active_save_path(),FileAccess.WRITE)
@@ -1053,6 +1053,10 @@ func _save() -> void:
 		"language_code":language_code,"language_selected":language_selected,"first_habitat_gift_claimed":first_habitat_gift_claimed,
 		"secret_gacha_active":secret_gacha_active,"secret_gacha_draws_remaining":secret_gacha_draws_remaining,"secret_gacha_last_roll_play_count":secret_gacha_last_roll_play_count
 	}
+	# Discovery-cycle state belongs only to the opt-in experiment namespace.  A
+	# finite save never receives trial-only fields, even though both modes share
+	# the same serializer.
+	if _is_endless_greenhouse_enabled():payload["endless_discovery_state"]=endless_greenhouse.discovery_state_for_save()
 	f.store_string(JSON.stringify(payload))
 	f.close()
 
@@ -1125,17 +1129,17 @@ func _ensure_endless_greenhouse_running()->void:
 	_start_greenhouse_play("normal")
 
 func _puku_gauge_target_cm()->float:
-	return ENDLESS_PUKU_GAUGE_TARGET_CM if _is_endless_greenhouse_enabled() else PUKU_GAUGE_TARGET_CM
+	return PUKU_GAUGE_TARGET_CM
 
 func _puku_gauge_reward_puku()->int:
-	return ENDLESS_PUKU_GAUGE_REWARD_PUKU if _is_endless_greenhouse_enabled() else PUKU_GAUGE_REWARD_PUKU
+	return PUKU_GAUGE_REWARD_PUKU
 
 func _resolve_jurejure_progress_reward(reward_kind:String)->void:
 	# The legacy save field is kept for rollback compatibility. Its release event
-	# is mode-specific: finite play waits for a seed-pod payout; ENDLESS waits for
-	# the next real Puku Gauge payout.
+	# is mode-specific: finite play waits for a seed-pod payout; ENDLESS has no
+	# visible gauges and waits for the next hidden 12-settlement discovery set.
 	if not jurejure_waiting_for_seed_pod_reward:return
-	if (_is_endless_greenhouse_enabled() and reward_kind=="puku") or (not _is_endless_greenhouse_enabled() and reward_kind=="seed_pod"):
+	if (_is_endless_greenhouse_enabled() and reward_kind=="discovery_set") or (not _is_endless_greenhouse_enabled() and reward_kind=="seed_pod"):
 		jurejure_waiting_for_seed_pod_reward=false
 
 func _should_simulate_endless_greenhouse()->bool:
@@ -2615,6 +2619,10 @@ func _on_habitat_awakening_finished()->void:
 
 func _start_puku_gauge_intro_dialog()->void:
 	if puku_gauge_intro_complete:return
+	if _is_endless_greenhouse_enabled():
+		puku_gauge_intro_complete=true;tutorial_steps["puku_gauge_intro_complete"]=true;_save();_update_play_ui()
+		call_deferred("_ensure_endless_greenhouse_running")
+		return
 	_start_scripted_dialog("puku_gauge_first_gift",[
 		{"speaker":"panda","text":Localizer.text(language_code,"puku_intro_1")},
 		{"speaker":"panda","text":Localizer.text(language_code,"puku_intro_2"),"button":Localizer.text(language_code,"continue")}
@@ -2786,7 +2794,9 @@ func _start_puku_buyback_tutorial()->void:
 	_show_puku_buyback_tutorial_page()
 
 func _show_puku_buyback_tutorial_page()->void:
-	var keys:=["puku_buyback_1","puku_buyback_2_endless" if _is_endless_greenhouse_enabled() else "puku_buyback_2"]
+	# ENDLESS retains Panda's buyback introduction, but has no Puku Gauge to
+	# explain or spotlight. Finite play keeps the original two-page lesson.
+	var keys:=["puku_buyback_1"] if _is_endless_greenhouse_enabled() else ["puku_buyback_1","puku_buyback_2"]
 	if puku_buyback_tutorial_index>=keys.size():
 		puku_buyback_tutorial_active=false;puku_buyback_tutorial_complete=true;_hide_first_play_tutorial_overlay();_save()
 		if first_seed_pod_reward_event_active:call_deferred("_start_first_seed_pod_max_event")
@@ -2794,10 +2804,15 @@ func _show_puku_buyback_tutorial_page()->void:
 		return
 	if tutorial_highlight_tween and tutorial_highlight_tween.is_valid():tutorial_highlight_tween.kill()
 	var viewport_size:=get_viewport().get_visible_rect().size
-	var center:=puku_gauge_area.global_position+puku_gauge_area.size*.5
-	tutorial_guide_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_shade.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_shade.material=first_play_harvest_spotlight_material;tutorial_guide_shade.color=Color(.025,.02,.01,.86)
-	var focus_half_size:=(puku_gauge_area.size*.5+Vector2(9,5))/viewport_size
-	first_play_harvest_spotlight_material.set_shader_parameter("focus_ellipse",true);first_play_harvest_spotlight_material.set_shader_parameter("focus_half_size_uv",focus_half_size);first_play_harvest_spotlight_material.set_shader_parameter("focus_count",1);first_play_harvest_spotlight_material.set_shader_parameter("focus_uv_a",center/viewport_size);first_play_harvest_spotlight_material.set_shader_parameter("focus_radius_a",.10);first_play_harvest_spotlight_material.set_shader_parameter("viewport_aspect",viewport_size.x/viewport_size.y)
+	tutorial_guide_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_shade.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_shade.color=Color(.025,.02,.01,.86)
+	if _is_endless_greenhouse_enabled():
+		tutorial_guide_shade.material=null
+		first_play_harvest_spotlight_material.set_shader_parameter("focus_ellipse",false)
+	else:
+		var center:=puku_gauge_area.global_position+puku_gauge_area.size*.5
+		tutorial_guide_shade.material=first_play_harvest_spotlight_material
+		var focus_half_size:=(puku_gauge_area.size*.5+Vector2(9,5))/viewport_size
+		first_play_harvest_spotlight_material.set_shader_parameter("focus_ellipse",true);first_play_harvest_spotlight_material.set_shader_parameter("focus_half_size_uv",focus_half_size);first_play_harvest_spotlight_material.set_shader_parameter("focus_count",1);first_play_harvest_spotlight_material.set_shader_parameter("focus_uv_a",center/viewport_size);first_play_harvest_spotlight_material.set_shader_parameter("focus_radius_a",.10);first_play_harvest_spotlight_material.set_shader_parameter("viewport_aspect",viewport_size.x/viewport_size.y)
 	tutorial_guide_button.visible=true;tutorial_guide_button.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_button.position=Vector2.ZERO;tutorial_guide_button.size=viewport_size;tutorial_guide_button.text="";tutorial_guide_button.icon=null;tutorial_guide_button.flat=true;tutorial_guide_button.focus_mode=Control.FOCUS_NONE;tutorial_guide_button.set_meta("target","puku_buyback")
 	var empty_style:=StyleBoxEmpty.new()
 	for state in ["normal","hover","pressed","disabled","focus"]:tutorial_guide_button.add_theme_stylebox_override(state,empty_style)
@@ -3459,6 +3474,7 @@ func _change_audio_volume(value:float,is_bgm:bool)->void:
 
 func _reset_progression_state()->void:
 	_end_first_play_tutorial_context()
+	endless_greenhouse.reset_discovery_state()
 	pending_restoration_snapshot.clear()
 	if habitat_restoration_ui:habitat_restoration_ui.reset_view()
 	old_seed_reaction_stage=0;old_seed_harvest_guide_active=false;habitat_lookaround_active=false;habitat_lookaround_elapsed=0.0;habitat_lookaround_context="";jurejure_first_encounter_active=false;jurejure_intro_camera_active=false;jurejure_intro_camera_elapsed=0.0;jurejure_camera_focus_context=""
@@ -3692,7 +3708,7 @@ func _update_play_ui()->void:
 	if main_status_hud:main_status_hud.visible=not arrangement_hud_hidden and not battle_open
 	if labels_layer:labels_layer.visible=not arrangement_hud_hidden and not battle_open
 	if best_panel:best_panel.visible=mystery_catalog_tutorial_complete and not _old_seed_story_active()
-	if puku_gauge_area:puku_gauge_area.visible=mystery_items_acquired
+	if puku_gauge_area:puku_gauge_area.visible=mystery_items_acquired and not _is_endless_greenhouse_enabled()
 	if seed_pod_gauge_area:seed_pod_gauge_area.visible=mystery_items_acquired and not _is_endless_greenhouse_enabled()
 	play_overlay.visible=current_mode=="greenhouse" and not play_active and play_modal_open and not endless_owns_normal_flow
 	play_open_button.visible=current_mode=="greenhouse" and intro_story_complete and not play_active and not play_modal_open and not endless_owns_normal_flow and not arrangement_navigation_suspended and (not result_overlay or not result_overlay.visible) and (not shop_overlay or not shop_overlay.visible) and (not encyclopedia_overlay or not encyclopedia_overlay.visible) and (not settings_overlay or not settings_overlay.visible) and (not arrangement_ui or not arrangement_ui.visible)
@@ -3909,7 +3925,7 @@ func _update_shop_ui()->void:
 		shop_buy_pulse_tween=create_tween().set_loops();shop_buy_pulse_tween.tween_property(shop_buy_glow,"modulate:a",.88,.9).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT);shop_buy_pulse_tween.tween_property(shop_buy_glow,"modulate:a",.34,.9).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 func _tutorial_fully_complete()->bool:
-	return intro_story_complete and habitat_awakened and habitat_tutorial_complete and seed_shop_open and puku_gauge_intro_complete
+	return intro_story_complete and habitat_awakened and habitat_tutorial_complete and seed_shop_open and (puku_gauge_intro_complete or _is_endless_greenhouse_enabled())
 
 func _refresh_seed_pack_unlocks()->void:
 	if volume_seed_bags>0:volume_seed_unlocked=true
@@ -3953,6 +3969,7 @@ func add_seed_pod_gauge_cm(amount_cm:float,save_immediately:=true,show_effect:=t
 	return earned_bags
 
 func add_puku_coin_gauge_cm(amount_cm:float,save_immediately:=true,show_effect:=true,source_position:=Vector2(-10000,-10000))->int:
+	if _is_endless_greenhouse_enabled():return 0
 	if amount_cm<=0.0 or not mystery_items_acquired:return 0
 	var target_cm:=_puku_gauge_target_cm()
 	var reward_puku:=_puku_gauge_reward_puku()
@@ -5665,6 +5682,7 @@ func _arrangement_pot_anchor_screen()->Vector2:
 
 func spawn_plant(force_golden := false,spawn_position:Variant=null) -> void:
 	var chosen:Dictionary
+	var endless_forced_new:=false
 	if active_seed_type=="old":
 		chosen=_catalog_entry(FIRST_STORY_SPECIES_ID)
 	elif active_seed_type.begins_with("series:"):
@@ -5677,14 +5695,24 @@ func spawn_plant(force_golden := false,spawn_position:Variant=null) -> void:
 		if chosen.is_empty(): chosen = species[0]
 		forced_golden_done=true
 	elif not opening_species.is_empty():chosen=opening_species.pop_front()
+	elif _is_endless_normal_play() and endless_greenhouse.forced_new_pending:
+		chosen=_select_endless_forced_new_candidate()
+		if chosen.is_empty():
+			# Eligibility can legitimately disappear between a set roll and the
+			# next sprout. Keep the cycle best, but never invent a NEW species.
+			endless_greenhouse.cancel_forced_new_pending()
+			chosen=_select_normal_seed_species(-1.0,false)
+		else:
+			endless_forced_new=endless_greenhouse.consume_forced_new(str(chosen.get("species_id","")))
 	else:chosen=_select_species_for_seed(active_seed_type)
 	var pos:Vector3=_find_spawn_position() if spawn_position==null else spawn_position
 	var label:=_plant_label(); labels_layer.add_child(label)
 	var p = SucculentClass.new()
-	p.original_pos=pos; p.position=pos;p.set_meta("new_species_candidate",_species_get_count(str(chosen.get("species_id","")))<=0); world_root.add_child(p); p.setup(chosen,rng.randi(),label,null);p.jelly_permission=Callable(self,"_allow_plant_jelly").bind(p)
+	p.original_pos=pos; p.position=pos;p.set_meta("new_species_candidate",_species_get_count(str(chosen.get("species_id","")))<=0);p.set_meta("endless_forced_new",endless_forced_new); world_root.add_child(p); p.setup(chosen,rng.randi(),label,null);p.jelly_permission=Callable(self,"_allow_plant_jelly").bind(p)
 	if first_play_tutorial_active:p.jelly_checks_enabled=false
 	p.harvested.connect(_on_harvested); p.jellied.connect(_on_jellied)
 	plants.append(p)
+	if endless_forced_new:_save()
 	if audio_manager:audio_manager.play_se("sprout",.28)
 
 func _spawn_greenhouse_seed()->void:
@@ -5737,6 +5765,21 @@ func _complete_endless_virtual_batch()->void:
 	_prepare_story_spawn_guarantee()
 	_save();_update_play_ui()
 
+func _record_endless_discovery_settlement(harvested:bool,diameter_cm:float=0.0,forced_roll:float=-1.0)->Dictionary:
+	if not _is_endless_normal_play():return {"set_completed":false}
+	var result:=endless_greenhouse.register_discovery_settlement(harvested,diameter_cm)
+	if not bool(result.get("set_completed",false)):return result
+	# This same real set-completion event replaces the removed ENDLESS gauge
+	# reward as the early JureJure return trigger.
+	_resolve_jurejure_progress_reward("discovery_set")
+	if not bool(result.get("roll_allowed",false)):return result
+	var candidates:=_eligible_endless_forced_new_candidates()
+	if (candidates.get("unlocked",[]) as Array).is_empty() and (candidates.get("locked",[]) as Array).is_empty():return result
+	var chance:=clampf(float(result.get("new_chance",0.0)),0.0,.95)
+	var roll:=rng.randf() if forced_roll<0.0 else clampf(forced_roll,0.0,.999999)
+	if chance>0.0 and roll<chance:endless_greenhouse.queue_forced_new()
+	return result
+
 func _next_greenhouse_spawn_interval()->float:
 	if plants.size()<=3:return rng.randf_range(.04,.18)
 	if rng.randf()<.20:return rng.randf_range(.04,.16)
@@ -5784,7 +5827,7 @@ func _select_species_for_seed(seed_type:String,forced_category_roll:float=-1.0)-
 			if _species_available_in_current_era(entry) and bool(entry.get("mystery_pack_eligible",false)) and bool(discovered.get(str(entry.get("species_id","")),false)):mystery_pool.append(entry)
 		if not mystery_pool.is_empty():return mystery_pool[rng.randi_range(0,mystery_pool.size()-1)]
 		return _catalog_entry(FIRST_STORY_SPECIES_ID)
-	if seed_type=="normal":return _select_normal_seed_species(forced_category_roll)
+	if seed_type=="normal":return _select_normal_seed_species(forced_category_roll,not _is_endless_normal_play())
 	var config:Dictionary=SEED_PACK_CONFIG.get(seed_type,SEED_PACK_CONFIG.normal)
 	var unlocked_new_candidates:Array=[]
 	var locked_new_candidates:Array=[]
@@ -5828,7 +5871,7 @@ func _select_species_for_seed(seed_type:String,forced_category_roll:float=-1.0)-
 	if target_pool.is_empty():return _catalog_entry(FIRST_STORY_SPECIES_ID)
 	return _weighted_from_pool(target_pool)
 
-func _select_normal_seed_species(forced_category_roll:float=-1.0)->Dictionary:
+func _normal_seed_selection_pools()->Dictionary:
 	var unlocked_new_candidates:Array=[]
 	var locked_new_candidates:Array=[]
 	var known_by_stars:Array=[[],[],[]]
@@ -5849,11 +5892,24 @@ func _select_normal_seed_species(forced_category_roll:float=-1.0)->Dictionary:
 		var stars:=clampi(int(entry.get("gold_star_count",0)),0,2)
 		known_by_stars[stars].append(entry)
 		all_known.append(entry)
+	return {
+		"unlocked_new":unlocked_new_candidates,
+		"locked_new":locked_new_candidates,
+		"known_by_stars":known_by_stars,
+		"all_known":all_known,
+	}
+
+func _select_normal_seed_species(forced_category_roll:float=-1.0,allow_random_new:=true)->Dictionary:
+	var pools:=_normal_seed_selection_pools()
+	var unlocked_new_candidates:Array=pools.get("unlocked_new",[])
+	var locked_new_candidates:Array=pools.get("locked_new",[])
+	var known_by_stars:Array=pools.get("known_by_stars",[[],[],[]])
+	var all_known:Array=pools.get("all_known",[])
 	var category_roll:=rng.randf() if forced_category_roll<0.0 else clampf(forced_category_roll,0.0,.999999)
-	if category_roll<NORMAL_SEED_UNLOCKED_NEW_RATE:
+	if allow_random_new and category_roll<NORMAL_SEED_UNLOCKED_NEW_RATE:
 		if not unlocked_new_candidates.is_empty():return unlocked_new_candidates[rng.randi_range(0,unlocked_new_candidates.size()-1)]
 		return _uniform_normal_seed_fallback(all_known)
-	if category_roll<NORMAL_SEED_UNLOCKED_NEW_RATE+NORMAL_SEED_LOCKED_NEW_RATE:
+	if allow_random_new and category_roll<NORMAL_SEED_UNLOCKED_NEW_RATE+NORMAL_SEED_LOCKED_NEW_RATE:
 		if not locked_new_candidates.is_empty():
 			var locked_choice:Dictionary=locked_new_candidates[rng.randi_range(0,locked_new_candidates.size()-1)].duplicate(true)
 			locked_choice["_deferred_series_get"]=true
@@ -5867,6 +5923,32 @@ func _select_normal_seed_species(forced_category_roll:float=-1.0)->Dictionary:
 	var target_pool:Array=known_by_stars[target_stars]
 	if target_pool.is_empty():return _uniform_normal_seed_fallback(all_known)
 	return target_pool[rng.randi_range(0,target_pool.size()-1)]
+
+func _eligible_endless_forced_new_candidates()->Dictionary:
+	var pools:=_normal_seed_selection_pools()
+	return {
+		"unlocked":pools.get("unlocked_new",[]),
+		"locked":pools.get("locked_new",[]),
+	}
+
+func _select_endless_forced_new_candidate()->Dictionary:
+	var pools:=_eligible_endless_forced_new_candidates()
+	var unlocked:Array=pools.get("unlocked",[])
+	var locked:Array=pools.get("locked",[])
+	var reserved_id:=endless_greenhouse.forced_new_candidate_hint()
+	if not reserved_id.is_empty():
+		for candidate in unlocked:
+			if str(candidate.get("species_id",""))==reserved_id:return candidate
+		for candidate in locked:
+			if str(candidate.get("species_id",""))==reserved_id:
+				var reserved_locked:Dictionary=candidate.duplicate(true);reserved_locked["_deferred_series_get"]=true;return reserved_locked
+	var choose_locked:=not locked.is_empty() and (unlocked.is_empty() or rng.randf()>=.75)
+	if choose_locked:
+		var locked_choice:Dictionary=locked[rng.randi_range(0,locked.size()-1)].duplicate(true)
+		locked_choice["_deferred_series_get"]=true
+		return locked_choice
+	if not unlocked.is_empty():return unlocked[rng.randi_range(0,unlocked.size()-1)]
+	return {}
 
 func _uniform_normal_seed_fallback(all_known:Array)->Dictionary:
 	if all_known.is_empty():return _catalog_entry(FIRST_STORY_SPECIES_ID)
@@ -6613,6 +6695,7 @@ func _on_harvested(p)->void:
 	else:_maybe_activate_first_play_harvest_guide()
 	var story_old_seed:=_old_seed_story_active()
 	var deferred_tovar:=tovar_event_active and str(p.data.species_id)==HIDDEN_TOVAR_ID
+	var endless_forced_new:=bool(p.get_meta("endless_forced_new",false))
 	if deferred_tovar:tovar_harvested_this_play=true
 	var old:=float(bests.get(p.data.species_id,0.0));var is_record:bool=not deferred_tovar and not story_old_seed and p.diameter_cm>old
 	var first_discovery:=not deferred_tovar and _species_get_count(str(p.data.species_id))<=0
@@ -6627,17 +6710,22 @@ func _on_harvested(p)->void:
 			"gold_star_count":int(p.data.get("gold_star_count",0)),
 		}
 	if not deferred_tovar:
+		_record_endless_discovery_settlement(true,float(p.diameter_cm))
 		var harvested_species_id:=str(p.data.species_id);_register_species_discovery(harvested_species_id,true)
 		if first_discovery:
-			if _is_endless_normal_play():_queue_species_get_by_id(harvested_species_id,true,"endless_greenhouse")
+			if _is_endless_normal_play():
+				endless_greenhouse.complete_discovery_cycle()
+				_queue_species_get_by_id(harvested_species_id,true,"endless_greenhouse")
 			else:result_new_species_queue.append(harvested_species_id)
+		elif endless_forced_new:
+			endless_greenhouse.fail_forced_new(harvested_species_id)
 	if is_record:
 		bests[p.data.species_id]=p.diameter_cm
 		if play_active and (play_share_record.is_empty() or p.diameter_cm>float(play_share_record.get("size",0.0))):play_share_record={"species_id":str(p.data.species_id),"size":p.diameter_cm}
 		_evaluate_best_spawn_unlocks()
 	var earned_puku:=0;var harvest_screen_position:=camera.unproject_position(p.global_position)
-	if play_active and active_seed_type!="old":
-		if not _is_endless_greenhouse_enabled():add_seed_pod_gauge_cm(p.diameter_cm,false,true)
+	if play_active and active_seed_type!="old" and not _is_endless_greenhouse_enabled():
+		add_seed_pod_gauge_cm(p.diameter_cm,false,true)
 		earned_puku=add_puku_coin_gauge_cm(p.diameter_cm,false,true,harvest_screen_position)
 	_evaluate_unlock_rules("harvest_size",p.diameter_cm);_update_main_story_progress(false);_save();_update_best_ui();_update_currency_ui();audio_manager.play_se("harvest",.55)
 	if play_active:
@@ -6661,6 +6749,10 @@ func _is_terminal_first_tutorial_plant(plant)->bool:
 
 func _on_jellied(p)->void:
 	if bool(p.get_meta("catalog_preview",false)):_on_catalog_preview_jellied(p);return
+	if _is_endless_normal_play():
+		if bool(p.get_meta("endless_forced_new",false)):endless_greenhouse.fail_forced_new(str(p.data.get("species_id","")))
+		_record_endless_discovery_settlement(false,0.0)
+		_save()
 	_maybe_activate_first_play_harvest_guide()
 	_show_float(p,Localizer.text(language_code,"jelly_float"),Color("#e7c9f0"))
 	audio_manager.play_se("jelly",.38)
@@ -6697,7 +6789,7 @@ func _show_harvest_result(plant)->void:
 	var panel:=PanelContainer.new();panel.size=Vector2(220,132);panel.position=camera.unproject_position(plant.global_position)-Vector2(110,82);panel.pivot_offset=panel.size*.5;panel.scale=Vector2(.78,.78);panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;panel.add_theme_stylebox_override("panel",_box(Color(0.22,0.12,0.07,.92),Color("#f0cc82"),17,2));effects_layer.add_child(panel)
 	var content:=VBoxContainer.new();content.alignment=BoxContainer.ALIGNMENT_CENTER;content.add_theme_constant_override("separation",0);content.mouse_filter=Control.MOUSE_FILTER_IGNORE;panel.add_child(content)
 	var name_label:=Label.new();name_label.text=Localizer.species_name(language_code,plant.data);name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name_label.add_theme_font_size_override("font_size",20);name_label.add_theme_color_override("font_color",Color.WHITE);content.add_child(name_label)
-	var size_label:=Label.new();size_label.text=Localizer.text(language_code,"harvest_to_gauge",[_format_cm(plant.diameter_cm)]);size_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;size_label.add_theme_font_size_override("font_size",19);size_label.add_theme_color_override("font_color",UI_CREAM);content.add_child(size_label)
+	var size_label:=Label.new();size_label.text=_format_cm(plant.diameter_cm) if _is_endless_normal_play() else Localizer.text(language_code,"harvest_to_gauge",[_format_cm(plant.diameter_cm)]);size_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;size_label.add_theme_font_size_override("font_size",19);size_label.add_theme_color_override("font_color",UI_CREAM);content.add_child(size_label)
 	var tween:=create_tween().bind_node(panel);tween.tween_property(panel,"scale",Vector2.ONE,.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT);tween.tween_interval(1.12);tween.set_parallel(true);tween.tween_property(panel,"position:y",panel.position.y-34,.5).set_trans(Tween.TRANS_QUAD);tween.tween_property(panel,"modulate:a",0.0,.5);tween.set_parallel(false);tween.tween_callback(panel.queue_free)
 
 func _show_record(p)->void:
