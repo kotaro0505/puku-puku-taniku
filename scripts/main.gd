@@ -3316,7 +3316,12 @@ func _build_fusion_lab_ui(hud:Control)->void:
 	fusion_lab_ui.close_requested.connect(_close_fusion_lab)
 	fusion_lab_ui.parent_selected.connect(_on_fusion_parent_selected)
 	fusion_lab_ui.fuse_requested.connect(_perform_fusion)
+	fusion_lab_ui.candidate_image_requested.connect(_on_fusion_candidate_image_requested)
 	fusion_lab_ui.set_language(language_code)
+
+func _on_fusion_candidate_image_requested(entry:Dictionary,target:TextureRect,high_priority:bool)->void:
+	target.texture=_species_loading_texture(entry)
+	_request_species_texture(entry,target,high_priority)
 
 func _fusion_lab_available()->bool:
 	if fusion_system==null or not _tutorial_fully_complete():return false

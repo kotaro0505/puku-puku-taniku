@@ -93,7 +93,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	_remove_test_file(NORMAL_PATH)
 	_remove_test_file(EXPERIMENT_PATH)
-	print("ENDLESS_GREENHOUSE_SMOKE_OK autostart=true modal=false infinite=true refill=harvest+jelly result=false longevity=35/35/22/8 per_spawn_new=false discovery_set=12 forced_new=true immediate_get=true pause=true navigation=true trial_dev=settings+story+jelly+gacha dev_gacha_saved=true fusion=entrance+open+parents+execute+species_get pod=false puku=false restoration_pending=true finite=true save_isolated=true")
+	print("ENDLESS_GREENHOUSE_SMOKE_OK autostart=true modal=false infinite=true refill=harvest+jelly result=false longevity=35/35/22/8 per_spawn_new=false discovery_set=12 forced_new=true immediate_get=true pause=true navigation=true trial_dev=settings+story+jelly+gacha dev_gacha_saved=true fusion=entrance+open+image_cards+hybrid_image+selection+execute+species_get pod=false puku=false restoration_pending=true finite=true save_isolated=true")
 	get_tree().quit()
 
 
@@ -603,11 +603,16 @@ func _test_fusion_lab_flow(game: Node) -> void:
 	var gummy_id := "gummy_peach_milk"
 	var metal_id := "metal_silver_rosette"
 	var hybrid_id := "hyb_gummy_metal"
+	var owned_hybrid_id := "hyb_gummy_glow"
 	for parent_id in [gummy_id, metal_id]:
 		game.discovered[parent_id] = true
 		game.greenhouse_available[parent_id] = true
 		game.unlocked_species[parent_id] = true
 		game.species_get_counts[parent_id] = 1
+	game.discovered[owned_hybrid_id] = true
+	game.greenhouse_available[owned_hybrid_id] = true
+	game.unlocked_species[owned_hybrid_id] = true
+	game.species_get_counts[owned_hybrid_id] = 1
 	game.discovered.erase(hybrid_id)
 	game.greenhouse_available.erase(hybrid_id)
 	game.unlocked_species.erase(hybrid_id)
@@ -630,12 +635,33 @@ func _test_fusion_lab_flow(game: Node) -> void:
 
 	game.fusion_lab_ui.parent_a_button.pressed.emit()
 	assert(game.fusion_lab_ui.picker_page.visible and game.fusion_lab_ui.picker_slot == 0)
+	assert(game.fusion_lab_ui.picker_scroll.vertical_scroll_mode == ScrollContainer.SCROLL_MODE_AUTO)
+	assert(game.fusion_lab_ui.candidate_cards_by_id.has(gummy_id))
+	assert(game.fusion_lab_ui.candidate_images_by_id.has(gummy_id))
+	assert(game.fusion_lab_ui.candidate_name_labels_by_id[gummy_id].text == Localizer.species_name("ja", game._catalog_entry(gummy_id)))
+	var existing_image: TextureRect = game.fusion_lab_ui.candidate_images_by_id[gummy_id]
+	var existing_path: String = game._species_image_path(game._catalog_entry(gummy_id))
+	assert(existing_image.texture != null and str(existing_image.get_meta("catalog_loaded_path", "")) == existing_path)
+	assert(game.fusion_lab_ui.candidate_images_by_id.has(owned_hybrid_id))
+	var hybrid_image: TextureRect = game.fusion_lab_ui.candidate_images_by_id[owned_hybrid_id]
+	assert(hybrid_image.texture != null)
+	assert(str(hybrid_image.get_meta("catalog_loaded_path", "")) == "res://assets/catalog/hybrid/%s.png" % owned_hybrid_id)
 	game.fusion_lab_ui._choose_candidate(gummy_id)
 	assert(game.fusion_parent_a_id == gummy_id)
+	game.fusion_lab_ui.parent_a_button.pressed.emit()
+	assert(game.fusion_lab_ui.candidate_cards_by_id[gummy_id].button_pressed)
+	assert(game.fusion_lab_ui.candidate_selected_badges_by_id[gummy_id].visible)
+	game.fusion_lab_ui._choose_candidate(gummy_id)
 	game.fusion_lab_ui.parent_b_button.pressed.emit()
 	assert(game.fusion_lab_ui.picker_page.visible and game.fusion_lab_ui.picker_slot == 1)
+	assert(game.fusion_lab_ui.candidate_images_by_id[metal_id].texture != null)
+	assert(game.fusion_lab_ui.candidate_name_labels_by_id[metal_id].text == Localizer.species_name("ja", game._catalog_entry(metal_id)))
 	game.fusion_lab_ui._choose_candidate(metal_id)
 	assert(game.fusion_parent_b_id == metal_id)
+	game.fusion_lab_ui.parent_b_button.pressed.emit()
+	assert(game.fusion_lab_ui.candidate_cards_by_id[metal_id].button_pressed)
+	assert(game.fusion_lab_ui.candidate_selected_badges_by_id[metal_id].visible)
+	game.fusion_lab_ui._choose_candidate(metal_id)
 	assert(str(game.fusion_lab_ui.current_result.get("result_species_id", "")) == hybrid_id)
 	assert(not game.fusion_lab_ui.fuse_button.disabled)
 

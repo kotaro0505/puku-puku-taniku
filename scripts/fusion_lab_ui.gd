@@ -4,6 +4,7 @@ extends Control
 signal close_requested
 signal parent_selected(slot: int, species_id: String)
 signal fuse_requested(parent_a_id: String, parent_b_id: String)
+signal candidate_image_requested(entry: Dictionary, target: TextureRect, high_priority: bool)
 
 const Localizer = preload("res://scripts/game_localizer.gd")
 const UI_BROWN := Color("#4a2618")
@@ -45,7 +46,12 @@ var fuse_button: Button
 var picker_page: Control
 var picker_title_label: Label
 var picker_back_button: Button
+var picker_scroll: ScrollContainer
 var picker_grid: GridContainer
+var candidate_cards_by_id: Dictionary = {}
+var candidate_images_by_id: Dictionary = {}
+var candidate_name_labels_by_id: Dictionary = {}
+var candidate_selected_badges_by_id: Dictionary = {}
 
 func _ready() -> void:
 	name = "FusionLabUI"
@@ -211,17 +217,19 @@ func _build_picker_page() -> void:
 	picker_title_label.add_theme_color_override("font_color", UI_BROWN)
 	picker_page.add_child(picker_title_label)
 
-	var scroll := ScrollContainer.new()
-	scroll.position = Vector2(3, 62)
-	scroll.size = Vector2(475, 744)
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	picker_page.add_child(scroll)
+	picker_scroll = ScrollContainer.new()
+	picker_scroll.position = Vector2(3, 62)
+	picker_scroll.size = Vector2(475, 744)
+	picker_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	picker_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	picker_page.add_child(picker_scroll)
 	picker_grid = GridContainer.new()
 	picker_grid.columns = 2
+	picker_grid.custom_minimum_size = Vector2(452, 0)
 	picker_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	picker_grid.add_theme_constant_override("h_separation", 8)
 	picker_grid.add_theme_constant_override("v_separation", 8)
-	scroll.add_child(picker_grid)
+	picker_scroll.add_child(picker_grid)
 
 func open_lab(parent_candidates: Array[Dictionary], counts: Dictionary, parent_a_id := "", parent_b_id := "") -> void:
 	candidates = parent_candidates.duplicate(true)
@@ -304,6 +312,10 @@ func _rebuild_picker() -> void:
 		return
 	for child in picker_grid.get_children():
 		child.free()
+	candidate_cards_by_id.clear()
+	candidate_images_by_id.clear()
+	candidate_name_labels_by_id.clear()
+	candidate_selected_badges_by_id.clear()
 	picker_title_label.text = Localizer.text(language, "fusion_select_parent", ["A" if picker_slot == 0 else "B"])
 	if candidates.is_empty():
 		var empty_label := Label.new()
@@ -314,15 +326,78 @@ func _rebuild_picker() -> void:
 		empty_label.add_theme_color_override("font_color", UI_BROWN)
 		picker_grid.add_child(empty_label)
 		return
-	for entry in candidates:
+	var selected_id := selected_a_id if picker_slot == 0 else selected_b_id
+	for candidate_index in range(candidates.size()):
+		var entry: Dictionary = candidates[candidate_index]
 		var species_id := str(entry.get("species_id", ""))
+		var species_name := Localizer.species_name(language, entry)
+		var is_selected := species_id == selected_id
 		var button := Button.new()
-		button.custom_minimum_size = Vector2(222, 92)
-		button.text = "%s\n%s" % [Localizer.species_name(language, entry), Localizer.text(language, "fusion_get_count", [int(get_counts.get(species_id, 0))])]
-		button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-		_skin_button(button, Color("#e8ddbd"), 14)
+		button.name = "FusionCandidate_%s" % species_id
+		button.custom_minimum_size = Vector2(222, 222)
+		button.toggle_mode = true
+		button.button_pressed = is_selected
+		button.tooltip_text = species_name
+		button.set_meta("species_id", species_id)
+		button.set_meta("selected_for_slot", is_selected)
+		_skin_candidate_card(button)
 		button.pressed.connect(_choose_candidate.bind(species_id))
 		picker_grid.add_child(button)
+
+		var image := TextureRect.new()
+		image.name = "SpeciesImage"
+		image.position = Vector2(12, 10)
+		image.size = Vector2(198, 144)
+		image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		image.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		button.add_child(image)
+
+		var name_label := Label.new()
+		name_label.name = "SpeciesName"
+		name_label.text = species_name
+		name_label.position = Vector2(10, 155)
+		name_label.size = Vector2(202, 38)
+		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		name_label.add_theme_font_size_override("font_size", 15)
+		name_label.add_theme_color_override("font_color", UI_BROWN)
+		name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		button.add_child(name_label)
+
+		var count_label := Label.new()
+		count_label.name = "GetCount"
+		count_label.text = Localizer.text(language, "fusion_get_count", [int(get_counts.get(species_id, 0))])
+		count_label.position = Vector2(10, 193)
+		count_label.size = Vector2(202, 23)
+		count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		count_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		count_label.add_theme_font_size_override("font_size", 12)
+		count_label.add_theme_color_override("font_color", Color("#805f47"))
+		count_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		button.add_child(count_label)
+
+		var selected_badge := Label.new()
+		selected_badge.name = "SelectedBadge"
+		selected_badge.text = "✓"
+		selected_badge.position = Vector2(174, 10)
+		selected_badge.size = Vector2(36, 36)
+		selected_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		selected_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		selected_badge.add_theme_font_size_override("font_size", 23)
+		selected_badge.add_theme_color_override("font_color", Color.WHITE)
+		selected_badge.add_theme_stylebox_override("normal", _box(Color("#d28a28"), Color("#fff2b8"), 18, 2))
+		selected_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		selected_badge.visible = is_selected
+		button.add_child(selected_badge)
+
+		candidate_cards_by_id[species_id] = button
+		candidate_images_by_id[species_id] = image
+		candidate_name_labels_by_id[species_id] = name_label
+		candidate_selected_badges_by_id[species_id] = selected_badge
+		candidate_image_requested.emit(entry, image, candidate_index < 6)
 
 func _choose_candidate(species_id: String) -> void:
 	parent_selected.emit(picker_slot, species_id)
@@ -344,6 +419,12 @@ func _skin_button(button: Button, background: Color, font_size: int) -> void:
 	button.add_theme_stylebox_override("normal", _box(background, background.lightened(0.18), 18, 3))
 	button.add_theme_stylebox_override("hover", _box(background.lightened(0.06), Color.WHITE, 18, 3))
 	button.add_theme_stylebox_override("pressed", _box(background.darkened(0.08), background.lightened(0.18), 18, 3))
+
+func _skin_candidate_card(button: Button) -> void:
+	button.add_theme_stylebox_override("normal", _box(Color("#f6efdf"), Color("#c6aa72"), 18, 2))
+	button.add_theme_stylebox_override("hover", _box(Color("#fff8e8"), Color("#e0b75a"), 18, 4))
+	button.add_theme_stylebox_override("pressed", _box(Color("#fff0c7"), Color("#d28a28"), 18, 5))
+	button.add_theme_stylebox_override("focus", _box(Color(0, 0, 0, 0), Color("#f0c66a"), 18, 3))
 
 func _box(background: Color, border: Color, radius: int, width: int) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
