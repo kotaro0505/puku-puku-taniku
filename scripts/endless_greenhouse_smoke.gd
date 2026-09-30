@@ -31,21 +31,13 @@ func _ready() -> void:
 	assert(FileAccess.get_file_as_bytes(EXPERIMENT_PATH) == normal_bytes_before)
 
 	_test_localized_trial_tutorial(game)
-	await _test_endless_first_play_tutorial(game)
-	game.normal_play_tutorial_complete = true
-	game.initial_seed_stock_notice_complete = true
-	game.puku_buyback_tutorial_complete = true
-	game.normal_seed_bags = 0
-	game._update_play_ui()
-	assert(game.normal_play_button.visible and not game.normal_play_button.disabled)
-	assert(game.normal_play_button.text == Localizer.text("ja", "play_normal_seed_endless"))
-
 	game.rng.seed = 880031
-	game._start_greenhouse_play("normal")
-	await get_tree().create_timer(.72).timeout
+	await _test_endless_first_play_tutorial(game)
+	game._update_play_ui()
 	assert(game.play_active and game.active_seed_type == "normal")
 	assert(game.normal_seed_bags == 0)
 	assert(game.plants.size() >= game.PLAY_INITIAL_MIN_PLANTS and game.plants.size() <= game.PLAY_INITIAL_MAX_PLANTS)
+	assert(not game.play_open_button.visible and not game.play_overlay.visible and not game.normal_play_button.visible)
 	assert(not game.seed_bag_panel.visible and not game.seed_pod_gauge_area.visible)
 	assert(not game.result_overlay.visible)
 	for plant in game.plants:
@@ -95,7 +87,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	_remove_test_file(NORMAL_PATH)
 	_remove_test_file(EXPERIMENT_PATH)
-	print("ENDLESS_GREENHOUSE_SMOKE_OK infinite=true refill=harvest+jelly result=false immediate_get=true pause=true navigation=true pod=false puku=true restoration_pending=true finite=true save_isolated=true")
+	print("ENDLESS_GREENHOUSE_SMOKE_OK autostart=true modal=false infinite=true refill=harvest+jelly result=false immediate_get=true pause=true navigation=true pod=false puku=true restoration_pending=true finite=true save_isolated=true")
 	get_tree().quit()
 
 
@@ -160,37 +152,49 @@ func _test_localized_trial_tutorial(game: Node) -> void:
 	for language in ["ja", "hiragana", "en"]:
 		assert(not Localizer.text(language, "initial_seed_stock_endless_girl").is_empty())
 		assert(not Localizer.text(language, "initial_seed_stock_endless_armadillo").is_empty())
+		assert(not Localizer.text(language, "tutorial_normal_pre_sow_endless").is_empty())
 		assert(not Localizer.text(language, "play_normal_seed_endless").is_empty())
 		assert(not Localizer.text(language, "endless_record_update", [87.4]).is_empty())
+
+
+func _test_endless_first_play_tutorial(game: Node) -> void:
+	game._clear_greenhouse_plants()
+	game.play_active = false
+	game.play_modal_open = false
 	game.normal_play_tutorial_complete = false
+	game.puku_buyback_tutorial_complete = false
+	game.seed_pod_first_reward_seen = false
+	game.first_seed_pod_reward_event_active = false
 	game.initial_seed_stock_notice_complete = false
+	game.first_habitat_gift_claimed = false
+	game.normal_seed_bags = 0
+	game.tutorial_steps.erase(game.ENDLESS_AUTO_SOW_TUTORIAL_STEP)
+	game.play_overlay.visible = false
+	game.tutorial_guide_overlay.visible = false
+	assert(not game._normal_seed_play_available())
 	game._start_initial_seed_stock_notice()
 	assert(game.scripted_dialog_kind == "initial_seed_stock")
 	assert(game.scripted_dialog_pages.size() == 2)
 	assert(game.scripted_dialog_pages[0].text == Localizer.text("ja", "initial_seed_stock_endless_girl"))
 	assert(game.scripted_dialog_pages[1].text == Localizer.text("ja", "initial_seed_stock_endless_armadillo"))
 	assert(game.scripted_dialog_pages.all(func(page: Dictionary) -> bool: return str(page.get("text", "")) != Localizer.text("ja", "initial_seed_stock_received")))
-	game.scripted_dialog_kind = ""
-	game.scripted_dialog_pages.clear()
-	game.scripted_dialog_index = -1
-	game.intro_overlay.visible = false
-	game.first_habitat_gift_claimed = false
-	game.normal_seed_bags = 0
-	assert(not game._normal_seed_play_available())
-	game._claim_first_habitat_gift_once()
+	assert(not game.first_habitat_gift_claimed)
+	game._advance_scripted_dialog()
+	assert(game.scripted_dialog_index == 1 and not game.first_habitat_gift_claimed)
+	game._advance_scripted_dialog()
+	await get_tree().process_frame
+	assert(game.initial_seed_stock_notice_complete)
 	assert(game.first_habitat_gift_claimed and game.normal_seed_bags == 0 and game._normal_seed_play_available())
-
-
-func _test_endless_first_play_tutorial(game: Node) -> void:
-	game._clear_greenhouse_plants()
-	game.play_active = false
-	game.normal_play_tutorial_complete = false
-	game.puku_buyback_tutorial_complete = false
-	game.seed_pod_first_reward_seen = false
-	game.first_seed_pod_reward_event_active = false
-	game._start_greenhouse_play("normal")
+	assert(game.scripted_dialog_kind == "first_normal_sow_prompt")
+	assert(game.scripted_dialog_pages.size() == 1)
+	assert(game.scripted_dialog_pages[0].text == Localizer.text("ja", "tutorial_normal_pre_sow_endless"))
+	assert(not game.play_modal_open and not game.play_overlay.visible and not game.tutorial_guide_overlay.visible)
+	game._advance_scripted_dialog()
 	await get_tree().create_timer(.72).timeout
 	assert(game.play_active and game.first_play_tutorial_active)
+	assert(game.active_seed_type == "normal")
+	assert(game.plants.size() >= game.PLAY_INITIAL_MIN_PLANTS and game.plants.size() <= game.PLAY_INITIAL_MAX_PLANTS)
+	assert(not game.play_modal_open and not game.play_overlay.visible and not game.normal_play_button.visible)
 	var tutorial_plant = game.plants[0]
 	var tutorial_species_id := str(tutorial_plant.data.get("species_id", ""))
 	game.discovered[tutorial_species_id] = true
@@ -211,10 +215,8 @@ func _test_endless_first_play_tutorial(game: Node) -> void:
 	assert(game.tutorial_guide_message.text == Localizer.text("ja", "puku_buyback_2_endless"))
 	game._advance_puku_buyback_tutorial()
 	assert(game.puku_buyback_tutorial_complete and not game.puku_buyback_tutorial_active)
-	game.play_active = false
-	game.play_spawn_queue = 0
-	game.play_seed_animations_pending = 0
-	game._clear_greenhouse_plants()
+	await get_tree().create_timer(1.55).timeout
+	assert(game.play_active and game.plants.size() == game.play_concurrent_target)
 
 
 func _test_immediate_species_get_and_pause(game: Node) -> void:
@@ -271,6 +273,32 @@ func _test_navigation_pause_resume(game: Node) -> void:
 	game.arrangement_scene_active = false
 	game._update_play_ui()
 	assert(game._greenhouse_area_navigation_available())
+	var age_before_dialog: float = observer.age
+	game._start_scripted_dialog("endless_smoke_pause", [{"speaker": "panda", "text": "pause"}], false)
+	game._process(1.0)
+	assert(is_equal_approx(observer.age, age_before_dialog))
+	game._advance_scripted_dialog()
+	await get_tree().process_frame
+	var age_before_dialog_resume: float = observer.age
+	game._process(.25)
+	assert(observer.age > age_before_dialog_resume)
+
+	# If a safe transition ever leaves the loop inactive, returning to the plain
+	# greenhouse reconstructs it without exposing a start button or seed modal.
+	game.current_mode = "habitat"
+	game.play_active = false
+	game.play_spawn_queue = 0
+	game.play_seed_animations_pending = 0
+	game._clear_greenhouse_plants()
+	game._apply_mode()
+	game._process(.1)
+	assert(not game.play_active)
+	game.current_mode = "greenhouse"
+	game._apply_mode()
+	game._process(.01)
+	await get_tree().create_timer(.72).timeout
+	assert(game.play_active and game.active_seed_type == "normal")
+	assert(not game.play_open_button.visible and not game.play_overlay.visible)
 
 
 func _test_gauges(game: Node) -> void:
@@ -401,9 +429,18 @@ func _test_finite_mode_unchanged(game: Node) -> void:
 	game.play_active = false
 	game.endless_greenhouse.configure(false)
 	game.normal_seed_bags = 1
+	game.volume_seed_unlocked = true
+	game.volume_seed_bags = 1
 	game.puku_gauge_cm = 0.0
 	game.current_mode = "greenhouse"
 	game._apply_mode()
+	game.result_overlay.visible = false
+	game.play_modal_open = false
+	game._update_play_ui()
+	assert(game.play_open_button.visible)
+	game._open_play_modal()
+	assert(game.play_overlay.visible and game.normal_play_button.visible and game.volume_play_button.visible)
+	game._close_play_modal()
 	game._start_greenhouse_play("normal")
 	assert(game.play_active and game.normal_seed_bags == 0)
 	assert(is_equal_approx(game._puku_gauge_target_cm(), 500.0) and game._puku_gauge_reward_puku() == 3)
