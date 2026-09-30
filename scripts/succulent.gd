@@ -151,7 +151,7 @@ var jelly_permission:Callable
 var jelly_checks_enabled := true
 var sway_phase := 0.0
 
-func setup(species: Dictionary, seed_value: int, screen_label: Label, _danger: Label, logic_only := false) -> void:
+func setup(species: Dictionary, seed_value: int, screen_label: Label, _danger: Label, logic_only := false, balance_override:Dictionary = {}) -> void:
 	data = species
 	rng.seed = seed_value
 	sway_phase = rng.randf_range(0.0, TAU)
@@ -159,7 +159,7 @@ func setup(species: Dictionary, seed_value: int, screen_label: Label, _danger: L
 	# Every plant gets a short guaranteed establishment period. Its later
 	# vulnerability is individual: both the safe period and the time needed to
 	# reach the common 6%/second mature risk vary continuously.
-	var balance:=JellyBalanceClass.effective()
+	var balance:=balance_override if not balance_override.is_empty() else JellyBalanceClass.effective()
 	jelly_final_chance=float(balance.final_chance);growth_speed_multiplier=float(balance.growth_speed);growth_rhythm_amplitude=float(balance.rhythm_amplitude)
 	individual_growth_multiplier=1.0;is_slow_sticky=false;is_resilient=false
 	jelly_safe_end_seconds = rng.randf_range(float(balance.safe_min), float(balance.safe_max))

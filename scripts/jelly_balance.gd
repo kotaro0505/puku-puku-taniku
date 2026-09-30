@@ -14,6 +14,13 @@ const FORMAL := {
 	"growth_speed":1.0,"rhythm_amplitude":0.10
 }
 
+const ENDLESS_NORMAL_TRIAL_WEIGHTS := {
+	"short_weight":35.0,
+	"normal_weight":35.0,
+	"long_weight":22.0,
+	"ultra_weight":8.0,
+}
+
 # At 0% conversion rates the formal RNG draw sequence remains unchanged.
 # Opening the developer panel applies these candidate rates as an override only.
 const SLOW_STICKY_TEST_RATE := 70.0
@@ -40,6 +47,15 @@ static func apply_prediction_v1_test_values()->void:
 
 static func effective()->Dictionary:
 	return values if override_enabled else FORMAL
+
+static func endless_normal_trial_balance()->Dictionary:
+	# The trial changes only the resistance-type lottery. Keeping a complete
+	# formal snapshot here prevents a global developer override, battle plant,
+	# habitat specimen, or catalog preview from leaking into normal ENDLESS play.
+	var balance:=FORMAL.duplicate(true)
+	for key in ENDLESS_NORMAL_TRIAL_WEIGHTS:
+		balance[key]=ENDLESS_NORMAL_TRIAL_WEIGHTS[key]
+	return balance
 
 static func reset_formal()->void:
 	values=FORMAL.duplicate(true);override_enabled=false;initialized=true

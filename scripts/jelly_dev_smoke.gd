@@ -19,6 +19,52 @@ func _make_plant(balance:Dictionary,seed_value:int)->Succulent:
 	plant.setup(sample_species,seed_value,null,null)
 	return plant
 
+func _verify_endless_normal_trial_balance()->void:
+	JellyBalanceClass.reset_formal()
+	var formal:=JellyBalanceClass.FORMAL
+	var trial:=JellyBalanceClass.endless_normal_trial_balance()
+	assert(is_equal_approx(float(trial.short_weight),35.0))
+	assert(is_equal_approx(float(trial.normal_weight),35.0))
+	assert(is_equal_approx(float(trial.long_weight),22.0))
+	assert(is_equal_approx(float(trial.ultra_weight),8.0))
+	assert(is_equal_approx(JellyBalanceClass.weight_total(trial),100.0))
+	for key in formal:
+		if not str(key).ends_with("_weight"):
+			assert(trial[key]==formal[key])
+	assert(JellyBalanceClass.resistance_for_roll(.34,trial)=="short")
+	assert(JellyBalanceClass.resistance_for_roll(.40,trial)=="normal")
+	assert(JellyBalanceClass.resistance_for_roll(.80,trial)=="long")
+	assert(JellyBalanceClass.resistance_for_roll(.95,trial)=="ultra")
+	assert(JellyBalanceClass.resistance_for_roll(.40,formal)=="short")
+
+	var profile_rng:=RandomNumberGenerator.new();profile_rng.seed=20260930
+	var counts:={"short":0,"normal":0,"long":0,"ultra":0}
+	for index in range(50000):
+		var resistance:=JellyBalanceClass.resistance_for_roll(profile_rng.randf(),trial)
+		counts[resistance]=int(counts[resistance])+1
+	assert(absf(float(counts.short)/50000.0-.35)<.01)
+	assert(absf(float(counts.normal)/50000.0-.35)<.01)
+	assert(absf(float(counts.long)/50000.0-.22)<.01)
+	assert(absf(float(counts.ultra)/50000.0-.08)<.01)
+
+	# Supplying the mode-specific balance affects only this plant. The same RNG
+	# seed still uses the formal 45/35/16/4 split without the override.
+	var selected_seed:=-1
+	for seed_value in range(1000):
+		var probe:=RandomNumberGenerator.new();probe.seed=seed_value
+		probe.randf_range(0.0,TAU);probe.randf();probe.randf_range(float(formal.safe_min),float(formal.safe_max))
+		var roll:=probe.randf()
+		if roll>.35 and roll<.45:selected_seed=seed_value;break
+	assert(selected_seed>=0)
+	var trial_plant:=SucculentClass.new();trial_plant.setup(sample_species,selected_seed,null,null,true,trial)
+	var formal_plant:=SucculentClass.new();formal_plant.setup(sample_species,selected_seed,null,null,true,formal)
+	assert(trial_plant.base_resistance_type=="normal")
+	assert(formal_plant.base_resistance_type=="short")
+	trial_plant.free();formal_plant.free()
+	JellyBalanceClass.values=JellyBalanceClass.FORMAL.duplicate(true)
+	JellyBalanceClass.override_enabled=false
+	JellyBalanceClass.initialized=false
+
 func _verify_prediction_statistics()->void:
 	var balance:=JellyBalanceClass.FORMAL.duplicate(true)
 	balance.slow_short_rate=70.0;balance.slow_resilient_rate=30.0;balance.regular_short_resilient_rate=5.0
@@ -132,6 +178,7 @@ func _verify_profile_bounds_and_common_hazard()->void:
 		regular.free()
 
 func _ready()->void:
+	_verify_endless_normal_trial_balance()
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
 	game._open_jelly_dev()
@@ -186,5 +233,5 @@ func _ready()->void:
 	assert(not JellyBalanceClass.override_enabled and not game.jelly_trait_display_enabled and is_equal_approx(float(JellyBalanceClass.values.slow_short_rate),0.0))
 	assert(is_zero_approx(float(JellyBalanceClass.values.slow_resilient_rate)) and is_zero_approx(float(JellyBalanceClass.values.regular_short_resilient_rate)) and is_equal_approx(float(JellyBalanceClass.values.resilient_final_chance),0.03))
 	assert(is_equal_approx(float(JellyBalanceClass.effective().cooldown),0.0) and is_equal_approx(float(JellyBalanceClass.values.rhythm_amplitude),.10))
-	print("JELLY_DEV_SMOKE_OK prediction_v1 slow=70% slow_resilient=30% regular_resilient=5% resilient_final=3% formal_rng=legacy trait_default=OFF")
+	print("JELLY_DEV_SMOKE_OK endless_trial=35/35/22/8 prediction_v1 slow=70% slow_resilient=30% regular_resilient=5% resilient_final=3% formal_rng=legacy trait_default=OFF")
 	get_tree().quit()

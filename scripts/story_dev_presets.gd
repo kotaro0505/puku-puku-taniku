@@ -28,6 +28,12 @@ static func available(debug_enabled: bool) -> bool:
 	return debug_enabled
 
 
+static func _available_for_game(game) -> bool:
+	if game.has_method("_trial_dev_controls_enabled"):
+		return available(bool(game._trial_dev_controls_enabled()))
+	return available(bool(game.habitat_debug_enabled))
+
+
 static func options() -> Array[Dictionary]:
 	return [
 		{"id": ACT3_READY, "label": "第三幕直前"},
@@ -40,7 +46,7 @@ static func options() -> Array[Dictionary]:
 
 
 static func apply(game, preset_id: String) -> Dictionary:
-	if not available(bool(game.habitat_debug_enabled)):
+	if not _available_for_game(game):
 		return {"ok": false, "error": "development_only"}
 	if preset_id not in PRESET_IDS:
 		return {"ok": false, "error": "unknown_preset"}
@@ -88,7 +94,7 @@ static func apply(game, preset_id: String) -> Dictionary:
 
 
 static func spawn_101cm_colorata(game) -> bool:
-	if not available(bool(game.habitat_debug_enabled)):
+	if not _available_for_game(game):
 		return false
 	_prepare_runtime_view(game, "greenhouse")
 	game.active_seed_type = "normal"
