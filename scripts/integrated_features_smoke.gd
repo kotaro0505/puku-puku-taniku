@@ -23,6 +23,7 @@ func _test_catalog_and_collection_rarity(game)->void:
 	for series_value in game.series_catalog:
 		if not series_value is Dictionary:continue
 		var series:Dictionary=series_value;var ids:Array=series.get("species_ids",[]);var series_id:=str(series.get("series_id",""))
+		if series_id=="hybrid":continue
 		if ids.size()<3:continue
 		assert(rarity_data.has(series_id))
 		var two_star:=0;var one_star:=0

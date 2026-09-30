@@ -13,6 +13,8 @@ const ForestGachaUIClass = preload("res://scripts/forest_gacha_ui.gd")
 const SecretGachaSystemClass = preload("res://scripts/secret_gacha_system.gd")
 const SecretGachaUIClass = preload("res://scripts/secret_gacha_ui.gd")
 const SpeciesGetOverlayClass = preload("res://scripts/species_get_overlay.gd")
+const FusionSystemClass = preload("res://scripts/fusion_system.gd")
+const FusionLabUIClass = preload("res://scripts/fusion_lab_ui.gd")
 const Localizer = preload("res://scripts/game_localizer.gd")
 const DialoguePortraitsClass = preload("res://scripts/dialogue_portraits.gd")
 const StarRatingClass = preload("res://scripts/star_rating.gd")
@@ -255,6 +257,7 @@ var arrangement_button: Button
 var forest_gacha_button: Button
 var shop_forest_gacha_button: Button
 var secret_gacha_button: Button
+var fusion_lab_button: Button
 var settings_button:Button
 var current_mode := "greenhouse"
 var labels_layer: Control
@@ -465,6 +468,10 @@ var secret_gacha_last_roll_play_count:=-1
 var species_get_overlay
 var species_get_queue:Array[Dictionary]=[]
 var species_get_active_context:=""
+var fusion_system
+var fusion_lab_ui
+var fusion_parent_a_id:=""
+var fusion_parent_b_id:=""
 var language_code:="ja"
 var language_selected:=false
 var save_file_present_on_boot:=false
@@ -671,6 +678,7 @@ func _ready() -> void:
 	_load_species()
 	_load_series_data()
 	_load_collection_rarity()
+	fusion_system=FusionSystemClass.new();fusion_system.configure(catalog_species)
 	forest_gacha_system=ForestGachaSystemClass.new();forest_gacha_system.configure(series_catalog,catalog_species,catalog_progression)
 	_load_pot_data()
 	secret_gacha_system=SecretGachaSystemClass.new();secret_gacha_system.load_config();secret_gacha_system.configure(series_catalog,catalog_species,pot_catalog,catalog_progression)
@@ -797,6 +805,26 @@ func _continue_after_opening()->void:
 func _load_species() -> void:
 	var raw := FileAccess.get_file_as_string("res://data/species-v2.json")
 	var all_species: Array = JSON.parse_string(raw)
+	var parsed_hybrids:Variant=JSON.parse_string(FileAccess.get_file_as_string("res://data/hybrid-species.json"))
+	if parsed_hybrids is Array:
+		for raw_hybrid in parsed_hybrids:
+			if not raw_hybrid is Dictionary:continue
+			var hybrid:Dictionary=raw_hybrid.duplicate(true)
+			hybrid["description_ja"]="配合ラボで誕生した、ふたつの系統の個性を受け継ぐ特別な多肉。"
+			hybrid["description_en"]="A special hybrid succulent born in the Fusion Lab."
+			hybrid["rarity"]="配合種";hybrid["spawn_weight"]=0.0;hybrid["unlocked_spawn_weight"]=1.0
+			hybrid["series_seed_weight"]=0.0;hybrid["series_seed_eligible"]=false
+			hybrid["base_growth_rate"]=1.0;hybrid["jelly_risk_curve"]=1.0
+			hybrid["visual_variant"]=str(hybrid.get("species_id",""));hybrid["habitat_image_path"]=""
+			hybrid["golden_variant"]=false;hybrid["catalog_only"]=true
+			hybrid["mystery_pack_eligible"]=true;hybrid["fusion_only_until_discovered"]=true
+			all_species.append(hybrid)
+	for entry_value in all_species:
+		if not entry_value is Dictionary:continue
+		var entry:Dictionary=entry_value
+		if str(entry.get("fusion_series","")).is_empty():
+			var fusion_series:=FusionSystemClass.default_fusion_series_for_catalog_series(str(entry.get("series_id","")))
+			if not fusion_series.is_empty():entry["fusion_series"]=fusion_series
 	catalog_species=all_species.duplicate(true)
 	unlock_rules=JSON.parse_string(FileAccess.get_file_as_string("res://data/unlock-rules.json"))
 	greenhouse_available=_initial_greenhouse_state()
@@ -1549,6 +1577,8 @@ func _build_ui() -> void:
 	external_navigation_controls.append(shop_button)
 	forest_gacha_button=Button.new();forest_gacha_button.name="ForestGachaButton";forest_gacha_button.text="森のガチャ";forest_gacha_button.position=Vector2(398,326);forest_gacha_button.size=Vector2(153,67);_skin_button(forest_gacha_button,Color("#d9c77d"),15);forest_gacha_button.mouse_filter=Control.MOUSE_FILTER_STOP;forest_gacha_button.pressed.connect(_open_forest_gacha);hud.add_child(forest_gacha_button)
 	external_navigation_controls.append(forest_gacha_button)
+	fusion_lab_button=Button.new();fusion_lab_button.name="FusionLabButton";fusion_lab_button.text="配合ラボ";fusion_lab_button.position=Vector2(398,400);fusion_lab_button.size=Vector2(153,58);_skin_button(fusion_lab_button,Color("#cda4d7"),16);fusion_lab_button.mouse_filter=Control.MOUSE_FILTER_STOP;fusion_lab_button.pressed.connect(_open_fusion_lab);hud.add_child(fusion_lab_button)
+	external_navigation_controls.append(fusion_lab_button)
 	secret_gacha_button=Button.new();secret_gacha_button.name="SecretGachaButton";secret_gacha_button.text="秘密のガチャ\n1ぷく";secret_gacha_button.position=Vector2(398,466);secret_gacha_button.size=Vector2(153,67);_skin_button(secret_gacha_button,Color("#b88348"),15);secret_gacha_button.mouse_filter=Control.MOUSE_FILTER_STOP;secret_gacha_button.pressed.connect(_open_secret_gacha);secret_gacha_button.visible=false;hud.add_child(secret_gacha_button)
 	external_navigation_controls.append(secret_gacha_button)
 	habitat_status_label=Label.new();habitat_status_label.position=Vector2(163,42);habitat_status_label.size=Vector2(250,56);habitat_status_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;habitat_status_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;habitat_status_label.add_theme_font_size_override("font_size",18);habitat_status_label.add_theme_color_override("font_color",UI_CREAM);habitat_status_label.add_theme_stylebox_override("normal",_box(Color("#4b2d20"),Color("#d8ad68"),18,2));habitat_status_label.visible=false;hud.add_child(habitat_status_label)
@@ -1568,6 +1598,7 @@ func _build_ui() -> void:
 	_build_forest_gacha_ui(hud)
 	_build_secret_gacha_ui(hud)
 	_build_species_get_overlay(hud)
+	_build_fusion_lab_ui(hud)
 	if DEVELOPMENT_CATALOG_PREVIEW_ENABLED:_build_catalog_preview_dev(hud)
 	_build_jelly_dev_overlay(hud)
 	_build_intro_story(hud)
@@ -3209,6 +3240,7 @@ func _apply_language_to_ui()->void:
 	if shop_button:shop_button.text=Localizer.text(language_code,"main_shop")
 	if arrangement_button:arrangement_button.text=Localizer.text(language_code,"main_arrangement")
 	if forest_gacha_button:forest_gacha_button.text=Localizer.text(language_code,"main_forest_gacha")
+	if fusion_lab_button:fusion_lab_button.text=Localizer.text(language_code,"main_fusion")
 	_update_secret_gacha_button_state()
 	if mode_button:mode_button.text=Localizer.text(language_code,"main_greenhouse" if current_mode=="habitat" else "main_habitat")
 	if settings_button:settings_button.text=Localizer.text(language_code,"settings")
@@ -3227,6 +3259,7 @@ func _apply_language_to_ui()->void:
 	if shop_chatter_decline_button:shop_chatter_decline_button.text=Localizer.text(language_code,"no")
 	if forest_gacha_ui:forest_gacha_ui.set_language(language_code)
 	if secret_gacha_ui:secret_gacha_ui.set_language(language_code)
+	if fusion_lab_ui:fusion_lab_ui.set_language(language_code)
 	if arrangement_ui and arrangement_ui.has_method("set_language"):arrangement_ui.set_language(language_code)
 	if habitat_restoration_ui:habitat_restoration_ui.set_language(language_code)
 	_set_named_localized_text("PlayChooseTitle","play_choose_seed")
@@ -3275,6 +3308,66 @@ func _build_secret_gacha_ui(hud:Control)->void:
 func _build_species_get_overlay(hud:Control)->void:
 	species_get_overlay=SpeciesGetOverlayClass.new();hud.add_child(species_get_overlay)
 	species_get_overlay.closed.connect(_on_species_get_overlay_closed)
+
+func _build_fusion_lab_ui(hud:Control)->void:
+	fusion_lab_ui=FusionLabUIClass.new();hud.add_child(fusion_lab_ui)
+	fusion_lab_ui.close_requested.connect(_close_fusion_lab)
+	fusion_lab_ui.parent_selected.connect(_on_fusion_parent_selected)
+	fusion_lab_ui.fuse_requested.connect(_perform_fusion)
+	fusion_lab_ui.set_language(language_code)
+
+func _fusion_lab_available()->bool:
+	if fusion_system==null or _is_endless_greenhouse_enabled() or not _tutorial_fully_complete():return false
+	return not fusion_system.eligible_parents(species_get_counts).is_empty()
+
+func _open_fusion_lab()->void:
+	if fusion_lab_ui==null or play_active or arrangement_scene_active or arrangement_transitioning or current_mode!="greenhouse" or not _fusion_lab_available():return
+	if (encyclopedia_overlay and encyclopedia_overlay.visible) or (settings_overlay and settings_overlay.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible):return
+	play_modal_open=false
+	if play_overlay:play_overlay.visible=false
+	fusion_parent_a_id="";fusion_parent_b_id=""
+	fusion_lab_ui.set_language(language_code)
+	fusion_lab_ui.open_lab(fusion_system.eligible_parents(species_get_counts),species_get_counts)
+	_update_play_ui()
+
+func _close_fusion_lab()->void:
+	if fusion_lab_ui:fusion_lab_ui.close_lab()
+	fusion_parent_a_id="";fusion_parent_b_id=""
+	_update_play_ui()
+
+func _on_fusion_parent_selected(slot:int,species_id:String)->void:
+	if _species_get_count(species_id)<=0 or fusion_system.fusion_series_for_species(species_id).is_empty():return
+	if slot==0:fusion_parent_a_id=species_id
+	else:fusion_parent_b_id=species_id
+	_refresh_fusion_lab_result()
+
+func _refresh_fusion_lab_result()->void:
+	if fusion_lab_ui==null:return
+	var resolution:Dictionary=fusion_system.resolve(fusion_parent_a_id,fusion_parent_b_id)
+	var result_species_id:=str(resolution.get("result_species_id",""))
+	var is_new:=not result_species_id.is_empty() and _species_get_count(result_species_id)<=0
+	fusion_lab_ui.refresh_selection(fusion_parent_a_id,fusion_parent_b_id,resolution,is_new)
+	var result_entry:Dictionary=resolution.get("result_entry",{})
+	if result_entry.is_empty():return
+	fusion_lab_ui.result_image.texture=_species_loading_texture(result_entry)
+	_request_species_texture(result_entry,fusion_lab_ui.result_image,true)
+
+func _perform_fusion(parent_a_id:String,parent_b_id:String)->void:
+	if fusion_system==null or fusion_lab_ui==null:return
+	if not fusion_system.parents_are_owned(parent_a_id,parent_b_id,species_get_counts):
+		fusion_lab_ui.show_error(Localizer.text(language_code,"fusion_parent_missing"));return
+	var resolution:Dictionary=fusion_system.resolve(parent_a_id,parent_b_id)
+	var result_entry:Dictionary=resolution.get("result_entry",{})
+	var result_species_id:=str(resolution.get("result_species_id",""))
+	if result_entry.is_empty() or result_species_id.is_empty():
+		fusion_lab_ui.show_error(Localizer.text(language_code,"fusion_recipe_missing"));return
+	var is_new:=_species_get_count(result_species_id)<=0
+	_register_species_discovery(result_species_id,true)
+	_apply_saved_unlocks();_sync_arrangement_ui();_refresh_series_selection()
+	if encyclopedia_overlay and encyclopedia_overlay.visible:_refresh_encyclopedia_header();_refresh_encyclopedia_cards()
+	_save()
+	fusion_lab_ui.close_lab();fusion_parent_a_id="";fusion_parent_b_id="";_update_play_ui()
+	_queue_species_get(result_entry,is_new,"fusion_lab")
 
 func _open_forest_gacha()->void:
 	if forest_gacha_ui==null or not forest_gacha_unlocked or play_active or arrangement_scene_active or not _tutorial_fully_complete():return
@@ -3518,6 +3611,8 @@ func _change_audio_volume(value:float,is_bgm:bool)->void:
 
 func _reset_progression_state()->void:
 	_end_first_play_tutorial_context()
+	fusion_parent_a_id="";fusion_parent_b_id=""
+	if fusion_lab_ui:fusion_lab_ui.close_lab()
 	endless_greenhouse.reset_discovery_state()
 	pending_restoration_snapshot.clear()
 	if habitat_restoration_ui:habitat_restoration_ui.reset_view()
@@ -3743,7 +3838,7 @@ func _clear_greenhouse_plants()->void:
 func _update_play_ui()->void:
 	if not play_overlay:return
 	var preview_overlay_open:bool=catalog_preview_ui!=null and catalog_preview_ui.is_overlay_open()
-	var gacha_open:bool=(forest_gacha_ui!=null and forest_gacha_ui.visible) or (secret_gacha_ui!=null and secret_gacha_ui.visible) or (species_get_overlay!=null and species_get_overlay.visible)
+	var gacha_open:bool=(forest_gacha_ui!=null and forest_gacha_ui.visible) or (secret_gacha_ui!=null and secret_gacha_ui.visible) or (species_get_overlay!=null and species_get_overlay.visible) or (fusion_lab_ui!=null and fusion_lab_ui.visible)
 	var battle_open:bool=puku_puku_battle!=null and puku_puku_battle.visible
 	var habitat_modal_open:bool=battle_open or (habitat_plant_panel!=null and habitat_plant_panel.visible) or (habitat_dev_panel!=null and habitat_dev_panel.visible) or (story_dev_panel!=null and story_dev_panel.visible) or (habitat_awakening_overlay!=null and habitat_awakening_overlay.visible) or (seed_pod_story_overlay!=null and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay!=null and habitat_second_awakening_overlay.visible)
 	var arrangement_navigation_suspended:bool=arrangement_scene_active or arrangement_transitioning or catalog_preview_mode_active or preview_overlay_open or gacha_open or habitat_modal_open
@@ -3769,6 +3864,7 @@ func _update_play_ui()->void:
 	if habitat_dev_open_button:habitat_dev_open_button.visible=current_mode=="habitat" and not play_active and not arrangement_navigation_suspended
 	if shop_button:shop_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete()
 	if forest_gacha_button:forest_gacha_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete() and forest_gacha_unlocked and forest_gacha_intro_seen
+	if fusion_lab_button:fusion_lab_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _fusion_lab_available()
 	if shop_forest_gacha_button:shop_forest_gacha_button.visible=forest_gacha_unlocked and forest_gacha_intro_seen
 	if secret_gacha_button:
 		secret_gacha_button.visible=StoryProgressionClass.secret_gacha_feature_enabled() and not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete() and StoryProgressionClass.secret_gacha_is_unlocked(story_progression_state) and secret_gacha_active
@@ -6032,6 +6128,8 @@ func _normal_spawn_weight(entry:Dictionary)->float:
 
 func _seed_new_species_blocked(species_id:String)->bool:
 	if species_id in _mystery_event_species_ids():return true
+	var entry:=_catalog_entry(species_id)
+	if bool(entry.get("fusion_only_until_discovered",false)) and _species_get_count(species_id)<=0:return true
 	return species_id in [MYSTERY_RESEARCH_TRANSPARENT_ID,"golden_laui","golden_kannte"]
 
 func _find_spawn_position(position_rng:RandomNumberGenerator=null)->Vector3:
@@ -6612,7 +6710,7 @@ func _input(event:InputEvent)->void:
 	if habitat_lookaround_active or jurejure_intro_camera_active:return
 	if habitat_restoration_ui and habitat_restoration_ui.is_modal_visible():return
 	if arrangement_scene_active or arrangement_transitioning:return
-	if (opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible) or (puku_puku_battle and puku_puku_battle.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible and not first_play_harvest_guide_active and not old_seed_harvest_guide_active) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (story_dev_panel and story_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible):return
+	if (opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible) or (puku_puku_battle and puku_puku_battle.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible and not first_play_harvest_guide_active and not old_seed_harvest_guide_active) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (story_dev_panel and story_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (fusion_lab_ui and fusion_lab_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible):return
 	if current_mode=="greenhouse" and not play_active and not catalog_preview_mode_active:return
 	if event is InputEventScreenTouch:
 		if event.pressed:

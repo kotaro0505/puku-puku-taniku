@@ -607,6 +607,22 @@ const TEXT := {
 		,"jelly_float": "ジュレ"
 		,"preview_finished": "プレビュー終了"
 		,"preview_jelly": "ジュレ（プレビュー）"
+		,"main_fusion": "配合ラボ"
+		,"fusion_title": "配合ラボ"
+		,"fusion_owned_hint": "GETした多肉を2株えらんで配合します。\n親株はなくならず、GET数も減りません。"
+		,"fusion_parent_a": "親株 A"
+		,"fusion_parent_b": "親株 B"
+		,"fusion_choose": "えらぶ"
+		,"fusion_result_unknown": "？？？"
+		,"fusion_result_hint": "親株を2株えらぶと、配合結果が表示されます。"
+		,"fusion_result_new": "NEW！ 初GETとして図鑑に記録されます"
+		,"fusion_result_known": "GET済みの配合多肉です"
+		,"fusion_fuse": "この2株を配合する"
+		,"fusion_select_parent": "親株 %s をえらぶ"
+		,"fusion_no_parents": "配合できるGET済み多肉がまだありません。"
+		,"fusion_get_count": "GET %d"
+		,"fusion_parent_missing": "GET済みの親株を2株えらんでください。"
+		,"fusion_recipe_missing": "この組み合わせの配合結果が見つかりません。"
 		,"understood": "わかった"
 	},
 	"hiragana": {
@@ -1209,6 +1225,22 @@ const TEXT := {
 		,"jelly_float": "じゅれ"
 		,"preview_finished": "ぷれびゅー おわり"
 		,"preview_jelly": "じゅれ（ぷれびゅー）"
+		,"main_fusion": "はいごうらぼ"
+		,"fusion_title": "はいごうらぼ"
+		,"fusion_owned_hint": "GETした たにくを 2かぶ えらんで はいごうします。\nおやかぶは なくならず、GETすうも へりません。"
+		,"fusion_parent_a": "おやかぶ A"
+		,"fusion_parent_b": "おやかぶ B"
+		,"fusion_choose": "えらぶ"
+		,"fusion_result_unknown": "？？？"
+		,"fusion_result_hint": "おやかぶを 2かぶ えらぶと、はいごうけっかが ひょうじされます。"
+		,"fusion_result_new": "NEW！ はじめての GETとして ずかんに きろくされます"
+		,"fusion_result_known": "GETずみの はいごうたにくです"
+		,"fusion_fuse": "この 2かぶを はいごうする"
+		,"fusion_select_parent": "おやかぶ %s を えらぶ"
+		,"fusion_no_parents": "はいごうできる GETずみたにくが まだ ありません。"
+		,"fusion_get_count": "GET %d"
+		,"fusion_parent_missing": "GETずみの おやかぶを 2かぶ えらんでください。"
+		,"fusion_recipe_missing": "この くみあわせの はいごうけっかが みつかりません。"
 		,"understood": "わかった"
 	},
 	"en": {
@@ -1811,6 +1843,22 @@ const TEXT := {
 		,"jelly_float": "Jelly"
 		,"preview_finished": "Preview Finished"
 		,"preview_jelly": "Jelly (Preview)"
+		,"main_fusion": "Fusion Lab"
+		,"fusion_title": "Fusion Lab"
+		,"fusion_owned_hint": "Choose two succulents you have obtained to create a hybrid.\nParents are never consumed and their GET counts do not decrease."
+		,"fusion_parent_a": "Parent A"
+		,"fusion_parent_b": "Parent B"
+		,"fusion_choose": "Choose"
+		,"fusion_result_unknown": "???"
+		,"fusion_result_hint": "Choose two parents to preview the fusion result."
+		,"fusion_result_new": "NEW! This first GET will be recorded in the catalog"
+		,"fusion_result_known": "You have already obtained this hybrid"
+		,"fusion_fuse": "Fuse These Parents"
+		,"fusion_select_parent": "Choose Parent %s"
+		,"fusion_no_parents": "You do not have an eligible fusion parent yet."
+		,"fusion_get_count": "GET %d"
+		,"fusion_parent_missing": "Choose two parents you have already obtained."
+		,"fusion_recipe_missing": "No fusion result was found for this pair."
 		,"understood": "Got it"
 	}
 }
@@ -1847,7 +1895,7 @@ const HIRAGANA_SERIES_NAMES := {
 	"base":"げんしゅ", "metal":"きんぞくたにく",
 	"jewel":"ほうせきたにく", "jelly":"ぜりー", "sweets":"すいーつたにく", "gummy":"ぐみたにく",
 	"stardust":"ほしくずたにく", "glow":"ちっこうたにく", "neon":"ねおんたにく",
-	"stone":"すとーん", "sea":"うみ", "yumekawa":"ゆめふわ", "forest_amber":"もりと こはく"
+	"stone":"すとーん", "sea":"うみ", "yumekawa":"ゆめふわ", "forest_amber":"もりと こはく", "hybrid":"はいごうたにく"
 }
 
 static func normalize_language(value:String)->String:
@@ -1865,6 +1913,8 @@ static func species_name(language:String,entry:Dictionary)->String:
 	var species_id:=str(entry.get("species_id",""))
 	match normalize_language(language):
 		LANGUAGE_HIRAGANA:
+			var explicit_hiragana:=str(entry.get("name_hiragana",""))
+			if not explicit_hiragana.is_empty():return explicit_hiragana
 			if HIRAGANA_NAMES.has(species_id):return str(HIRAGANA_NAMES[species_id])
 			return _katakana_to_hiragana(str(entry.get("name_ja",species_id)))
 		LANGUAGE_EN:
@@ -1884,7 +1934,10 @@ static func species_description(language:String,entry:Dictionary)->String:
 
 static func series_name(language:String,entry:Dictionary)->String:
 	var series_id:=str(entry.get("series_id",""))
-	if normalize_language(language)==LANGUAGE_EN:return "Original Species" if series_id=="base" else series_id.replace("_"," ").capitalize()+" Catalog"
+	if normalize_language(language)==LANGUAGE_EN:
+		if series_id=="base":return "Original Species"
+		if series_id=="hybrid":return "Fusion Hybrids"
+		return series_id.replace("_"," ").capitalize()+" Catalog"
 	if normalize_language(language)==LANGUAGE_HIRAGANA:return str(HIRAGANA_SERIES_NAMES.get(series_id,_katakana_to_hiragana(str(entry.get("display_name",series_id)))))
 	return str(entry.get("display_name",series_id))
 
