@@ -73,6 +73,7 @@ func _ready() -> void:
 	await _test_forced_new_lifecycle(game)
 	await _test_navigation_pause_resume(game)
 	await _test_trial_dev_controls_and_gacha(game)
+	await _test_fusion_lab_flow(game)
 	_test_gauges(game)
 	await _test_restoration_pending_until_habitat(game)
 	_test_large_plant_screen_hits(game)
@@ -92,7 +93,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	_remove_test_file(NORMAL_PATH)
 	_remove_test_file(EXPERIMENT_PATH)
-	print("ENDLESS_GREENHOUSE_SMOKE_OK autostart=true modal=false infinite=true refill=harvest+jelly result=false longevity=35/35/22/8 per_spawn_new=false discovery_set=12 forced_new=true immediate_get=true pause=true navigation=true trial_dev=settings+story+jelly+gacha dev_gacha_saved=true pod=false puku=false restoration_pending=true finite=true save_isolated=true")
+	print("ENDLESS_GREENHOUSE_SMOKE_OK autostart=true modal=false infinite=true refill=harvest+jelly result=false longevity=35/35/22/8 per_spawn_new=false discovery_set=12 forced_new=true immediate_get=true pause=true navigation=true trial_dev=settings+story+jelly+gacha dev_gacha_saved=true fusion=entrance+open+parents+execute+species_get pod=false puku=false restoration_pending=true finite=true save_isolated=true")
 	get_tree().quit()
 
 
@@ -595,6 +596,70 @@ func _test_trial_dev_controls_and_gacha(game: Node) -> void:
 	var age_before_resume:float=observer.age
 	game._process(.25)
 	assert(observer.age>age_before_resume)
+
+
+func _test_fusion_lab_flow(game: Node) -> void:
+	assert(game._is_endless_normal_play())
+	var gummy_id := "gummy_peach_milk"
+	var metal_id := "metal_silver_rosette"
+	var hybrid_id := "hyb_gummy_metal"
+	for parent_id in [gummy_id, metal_id]:
+		game.discovered[parent_id] = true
+		game.greenhouse_available[parent_id] = true
+		game.unlocked_species[parent_id] = true
+		game.species_get_counts[parent_id] = 1
+	game.discovered.erase(hybrid_id)
+	game.greenhouse_available.erase(hybrid_id)
+	game.unlocked_species.erase(hybrid_id)
+	game.species_get_counts.erase(hybrid_id)
+	game._apply_saved_unlocks()
+	game._update_play_ui()
+	assert(game._fusion_lab_available())
+	assert(game.fusion_lab_button.visible)
+
+	var observer = game.plants[0]
+	observer.jelly_checks_enabled = false
+	var age_before_lab: float = observer.age
+	var spawn_queue_before: int = game.play_spawn_queue
+	game.fusion_lab_button.pressed.emit()
+	assert(game.fusion_lab_ui.visible)
+	assert(not game._should_simulate_endless_greenhouse())
+	game._process(1.0)
+	assert(is_equal_approx(observer.age, age_before_lab))
+	assert(game.play_spawn_queue == spawn_queue_before)
+
+	game.fusion_lab_ui.parent_a_button.pressed.emit()
+	assert(game.fusion_lab_ui.picker_page.visible and game.fusion_lab_ui.picker_slot == 0)
+	game.fusion_lab_ui._choose_candidate(gummy_id)
+	assert(game.fusion_parent_a_id == gummy_id)
+	game.fusion_lab_ui.parent_b_button.pressed.emit()
+	assert(game.fusion_lab_ui.picker_page.visible and game.fusion_lab_ui.picker_slot == 1)
+	game.fusion_lab_ui._choose_candidate(metal_id)
+	assert(game.fusion_parent_b_id == metal_id)
+	assert(str(game.fusion_lab_ui.current_result.get("result_species_id", "")) == hybrid_id)
+	assert(not game.fusion_lab_ui.fuse_button.disabled)
+
+	var gummy_before: int = game._species_get_count(gummy_id)
+	var metal_before: int = game._species_get_count(metal_id)
+	game.fusion_lab_ui.fuse_button.pressed.emit()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert(game._species_get_count(gummy_id) == gummy_before)
+	assert(game._species_get_count(metal_id) == metal_before)
+	assert(game._species_get_count(hybrid_id) == 1)
+	assert(bool(game.discovered.get(hybrid_id, false)))
+	assert(game.species_get_overlay.visible)
+	assert(game.species_get_overlay.name_label.text == "金箔グミ")
+	assert(not game._should_simulate_endless_greenhouse())
+
+	await get_tree().create_timer(.55).timeout
+	game.species_get_overlay.close_overlay()
+	await get_tree().create_timer(.24).timeout
+	assert(not game.species_get_overlay.visible)
+	assert(game._is_endless_normal_play() and game._should_simulate_endless_greenhouse())
+	var age_before_resume: float = observer.age
+	game._process(.25)
+	assert(observer.age > age_before_resume)
 
 
 func _test_gauges(game: Node) -> void:

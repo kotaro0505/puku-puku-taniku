@@ -1149,6 +1149,7 @@ func _endless_greenhouse_auto_start_blocked()->bool:
 	if result_overlay and result_overlay.visible:return true
 	if forest_gacha_ui and forest_gacha_ui.visible:return true
 	if secret_gacha_ui and secret_gacha_ui.visible:return true
+	if fusion_lab_ui and fusion_lab_ui.visible:return true
 	if species_get_overlay and species_get_overlay.visible:return true
 	if puku_puku_battle and puku_puku_battle.visible:return true
 	if catalog_preview_ui and catalog_preview_ui.is_overlay_open():return true
@@ -1204,6 +1205,7 @@ func _should_simulate_endless_greenhouse()->bool:
 	if result_overlay and result_overlay.visible:return false
 	if forest_gacha_ui and forest_gacha_ui.visible:return false
 	if secret_gacha_ui and secret_gacha_ui.visible:return false
+	if fusion_lab_ui and fusion_lab_ui.visible:return false
 	if species_get_overlay and species_get_overlay.visible:return false
 	if catalog_preview_ui and catalog_preview_ui.is_overlay_open():return false
 	if habitat_plant_panel and habitat_plant_panel.visible:return false
@@ -3317,11 +3319,11 @@ func _build_fusion_lab_ui(hud:Control)->void:
 	fusion_lab_ui.set_language(language_code)
 
 func _fusion_lab_available()->bool:
-	if fusion_system==null or _is_endless_greenhouse_enabled() or not _tutorial_fully_complete():return false
+	if fusion_system==null or not _tutorial_fully_complete():return false
 	return not fusion_system.eligible_parents(species_get_counts).is_empty()
 
 func _open_fusion_lab()->void:
-	if fusion_lab_ui==null or play_active or arrangement_scene_active or arrangement_transitioning or current_mode!="greenhouse" or not _fusion_lab_available():return
+	if fusion_lab_ui==null or (play_active and not _is_endless_normal_play()) or arrangement_scene_active or arrangement_transitioning or current_mode!="greenhouse" or not _fusion_lab_available():return
 	if (encyclopedia_overlay and encyclopedia_overlay.visible) or (settings_overlay and settings_overlay.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible):return
 	play_modal_open=false
 	if play_overlay:play_overlay.visible=false
@@ -3864,7 +3866,7 @@ func _update_play_ui()->void:
 	if habitat_dev_open_button:habitat_dev_open_button.visible=current_mode=="habitat" and not play_active and not arrangement_navigation_suspended
 	if shop_button:shop_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete()
 	if forest_gacha_button:forest_gacha_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete() and forest_gacha_unlocked and forest_gacha_intro_seen
-	if fusion_lab_button:fusion_lab_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _fusion_lab_available()
+	if fusion_lab_button:fusion_lab_button.visible=(not play_active or _is_endless_normal_play()) and not arrangement_navigation_suspended and current_mode=="greenhouse" and _fusion_lab_available()
 	if shop_forest_gacha_button:shop_forest_gacha_button.visible=forest_gacha_unlocked and forest_gacha_intro_seen
 	if secret_gacha_button:
 		secret_gacha_button.visible=StoryProgressionClass.secret_gacha_feature_enabled() and not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete() and StoryProgressionClass.secret_gacha_is_unlocked(story_progression_state) and secret_gacha_active
