@@ -1,6 +1,27 @@
 {
   "version": 1,
-  "special_recipes": [],
+  "special_recipes": [
+    {"parent_species_ids":["hyb_gummy_sea","hyb_glow_jewel"],"result_species_id":"fus1_rainbow_bubble"},
+    {"parent_species_ids":["hyb_gummy_gummy","hyb_stone_yumekawa"],"result_species_id":"fus1_pukupuku_planet"},
+    {"parent_species_ids":["hyb_metal_forest_amber","hyb_glow_glow"],"result_species_id":"fus1_moon_clock"},
+    {"parent_species_ids":["hyb_metal_yumekawa","hyb_metal_sea"],"result_species_id":"fus1_diving_sphere"},
+    {"parent_species_ids":["hyb_sweets_sweets","hyb_glow_sea"],"result_species_id":"fus1_jellyfish_parfait"},
+    {"parent_species_ids":["hyb_sweets_sea","hyb_jewel_yumekawa"],"result_species_id":"fus1_sunset_jelly"},
+    {"parent_species_ids":["hyb_glow_glow","hyb_jewel_sea"],"result_species_id":"fus1_moon_pool"},
+    {"parent_species_ids":["hyb_glow_forest_amber","hyb_glow_yumekawa"],"result_species_id":"fus1_firefly_dome"},
+    {"parent_species_ids":["hyb_jewel_jewel","hyb_metal_yumekawa"],"result_species_id":"fus1_kaleidoscope"},
+    {"parent_species_ids":["hyb_jewel_forest_amber","hyb_sweets_glow"],"result_species_id":"fus1_prism_drop"},
+    {"parent_species_ids":["hyb_jure_jure","hyb_sweets_sweets"],"result_species_id":"fus1_bonus_time"},
+    {"parent_species_ids":["hyb_jure_sea","hyb_jure_yumekawa"],"result_species_id":"fus1_on_vacation"},
+    {"parent_species_ids":["hyb_stone_stone","hyb_stone_forest_amber"],"result_species_id":"fus1_geode"},
+    {"parent_species_ids":["hyb_stone_yumekawa","hyb_yumekawa_forest_amber"],"result_species_id":"fus1_moss_garden"},
+    {"parent_species_ids":["hyb_sea_sea","hyb_glow_yumekawa"],"result_species_id":"fus1_deep_sea_aquarium"},
+    {"parent_species_ids":["hyb_stone_sea","hyb_glow_jewel"],"result_species_id":"fus1_tide_pool"},
+    {"parent_species_ids":["hyb_yumekawa_yumekawa","hyb_gummy_glow"],"result_species_id":"fus1_dream_balloon"},
+    {"parent_species_ids":["hyb_jewel_yumekawa","hyb_sweets_yumekawa"],"result_species_id":"fus1_dream_specimen"},
+    {"parent_species_ids":["hyb_forest_amber_forest_amber","hyb_jewel_stone"],"result_species_id":"fus1_strata"},
+    {"parent_species_ids":["hyb_sea_forest_amber","hyb_sweets_forest_amber"],"result_species_id":"fus1_amber_forest"}
+  ],
   "basic_recipes": [
     {"parent_series":["gummy","gummy"],"result_species_id":"hyb_gummy_gummy"},
     {"parent_series":["gummy","metal"],"result_species_id":"hyb_gummy_metal"},

@@ -300,6 +300,7 @@ var encyclopedia_grid: GridContainer
 var encyclopedia_scroll: ScrollContainer
 var encyclopedia_card_images: Array[TextureRect] = []
 var encyclopedia_card_entries: Array[Dictionary] = []
+var encyclopedia_silhouette_material: ShaderMaterial
 var series_catalog: Array = []
 var catalog_progression: Dictionary = {}
 var selected_series_index := 0
@@ -811,9 +812,10 @@ func _load_species() -> void:
 		for raw_hybrid in parsed_hybrids:
 			if not raw_hybrid is Dictionary:continue
 			var hybrid:Dictionary=raw_hybrid.duplicate(true)
-			hybrid["description_ja"]="配合ラボで誕生した、ふたつの系統の個性を受け継ぐ特別な多肉。"
-			hybrid["description_en"]="A special hybrid succulent born in the Fusion Lab."
-			hybrid["rarity"]="配合種";hybrid["spawn_weight"]=0.0;hybrid["unlocked_spawn_weight"]=1.0
+			var is_special_fusion:=int(hybrid.get("fusion_tier",0))>0
+			hybrid["description_ja"]="決められた特別な組み合わせから誕生した、二段目の特殊配合多肉。" if is_special_fusion else "配合ラボで誕生した、ふたつの系統の個性を受け継ぐ特別な多肉。"
+			hybrid["description_en"]="A second-tier special fusion succulent born from a specific pairing." if is_special_fusion else "A special hybrid succulent born in the Fusion Lab."
+			hybrid["rarity"]="特殊配合種" if is_special_fusion else "配合種";hybrid["spawn_weight"]=0.0;hybrid["unlocked_spawn_weight"]=1.0
 			hybrid["series_seed_weight"]=0.0;hybrid["series_seed_eligible"]=false
 			hybrid["base_growth_rate"]=1.0;hybrid["jelly_risk_curve"]=1.0
 			hybrid["visual_variant"]=str(hybrid.get("species_id",""));hybrid["habitat_image_path"]=""
@@ -5301,14 +5303,14 @@ func _refresh_encyclopedia_cards()->void:
 	encyclopedia_card_images.clear();encyclopedia_card_entries.clear()
 	for child in encyclopedia_grid.get_children():child.free()
 	for entry in _series_species_entries(current_encyclopedia_series_id):
-		var species_id:=str(entry.get("species_id",""));var found:=bool(discovered.get(species_id,false))
+		var species_id:=str(entry.get("species_id",""));var found:=bool(discovered.get(species_id,false));var identity_visible:=found or _catalog_identity_visible_before_get(entry)
 		var card:=Button.new();card.custom_minimum_size=Vector2(252,274);card.mouse_filter=Control.MOUSE_FILTER_PASS;card.mouse_force_pass_scroll_events=true;card.action_mode=BaseButton.ACTION_MODE_BUTTON_RELEASE;_skin_button(card,Color("#f6e7c5"),16);card.disabled=not found;encyclopedia_grid.add_child(card)
 		var content:=VBoxContainer.new();content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);content.offset_left=10;content.offset_top=8;content.offset_right=-10;content.offset_bottom=-8;content.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.alignment=BoxContainer.ALIGNMENT_CENTER;card.add_child(content)
 		var image_frame:=MarginContainer.new();image_frame.name="SpeciesCardImageFrame";image_frame.custom_minimum_size=Vector2(210,137);image_frame.add_theme_constant_override("margin_left",10);image_frame.add_theme_constant_override("margin_top",8);image_frame.add_theme_constant_override("margin_right",10);image_frame.add_theme_constant_override("margin_bottom",8);image_frame.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.add_child(image_frame)
 		var image:=TextureRect.new();image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.mouse_filter=Control.MOUSE_FILTER_IGNORE;image.texture=_species_loading_texture(entry)
 		_apply_encyclopedia_image_style(image,entry,found)
 		image_frame.add_child(image);encyclopedia_card_images.append(image);encyclopedia_card_entries.append(entry)
-		var name_label:=Label.new();name_label.text=Localizer.species_name(language_code,entry) if found else "？？？";name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name_label.add_theme_font_size_override("font_size",18);name_label.add_theme_color_override("font_color",UI_BROWN);content.add_child(name_label)
+		var name_label:=Label.new();name_label.text=Localizer.species_name(language_code,entry) if identity_visible else "？？？";name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name_label.add_theme_font_size_override("font_size",18);name_label.add_theme_color_override("font_color",UI_BROWN);content.add_child(name_label)
 		var stars:=StarRating.new();stars.star_count=int(entry.get("gold_star_count",0)) if found else 0;stars.custom_minimum_size=Vector2(maxf(1.0,float(stars.star_count)*34.0),28.0);stars.visible=stars.star_count>0;content.add_child(stars)
 		var best_label_card:=Label.new();var card_best:=float(bests.get(species_id,0.0));best_label_card.text=(Localizer.text(language_code,"self_best",[card_best]) if card_best>0.0 else Localizer.text(language_code,"self_best_none")) if found else Localizer.text(language_code,"undiscovered");best_label_card.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;best_label_card.add_theme_font_size_override("font_size",14);best_label_card.add_theme_color_override("font_color",Color("#79543a"));content.add_child(best_label_card)
 		var get_label_card:=Label.new();get_label_card.text="GET %d"%_species_get_count(species_id) if found else "GET 0";get_label_card.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;get_label_card.add_theme_font_size_override("font_size",13);get_label_card.add_theme_color_override("font_color",Color("#98602e"));content.add_child(get_label_card)
@@ -5318,9 +5320,16 @@ func _refresh_encyclopedia_cards()->void:
 func _encyclopedia_unfound_status(_series_id:String)->String:
 	return Localizer.text(language_code,"undiscovered")
 
-func _apply_encyclopedia_image_style(image:TextureRect,_entry:Dictionary,found:bool)->void:
-	image.material=null
-	image.modulate=Color.WHITE if found else Color(0.12,0.09,0.08,0.82)
+func _catalog_identity_visible_before_get(entry:Dictionary)->bool:
+	return int(entry.get("fusion_tier",0))>0
+
+func _apply_encyclopedia_image_style(image:TextureRect,entry:Dictionary,found:bool)->void:
+	if found:
+		image.material=null;image.modulate=Color.WHITE;return
+	if _catalog_identity_visible_before_get(entry):
+		if encyclopedia_silhouette_material==null:encyclopedia_silhouette_material=FusionLabUIClass.create_silhouette_material()
+		image.material=encyclopedia_silhouette_material;image.modulate=Color.WHITE;return
+	image.material=null;image.modulate=Color(0.12,0.09,0.08,0.82)
 
 func _update_encyclopedia_visible_textures()->void:
 	if not encyclopedia_overlay.visible or not encyclopedia_list_page.visible:return
@@ -5719,7 +5728,7 @@ func _open_species_detail(entry:Dictionary)->void:
 	var image_frame:=MarginContainer.new();image_frame.name="SpeciesImageFrame";image_frame.custom_minimum_size=Vector2(450,430);image_frame.add_theme_constant_override("margin_left",22);image_frame.add_theme_constant_override("margin_top",22);image_frame.add_theme_constant_override("margin_right",22);image_frame.add_theme_constant_override("margin_bottom",22);content.add_child(image_frame)
 	var species_id:=str(entry.get("species_id",""));var found:=bool(discovered.get(species_id,false))
 	var image:=TextureRect.new();image.name="SpeciesImage";image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.texture=_species_texture(entry);image.mouse_filter=Control.MOUSE_FILTER_IGNORE;_apply_encyclopedia_image_style(image,entry,found);image_frame.add_child(image);_request_species_texture(entry,image,true)
-	var name_label:=Label.new();name_label.name="SpeciesName";name_label.text=Localizer.species_name(language_code,entry) if found else "？？？";name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name_label.add_theme_font_size_override("font_size",31);name_label.add_theme_color_override("font_color",UI_BROWN);content.add_child(name_label)
+	var name_label:=Label.new();name_label.name="SpeciesName";name_label.text=Localizer.species_name(language_code,entry) if found or _catalog_identity_visible_before_get(entry) else "？？？";name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name_label.add_theme_font_size_override("font_size",31);name_label.add_theme_color_override("font_color",UI_BROWN);content.add_child(name_label)
 	var stars:=StarRating.new();stars.name="GoldStars";stars.star_count=int(entry.get("gold_star_count",0)) if found else 0;stars.visible=stars.star_count>0;content.add_child(stars)
 	if stars.star_count>0:
 		var rarity:=Label.new();rarity.text=Localizer.text(language_code,"super_rare");rarity.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;rarity.add_theme_font_size_override("font_size",18);rarity.add_theme_color_override("font_color",Color("#b87916"));content.add_child(rarity)

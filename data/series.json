@@ -400,5 +400,41 @@
     "unlock_condition": {"display_text": "配合ラボで初GETすると開放"},
     "iap_product_id": "",
     "sort_order": 140
+  },
+  {
+    "series_id": "fusion_tier1",
+    "display_name": "特殊配合",
+    "subtitle": "二段目の特別な組み合わせから生まれる多肉",
+    "description": "決められた配合種同士を掛け合わせて誕生した、特殊配合の多肉を記録するページです。",
+    "cover_image_path": "res://assets/catalog/fusion_tier1/fus1_rainbow_bubble.png",
+    "species_ids": [
+      "fus1_rainbow_bubble",
+      "fus1_pukupuku_planet",
+      "fus1_moon_clock",
+      "fus1_diving_sphere",
+      "fus1_jellyfish_parfait",
+      "fus1_sunset_jelly",
+      "fus1_moon_pool",
+      "fus1_firefly_dome",
+      "fus1_kaleidoscope",
+      "fus1_prism_drop",
+      "fus1_bonus_time",
+      "fus1_on_vacation",
+      "fus1_geode",
+      "fus1_moss_garden",
+      "fus1_deep_sea_aquarium",
+      "fus1_tide_pool",
+      "fus1_dream_balloon",
+      "fus1_dream_specimen",
+      "fus1_strata",
+      "fus1_amber_forest"
+    ],
+    "field_id": "",
+    "unlock_type": "future",
+    "preview_catalog_when_locked": false,
+    "catalog_purchase_enabled": false,
+    "unlock_condition": {"display_text": "特殊配合で初GETすると開放"},
+    "iap_product_id": "",
+    "sort_order": 150
   }
 ]

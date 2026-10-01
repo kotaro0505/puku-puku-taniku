@@ -70,6 +70,11 @@ func set_special_recipes(recipes: Array) -> void:
 			_register_recipe(raw_recipe, true)
 
 func fusion_series_for_entry(entry: Dictionary) -> String:
+	# Higher-tier fusion species only participate through species-id recipes.
+	# Their display family is intentionally stored separately and must never
+	# route them into the 55 basic series recipes.
+	if int(entry.get("fusion_tier", 0)) > 0:
+		return ""
 	var explicit := str(entry.get("fusion_series", ""))
 	if not explicit.is_empty():
 		return explicit
@@ -88,7 +93,7 @@ func is_eligible_parent_species(species_id: String) -> bool:
 	var entry: Dictionary = species_by_id.get(species_id, {})
 	if entry.is_empty():
 		return false
-	return is_original_entry(entry) or not fusion_series_for_entry(entry).is_empty()
+	return bool(entry.get("fusion_parent_enabled", false)) or is_original_entry(entry) or not fusion_series_for_entry(entry).is_empty()
 
 func resolve(parent_a_id: String, parent_b_id: String) -> Dictionary:
 	if parent_a_id.is_empty() or parent_b_id.is_empty():

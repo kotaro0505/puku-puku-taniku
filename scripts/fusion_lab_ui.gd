@@ -238,7 +238,7 @@ func _build_main_page() -> void:
 	result_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	result_image.pivot_offset = result_image.size * 0.5
 	result_content.add_child(result_image)
-	silhouette_material = _create_silhouette_material()
+	silhouette_material = create_silhouette_material()
 
 	result_name_label = Label.new()
 	result_name_label.position = Vector2(8, 210)
@@ -497,7 +497,7 @@ func _parent_button_text(slot: int, species_id: String) -> String:
 	if species_id.is_empty() or not candidate_by_id.has(species_id):
 		return "%s\n%s" % [Localizer.text(language, slot_key), Localizer.text(language, "fusion_choose")]
 	var entry: Dictionary = candidate_by_id[species_id]
-	var series := str(entry.get("fusion_series", ""))
+	var series := str(entry.get("fusion_display_series", entry.get("fusion_series", "")))
 	var series_names: Dictionary = SERIES_LABELS.get(language, SERIES_LABELS["ja"])
 	return "%s\n%s\n[%s]" % [Localizer.text(language, slot_key), Localizer.species_name(language, entry), str(series_names.get(series, series))]
 
@@ -642,7 +642,7 @@ func _skin_candidate_card(button: Button) -> void:
 	button.add_theme_stylebox_override("pressed", _box(Color("#fff0c7"), Color("#d28a28"), 18, 5))
 	button.add_theme_stylebox_override("focus", _box(Color(0, 0, 0, 0), Color("#f0c66a"), 18, 3))
 
-func _create_silhouette_material() -> ShaderMaterial:
+static func create_silhouette_material() -> ShaderMaterial:
 	var shader := Shader.new()
 	shader.code = """
 shader_type canvas_item;
