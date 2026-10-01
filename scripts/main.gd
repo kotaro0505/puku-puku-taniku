@@ -13,6 +13,7 @@ const ForestGachaUIClass = preload("res://scripts/forest_gacha_ui.gd")
 const SecretGachaSystemClass = preload("res://scripts/secret_gacha_system.gd")
 const SecretGachaUIClass = preload("res://scripts/secret_gacha_ui.gd")
 const SpeciesGetOverlayClass = preload("res://scripts/species_get_overlay.gd")
+const CatalogSeriesUnlockOverlayClass = preload("res://scripts/catalog_series_unlock_overlay.gd")
 const FusionSystemClass = preload("res://scripts/fusion_system.gd")
 const FusionLabUIClass = preload("res://scripts/fusion_lab_ui.gd")
 const Localizer = preload("res://scripts/game_localizer.gd")
@@ -469,6 +470,9 @@ var secret_gacha_last_roll_play_count:=-1
 var species_get_overlay
 var species_get_queue:Array[Dictionary]=[]
 var species_get_active_context:=""
+var species_get_active_series_id:=""
+var catalog_series_unlock_overlay
+var catalog_series_unlock_active_id:=""
 var fusion_system
 var fusion_lab_ui
 var fusion_parent_a_id:=""
@@ -563,6 +567,7 @@ var mystery_seed_pack_unlocked := false
 var result_new_species_queue: Array[String] = []
 var result_deferred_species_queue: Array[String] = []
 var catalog_series_unlock_notice_queue: Array[String] = []
+var catalog_series_unlock_notice_ready: Dictionary = {}
 var shop_chatter_acquired_species: Array[String] = []
 var mystery_route_assignments: Dictionary = {}
 var mystery_route_completed: Dictionary = {}
@@ -1159,6 +1164,7 @@ func _endless_greenhouse_auto_start_blocked()->bool:
 	if secret_gacha_ui and secret_gacha_ui.visible:return true
 	if fusion_lab_ui and fusion_lab_ui.visible:return true
 	if species_get_overlay and species_get_overlay.visible:return true
+	if catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible:return true
 	if puku_puku_battle and puku_puku_battle.visible:return true
 	if catalog_preview_ui and catalog_preview_ui.is_overlay_open():return true
 	if habitat_plant_panel and habitat_plant_panel.visible:return true
@@ -1215,6 +1221,7 @@ func _should_simulate_endless_greenhouse()->bool:
 	if secret_gacha_ui and secret_gacha_ui.visible:return false
 	if fusion_lab_ui and fusion_lab_ui.visible:return false
 	if species_get_overlay and species_get_overlay.visible:return false
+	if catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible:return false
 	if catalog_preview_ui and catalog_preview_ui.is_overlay_open():return false
 	if habitat_plant_panel and habitat_plant_panel.visible:return false
 	if habitat_dev_panel and habitat_dev_panel.visible:return false
@@ -1608,6 +1615,7 @@ func _build_ui() -> void:
 	_build_forest_gacha_ui(hud)
 	_build_secret_gacha_ui(hud)
 	_build_species_get_overlay(hud)
+	_build_catalog_series_unlock_overlay(hud)
 	_build_fusion_lab_ui(hud)
 	if DEVELOPMENT_CATALOG_PREVIEW_ENABLED:_build_catalog_preview_dev(hud)
 	_build_jelly_dev_overlay(hud)
@@ -2857,7 +2865,7 @@ func _hide_first_play_tutorial_overlay()->void:
 
 func _start_puku_buyback_tutorial()->void:
 	if puku_buyback_tutorial_complete or puku_buyback_tutorial_active or puku_gauge_area==null:return
-	if not species_get_queue.is_empty() or species_get_overlay and species_get_overlay.visible:return
+	if not species_get_queue.is_empty() or species_get_overlay and species_get_overlay.visible or catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible:return
 	puku_buyback_tutorial_active=true;puku_buyback_tutorial_index=0
 	_show_puku_buyback_tutorial_page()
 
@@ -3326,6 +3334,10 @@ func _build_species_get_overlay(hud:Control)->void:
 	species_get_overlay=SpeciesGetOverlayClass.new();hud.add_child(species_get_overlay)
 	species_get_overlay.closed.connect(_on_species_get_overlay_closed)
 
+func _build_catalog_series_unlock_overlay(hud:Control)->void:
+	catalog_series_unlock_overlay=CatalogSeriesUnlockOverlayClass.new();hud.add_child(catalog_series_unlock_overlay)
+	catalog_series_unlock_overlay.closed.connect(_on_catalog_series_unlock_overlay_closed)
+
 func _build_fusion_lab_ui(hud:Control)->void:
 	fusion_lab_ui=FusionLabUIClass.new();hud.add_child(fusion_lab_ui)
 	fusion_lab_ui.close_requested.connect(_close_fusion_lab)
@@ -3344,7 +3356,7 @@ func _fusion_lab_available()->bool:
 
 func _open_fusion_lab()->void:
 	if fusion_lab_ui==null or (play_active and not _is_endless_normal_play()) or arrangement_scene_active or arrangement_transitioning or current_mode!="greenhouse" or not _fusion_lab_available():return
-	if (encyclopedia_overlay and encyclopedia_overlay.visible) or (settings_overlay and settings_overlay.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible):return
+	if (encyclopedia_overlay and encyclopedia_overlay.visible) or (settings_overlay and settings_overlay.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible):return
 	play_modal_open=false
 	if play_overlay:play_overlay.visible=false
 	fusion_parent_a_id="";fusion_parent_b_id=""
@@ -3484,7 +3496,7 @@ func _spin_forest_gacha()->void:
 	if forest_gacha_preview_mode:
 		if forest_gacha_preview_puku_points<FOREST_GACHA_SPIN_COST:return
 		var preview_next:=forest_gacha_preview_draw_count+1
-		var preview_result:Dictionary=forest_gacha_system.draw(preview_next,{INITIAL_SERIES_ID:true},forest_gacha_preview_discovered,forest_gacha_preview_encountered,forest_gacha_rng)
+		var preview_result:Dictionary=forest_gacha_system.draw({INITIAL_SERIES_ID:true},forest_gacha_preview_discovered,forest_gacha_preview_encountered,forest_gacha_rng)
 		if preview_result.is_empty():return
 		forest_gacha_preview_puku_points-=FOREST_GACHA_SPIN_COST;forest_gacha_preview_draw_count=preview_next
 		var preview_species_id:=str(preview_result.get("species_id",""))
@@ -3493,7 +3505,7 @@ func _spin_forest_gacha()->void:
 		forest_gacha_ui.set_wallet(forest_gacha_preview_puku_points,forest_gacha_preview_draw_count);var preview_entry:Dictionary=preview_result.get("species_entry",{});var preview_texture:=_species_texture(preview_entry);forest_gacha_ui.play_spin(preview_result,preview_texture if preview_texture!=null else CatalogImageLoader.placeholder_texture);return
 	if forest_gacha_trial_dev_mode:
 		var trial_next:=forest_gacha_draw_count+1
-		var trial_result:Dictionary=forest_gacha_system.draw(trial_next,unlocked_series,discovered,forest_gacha_encountered,forest_gacha_rng,-1.0,StoryProgressionClass.fantasy_is_unlocked(story_progression_state),jurejure_species_unlocked)
+		var trial_result:Dictionary=forest_gacha_system.draw(unlocked_series,discovered,forest_gacha_encountered,forest_gacha_rng,StoryProgressionClass.fantasy_is_unlocked(story_progression_state),jurejure_species_unlocked)
 		if trial_result.is_empty():return
 		forest_gacha_draw_count=trial_next
 		var trial_species_id:=str(trial_result.get("species_id",""))
@@ -3507,7 +3519,7 @@ func _spin_forest_gacha()->void:
 	if puku_points<FOREST_GACHA_SPIN_COST:
 		forest_gacha_ui.set_wallet(puku_points,forest_gacha_draw_count);return
 	var next_draw:=forest_gacha_draw_count+1
-	var result:Dictionary=forest_gacha_system.draw(next_draw,unlocked_series,discovered,forest_gacha_encountered,forest_gacha_rng,-1.0,StoryProgressionClass.fantasy_is_unlocked(story_progression_state),jurejure_species_unlocked)
+	var result:Dictionary=forest_gacha_system.draw(unlocked_series,discovered,forest_gacha_encountered,forest_gacha_rng,StoryProgressionClass.fantasy_is_unlocked(story_progression_state),jurejure_species_unlocked)
 	if result.is_empty():return
 	puku_points-=FOREST_GACHA_SPIN_COST;forest_gacha_draw_count=next_draw
 	var species_id:=str(result.get("species_id",""))
@@ -3545,14 +3557,16 @@ func _queue_species_get(entry:Dictionary,is_new:bool,context:String)->void:
 		_on_species_get_overlay_closed(context)
 		return
 	species_get_queue.append({"entry":entry.duplicate(true),"is_new":is_new,"context":context})
-	if species_get_overlay and not species_get_overlay.visible:call_deferred("_show_next_species_get")
+	if species_get_overlay and not species_get_overlay.visible and (catalog_series_unlock_overlay==null or not catalog_series_unlock_overlay.visible):call_deferred("_show_next_species_get")
 
 func _queue_species_get_by_id(species_id:String,is_new:bool,context:String)->void:
 	_queue_species_get(_catalog_entry(species_id),is_new,context)
 
 func _show_next_species_get()->void:
-	if species_get_overlay==null or species_get_overlay.visible or species_get_queue.is_empty():return
+	if species_get_overlay==null or species_get_overlay.visible or catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible or species_get_queue.is_empty():return
 	var queued:Dictionary=species_get_queue.pop_front();var entry:Dictionary=queued.get("entry",{});species_get_active_context=str(queued.get("context",""))
+	species_get_active_series_id=_series_id_for_species(str(entry.get("species_id","")))
+	if species_get_active_series_id in catalog_series_unlock_notice_queue:catalog_series_unlock_notice_ready[species_get_active_series_id]=true
 	var texture:=_species_texture(entry)
 	species_get_overlay.show_species(entry,texture if texture!=null else CatalogImageLoader.placeholder_texture,bool(queued.get("is_new",true)),species_get_active_context,language_code)
 	_request_species_texture(entry,species_get_overlay.result_image,true)
@@ -3560,6 +3574,17 @@ func _show_next_species_get()->void:
 
 func _on_species_get_overlay_closed(context:String)->void:
 	species_get_active_context=""
+	var closed_series_id:=species_get_active_series_id
+	species_get_active_series_id=""
+	if not closed_series_id.is_empty() and closed_series_id in catalog_series_unlock_notice_queue:
+		if _show_catalog_series_unlock_notice(closed_series_id,context):return
+	_continue_after_species_get_card(context)
+
+func _on_catalog_series_unlock_overlay_closed(context:String)->void:
+	catalog_series_unlock_active_id=""
+	_continue_after_species_get_card(context)
+
+func _continue_after_species_get_card(context:String)->void:
 	var followup_started:=false
 	match context:
 		"first_colorata":
@@ -3653,6 +3678,8 @@ func _reset_progression_state()->void:
 	_end_first_play_tutorial_context()
 	fusion_parent_a_id="";fusion_parent_b_id="";fusion_in_progress=false
 	if fusion_lab_ui:fusion_lab_ui.close_lab()
+	if catalog_series_unlock_overlay:catalog_series_unlock_overlay.reset_overlay()
+	catalog_series_unlock_active_id="";species_get_active_series_id=""
 	endless_greenhouse.reset_discovery_state()
 	pending_restoration_snapshot.clear()
 	if habitat_restoration_ui:habitat_restoration_ui.reset_view()
@@ -3662,7 +3689,7 @@ func _reset_progression_state()->void:
 	JellyBalanceClass.reset_formal();jelly_trait_display_enabled=false;dev_jelly_test_active=false;last_jelly_claim_msec=-1000000000
 	mystery_route_assignments.clear();mystery_route_completed.clear();mystery_route_dialog_seen.clear();rain_completion_count=0;best_100_achieved=false;shop_selected_seed_type="normal"
 	first_tutorial_species_id="";habitat_wild_plants.clear();habitat_wild_initialized=false;habitat_wild_next_spawn_unix=0.0;habitat_tutorial_started=false;habitat_tutorial_complete=false;habitat_tutorial_species_id="";original_catalog_gifted=false;panda_beacon_unlocked=false;panda_beacon_count=0;panda_beacon_unread_log.clear();first_habitat_gift_claimed=false;armadillo_intro_event_3_completed=false;armadillo_series_event_7_completed=false;pending_armadillo_story_event="";armadillo_gift_series_id="";armadillo_gift_species_id="";scripted_dialog_kind="";scripted_dialog_pages.clear();scripted_dialog_index=-1
-	first_colorata_confirmed=false;trio_originals_confirmed=false;habitat_arrival_started=false;habitat_awakened=false;habitat_awakening_event_complete=false;seed_shop_open=false;mystery_items_acquired=false;mystery_catalog_tutorial_complete=false;normal_play_tutorial_complete=false;seed_pod_gauge_discovery_complete=false;seed_pod_first_reward_seen=false;initial_seed_stock_notice_complete=false;puku_buyback_tutorial_complete=false;puku_buyback_tutorial_active=false;puku_buyback_tutorial_index=0;habitat_returned_species.clear();special_series_explanation_seen=false;pending_special_series_explanation=false;main_story_stage=StoryProgressionClass.ACT_1;main_story_complete=false;main_story_completion_seen=false;catalog_series_unlock_notice_queue.clear()
+	first_colorata_confirmed=false;trio_originals_confirmed=false;habitat_arrival_started=false;habitat_awakened=false;habitat_awakening_event_complete=false;seed_shop_open=false;mystery_items_acquired=false;mystery_catalog_tutorial_complete=false;normal_play_tutorial_complete=false;seed_pod_gauge_discovery_complete=false;seed_pod_first_reward_seen=false;initial_seed_stock_notice_complete=false;puku_buyback_tutorial_complete=false;puku_buyback_tutorial_active=false;puku_buyback_tutorial_index=0;habitat_returned_species.clear();special_series_explanation_seen=false;pending_special_series_explanation=false;main_story_stage=StoryProgressionClass.ACT_1;main_story_complete=false;main_story_completion_seen=false;catalog_series_unlock_notice_queue.clear();catalog_series_unlock_notice_ready.clear()
 	act2_unlocked=false;story_progression_state=StoryProgressionClass.default_runtime_state();forest_gacha_unlocked=false;forest_gacha_intro_seen=false;fantasy_first_discovery_seen=false;fantasy_realization_seen=false;act3_unlocked=false;act3_intro_pending=false;act3_intro_seen=false;jurejure_pool_unlocked=false;jurejure_species_unlocked.clear();jurejure_species_first_seen=false;habitat_crisis_pending=false;habitat_crisis_started=false;finale_complete=false;habitat_return_dialog_seen=false
 	original_catalog_complete_event_seen=false;habitat_tutorial_returned_to_greenhouse=false;jurejure_intro_complete=false;jurejure_enabled=false;jurejure_growth_stage=JureJureSystemClass.GROWTH_EARLY;jurejure_growth_event_mask=0;active_jurejure_event={};jurejure_next_check_unix=0.0;jurejure_cooldown_until_unix=0.0;jurejure_return_event_complete=false;jurejure_waiting_for_seed_pod_reward=false;jurejure_battle_count=0;jurejure_battle_win_count=0;jurejure_habitat_visit_point=Vector2(-1.0,-1.0);jurejure_pending_reward_species_id="";jurejure_last_battle_result.clear();habitat_second_awakened=false;habitat_second_awakening_complete=false;jurejure_update_accumulator=0.0
 	first_seed_pod_reward_event_active=false;habitat_visit_id=0;act3_intro_eligible_visit_id=0;habitat_crisis_eligible_visit_id=0
@@ -3878,7 +3905,7 @@ func _clear_greenhouse_plants()->void:
 func _update_play_ui()->void:
 	if not play_overlay:return
 	var preview_overlay_open:bool=catalog_preview_ui!=null and catalog_preview_ui.is_overlay_open()
-	var gacha_open:bool=(forest_gacha_ui!=null and forest_gacha_ui.visible) or (secret_gacha_ui!=null and secret_gacha_ui.visible) or (species_get_overlay!=null and species_get_overlay.visible) or (fusion_lab_ui!=null and fusion_lab_ui.visible)
+	var gacha_open:bool=(forest_gacha_ui!=null and forest_gacha_ui.visible) or (secret_gacha_ui!=null and secret_gacha_ui.visible) or (species_get_overlay!=null and species_get_overlay.visible) or (catalog_series_unlock_overlay!=null and catalog_series_unlock_overlay.visible) or (fusion_lab_ui!=null and fusion_lab_ui.visible)
 	var battle_open:bool=puku_puku_battle!=null and puku_puku_battle.visible
 	var habitat_modal_open:bool=battle_open or (habitat_plant_panel!=null and habitat_plant_panel.visible) or (habitat_dev_panel!=null and habitat_dev_panel.visible) or (story_dev_panel!=null and story_dev_panel.visible) or (habitat_awakening_overlay!=null and habitat_awakening_overlay.visible) or (seed_pod_story_overlay!=null and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay!=null and habitat_second_awakening_overlay.visible)
 	var arrangement_navigation_suspended:bool=arrangement_scene_active or arrangement_transitioning or catalog_preview_mode_active or preview_overlay_open or gacha_open or habitat_modal_open
@@ -4621,7 +4648,7 @@ func _unlock_series_and_register_encounters(series_id:String)->Array[String]:
 	var was_unlocked:=_is_series_unlocked(_series_entry(series_id))
 	unlocked_series[series_id]=true
 	var registered:=_register_forest_gacha_encounters_for_series(series_id)
-	if not was_unlocked and not registered.is_empty():_queue_catalog_series_unlock_notice(series_id)
+	if not was_unlocked and not registered.is_empty():_queue_catalog_series_unlock_notice(series_id,true)
 	return registered
 
 func _species_is_in_unlocked_series(species_id:String)->bool:
@@ -4872,9 +4899,10 @@ func _update_main_story_progress(schedule_completion:=true)->void:
 	if main_story_complete:main_story_completion_seen=true
 	if schedule_completion:call_deferred("_try_start_pending_story_event")
 
-func _queue_catalog_series_unlock_notice(series_id:String)->void:
-	if series_id.is_empty() or series_id in catalog_series_unlock_notice_queue:return
-	catalog_series_unlock_notice_queue.append(series_id)
+func _queue_catalog_series_unlock_notice(series_id:String,species_get_already_shown:=false)->void:
+	if series_id.is_empty():return
+	if series_id not in catalog_series_unlock_notice_queue:catalog_series_unlock_notice_queue.append(series_id)
+	if species_get_already_shown:catalog_series_unlock_notice_ready[series_id]=true
 
 func _catalog_series_notice_name(series_entry:Dictionary)->String:
 	var display_name:=Localizer.series_name(language_code,series_entry)
@@ -4883,17 +4911,36 @@ func _catalog_series_notice_name(series_entry:Dictionary)->String:
 		else:display_name+="たにく"
 	return display_name
 
+func _catalog_series_notice_cover(series_entry:Dictionary)->Texture2D:
+	var cover_path:=str(series_entry.get("cover_image_path",""))
+	if not cover_path.is_empty() and ResourceLoader.exists(cover_path):
+		return load(cover_path) as Texture2D
+	return _series_cover_texture(series_entry)
+
+func _show_catalog_series_unlock_notice(series_id:String,context:String="")->bool:
+	if catalog_series_unlock_overlay==null or catalog_series_unlock_overlay.visible:return false
+	if species_get_overlay and species_get_overlay.visible:return false
+	var queue_index:=catalog_series_unlock_notice_queue.find(series_id)
+	if queue_index<0 or not bool(catalog_series_unlock_notice_ready.get(series_id,false)):return false
+	var series_entry:=_series_entry(series_id)
+	if series_entry.is_empty():
+		catalog_series_unlock_notice_queue.remove_at(queue_index)
+		catalog_series_unlock_notice_ready.erase(series_id)
+		return false
+	catalog_series_unlock_notice_queue.remove_at(queue_index)
+	catalog_series_unlock_notice_ready.erase(series_id)
+	catalog_series_unlock_active_id=series_id
+	catalog_series_unlock_overlay.show_series(series_entry,_catalog_series_notice_cover(series_entry),_catalog_series_notice_name(series_entry),context,language_code)
+	if audio_manager:audio_manager.play_se("new_species",.72)
+	return true
+
 func _try_start_catalog_series_unlock_notice()->bool:
 	while not catalog_series_unlock_notice_queue.is_empty():
-		var series_id:String=catalog_series_unlock_notice_queue.pop_front()
+		var series_id:String=catalog_series_unlock_notice_queue[0]
 		var series_entry:=_series_entry(series_id)
-		if series_entry.is_empty():continue
-		var display_name:=_catalog_series_notice_name(series_entry)
-		_start_scripted_dialog("catalog_series_unlock_notice",[{
-			"speaker":"",
-			"text":Localizer.text(language_code,"catalog_series_first_unlock",[display_name]),
-		}],false)
-		return true
+		if series_entry.is_empty():catalog_series_unlock_notice_queue.pop_front();catalog_series_unlock_notice_ready.erase(series_id);continue
+		if not bool(catalog_series_unlock_notice_ready.get(series_id,false)):return false
+		return _show_catalog_series_unlock_notice(series_id)
 	return false
 
 func _try_start_pending_story_event()->void:
@@ -4908,6 +4955,7 @@ func _try_start_pending_story_event()->void:
 	if first_seed_pod_reward_event_active or tutorial_guide_overlay and tutorial_guide_overlay.visible:return
 	if puku_puku_battle and puku_puku_battle.visible:return
 	if species_get_overlay and species_get_overlay.visible:return
+	if catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible:return
 	if result_overlay and result_overlay.visible:return
 	if play_overlay and play_overlay.visible:return
 	if encyclopedia_overlay and encyclopedia_overlay.visible:return
@@ -4922,6 +4970,7 @@ func _try_start_pending_story_event()->void:
 	if settings_overlay and settings_overlay.visible:return
 	if habitat_restoration_ui and habitat_restoration_ui.is_modal_visible():return
 	if _try_start_catalog_series_unlock_notice():return
+	if not catalog_series_unlock_notice_queue.is_empty():return
 	if _try_start_pending_habitat_crisis_transition():return
 	var queued_story_event:=StoryProgressionClass.peek_story_event(story_progression_state)
 	if current_mode=="habitat" and act3_intro_pending and not act3_intro_seen and habitat_visit_id>act3_intro_eligible_visit_id:
@@ -6731,7 +6780,7 @@ func _update_labels()->void:
 func _greenhouse_area_navigation_available()->bool:
 	if not StoryProgressionClass.arrangement_is_unlocked(story_progression_state) or not _tutorial_fully_complete() or current_mode!="greenhouse" or (play_active and not _is_endless_normal_play()) or catalog_preview_mode_active or arrangement_transitioning:return false
 	if arrangement_scene_active and arrangement_ui and arrangement_ui.is_editor_active():return false
-	return not ((opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible) or jurejure_first_encounter_active or (puku_puku_battle and puku_puku_battle.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (story_dev_panel and story_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible))
+	return not ((opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible) or jurejure_first_encounter_active or (puku_puku_battle and puku_puku_battle.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (story_dev_panel and story_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible))
 
 func _arrangement_navigation_hint_safe()->bool:
 	# Navigation availability covers gameplay overlays. The opening screen is a
@@ -6817,7 +6866,7 @@ func _input(event:InputEvent)->void:
 	if habitat_lookaround_active or jurejure_intro_camera_active:return
 	if habitat_restoration_ui and habitat_restoration_ui.is_modal_visible():return
 	if arrangement_scene_active or arrangement_transitioning:return
-	if (opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible) or (puku_puku_battle and puku_puku_battle.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible and not first_play_harvest_guide_active and not old_seed_harvest_guide_active) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (story_dev_panel and story_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (fusion_lab_ui and fusion_lab_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible):return
+	if (opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible) or (puku_puku_battle and puku_puku_battle.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible and not first_play_harvest_guide_active and not old_seed_harvest_guide_active) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (story_dev_panel and story_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (fusion_lab_ui and fusion_lab_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible):return
 	if current_mode=="greenhouse" and not play_active and not catalog_preview_mode_active:return
 	if event is InputEventScreenTouch:
 		if event.pressed:

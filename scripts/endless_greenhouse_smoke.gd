@@ -359,9 +359,10 @@ func _test_immediate_species_get_and_pause(game: Node) -> void:
 	assert(is_equal_approx(observer.age, age_before))
 	assert(game.play_spawn_queue == spawn_queue_before)
 	await get_tree().create_timer(.55).timeout
-	game.species_get_overlay.close_overlay()
-	await get_tree().create_timer(.24).timeout
+	await game.species_get_overlay.close_overlay()
 	assert(not game.species_get_overlay.visible)
+	if game.catalog_series_unlock_overlay.visible:
+		game.catalog_series_unlock_overlay.busy=false;await game.catalog_series_unlock_overlay.close_overlay()
 	assert(game._should_simulate_endless_greenhouse())
 
 
@@ -403,8 +404,9 @@ func _test_forced_new_lifecycle(game: Node) -> void:
 	assert(not game.endless_greenhouse.has_forced_new())
 	assert(is_zero_approx(game.endless_greenhouse.discovery_cycle_best_cm))
 	await get_tree().create_timer(.55).timeout
-	game.species_get_overlay.close_overlay()
-	await get_tree().create_timer(.24).timeout
+	await game.species_get_overlay.close_overlay()
+	if game.catalog_series_unlock_overlay.visible:
+		game.catalog_series_unlock_overlay.busy=false;await game.catalog_series_unlock_overlay.close_overlay()
 	game.story_progression_state["pending_story_events"] = []
 	game.scripted_dialog_kind = ""
 	game.scripted_dialog_pages.clear()
@@ -585,8 +587,9 @@ func _test_formal_endless_main_features(game: Node) -> void:
 	await get_tree().process_frame
 	assert(game.species_get_overlay.visible)
 	await get_tree().create_timer(.55).timeout
-	game.species_get_overlay.close_overlay()
-	await get_tree().create_timer(.24).timeout
+	await game.species_get_overlay.close_overlay()
+	if game.catalog_series_unlock_overlay.visible:
+		game.catalog_series_unlock_overlay.busy=false;await game.catalog_series_unlock_overlay.close_overlay()
 	game._close_forest_gacha()
 	game.story_progression_state["pending_story_events"]=[]
 	game.scripted_dialog_kind="";game.scripted_dialog_pages.clear();game.intro_overlay.visible=false
@@ -655,7 +658,7 @@ func _test_debug_controls_and_gacha(game: Node) -> void:
 	var next_draw:int=game.forest_gacha_draw_count+1
 	for seed_value in range(2000):
 		var probe:=RandomNumberGenerator.new();probe.seed=seed_value
-		var candidate:Dictionary=game.forest_gacha_system.draw(next_draw,game.unlocked_series,game.discovered,game.forest_gacha_encountered,probe,-1.0,StoryProgressionClass.fantasy_is_unlocked(game.story_progression_state),game.jurejure_species_unlocked)
+		var candidate:Dictionary=game.forest_gacha_system.draw(game.unlocked_series,game.discovered,game.forest_gacha_encountered,probe,StoryProgressionClass.fantasy_is_unlocked(game.story_progression_state),game.jurejure_species_unlocked)
 		if not candidate.is_empty() and not bool(game.discovered.get(str(candidate.get("species_id","")),false)):
 			selected_seed=seed_value;break
 	assert(selected_seed>=0)
@@ -688,9 +691,10 @@ func _test_debug_controls_and_gacha(game: Node) -> void:
 	await get_tree().process_frame
 	assert(game.species_get_overlay.visible)
 	await get_tree().create_timer(.55).timeout
-	game.species_get_overlay.close_overlay()
-	await get_tree().create_timer(.24).timeout
+	await game.species_get_overlay.close_overlay()
 	assert(not game.species_get_overlay.visible)
+	if game.catalog_series_unlock_overlay.visible:
+		game.catalog_series_unlock_overlay.busy=false;await game.catalog_series_unlock_overlay.close_overlay()
 	game._close_forest_gacha()
 	assert(not game.forest_gacha_trial_dev_mode and game.puku_points==puku_before)
 	game.story_progression_state["pending_story_events"]=[]
@@ -705,6 +709,7 @@ func _test_debug_controls_and_gacha(game: Node) -> void:
 
 func _test_fusion_lab_flow(game: Node) -> void:
 	assert(game._is_endless_normal_play())
+	game.catalog_series_unlock_notice_queue.clear();game.catalog_series_unlock_notice_ready.clear();game.catalog_series_unlock_overlay.reset_overlay();game.species_get_queue.clear();game.species_get_overlay.visible=false
 	var gummy_id := "gummy_peach_milk"
 	var metal_id := "metal_silver_rosette"
 	var hybrid_id := "hyb_gummy_metal"
@@ -796,13 +801,15 @@ func _test_fusion_lab_flow(game: Node) -> void:
 	assert(not game._should_simulate_endless_greenhouse())
 
 	await get_tree().create_timer(.55).timeout
-	game.species_get_overlay.close_overlay()
-	await get_tree().create_timer(.24).timeout
+	await game.species_get_overlay.close_overlay()
 	assert(not game.species_get_overlay.visible)
-	assert(game.scripted_dialog_kind=="catalog_series_unlock_notice")
-	assert(str(game.scripted_dialog_pages[0].get("text","")).contains("『配合多肉』"))
-	while not game.scripted_dialog_kind.is_empty():game._advance_scripted_dialog()
-	await get_tree().process_frame
+	assert(game.catalog_series_unlock_overlay.visible)
+	assert(game.scripted_dialog_kind.is_empty())
+	assert(game.catalog_series_unlock_overlay.title_label.text=="図鑑ページ解放！")
+	assert(game.catalog_series_unlock_overlay.message_label.text.contains("『配合多肉』"))
+	assert(not game._should_simulate_endless_greenhouse())
+	game.catalog_series_unlock_overlay.busy=false
+	await game.catalog_series_unlock_overlay.close_overlay()
 	assert(game._is_endless_normal_play() and game._should_simulate_endless_greenhouse())
 	var age_before_resume: float = observer.age
 	game._process(.25)
