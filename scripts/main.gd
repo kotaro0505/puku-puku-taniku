@@ -5989,8 +5989,8 @@ func spawn_plant(force_golden := false,spawn_position:Variant=null) -> void:
 	elif _is_endless_normal_play() and endless_greenhouse.forced_new_pending:
 		chosen=_select_endless_forced_new_candidate()
 		if chosen.is_empty():
-			# Eligibility can legitimately disappear between a set roll and the
-			# next sprout. Keep the cycle best, but never invent a NEW species.
+			# Eligibility can legitimately disappear between a harvest roll and
+			# the next sprout. Never invent a NEW species.
 			endless_greenhouse.cancel_forced_new_pending()
 			chosen=_select_normal_seed_species(-1.0,false)
 		else:
@@ -6070,13 +6070,12 @@ func _complete_endless_virtual_batch()->void:
 func _record_endless_discovery_settlement(harvested:bool,diameter_cm:float=0.0,forced_roll:float=-1.0)->Dictionary:
 	if not _is_endless_normal_play():return {"set_completed":false}
 	var result:=endless_greenhouse.register_discovery_settlement(harvested,diameter_cm)
-	if not bool(result.get("set_completed",false)):return result
-	# This same real set-completion event replaces the removed ENDLESS gauge
-	# reward as the early JureJure return trigger.
-	_resolve_jurejure_progress_reward("discovery_set")
+	if bool(result.get("set_completed",false)):
+		# Keep the legacy 12-settlement story hook independent from NEW rolls.
+		_resolve_jurejure_progress_reward("discovery_set")
 	if not bool(result.get("roll_allowed",false)):return result
 	var candidates:=_eligible_endless_forced_new_candidates()
-	if (candidates.get("unlocked",[]) as Array).is_empty() and (candidates.get("locked",[]) as Array).is_empty():return result
+	if candidates.is_empty():return result
 	var chance:=clampf(float(result.get("new_chance",0.0)),0.0,.95)
 	var roll:=rng.randf() if forced_roll<0.0 else clampf(forced_roll,0.0,.999999)
 	if chance>0.0 and roll<chance:endless_greenhouse.queue_forced_new()
@@ -6226,31 +6225,26 @@ func _select_normal_seed_species(forced_category_roll:float=-1.0,allow_random_ne
 	if target_pool.is_empty():return _uniform_normal_seed_fallback(all_known)
 	return target_pool[rng.randi_range(0,target_pool.size()-1)]
 
-func _eligible_endless_forced_new_candidates()->Dictionary:
+func _eligible_endless_forced_new_candidates()->Array[Dictionary]:
 	var pools:=_normal_seed_selection_pools()
-	return {
-		"unlocked":pools.get("unlocked_new",[]),
-		"locked":pools.get("locked_new",[]),
-	}
+	var candidates:Array[Dictionary]=[]
+	for raw_candidate in (pools.get("unlocked_new",[]) as Array):
+		if raw_candidate is Dictionary:candidates.append(raw_candidate)
+	for raw_candidate in (pools.get("locked_new",[]) as Array):
+		if not raw_candidate is Dictionary:continue
+		var candidate:Dictionary=raw_candidate.duplicate(true)
+		candidate["_deferred_series_get"]=true
+		candidates.append(candidate)
+	return candidates
 
 func _select_endless_forced_new_candidate()->Dictionary:
-	var pools:=_eligible_endless_forced_new_candidates()
-	var unlocked:Array=pools.get("unlocked",[])
-	var locked:Array=pools.get("locked",[])
+	var candidates:=_eligible_endless_forced_new_candidates()
 	var reserved_id:=endless_greenhouse.forced_new_candidate_hint()
 	if not reserved_id.is_empty():
-		for candidate in unlocked:
+		for candidate in candidates:
 			if str(candidate.get("species_id",""))==reserved_id:return candidate
-		for candidate in locked:
-			if str(candidate.get("species_id",""))==reserved_id:
-				var reserved_locked:Dictionary=candidate.duplicate(true);reserved_locked["_deferred_series_get"]=true;return reserved_locked
-	var choose_locked:=not locked.is_empty() and (unlocked.is_empty() or rng.randf()>=.75)
-	if choose_locked:
-		var locked_choice:Dictionary=locked[rng.randi_range(0,locked.size()-1)].duplicate(true)
-		locked_choice["_deferred_series_get"]=true
-		return locked_choice
-	if not unlocked.is_empty():return unlocked[rng.randi_range(0,unlocked.size()-1)]
-	return {}
+	if candidates.is_empty():return {}
+	return candidates[rng.randi_range(0,candidates.size()-1)]
 
 func _uniform_normal_seed_fallback(all_known:Array)->Dictionary:
 	if all_known.is_empty():return _catalog_entry(FIRST_STORY_SPECIES_ID)
@@ -7017,7 +7011,7 @@ func _on_harvested(p)->void:
 		var harvested_species_id:=str(p.data.species_id);_register_species_discovery(harvested_species_id,true)
 		if first_discovery:
 			if _is_endless_normal_play():
-				endless_greenhouse.complete_discovery_cycle()
+				endless_greenhouse.complete_forced_new()
 				_queue_species_get_by_id(harvested_species_id,true,"endless_greenhouse")
 			else:result_new_species_queue.append(harvested_species_id)
 		elif endless_forced_new:

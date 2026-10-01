@@ -9,8 +9,9 @@ const DEFAULT_ENABLED := true
 const NORMAL_SAVE_PATH := "user://records.json"
 const EXPERIMENT_SAVE_PATH := "user://records_endless_experiment.json"
 const VIRTUAL_BATCH_SIZE := 12
+# Kept only for the existing 12-settlement progression hook. NEW rolls are
+# evaluated independently for every harvested plant.
 const DISCOVERY_SET_SIZE := 12
-const DISCOVERY_BACKGROUND_MAX_CHANCE := 0.03
 const DISCOVERY_CHANCE_ANCHORS := [
 	Vector2(0.0, 0.0),
 	Vector2(20.0, 0.005),
@@ -113,44 +114,41 @@ static func discovery_base_chance_for_cm(diameter_cm: float) -> float:
 
 
 func register_discovery_settlement(harvested: bool, diameter_cm: float = 0.0) -> Dictionary:
+	var harvested_cm := maxf(0.0, diameter_cm) if harvested else 0.0
+	var previous_cycle_best := discovery_cycle_best_cm
+	var improved := harvested and harvested_cm > previous_cycle_best
+	var base_chance := discovery_base_chance_for_cm(harvested_cm) if harvested else 0.0
 	var result := {
 		"set_completed": false,
 		"set_max_harvest_cm": discovery_set_max_harvest_cm,
-		"cycle_best_before_cm": discovery_cycle_best_cm,
-		"cycle_best_after_cm": discovery_cycle_best_cm,
-		"improved_cycle_best": false,
-		"base_chance": 0.0,
-		"new_chance": 0.0,
-		"roll_allowed": false,
+		"cycle_best_before_cm": previous_cycle_best,
+		"cycle_best_after_cm": previous_cycle_best,
+		"improved_cycle_best": improved,
+		"base_chance": base_chance,
+		"new_chance": base_chance,
+		"roll_allowed": harvested and not has_forced_new(),
 	}
 	if not enabled:
+		result["base_chance"] = 0.0
+		result["new_chance"] = 0.0
+		result["roll_allowed"] = false
 		return result
 	discovery_settled_count += 1
 	if harvested:
-		discovery_set_max_harvest_cm = maxf(discovery_set_max_harvest_cm, maxf(0.0, diameter_cm))
+		discovery_set_max_harvest_cm = maxf(discovery_set_max_harvest_cm, harvested_cm)
+		if improved:
+			discovery_cycle_best_cm = harvested_cm
+	result["cycle_best_after_cm"] = discovery_cycle_best_cm
 	result["set_max_harvest_cm"] = discovery_set_max_harvest_cm
 	if discovery_settled_count < DISCOVERY_SET_SIZE:
 		return result
 
 	var completed_set_max := discovery_set_max_harvest_cm
-	var previous_cycle_best := discovery_cycle_best_cm
-	var improved := completed_set_max > previous_cycle_best
-	var base_chance := discovery_base_chance_for_cm(completed_set_max)
-	if improved:
-		discovery_cycle_best_cm = completed_set_max
-	var new_chance := base_chance if improved else minf(DISCOVERY_BACKGROUND_MAX_CHANCE, base_chance)
 	discovery_settled_count = 0
 	discovery_set_max_harvest_cm = 0.0
-	return {
-		"set_completed": true,
-		"set_max_harvest_cm": completed_set_max,
-		"cycle_best_before_cm": previous_cycle_best,
-		"cycle_best_after_cm": discovery_cycle_best_cm,
-		"improved_cycle_best": improved,
-		"base_chance": base_chance,
-		"new_chance": new_chance,
-		"roll_allowed": not has_forced_new(),
-	}
+	result["set_completed"] = true
+	result["set_max_harvest_cm"] = completed_set_max
+	return result
 
 
 func has_forced_new() -> bool:
@@ -191,13 +189,19 @@ func fail_forced_new(species_id: String) -> bool:
 	return true
 
 
-func complete_discovery_cycle() -> void:
-	discovery_settled_count = 0
-	discovery_set_max_harvest_cm = 0.0
+func complete_forced_new() -> void:
+	# NEW acquisition no longer defines the 12-settlement progression window.
+	# Clear only the one-slot NEW reservation and legacy best marker.
 	discovery_cycle_best_cm = 0.0
 	forced_new_pending = false
 	forced_new_active_species_id = ""
 	forced_new_reserved_species_id = ""
+
+
+func complete_discovery_cycle() -> void:
+	discovery_settled_count = 0
+	discovery_set_max_harvest_cm = 0.0
+	complete_forced_new()
 
 
 func reset_discovery_state() -> void:

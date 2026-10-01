@@ -246,7 +246,7 @@ func _test_battle_win_and_respawn(game: Node) -> void:
 	await game.species_get_overlay.close_overlay()
 
 	# Formal endless progression releases the early JureJure wait on the next
-	# completed 12-plant discovery set, while normal seed bags remain unlimited.
+	# completed 12-plant progression set, while normal seed bags remain unlimited.
 	game.play_active = true
 	game.active_seed_type = "normal"
 	var bags_before: int = game.normal_seed_bags
