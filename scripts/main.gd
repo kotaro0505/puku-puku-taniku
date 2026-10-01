@@ -472,6 +472,7 @@ var fusion_system
 var fusion_lab_ui
 var fusion_parent_a_id:=""
 var fusion_parent_b_id:=""
+var fusion_in_progress:=false
 var language_code:="ja"
 var language_selected:=false
 var save_file_present_on_boot:=false
@@ -3332,12 +3333,13 @@ func _open_fusion_lab()->void:
 	_update_play_ui()
 
 func _close_fusion_lab()->void:
+	if fusion_in_progress:return
 	if fusion_lab_ui:fusion_lab_ui.close_lab()
 	fusion_parent_a_id="";fusion_parent_b_id=""
 	_update_play_ui()
 
 func _on_fusion_parent_selected(slot:int,species_id:String)->void:
-	if _species_get_count(species_id)<=0 or fusion_system.fusion_series_for_species(species_id).is_empty():return
+	if fusion_in_progress or _species_get_count(species_id)<=0 or not fusion_system.is_eligible_parent_species(species_id):return
 	if slot==0:fusion_parent_a_id=species_id
 	else:fusion_parent_b_id=species_id
 	_refresh_fusion_lab_result()
@@ -3350,11 +3352,11 @@ func _refresh_fusion_lab_result()->void:
 	fusion_lab_ui.refresh_selection(fusion_parent_a_id,fusion_parent_b_id,resolution,is_new)
 	var result_entry:Dictionary=resolution.get("result_entry",{})
 	if result_entry.is_empty():return
-	fusion_lab_ui.result_image.texture=_species_loading_texture(result_entry)
+	fusion_lab_ui.set_result_texture(_species_loading_texture(result_entry))
 	_request_species_texture(result_entry,fusion_lab_ui.result_image,true)
 
 func _perform_fusion(parent_a_id:String,parent_b_id:String)->void:
-	if fusion_system==null or fusion_lab_ui==null:return
+	if fusion_system==null or fusion_lab_ui==null or fusion_in_progress:return
 	if not fusion_system.parents_are_owned(parent_a_id,parent_b_id,species_get_counts):
 		fusion_lab_ui.show_error(Localizer.text(language_code,"fusion_parent_missing"));return
 	var resolution:Dictionary=fusion_system.resolve(parent_a_id,parent_b_id)
@@ -3362,13 +3364,26 @@ func _perform_fusion(parent_a_id:String,parent_b_id:String)->void:
 	var result_species_id:=str(resolution.get("result_species_id",""))
 	if result_entry.is_empty() or result_species_id.is_empty():
 		fusion_lab_ui.show_error(Localizer.text(language_code,"fusion_recipe_missing"));return
+	var fusion_cost:=maxi(1,int(resolution.get("fusion_cost_puku",1)))
+	if puku_points<fusion_cost:
+		fusion_lab_ui.show_error(Localizer.text(language_code,"not_enough_puku"));return
+	fusion_in_progress=true
+	fusion_lab_ui.set_processing_state(true)
 	var is_new:=_species_get_count(result_species_id)<=0
+	# Currency and discovery are committed together and saved exactly once.
+	puku_points-=fusion_cost
 	_register_species_discovery(result_species_id,true)
 	_apply_saved_unlocks();_sync_arrangement_ui();_refresh_series_selection()
 	if encyclopedia_overlay and encyclopedia_overlay.visible:_refresh_encyclopedia_header();_refresh_encyclopedia_cards()
-	_save()
-	fusion_lab_ui.close_lab();fusion_parent_a_id="";fusion_parent_b_id="";_update_play_ui()
-	_queue_species_get(result_entry,is_new,"fusion_lab")
+	_save();_update_currency_ui();_update_play_ui()
+	await fusion_lab_ui.play_fusion_reveal(_species_texture(result_entry),is_new)
+	fusion_in_progress=false
+	if is_new:
+		fusion_lab_ui.close_lab();fusion_parent_a_id="";fusion_parent_b_id="";_update_play_ui()
+		_queue_species_get(result_entry,true,"fusion_lab")
+	else:
+		fusion_lab_ui.set_processing_state(false)
+		fusion_lab_ui.show_error(Localizer.text(language_code,"fusion_result_known"))
 
 func _open_forest_gacha()->void:
 	if forest_gacha_ui==null or not forest_gacha_unlocked or (play_active and not _is_endless_normal_play()) or arrangement_scene_active or not _tutorial_fully_complete():return
@@ -3612,7 +3627,7 @@ func _change_audio_volume(value:float,is_bgm:bool)->void:
 
 func _reset_progression_state()->void:
 	_end_first_play_tutorial_context()
-	fusion_parent_a_id="";fusion_parent_b_id=""
+	fusion_parent_a_id="";fusion_parent_b_id="";fusion_in_progress=false
 	if fusion_lab_ui:fusion_lab_ui.close_lab()
 	endless_greenhouse.reset_discovery_state()
 	pending_restoration_snapshot.clear()

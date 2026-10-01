@@ -722,6 +722,7 @@ func _test_fusion_lab_flow(game: Node) -> void:
 	game.greenhouse_available.erase(hybrid_id)
 	game.unlocked_species.erase(hybrid_id)
 	game.species_get_counts.erase(hybrid_id)
+	game.puku_points = maxi(game.puku_points, 1)
 	game._apply_saved_unlocks()
 	game._update_play_ui()
 	assert(game._fusion_lab_available())
@@ -769,10 +770,21 @@ func _test_fusion_lab_flow(game: Node) -> void:
 	game.fusion_lab_ui._choose_candidate(metal_id)
 	assert(str(game.fusion_lab_ui.current_result.get("result_species_id", "")) == hybrid_id)
 	assert(not game.fusion_lab_ui.fuse_button.disabled)
+	assert(game.fusion_lab_ui.result_name_label.text == "金箔グミ")
+	assert(game.fusion_lab_ui.result_image.texture != null)
+	assert(game.fusion_lab_ui.result_image.material == game.fusion_lab_ui.silhouette_material)
+	assert(game.fusion_lab_ui.parent_a_image.texture != null and game.fusion_lab_ui.parent_b_image.texture != null)
+	assert(game.fusion_lab_ui.fusion_cost_label.text == "1ぷくコイン")
 
 	var gummy_before: int = game._species_get_count(gummy_id)
 	var metal_before: int = game._species_get_count(metal_id)
+	var puku_before_fusion: int = game.puku_points
 	game.fusion_lab_ui.fuse_button.pressed.emit()
+	game.fusion_lab_ui.fuse_button.pressed.emit()
+	assert(game.fusion_in_progress)
+	assert(game.puku_points == puku_before_fusion - 1)
+	assert(game._species_get_count(hybrid_id) == 1)
+	await get_tree().create_timer(2.0).timeout
 	await get_tree().process_frame
 	await get_tree().process_frame
 	assert(game._species_get_count(gummy_id) == gummy_before)

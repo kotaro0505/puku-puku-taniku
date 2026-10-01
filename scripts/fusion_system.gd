@@ -78,6 +78,18 @@ func fusion_series_for_entry(entry: Dictionary) -> String:
 func fusion_series_for_species(species_id: String) -> String:
 	return fusion_series_for_entry(species_by_id.get(species_id, {}))
 
+func is_original_entry(entry: Dictionary) -> bool:
+	return str(entry.get("series_id", "")) == "base" and bool(entry.get("main_story_original", false))
+
+func is_original_species(species_id: String) -> bool:
+	return is_original_entry(species_by_id.get(species_id, {}))
+
+func is_eligible_parent_species(species_id: String) -> bool:
+	var entry: Dictionary = species_by_id.get(species_id, {})
+	if entry.is_empty():
+		return false
+	return is_original_entry(entry) or not fusion_series_for_entry(entry).is_empty()
+
 func resolve(parent_a_id: String, parent_b_id: String) -> Dictionary:
 	if parent_a_id.is_empty() or parent_b_id.is_empty():
 		return {}
@@ -88,6 +100,20 @@ func resolve(parent_a_id: String, parent_b_id: String) -> Dictionary:
 	var parent_b: Dictionary = species_by_id.get(parent_b_id, {})
 	if parent_a.is_empty() or parent_b.is_empty():
 		return {}
+	# Species-specific recipes always win. Otherwise an original species returns
+	# to itself; when both parents are originals, the left-side parent wins.
+	if is_original_entry(parent_a):
+		return _resolution({
+			"source": "original_fallback",
+			"parent_species_ids": [parent_a_id, parent_b_id],
+			"result_species_id": parent_a_id,
+		})
+	if is_original_entry(parent_b):
+		return _resolution({
+			"source": "original_fallback",
+			"parent_species_ids": [parent_a_id, parent_b_id],
+			"result_species_id": parent_b_id,
+		})
 	var series_a := fusion_series_for_entry(parent_a)
 	var series_b := fusion_series_for_entry(parent_b)
 	if series_a.is_empty() or series_b.is_empty():
@@ -110,6 +136,7 @@ func _resolution(recipe_value: Variant) -> Dictionary:
 		"recipe": recipe.duplicate(true),
 		"result_species_id": result_species_id,
 		"result_entry": result_entry,
+		"fusion_cost_puku": maxi(1, int(result_entry.get("fusion_cost_puku", 1))),
 	}
 
 func eligible_parents(species_get_counts: Dictionary) -> Array[Dictionary]:
@@ -119,7 +146,7 @@ func eligible_parents(species_get_counts: Dictionary) -> Array[Dictionary]:
 		if int(species_get_counts.get(species_id, 0)) <= 0:
 			continue
 		var entry: Dictionary = species_by_id[species_id]
-		if fusion_series_for_entry(entry).is_empty():
+		if not is_eligible_parent_species(species_id):
 			continue
 		result.append(entry)
 	result.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
