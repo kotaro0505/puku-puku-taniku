@@ -30,8 +30,9 @@ func _ready()->void:
 		for formal_entry in game.species:assert(str(formal_entry.get("species_id",""))!=str(species_id_value))
 	var preview_source:=FileAccess.get_file_as_string("res://scripts/catalog_preview_dev.gd")
 	assert("gummy_" not in preview_source)
+	var active_save_path:String=game._active_save_path()
 	var saved_before:=""
-	if FileAccess.file_exists("user://records.json"):saved_before=FileAccess.get_file_as_string("user://records.json")
+	if FileAccess.file_exists(active_save_path):saved_before=FileAccess.get_file_as_string(active_save_path)
 	var bests_before:Dictionary=game.bests.duplicate(true)
 	var discovered_before:Dictionary=game.discovered.duplicate(true)
 	var get_counts_before:Dictionary=game.species_get_counts.duplicate(true)
@@ -93,6 +94,6 @@ func _ready()->void:
 	assert(game.total_play_count==total_play_before)
 	assert(game.formal_play_count==formal_play_before)
 	assert(game.rng.state==main_rng_state_before)
-	if not saved_before.is_empty():assert(FileAccess.file_exists("user://records.json"))
+	if not saved_before.is_empty():assert(FileAccess.file_exists(active_save_path))
 	print("CATALOG_PREVIEW_DEV_SMOKE_OK series=",game.catalog_preview_ui.group_count()," gummy=",gummy_ids.size()," base_batch=",mini(base_ids.size(),game.catalog_preview_ui.MAX_PLANTS_PER_BATCH)," gameplay_state_unchanged=true rng_isolated=true")
 	get_tree().quit()

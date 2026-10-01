@@ -144,8 +144,10 @@ func _test_integrated_final_chapter() -> void:
 	game.result_overlay.visible = false
 	game.play_overlay.visible = false
 	game.current_mode = "greenhouse"
+	game.habitat_unlocked = true
 	game.habitat_awakened = true
 	game.habitat_awakening_event_complete = true
+	game.habitat_tutorial_complete = true
 	game.habitat_tutorial_returned_to_greenhouse = true
 	game.habitat_crisis_started = true
 	game.story_progression_state = StoryProgressionClass.default_runtime_state()
@@ -218,8 +220,9 @@ func _test_integrated_final_chapter() -> void:
 		"rarity": "通常",
 		"gold_star_count": 0,
 	}
-	# A real harvest automatically commits every 100cm plant, but stays in the
-	# greenhouse until the normal Today's Harvest result has closed.
+	# A real harvest automatically commits every 100cm plant. Formal endless
+	# progression has no finite result screen, so the player carries the queued
+	# return event into the habitat with the always-available navigation button.
 	game.discovered["colorata"] = true
 	game.species_get_counts["colorata"] = 1
 	game.first_colorata_confirmed = true
@@ -245,9 +248,9 @@ func _test_integrated_final_chapter() -> void:
 	assert(game.current_mode == "greenhouse" and game.scripted_dialog_kind.is_empty())
 	await get_tree().process_frame
 	await get_tree().process_frame
-	assert(game.result_overlay.visible and game.current_mode == "greenhouse")
+	assert(not game.result_overlay.visible and game.current_mode == "greenhouse" and game.play_active)
 	assert(game.scripted_dialog_kind.is_empty())
-	game._close_result()
+	game._toggle_mode()
 	await get_tree().create_timer(1.2).timeout
 	for _frame in range(100):
 		if game.scripted_dialog_kind == "restoration_return_1":

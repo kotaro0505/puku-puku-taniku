@@ -2,12 +2,17 @@ extends Node
 
 const OpeningStoryOverlayClass=preload("res://scripts/opening_story_overlay.gd")
 const Localizer=preload("res://scripts/game_localizer.gd")
-const SAVE_PATH:="user://records.json"
+const EndlessClass=preload("res://scripts/endless_greenhouse_experiment.gd")
+const SAVE_PATH:=EndlessClass.EXPERIMENT_SAVE_PATH
+const LEGACY_FINITE_SAVE_PATH:=EndlessClass.NORMAL_SAVE_PATH
 
 func _ready()->void:
 	var had_existing_save:=FileAccess.file_exists(SAVE_PATH)
 	var existing_save_text:=FileAccess.get_file_as_string(SAVE_PATH) if had_existing_save else ""
+	var had_existing_finite_save:=FileAccess.file_exists(LEGACY_FINITE_SAVE_PATH)
+	var existing_finite_save_text:=FileAccess.get_file_as_string(LEGACY_FINITE_SAVE_PATH) if had_existing_finite_save else ""
 	if had_existing_save:assert(DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))==OK)
+	if had_existing_finite_save:assert(DirAccess.remove_absolute(ProjectSettings.globalize_path(LEGACY_FINITE_SAVE_PATH))==OK)
 	assert(not FileAccess.file_exists(SAVE_PATH))
 	var story_font:Font=load("res://assets/fonts/ZenMaruGothic-Bold.ttf")
 	for locale in Localizer.SUPPORTED_LANGUAGES:
@@ -60,7 +65,7 @@ func _ready()->void:
 	await get_tree().create_timer(.35).timeout;await get_tree().process_frame;await get_tree().process_frame
 	assert(not story.visible and game.opening_story_complete and game.intro_overlay.visible and not game.shop_overlay.visible)
 	assert(game.current_mode=="greenhouse" and game.audio_manager.current_bgm_key=="greenhouse")
-	var saved=JSON.parse_string(FileAccess.get_file_as_string("user://records.json"));assert(saved is Dictionary and bool(saved.get("opening_story_complete",false)) and bool(saved.get("language_selected",false)))
+	var saved=JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH));assert(saved is Dictionary and bool(saved.get("opening_story_complete",false)) and bool(saved.get("language_selected",false)))
 	game.intro_overlay.visible=false;game.shop_overlay.visible=false;game.language_code="en";game._replay_opening_story_for_development()
 	assert(story.visible and story.replay_mode and story.current_page_index==0 and story.story_text.text==Localizer.text("en","opening_story_1"))
 	assert(game.settings_overlay.find_child("OpeningStoryReplay",true,false)!=null)
@@ -75,5 +80,9 @@ func _ready()->void:
 		var restored_save:=FileAccess.open(SAVE_PATH,FileAccess.WRITE);assert(restored_save!=null);restored_save.store_string(existing_save_text);restored_save.close()
 	elif FileAccess.file_exists(SAVE_PATH):
 		assert(DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))==OK)
+	if had_existing_finite_save:
+		var restored_finite_save:=FileAccess.open(LEGACY_FINITE_SAVE_PATH,FileAccess.WRITE);assert(restored_finite_save!=null);restored_finite_save.store_string(existing_finite_save_text);restored_finite_save.close()
+	elif FileAccess.file_exists(LEGACY_FINITE_SAVE_PATH):
+		assert(DirAccess.remove_absolute(ProjectSettings.globalize_path(LEGACY_FINITE_SAVE_PATH))==OK)
 	print("OPENING_STORY_SMOKE_OK cold_start=true language_first=true restart=true pages=4 layout=20_centered_full_border fade=true greenhouse=true locales=3")
 	get_tree().quit()

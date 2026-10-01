@@ -245,11 +245,16 @@ func _test_battle_win_and_respawn(game: Node) -> void:
 		await get_tree().process_frame
 	await game.species_get_overlay.close_overlay()
 
-	game.puku_gauge_cm = game.SEED_POD_GAUGE_TARGET_CM - 10.0
+	# Formal endless progression releases the early JureJure wait on the next
+	# completed 12-plant discovery set, while normal seed bags remain unlimited.
+	game.play_active = true
+	game.active_seed_type = "normal"
 	var bags_before: int = game.normal_seed_bags
-	var earned: int = game.add_seed_pod_gauge_cm(10.0, false, false)
-	assert(earned == game.SEED_POD_GAUGE_REWARD_BAGS)
-	assert(game.normal_seed_bags == bags_before + game.SEED_POD_GAUGE_REWARD_BAGS)
+	var settlement_result: Dictionary
+	for index in range(game.endless_greenhouse.DISCOVERY_SET_SIZE):
+		settlement_result = game._record_endless_discovery_settlement(false, 0.0, 1.0)
+	assert(bool(settlement_result.get("set_completed", false)))
+	assert(game.normal_seed_bags == bags_before)
 	assert(not game.jurejure_waiting_for_seed_pod_reward)
 	game._toggle_mode()
 	await get_tree().process_frame

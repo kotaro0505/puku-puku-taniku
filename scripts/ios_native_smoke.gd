@@ -1,7 +1,11 @@
 extends Node
 
+const EndlessClass = preload("res://scripts/endless_greenhouse_experiment.gd")
+
 func _ready() -> void:
 	assert(not OS.has_feature("web"))
+	assert(EndlessClass.DEFAULT_ENABLED)
+	assert(EndlessClass.requested_by_runtime())
 	assert(ProjectSettings.get_setting("application/config/name") == "ぷくぷく多肉")
 	assert(ProjectSettings.get_setting("application/config/version") == "1.0.0")
 	assert(ProjectSettings.get_setting("rendering/renderer/rendering_method") == "gl_compatibility")
@@ -33,6 +37,7 @@ func _ready() -> void:
 	add_child(game)
 	await get_tree().process_frame
 	await get_tree().process_frame
+	assert(game._is_endless_greenhouse_enabled())
 	assert(game.habitat_texture_mode == "full")
 	assert(game.habitat_background_mode == "current")
 	game.current_mode = "habitat"
@@ -78,7 +83,7 @@ func _ready() -> void:
 	assert(FileAccess.get_file_as_string(save_probe_path) == "ios-native-save-ok")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(save_probe_path))
 
-	print("IOS_NATIVE_SMOKE_OK renderer=gl_compatibility texture=full background=current audio=ogg share=plugin+web-fallback notification=scheduled-local save=user")
+	print("IOS_NATIVE_SMOKE_OK endless_default_without_flags=true renderer=gl_compatibility texture=full background=current audio=ogg share=plugin+web-fallback notification=scheduled-local save=user")
 	game.free()
 	await get_tree().process_frame
 	get_tree().quit()

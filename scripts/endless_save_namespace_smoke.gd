@@ -6,6 +6,11 @@ const EXPERIMENT_PATH := "user://endless_namespace_experiment_smoke.json"
 
 
 func _ready() -> void:
+	assert(EndlessClass.DEFAULT_ENABLED)
+	assert(EndlessClass.requested_by_runtime())
+	var default_progression := EndlessClass.new()
+	default_progression.configure(EndlessClass.requested_by_runtime())
+	assert(default_progression.enabled)
 	_remove_test_file(NORMAL_PATH)
 	_remove_test_file(EXPERIMENT_PATH)
 	var state_a := {
@@ -47,7 +52,7 @@ func _ready() -> void:
 
 	_remove_test_file(NORMAL_PATH)
 	_remove_test_file(EXPERIMENT_PATH)
-	print("ENDLESS_SAVE_NAMESPACE_SMOKE_OK normal_unchanged=true one_way_copy=true")
+	print("ENDLESS_SAVE_NAMESPACE_SMOKE_OK default_without_flags=true normal_unchanged=true one_way_copy=true legacy_finite=true")
 	get_tree().quit()
 
 

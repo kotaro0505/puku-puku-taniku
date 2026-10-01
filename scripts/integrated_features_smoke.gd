@@ -91,7 +91,7 @@ func _test_secret_gacha(game)->void:
 	assert(not game._maybe_activate_secret_gacha(0.0))
 	assert(game.secret_gacha_active and game.secret_gacha_draws_remaining==2 and game.secret_gacha_last_roll_play_count==7)
 	game._save()
-	var saved=JSON.parse_string(FileAccess.get_file_as_string("user://records.json"))
+	var saved=JSON.parse_string(FileAccess.get_file_as_string(game._active_save_path()))
 	assert(saved is Dictionary and bool(saved.get("secret_gacha_active",false)) and int(saved.get("secret_gacha_draws_remaining",0))==2)
 	assert(bool((saved.get("story_progression_state",{}) as Dictionary).get("secret_gacha_unlocked",false)))
 	game._open_secret_gacha_preview()
@@ -130,7 +130,7 @@ func _test_language_and_symbol_safety(game)->void:
 func _test_one_time_gift_arrangement_and_share(game)->void:
 	var points_before:int=game.puku_points;var bags_before:int=game.normal_seed_bags
 	game._claim_first_habitat_gift_once();game._claim_first_habitat_gift_once()
-	assert(game.first_habitat_gift_claimed and game.puku_points==points_before and game.normal_seed_bags==bags_before+1)
+	assert(game.first_habitat_gift_claimed and game.puku_points==points_before and game.normal_seed_bags==bags_before)
 	assert(is_equal_approx(game.arrangement_ui._species_scale_max("laui"),game.arrangement_ui.PLANT_SCALE_SAFETY_MAX))
 	game.bests["laui"]=52.6;game._sync_arrangement_ui()
 	assert(is_equal_approx(game.arrangement_ui._species_scale_max("laui"),game.arrangement_ui.PLANT_SCALE_SAFETY_MAX))

@@ -17,6 +17,10 @@ func _ready() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	game.audio_manager.apply_settings({"bgm_enabled": false, "se_enabled": false})
+	assert(EndlessClass.DEFAULT_ENABLED)
+	assert(EndlessClass.requested_by_runtime())
+	assert(game._is_endless_greenhouse_enabled())
+	assert(game._active_save_path() == EndlessClass.EXPERIMENT_SAVE_PATH)
 	game.endless_greenhouse.set_save_paths_for_test(NORMAL_PATH, EXPERIMENT_PATH)
 	game.endless_greenhouse.configure(false)
 	_configure_ready_greenhouse(game)
@@ -41,7 +45,7 @@ func _ready() -> void:
 	assert(game.normal_seed_bags == 0)
 	assert(game.plants.size() >= game.PLAY_INITIAL_MIN_PLANTS and game.plants.size() <= game.PLAY_INITIAL_MAX_PLANTS)
 	assert(not game.play_open_button.visible and not game.play_overlay.visible and not game.normal_play_button.visible)
-	assert(not game.seed_bag_panel.visible and not game.seed_pod_gauge_area.visible and not game.puku_gauge_area.visible)
+	assert(not game.seed_bag_panel.visible and not game.seed_pod_gauge_area.visible and game.puku_gauge_area.visible)
 	assert(not game.result_overlay.visible)
 	for plant in game.plants:
 		plant.jelly_checks_enabled = false
@@ -72,7 +76,8 @@ func _ready() -> void:
 	await _test_immediate_species_get_and_pause(game)
 	await _test_forced_new_lifecycle(game)
 	await _test_navigation_pause_resume(game)
-	await _test_trial_dev_controls_and_gacha(game)
+	await _test_formal_endless_main_features(game)
+	await _test_debug_controls_and_gacha(game)
 	await _test_fusion_lab_flow(game)
 	_test_gauges(game)
 	await _test_restoration_pending_until_habitat(game)
@@ -93,7 +98,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	_remove_test_file(NORMAL_PATH)
 	_remove_test_file(EXPERIMENT_PATH)
-	print("ENDLESS_GREENHOUSE_SMOKE_OK autostart=true modal=false infinite=true refill=harvest+jelly result=false longevity=35/35/22/8 per_spawn_new=false discovery_set=12 forced_new=true immediate_get=true pause=true navigation=true trial_dev=settings+story+jelly+gacha dev_gacha_saved=true fusion=entrance+open+image_cards+hybrid_image+selection+execute+species_get pod=false puku=false restoration_pending=true finite=true save_isolated=true")
+	print("ENDLESS_GREENHOUSE_SMOKE_OK default_without_flags=true autostart=true modal=false infinite=true refill=harvest+jelly result=false longevity=35/35/22/8 per_spawn_new=false discovery_set=12 forced_new=true immediate_get=true pause=true navigation=habitat+catalog+shop+gacha debug_controls=debug_only production_gacha=earned_puku+spin+species_get dev_gacha_saved=true fusion=entrance+open+image_cards+hybrid_image+selection+execute+species_get pod=false puku=true restoration_pending=true finite=true save_isolated=true")
 	get_tree().quit()
 
 
@@ -324,6 +329,9 @@ func _test_endless_first_play_tutorial(game: Node) -> void:
 	assert(game.puku_buyback_tutorial_active)
 	assert(game.tutorial_guide_message.text == Localizer.text("ja", "puku_buyback_1"))
 	game._advance_puku_buyback_tutorial()
+	assert(game.puku_buyback_tutorial_active)
+	assert(game.tutorial_guide_message.text == Localizer.text("ja", "puku_buyback_2"))
+	game._advance_puku_buyback_tutorial()
 	assert(game.puku_buyback_tutorial_complete and not game.puku_buyback_tutorial_active)
 	await get_tree().create_timer(1.55).timeout
 	assert(game.play_active and game.plants.size() == game.play_concurrent_target)
@@ -508,11 +516,9 @@ func _test_navigation_pause_resume(game: Node) -> void:
 	assert(not game.play_open_button.visible and not game.play_overlay.visible)
 
 
-func _test_trial_dev_controls_and_gacha(game: Node) -> void:
-	# Release ENDLESS is a contained trial-dev surface even without the separate
-	# habitat debug query. The normal release URL remains production-only.
+func _test_formal_endless_main_features(game: Node) -> void:
 	game.habitat_debug_enabled = false
-	assert(game._trial_dev_controls_enabled())
+	assert(not game._trial_dev_controls_enabled())
 	var trial_balance:Dictionary=game._greenhouse_jelly_balance_for_spawn()
 	assert(is_equal_approx(float(trial_balance.short_weight),35.0))
 	assert(is_equal_approx(float(trial_balance.normal_weight),35.0))
@@ -522,11 +528,70 @@ func _test_trial_dev_controls_and_gacha(game: Node) -> void:
 	assert(is_equal_approx(float(JellyBalanceClass.FORMAL.normal_weight),35.0))
 	assert(is_equal_approx(float(JellyBalanceClass.FORMAL.long_weight),16.0))
 	assert(is_equal_approx(float(JellyBalanceClass.FORMAL.ultra_weight),4.0))
+	game.puku_gauge_intro_complete=false
+	game._start_puku_gauge_intro_dialog()
+	assert(game.scripted_dialog_kind=="puku_gauge_first_gift" and game.scripted_dialog_pages.size()==2)
+	game._advance_scripted_dialog()
+	game._advance_scripted_dialog()
+	assert(game.puku_gauge_intro_complete)
+	game._close_shop()
 
+	game.encyclopedia_unlocked=true
+	game.forest_gacha_unlocked=true
+	game.forest_gacha_intro_seen=true
 	game._update_play_ui()
-	assert(game.settings_button.visible and game.encyclopedia_icon_button.visible)
+	assert(game.settings_button.visible and game.encyclopedia_icon_button.visible and game.shop_button.visible and game.forest_gacha_button.visible)
 	var observer=game.plants[0]
 	observer.jelly_checks_enabled=false
+
+	var age_before_catalog:float=observer.age
+	game._open_encyclopedia()
+	assert(game.encyclopedia_overlay.visible and not game._should_simulate_endless_greenhouse())
+	game._process(1.0)
+	assert(is_equal_approx(observer.age,age_before_catalog))
+	game._close_encyclopedia()
+	assert(game._should_simulate_endless_greenhouse())
+
+	var age_before_shop:float=observer.age
+	game._open_shop()
+	assert(game.shop_overlay.visible and not game._should_simulate_endless_greenhouse())
+	game._process(1.0)
+	assert(is_equal_approx(observer.age,age_before_shop))
+	game._close_shop()
+	assert(game._should_simulate_endless_greenhouse())
+
+	game.puku_coin_gauge_cm=490.0
+	var earned_puku_before:int=game.puku_points
+	assert(game.add_puku_coin_gauge_cm(10.0,false,false)==game.PUKU_GAUGE_REWARD_PUKU)
+	assert(game.puku_points==earned_puku_before+game.PUKU_GAUGE_REWARD_PUKU)
+	game.puku_points=maxi(game.puku_points,5)
+	var puku_before:int=game.puku_points
+	var draw_before:int=game.forest_gacha_draw_count
+	game.forest_gacha_ui.animation_time_scale=.001
+	game._open_forest_gacha()
+	assert(game.forest_gacha_ui.visible and not game.forest_gacha_trial_dev_mode and not game.forest_gacha_preview_mode)
+	assert(not game._should_simulate_endless_greenhouse())
+	game._spin_forest_gacha()
+	assert(not game.forest_gacha_ui.pending_result.is_empty())
+	assert(game.puku_points==puku_before-game.FOREST_GACHA_SPIN_COST)
+	assert(game.forest_gacha_draw_count==draw_before+1)
+	for _frame in range(120):
+		if game.forest_gacha_ui.capsule_ready:
+			break
+		await get_tree().process_frame
+	assert(game.forest_gacha_ui.capsule_ready)
+	game.forest_gacha_ui._reveal_result()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert(game.species_get_overlay.visible)
+	await get_tree().create_timer(.55).timeout
+	game.species_get_overlay.close_overlay()
+	await get_tree().create_timer(.24).timeout
+	game._close_forest_gacha()
+	game.story_progression_state["pending_story_events"]=[]
+	game.scripted_dialog_kind="";game.scripted_dialog_pages.clear();game.intro_overlay.visible=false
+	assert(game._should_simulate_endless_greenhouse())
+
 	var age_before_settings:float=observer.age
 	game._open_settings()
 	assert(game.settings_overlay.visible and not game._should_simulate_endless_greenhouse())
@@ -536,6 +601,27 @@ func _test_trial_dev_controls_and_gacha(game: Node) -> void:
 	assert(game.find_child("JellyDevOpen",true,false)!=null)
 	assert(game.find_child("StoryDevOpen",true,false)!=null)
 	assert(game.find_child("TrialDevGachaOpen",true,false)!=null)
+	assert(not game.trial_dev_gacha_button.visible)
+	game._open_story_dev()
+	assert(game.story_dev_panel!=null and not game.story_dev_panel.visible)
+	game._open_jelly_dev()
+	assert(not game.jelly_dev_overlay.visible)
+	game._close_settings()
+
+
+func _test_debug_controls_and_gacha(game: Node) -> void:
+	# Explicit debug mode still exposes the development aids; formal ENDLESS alone
+	# no longer grants these controls in production.
+	game.habitat_debug_enabled = true
+	assert(game._trial_dev_controls_enabled())
+	var observer=game.plants[0]
+	observer.jelly_checks_enabled=false
+	game._update_play_ui()
+	game._open_settings()
+	assert(game.find_child("JellyDevOpen",true,false)!=null)
+	assert(game.find_child("StoryDevOpen",true,false)!=null)
+	assert(game.find_child("TrialDevGachaOpen",true,false)!=null)
+	assert(game.trial_dev_gacha_button.visible)
 
 	game._open_story_dev()
 	assert(game.story_dev_panel!=null and game.story_dev_panel.visible)
@@ -578,7 +664,10 @@ func _test_trial_dev_controls_and_gacha(game: Node) -> void:
 	var saved_payload=JSON.parse_string(FileAccess.get_file_as_string(EXPERIMENT_PATH))
 	assert(saved_payload is Dictionary)
 	assert(bool((saved_payload.get("discovered",{}) as Dictionary).get(species_id,false)))
-	await get_tree().create_timer(.12).timeout
+	for _frame in range(120):
+		if game.forest_gacha_ui.capsule_ready:
+			break
+		await get_tree().process_frame
 	assert(game.forest_gacha_ui.capsule_ready)
 	game.forest_gacha_ui._reveal_result()
 	await get_tree().process_frame
@@ -596,6 +685,8 @@ func _test_trial_dev_controls_and_gacha(game: Node) -> void:
 	var age_before_resume:float=observer.age
 	game._process(.25)
 	assert(observer.age>age_before_resume)
+	game.habitat_debug_enabled=false
+	assert(not game._trial_dev_controls_enabled())
 
 
 func _test_fusion_lab_flow(game: Node) -> void:
@@ -693,18 +784,18 @@ func _test_gauges(game: Node) -> void:
 	game.puku_coin_gauge_cm = 321.0
 	game.puku_points = 7
 	game._update_play_ui()
-	assert(not game.seed_pod_gauge_area.visible and not game.puku_gauge_area.visible)
+	assert(not game.seed_pod_gauge_area.visible and game.puku_gauge_area.visible)
 	assert(game.add_seed_pod_gauge_cm(700.0, false, false) == 0)
 	assert(is_equal_approx(game.puku_gauge_cm, 123.0))
-	assert(game.add_puku_coin_gauge_cm(1500.0, false, false) == 0)
-	assert(is_equal_approx(game.puku_coin_gauge_cm, 321.0) and game.puku_points == 7)
+	assert(game.add_puku_coin_gauge_cm(1500.0, false, false) == 9)
+	assert(is_equal_approx(game.puku_coin_gauge_cm, 321.0) and game.puku_points == 16)
 	game._spawn_specific_plant("colorata")
 	var gauge_probe = game.plants.back()
 	gauge_probe.jelly_checks_enabled = false
 	gauge_probe.diameter_cm = 100.0
 	gauge_probe.harvest()
 	assert(is_equal_approx(game.puku_gauge_cm, 123.0))
-	assert(is_equal_approx(game.puku_coin_gauge_cm, 321.0) and game.puku_points == 7)
+	assert(is_equal_approx(game.puku_coin_gauge_cm, 421.0) and game.puku_points == 16)
 	game._clear_greenhouse_plants()
 	game.play_spawn_queue = 0
 	game.play_seed_animations_pending = 0
@@ -712,7 +803,7 @@ func _test_gauges(game: Node) -> void:
 	assert(not game._should_show_jurejure_group())
 	assert(game.add_seed_pod_gauge_cm(2000.0, false, false) == 0)
 	assert(game.jurejure_waiting_for_seed_pod_reward)
-	assert(game.add_puku_coin_gauge_cm(2000.0, false, false) == 0)
+	assert(game.add_puku_coin_gauge_cm(2000.0, false, false) == 12)
 	assert(game.jurejure_waiting_for_seed_pod_reward)
 	game.endless_greenhouse.reset_discovery_state()
 	for index in range(11):
@@ -749,7 +840,10 @@ func _test_restoration_pending_until_habitat(game: Node) -> void:
 	assert(game.current_mode == "greenhouse" and game.play_active)
 	assert(game.scripted_dialog_kind.is_empty())
 	game._toggle_mode()
-	await get_tree().create_timer(.12).timeout
+	for _frame in range(120):
+		if game.current_mode == "habitat" and game.scripted_dialog_kind == "restoration_return_1":
+			break
+		await get_tree().process_frame
 	assert(game.current_mode == "habitat")
 	assert(game.scripted_dialog_kind == "restoration_return_1")
 	game.scripted_dialog_kind = ""

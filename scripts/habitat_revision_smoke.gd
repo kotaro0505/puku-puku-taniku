@@ -209,7 +209,8 @@ func _test_legacy_save_migration(game: Node) -> void:
 	game.habitat_wild_initialized = true
 	game.habitat_wild_next_spawn_unix = now + 7200.0
 	game._save()
-	var payload = JSON.parse_string(FileAccess.get_file_as_string("user://records.json"))
+	var active_save_path: String = game._active_save_path()
+	var payload = JSON.parse_string(FileAccess.get_file_as_string(active_save_path))
 	assert(payload is Dictionary)
 	payload["progression_version"] = 21
 	payload["panda_beacon_unlocked"] = true
@@ -219,7 +220,7 @@ func _test_legacy_save_migration(game: Node) -> void:
 	payload["rain_bonus_in_progress"] = true
 	payload["rain_bonus_active"] = true
 	payload["rain_time_remaining"] = 99.0
-	var save_file := FileAccess.open("user://records.json", FileAccess.WRITE)
+	var save_file := FileAccess.open(active_save_path, FileAccess.WRITE)
 	save_file.store_string(JSON.stringify(payload))
 	save_file.close()
 

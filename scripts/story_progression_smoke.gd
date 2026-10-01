@@ -379,7 +379,7 @@ func _test_three_act_sequence(game: Node) -> void:
 	game._toggle_mode();await get_tree().process_frame
 	assert(game.current_mode == "greenhouse" and game.scripted_dialog_kind.is_empty())
 	game._save()
-	var phase_payload = JSON.parse_string(FileAccess.get_file_as_string("user://records.json"))
+	var phase_payload = JSON.parse_string(FileAccess.get_file_as_string(game._active_save_path()))
 	assert(phase_payload is Dictionary and bool(phase_payload.get("habitat_crisis_started", false)))
 	var saved_phase_state := StoryProgressionClass.normalize_runtime_state(phase_payload.get("story_progression_state", {}))
 	assert(StoryProgressionClass.exploitation_is_started(saved_phase_state))
@@ -460,12 +460,13 @@ func _test_legacy_three_act_migration(game: Node) -> void:
 	game.habitat_returned_species[migrated_jurejure_id] = true
 	game.completed_unlock_conditions = {"legacy_40cm": true, "legacy_play_13": true}
 	game._save()
-	var payload = JSON.parse_string(FileAccess.get_file_as_string("user://records.json"))
+	var active_save_path:String=game._active_save_path()
+	var payload = JSON.parse_string(FileAccess.get_file_as_string(active_save_path))
 	assert(payload is Dictionary)
 	payload["progression_version"] = 24
 	for key in ["act2_unlocked", "forest_gacha_unlocked", "forest_gacha_intro_seen", "fantasy_first_discovery_seen", "fantasy_realization_seen", "act3_unlocked", "act3_intro_pending", "act3_intro_seen", "jurejure_pool_unlocked", "jurejure_species_unlocked", "jurejure_species_first_seen", "habitat_crisis_pending", "habitat_crisis_started", "finale_complete"]:
 		payload.erase(key)
-	var file := FileAccess.open("user://records.json", FileAccess.WRITE)
+	var file := FileAccess.open(active_save_path, FileAccess.WRITE)
 	file.store_string(JSON.stringify(payload))
 	file.close()
 

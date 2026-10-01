@@ -1,10 +1,11 @@
 class_name EndlessGreenhouseExperiment
 extends RefCounted
 
-# The experiment is compiled into the trial build, but remains opt-in.  Normal
-# players use the finite greenhouse unless the explicit Web query/CLI switch is
-# present.
+# The endless greenhouse is the formal default progression on every platform.
+# The legacy experiment class/save names remain in place so existing installs
+# keep their progress and the finite flow stays available for rollback tests.
 const FEATURE_ENABLED := true
+const DEFAULT_ENABLED := true
 const NORMAL_SAVE_PATH := "user://records.json"
 const EXPERIMENT_SAVE_PATH := "user://records_endless_experiment.json"
 const VIRTUAL_BATCH_SIZE := 12
@@ -25,7 +26,7 @@ const DISCOVERY_CHANCE_ANCHORS := [
 	Vector2(120.0, 0.95),
 ]
 
-var enabled := false
+var enabled := DEFAULT_ENABLED
 var spawned_in_virtual_batch := 0
 var discovery_settled_count := 0
 var discovery_set_max_harvest_cm := 0.0
@@ -237,9 +238,7 @@ func restore_discovery_state(raw_state: Variant) -> void:
 
 
 static func requested_by_runtime() -> bool:
-	if not FEATURE_ENABLED:
-		return false
-	if OS.has_feature("web"):
-		var requested = JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('endless')", true)
-		return str(requested) == "1"
-	return "--endless" in OS.get_cmdline_user_args()
+	# Web query parameters and native command-line flags no longer gate the
+	# production progression. Keeping this entry point lets old callers and the
+	# legacy finite implementation coexist without a broad refactor.
+	return FEATURE_ENABLED and DEFAULT_ENABLED

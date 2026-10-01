@@ -11,7 +11,7 @@ func _ready() -> void:
 	await _test_act3_and_crisis_presets()
 	await _test_restoration_and_101cm_presets()
 	await _test_ending_presets()
-	print("STORY_DEV_PRESETS_SMOKE_OK production_hidden=true endless_trial_access=true act3_ready=true crisis_ready=7 restoration=0,4 ending=true thank_you=true harvestable_101=true")
+	print("STORY_DEV_PRESETS_SMOKE_OK production_hidden=true endless_does_not_grant_debug=true explicit_debug_only=true act3_ready=true crisis_ready=7 restoration=0,4 ending=true thank_you=true harvestable_101=true")
 	get_tree().quit()
 
 
@@ -31,14 +31,13 @@ func _new_game():
 	game._open_story_dev()
 	assert(not game.story_dev_panel.visible)
 	game.endless_greenhouse.configure(true)
-	assert(game._trial_dev_controls_enabled())
+	assert(not game._trial_dev_controls_enabled())
 	game.settings_overlay.visible = true
 	game._open_story_dev()
-	assert(game.story_dev_panel.visible)
-	assert(not game.settings_overlay.visible)
-	game.story_dev_panel.close()
-	game.endless_greenhouse.configure(false)
+	assert(not game.story_dev_panel.visible)
+	assert(game.settings_overlay.visible)
 	game.habitat_debug_enabled = true
+	assert(game._is_endless_greenhouse_enabled())
 	game.settings_overlay.visible = true
 	game._open_story_dev()
 	assert(game.story_dev_panel.visible)
@@ -148,8 +147,8 @@ func _test_restoration_and_101cm_presets() -> void:
 	assert(game.current_mode == "greenhouse")
 	await get_tree().process_frame
 	await get_tree().process_frame
-	assert(game.result_overlay.visible)
-	game._close_result()
+	assert(not game.result_overlay.visible)
+	game._toggle_mode()
 	await get_tree().create_timer(1.2).timeout
 	assert(game.current_mode == "habitat")
 	assert(game.scripted_dialog_kind == "restoration_return_5")

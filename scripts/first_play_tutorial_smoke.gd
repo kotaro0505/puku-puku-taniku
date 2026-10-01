@@ -8,6 +8,8 @@ func _ready() -> void:
 	add_child(game)
 	await get_tree().process_frame
 	await get_tree().process_frame
+	# This suite deliberately preserves the complete legacy finite tutorial flow.
+	game.endless_greenhouse.configure(false)
 	game._reset_progression_state()
 	game.audio_manager.apply_settings({"bgm_enabled": false, "se_enabled": false})
 	game.opening_story_complete = true

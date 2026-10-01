@@ -4,6 +4,9 @@ func _ready()->void:
 	var scene:PackedScene=load("res://main.tscn");var game:Node=scene.instantiate();add_child(game)
 	await get_tree().process_frame
 	await get_tree().process_frame
+	# This broad regression suite intentionally covers the retained legacy finite
+	# flow. Formal parameterless startup is asserted by the ENDLESS/iOS smokes.
+	game.endless_greenhouse.configure(false)
 	assert(game.opening_overlay.visible and game.audio_manager.current_bgm_key=="opening")
 	if not game.language_selected:
 		assert(game.opening_language_panel.visible and game.opening_tap_area.disabled)

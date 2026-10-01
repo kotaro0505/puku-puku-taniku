@@ -177,7 +177,7 @@ func _ready() -> void:
 	await get_tree().create_timer(.82).timeout
 	assert(not game.seed_pod_story_overlay.visible and bool(game.tutorial_steps.get("seed_pod_story_seen", false)))
 	assert(game.mystery_items_acquired and game.seed_shop_open and game.normal_seed_bags == 0 and game.puku_points == 0)
-	assert(game.current_mode == "greenhouse" and game.seed_pod_gauge_area.visible and game.puku_gauge_area.visible and game.encyclopedia_icon_button.visible)
+	assert(game.current_mode == "greenhouse" and not game.seed_pod_gauge_area.visible and game.puku_gauge_area.visible and game.encyclopedia_icon_button.visible)
 	assert(not game.scene_transition_fade.visible and game.scripted_dialog_kind == "habitat_return")
 	assert(game.scripted_dialog_pages.size() == 5)
 	var return_keys := ["habitat_return_panda", "habitat_return_girl_1", "habitat_return_armadillo_1", "habitat_return_girl_2", "habitat_return_armadillo_2"]
@@ -201,17 +201,20 @@ func _ready() -> void:
 	game._close_encyclopedia()
 	await get_tree().process_frame
 	assert(game.scripted_dialog_kind == "initial_seed_stock")
-	assert(game.normal_seed_bags == 0 and game.scripted_dialog_pages.size() == 3)
-	assert(game.intro_dialogue_label.text == Localizer.text("ja", "initial_seed_stock_girl"))
+	assert(game.normal_seed_bags == 0 and game.scripted_dialog_pages.size() == 2)
+	assert(game.intro_dialogue_label.text == Localizer.text("ja", "initial_seed_stock_endless_girl"))
 	game._advance_scripted_dialog()
-	assert(game.intro_dialogue_label.text == Localizer.text("ja", "initial_seed_stock_armadillo"))
-	game._advance_scripted_dialog()
-	assert(game.intro_dialogue_label.text == Localizer.text("ja", "initial_seed_stock_received"))
-	assert(game.normal_seed_bags == 1 and game.first_habitat_gift_claimed)
+	assert(game.intro_dialogue_label.text == Localizer.text("ja", "initial_seed_stock_endless_armadillo"))
 	game._advance_scripted_dialog()
 	await get_tree().process_frame
-	assert(game.initial_seed_stock_notice_complete and game.tutorial_guide_overlay.visible and str(game.tutorial_guide_button.get_meta("target", "")) == "play_open_normal")
-	game._hide_first_play_tutorial_overlay();game.normal_play_tutorial_complete=true;game._save()
+	assert(game.initial_seed_stock_notice_complete and game.first_habitat_gift_claimed and game.normal_seed_bags == 0)
+	assert(game.scripted_dialog_kind == "first_normal_sow_prompt")
+	assert(game.intro_dialogue_label.text == Localizer.text("ja", "tutorial_normal_pre_sow_endless"))
+	game._advance_scripted_dialog()
+	await get_tree().create_timer(.75).timeout
+	assert(game.play_active and game.active_seed_type == "normal" and game.normal_seed_bags == 0)
+	assert(not game.play_open_button.visible and not game.play_overlay.visible and game.first_play_tutorial_active)
+	game._end_first_play_tutorial_context();game.normal_play_tutorial_complete=true;game._hide_first_play_tutorial_overlay();game._save()
 	assert(not game.panda_beacon_unlocked and game.panda_beacon_count == 0)
 	assert(game.puku_gauge_intro_complete and game._tutorial_fully_complete())
 
@@ -228,10 +231,13 @@ func _ready() -> void:
 	game._ensure_habitat_wild_state(now_unix, false)
 	assert(game.habitat_wild_plants.size() >= population_before)
 
-	print("EARLY_GAME_HABITAT_SMOKE_OK empty=true dormant=true awakening=rain+ghosts+three_green_sprouts promise=two_pages observation=true items=pod+catalog image_fade=true return_dialog=5 stock=1x12 catalog_tutorial=4 shop=true beacon=retired settlement=true")
+	print("EARLY_GAME_HABITAT_SMOKE_OK empty=true dormant=true awakening=rain+ghosts+three_green_sprouts promise=two_pages observation=true items=pod+catalog image_fade=true return_dialog=5 stock=endless catalog_tutorial=4 autostart=true shop=true beacon=retired settlement=true")
 	get_tree().quit()
 
 func _prepare_trio_complete(game: Node) -> void:
+	game.opening_finished = true
+	game.opening_overlay.visible = false
+	game.opening_story_overlay.visible = false
 	game.opening_story_complete = true
 	game.intro_story_complete = true
 	game.first_colorata_confirmed = true

@@ -1084,9 +1084,9 @@ func _save() -> void:
 		"language_code":language_code,"language_selected":language_selected,"first_habitat_gift_claimed":first_habitat_gift_claimed,
 		"secret_gacha_active":secret_gacha_active,"secret_gacha_draws_remaining":secret_gacha_draws_remaining,"secret_gacha_last_roll_play_count":secret_gacha_last_roll_play_count
 	}
-	# Discovery-cycle state belongs only to the opt-in experiment namespace.  A
-	# finite save never receives trial-only fields, even though both modes share
-	# the same serializer.
+	# Discovery-cycle state belongs only to the endless save namespace. A legacy
+	# finite save never receives these fields, even though both modes share the
+	# same serializer.
 	if _is_endless_greenhouse_enabled():payload["endless_discovery_state"]=endless_greenhouse.discovery_state_for_save()
 	f.store_string(JSON.stringify(payload))
 	f.close()
@@ -1098,21 +1098,21 @@ func _is_endless_greenhouse_enabled()->bool:
 	return endless_greenhouse.enabled
 
 func _trial_dev_controls_enabled()->bool:
-	# The opt-in ENDLESS URL doubles as a contained play-test build. Release
-	# players on the normal URL still never receive development controls.
-	return habitat_debug_enabled or _is_endless_greenhouse_enabled()
+	# Endless is production progression now; it must never imply developer access.
+	return habitat_debug_enabled
 
 func _is_endless_normal_play()->bool:
 	return _is_endless_greenhouse_enabled() and play_active and active_seed_type=="normal"
 
 func _greenhouse_jelly_balance_for_spawn()->Dictionary:
-	# Only the continuously replenished normal ENDLESS plants receive the trial
+	# Only the continuously replenished normal ENDLESS plants receive its existing
 	# resistance mix. Every other Succulent setup path keeps its existing balance.
 	return JellyBalanceClass.endless_normal_trial_balance() if _is_endless_normal_play() else {}
 
 func _normal_seed_play_available()->bool:
 	# Unlimited supply begins only after the story actually grants the mysterious
-	# pod. The URL flag must not expose normal seeds during the old-seed prologue.
+	# pod. Formal endless progression must not expose normal seeds during the
+	# old-seed prologue.
 	return normal_seed_bags>0 or (_is_endless_greenhouse_enabled() and first_habitat_gift_claimed)
 
 func _endless_normal_flow_owns_play_controls()->bool:
@@ -2666,10 +2666,6 @@ func _on_habitat_awakening_finished()->void:
 
 func _start_puku_gauge_intro_dialog()->void:
 	if puku_gauge_intro_complete:return
-	if _is_endless_greenhouse_enabled():
-		puku_gauge_intro_complete=true;tutorial_steps["puku_gauge_intro_complete"]=true;_save();_update_play_ui()
-		call_deferred("_ensure_endless_greenhouse_running")
-		return
 	_start_scripted_dialog("puku_gauge_first_gift",[
 		{"speaker":"panda","text":Localizer.text(language_code,"puku_intro_1")},
 		{"speaker":"panda","text":Localizer.text(language_code,"puku_intro_2"),"button":Localizer.text(language_code,"continue")}
@@ -2841,9 +2837,7 @@ func _start_puku_buyback_tutorial()->void:
 	_show_puku_buyback_tutorial_page()
 
 func _show_puku_buyback_tutorial_page()->void:
-	# ENDLESS retains Panda's buyback introduction, but has no Puku Gauge to
-	# explain or spotlight. Finite play keeps the original two-page lesson.
-	var keys:=["puku_buyback_1"] if _is_endless_greenhouse_enabled() else ["puku_buyback_1","puku_buyback_2"]
+	var keys:=["puku_buyback_1","puku_buyback_2"]
 	if puku_buyback_tutorial_index>=keys.size():
 		puku_buyback_tutorial_active=false;puku_buyback_tutorial_complete=true;_hide_first_play_tutorial_overlay();_save()
 		if first_seed_pod_reward_event_active:call_deferred("_start_first_seed_pod_max_event")
@@ -2852,14 +2846,10 @@ func _show_puku_buyback_tutorial_page()->void:
 	if tutorial_highlight_tween and tutorial_highlight_tween.is_valid():tutorial_highlight_tween.kill()
 	var viewport_size:=get_viewport().get_visible_rect().size
 	tutorial_guide_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_shade.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_shade.color=Color(.025,.02,.01,.86)
-	if _is_endless_greenhouse_enabled():
-		tutorial_guide_shade.material=null
-		first_play_harvest_spotlight_material.set_shader_parameter("focus_ellipse",false)
-	else:
-		var center:=puku_gauge_area.global_position+puku_gauge_area.size*.5
-		tutorial_guide_shade.material=first_play_harvest_spotlight_material
-		var focus_half_size:=(puku_gauge_area.size*.5+Vector2(9,5))/viewport_size
-		first_play_harvest_spotlight_material.set_shader_parameter("focus_ellipse",true);first_play_harvest_spotlight_material.set_shader_parameter("focus_half_size_uv",focus_half_size);first_play_harvest_spotlight_material.set_shader_parameter("focus_count",1);first_play_harvest_spotlight_material.set_shader_parameter("focus_uv_a",center/viewport_size);first_play_harvest_spotlight_material.set_shader_parameter("focus_radius_a",.10);first_play_harvest_spotlight_material.set_shader_parameter("viewport_aspect",viewport_size.x/viewport_size.y)
+	var center:=puku_gauge_area.global_position+puku_gauge_area.size*.5
+	tutorial_guide_shade.material=first_play_harvest_spotlight_material
+	var focus_half_size:=(puku_gauge_area.size*.5+Vector2(9,5))/viewport_size
+	first_play_harvest_spotlight_material.set_shader_parameter("focus_ellipse",true);first_play_harvest_spotlight_material.set_shader_parameter("focus_half_size_uv",focus_half_size);first_play_harvest_spotlight_material.set_shader_parameter("focus_count",1);first_play_harvest_spotlight_material.set_shader_parameter("focus_uv_a",center/viewport_size);first_play_harvest_spotlight_material.set_shader_parameter("focus_radius_a",.10);first_play_harvest_spotlight_material.set_shader_parameter("viewport_aspect",viewport_size.x/viewport_size.y)
 	tutorial_guide_button.visible=true;tutorial_guide_button.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_button.position=Vector2.ZERO;tutorial_guide_button.size=viewport_size;tutorial_guide_button.text="";tutorial_guide_button.icon=null;tutorial_guide_button.flat=true;tutorial_guide_button.focus_mode=Control.FOCUS_NONE;tutorial_guide_button.set_meta("target","puku_buyback")
 	var empty_style:=StyleBoxEmpty.new()
 	for state in ["normal","hover","pressed","disabled","focus"]:tutorial_guide_button.add_theme_stylebox_override(state,empty_style)
@@ -2983,7 +2973,7 @@ func _build_settings(hud:Control)->void:
 		_add_progression_dev_counter(content,"old_page","古びた図鑑のページ")
 		_add_progression_dev_counter(content,"puku_coin","ぷくコイン")
 		var jelly_test:=Button.new();jelly_test.name="JellyDevOpen";jelly_test.text="開発用：ジュレテスト";jelly_test.custom_minimum_size=Vector2(370,58);_skin_button(jelly_test,Color("#c7b4d9"),17);jelly_test.pressed.connect(_open_jelly_dev);content.add_child(jelly_test)
-		trial_dev_gacha_button=Button.new();trial_dev_gacha_button.name="TrialDevGachaOpen";trial_dev_gacha_button.text="開発用：品種ガチャ";trial_dev_gacha_button.custom_minimum_size=Vector2(370,58);_skin_button(trial_dev_gacha_button,Color("#d9c77d"),17);trial_dev_gacha_button.pressed.connect(_open_trial_dev_forest_gacha);trial_dev_gacha_button.visible=_is_endless_greenhouse_enabled();content.add_child(trial_dev_gacha_button)
+		trial_dev_gacha_button=Button.new();trial_dev_gacha_button.name="TrialDevGachaOpen";trial_dev_gacha_button.text="開発用：品種ガチャ";trial_dev_gacha_button.custom_minimum_size=Vector2(370,58);_skin_button(trial_dev_gacha_button,Color("#d9c77d"),17);trial_dev_gacha_button.pressed.connect(_open_trial_dev_forest_gacha);trial_dev_gacha_button.visible=_is_endless_greenhouse_enabled() and _trial_dev_controls_enabled();content.add_child(trial_dev_gacha_button)
 		if DEVELOPMENT_CATALOG_PREVIEW_ENABLED and habitat_debug_enabled:
 			catalog_preview_settings_button=Button.new();catalog_preview_settings_button.text="開発用：品種プレビュー";catalog_preview_settings_button.custom_minimum_size=Vector2(370,58);_skin_button(catalog_preview_settings_button,Color("#c7d6ad"),17);catalog_preview_settings_button.pressed.connect(_open_catalog_preview_dev);content.add_child(catalog_preview_settings_button)
 	settings_close_button=Button.new();settings_close_button.text="閉じる";settings_close_button.custom_minimum_size=Vector2(280,55);_skin_button(settings_close_button,Color("#ead8b1"),18);settings_close_button.pressed.connect(_close_settings);content.add_child(settings_close_button)
@@ -3377,7 +3367,7 @@ func _perform_fusion(parent_a_id:String,parent_b_id:String)->void:
 	_queue_species_get(result_entry,is_new,"fusion_lab")
 
 func _open_forest_gacha()->void:
-	if forest_gacha_ui==null or not forest_gacha_unlocked or play_active or arrangement_scene_active or not _tutorial_fully_complete():return
+	if forest_gacha_ui==null or not forest_gacha_unlocked or (play_active and not _is_endless_normal_play()) or arrangement_scene_active or not _tutorial_fully_complete():return
 	if (encyclopedia_overlay and encyclopedia_overlay.visible) or (settings_overlay and settings_overlay.visible) or (secret_gacha_ui and secret_gacha_ui.visible):return
 	forest_gacha_preview_mode=false;forest_gacha_trial_dev_mode=false
 	if shop_overlay and shop_overlay.visible:
@@ -3554,7 +3544,7 @@ func _on_species_get_overlay_closed(context:String)->void:
 	elif not followup_started:call_deferred("_try_start_pending_story_event")
 
 func _open_secret_gacha()->void:
-	if secret_gacha_ui==null or not _secret_gacha_is_playable() or play_active or arrangement_scene_active or not _tutorial_fully_complete():return
+	if secret_gacha_ui==null or not _secret_gacha_is_playable() or (play_active and not _is_endless_normal_play()) or arrangement_scene_active or not _tutorial_fully_complete():return
 	if (encyclopedia_overlay and encyclopedia_overlay.visible) or (settings_overlay and settings_overlay.visible) or (forest_gacha_ui and forest_gacha_ui.visible):return
 	play_modal_open=false;play_overlay.visible=false;secret_gacha_ui.open_gacha(puku_points,secret_gacha_draws_remaining,false);audio_manager.play_bgm("shop");_update_play_ui()
 
@@ -3856,9 +3846,9 @@ func _update_play_ui()->void:
 	if main_status_hud:main_status_hud.visible=not arrangement_hud_hidden and not battle_open
 	if labels_layer:labels_layer.visible=not arrangement_hud_hidden and not battle_open
 	if best_panel:best_panel.visible=mystery_catalog_tutorial_complete and not _old_seed_story_active()
-	if puku_gauge_area:puku_gauge_area.visible=mystery_items_acquired and not _is_endless_greenhouse_enabled()
+	if puku_gauge_area:puku_gauge_area.visible=mystery_items_acquired
 	if seed_pod_gauge_area:seed_pod_gauge_area.visible=mystery_items_acquired and not _is_endless_greenhouse_enabled()
-	if trial_dev_gacha_button:trial_dev_gacha_button.visible=_is_endless_greenhouse_enabled()
+	if trial_dev_gacha_button:trial_dev_gacha_button.visible=_is_endless_greenhouse_enabled() and _trial_dev_controls_enabled()
 	play_overlay.visible=current_mode=="greenhouse" and not play_active and play_modal_open and not endless_owns_normal_flow
 	play_open_button.visible=current_mode=="greenhouse" and intro_story_complete and not play_active and not play_modal_open and not endless_owns_normal_flow and not arrangement_navigation_suspended and (not result_overlay or not result_overlay.visible) and (not shop_overlay or not shop_overlay.visible) and (not encyclopedia_overlay or not encyclopedia_overlay.visible) and (not settings_overlay or not settings_overlay.visible) and (not arrangement_ui or not arrangement_ui.visible)
 	seed_bag_panel.visible=current_mode=="greenhouse" and play_active and active_seed_type!="old" and not _is_endless_normal_play()
@@ -3869,12 +3859,12 @@ func _update_play_ui()->void:
 	# simulation is paused outside the greenhouse.
 	if mode_button:mode_button.visible=(not play_active or _is_endless_normal_play()) and not arrangement_navigation_suspended and habitat_unlocked
 	if habitat_dev_open_button:habitat_dev_open_button.visible=current_mode=="habitat" and not play_active and not arrangement_navigation_suspended
-	if shop_button:shop_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete()
-	if forest_gacha_button:forest_gacha_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete() and forest_gacha_unlocked and forest_gacha_intro_seen
+	if shop_button:shop_button.visible=(not play_active or _is_endless_normal_play()) and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete()
+	if forest_gacha_button:forest_gacha_button.visible=(not play_active or _is_endless_normal_play()) and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete() and forest_gacha_unlocked and forest_gacha_intro_seen
 	if fusion_lab_button:fusion_lab_button.visible=(not play_active or _is_endless_normal_play()) and not arrangement_navigation_suspended and current_mode=="greenhouse" and _fusion_lab_available()
 	if shop_forest_gacha_button:shop_forest_gacha_button.visible=forest_gacha_unlocked and forest_gacha_intro_seen
 	if secret_gacha_button:
-		secret_gacha_button.visible=StoryProgressionClass.secret_gacha_feature_enabled() and not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete() and StoryProgressionClass.secret_gacha_is_unlocked(story_progression_state) and secret_gacha_active
+		secret_gacha_button.visible=StoryProgressionClass.secret_gacha_feature_enabled() and (not play_active or _is_endless_normal_play()) and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete() and StoryProgressionClass.secret_gacha_is_unlocked(story_progression_state) and secret_gacha_active
 		_update_secret_gacha_button_state()
 	if arrangement_navigation_hint:
 		arrangement_navigation_hint.update_hint(language_code,arrangement_scene_active,_arrangement_navigation_hint_safe())
@@ -4077,7 +4067,7 @@ func _update_shop_ui()->void:
 		shop_buy_pulse_tween=create_tween().set_loops();shop_buy_pulse_tween.tween_property(shop_buy_glow,"modulate:a",.88,.9).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT);shop_buy_pulse_tween.tween_property(shop_buy_glow,"modulate:a",.34,.9).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 func _tutorial_fully_complete()->bool:
-	return intro_story_complete and habitat_awakened and habitat_tutorial_complete and seed_shop_open and (puku_gauge_intro_complete or _is_endless_greenhouse_enabled())
+	return intro_story_complete and habitat_awakened and habitat_tutorial_complete and seed_shop_open and puku_gauge_intro_complete
 
 func _refresh_seed_pack_unlocks()->void:
 	if volume_seed_bags>0:volume_seed_unlocked=true
@@ -4121,7 +4111,6 @@ func add_seed_pod_gauge_cm(amount_cm:float,save_immediately:=true,show_effect:=t
 	return earned_bags
 
 func add_puku_coin_gauge_cm(amount_cm:float,save_immediately:=true,show_effect:=true,source_position:=Vector2(-10000,-10000))->int:
-	if _is_endless_greenhouse_enabled():return 0
 	if amount_cm<=0.0 or not mystery_items_acquired:return 0
 	var target_cm:=_puku_gauge_target_cm()
 	var reward_puku:=_puku_gauge_reward_puku()
@@ -6878,8 +6867,8 @@ func _on_harvested(p)->void:
 		if play_active and (play_share_record.is_empty() or p.diameter_cm>float(play_share_record.get("size",0.0))):play_share_record={"species_id":str(p.data.species_id),"size":p.diameter_cm}
 		_evaluate_best_spawn_unlocks()
 	var earned_puku:=0;var harvest_screen_position:=camera.unproject_position(p.global_position)
-	if play_active and active_seed_type!="old" and not _is_endless_greenhouse_enabled():
-		add_seed_pod_gauge_cm(p.diameter_cm,false,true)
+	if play_active and active_seed_type!="old":
+		if not _is_endless_greenhouse_enabled():add_seed_pod_gauge_cm(p.diameter_cm,false,true)
 		earned_puku=add_puku_coin_gauge_cm(p.diameter_cm,false,true,harvest_screen_position)
 	_evaluate_unlock_rules("harvest_size",p.diameter_cm);_update_main_story_progress(false);_save();_update_best_ui();_update_currency_ui();audio_manager.play_se("harvest",.55)
 	if play_active:
@@ -6943,7 +6932,7 @@ func _show_harvest_result(plant)->void:
 	var panel:=PanelContainer.new();panel.size=Vector2(220,132);panel.position=camera.unproject_position(plant.global_position)-Vector2(110,82);panel.pivot_offset=panel.size*.5;panel.scale=Vector2(.78,.78);panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;panel.add_theme_stylebox_override("panel",_box(Color(0.22,0.12,0.07,.92),Color("#f0cc82"),17,2));effects_layer.add_child(panel)
 	var content:=VBoxContainer.new();content.alignment=BoxContainer.ALIGNMENT_CENTER;content.add_theme_constant_override("separation",0);content.mouse_filter=Control.MOUSE_FILTER_IGNORE;panel.add_child(content)
 	var name_label:=Label.new();name_label.text=Localizer.species_name(language_code,plant.data);name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name_label.add_theme_font_size_override("font_size",20);name_label.add_theme_color_override("font_color",Color.WHITE);content.add_child(name_label)
-	var size_label:=Label.new();size_label.text=_format_cm(plant.diameter_cm) if _is_endless_normal_play() else Localizer.text(language_code,"harvest_to_gauge",[_format_cm(plant.diameter_cm)]);size_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;size_label.add_theme_font_size_override("font_size",19);size_label.add_theme_color_override("font_color",UI_CREAM);content.add_child(size_label)
+	var size_label:=Label.new();size_label.text=Localizer.text(language_code,"harvest_to_gauge",[_format_cm(plant.diameter_cm)]);size_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;size_label.add_theme_font_size_override("font_size",19);size_label.add_theme_color_override("font_color",UI_CREAM);content.add_child(size_label)
 	var tween:=create_tween().bind_node(panel);tween.tween_property(panel,"scale",Vector2.ONE,.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT);tween.tween_interval(1.12);tween.set_parallel(true);tween.tween_property(panel,"position:y",panel.position.y-34,.5).set_trans(Tween.TRANS_QUAD);tween.tween_property(panel,"modulate:a",0.0,.5);tween.set_parallel(false);tween.tween_callback(panel.queue_free)
 
 func _show_record(p)->void:
