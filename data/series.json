@@ -436,5 +436,31 @@
     "unlock_condition": {"display_text": "特殊配合で初GETすると開放"},
     "iap_product_id": "",
     "sort_order": 150
+  },
+  {
+    "series_id": "fusion_tier2",
+    "display_name": "上位特殊配合",
+    "subtitle": "さらに特殊な組み合わせから生まれる多肉",
+    "description": "特殊配合をさらに掛け合わせて誕生した、上位配合の多肉を記録するページです。",
+    "cover_image_path": "res://assets/catalog/fusion_tier2/fus2_moonbow.png",
+    "species_ids": [
+      "fus2_moonbow",
+      "fus2_abyss_glass",
+      "fus2_kaleido_geode",
+      "fus2_amber_lantern",
+      "fus2_planet_specimen",
+      "fus2_deep_sea_light",
+      "fus2_sunset_stone",
+      "fus2_moon_resort",
+      "fus2_fever_lagoon",
+      "fus2_rust_garden"
+    ],
+    "field_id": "",
+    "unlock_type": "future",
+    "preview_catalog_when_locked": false,
+    "catalog_purchase_enabled": false,
+    "unlock_condition": {"display_text": "上位特殊配合で初GETすると開放"},
+    "iap_product_id": "",
+    "sort_order": 160
   }
 ]

@@ -818,10 +818,11 @@ func _load_species() -> void:
 		for raw_hybrid in parsed_hybrids:
 			if not raw_hybrid is Dictionary:continue
 			var hybrid:Dictionary=raw_hybrid.duplicate(true)
-			var is_special_fusion:=int(hybrid.get("fusion_tier",0))>0
-			hybrid["description_ja"]="決められた特別な組み合わせから誕生した、二段目の特殊配合多肉。" if is_special_fusion else "配合ラボで誕生した、ふたつの系統の個性を受け継ぐ特別な多肉。"
-			hybrid["description_en"]="A second-tier special fusion succulent born from a specific pairing." if is_special_fusion else "A special hybrid succulent born in the Fusion Lab."
-			hybrid["rarity"]="特殊配合種" if is_special_fusion else "配合種";hybrid["spawn_weight"]=0.0;hybrid["unlocked_spawn_weight"]=1.0
+			var fusion_tier:=int(hybrid.get("fusion_tier",0))
+			var is_special_fusion:=fusion_tier>0
+			hybrid["description_ja"]="特殊配合をさらに掛け合わせて誕生した、上位特殊配合多肉。" if fusion_tier>=2 else ("決められた特別な組み合わせから誕生した、二段目の特殊配合多肉。" if is_special_fusion else "配合ラボで誕生した、ふたつの系統の個性を受け継ぐ特別な多肉。")
+			hybrid["description_en"]="An advanced special fusion succulent born by combining special fusions." if fusion_tier>=2 else ("A second-tier special fusion succulent born from a specific pairing." if is_special_fusion else "A special hybrid succulent born in the Fusion Lab.")
+			hybrid["rarity"]="上位特殊配合種" if fusion_tier>=2 else ("特殊配合種" if is_special_fusion else "配合種");hybrid["spawn_weight"]=0.0;hybrid["unlocked_spawn_weight"]=1.0
 			hybrid["series_seed_weight"]=0.0;hybrid["series_seed_eligible"]=false
 			hybrid["base_growth_rate"]=1.0;hybrid["jelly_risk_curve"]=1.0
 			hybrid["visual_variant"]=str(hybrid.get("species_id",""));hybrid["habitat_image_path"]=""

@@ -18,6 +18,7 @@ const FUSION_SERIES_BY_CATALOG_SERIES := {
 var species_by_id: Dictionary = {}
 var basic_recipes_by_pair: Dictionary = {}
 var special_recipes_by_pair: Dictionary = {}
+var series_special_recipes_by_species: Dictionary = {}
 
 static func default_fusion_series_for_catalog_series(series_id: String) -> String:
 	return str(FUSION_SERIES_BY_CATALOG_SERIES.get(series_id, ""))
@@ -42,12 +43,16 @@ func configure(species_catalog: Array, recipe_config: Dictionary = {}) -> void:
 func _load_recipes(config: Dictionary) -> void:
 	basic_recipes_by_pair.clear()
 	special_recipes_by_pair.clear()
+	series_special_recipes_by_species.clear()
 	for raw_recipe in config.get("basic_recipes", []):
 		if raw_recipe is Dictionary:
 			_register_recipe(raw_recipe, false)
 	for raw_recipe in config.get("special_recipes", []):
 		if raw_recipe is Dictionary:
 			_register_recipe(raw_recipe, true)
+	for raw_recipe in config.get("series_special_recipes", []):
+		if raw_recipe is Dictionary:
+			_register_series_special_recipe(raw_recipe)
 
 func _register_recipe(recipe: Dictionary, is_special: bool) -> void:
 	var parents: Array = recipe.get("parent_species_ids" if is_special else "parent_series", [])
@@ -69,10 +74,28 @@ func set_special_recipes(recipes: Array) -> void:
 		if raw_recipe is Dictionary:
 			_register_recipe(raw_recipe, true)
 
+func _register_series_special_recipe(recipe: Dictionary) -> void:
+	var parent_species_id := str(recipe.get("parent_species_id", ""))
+	var parent_series := str(recipe.get("parent_series", ""))
+	var result_species_id := str(recipe.get("result_species_id", ""))
+	if parent_species_id.is_empty() or parent_series.is_empty() or result_species_id.is_empty():
+		return
+	var stored := recipe.duplicate(true)
+	stored["source"] = "series_special"
+	if not series_special_recipes_by_species.has(parent_species_id):
+		series_special_recipes_by_species[parent_species_id] = []
+	(series_special_recipes_by_species[parent_species_id] as Array).append(stored)
+
+func set_series_special_recipes(recipes: Array) -> void:
+	series_special_recipes_by_species.clear()
+	for raw_recipe in recipes:
+		if raw_recipe is Dictionary:
+			_register_series_special_recipe(raw_recipe)
+
 func fusion_series_for_entry(entry: Dictionary) -> String:
-	# Higher-tier fusion species only participate through species-id recipes.
-	# Their display family is intentionally stored separately and must never
-	# route them into the 55 basic series recipes.
+	# Higher-tier fusion species participate only as explicitly named parents.
+	# Their display family is intentionally stored separately and must never act
+	# as the series side of a series-special recipe or enter the 55 basic matrix.
 	if int(entry.get("fusion_tier", 0)) > 0:
 		return ""
 	var explicit := str(entry.get("fusion_series", ""))
@@ -105,8 +128,12 @@ func resolve(parent_a_id: String, parent_b_id: String) -> Dictionary:
 	var parent_b: Dictionary = species_by_id.get(parent_b_id, {})
 	if parent_a.is_empty() or parent_b.is_empty():
 		return {}
-	# Species-specific recipes always win. Otherwise an original species returns
-	# to itself; when both parents are originals, the left-side parent wins.
+	var series_special := _resolve_series_special(parent_a_id, parent_b_id, parent_a, parent_b)
+	if not series_special.is_empty():
+		return series_special
+	# Exact and species-to-series recipes always win. Otherwise an original
+	# species returns to itself; when both parents are originals, the left-side
+	# parent wins.
 	if is_original_entry(parent_a):
 		return _resolution({
 			"source": "original_fallback",
@@ -127,6 +154,23 @@ func resolve(parent_a_id: String, parent_b_id: String) -> Dictionary:
 	if not basic_recipes_by_pair.has(recipe_key):
 		return {}
 	return _resolution(basic_recipes_by_pair[recipe_key])
+
+func _resolve_series_special(parent_a_id: String, parent_b_id: String, parent_a: Dictionary, parent_b: Dictionary) -> Dictionary:
+	var forward := _series_special_recipe(parent_a_id, fusion_series_for_entry(parent_b))
+	if not forward.is_empty():
+		return _resolution(forward)
+	var reverse := _series_special_recipe(parent_b_id, fusion_series_for_entry(parent_a))
+	if not reverse.is_empty():
+		return _resolution(reverse)
+	return {}
+
+func _series_special_recipe(parent_species_id: String, parent_series: String) -> Dictionary:
+	if parent_series.is_empty():
+		return {}
+	for recipe_value in series_special_recipes_by_species.get(parent_species_id, []):
+		if recipe_value is Dictionary and str(recipe_value.get("parent_series", "")) == parent_series:
+			return recipe_value
+	return {}
 
 func _resolution(recipe_value: Variant) -> Dictionary:
 	if not recipe_value is Dictionary:

@@ -1910,7 +1910,7 @@ const HIRAGANA_SERIES_NAMES := {
 	"base":"げんしゅ", "metal":"きんぞくたにく",
 	"jewel":"ほうせきたにく", "jelly":"ぜりー", "sweets":"すいーつたにく", "gummy":"ぐみたにく",
 	"stardust":"ほしくずたにく", "glow":"ちっこうたにく", "neon":"ねおんたにく",
-	"stone":"すとーん", "sea":"うみ", "yumekawa":"ゆめふわ", "forest_amber":"もりと こはく", "hybrid":"はいごうたにく", "fusion_tier1":"とくしゅはいごう"
+	"stone":"すとーん", "sea":"うみ", "yumekawa":"ゆめふわ", "forest_amber":"もりと こはく", "hybrid":"はいごうたにく", "fusion_tier1":"とくしゅはいごう", "fusion_tier2":"じょういとくしゅはいごう"
 }
 
 static func normalize_language(value:String)->String:
@@ -1953,6 +1953,7 @@ static func series_name(language:String,entry:Dictionary)->String:
 		if series_id=="base":return "Original Species"
 		if series_id=="hybrid":return "Fusion Hybrids"
 		if series_id=="fusion_tier1":return "Special Fusion"
+		if series_id=="fusion_tier2":return "Advanced Special Fusion"
 		return series_id.replace("_"," ").capitalize()+" Catalog"
 	if normalize_language(language)==LANGUAGE_HIRAGANA:return str(HIRAGANA_SERIES_NAMES.get(series_id,_katakana_to_hiragana(str(entry.get("display_name",series_id)))))
 	return str(entry.get("display_name",series_id))

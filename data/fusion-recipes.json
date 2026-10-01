@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "special_recipes": [
     {"parent_species_ids":["hyb_gummy_sea","hyb_glow_jewel"],"result_species_id":"fus1_rainbow_bubble"},
     {"parent_species_ids":["hyb_gummy_gummy","hyb_stone_yumekawa"],"result_species_id":"fus1_pukupuku_planet"},
@@ -20,7 +20,19 @@
     {"parent_species_ids":["hyb_yumekawa_yumekawa","hyb_gummy_glow"],"result_species_id":"fus1_dream_balloon"},
     {"parent_species_ids":["hyb_jewel_yumekawa","hyb_sweets_yumekawa"],"result_species_id":"fus1_dream_specimen"},
     {"parent_species_ids":["hyb_forest_amber_forest_amber","hyb_jewel_stone"],"result_species_id":"fus1_strata"},
-    {"parent_species_ids":["hyb_sea_forest_amber","hyb_sweets_forest_amber"],"result_species_id":"fus1_amber_forest"}
+    {"parent_species_ids":["hyb_sea_forest_amber","hyb_sweets_forest_amber"],"result_species_id":"fus1_amber_forest"},
+    {"parent_species_ids":["fus1_rainbow_bubble","fus1_moon_clock"],"result_species_id":"fus2_moonbow"},
+    {"parent_species_ids":["fus1_jellyfish_parfait","fus1_deep_sea_aquarium"],"result_species_id":"fus2_abyss_glass"},
+    {"parent_species_ids":["fus1_kaleidoscope","fus1_geode"],"result_species_id":"fus2_kaleido_geode"},
+    {"parent_species_ids":["fus1_firefly_dome","fus1_amber_forest"],"result_species_id":"fus2_amber_lantern"},
+    {"parent_species_ids":["fus1_pukupuku_planet","fus1_dream_specimen"],"result_species_id":"fus2_planet_specimen"}
+  ],
+  "series_special_recipes": [
+    {"parent_species_id":"fus1_diving_sphere","parent_series":"glow","result_species_id":"fus2_deep_sea_light"},
+    {"parent_species_id":"fus1_sunset_jelly","parent_series":"stone","result_species_id":"fus2_sunset_stone"},
+    {"parent_species_id":"fus1_moon_pool","parent_series":"jure","result_species_id":"fus2_moon_resort"},
+    {"parent_species_id":"fus1_bonus_time","parent_series":"sea","result_species_id":"fus2_fever_lagoon"},
+    {"parent_species_id":"fus1_moss_garden","parent_series":"metal","result_species_id":"fus2_rust_garden"}
   ],
   "basic_recipes": [
     {"parent_series":["gummy","gummy"],"result_species_id":"hyb_gummy_gummy"},

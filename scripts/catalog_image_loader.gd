@@ -7,6 +7,7 @@ const CACHE_VERSION_BY_PREFIX := {
 	"assets/catalog/glow/": "glow-20260915-2",
 	"assets/catalog/hybrid/": "hybrid-20260930-1",
 	"assets/catalog/fusion_tier1/": "fusion-tier1-20261001-1",
+	"assets/catalog/fusion_tier2/": "fusion-tier2-20261002-1",
 }
 
 var placeholder_texture: ImageTexture
