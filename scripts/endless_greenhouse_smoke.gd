@@ -98,7 +98,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	_remove_test_file(NORMAL_PATH)
 	_remove_test_file(EXPERIMENT_PATH)
-	print("ENDLESS_GREENHOUSE_SMOKE_OK default_without_flags=true autostart=true modal=false infinite=true refill=harvest+jelly result=false longevity=35/35/22/8 per_spawn_new=false discovery_set=12 forced_new=true immediate_get=true pause=true navigation=habitat+catalog+shop+gacha debug_controls=debug_only production_gacha=earned_puku+spin+species_get dev_gacha_saved=true fusion=entrance+open+image_cards+hybrid_image+selection+execute+species_get pod=false puku=true restoration_pending=true finite=true save_isolated=true")
+	print("ENDLESS_GREENHOUSE_SMOKE_OK default_without_flags=true autostart=true modal=false infinite=true refill=harvest+jelly result=false longevity=35/35/22/8 jelly_debug_override=true per_spawn_new=false discovery_set=12 forced_new=true immediate_get=true pause=true navigation=habitat+catalog+shop+gacha debug_controls=debug_only production_gacha=earned_puku+spin+species_get dev_gacha_saved=true fusion=entrance+open+image_cards+hybrid_image+selection+execute+species_get pod=false puku=true restoration_pending=true finite=true save_isolated=true")
 	get_tree().quit()
 
 
@@ -630,7 +630,21 @@ func _test_debug_controls_and_gacha(game: Node) -> void:
 	game._open_settings()
 	game._open_jelly_dev()
 	assert(game.jelly_dev_overlay.visible and not game._should_simulate_endless_greenhouse())
+	var debug_balance:Dictionary=game._greenhouse_jelly_balance_for_spawn()
+	assert(is_equal_approx(float(debug_balance.short_weight),45.0))
+	assert(is_equal_approx(float(debug_balance.normal_weight),35.0))
+	assert(is_equal_approx(float(debug_balance.long_weight),16.0))
+	assert(is_equal_approx(float(debug_balance.ultra_weight),4.0))
+	assert(is_equal_approx(float(debug_balance.cooldown),1.0))
+	game._change_jelly_dev_value("final_chance",.005)
+	debug_balance=game._greenhouse_jelly_balance_for_spawn()
+	assert(is_equal_approx(float(debug_balance.final_chance),.065))
 	game._dev_reset_jelly()
+	var production_balance:Dictionary=game._greenhouse_jelly_balance_for_spawn()
+	assert(is_equal_approx(float(production_balance.short_weight),35.0))
+	assert(is_equal_approx(float(production_balance.normal_weight),35.0))
+	assert(is_equal_approx(float(production_balance.long_weight),22.0))
+	assert(is_equal_approx(float(production_balance.ultra_weight),8.0))
 	game._close_jelly_dev()
 	assert(game._should_simulate_endless_greenhouse())
 

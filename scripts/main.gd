@@ -1105,8 +1105,12 @@ func _is_endless_normal_play()->bool:
 	return _is_endless_greenhouse_enabled() and play_active and active_seed_type=="normal"
 
 func _greenhouse_jelly_balance_for_spawn()->Dictionary:
-	# Only the continuously replenished normal ENDLESS plants receive its existing
-	# resistance mix. Every other Succulent setup path keeps its existing balance.
+	# An explicit developer override must win so the habitat_debug jelly controls
+	# affect newly spawned plants during the formal ENDLESS flow as intended.
+	if _trial_dev_controls_enabled() and JellyBalanceClass.override_enabled:
+		return JellyBalanceClass.effective().duplicate(true)
+	# Production ENDLESS plants keep their formal resistance mix. Every other
+	# Succulent setup path keeps its existing balance.
 	return JellyBalanceClass.endless_normal_trial_balance() if _is_endless_normal_play() else {}
 
 func _normal_seed_play_available()->bool:
