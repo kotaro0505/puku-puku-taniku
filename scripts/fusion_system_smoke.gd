@@ -56,7 +56,7 @@ func _ready() -> void:
 	await _test_tier2_game_flow(game)
 	game._reset_progression_state()
 	game.queue_free()
-	print("FUSION_SYSTEM_SMOKE_OK basic_species=55 basic_recipes=55 tier1_species=20 tier1_special=20 tier2_species=10 tier2_exact=5 tier2_series=5 unordered=true originals=fallback exact_then_series_special=priority parents=GET_only cost=atomic silhouette=species_specific double_submit=blocked seeds=after_GET languages=3")
+	print("FUSION_SYSTEM_SMOKE_OK basic_species=55 basic_recipes=55 tier1_species=20 tier1_special=20 tier2_species=10 tier2_exact=5 tier2_series=5 transparent_images=85 unordered=true originals=fallback exact_then_series_special=priority parents=GET_only cost=atomic silhouette=species_specific double_submit=blocked seeds=after_GET languages=3")
 	get_tree().quit()
 
 func _test_catalog_and_recipes(game) -> void:
@@ -92,6 +92,7 @@ func _test_catalog_and_recipes(game) -> void:
 		assert(FileAccess.file_exists(image_path) and ResourceLoader.exists(image_path))
 		var texture := load(image_path) as Texture2D
 		assert(texture != null and texture.get_width() == 768 and texture.get_height() == 768)
+		_assert_transparent_catalog_image(image_path, Vector2i(768, 768))
 	assert(hybrid_entries.size() == 55 and ids.size() == 55)
 	assert(result_series_counts == {"gummy":6,"metal":5,"sweets":5,"glow":5,"jewel":5,"jure":6,"stone":6,"sea":6,"yumekawa":5,"forest_amber":6})
 	assert(game.fusion_system.basic_recipes_by_pair.size() == 55)
@@ -203,6 +204,7 @@ func _test_tier1_recipes(game) -> void:
 		assert(FileAccess.file_exists(image_path) and ResourceLoader.exists(image_path))
 		var texture := load(image_path) as Texture2D
 		assert(texture != null and texture.get_width() == 1254 and texture.get_height() == 1254)
+		_assert_transparent_catalog_image(image_path, Vector2i(1254, 1254))
 		tier1_ids[result_id] = true
 	assert(tier1_ids.size() == 20)
 	var tier1_series: Dictionary = game._series_entry("fusion_tier1")
@@ -278,13 +280,15 @@ func _test_tier2_recipes(game) -> void:
 		assert(FileAccess.file_exists(image_path) and ResourceLoader.exists(image_path))
 		var texture := load(image_path) as Texture2D
 		assert(texture != null and texture.get_width() == 1254 and texture.get_height() == 1254)
+		_assert_transparent_catalog_image(image_path, Vector2i(1254, 1254))
 	var tier2_series: Dictionary = game._series_entry("fusion_tier2")
 	assert(not tier2_series.is_empty())
 	assert((tier2_series.get("species_ids", []) as Array).size() == 10)
 	assert(str(tier2_series.get("cover_image_path", "")) == "res://assets/catalog/fusion_tier2/fus2_moonbow.png")
 	var image_loader = CatalogImageLoaderClass.new()
-	assert(image_loader._versioned_relative_path("assets/catalog/fusion_tier2/fus2_moonbow.png") == "assets/catalog/fusion_tier2/fus2_moonbow.png?v=fusion-tier2-20261002-1")
-	assert(image_loader._versioned_relative_path("assets/catalog/fusion_tier1/fus1_rainbow_bubble.png") == "assets/catalog/fusion_tier1/fus1_rainbow_bubble.png?v=fusion-tier1-20261001-1")
+	assert(image_loader._versioned_relative_path("assets/catalog/hybrid/hyb_gummy_gummy.png") == "assets/catalog/hybrid/hyb_gummy_gummy.png?v=hybrid-20261002-2")
+	assert(image_loader._versioned_relative_path("assets/catalog/fusion_tier2/fus2_moonbow.png") == "assets/catalog/fusion_tier2/fus2_moonbow.png?v=fusion-tier2-20261002-2")
+	assert(image_loader._versioned_relative_path("assets/catalog/fusion_tier1/fus1_rainbow_bubble.png") == "assets/catalog/fusion_tier1/fus1_rainbow_bubble.png?v=fusion-tier1-20261002-2")
 	image_loader.free()
 	# Wrong series do not match, and a higher-tier display family never acts as
 	# the series side of a species-to-series recipe.
@@ -300,6 +304,20 @@ func _test_tier2_recipes(game) -> void:
 		eligible_ids.append(str(entry.get("species_id", "")))
 	assert("fus2_moonbow" in eligible_ids and "fus2_abyss_glass" in eligible_ids)
 	assert(game.fusion_system.resolve("fus2_moonbow", "metal_silver_rosette").is_empty())
+
+func _assert_transparent_catalog_image(image_path: String, expected_size: Vector2i) -> void:
+	var file := FileAccess.open(image_path, FileAccess.READ)
+	assert(file != null)
+	var image_bytes := file.get_buffer(file.get_length())
+	var image := Image.new()
+	assert(image.load_png_from_buffer(image_bytes) == OK)
+	assert(Vector2i(image.get_width(), image.get_height()) == expected_size)
+	assert(image.detect_alpha() != Image.ALPHA_NONE)
+	assert(image.get_pixel(0, 0).a <= 0.001)
+	assert(image.get_pixel(image.get_width() - 1, 0).a <= 0.001)
+	assert(image.get_pixel(0, image.get_height() - 1).a <= 0.001)
+	assert(image.get_pixel(image.get_width() - 1, image.get_height() - 1).a <= 0.001)
+	assert(image.get_pixel(image.get_width() / 2, image.get_height() / 2).a >= 0.99)
 
 func _test_game_flow(game) -> void:
 	game._reset_progression_state()
