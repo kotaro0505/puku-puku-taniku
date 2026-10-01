@@ -6,8 +6,9 @@ const Localizer = preload("res://scripts/game_localizer.gd")
 # Durable state for the post-crisis final chapter.  It is stored as one nested
 # payload in StoryProgression rather than spreading one-off flags through
 # main.gd.
-const STATE_VERSION := 2
+const STATE_VERSION := 3
 const REQUIRED_NEW_SPECIES := 3
+const REQUIRED_SEEDS_SOWN_AFTER_CRISIS := 48
 const REQUIRED_RETURNED_PLANTS := 5
 const MIN_RETURN_DIAMETER_CM := 100.0
 const JUREJURE_PHASE_CRISIS := "crisis"
@@ -95,6 +96,7 @@ static func default_state() -> Dictionary:
 		"version": STATE_VERSION,
 		"tracking_started": false,
 		"new_species_ids": [],
+		"seeds_sown_since_crisis": 0,
 		"join_home_pending": false,
 		"join_home_seen": false,
 		"join_habitat_pending": false,
@@ -127,6 +129,9 @@ static func normalize_state(raw_state: Variant, migration: Dictionary = {}) -> D
 			if not species_id.is_empty() and species_id not in new_species:
 				new_species.append(species_id)
 	state["new_species_ids"] = new_species
+	state["seeds_sown_since_crisis"] = maxi(
+		0, int(state.get("seeds_sown_since_crisis", 0))
+	)
 
 	var returned: Array[Dictionary] = []
 	var raw_returned: Variant = state.get("returned_plants", [])
@@ -163,6 +168,7 @@ static func normalize_state(raw_state: Variant, migration: Dictionary = {}) -> D
 	)
 	if pending_stages.is_empty() and legacy_pending_stage > 0:
 		pending_stages.append(legacy_pending_stage)
+	pending_stages.sort()
 	state["return_event_pending_stages"] = pending_stages
 	state["return_event_pending_stage"] = pending_stages[0] if not pending_stages.is_empty() else 0
 	state["last_post_ending_dialog_index"] = int(state.get("last_post_ending_dialog_index", -1))
@@ -173,9 +179,9 @@ static func normalize_state(raw_state: Variant, migration: Dictionary = {}) -> D
 		ending_phase = ""
 	state["ending_phase"] = ending_phase
 
-	# Saves made before the final chapter existed begin tracking from the first
-	# new GET after upgrade.  Historical acquisitions cannot be dated reliably,
-	# so they are deliberately not counted retroactively.
+	# Saves made before this counter existed begin tracking future normal
+	# greenhouse sowings once the already-persisted crisis state is active.
+	# Historical sowings cannot be dated reliably, so they are not inferred.
 	if bool(migration.get("habitat_crisis_started", false)):
 		state["tracking_started"] = true
 	if not returned.is_empty():
@@ -208,14 +214,33 @@ static func record_new_species(state: Dictionary, species_id: String) -> bool:
 	if species_id not in ids:
 		ids.append(species_id)
 	state["new_species_ids"] = ids
-	if ids.size() >= REQUIRED_NEW_SPECIES and not bool(state.get("join_home_seen", false)):
-		state["join_home_pending"] = true
-		return true
 	return false
 
 
 static func new_species_count(state: Dictionary) -> int:
 	return mini(REQUIRED_NEW_SPECIES, (state.get("new_species_ids", []) as Array).size())
+
+
+static func record_normal_seed_sown_after_crisis(state: Dictionary, amount := 1) -> bool:
+	if amount <= 0 \
+			or not bool(state.get("tracking_started", false)) \
+			or bool(state.get("join_home_pending", false)) \
+			or bool(state.get("join_home_seen", false)) \
+			or bool(state.get("jurejure_joined", false)):
+		return false
+	var previous := maxi(0, int(state.get("seeds_sown_since_crisis", 0)))
+	var current := previous + amount
+	state["seeds_sown_since_crisis"] = current
+	if previous < REQUIRED_SEEDS_SOWN_AFTER_CRISIS \
+			and current >= REQUIRED_SEEDS_SOWN_AFTER_CRISIS \
+			and not bool(state.get("join_home_pending", false)):
+		state["join_home_pending"] = true
+		return true
+	return false
+
+
+static func seeds_sown_since_crisis(state: Dictionary) -> int:
+	return maxi(0, int(state.get("seeds_sown_since_crisis", 0)))
 
 
 static func can_queue_join_home(state: Dictionary, post_crisis_greenhouse_seen: bool) -> bool:
@@ -351,6 +376,13 @@ static func restoration_stage(state: Dictionary) -> int:
 
 static func is_complete(state: Dictionary) -> bool:
 	return bool(state.get("full_recovery_revealed", false))
+
+
+static func should_show_progress(state: Dictionary) -> bool:
+	return is_started(state) \
+		and not bool(state.get("ending_seen", false)) \
+		and not bool(state.get("thank_you_seen", false)) \
+		and ending_phase(state) != "complete"
 
 
 static func jurejure_interaction_phase(state: Dictionary) -> String:

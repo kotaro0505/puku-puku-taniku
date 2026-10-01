@@ -799,6 +799,10 @@ func _test_fusion_lab_flow(game: Node) -> void:
 	game.species_get_overlay.close_overlay()
 	await get_tree().create_timer(.24).timeout
 	assert(not game.species_get_overlay.visible)
+	assert(game.scripted_dialog_kind=="catalog_series_unlock_notice")
+	assert(str(game.scripted_dialog_pages[0].get("text","")).contains("『配合多肉』"))
+	while not game.scripted_dialog_kind.is_empty():game._advance_scripted_dialog()
+	await get_tree().process_frame
 	assert(game._is_endless_normal_play() and game._should_simulate_endless_greenhouse())
 	var age_before_resume: float = observer.age
 	game._process(.25)

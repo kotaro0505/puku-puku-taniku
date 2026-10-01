@@ -16,6 +16,7 @@ func _ready()->void:
 	_test_uniform_known_category(game)
 	_test_distribution(game)
 	_test_known_fallback_and_exclusions(game)
+	_test_discovery_does_not_boost_spawn_weight(game)
 	game.free();await get_tree().process_frame
 	print("NORMAL_SEED_DISTRIBUTION_SMOKE_OK new=3+1 stars=81/10/5 uniform=true legacy_rarity=false spawn_weight=false excluded=true")
 	get_tree().quit()
@@ -98,6 +99,18 @@ func _test_known_fallback_and_exclusions(game:Node)->void:
 		assert(bool(game.discovered.get(str(fallback.species_id),false)))
 		assert(str(fallback.species_id) not in EXCLUDED)
 	for draw in range(400):assert(str(game._select_species_for_seed("normal",.50).species_id) not in EXCLUDED)
+
+func _test_discovery_does_not_boost_spawn_weight(game:Node)->void:
+	var entry:Dictionary=game._catalog_entry(KNOWN_ZERO[0]).duplicate(true)
+	entry["catalog_only"]=true
+	entry["spawn_weight"]=0.35
+	entry["unlocked_spawn_weight"]=99.0
+	game.discovered.erase(KNOWN_ZERO[0])
+	var before_get:float=game._normal_spawn_weight(entry)
+	game.discovered[KNOWN_ZERO[0]]=true
+	var after_get:float=game._normal_spawn_weight(entry)
+	assert(is_equal_approx(before_get,0.35))
+	assert(is_equal_approx(after_get,before_get))
 
 func _ratio(count:int)->float:
 	return float(count)/50000.0

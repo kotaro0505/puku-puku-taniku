@@ -18,7 +18,7 @@ const ACT_FINALE := 4
 # New Act II/III gates live in one versioned payload instead of adding another
 # row of unrelated booleans to main.gd.  The root scene only forwards gameplay
 # milestones and persists this dictionary.
-const RUNTIME_STATE_VERSION := 6
+const RUNTIME_STATE_VERSION := 7
 # Keep the complete Secret Gacha implementation and saved state intact while
 # disconnecting it from normal progression.  Preview routes remain available,
 # and changing this one flag reconnects the midpoint install flow.
@@ -390,6 +390,25 @@ static func record_restoration_new_get(
 	var restoration: Dictionary = state.get("restoration", HabitatRestorationClass.default_state())
 	HabitatRestorationClass.begin_tracking(restoration)
 	var became_ready := HabitatRestorationClass.record_new_species(restoration, species_id)
+	state["restoration"] = restoration
+	if HabitatRestorationClass.can_queue_join_home(
+			restoration, bool(state.get("post_crisis_greenhouse_seen", false))):
+		queue_story_event(state, EVENT_RESTORATION_JOIN_HOME)
+	return became_ready
+
+
+static func record_normal_seed_sown_after_crisis(
+		state: Dictionary, habitat_crisis_started: bool, amount := 1
+	) -> bool:
+	if not habitat_crisis_started or amount <= 0:
+		return false
+	var restoration: Dictionary = state.get(
+		"restoration", HabitatRestorationClass.default_state()
+	)
+	HabitatRestorationClass.begin_tracking(restoration)
+	var became_ready := HabitatRestorationClass.record_normal_seed_sown_after_crisis(
+		restoration, amount
+	)
 	state["restoration"] = restoration
 	if HabitatRestorationClass.can_queue_join_home(
 			restoration, bool(state.get("post_crisis_greenhouse_seen", false))):

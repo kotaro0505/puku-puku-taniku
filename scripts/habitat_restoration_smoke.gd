@@ -11,7 +11,7 @@ func _ready() -> void:
 	_test_restoration_state_machine()
 	_test_localization_contract()
 	await _test_integrated_final_chapter()
-	print("HABITAT_RESTORATION_SMOKE_OK post_crisis=7 new_gets=3 joined=true lamps=5 threshold=100 returned=5 medals=5 stages=0..5 slides=3 finale=true epilogue=true thank_you=true save_resume=true")
+	print("HABITAT_RESTORATION_SMOKE_OK post_crisis=7 seeds_after_crisis=48 joined=true lamps=5 threshold=100 returned=5 medals=5 stages=0..5 slides=3 finale=true epilogue=true thank_you=true save_resume=true")
 	get_tree().quit()
 
 
@@ -22,8 +22,19 @@ func _test_restoration_state_machine() -> void:
 	assert(bool(restoration.get("tracking_started", false)))
 	assert(not StoryProgressionClass.record_restoration_new_get(progression, "colorata", true))
 	assert(not StoryProgressionClass.record_restoration_new_get(progression, "affinis", true))
-	assert(StoryProgressionClass.record_restoration_new_get(progression, "shaviana", true))
+	assert(not StoryProgressionClass.record_restoration_new_get(progression, "shaviana", true))
 	assert(HabitatRestorationClass.new_species_count(restoration) == 3)
+	assert(not bool(restoration.get("join_home_pending", false)))
+	var before_crisis := StoryProgressionClass.default_runtime_state()
+	assert(not StoryProgressionClass.record_normal_seed_sown_after_crisis(before_crisis, false, 48))
+	assert(HabitatRestorationClass.seeds_sown_since_crisis(StoryProgressionClass.restoration_state(before_crisis)) == 0)
+	assert(not StoryProgressionClass.record_normal_seed_sown_after_crisis(progression, true, 47))
+	assert(HabitatRestorationClass.seeds_sown_since_crisis(restoration) == 47)
+	assert(not bool(restoration.get("join_home_pending", false)))
+	assert(StoryProgressionClass.record_normal_seed_sown_after_crisis(progression, true, 1))
+	assert(HabitatRestorationClass.seeds_sown_since_crisis(restoration) == 48)
+	assert(not StoryProgressionClass.record_normal_seed_sown_after_crisis(progression, true, 1))
+	assert(HabitatRestorationClass.seeds_sown_since_crisis(restoration) == 48)
 	# The home event stays queued until the preceding post-crisis conversation
 	# has actually completed.
 	assert(StoryProgressionClass.peek_story_event(progression).is_empty())
@@ -84,11 +95,13 @@ func _test_restoration_state_machine() -> void:
 		"habitat_crisis_started": true,
 	})
 	var restored_state: Dictionary = StoryProgressionClass.restoration_state(reloaded)
+	assert(HabitatRestorationClass.seeds_sown_since_crisis(restored_state) == 48)
 	assert(HabitatRestorationClass.returned_count(restored_state) == 5)
 	assert(HabitatRestorationClass.ending_phase(restored_state) == "thank_you")
 	HabitatRestorationClass.complete_ending(restored_state)
 	assert(bool(restored_state.get("ending_seen", false)))
 	assert(bool(restored_state.get("thank_you_seen", false)))
+	assert(not HabitatRestorationClass.should_show_progress(restored_state))
 
 
 func _test_localization_contract() -> void:
@@ -149,6 +162,25 @@ func _test_integrated_final_chapter() -> void:
 	game.habitat_awakening_event_complete = true
 	game.habitat_tutorial_complete = true
 	game.habitat_tutorial_returned_to_greenhouse = true
+	game.puku_gauge_intro_complete = true
+	game.story_progression_state = StoryProgressionClass.default_runtime_state()
+	game.play_active = true
+	game.active_seed_type = "normal"
+	game.habitat_crisis_started = false
+	assert(not game._record_normal_greenhouse_seed_sown())
+	game.habitat_crisis_started = true
+	game.active_seed_type = "old"
+	assert(not game._record_normal_greenhouse_seed_sown())
+	game.active_seed_type = "normal"
+	game.dev_jelly_test_active = true
+	assert(not game._record_normal_greenhouse_seed_sown())
+	game.dev_jelly_test_active = false
+	game.catalog_preview_mode_active = true
+	assert(not game._record_normal_greenhouse_seed_sown())
+	game.catalog_preview_mode_active = false
+	assert(game._record_normal_greenhouse_seed_sown())
+	assert(HabitatRestorationClass.seeds_sown_since_crisis(game._restoration_state()) == 1)
+	game.play_active = false
 	game.habitat_crisis_started = true
 	game.story_progression_state = StoryProgressionClass.default_runtime_state()
 	StoryProgressionClass.begin_habitat_crisis(game.story_progression_state)
@@ -162,6 +194,9 @@ func _test_integrated_final_chapter() -> void:
 
 	for species_id in ["colorata", "affinis", "shaviana"]:
 		StoryProgressionClass.record_restoration_new_get(game.story_progression_state, species_id, true)
+	assert(StoryProgressionClass.peek_story_event(game.story_progression_state).is_empty())
+	assert(not StoryProgressionClass.record_normal_seed_sown_after_crisis(game.story_progression_state, true, 47))
+	assert(StoryProgressionClass.record_normal_seed_sown_after_crisis(game.story_progression_state, true, 1))
 	game._try_start_pending_story_event()
 	assert(game.scripted_dialog_kind == "restoration_join_home")
 	assert(game.scripted_dialog_pages.size() == 3)
@@ -251,32 +286,64 @@ func _test_integrated_final_chapter() -> void:
 	assert(not game.result_overlay.visible and game.current_mode == "greenhouse" and game.play_active)
 	assert(game.scripted_dialog_kind.is_empty())
 	game._toggle_mode()
-	await get_tree().create_timer(1.2).timeout
 	for _frame in range(100):
 		if game.scripted_dialog_kind == "restoration_return_1":
 			break
 		await get_tree().process_frame
 	assert(not game.result_overlay.visible and game.current_mode == "habitat", "return transition mode=%s dialog=%s fade=%s pending=%s" % [game.current_mode, game.scripted_dialog_kind, game.scene_transition_fade.visible, HabitatRestorationClass.pending_return_stages(game._restoration_state())])
 	assert(game.scripted_dialog_kind == "restoration_return_1", "unexpected rooted event: %s pending=%s" % [game.scripted_dialog_kind, HabitatRestorationClass.pending_return_stages(game._restoration_state())])
+	assert(game.jurejure_camera_focus_context == "restoration_return_1")
+	var first_medal:Node3D=game._restoration_returned_plant_node(1)
+	assert(is_instance_valid(first_medal))
+	assert(int(first_medal.get_meta("restoration_stage",0))==1)
+	assert(is_equal_approx(float((first_medal.get_meta("restoration_snapshot",{}) as Dictionary).get("diameter_cm",0.0)),120.0))
 	_finish_dialog(game)
 	await get_tree().process_frame
 	assert(game.scripted_dialog_kind == "restoration_return_2")
+	assert(game.jurejure_camera_focus_context == "restoration_return_2")
+	var second_medal:Node3D=game._restoration_returned_plant_node(2)
+	assert(is_equal_approx(float((second_medal.get_meta("restoration_snapshot",{}) as Dictionary).get("diameter_cm",0.0)),130.0))
 	_finish_dialog(game)
-	await get_tree().create_timer(1.1).timeout
-	for _frame in range(100):
-		if game.current_mode == "greenhouse" and game.scripted_dialog_kind.is_empty():
-			break
-		await get_tree().process_frame
-	assert(game.current_mode == "greenhouse")
+	await get_tree().process_frame
+	assert(game.current_mode == "habitat")
+	await get_tree().create_timer(.9).timeout
 	restoration = game._restoration_state()
 	assert(HabitatRestorationClass.pending_return_stages(restoration).is_empty())
+	game._toggle_mode()
+	await get_tree().process_frame
+	assert(game.current_mode=="greenhouse")
 	# Fill the remaining slots directly; their queue behavior was covered above.
-	for index in range(2, 5):
+	for index in range(2, 4):
 		var plant := snapshot.duplicate(true)
-		plant["diameter_cm"] = 100.0 + 15.0 * float(index)
+		plant["diameter_cm"] = 115.0 + 15.0 * float(index)
 		assert(HabitatRestorationClass.add_returned_plant(restoration, plant) == index + 1)
-		HabitatRestorationClass.complete_return_event(restoration, index + 1)
+	game._try_start_pending_story_event()
+	await get_tree().process_frame
+	assert(game.current_mode=="greenhouse" and not game.scene_transition_fade.visible)
+	var final_plant:=snapshot.duplicate(true)
+	final_plant["diameter_cm"]=175.0
+	assert(HabitatRestorationClass.add_returned_plant(restoration,final_plant)==5)
 	game.story_progression_state["restoration"] = restoration
+	game._try_start_pending_story_event()
+	await get_tree().process_frame
+	assert(game.scene_transition_fade.visible,"final return did not start: mode=%s pending=%s dialog=%s intro=%s camera=%s result=%s"%[game.current_mode,HabitatRestorationClass.pending_return_stages(restoration),game.scripted_dialog_kind,game.intro_overlay.visible,game.jurejure_intro_camera_active,game.result_overlay.visible])
+	assert(game.scene_transition_fade.color.r>0.99 and game.scene_transition_fade.color.g>0.99 and game.scene_transition_fade.color.b>0.99)
+	await get_tree().create_timer(2.8).timeout
+	assert(game.current_mode=="habitat")
+	assert(game.scripted_dialog_kind=="restoration_return_3")
+	assert(game.habitat_items_root.find_children("RestorationMedalPlant*","Sprite3D",true,false).size()==5)
+	assert(is_equal_approx(float((game._restoration_returned_plant_node(3).get_meta("restoration_snapshot",{}) as Dictionary).get("diameter_cm",0.0)),145.0))
+	_finish_dialog(game);await get_tree().process_frame
+	assert(game.scripted_dialog_kind=="restoration_return_4")
+	assert(is_equal_approx(float((game._restoration_returned_plant_node(4).get_meta("restoration_snapshot",{}) as Dictionary).get("diameter_cm",0.0)),160.0))
+	_finish_dialog(game);await get_tree().process_frame
+	assert(game.scripted_dialog_kind=="restoration_return_5")
+	assert(game.jurejure_camera_focus_context=="restoration_return_5")
+	assert(is_equal_approx(float((game._restoration_returned_plant_node(5).get_meta("restoration_snapshot",{}) as Dictionary).get("diameter_cm",0.0)),175.0))
+	_finish_dialog(game)
+	await get_tree().create_timer(1.2).timeout
+	assert(game.habitat_restoration_ui.ending_layer.visible)
+	game.habitat_restoration_ui.reset_view()
 	game.habitat_restoration_ui.update_lamps(5, true)
 	for lamp in game.habitat_restoration_ui.lamp_labels:
 		assert(lamp.text == "●")
@@ -325,11 +392,17 @@ func _test_integrated_final_chapter() -> void:
 	game.scripted_dialog_pages.clear()
 	game.intro_overlay.visible = false
 	game._show_restoration_thank_you()
+	await get_tree().process_frame
 	assert(game.habitat_restoration_ui.ending_layer.visible)
 	assert(game.habitat_restoration_ui.ending_title.text.contains("ありがとう"))
 	assert(game.habitat_restoration_ui.character_row.get_child_count() == 6)
 	assert(game.audio_manager.current_bgm_key == "greenhouse")
 	game.habitat_restoration_ui.reset_view()
+	game._on_restoration_thank_you_closed()
+	assert(HabitatRestorationClass.ending_phase(game._restoration_state())=="complete")
+	assert(not game.habitat_restoration_ui.lamp_panel.visible)
+	game.current_mode="habitat";game._apply_mode();game._build_habitat_items(true)
+	assert(game.habitat_items_root.find_children("RestorationMedalPlant*","Sprite3D",true,false).size()==5)
 	game.free()
 	await get_tree().process_frame
 
