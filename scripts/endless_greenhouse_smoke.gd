@@ -44,7 +44,9 @@ func _ready() -> void:
 	game._update_play_ui()
 	assert(game.play_active and game.active_seed_type == "normal")
 	assert(game.normal_seed_bags == 0)
-	assert(game.plants.size() >= game.PLAY_INITIAL_MIN_PLANTS and game.plants.size() <= game.PLAY_INITIAL_MAX_PLANTS)
+	assert(game.ENDLESS_NORMAL_MIN_PLANTS==7 and game.ENDLESS_NORMAL_MAX_PLANTS==10)
+	assert(game.play_concurrent_target>=game.ENDLESS_NORMAL_MIN_PLANTS and game.play_concurrent_target<=game.ENDLESS_NORMAL_MAX_PLANTS)
+	assert(game.plants.size()==game.play_concurrent_target and game.plants.size()<=10)
 	assert(not game.play_open_button.visible and not game.play_overlay.visible and not game.normal_play_button.visible)
 	assert(not game.seed_bag_panel.visible and not game.seed_pod_gauge_area.visible and game.puku_gauge_area.visible)
 	assert(not game.result_overlay.visible)
@@ -56,11 +58,11 @@ func _ready() -> void:
 	harvested.diameter_cm = 30.0
 	harvested.harvest()
 	await get_tree().create_timer(1.55).timeout
-	assert(game.play_active and game.plants.size() == concurrent_target)
+	assert(game.play_active and game.plants.size() == concurrent_target and game.plants.size()<=10)
 	var jellied = game.plants[0]
 	jellied.jelly()
 	await get_tree().create_timer(1.75).timeout
-	assert(game.play_active and game.plants.size() == concurrent_target)
+	assert(game.play_active and game.plants.size() == concurrent_target and game.plants.size()<=10)
 	assert(game.play_seeds_remaining == 0)
 	game._finish_greenhouse_play()
 	assert(game.play_active and not game.result_overlay.visible)
@@ -99,7 +101,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	_remove_test_file(NORMAL_PATH)
 	_remove_test_file(EXPERIMENT_PATH)
-	print("ENDLESS_GREENHOUSE_SMOKE_OK default_without_flags=true autostart=true modal=false infinite=true refill=harvest+jelly result=false longevity=35/35/22/8 jelly_debug_override=true new_roll=per_harvest jelly_new_roll=false discovery_curve=unchanged forced_new=true candidate_pool=uniform immediate_get=true virtual_batch=12 pause=true navigation=habitat+catalog+shop+gacha debug_controls=debug_only production_gacha=earned_puku+spin+species_get dev_gacha_saved=true fusion=entrance+open+image_cards+hybrid_image+selection+execute+species_get pod=false puku=true restoration_pending=true finite=true save_isolated=true")
+	print("ENDLESS_GREENHOUSE_SMOKE_OK default_without_flags=true autostart=true modal=false infinite=true concurrent=7-10 refill=harvest+jelly result=false longevity=35/35/22/8 jelly_debug_override=true new_roll=per_harvest jelly_new_roll=false discovery_curve=unchanged forced_new=true candidate_pool=uniform immediate_get=true virtual_batch=12 pause=true navigation=habitat+catalog+shop+gacha debug_controls=debug_only production_gacha=earned_puku+spin+species_get dev_gacha_saved=true fusion=entrance+open+image_cards+hybrid_image+selection+execute+species_get pod=false puku_curve=squared_over_70 restoration_pending=true finite=true save_isolated=true")
 	get_tree().quit()
 
 
@@ -336,7 +338,7 @@ func _test_endless_first_play_tutorial(game: Node) -> void:
 	await get_tree().create_timer(.72).timeout
 	assert(game.play_active and game.first_play_tutorial_active)
 	assert(game.active_seed_type == "normal")
-	assert(game.plants.size() >= game.PLAY_INITIAL_MIN_PLANTS and game.plants.size() <= game.PLAY_INITIAL_MAX_PLANTS)
+	assert(game.plants.size()>=game.ENDLESS_NORMAL_MIN_PLANTS and game.plants.size()<=game.ENDLESS_NORMAL_MAX_PLANTS)
 	assert(not game.play_modal_open and not game.play_overlay.visible and not game.normal_play_button.visible)
 	var tutorial_plant = game.plants[0]
 	var tutorial_species_id := str(tutorial_plant.data.get("species_id", ""))
@@ -853,13 +855,21 @@ func _test_gauges(game: Node) -> void:
 	assert(is_equal_approx(game.puku_gauge_cm, 123.0))
 	assert(game.add_puku_coin_gauge_cm(1500.0, false, false) == 9)
 	assert(is_equal_approx(game.puku_coin_gauge_cm, 321.0) and game.puku_points == 16)
+	game.discovered["colorata"]=true
+	game.species_get_counts["colorata"]=maxi(1,game._species_get_count("colorata"))
 	game._spawn_specific_plant("colorata")
 	var gauge_probe = game.plants.back()
 	gauge_probe.jelly_checks_enabled = false
 	gauge_probe.diameter_cm = 100.0
 	gauge_probe.harvest()
 	assert(is_equal_approx(game.puku_gauge_cm, 123.0))
-	assert(is_equal_approx(game.puku_coin_gauge_cm, 421.0) and game.puku_points == 16)
+	var effective_100:float=game._effective_puku_cm_for_harvest(100.0,false)
+	assert(is_equal_approx(game.puku_coin_gauge_cm,321.0+effective_100) and game.puku_points==16)
+	var fly_label:=game.effects_layer.find_child("HarvestCmFly",true,false) as Label
+	var harvest_panel:=game.effects_layer.find_child("HarvestResult",true,false) as PanelContainer
+	assert(fly_label and fly_label.text=="+142.9cm" and harvest_panel)
+	assert((harvest_panel.find_child("HarvestSize",true,false) as Label).text=="収穫 100cm")
+	assert((harvest_panel.find_child("PukuGaugeGain",true,false) as Label).text=="ぷくゲージ +142.9cm")
 	game._clear_greenhouse_plants()
 	game.play_spawn_queue = 0
 	game.play_seed_animations_pending = 0
@@ -1014,6 +1024,7 @@ func _test_finite_mode_unchanged(game: Node) -> void:
 	assert(game._species_get_count(str(finite_new_roll.get("species_id", ""))) == 0)
 	game._start_greenhouse_play("normal")
 	assert(game.play_active and game.normal_seed_bags == 0)
+	assert(game.play_concurrent_target>=game.PLAY_INITIAL_MIN_PLANTS and game.play_concurrent_target<=game.PLAY_INITIAL_MAX_PLANTS)
 	assert(is_equal_approx(game._puku_gauge_target_cm(), 500.0) and game._puku_gauge_reward_puku() == 3)
 	assert(game.play_seeds_remaining < game.NORMAL_GERMINATION_COUNT)
 	assert(game.seed_pod_gauge_area.visible and game.puku_gauge_area.visible)

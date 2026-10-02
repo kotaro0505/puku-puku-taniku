@@ -106,6 +106,7 @@ static func spawn_101cm_colorata(game) -> bool:
 	game.play_spawn_timer = 0.0
 	game.play_concurrent_target = 1
 	game.play_harvest_cm_total = 0.0
+	game.play_puku_gauge_cm_total = 0.0
 	game.play_puku_earned_total = 0
 	game.play_harvest_count = 0
 	game.play_max_size = 0.0

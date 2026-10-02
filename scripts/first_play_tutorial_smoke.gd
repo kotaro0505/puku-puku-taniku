@@ -239,7 +239,7 @@ func _ready() -> void:
 	assert(game.first_play_harvest_guide_active and game.tutorial_guide_message.text==Localizer.text("ja","tutorial_harvest_tap"))
 	assert(is_equal_approx(game.tutorial_harvest_plant.diameter_cm, game.TUTORIAL_HARVEST_CM))
 	game.tutorial_harvest_plant.harvest();await get_tree().process_frame
-	assert(game.normal_play_tutorial_complete and game.puku_coin_gauge_cm>=game.TUTORIAL_HARVEST_CM and game.puku_buyback_tutorial_active)
+	assert(game.normal_play_tutorial_complete and is_equal_approx(game.puku_coin_gauge_cm,game._effective_puku_cm_for_harvest(game.TUTORIAL_HARVEST_CM,false)) and game.puku_buyback_tutorial_active)
 	assert(game.tutorial_guide_message.text==Localizer.text("ja","puku_buyback_1"));game._advance_puku_buyback_tutorial()
 	assert(bool(game.first_play_harvest_spotlight_material.get_shader_parameter("focus_ellipse")))
 	var puku_center: Vector2 = game.first_play_harvest_spotlight_material.get_shader_parameter("focus_uv_a")
