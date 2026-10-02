@@ -40,6 +40,7 @@ func _ready() -> void:
 	assert(str(bgm_config.get("jurejure", "")) == "res://assets/audio/jurejure-gang-theme.mp3")
 	assert(str(bgm_config.get("puku_battle", "")) == "res://assets/audio/puku-puku-battle.mp3")
 	assert(str(bgm_config.get("habitat_crisis", "")) == "res://assets/audio/habitat-weakened-theme.mp3")
+	assert(str(bgm_config.get("ending", "")) == "res://assets/audio/ending-pssshh-new-batch.mp3")
 	audio.play_bgm("jurejure")
 	await get_tree().create_timer(audio.BGM_FADE_SECONDS + 0.10).timeout
 	_assert_single_finished_crossfade(audio, "jurejure")
@@ -58,6 +59,12 @@ func _ready() -> void:
 	audio.play_bgm("habitat")
 	await get_tree().create_timer(audio.BGM_FADE_SECONDS + 0.10).timeout
 	_assert_single_finished_crossfade(audio, "habitat")
+	audio.play_bgm("ending", true, 0.08)
+	assert(is_equal_approx(audio.last_bgm_fade_seconds, 0.08))
+	await get_tree().create_timer(0.18).timeout
+	_assert_single_finished_crossfade(audio, "ending")
+	var ending_stream:AudioStreamMP3 = audio.bgm_players[audio.active_bgm].stream as AudioStreamMP3
+	assert(ending_stream != null and ending_stream.loop)
 
 	audio._pause_bgm_for_background()
 	assert(audio.application_audio_paused and _unpaused_playing_count(audio) == 0)
@@ -81,7 +88,9 @@ func _ready() -> void:
 	await get_tree().create_timer(audio.BGM_FADE_SECONDS + 0.10).timeout
 	_assert_single_finished_crossfade(audio, "shop")
 
-	print("WEB_AUDIO_SMOKE_OK locked_start=silent playback=stream crossfade=single jurejure_sequence=true crisis_sequence=true mp3_loop=true visibility=pause_resume")
+	audio.queue_free()
+	await get_tree().process_frame
+	print("WEB_AUDIO_SMOKE_OK locked_start=silent playback=stream crossfade=single jurejure_sequence=true crisis_sequence=true ending=true custom_fade=true mp3_loop=true visibility=pause_resume")
 	get_tree().quit()
 
 func _playing_count(audio:Node) -> int:

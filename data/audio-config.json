@@ -6,6 +6,7 @@
     "habitat_crisis": "res://assets/audio/habitat-weakened-theme.mp3",
     "jurejure": "res://assets/audio/jurejure-gang-theme.mp3",
     "puku_battle": "res://assets/audio/puku-puku-battle.mp3",
+    "ending": "res://assets/audio/ending-pssshh-new-batch.mp3",
     "shop": "res://assets/audio/puku-puku-taniku-main.ogg"
   },
   "bgm_gain": {

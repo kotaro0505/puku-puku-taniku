@@ -20,6 +20,7 @@ var web_audio_mode := OS.has_feature("web")
 var web_audio_unlocked := not web_audio_mode
 var bgm_restart_queued := false
 var bgm_fade_tween: Tween
+var last_bgm_fade_seconds := BGM_FADE_SECONDS
 var application_audio_paused := false
 var bgm_changed_while_paused := false
 var web_visibility_callback
@@ -71,8 +72,9 @@ func apply_settings(saved: Dictionary) -> void:
 func settings_dictionary() -> Dictionary:
 	return {"bgm_enabled":bgm_enabled,"se_enabled":se_enabled,"bgm_volume":bgm_volume,"se_volume":se_volume}
 
-func play_bgm(key: String, restart := false) -> void:
+func play_bgm(key: String, restart := false, fade_seconds := BGM_FADE_SECONDS) -> void:
 	var previous_key := current_bgm_key
+	if restart or key != previous_key: last_bgm_fade_seconds = maxf(0.01, fade_seconds)
 	if application_audio_paused and key != current_bgm_key: bgm_changed_while_paused = true
 	current_bgm_key = key
 	if key != previous_key: print("BGM_TRANSITION from=", previous_key, " to=", key)
@@ -92,8 +94,8 @@ func play_bgm(key: String, restart := false) -> void:
 	next.play()
 	var target_db := _bgm_target_db(key)
 	bgm_fade_tween = create_tween().set_parallel()
-	bgm_fade_tween.tween_property(next, "volume_db", target_db, BGM_FADE_SECONDS)
-	if current.playing: bgm_fade_tween.tween_property(current, "volume_db", -60.0, BGM_FADE_SECONDS)
+	bgm_fade_tween.tween_property(next, "volume_db", target_db, last_bgm_fade_seconds)
+	if current.playing: bgm_fade_tween.tween_property(current, "volume_db", -60.0, last_bgm_fade_seconds)
 	bgm_fade_tween.chain().tween_callback(_stop_and_release_bgm_player.bind(current))
 	active_bgm = next_index
 

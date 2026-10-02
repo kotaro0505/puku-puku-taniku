@@ -19,6 +19,8 @@ const ACT_FINALE := 4
 # row of unrelated booleans to main.gd.  The root scene only forwards gameplay
 # milestones and persists this dictionary.
 const RUNTIME_STATE_VERSION := 7
+# Lifetime ending counters are optional scalar fields normalized to zero below,
+# so they do not require replaying the story-phase migrations for existing v7 saves.
 # Keep the complete Secret Gacha implementation and saved state intact while
 # disconnecting it from normal progression.  Preview routes remain available,
 # and changing this one flag reconnects the midpoint install flow.
@@ -83,6 +85,8 @@ static func default_runtime_state() -> Dictionary:
 		"last_exploitation_concern_phase": "",
 		"last_exploitation_concern_index": -1,
 		"habitat_crisis_route": CRISIS_ROUTE_NONE,
+		"lifetime_harvest_count": 0,
+		"lifetime_harvest_cm_total": 0.0,
 		"restoration": HabitatRestorationClass.default_state(),
 	}
 
@@ -108,6 +112,8 @@ static func normalize_runtime_state(raw_state: Variant, migration: Dictionary = 
 	state["last_crisis_concern_visit"] = int(state.get("last_crisis_concern_visit", -1))
 	state["last_exploitation_concern_phase"] = str(state.get("last_exploitation_concern_phase", ""))
 	state["last_exploitation_concern_index"] = int(state.get("last_exploitation_concern_index", -1))
+	state["lifetime_harvest_count"] = maxi(0, int(state.get("lifetime_harvest_count", 0)))
+	state["lifetime_harvest_cm_total"] = maxf(0.0, float(state.get("lifetime_harvest_cm_total", 0.0)))
 	var crisis_route := str(state.get("habitat_crisis_route", CRISIS_ROUTE_NONE))
 	if crisis_route not in [CRISIS_ROUTE_NONE, CRISIS_ROUTE_SAME_HABITAT, CRISIS_ROUTE_FORCE_TRAVEL]:
 		crisis_route = CRISIS_ROUTE_NONE
@@ -226,6 +232,21 @@ static func normalize_runtime_state(raw_state: Variant, migration: Dictionary = 
 			and not bool(state.get("secret_gacha_install_seen", false)):
 		queue_story_event(state, EVENT_SECRET_GACHA_INSTALL)
 	return state
+
+
+static func record_greenhouse_harvest(state: Dictionary, diameter_cm: float) -> void:
+	if diameter_cm <= 0.0:
+		return
+	state["lifetime_harvest_count"] = lifetime_harvest_count(state) + 1
+	state["lifetime_harvest_cm_total"] = lifetime_harvest_cm_total(state) + diameter_cm
+
+
+static func lifetime_harvest_count(state: Dictionary) -> int:
+	return maxi(0, int(state.get("lifetime_harvest_count", 0)))
+
+
+static func lifetime_harvest_cm_total(state: Dictionary) -> float:
+	return maxf(0.0, float(state.get("lifetime_harvest_cm_total", 0.0)))
 
 
 static func begin_act_two(state: Dictionary) -> void:

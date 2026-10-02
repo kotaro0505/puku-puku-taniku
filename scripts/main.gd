@@ -142,6 +142,8 @@ const SERIES_CAROUSEL_CARD_SIZE := Vector2(480,590)
 const SERIES_CAROUSEL_SPACING := 420.0
 const SERIES_CAROUSEL_SWIPE_THRESHOLD := 78.0
 const SERIES_CAROUSEL_SLIDE_SECONDS := 0.28
+const ENDING_BGM_FADE_IN_SECONDS := 1.75
+const ENDING_BGM_FADE_OUT_SECONDS := 1.25
 
 var rng := RandomNumberGenerator.new()
 var endless_greenhouse := EndlessGreenhouseExperimentClass.new()
@@ -1729,6 +1731,7 @@ func _build_habitat_restoration_ui(hud:Control)->void:
 	habitat_restoration_ui.set_language(language_code)
 	habitat_restoration_ui.return_decided.connect(_on_restoration_return_decided)
 	habitat_restoration_ui.slides_finished.connect(_on_restoration_slides_finished)
+	habitat_restoration_ui.ending_bgm_requested.connect(_on_restoration_ending_bgm_requested)
 	habitat_restoration_ui.thank_you_closed.connect(_on_restoration_thank_you_closed)
 
 func _build_jurejure_first_encounter(hud:Control)->void:
@@ -5131,7 +5134,39 @@ func _begin_restoration_recovery_slides()->void:
 		scene_transition_fade.visible=false
 
 func _show_restoration_thank_you()->void:
-	audio_manager.play_bgm("greenhouse");habitat_restoration_ui.set_language(language_code);habitat_restoration_ui.show_thank_you();_update_play_ui()
+	habitat_restoration_ui.set_language(language_code)
+	habitat_restoration_ui.show_thank_you(_restoration_ending_record_slides(),_restoration_ending_plant_slides())
+	_update_play_ui()
+
+func _restoration_ending_record_slides()->Array[Dictionary]:
+	var catalog_count:=0
+	for get_count_value in species_get_counts.values():
+		if int(get_count_value)>0:catalog_count+=1
+	return [
+		{"kind":"harvest_count","text":Localizer.text(language_code,"restoration_record_harvested",[StoryProgressionClass.lifetime_harvest_count(story_progression_state)])},
+		{"kind":"harvest_cm_total","text":Localizer.text(language_code,"restoration_record_size",[_format_cm(StoryProgressionClass.lifetime_harvest_cm_total(story_progression_state))])},
+		{"kind":"catalog_count","text":Localizer.text(language_code,"restoration_record_catalog",[catalog_count])},
+		{"kind":"battle_count","text":Localizer.text(language_code,"restoration_record_battles",[jurejure_battle_count])},
+		{"kind":"battle_win_count","text":Localizer.text(language_code,"restoration_record_wins",[jurejure_battle_win_count])},
+	]
+
+func _restoration_ending_plant_slides()->Array[Dictionary]:
+	var slides:Array[Dictionary]=[]
+	for snapshot_value in HabitatRestorationClass.returned_plants(_restoration_state()):
+		if not snapshot_value is Dictionary or slides.size()>=HabitatRestorationClass.REQUIRED_RETURNED_PLANTS:continue
+		var snapshot:Dictionary=(snapshot_value as Dictionary).duplicate(true)
+		var species_id:=str(snapshot.get("species_id",""));var entry:=_catalog_entry(species_id)
+		snapshot["display_name"]=Localizer.species_name(language_code,entry) if not entry.is_empty() else str(snapshot.get("display_name",species_id))
+		snapshot["diameter_text"]=_format_cm(float(snapshot.get("diameter_cm",0.0)))
+		snapshot["heading"]=Localizer.text(language_code,"restoration_returned_plant_heading")
+		snapshot["image_path"]=_species_image_path(entry) if not entry.is_empty() else ""
+		slides.append(snapshot)
+	return slides
+
+func _on_restoration_ending_bgm_requested()->void:
+	# `restart=true` guarantees the attached ending track begins at 0:00. The
+	# UI emits this synchronously with the first record's fade-in.
+	audio_manager.play_bgm("ending",true,ENDING_BGM_FADE_IN_SECONDS)
 
 func _resume_restoration_ending()->bool:
 	var phase:=HabitatRestorationClass.ending_phase(_restoration_state())
@@ -5177,7 +5212,10 @@ func _on_restoration_slides_finished()->void:
 
 func _on_restoration_thank_you_closed()->void:
 	var restoration:=_restoration_state();HabitatRestorationClass.complete_ending(restoration);story_progression_state["restoration"]=restoration
-	finale_complete=true;current_mode="greenhouse";_apply_mode();_update_main_story_progress(false);_save();_update_play_ui()
+	audio_manager.play_bgm("greenhouse",false,ENDING_BGM_FADE_OUT_SECONDS)
+	finale_complete=true;current_mode="greenhouse";_apply_mode();_update_main_story_progress(false);_save()
+	await habitat_restoration_ui.fade_out_ending_sequence(ENDING_BGM_FADE_OUT_SECONDS)
+	_update_play_ui()
 	call_deferred("_poll_greenhouse_play_completion")
 
 func _start_forest_gacha_intro_event()->void:
@@ -7025,6 +7063,7 @@ func _on_harvested(p)->void:
 	if play_active and active_seed_type!="old":
 		if not _is_endless_greenhouse_enabled():add_seed_pod_gauge_cm(p.diameter_cm,false,true)
 		earned_puku=add_puku_coin_gauge_cm(p.diameter_cm,false,true,harvest_screen_position)
+	if play_active:StoryProgressionClass.record_greenhouse_harvest(story_progression_state,float(p.diameter_cm))
 	_evaluate_unlock_rules("harvest_size",p.diameter_cm);_update_main_story_progress(false);_save();_update_best_ui();_update_currency_ui();audio_manager.play_se("harvest",.55)
 	if play_active:
 		play_harvest_cm_total+=p.diameter_cm;play_puku_earned_total+=earned_puku;play_harvest_count+=1;play_max_size=maxf(play_max_size,p.diameter_cm)

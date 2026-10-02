@@ -10,12 +10,20 @@ const Localizer = preload("res://scripts/game_localizer.gd")
 func _ready() -> void:
 	_test_restoration_state_machine()
 	_test_localization_contract()
+	_test_ending_asset_contract()
 	await _test_integrated_final_chapter()
-	print("HABITAT_RESTORATION_SMOKE_OK post_crisis=7 seeds_after_crisis=48 joined=true lamps=5 threshold=100 returned=5 medals=5 stages=0..5 slides=3 finale=true epilogue=true thank_you=true save_resume=true")
+	print("HABITAT_RESTORATION_SMOKE_OK post_crisis=7 seeds_after_crisis=48 joined=true lamps=5 threshold=100 returned=5 medals=5 stages=0..5 slides=3 finale=true epilogue=true ending_records=5 returned_recap=5 final_image=true ending_bgm=true lifetime_harvest=true save_resume=true")
 	get_tree().quit()
 
 
 func _test_restoration_state_machine() -> void:
+	var legacy_runtime := StoryProgressionClass.normalize_runtime_state({"version": 7})
+	assert(StoryProgressionClass.lifetime_harvest_count(legacy_runtime) == 0)
+	assert(is_zero_approx(StoryProgressionClass.lifetime_harvest_cm_total(legacy_runtime)))
+	StoryProgressionClass.record_greenhouse_harvest(legacy_runtime, 12.5)
+	StoryProgressionClass.record_greenhouse_harvest(legacy_runtime, 27.75)
+	assert(StoryProgressionClass.lifetime_harvest_count(legacy_runtime) == 2)
+	assert(is_equal_approx(StoryProgressionClass.lifetime_harvest_cm_total(legacy_runtime), 40.25))
 	var progression := StoryProgressionClass.default_runtime_state()
 	StoryProgressionClass.begin_habitat_crisis(progression)
 	var restoration: Dictionary = StoryProgressionClass.restoration_state(progression)
@@ -135,6 +143,12 @@ func _test_localization_contract() -> void:
 		"restoration_slide_3",
 		"restoration_final_girl_2",
 		"restoration_epilogue_mouse",
+		"restoration_record_harvested",
+		"restoration_record_size",
+		"restoration_record_catalog",
+		"restoration_record_battles",
+		"restoration_record_wins",
+		"restoration_returned_plant_heading",
 		"restoration_thank_you",
 		"restoration_product_by",
 	]
@@ -142,6 +156,18 @@ func _test_localization_contract() -> void:
 		for key in keys:
 			var value := Localizer.text(language, key)
 			assert(not value.is_empty() and value != key)
+
+
+func _test_ending_asset_contract() -> void:
+	var audio_config: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://data/audio-config.json"))
+	assert(audio_config is Dictionary)
+	var bgm_config: Dictionary = (audio_config as Dictionary).get("bgm", {}) as Dictionary
+	assert(str(bgm_config.get("ending", "")) == "res://assets/audio/ending-pssshh-new-batch.mp3")
+	var ending_stream := load("res://assets/audio/ending-pssshh-new-batch.mp3") as AudioStream
+	assert(ending_stream is AudioStreamMP3)
+	var ending_texture := load(HabitatRestorationUIClass.FINAL_IMAGE_PATH) as Texture2D
+	assert(ending_texture != null and ending_texture.get_size() == Vector2(720, 1280))
+	assert(HabitatRestorationUIClass.ENDING_FINAL_IMAGE_HOLD_SECONDS >= 4.0)
 
 
 func _test_integrated_final_chapter() -> void:
@@ -267,6 +293,13 @@ func _test_integrated_final_chapter() -> void:
 	game.normal_play_tutorial_complete = true
 	game.puku_buyback_tutorial_complete = true
 	game.mystery_items_acquired = true
+	game.play_active = false
+	game._spawn_specific_plant("colorata")
+	var jellied_plant = game.plants.back()
+	jellied_plant.fast_forward_to_diameter(118.0)
+	game._on_jellied(jellied_plant)
+	assert(StoryProgressionClass.lifetime_harvest_count(game.story_progression_state) == 0)
+	assert(is_zero_approx(StoryProgressionClass.lifetime_harvest_cm_total(game.story_progression_state)))
 	game.play_active = true
 	game.active_seed_type = "normal"
 	game.play_seeds_remaining = 0
@@ -277,6 +310,8 @@ func _test_integrated_final_chapter() -> void:
 		var harvested_plant = game.plants.back()
 		harvested_plant.fast_forward_to_diameter(diameter)
 		game._on_harvested(harvested_plant)
+	assert(StoryProgressionClass.lifetime_harvest_count(game.story_progression_state) == 2)
+	assert(is_equal_approx(StoryProgressionClass.lifetime_harvest_cm_total(game.story_progression_state), 250.0))
 	assert(HabitatRestorationClass.returned_count(restoration) == 2)
 	assert(HabitatRestorationClass.pending_return_stages(restoration) == [1, 2])
 	assert(not game.habitat_restoration_ui.prompt_layer.visible)
@@ -313,14 +348,19 @@ func _test_integrated_final_chapter() -> void:
 	await get_tree().process_frame
 	assert(game.current_mode=="greenhouse")
 	# Fill the remaining slots directly; their queue behavior was covered above.
+	var later_species := ["shaviana", "affinis"]
 	for index in range(2, 4):
 		var plant := snapshot.duplicate(true)
+		plant["species_id"] = later_species[index - 2]
+		plant["display_name"] = Localizer.species_name("ja", game._catalog_entry(str(plant["species_id"])))
 		plant["diameter_cm"] = 115.0 + 15.0 * float(index)
 		assert(HabitatRestorationClass.add_returned_plant(restoration, plant) == index + 1)
 	game._try_start_pending_story_event()
 	await get_tree().process_frame
 	assert(game.current_mode=="greenhouse" and not game.scene_transition_fade.visible)
 	var final_plant:=snapshot.duplicate(true)
+	final_plant["species_id"]="laui"
+	final_plant["display_name"]=Localizer.species_name("ja",game._catalog_entry("laui"))
 	final_plant["diameter_cm"]=175.0
 	assert(HabitatRestorationClass.add_returned_plant(restoration,final_plant)==5)
 	game.story_progression_state["restoration"] = restoration
@@ -391,16 +431,61 @@ func _test_integrated_final_chapter() -> void:
 	game.scripted_dialog_kind = ""
 	game.scripted_dialog_pages.clear()
 	game.intro_overlay.visible = false
+	game.species_get_counts["affinis"] = 2
+	game.jurejure_battle_count = 7
+	game.jurejure_battle_win_count = 4
+	var ending_bgm_requests := {"count": 0}
+	game.habitat_restoration_ui.ending_bgm_requested.connect(func() -> void: ending_bgm_requests["count"] = int(ending_bgm_requests["count"]) + 1)
+	game.habitat_restoration_ui.ending_sequence_time_scale = 0.005
 	game._show_restoration_thank_you()
-	await get_tree().process_frame
-	assert(game.habitat_restoration_ui.ending_layer.visible)
-	assert(game.habitat_restoration_ui.ending_title.text.contains("ありがとう"))
-	assert(game.habitat_restoration_ui.character_row.get_child_count() == 6)
-	assert(game.audio_manager.current_bgm_key == "greenhouse")
-	game.habitat_restoration_ui.reset_view()
-	game._on_restoration_thank_you_closed()
+	assert(game.habitat_restoration_ui.ending_sequence_layer.visible)
+	assert(not game.habitat_restoration_ui.ending_layer.visible)
+	assert(game.habitat_restoration_ui.ending_current_phase == "darkening")
+	assert(game.audio_manager.current_bgm_key != "ending")
+	for _frame in range(240):
+		if game.habitat_restoration_ui.ending_current_phase == "await_return":
+			break
+		await get_tree().process_frame
+	assert(game.habitat_restoration_ui.ending_current_phase == "await_return")
+	assert(int(ending_bgm_requests["count"]) == 1)
+	assert(game.audio_manager.current_bgm_key == "ending")
+	assert(is_equal_approx(game.audio_manager.last_bgm_fade_seconds, game.ENDING_BGM_FADE_IN_SECONDS))
+	var record_events: Array[Dictionary] = []
+	var plant_events: Array[Dictionary] = []
+	for event_value in game.habitat_restoration_ui.ending_sequence_history:
+		var event := event_value as Dictionary
+		if str(event.get("kind", "")) == "record": record_events.append(event)
+		elif str(event.get("kind", "")) == "plant": plant_events.append(event)
+	assert(record_events.size() == 5)
+	assert(str((record_events[0].get("payload", {}) as Dictionary).get("text", "")).contains("2株"))
+	assert(str((record_events[1].get("payload", {}) as Dictionary).get("text", "")).contains("250cm"))
+	assert(str((record_events[2].get("payload", {}) as Dictionary).get("text", "")).contains("2種"))
+	assert(str((record_events[3].get("payload", {}) as Dictionary).get("text", "")).contains("7回"))
+	assert(str((record_events[4].get("payload", {}) as Dictionary).get("text", "")).contains("4回"))
+	assert(plant_events.size() == 5)
+	var returned_snapshots := HabitatRestorationClass.returned_plants(game._restoration_state())
+	for index in 5:
+		var payload := plant_events[index].get("payload", {}) as Dictionary
+		var expected := returned_snapshots[index] as Dictionary
+		assert(str(payload.get("species_id", "")) == str(expected.get("species_id", "")))
+		assert(is_equal_approx(float(payload.get("diameter_cm", 0.0)), float(expected.get("diameter_cm", 0.0))))
+		assert(not str(payload.get("display_name", "")).is_empty())
+		assert(not str(payload.get("image_path", "")).is_empty())
+	assert(game.habitat_restoration_ui.ending_final_image.visible)
+	assert(game.habitat_restoration_ui.ending_final_image.texture != null)
+	assert(game.habitat_restoration_ui.ending_final_image.stretch_mode == TextureRect.STRETCH_KEEP_ASPECT_COVERED)
+	assert(game.habitat_restoration_ui.ending_final_text_group.visible)
+	assert(game.habitat_restoration_ui.ending_return_button.visible and not game.habitat_restoration_ui.ending_return_button.disabled)
+	assert(game.habitat_restoration_ui.ending_thank_you_label.text.contains("ありがとう"))
+	game.habitat_restoration_ui.ending_return_button.pressed.emit()
+	await get_tree().create_timer(game.ENDING_BGM_FADE_OUT_SECONDS + 0.15).timeout
 	assert(HabitatRestorationClass.ending_phase(game._restoration_state())=="complete")
+	assert(game.current_mode == "greenhouse")
+	assert(game.audio_manager.current_bgm_key == "greenhouse")
+	assert(is_equal_approx(game.audio_manager.last_bgm_fade_seconds, game.ENDING_BGM_FADE_OUT_SECONDS))
+	assert(not game.habitat_restoration_ui.ending_sequence_layer.visible)
 	assert(not game.habitat_restoration_ui.lamp_panel.visible)
+	assert(not game._resume_restoration_ending())
 	game.current_mode="habitat";game._apply_mode();game._build_habitat_items(true)
 	assert(game.habitat_items_root.find_children("RestorationMedalPlant*","Sprite3D",true,false).size()==5)
 	game.free()
