@@ -834,13 +834,9 @@ func _test_fusion_lab_flow(game: Node) -> void:
 	await get_tree().create_timer(.55).timeout
 	await game.species_get_overlay.close_overlay()
 	assert(not game.species_get_overlay.visible)
-	assert(game.catalog_series_unlock_overlay.visible)
+	assert(game._is_series_unlocked(game._series_entry("hybrid")))
+	assert(not game.catalog_series_unlock_overlay.visible and game.catalog_series_unlock_notice_queue.is_empty())
 	assert(game.scripted_dialog_kind.is_empty())
-	assert(game.catalog_series_unlock_overlay.title_label.text=="図鑑ページ解放！")
-	assert(game.catalog_series_unlock_overlay.message_label.text.contains("『配合多肉』"))
-	assert(not game._should_simulate_endless_greenhouse())
-	game.catalog_series_unlock_overlay.busy=false
-	await game.catalog_series_unlock_overlay.close_overlay()
 	assert(game._is_endless_normal_play() and game._should_simulate_endless_greenhouse())
 	var age_before_resume: float = observer.age
 	game._process(.25)

@@ -61,7 +61,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	assert(game._current_series_entry().get("series_id", "") == "stone")
 	assert(game.encyclopedia_list_title.text == "ストーン")
-	assert(game.encyclopedia_grid.get_child_count() == 10)
+	assert(game.encyclopedia_grid.get_child_count() == 19)
 	assert(game.series_cover_image.texture.resource_path == "res://assets/catalog/stone/stone-black-lava-rosette.png")
 	var first_card: Button = game.encyclopedia_grid.get_child(0)
 	assert(first_card.disabled)

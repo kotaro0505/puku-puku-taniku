@@ -72,7 +72,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	assert(game._current_series_entry().get("series_id", "") == "yumekawa")
 	assert(game.encyclopedia_list_title.text == "ゆめふわ")
-	assert(game.encyclopedia_grid.get_child_count() == 10)
+	assert(game.encyclopedia_grid.get_child_count() == 18)
 	assert(game.series_cover_image.texture.resource_path == "res://assets/catalog/yumekawa/yumekawa-milky-dream.png")
 	var first_card: Button = game.encyclopedia_grid.get_child(0)
 	assert(first_card.disabled)

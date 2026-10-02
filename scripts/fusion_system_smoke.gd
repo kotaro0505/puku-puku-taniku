@@ -518,12 +518,11 @@ func _test_tier1_game_flow(game) -> void:
 		game.species_get_counts[parent_id] = 1
 	game._apply_saved_unlocks()
 
-	# Once the special catalog is visible, every unknown tier-1 species exposes
-	# its formal name and its own image only through the silhouette shader.
-	game.unlocked_series["fusion_tier1"] = true
-	game.current_encyclopedia_series_id = "fusion_tier1"
+	# Unknown fusion species live at the end of their visual-family page. Their
+	# own image supplies the silhouette, while identity stays hidden until GET.
+	game.current_encyclopedia_series_id = "gummy"
 	game._refresh_encyclopedia_cards()
-	assert(game.encyclopedia_card_entries.size() == 20)
+	assert(game.encyclopedia_card_entries.size() == game._catalog_display_entries_for_series("gummy").size())
 	var unknown_index := -1
 	for index in range(game.encyclopedia_card_entries.size()):
 		if str(game.encyclopedia_card_entries[index].get("species_id", "")) == result_id:
@@ -535,14 +534,18 @@ func _test_tier1_game_flow(game) -> void:
 	assert(unknown_image.texture != null)
 	assert(unknown_image.material == game.encyclopedia_silhouette_material)
 	assert(unknown_image.material != null)
-	var unknown_card: Control = unknown_image.get_parent().get_parent().get_parent()
+	var unknown_card: Button = unknown_image.get_parent().get_parent().get_parent()
 	var formal_name_visible := false
+	var unknown_name_visible := false
 	for label_value in unknown_card.find_children("*", "Label", true, false):
 		var label := label_value as Label
 		if label and label.text == "レインボーバブル":
 			formal_name_visible = true
-	assert(formal_name_visible)
-	game.unlocked_series.erase("fusion_tier1")
+		if label and label.text == "？？？":
+			unknown_name_visible = true
+	assert(not formal_name_visible and unknown_name_visible and unknown_card.disabled)
+	unknown_card.pressed.emit()
+	assert(not game.encyclopedia_detail_page.visible)
 
 	game._open_fusion_lab()
 	game._on_fusion_parent_selected(0, parent_a_id)
@@ -586,7 +589,7 @@ func _test_tier1_game_flow(game) -> void:
 
 	game.species_get_overlay.visible = false
 	game.species_get_queue.clear()
-	game.current_encyclopedia_series_id = "fusion_tier1"
+	game.current_encyclopedia_series_id = "gummy"
 	game._refresh_encyclopedia_cards()
 	var known_index := -1
 	for index in range(game.encyclopedia_card_entries.size()):
@@ -674,9 +677,9 @@ func _test_tier2_game_flow(game) -> void:
 	assert(eligible_after_get.any(func(entry: Dictionary) -> bool: return str(entry.get("species_id", "")) == result_id))
 	game.species_get_overlay.visible = false
 	game.species_get_queue.clear()
-	game.current_encyclopedia_series_id = "fusion_tier2"
+	game.current_encyclopedia_series_id = "yumekawa"
 	game._refresh_encyclopedia_cards()
-	assert(game.encyclopedia_card_entries.size() == 10)
+	assert(game.encyclopedia_card_entries.size() == game._catalog_display_entries_for_series("yumekawa").size())
 	var known_index := -1
 	for index in range(game.encyclopedia_card_entries.size()):
 		if str(game.encyclopedia_card_entries[index].get("species_id", "")) == result_id:

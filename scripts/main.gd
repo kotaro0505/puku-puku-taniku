@@ -4615,7 +4615,7 @@ func _current_series_entry()->Dictionary:
 func _owned_series_entries()->Array[Dictionary]:
 	var owned:Array[Dictionary]=[]
 	for entry in series_catalog:
-		if entry is Dictionary and _is_series_unlocked(entry):owned.append(entry)
+		if entry is Dictionary and _is_series_unlocked(entry) and not _catalog_series_hidden_from_navigation(entry):owned.append(entry)
 	return owned
 
 func _series_entry(series_id:String)->Dictionary:
@@ -4629,6 +4629,45 @@ func _series_species_entries(series_id:String)->Array[Dictionary]:
 	for species_id_value in ids:
 		var entry:=_catalog_entry(str(species_id_value))
 		if not entry.is_empty():entries.append(entry)
+	return entries
+
+func _catalog_entry_is_fusion(entry:Dictionary)->bool:
+	return str(entry.get("series_id",""))=="hybrid" or int(entry.get("fusion_tier",0))>0
+
+func _catalog_display_series_id_for_entry(entry:Dictionary)->String:
+	var display_series_id:=str(entry.get("series_id",""))
+	var fusion_display_series:=str(entry.get("fusion_display_series",""))
+	if not fusion_display_series.is_empty():display_series_id=fusion_display_series
+	elif display_series_id=="hybrid":display_series_id=str(entry.get("fusion_series",""))
+	return JUREJURE_SERIES_ID if display_series_id=="jure" else display_series_id
+
+func _catalog_series_hidden_from_navigation(series_entry:Dictionary)->bool:
+	var source_entries:=_series_species_entries(str(series_entry.get("series_id","")))
+	if source_entries.is_empty():return false
+	for entry in source_entries:
+		if not _catalog_entry_is_fusion(entry):return false
+	return true
+
+func _catalog_display_entries_for_series(series_id:String)->Array[Dictionary]:
+	var destination_series:=_series_entry(series_id)
+	if destination_series.is_empty() or _catalog_series_hidden_from_navigation(destination_series):return []
+	var entries:Array[Dictionary]=_series_species_entries(series_id)
+	var included:Dictionary={}
+	for entry in entries:included[str(entry.get("species_id",""))]=true
+	# Basic hybrids come first and retain hybrid-species.json order.
+	for entry in _series_species_entries("hybrid"):
+		var species_id:=str(entry.get("species_id",""))
+		if _catalog_display_series_id_for_entry(entry)==series_id and not included.has(species_id):
+			entries.append(entry);included[species_id]=true
+	# Higher fusion source pages follow series.json order. This also lets a future
+	# tier participate automatically when its species define fusion_display_series.
+	for source_series in series_catalog:
+		var source_series_id:=str(source_series.get("series_id",""))
+		if source_series_id=="hybrid" or not _catalog_series_hidden_from_navigation(source_series):continue
+		for entry in _series_species_entries(source_series_id):
+			var species_id:=str(entry.get("species_id",""))
+			if _catalog_display_series_id_for_entry(entry)==series_id and not included.has(species_id):
+				entries.append(entry);included[species_id]=true
 	return entries
 
 func _series_id_for_species(species_id:String)->String:
@@ -4686,7 +4725,7 @@ func _is_series_unlocked(entry:Dictionary)->bool:
 	return str(entry.get("unlock_type","future"))=="default" or bool(unlocked_series.get(series_id,false))
 
 func _can_browse_series(entry:Dictionary)->bool:
-	return _is_series_unlocked(entry)
+	return _is_series_unlocked(entry) and not _catalog_series_hidden_from_navigation(entry)
 
 func _catalog_purchase_enabled(entry:Dictionary)->bool:
 	return false
@@ -4911,6 +4950,8 @@ func _update_main_story_progress(schedule_completion:=true)->void:
 
 func _queue_catalog_series_unlock_notice(series_id:String,species_get_already_shown:=false)->void:
 	if series_id.is_empty():return
+	var series_entry:=_series_entry(series_id)
+	if series_entry.is_empty() or _catalog_series_hidden_from_navigation(series_entry):return
 	if series_id not in catalog_series_unlock_notice_queue:catalog_series_unlock_notice_queue.append(series_id)
 	if species_get_already_shown:catalog_series_unlock_notice_ready[series_id]=true
 
@@ -4933,7 +4974,7 @@ func _show_catalog_series_unlock_notice(series_id:String,context:String="")->boo
 	var queue_index:=catalog_series_unlock_notice_queue.find(series_id)
 	if queue_index<0 or not bool(catalog_series_unlock_notice_ready.get(series_id,false)):return false
 	var series_entry:=_series_entry(series_id)
-	if series_entry.is_empty():
+	if series_entry.is_empty() or _catalog_series_hidden_from_navigation(series_entry):
 		catalog_series_unlock_notice_queue.remove_at(queue_index)
 		catalog_series_unlock_notice_ready.erase(series_id)
 		return false
@@ -4948,7 +4989,7 @@ func _try_start_catalog_series_unlock_notice()->bool:
 	while not catalog_series_unlock_notice_queue.is_empty():
 		var series_id:String=catalog_series_unlock_notice_queue[0]
 		var series_entry:=_series_entry(series_id)
-		if series_entry.is_empty():catalog_series_unlock_notice_queue.pop_front();catalog_series_unlock_notice_ready.erase(series_id);continue
+		if series_entry.is_empty() or _catalog_series_hidden_from_navigation(series_entry):catalog_series_unlock_notice_queue.pop_front();catalog_series_unlock_notice_ready.erase(series_id);continue
 		if not bool(catalog_series_unlock_notice_ready.get(series_id,false)):return false
 		return _show_catalog_series_unlock_notice(series_id)
 	return false
@@ -5465,7 +5506,7 @@ func _acquire_current_catalog(method:String)->void:
 func _refresh_encyclopedia_cards()->void:
 	encyclopedia_card_images.clear();encyclopedia_card_entries.clear()
 	for child in encyclopedia_grid.get_children():child.free()
-	for entry in _series_species_entries(current_encyclopedia_series_id):
+	for entry in _catalog_display_entries_for_series(current_encyclopedia_series_id):
 		var species_id:=str(entry.get("species_id",""));var found:=bool(discovered.get(species_id,false));var identity_visible:=found or _catalog_identity_visible_before_get(entry)
 		var card:=Button.new();card.custom_minimum_size=Vector2(252,274);card.mouse_filter=Control.MOUSE_FILTER_PASS;card.mouse_force_pass_scroll_events=true;card.action_mode=BaseButton.ACTION_MODE_BUTTON_RELEASE;_skin_button(card,Color("#f6e7c5"),16);card.disabled=not found;encyclopedia_grid.add_child(card)
 		var content:=VBoxContainer.new();content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);content.offset_left=10;content.offset_top=8;content.offset_right=-10;content.offset_bottom=-8;content.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.alignment=BoxContainer.ALIGNMENT_CENTER;card.add_child(content)
@@ -5483,13 +5524,16 @@ func _refresh_encyclopedia_cards()->void:
 func _encyclopedia_unfound_status(_series_id:String)->String:
 	return Localizer.text(language_code,"undiscovered")
 
-func _catalog_identity_visible_before_get(entry:Dictionary)->bool:
-	return int(entry.get("fusion_tier",0))>0
+func _catalog_identity_visible_before_get(_entry:Dictionary)->bool:
+	return false
+
+func _catalog_uses_species_silhouette_before_get(entry:Dictionary)->bool:
+	return _catalog_entry_is_fusion(entry)
 
 func _apply_encyclopedia_image_style(image:TextureRect,entry:Dictionary,found:bool)->void:
 	if found:
 		image.material=null;image.modulate=Color.WHITE;return
-	if _catalog_identity_visible_before_get(entry):
+	if _catalog_uses_species_silhouette_before_get(entry):
 		if encyclopedia_silhouette_material==null:encyclopedia_silhouette_material=FusionLabUIClass.create_silhouette_material()
 		image.material=encyclopedia_silhouette_material;image.modulate=Color.WHITE;return
 	image.material=null;image.modulate=Color(0.12,0.09,0.08,0.82)
