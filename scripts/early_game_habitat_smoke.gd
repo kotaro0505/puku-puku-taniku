@@ -176,7 +176,7 @@ func _ready() -> void:
 	assert(game.scene_transition_fade.visible and game.scripted_dialog_kind.is_empty())
 	await get_tree().create_timer(.82).timeout
 	assert(not game.seed_pod_story_overlay.visible and bool(game.tutorial_steps.get("seed_pod_story_seen", false)))
-	assert(game.mystery_items_acquired and game.seed_shop_open and game.normal_seed_bags == 0 and game.puku_points == 0)
+	assert(game.mystery_items_acquired and game.seed_shop_open and game.normal_seed_bags == 0 and game.puku_balance_units == game.INITIAL_PUKU_CAPITAL_UNITS and game.puku_points == 5)
 	assert(game.current_mode == "greenhouse" and not game.seed_pod_gauge_area.visible and game.puku_gauge_area.visible and game.encyclopedia_icon_button.visible)
 	assert(not game.scene_transition_fade.visible and game.scripted_dialog_kind == "habitat_return")
 	assert(game.scripted_dialog_pages.size() == 5)

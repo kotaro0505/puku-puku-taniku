@@ -324,12 +324,12 @@ const TEXT := {
 		"back": "もどる",
 		"close": "とじる",
 		"continue": "つづける",
-		"puku_gauge": "ぷくゲージ",
+		"puku_gauge": "ぷく残高",
 		"seed_pod_gauge": "さやゲージ",
 		"wallet": "所持　%dぷくコイン",
 		"forest_gacha": "森のガチャ",
 		"secret_gacha": "秘密のガチャ",
-		"gacha_spin": "1ぷくコインで回す",
+		"gacha_spin": "3ぷくコインで回す",
 		"gacha_dial_hint": "ダイヤルをタップして回そう",
 		"secret_gacha_dial_hint": "重いダイヤルを回そう",
 		"gacha_capsule_hint": "カプセルをタップ！",
@@ -343,8 +343,8 @@ const TEXT := {
 		"habitat_intro_1": "芽が出た！",
 		"habitat_observe_size": "現在 %.1fcm",
 		"habitat_observe_note": "自然の中で、ゆっくり育っています。",
-		"puku_intro_1": "育てた多肉はうちのお店で買い取るよ！",
-		"puku_intro_2": "このゲージが満タンになったら\n3ぷくコインと交換するね！",
+		"puku_intro_1": "種をまく時に少しぷくを使うけど、\n育てた多肉はうちのお店で買い取るよ！",
+		"puku_intro_2": "大きく育てるほど、収穫でもらえるぷくが増えるよ。\nまずは5ぷくから始めてみよう！",
 		"initial_seed_stock_girl": "……あれ？ さやの中に種ができてる。",
 		"initial_seed_stock_armadillo": "12粒あるみたいだね。まずは育ててみよう。",
 		"initial_seed_stock_received": "たね（12粒）×1セット　GET！",
@@ -355,9 +355,9 @@ const TEXT := {
 		"seed_pod_tutorial_armadillo": "育てると少しずつ光が溜まっていくみたいだね。",
 		"seed_pod_tutorial_panda": "見て！ 種がたくさん出てきたよ！",
 		"seed_pod_tutorial_received": "たね（12粒）×3セット　GET！",
-		"puku_buyback_1": "そうだ！育った多肉はうちで買い取るよ！",
-		"puku_buyback_2": "このゲージが満タンになったら\n3ぷくコインと交換するね！",
-		"puku_buyback_2_endless": "このゲージが満タンになったら\n1ぷくコインと交換するね！",
+		"puku_buyback_1": "育った多肉は、大きさに合わせて\nぷくで買い取るよ！",
+		"puku_buyback_2": "ゲージは1ぷく未満の残高だよ。\n大きく育てるほど受け取るぷくも増えるよ！",
+		"puku_buyback_2_endless": "ゲージは1ぷく未満の残高だよ。\n大きく育てるほど受け取るぷくも増えるよ！",
 		"pinwheel_received": "ピンウィールを手に入れた！",
 		"mystery_seed_owned": "おや、なぞのたねを持っているようだね。",
 		"mystery_seed_request": "研究のために、そのたねを預けてもらえないか？",
@@ -444,6 +444,7 @@ const TEXT := {
 		,"list_back": "一覧へ"
 		,"harvest_size": "収穫 %scm"
 		,"harvest_to_gauge": "ぷくゲージ +%scm"
+		,"harvest_puku_reward": "+%sぷく"
 		,"record_update": "収穫記録更新！\nNEW RECORD\n%.1f cm"
 		,"endless_record_update": "最大サイズ更新！\n%.1f cm"
 		,"mystery_seed_get": "謎のたね GET!"
@@ -554,6 +555,9 @@ const TEXT := {
 		,"arrangement_default_name": "寄せ植え %d"
 		,"shop_rescue_offer": "タネなくなっちゃった？\n少し分けてあげるよ！"
 		,"shop_rescue_success": "はい、どうぞ！大事にまいてみてね。"
+		,"shop_puku_rescue_offer": "ぷくが足りなくて種をまけないの？\nお店のお手伝いをしたら5ぷく渡すよ！"
+		,"shop_puku_rescue_success": "お手伝いありがとう！\n5ぷくで温室をもう一度動かしてみてね。"
+		,"shop_help_action": "お手伝いする"
 		,"shop_chatter_touch": "多肉を触ってみて柔らかくなっていたら水やりのタイミングだよ"
 		,"shop_chatter_welcome": "いらっしゃい！"
 		,"shop_chatter_edible": "知ってる？食べられる多肉もあるんだって。"
@@ -954,12 +958,12 @@ const TEXT := {
 		"back": "もどる",
 		"close": "とじる",
 		"continue": "つづける",
-		"puku_gauge": "ぷくげーじ",
+		"puku_gauge": "ぷくざんだか",
 		"seed_pod_gauge": "さやげーじ",
 		"wallet": "もっている ぷくこいん　%dまい",
 		"forest_gacha": "もりの がちゃ",
 		"secret_gacha": "ひみつの がちゃ",
-		"gacha_spin": "1ぷくこいんで まわす",
+		"gacha_spin": "3ぷくこいんで まわす",
 		"gacha_dial_hint": "だいやるを おして まわそう",
 		"secret_gacha_dial_hint": "おもい だいやるを まわそう",
 		"gacha_capsule_hint": "かぷせるを おしてね！",
@@ -973,8 +977,8 @@ const TEXT := {
 		"habitat_intro_1": "めが でた！",
 		"habitat_observe_size": "いまの おおきさ %.1fcm",
 		"habitat_observe_note": "しぜんの なかで、ゆっくり そだっています。",
-		"puku_intro_1": "そだてた たにくは うちの おみせで かいとるよ！",
-		"puku_intro_2": "この げーじが いっぱいに なったら\n3ぷくこいんと こうかんするね！",
+		"puku_intro_1": "たねを まくときに すこし ぷくを つかうけど、\nそだてた たにくは うちで かいとるよ！",
+		"puku_intro_2": "おおきく そだてるほど、もらえる ぷくが ふえるよ。\nまずは 5ぷくから はじめよう！",
 		"initial_seed_stock_girl": "……あれ？ さやの なかに たねが できてる。",
 		"initial_seed_stock_armadillo": "12つぶ あるみたいだね。まずは そだててみよう。",
 		"initial_seed_stock_received": "たね（12つぶ）×1せっと　げっと！",
@@ -985,9 +989,9 @@ const TEXT := {
 		"seed_pod_tutorial_armadillo": "そだてると すこしずつ ひかりが たまっていくみたいだね。",
 		"seed_pod_tutorial_panda": "みて！ たねが たくさん でてきたよ！",
 		"seed_pod_tutorial_received": "たね（12つぶ）×3せっと　げっと！",
-		"puku_buyback_1": "そうだ！そだった たにくは うちで かいとるよ！",
-		"puku_buyback_2": "この げーじが いっぱいに なったら\n3ぷくこいんと こうかんするね！",
-		"puku_buyback_2_endless": "この げーじが いっぱいに なったら\n1ぷくこいんと こうかんするね！",
+		"puku_buyback_1": "そだった たにくは、おおきさに あわせて\nぷくで かいとるよ！",
+		"puku_buyback_2": "げーじは 1ぷくより ちいさい ざんだかだよ。\nおおきく そだてるほど ぷくも ふえるよ！",
+		"puku_buyback_2_endless": "げーじは 1ぷくより ちいさい ざんだかだよ。\nおおきく そだてるほど ぷくも ふえるよ！",
 		"pinwheel_received": "ぴんうぃーるを てにいれた！",
 		"mystery_seed_owned": "おや、なぞのたねを もっているようだね。",
 		"mystery_seed_request": "けんきゅうのために、そのたねを あずけてもらえないか？",
@@ -1074,6 +1078,7 @@ const TEXT := {
 		,"list_back": "いちらんへ"
 		,"harvest_size": "しゅうかく %sせんち"
 		,"harvest_to_gauge": "ぷくげーじ +%sせんち"
+		,"harvest_puku_reward": "+%sぷく"
 		,"record_update": "しゅうかく きろくこうしん！\nさいこうきろく\n%.1f せんち"
 		,"endless_record_update": "さいだい さいず こうしん！\n%.1f せんち"
 		,"mystery_seed_get": "なぞの たねを みつけた！"
@@ -1184,6 +1189,9 @@ const TEXT := {
 		,"arrangement_default_name": "よせうえ %d"
 		,"shop_rescue_offer": "たね なくなっちゃった？\nすこし わけてあげるよ！"
 		,"shop_rescue_success": "はい、どうぞ！だいじに まいてみてね。"
+		,"shop_puku_rescue_offer": "ぷくが たりなくて たねを まけないの？\nおてつだいを したら 5ぷく わたすよ！"
+		,"shop_puku_rescue_success": "おてつだい ありがとう！\n5ぷくで おんしつを もういちど うごかしてね。"
+		,"shop_help_action": "おてつだいする"
 		,"shop_chatter_touch": "たにくを さわって やわらかくなっていたら、みずやりの たいみんぐだよ"
 		,"shop_chatter_welcome": "いらっしゃい！"
 		,"shop_chatter_edible": "しってる？たべられる たにくも あるんだって。"
@@ -1584,12 +1592,12 @@ const TEXT := {
 		"back": "Back",
 		"close": "Close",
 		"continue": "Continue",
-		"puku_gauge": "Puku Gauge",
+		"puku_gauge": "Puku Balance",
 		"seed_pod_gauge": "Pod Gauge",
 		"wallet": "%d Puku Coins",
 		"forest_gacha": "Forest Gacha",
 		"secret_gacha": "Secret Gacha",
-		"gacha_spin": "Spin for 1 Puku Coin",
+		"gacha_spin": "Spin for 3 Puku Coins",
 		"gacha_dial_hint": "Tap or turn the dial",
 		"secret_gacha_dial_hint": "Turn the heavy dial",
 		"gacha_capsule_hint": "Tap the capsule!",
@@ -1603,8 +1611,8 @@ const TEXT := {
 		"habitat_intro_1": "A sprout!",
 		"habitat_observe_size": "Current size: %.1f cm",
 		"habitat_observe_note": "It is growing slowly in the habitat.",
-		"puku_intro_1": "My shop will buy the succulents you grow!",
-		"puku_intro_2": "When this gauge fills up,\nI'll trade it for 3 Puku Coins!",
+		"puku_intro_1": "Sowing costs a little Puku,\nbut my shop will buy what you grow!",
+		"puku_intro_2": "Larger harvests earn more Puku.\nHere are 5 Puku to get you started!",
 		"initial_seed_stock_girl": "...Huh? There are seeds inside the pod.",
 		"initial_seed_stock_armadillo": "There seem to be 12. Let's try growing them first.",
 		"initial_seed_stock_received": "Seeds (12) × 1 set — GET!",
@@ -1615,9 +1623,9 @@ const TEXT := {
 		"seed_pod_tutorial_armadillo": "Growing succulents seems to fill it with light little by little.",
 		"seed_pod_tutorial_panda": "Look! Lots of seeds came out!",
 		"seed_pod_tutorial_received": "Seeds (12) × 3 sets — GET!",
-		"puku_buyback_1": "That's it! My shop will buy the succulents you grow!",
-		"puku_buyback_2": "When this gauge fills up,\nI'll trade it for 3 Puku Coins!",
-		"puku_buyback_2_endless": "When this gauge fills up,\nI'll trade it for 1 Puku Coin!",
+		"puku_buyback_1": "I'll buy each succulent based on\nhow large you grow it!",
+		"puku_buyback_2": "The meter shows the fraction below 1 Puku.\nLarger harvests earn more Puku!",
+		"puku_buyback_2_endless": "The meter shows the fraction below 1 Puku.\nLarger harvests earn more Puku!",
 		"pinwheel_received": "You got Pinwheel!",
 		"mystery_seed_owned": "Oh, I see you already have a mystery seed.",
 		"mystery_seed_request": "Would you let me study that seed?",
@@ -1704,6 +1712,7 @@ const TEXT := {
 		,"list_back": "Back to list"
 		,"harvest_size": "Harvest %s cm"
 		,"harvest_to_gauge": "Puku Gauge +%s cm"
+		,"harvest_puku_reward": "+%s Puku"
 		,"record_update": "NEW HARVEST RECORD\n%.1f cm"
 		,"endless_record_update": "NEW MAX SIZE!\n%.1f cm"
 		,"mystery_seed_get": "Mystery Seed GET!"
@@ -1814,6 +1823,9 @@ const TEXT := {
 		,"arrangement_default_name": "Arrangement %d"
 		,"shop_rescue_offer": "Run out of seeds?\nI'll share a set with you!"
 		,"shop_rescue_success": "Here you go! Plant them with care."
+		,"shop_puku_rescue_offer": "Not enough Puku to sow another seed?\nHelp at the shop and I'll give you 5 Puku!"
+		,"shop_puku_rescue_success": "Thanks for helping!\nUse these 5 Puku to restart your greenhouse."
+		,"shop_help_action": "Help at the shop"
 		,"shop_chatter_touch": "When a succulent feels soft, it may be time to water it."
 		,"shop_chatter_welcome": "Welcome!"
 		,"shop_chatter_edible": "Did you know some succulents are edible?"

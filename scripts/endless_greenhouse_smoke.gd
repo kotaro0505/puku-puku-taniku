@@ -101,7 +101,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	_remove_test_file(NORMAL_PATH)
 	_remove_test_file(EXPERIMENT_PATH)
-	print("ENDLESS_GREENHOUSE_SMOKE_OK default_without_flags=true autostart=true modal=false infinite=true concurrent=7-10 refill=harvest+jelly result=false longevity=35/35/22/8 jelly_debug_override=true new_roll=per_harvest jelly_new_roll=false discovery_curve=unchanged forced_new=true candidate_pool=uniform immediate_get=true virtual_batch=12 pause=true navigation=habitat+catalog+shop+gacha debug_controls=debug_only production_gacha=earned_puku+spin+species_get dev_gacha_saved=true fusion=entrance+open+image_cards+hybrid_image+selection+execute+species_get pod=false puku_curve=squared_over_70 restoration_pending=true finite=true save_isolated=true")
+	print("ENDLESS_GREENHOUSE_SMOKE_OK default_without_flags=true autostart=true modal=false infinite=true concurrent=7-10 paid_refill=.20 harvest_direct=true wallet=fixed_point jelly_refund=false result=false longevity=35/35/22/8 new_roll=per_harvest jelly_new_roll=false discovery_curve=unchanged forced_new=true candidate_pool=uniform immediate_get=true virtual_batch=12 pause=true navigation=habitat+catalog+shop+gacha production_gacha=3puku+species_get fusion=1-2-3puku restoration_pending=true finite=true save_isolated=true")
 	get_tree().quit()
 
 
@@ -595,12 +595,8 @@ func _test_formal_endless_main_features(game: Node) -> void:
 	game._close_shop()
 	assert(game._should_simulate_endless_greenhouse())
 
-	game.puku_coin_gauge_cm=490.0
-	var earned_puku_before:int=game.puku_points
-	assert(game.add_puku_coin_gauge_cm(10.0,false,false)==game.PUKU_GAUGE_REWARD_PUKU)
-	assert(game.puku_points==earned_puku_before+game.PUKU_GAUGE_REWARD_PUKU)
-	game.puku_points=maxi(game.puku_points,5)
-	var puku_before:int=game.puku_points
+	game.puku_balance_units=maxi(game.puku_balance_units,5000)
+	var puku_before_units:int=game.puku_balance_units
 	var draw_before:int=game.forest_gacha_draw_count
 	game.forest_gacha_ui.animation_time_scale=.001
 	game._open_forest_gacha()
@@ -608,7 +604,7 @@ func _test_formal_endless_main_features(game: Node) -> void:
 	assert(not game._should_simulate_endless_greenhouse())
 	game._spin_forest_gacha()
 	assert(not game.forest_gacha_ui.pending_result.is_empty())
-	assert(game.puku_points==puku_before-game.FOREST_GACHA_SPIN_COST)
+	assert(game.puku_balance_units==puku_before_units-game.FOREST_GACHA_SPIN_COST*game.PUKU_UNITS_PER_PUKU)
 	assert(game.forest_gacha_draw_count==draw_before+1)
 	for _frame in range(120):
 		if game.forest_gacha_ui.capsule_ready:
@@ -847,14 +843,13 @@ func _test_fusion_lab_flow(game: Node) -> void:
 
 func _test_gauges(game: Node) -> void:
 	game.puku_gauge_cm = 123.0
-	game.puku_coin_gauge_cm = 321.0
-	game.puku_points = 7
+	game.puku_balance_units = 7321
 	game._update_play_ui()
 	assert(not game.seed_pod_gauge_area.visible and game.puku_gauge_area.visible)
 	assert(game.add_seed_pod_gauge_cm(700.0, false, false) == 0)
 	assert(is_equal_approx(game.puku_gauge_cm, 123.0))
-	assert(game.add_puku_coin_gauge_cm(1500.0, false, false) == 9)
-	assert(is_equal_approx(game.puku_coin_gauge_cm, 321.0) and game.puku_points == 16)
+	assert(game._change_puku_balance(1500,"smoke_gain",false,false)==1500)
+	assert(game.puku_balance_units==8821 and game.puku_points==8 and game._puku_fraction_units()==821)
 	game.discovered["colorata"]=true
 	game.species_get_counts["colorata"]=maxi(1,game._species_get_count("colorata"))
 	game._spawn_specific_plant("colorata")
@@ -863,13 +858,12 @@ func _test_gauges(game: Node) -> void:
 	gauge_probe.diameter_cm = 100.0
 	gauge_probe.harvest()
 	assert(is_equal_approx(game.puku_gauge_cm, 123.0))
-	var effective_100:float=game._effective_puku_cm_for_harvest(100.0,false)
-	assert(is_equal_approx(game.puku_coin_gauge_cm,321.0+effective_100) and game.puku_points==16)
-	var fly_label:=game.effects_layer.find_child("HarvestCmFly",true,false) as Label
+	assert(game.puku_balance_units==17821 and game.puku_points==17 and game._puku_fraction_units()==821)
+	var fly_label:=game.effects_layer.find_child("PukuBalanceFly",true,false) as Label
 	var harvest_panel:=game.effects_layer.find_child("HarvestResult",true,false) as PanelContainer
-	assert(fly_label and fly_label.text=="+142.9cm" and harvest_panel)
+	assert(fly_label and fly_label.text=="+9.00ぷく" and harvest_panel)
 	assert((harvest_panel.find_child("HarvestSize",true,false) as Label).text=="収穫 100cm")
-	assert((harvest_panel.find_child("PukuGaugeGain",true,false) as Label).text=="ぷくゲージ +142.9cm")
+	assert((harvest_panel.find_child("PukuRewardGain",true,false) as Label).text=="+9.00ぷく")
 	game._clear_greenhouse_plants()
 	game.play_spawn_queue = 0
 	game.play_seed_animations_pending = 0
@@ -877,7 +871,7 @@ func _test_gauges(game: Node) -> void:
 	assert(not game._should_show_jurejure_group())
 	assert(game.add_seed_pod_gauge_cm(2000.0, false, false) == 0)
 	assert(game.jurejure_waiting_for_seed_pod_reward)
-	assert(game.add_puku_coin_gauge_cm(2000.0, false, false) == 12)
+	assert(game._change_puku_balance(2000,"smoke_gain",false,false)==2000)
 	assert(game.jurejure_waiting_for_seed_pod_reward)
 	game.endless_greenhouse.reset_discovery_state()
 	for index in range(11):
@@ -1025,7 +1019,7 @@ func _test_finite_mode_unchanged(game: Node) -> void:
 	game._start_greenhouse_play("normal")
 	assert(game.play_active and game.normal_seed_bags == 0)
 	assert(game.play_concurrent_target>=game.PLAY_INITIAL_MIN_PLANTS and game.play_concurrent_target<=game.PLAY_INITIAL_MAX_PLANTS)
-	assert(is_equal_approx(game._puku_gauge_target_cm(), 500.0) and game._puku_gauge_reward_puku() == 3)
+	assert(game.PUKU_UNITS_PER_PUKU==1000 and game.ENDLESS_NORMAL_SEED_COST_UNITS==200)
 	assert(game.play_seeds_remaining < game.NORMAL_GERMINATION_COUNT)
 	assert(game.seed_pod_gauge_area.visible and game.puku_gauge_area.visible)
 	game._clear_greenhouse_plants()
@@ -1038,10 +1032,9 @@ func _test_finite_mode_unchanged(game: Node) -> void:
 	assert(not game.play_active and game.result_overlay.visible)
 	assert(game.add_seed_pod_gauge_cm(10.0, false, false) == 0)
 	assert(is_equal_approx(game.puku_gauge_cm, 10.0))
-	game.puku_points = 0
-	game.puku_coin_gauge_cm = 0.0
-	assert(game.add_puku_coin_gauge_cm(500.0, false, false) == 3)
-	assert(game.puku_points == 3)
+	game.puku_balance_units = 0
+	assert(game._change_puku_balance(500,"finite_smoke",false,false)==500)
+	assert(game.puku_balance_units==500 and game.puku_points==0 and game._puku_fraction_units()==500)
 	game.jurejure_waiting_for_seed_pod_reward = true
 	game.puku_gauge_cm = 740.0
 	assert(game.add_seed_pod_gauge_cm(10.0, false, false) == game.SEED_POD_GAUGE_REWARD_BAGS)

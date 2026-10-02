@@ -105,7 +105,7 @@ func _test_jurejure_species_gate(game)->void:
 	assert(seen_jurejure.size()>1)
 
 func _test_spin_capsule_and_reveal(game)->void:
-	game.puku_points=2;game.forest_gacha_draw_count=0;game.forest_gacha_encountered.clear();game.discovered={"colorata":true};game.greenhouse_available={"colorata":true};game.unlocked_species=game.greenhouse_available.duplicate(true);game.unlocked_series={"base":true};game.story_progression_state["fantasy_unlocked"]=true;game._apply_saved_unlocks();game.forest_gacha_ui.animation_time_scale=.02
+	game.puku_points=5;game.forest_gacha_draw_count=0;game.forest_gacha_encountered.clear();game.discovered={"colorata":true};game.greenhouse_available={"colorata":true};game.unlocked_species=game.greenhouse_available.duplicate(true);game.unlocked_series={"base":true};game.story_progression_state["fantasy_unlocked"]=true;game._apply_saved_unlocks();game.forest_gacha_ui.animation_time_scale=.02
 	var locked_seed:=-1
 	for seed_value in range(1,100):
 		var probe:=RandomNumberGenerator.new();probe.seed=seed_value
@@ -113,7 +113,7 @@ func _test_spin_capsule_and_reveal(game)->void:
 		if str(candidate.get("source",""))=="locked":locked_seed=seed_value;break
 	assert(locked_seed>0);game.forest_gacha_rng.seed=locked_seed;game._open_forest_gacha()
 	game._spin_forest_gacha();await get_tree().create_timer(.45).timeout
-	assert(game.puku_points==1 and game.forest_gacha_draw_count==1 and game.forest_gacha_ui.capsule_ready and game.forest_gacha_ui.capsule.visible and absf(game.forest_gacha_ui.dial_texture.rotation)>1.0)
+	assert(game.puku_points==2 and game.forest_gacha_draw_count==1 and game.forest_gacha_ui.capsule_ready and game.forest_gacha_ui.capsule.visible and absf(game.forest_gacha_ui.dial_texture.rotation)>1.0)
 	var species_id:=str(game.forest_gacha_ui.pending_result.get("species_id",""));var series_id:=str(game.forest_gacha_ui.pending_result.get("series_id",""));assert(not species_id.is_empty() and series_id!="base" and bool(game.discovered.get(species_id,false)) and bool(game.greenhouse_available.get(species_id,false)))
 	assert(series_id in game.catalog_series_unlock_notice_queue and not game.catalog_series_unlock_overlay.visible)
 	game.forest_gacha_ui._reveal_result();await get_tree().process_frame;assert(game.species_get_overlay.visible and not game.catalog_series_unlock_overlay.visible and game.species_get_overlay.result_image.texture!=null and game.species_get_overlay.name_label.text==str(game._catalog_entry(species_id).get("name_ja","")))
@@ -123,7 +123,7 @@ func _test_spin_capsule_and_reveal(game)->void:
 	assert(game.catalog_series_unlock_overlay.cover_image.texture!=null and game.catalog_series_unlock_overlay.cover_image.texture.resource_path==str(game._series_entry(series_id).get("cover_image_path","")))
 	game.catalog_series_unlock_overlay.busy=false;await game.catalog_series_unlock_overlay.close_overlay();await get_tree().process_frame
 	assert(not game.catalog_series_unlock_overlay.visible and not game.forest_gacha_ui.busy);game._close_forest_gacha()
-	game.puku_points=0;var previous_count:int=game.forest_gacha_draw_count;game._open_forest_gacha();game._spin_forest_gacha();assert(game.forest_gacha_draw_count==previous_count and game.puku_points==0);game._close_forest_gacha()
+	game.puku_points=2;var previous_count:int=game.forest_gacha_draw_count;game._open_forest_gacha();game._spin_forest_gacha();assert(game.forest_gacha_draw_count==previous_count and game.puku_points==2);game._close_forest_gacha()
 
 func _test_encounter_save_and_unlock(game)->void:
 	var target_id:="gummy_peach_milk";game.unlocked_series.erase("gummy");game.discovered.erase(target_id);game.greenhouse_available.erase(target_id);game.unlocked_species.erase(target_id);game.forest_gacha_encountered={target_id:true};game.forest_gacha_draw_count=9;game.act2_unlocked=true;game.forest_gacha_unlocked=true;game.forest_gacha_intro_seen=true;game._save();game.forest_gacha_encountered.clear();game.forest_gacha_draw_count=0;game.act2_unlocked=false;game.forest_gacha_unlocked=false;game.forest_gacha_intro_seen=false;game._load_save();assert(game.forest_gacha_draw_count==9 and bool(game.forest_gacha_encountered.get(target_id,false)) and not bool(game.discovered.get(target_id,false)))

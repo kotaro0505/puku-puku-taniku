@@ -52,7 +52,7 @@ func _ready() -> void:
 	first_plant.simulate(1.0)
 	assert(str(first_plant.state) == state_before)
 	assert(not game.tutorial_guide_overlay.visible)
-	assert(is_zero_approx(game.puku_gauge_cm) and is_zero_approx(game.puku_coin_gauge_cm))
+	assert(is_zero_approx(game.puku_gauge_cm) and game.puku_balance_units==0)
 	first_plant.fast_forward_to_diameter(game.OLD_SEED_REACTION_SPROUT_CM)
 	game._process(0.01)
 	assert(game.scripted_dialog_kind == "old_seed_growth_reaction")
@@ -206,7 +206,7 @@ func _ready() -> void:
 	# The actual controls tutorial starts only with the first normal set after
 	# the awakening items have been acquired.
 	game._hide_first_play_tutorial_overlay()
-	game.mystery_items_acquired=true;game.encyclopedia_unlocked=true;game.seed_shop_open=true;game.habitat_awakened=true;game.habitat_tutorial_complete=true;game.mystery_catalog_tutorial_complete=true;game.initial_seed_stock_notice_complete=true;game.normal_seed_bags=1;game.current_mode="greenhouse";game.normal_play_tutorial_complete=false;game.seed_pod_gauge_discovery_complete=false;game.seed_pod_first_reward_seen=false;game.puku_buyback_tutorial_complete=false;game.puku_gauge_cm=0.0;game.puku_coin_gauge_cm=0.0
+	game.mystery_items_acquired=true;game.encyclopedia_unlocked=true;game.seed_shop_open=true;game.habitat_awakened=true;game.habitat_tutorial_complete=true;game.mystery_catalog_tutorial_complete=true;game.initial_seed_stock_notice_complete=true;game.normal_seed_bags=1;game.current_mode="greenhouse";game.normal_play_tutorial_complete=false;game.seed_pod_gauge_discovery_complete=false;game.seed_pod_first_reward_seen=false;game.puku_buyback_tutorial_complete=false;game.puku_gauge_cm=0.0;game.puku_balance_units=0
 	game._update_play_ui();assert(game.best_panel.visible)
 	game._show_tutorial_guide("play_open_normal")
 	assert(str(game.tutorial_guide_button.get_meta("target", "")) == "play_open_normal")
@@ -232,14 +232,14 @@ func _ready() -> void:
 	assert(game.first_play_tutorial_dialog_visible and game.tutorial_guide_message.text==Localizer.text("ja","tutorial_normal_jelly"))
 	game._dismiss_first_play_tutorial_dialog();assert(game.first_play_tutorial_sequence_complete)
 	game._process(.05);await get_tree().process_frame
-	assert(is_zero_approx(game.puku_gauge_cm) and is_zero_approx(game.puku_coin_gauge_cm))
+	assert(is_zero_approx(game.puku_gauge_cm) and game.puku_balance_units==0)
 	assert(not game.seed_pod_gauge_discovery_complete and game.scripted_dialog_kind.is_empty())
 	for plant in game.plants:plant.fast_forward_to_diameter(game.TUTORIAL_HARVEST_CM + .1)
 	game.play_seed_animations_pending=0;game._process(.01)
 	assert(game.first_play_harvest_guide_active and game.tutorial_guide_message.text==Localizer.text("ja","tutorial_harvest_tap"))
 	assert(is_equal_approx(game.tutorial_harvest_plant.diameter_cm, game.TUTORIAL_HARVEST_CM))
 	game.tutorial_harvest_plant.harvest();await get_tree().process_frame
-	assert(game.normal_play_tutorial_complete and is_equal_approx(game.puku_coin_gauge_cm,game._effective_puku_cm_for_harvest(game.TUTORIAL_HARVEST_CM,false)) and game.puku_buyback_tutorial_active)
+	assert(game.normal_play_tutorial_complete and game.puku_balance_units==0 and game.puku_buyback_tutorial_active)
 	assert(game.tutorial_guide_message.text==Localizer.text("ja","puku_buyback_1"));game._advance_puku_buyback_tutorial()
 	assert(bool(game.first_play_harvest_spotlight_material.get_shader_parameter("focus_ellipse")))
 	var puku_center: Vector2 = game.first_play_harvest_spotlight_material.get_shader_parameter("focus_uv_a")
@@ -248,7 +248,7 @@ func _ready() -> void:
 	assert(((seed_center - puku_center) / puku_half_size).length() > 1.0)
 	assert(game.tutorial_guide_message.text==Localizer.text("ja","puku_buyback_2"));game._advance_puku_buyback_tutorial()
 	assert(game.puku_buyback_tutorial_complete and not game.puku_buyback_tutorial_active)
-	assert(Localizer.text("ja","puku_buyback_2") == "このゲージが満タンになったら\n3ぷくコインと交換するね！")
+	assert(Localizer.text("ja","puku_buyback_2").contains("1ぷく未満"))
 
 	# Collapse the remaining simulation to the actual final plant. The first
 	# tutorial must fill the pod before the result and grant exactly three sets.
@@ -278,8 +278,8 @@ func _ready() -> void:
 	assert(game.result_overlay.visible and not game.first_seed_pod_reward_event_active)
 	assert(game.normal_seed_bags == 3)
 
-	assert(Localizer.text("ja","puku_buyback_1") == "そうだ！育った多肉はうちで買い取るよ！")
-	print("FIRST_PLAY_TUTORIAL_SMOKE_OK trio_cards=catalog_only pre_sow=true old_seed=manual_25cm_harvest normal=harvest_only_gauges forced_pod_max=true reward=3sets result_after_reward=true")
+	assert(Localizer.text("ja","puku_buyback_1").contains("大きさに合わせて"))
+	print("FIRST_PLAY_TUTORIAL_SMOKE_OK trio_cards=catalog_only pre_sow=true old_seed=manual_25cm_harvest normal=finite_seed_pod_gauge forced_pod_max=true reward=3sets result_after_reward=true")
 	get_tree().quit()
 
 

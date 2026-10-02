@@ -20,7 +20,7 @@ func _ready()->void:
 	game.rain_event_pending=false;game.rain_bonus_active=false;game._roll_rain_event()
 	assert(not game.rain_event_pending and not game.rain_bonus_active)
 	assert(game.habitat_awakening_overlay!=null and game.habitat_awakening_overlay.DIALOG_KEYS.has("_pause_before_memory"))
-	game.play_harvest_cm_total=12.0;game.play_puku_gauge_cm_total=12.0;game.play_puku_earned_total=0;game.play_harvest_count=1;game.play_max_size=12.0;game.play_updated_global_best=false;game.play_notable_species={"colorata":{"name":"コロラータ","size":12.0}};game.result_new_species_queue.clear();game.result_new_species_queue.append("colorata");game._show_play_result();await get_tree().process_frame
+	game.play_harvest_cm_total=12.0;game.play_puku_reward_units_total=0;game.play_harvest_count=1;game.play_max_size=12.0;game.play_updated_global_best=false;game.play_notable_species={"colorata":{"name":"コロラータ","size":12.0}};game.result_new_species_queue.clear();game.result_new_species_queue.append("colorata");game._show_play_result();await get_tree().process_frame
 	assert(game.result_new_species_label.visible and game.result_new_species_label.text=="コロラータを図鑑登録！" and game.result_new_species_label.get_theme_font_size("font_size")>=23 and game.result_new_species_pulse_tween!=null)
 	game.result_overlay.visible=false;game.result_new_species_queue.clear();game._show_play_result();assert(not game.result_new_species_label.visible)
 	print("TUTORIAL_RAIN_UI_SMOKE_OK tutorial_finger=retired dark_highlight=true story_rain=preserved rain_bonus=retired new_species_ui=true")

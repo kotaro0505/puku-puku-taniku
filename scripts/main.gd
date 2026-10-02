@@ -51,14 +51,25 @@ const ORIGINAL_SERIES_ID := "base"
 const FIRST_STORY_SPECIES_ID := "colorata"
 const PANDA_STORY_SPECIES_ID := "affinis"
 const ARMADILLO_STORY_SPECIES_ID := "shaviana"
-const FOREST_GACHA_SPIN_COST := 1
+const FOREST_GACHA_SPIN_COST := 3
 const TRIAL_DEV_GACHA_WALLET := 9999
 const LEGACY_COMBINED_GAUGE_TARGET_CM := 600.0
 const SEED_POD_GAUGE_TARGET_CM := 750.0
 const SEED_POD_GAUGE_REWARD_BAGS := 3
-const PUKU_GAUGE_TARGET_CM := 500.0
-const PUKU_GAUGE_REWARD_PUKU := 3
-const PUKU_GAUGE_SIZE_CURVE_BASE_CM := 70.0
+const PUKU_UNITS_PER_PUKU := 1000
+const ENDLESS_NORMAL_SEED_COST_UNITS := 200
+const INITIAL_PUKU_CAPITAL_UNITS := 5000
+const PANDA_HELP_REWARD_UNITS := 5000
+const LEGACY_PUKU_GAUGE_TARGET_CM := 500.0
+const LEGACY_PUKU_GAUGE_REWARD_UNITS := 3000
+const HARVEST_PUKU_REWARD_ANCHORS := [
+	Vector2(0.0,0.0),Vector2(20.0,200.0),Vector2(30.0,360.0),
+	Vector2(40.0,620.0),Vector2(50.0,1100.0),Vector2(60.0,1700.0),
+	Vector2(70.0,2700.0),Vector2(80.0,4200.0),Vector2(90.0,6500.0),
+	Vector2(100.0,9000.0),Vector2(110.0,12500.0),Vector2(120.0,17500.0),
+	Vector2(130.0,23000.0),Vector2(140.0,30000.0),Vector2(150.0,38000.0),
+]
+const HARVEST_PUKU_POST_150_UNITS_PER_10_CM := 8000.0
 const ENDLESS_AUTO_SOW_TUTORIAL_STEP := "endless_auto_sow_prompt_seen"
 const HABITAT_TIME_MULTIPLIERS := [1, 60, 3600, 21600, 86400]
 const DEFAULT_POT_ID := "shallow_terracotta"
@@ -282,7 +293,7 @@ var puku_gauge_glow_tween: Tween
 var puku_point_label: Label
 var puku_gain_label: Label
 var puku_gain_tween: Tween
-var puku_gauge_display_cm := 0.0
+var puku_gauge_display_units := 0.0
 var puku_points_display := 0
 var puku_gauge_animation_queue: Array[Dictionary] = []
 var puku_gauge_animation_running := false
@@ -393,6 +404,7 @@ var shop_chatter_sequence_kind := ""
 var shop_chatter_sequence_speaker := "panda"
 var last_shop_chatter := ""
 var rescue_reward_in_progress := false
+var rescue_reward_context := ""
 var intro_overlay: Control
 var intro_dialog_panel: PanelContainer
 var intro_dialogue_label: Label
@@ -519,13 +531,18 @@ var encyclopedia_icon_button: Button
 var external_navigation_controls: Array[Control] = []
 var encyclopedia_navigation_controls: Array[Control] = []
 var puku_gauge_cm := 0.0
-var puku_coin_gauge_cm := 0.0
-var puku_points := 0
+var puku_balance_units := 0
+var puku_points:int:
+	get:
+		return maxi(0,floori(float(puku_balance_units)/float(PUKU_UNITS_PER_PUKU)))
+	set(value):
+		puku_balance_units=maxi(0,value)*PUKU_UNITS_PER_PUKU
 var bests: Dictionary = {}
 var discovered: Dictionary = {}
 var species_get_counts: Dictionary = {}
 var unlocked_series: Dictionary = {INITIAL_SERIES_ID:true}
 var get_counts_migration_dirty := false
+var puku_balance_migration_dirty := false
 var pot_catalog: Array = []
 var owned_pots: Dictionary = {DEFAULT_POT_ID:true}
 var saved_arrangements: Array = []
@@ -586,8 +603,7 @@ var play_time_remaining := 0.0
 var active_seed_type := "normal"
 var play_modal_open := false
 var play_harvest_cm_total := 0.0
-var play_puku_gauge_cm_total := 0.0
-var play_puku_earned_total := 0
+var play_puku_reward_units_total := 0
 var play_harvest_count := 0
 var play_max_size := 0.0
 var play_previous_global_best := 0.0
@@ -601,6 +617,13 @@ var play_spawn_queue := 0
 var play_seed_animations_pending := 0
 var play_spawn_timer := 0.0
 var play_concurrent_target := PLAY_INITIAL_MAX_PLANTS
+var endless_economy_start_units := 0
+var endless_economy_seed_count := 0
+var endless_economy_seed_cost_units := 0
+var endless_economy_harvest_reward_units := 0
+var endless_economy_jelly_count := 0
+var endless_economy_harvest_count := 0
+var endless_economy_max_harvest_cm := 0.0
 var greenhouse_finish_attempt_count := 0
 var greenhouse_finish_completed_count := 0
 var greenhouse_finish_last_block_reason := ""
@@ -708,11 +731,11 @@ func _ready() -> void:
 	if not legacy_habitat_notification_ids_to_cancel.is_empty():
 		habitat_notification_service=HabitatNotificationServiceClass.new();add_child(habitat_notification_service)
 		habitat_notification_service.cancel_all(legacy_habitat_notification_ids_to_cancel);legacy_habitat_notification_ids_to_cancel.clear()
-	if best_spawn_unlocks_dirty or get_counts_migration_dirty or recovered_forest_encounters:
+	if best_spawn_unlocks_dirty or get_counts_migration_dirty or puku_balance_migration_dirty or recovered_forest_encounters:
 		# A true cold start must reach the language choice before creating its
 		# first save.  The selected language then persists all initialized state.
 		if save_file_present_on_boot or language_selected:_save()
-		best_spawn_unlocks_dirty=false;get_counts_migration_dirty=false
+		best_spawn_unlocks_dirty=false;get_counts_migration_dirty=false;puku_balance_migration_dirty=false
 	_build_world()
 	_build_ui()
 	if habitat_awakened and (habitat_wild_initialized or habitat_unlocked):_ensure_habitat_wild_state(Time.get_unix_time_from_system(),true)
@@ -894,7 +917,8 @@ func _load_pot_data()->void:
 
 func _load_save() -> void:
 	_cancel_puku_gauge_animations()
-	legacy_habitat_migration_dirty=false;legacy_habitat_notification_ids_to_cancel.clear();panda_beacon_unread_log.clear()
+	legacy_habitat_migration_dirty=false;puku_balance_migration_dirty=false;legacy_habitat_notification_ids_to_cancel.clear();panda_beacon_unread_log.clear()
+	puku_balance_units=0
 	save_file_present_on_boot=false
 	language_selected=false
 	var save_path:=_active_save_path()
@@ -903,17 +927,23 @@ func _load_save() -> void:
 		if value is Dictionary:
 			save_file_present_on_boot=true
 			var saved_progression_version:=int(value.get("progression_version",0))
+			var migrating_legacy_puku_balance:bool=not value.has("puku_balance_units")
 			# Legacy `yen`, `money`, and `coins` fields are intentionally ignored. They
 			# remain valid JSON input, but game progression now uses puku coins only.
-			bests=value.get("bests",{});puku_gauge_cm=maxf(0.0,float(value.get("puku_gauge_cm",0.0)));puku_coin_gauge_cm=maxf(0.0,float(value.get("puku_coin_gauge_cm",0.0)));puku_points=maxi(0,int(value.get("puku_points",0)));discovered=value.get("discovered",{});habitat_seed_date=str(value.get("habitat_seed_date",""));habitat_seeds_collected=int(value.get("habitat_seeds_collected",0))
+			var legacy_puku_points:=maxi(0,int(value.get("puku_points",0)))
+			var legacy_puku_coin_gauge_cm:=maxf(0.0,float(value.get("puku_coin_gauge_cm",0.0)))
+			if not migrating_legacy_puku_balance:
+				puku_balance_units=maxi(0,int(value.get("puku_balance_units",0)))
+			else:
+				puku_balance_units=legacy_puku_points*PUKU_UNITS_PER_PUKU+roundi(legacy_puku_coin_gauge_cm/LEGACY_PUKU_GAUGE_TARGET_CM*LEGACY_PUKU_GAUGE_REWARD_UNITS)
+				puku_balance_migration_dirty=true
+			bests=value.get("bests",{});puku_gauge_cm=maxf(0.0,float(value.get("puku_gauge_cm",0.0)));discovered=value.get("discovered",{});habitat_seed_date=str(value.get("habitat_seed_date",""));habitat_seeds_collected=int(value.get("habitat_seeds_collected",0))
 			if saved_progression_version<21:
 				# v20 used one 600 cm gauge for both rewards. Preserve its fill ratio as
 				# pod light without granting migration-time seeds or coins.
 				puku_gauge_cm=clampf(puku_gauge_cm/LEGACY_COMBINED_GAUGE_TARGET_CM*SEED_POD_GAUGE_TARGET_CM,0.0,SEED_POD_GAUGE_TARGET_CM-.001)
-				puku_coin_gauge_cm=0.0
 			else:
 				puku_gauge_cm=fposmod(puku_gauge_cm,SEED_POD_GAUGE_TARGET_CM)
-				puku_coin_gauge_cm=fposmod(puku_coin_gauge_cm,_puku_gauge_target_cm())
 			species_get_counts=value.get("species_get_counts",{});unlocked_series=value.get("unlocked_series",{INITIAL_SERIES_ID:true})
 			owned_pots=value.get("owned_pots",{DEFAULT_POT_ID:true});saved_arrangements=value.get("saved_arrangements",[]);arrangement_save_capacity=maxi(1,int(value.get("arrangement_save_capacity",20)))
 			if not species_get_counts is Dictionary:species_get_counts={}
@@ -1053,6 +1083,7 @@ func _load_save() -> void:
 			_migrate_mystery_route_progress()
 			if _is_endless_greenhouse_enabled():
 				endless_greenhouse.restore_discovery_state(value.get("endless_discovery_state",{}))
+			if migrating_legacy_puku_balance and _ensure_initial_puku_capital(false):puku_balance_migration_dirty=true
 
 func _save() -> void:
 	var f := FileAccess.open(_active_save_path(),FileAccess.WRITE)
@@ -1088,7 +1119,7 @@ func _save() -> void:
 		"mystery_route_assignments":mystery_route_assignments,"mystery_route_completed":mystery_route_completed,"mystery_route_dialog_seen":mystery_route_dialog_seen,
 		"best_100_achieved":best_100_achieved,"login_bonus_date":login_bonus_date,"audio_settings":audio_settings,
 		"series_seed_inventory":series_seed_inventory,"forest_gacha_draw_count":forest_gacha_draw_count,"forest_gacha_encountered":forest_gacha_encountered,
-		"puku_gauge_cm":puku_gauge_cm,"puku_coin_gauge_cm":puku_coin_gauge_cm,"puku_points":puku_points,"old_catalog_pages":old_catalog_pages,"old_catalog_page_inventory":old_catalog_page_inventory,
+		"puku_gauge_cm":puku_gauge_cm,"puku_balance_units":puku_balance_units,"puku_coin_gauge_cm":_legacy_puku_coin_gauge_cm_for_save(),"puku_points":puku_points,"old_catalog_pages":old_catalog_pages,"old_catalog_page_inventory":old_catalog_page_inventory,
 		"old_catalog_intro_seen":old_catalog_intro_seen,"old_catalog_intro_pending":old_catalog_intro_pending,"research_catalog_reward_pending":research_catalog_reward_pending,
 		"habitat_old_catalog_page_pending":habitat_old_catalog_page_pending,"habitat_old_catalog_page_series_id":habitat_old_catalog_page_series_id,
 		"habitat_old_catalog_page_point_x":habitat_old_catalog_page_point.x,"habitat_old_catalog_page_point_y":habitat_old_catalog_page_point.y,
@@ -1125,6 +1156,9 @@ func _trial_dev_controls_enabled_for_context(is_web_build:bool)->bool:
 
 func _is_endless_normal_play()->bool:
 	return _is_endless_greenhouse_enabled() and play_active and active_seed_type=="normal"
+
+func _endless_puku_economy_active()->bool:
+	return _is_endless_normal_play() and puku_gauge_intro_complete
 
 func _greenhouse_jelly_balance_for_spawn()->Dictionary:
 	# An explicit developer override must win so the habitat_debug jelly controls
@@ -1197,11 +1231,27 @@ func _ensure_endless_greenhouse_running()->void:
 	if _endless_greenhouse_auto_start_blocked():return
 	_start_greenhouse_play("normal")
 
-func _puku_gauge_target_cm()->float:
-	return PUKU_GAUGE_TARGET_CM
+func _puku_whole_count(balance_units:int=-1)->int:
+	var resolved_units:=puku_balance_units if balance_units<0 else balance_units
+	return maxi(0,floori(float(resolved_units)/float(PUKU_UNITS_PER_PUKU)))
 
-func _puku_gauge_reward_puku()->int:
-	return PUKU_GAUGE_REWARD_PUKU
+func _puku_fraction_units(balance_units:int=-1)->int:
+	var resolved_units:=puku_balance_units if balance_units<0 else balance_units
+	return posmod(maxi(0,resolved_units),PUKU_UNITS_PER_PUKU)
+
+func _puku_cost_units(puku_cost:int)->int:
+	return maxi(0,puku_cost)*PUKU_UNITS_PER_PUKU
+
+func _can_afford_puku_units(cost_units:int)->bool:
+	return puku_balance_units>=maxi(0,cost_units)
+
+func _legacy_puku_coin_gauge_cm_for_save()->float:
+	return float(_puku_fraction_units())/float(LEGACY_PUKU_GAUGE_REWARD_UNITS)*LEGACY_PUKU_GAUGE_TARGET_CM
+
+func _ensure_initial_puku_capital(show_effect:=false)->bool:
+	if not puku_gauge_intro_complete or puku_balance_units>=INITIAL_PUKU_CAPITAL_UNITS:return false
+	_change_puku_balance(INITIAL_PUKU_CAPITAL_UNITS-puku_balance_units,"initial_capital",false,show_effect)
+	return true
 
 func _resolve_jurejure_progress_reward(reward_kind:String)->void:
 	# The legacy save field is kept for rollback compatibility. Its release event
@@ -1590,7 +1640,7 @@ func _build_ui() -> void:
 	puku_gauge_area=Control.new();puku_gauge_area.name="PukuGaugeArea";puku_gauge_area.position=Vector2(42,190);puku_gauge_area.size=Vector2(158,60);puku_gauge_area.mouse_filter=Control.MOUSE_FILTER_IGNORE;main_status_hud.add_child(puku_gauge_area)
 	var puku_content:=VBoxContainer.new();puku_content.position=Vector2(13,0);puku_content.size=Vector2(132,60);puku_content.alignment=BoxContainer.ALIGNMENT_CENTER;puku_content.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_content.add_theme_constant_override("separation",2);puku_gauge_area.add_child(puku_content)
 	puku_gauge_label=Label.new();puku_gauge_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;puku_gauge_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_gauge_label.add_theme_font_size_override("font_size",14);puku_gauge_label.add_theme_color_override("font_color",Color("#fff8cf"));puku_gauge_label.add_theme_color_override("font_outline_color",Color("#173622"));puku_gauge_label.add_theme_constant_override("outline_size",4);puku_content.add_child(puku_gauge_label)
-	puku_gauge_meter=ProgressBar.new();puku_gauge_meter.custom_minimum_size=Vector2(132,10);puku_gauge_meter.max_value=_puku_gauge_target_cm();puku_gauge_meter.show_percentage=false;puku_gauge_meter.mouse_filter=Control.MOUSE_FILTER_IGNORE;var meter_bg:=StyleBoxFlat.new();meter_bg.bg_color=Color(.025,.09,.045,.9);meter_bg.set_corner_radius_all(5);meter_bg.border_color=Color(.16,.34,.19,.76);meter_bg.set_border_width_all(1);puku_gauge_fill_style=StyleBoxFlat.new();puku_gauge_fill_style.bg_color=Color("#1f6840");puku_gauge_fill_style.border_color=Color("#76aa78");puku_gauge_fill_style.set_border_width_all(1);puku_gauge_fill_style.set_corner_radius_all(5);puku_gauge_meter.add_theme_stylebox_override("background",meter_bg);puku_gauge_meter.add_theme_stylebox_override("fill",puku_gauge_fill_style);puku_content.add_child(puku_gauge_meter)
+	puku_gauge_meter=ProgressBar.new();puku_gauge_meter.custom_minimum_size=Vector2(132,10);puku_gauge_meter.max_value=PUKU_UNITS_PER_PUKU;puku_gauge_meter.show_percentage=false;puku_gauge_meter.mouse_filter=Control.MOUSE_FILTER_IGNORE;var meter_bg:=StyleBoxFlat.new();meter_bg.bg_color=Color(.025,.09,.045,.9);meter_bg.set_corner_radius_all(5);meter_bg.border_color=Color(.16,.34,.19,.76);meter_bg.set_border_width_all(1);puku_gauge_fill_style=StyleBoxFlat.new();puku_gauge_fill_style.bg_color=Color("#1f6840");puku_gauge_fill_style.border_color=Color("#76aa78");puku_gauge_fill_style.set_border_width_all(1);puku_gauge_fill_style.set_corner_radius_all(5);puku_gauge_meter.add_theme_stylebox_override("background",meter_bg);puku_gauge_meter.add_theme_stylebox_override("fill",puku_gauge_fill_style);puku_content.add_child(puku_gauge_meter)
 	puku_gauge_glow=Panel.new();puku_gauge_glow.name="PukuGaugeGlow";puku_gauge_glow.show_behind_parent=true;puku_gauge_glow.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_gauge_glow.position=Vector2(1,1);puku_gauge_glow.size=Vector2(2,8);puku_gauge_glow_style=StyleBoxFlat.new();puku_gauge_glow_style.bg_color=Color(0,0,0,0);puku_gauge_glow_style.border_color=Color(1.0,.82,.22,.0);puku_gauge_glow_style.set_border_width_all(1);puku_gauge_glow_style.set_corner_radius_all(5);puku_gauge_glow_style.shadow_color=Color(1.0,.67,.08,0.0);puku_gauge_glow_style.shadow_size=2;puku_gauge_glow.add_theme_stylebox_override("panel",puku_gauge_glow_style);puku_gauge_meter.add_child(puku_gauge_glow);call_deferred("_start_puku_gauge_glow");call_deferred("_update_puku_ui")
 	puku_point_label=Label.new();puku_point_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;puku_point_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_point_label.add_theme_font_size_override("font_size",14);puku_point_label.add_theme_color_override("font_color",Color("#fff7c2"));puku_point_label.add_theme_color_override("font_outline_color",Color("#193923"));puku_point_label.add_theme_constant_override("outline_size",4);puku_content.add_child(puku_point_label)
 	puku_gain_label=Label.new();puku_gain_label.position=Vector2(138,246);puku_gain_label.size=Vector2(300,60);puku_gain_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;puku_gain_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;puku_gain_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_gain_label.add_theme_font_size_override("font_size",27);puku_gain_label.add_theme_color_override("font_color",Color("#fff49a"));puku_gain_label.add_theme_color_override("font_outline_color",Color("#31553c"));puku_gain_label.add_theme_constant_override("outline_size",7);puku_gain_label.visible=false;effects_layer.add_child(puku_gain_label)
@@ -1981,8 +2031,9 @@ func _on_pot_purchase_requested(pot_id:String)->void:
 	var price_value=pot.get("price_puku")
 	if not (price_value is int or price_value is float):arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"pot_price_tbd"));return
 	var price:=maxi(0,int(price_value))
-	if puku_points<price:arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"not_enough_puku"));return
-	puku_points-=price;owned_pots[pot_id]=true;_save();_update_currency_ui();arrangement_ui.sync_state(owned_pots,saved_arrangements,arrangement_save_capacity);arrangement_ui.sync_catalog_state(unlocked_series,puku_points);arrangement_ui.sync_seed_shop_state(_seed_shop_products(),puku_points);arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"pot_bought",[Localizer.pot_name(language_code,pot)]))
+	var price_units:=_puku_cost_units(price)
+	if not _can_afford_puku_units(price_units):arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"not_enough_puku"));return
+	_change_puku_balance(-price_units,"pot_purchase",false,true);owned_pots[pot_id]=true;_save();_update_currency_ui();arrangement_ui.sync_state(owned_pots,saved_arrangements,arrangement_save_capacity);arrangement_ui.sync_catalog_state(unlocked_series,puku_points);arrangement_ui.sync_seed_shop_state(_seed_shop_products(),puku_points);arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"pot_bought",[Localizer.pot_name(language_code,pot)]))
 	audio_manager.notify_user_gesture();audio_manager.play_se("purchase",1.0)
 
 func _on_catalog_purchase_requested(series_id:String)->void:
@@ -2025,7 +2076,7 @@ func _normalize_arrangement(source:Dictionary)->Dictionary:
 func _on_shop_panda_tapped()->void:
 	if shop_chatter_bubble.visible:_dismiss_or_advance_shop_chatter();return
 	if _shop_rescue_needed():
-		_show_shop_chatter(Localizer.text(language_code,"shop_rescue_offer"),true)
+		_show_shop_chatter(Localizer.text(language_code,"shop_puku_rescue_offer" if _shop_puku_rescue_needed() else "shop_rescue_offer"),true)
 		return
 	_show_shop_chatter(_pick_shop_chatter(),false)
 
@@ -2044,7 +2095,7 @@ func _show_shop_chatter(message:String,is_rescue:bool,dialog_mode:="normal",spea
 		shop_chatter_bubble.size=Vector2(bubble_width,bubble_height);shop_chatter_bubble.position=Vector2((576.0-bubble_width)*.5,276)
 	shop_chatter_action_button.visible=is_rescue or dialog_mode in ["research_offer","catalog_restore_offer"]
 	shop_chatter_action_button.disabled=rescue_reward_in_progress if is_rescue else false
-	shop_chatter_action_button.text=(Localizer.text(language_code,"ad_preparing") if rescue_reward_in_progress else Localizer.text(language_code,"ad_seed")) if is_rescue else (Localizer.text(language_code,"restore") if dialog_mode=="catalog_restore_offer" else Localizer.text(language_code,"yes"))
+	shop_chatter_action_button.text=(Localizer.text(language_code,"ad_preparing") if rescue_reward_in_progress else Localizer.text(language_code,"shop_help_action") if _shop_puku_rescue_needed() else Localizer.text(language_code,"ad_seed")) if is_rescue else (Localizer.text(language_code,"restore") if dialog_mode=="catalog_restore_offer" else Localizer.text(language_code,"yes"))
 	shop_chatter_decline_button.visible=dialog_mode in ["research_offer","catalog_restore_offer"]
 
 func _start_shop_chatter_sequence(kind:String,pages:Array,speaker_id:String)->void:
@@ -2133,26 +2184,36 @@ func _has_any_playable_seed_stock()->bool:
 		if int(series_seed_inventory.get(series_id,0))>0 and bool(unlocked_series.get(str(series_id),false)):return true
 	return false
 
-func _shop_rescue_needed()->bool:
+func _shop_puku_rescue_needed()->bool:
+	return mystery_items_acquired and habitat_tutorial_complete and current_mode=="greenhouse" and _endless_puku_economy_active() and puku_balance_units<ENDLESS_NORMAL_SEED_COST_UNITS
+
+func _shop_seed_rescue_needed()->bool:
 	return mystery_items_acquired and habitat_tutorial_complete and current_mode=="greenhouse" and not play_active and plants.is_empty() and normal_seed_bags<=0 and not _has_any_playable_seed_stock()
+
+func _shop_rescue_needed()->bool:
+	return _shop_puku_rescue_needed() or _shop_seed_rescue_needed()
 
 func _request_rescue_reward_ad()->void:
 	if rescue_reward_in_progress or not _shop_rescue_needed():return
+	rescue_reward_context="shop_puku_rescue" if _shop_puku_rescue_needed() else "shop_seed_rescue"
 	rescue_reward_in_progress=true;shop_chatter_action_button.disabled=true;shop_chatter_action_button.text=Localizer.text(language_code,"ad_preparing")
 	if REWARDED_AD_DEVELOPMENT_STUB_ENABLED:
 		await get_tree().create_timer(.65).timeout
 		_on_rescue_reward_ad_completed(true)
 	else:
-		rescue_reward_ad_requested.emit("shop_seed_rescue")
+		rescue_reward_ad_requested.emit(rescue_reward_context)
 
 func _on_rescue_reward_ad_completed(reward_earned:bool)->void:
 	if not rescue_reward_in_progress:return
 	rescue_reward_in_progress=false
 	if not reward_earned:
-		shop_chatter_action_button.disabled=false;shop_chatter_action_button.text=Localizer.text(language_code,"ad_seed")
+		shop_chatter_action_button.disabled=false;shop_chatter_action_button.text=Localizer.text(language_code,"shop_help_action") if rescue_reward_context=="shop_puku_rescue" else Localizer.text(language_code,"ad_seed");rescue_reward_context=""
 		return
-	_grant_rescue_seed_bags();_save();_update_shop_ui();_update_play_ui();audio_manager.play_se("daily",.48)
-	_show_shop_chatter(Localizer.text(language_code,"shop_rescue_success"),false)
+	var completed_context:=rescue_reward_context;rescue_reward_context=""
+	if completed_context=="shop_puku_rescue":_change_puku_balance(PANDA_HELP_REWARD_UNITS,"panda_help",false,true)
+	else:_grant_rescue_seed_bags()
+	_save();_update_shop_ui();_update_play_ui();audio_manager.play_se("daily",.48)
+	_show_shop_chatter(Localizer.text(language_code,"shop_puku_rescue_success" if completed_context=="shop_puku_rescue" else "shop_rescue_success"),false)
 
 func _grant_rescue_seed_bags()->void:
 	match RESCUE_REWARD_SEED_TYPE:
@@ -2214,7 +2275,7 @@ func _advance_intro_story()->void:
 		var finished_kind:=tutorial_dialog_kind;tutorial_dialog_kind="";tutorial_steps[finished_kind+"_dialog"]=true;intro_overlay.visible=false;shop_overlay.visible=false;intro_speaker_label.visible=true;intro_dialogue_label.add_theme_font_size_override("font_size",20);intro_dialogue_label.add_theme_color_override("font_color",UI_BROWN);intro_continue_button.text=Localizer.text(language_code,"next");_save();_update_play_ui();_play_current_area_bgm()
 		if finished_kind=="play3":_show_tutorial_guide("habitat")
 		elif finished_kind=="habitat_scroll":habitat_scroll_tutorial_active=true
-		elif finished_kind=="puku_gauge":puku_gauge_intro_complete=true;tutorial_steps["puku_gauge_intro_complete"]=true;_save();_update_currency_ui()
+		elif finished_kind=="puku_gauge":puku_gauge_intro_complete=true;tutorial_steps["puku_gauge_intro_complete"]=true;_ensure_initial_puku_capital(true);_save();_update_currency_ui()
 		return
 	if intro_is_daily_gift:
 		intro_is_daily_gift=false;intro_overlay.visible=false;shop_overlay.visible=false;intro_speaker_label.visible=true;intro_dialogue_label.add_theme_font_size_override("font_size",20);intro_dialogue_label.add_theme_color_override("font_color",UI_BROWN);intro_continue_button.text=Localizer.text(language_code,"next");_update_play_ui();audio_manager.play_bgm("greenhouse");return
@@ -2378,7 +2439,7 @@ func _finish_scripted_dialog()->void:
 		"armadillo_mystery_intro":
 			armadillo_research_intro_seen=true
 		"puku_gauge_first_gift":
-			puku_gauge_intro_complete=true;tutorial_steps["puku_gauge_intro_complete"]=true;shop_current_page="categories";_set_shop_purchase_visible(true)
+			puku_gauge_intro_complete=true;tutorial_steps["puku_gauge_intro_complete"]=true;_ensure_initial_puku_capital(true);shop_current_page="categories";_set_shop_purchase_visible(true)
 	_update_main_story_progress(false);_save();shop_overlay.visible=keep_shop
 	if finished_kind=="act3_intro" and current_mode=="habitat":_build_habitat_items(true)
 	if keep_shop:
@@ -2470,6 +2531,7 @@ func _start_seed_pod_story()->void:
 func _on_seed_pod_story_finished()->void:
 	tutorial_steps["seed_pod_story_seen"]=true;tutorial_steps["puku_gauge_intro_complete"]=true
 	mystery_items_acquired=true;encyclopedia_unlocked=true;seed_shop_open=true;original_catalog_gifted=true;puku_gauge_intro_complete=true
+	_ensure_initial_puku_capital(true)
 	habitat_tutorial_returned_to_greenhouse=true;unlocked_series[ORIGINAL_SERIES_ID]=true
 	if scene_transition_fade:
 		scene_transition_fade.color.a=1.0;scene_transition_fade.visible=true;scene_transition_fade.move_to_front()
@@ -3078,7 +3140,7 @@ func _adjust_progression_dev_value(key:String,delta:int)->void:
 	if key=="old_page":
 		if delta>0:_grant_old_catalog_page(delta,true)
 		else:_remove_old_catalog_page(-delta)
-	elif key=="puku_coin":puku_points=maxi(0,puku_points+delta)
+	elif key=="puku_coin":_change_puku_balance(delta*PUKU_UNITS_PER_PUKU,"dev_adjustment",false,true)
 	_save();_refresh_progression_dev_counters();_update_currency_ui();_sync_arrangement_ui()
 
 func _refresh_progression_dev_counters()->void:
@@ -3411,13 +3473,14 @@ func _perform_fusion(parent_a_id:String,parent_b_id:String)->void:
 	if result_entry.is_empty() or result_species_id.is_empty():
 		fusion_lab_ui.show_error(Localizer.text(language_code,"fusion_recipe_missing"));return
 	var fusion_cost:=maxi(1,int(resolution.get("fusion_cost_puku",1)))
-	if puku_points<fusion_cost:
+	var fusion_cost_units:=_puku_cost_units(fusion_cost)
+	if not _can_afford_puku_units(fusion_cost_units):
 		fusion_lab_ui.show_error(Localizer.text(language_code,"not_enough_puku"));return
 	fusion_in_progress=true
 	fusion_lab_ui.set_processing_state(true)
 	var is_new:=_species_get_count(result_species_id)<=0
 	# Currency and discovery are committed together and saved exactly once.
-	puku_points-=fusion_cost
+	_change_puku_balance(-fusion_cost_units,"fusion",false,true)
 	_register_species_discovery(result_species_id,true)
 	_apply_saved_unlocks();_sync_arrangement_ui();_refresh_series_selection()
 	if encyclopedia_overlay and encyclopedia_overlay.visible:_refresh_encyclopedia_header();_refresh_encyclopedia_cards()
@@ -3472,7 +3535,8 @@ func _open_arrangement_test_preview()->void:
 	_sync_arrangement_ui();arrangement_ui.set_world_backdrop_mode(false,_arrangement_pot_anchor_screen());arrangement_ui.open_home();arrangement_ui._start_new_arrangement();arrangement_ui._select_editor_pot("shallow_terracotta");arrangement_ui._add_species_to_editor(preview_species_id);_update_play_ui()
 
 func _open_secret_gacha_preview()->void:
-	secret_gacha_active=true;secret_gacha_draws_remaining=secret_gacha_system.setting_int("max_draws_per_event",3);puku_points=maxi(puku_points,10)
+	secret_gacha_active=true;secret_gacha_draws_remaining=secret_gacha_system.setting_int("max_draws_per_event",3)
+	if puku_balance_units<10000:_change_puku_balance(10000-puku_balance_units,"secret_gacha_preview",false,false)
 	if opening_overlay:opening_overlay.visible=false
 	if intro_overlay:intro_overlay.visible=false
 	if shop_overlay:shop_overlay.visible=false
@@ -3530,12 +3594,13 @@ func _spin_forest_gacha()->void:
 		if not trial_unlocked_series_id.is_empty():_queue_catalog_series_unlock_notice(trial_unlocked_series_id)
 		_save();_update_currency_ui();_sync_arrangement_ui();forest_gacha_ui.set_wallet(TRIAL_DEV_GACHA_WALLET,forest_gacha_draw_count)
 		var trial_entry:Dictionary=trial_result.get("species_entry",{});var trial_texture:=_species_texture(trial_entry);forest_gacha_ui.play_spin(trial_result,trial_texture if trial_texture!=null else CatalogImageLoader.placeholder_texture);return
-	if puku_points<FOREST_GACHA_SPIN_COST:
+	var forest_cost_units:=_puku_cost_units(FOREST_GACHA_SPIN_COST)
+	if not _can_afford_puku_units(forest_cost_units):
 		forest_gacha_ui.set_wallet(puku_points,forest_gacha_draw_count);return
 	var next_draw:=forest_gacha_draw_count+1
 	var result:Dictionary=forest_gacha_system.draw(unlocked_series,discovered,forest_gacha_encountered,forest_gacha_rng,StoryProgressionClass.fantasy_is_unlocked(story_progression_state),jurejure_species_unlocked)
 	if result.is_empty():return
-	puku_points-=FOREST_GACHA_SPIN_COST;forest_gacha_draw_count=next_draw
+	_change_puku_balance(-forest_cost_units,"forest_gacha",false,true);forest_gacha_draw_count=next_draw
 	var species_id:=str(result.get("species_id",""))
 	var unlocked_series_id:=""
 	if str(result.get("source",""))=="locked":
@@ -3637,11 +3702,12 @@ func _close_secret_gacha()->void:
 func _spin_secret_gacha()->void:
 	if secret_gacha_ui==null or not secret_gacha_ui.visible or secret_gacha_ui.is_busy() or not _secret_gacha_is_playable():return
 	var cost:int=int(secret_gacha_system.setting_int("cost_puku",1))
+	var cost_units:=_puku_cost_units(cost)
 	var unlimited_preview:=_secret_gacha_preview_requested()
-	if puku_points<cost or (not unlimited_preview and secret_gacha_draws_remaining<=0):secret_gacha_ui.set_wallet(puku_points,secret_gacha_draws_remaining);return
+	if not _can_afford_puku_units(cost_units) or (not unlimited_preview and secret_gacha_draws_remaining<=0):secret_gacha_ui.set_wallet(puku_points,secret_gacha_draws_remaining);return
 	var result:Dictionary=secret_gacha_system.draw(unlocked_series,discovered,owned_pots,secret_gacha_rng,"",unlimited_preview or StoryProgressionClass.fantasy_is_unlocked(story_progression_state),jurejure_species_unlocked)
 	if result.is_empty():return
-	puku_points-=cost
+	_change_puku_balance(-cost_units,"secret_gacha",false,true)
 	if not unlimited_preview:secret_gacha_draws_remaining=maxi(0,secret_gacha_draws_remaining-1)
 	var texture:=_apply_secret_gacha_reward(result)
 	if not unlimited_preview and secret_gacha_draws_remaining<=0:secret_gacha_active=false
@@ -3708,7 +3774,7 @@ func _reset_progression_state()->void:
 	original_catalog_complete_event_seen=false;habitat_tutorial_returned_to_greenhouse=false;jurejure_intro_complete=false;jurejure_enabled=false;jurejure_growth_stage=JureJureSystemClass.GROWTH_EARLY;jurejure_growth_event_mask=0;active_jurejure_event={};jurejure_next_check_unix=0.0;jurejure_cooldown_until_unix=0.0;jurejure_return_event_complete=false;jurejure_waiting_for_seed_pod_reward=false;jurejure_battle_count=0;jurejure_battle_win_count=0;jurejure_habitat_visit_point=Vector2(-1.0,-1.0);jurejure_pending_reward_species_id="";jurejure_last_battle_result.clear();habitat_second_awakened=false;habitat_second_awakening_complete=false;jurejure_update_accumulator=0.0
 	first_seed_pod_reward_event_active=false;habitat_visit_id=0;act3_intro_eligible_visit_id=0;habitat_crisis_eligible_visit_id=0
 	if habitat_crisis_atmosphere:habitat_crisis_atmosphere.deactivate()
-	_cancel_puku_gauge_animations();puku_gauge_cm=0.0;puku_coin_gauge_cm=0.0;puku_points=0;bests.clear();discovered.clear();species_get_counts.clear();unlocked_series={INITIAL_SERIES_ID:true};series_seed_inventory.clear();forest_gacha_draw_count=0;forest_gacha_encountered.clear();secret_gacha_active=false;secret_gacha_draws_remaining=0;secret_gacha_last_roll_play_count=-1;active_series_seed_id="";owned_pots={DEFAULT_POT_ID:true};saved_arrangements.clear();arrangement_save_capacity=20;greenhouse_available=_initial_greenhouse_state();unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;opening_story_complete=false;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;puku_gauge_intro_complete=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;mystery_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;mystery_seed_pack_unlocked=false;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;habitat_mystery_seeds_pending=0;mystery_seed_count=0;armadillo_research_total=0;armadillo_research_rewards.clear();armadillo_research_intro_seen=false;armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();result_deferred_species_queue.clear();shop_chatter_acquired_species.clear();species_get_queue.clear();play_share_record.clear();play_active=false;play_time_remaining=0.0;play_harvest_cm_total=0.0;play_puku_gauge_cm_total=0.0;play_puku_earned_total=0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_time_multiplier=1;habitat_simulation_unix=Time.get_unix_time_from_system();habitat_debug_log.clear();habitat_scroll_tutorial_active=false;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_clear_habitat_items();_save();_update_currency_ui();_update_play_ui()
+	_cancel_puku_gauge_animations();puku_gauge_cm=0.0;puku_balance_units=0;bests.clear();discovered.clear();species_get_counts.clear();unlocked_series={INITIAL_SERIES_ID:true};series_seed_inventory.clear();forest_gacha_draw_count=0;forest_gacha_encountered.clear();secret_gacha_active=false;secret_gacha_draws_remaining=0;secret_gacha_last_roll_play_count=-1;active_series_seed_id="";owned_pots={DEFAULT_POT_ID:true};saved_arrangements.clear();arrangement_save_capacity=20;greenhouse_available=_initial_greenhouse_state();unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;opening_story_complete=false;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;puku_gauge_intro_complete=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;mystery_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;mystery_seed_pack_unlocked=false;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;habitat_mystery_seeds_pending=0;mystery_seed_count=0;armadillo_research_total=0;armadillo_research_rewards.clear();armadillo_research_intro_seen=false;armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();result_deferred_species_queue.clear();shop_chatter_acquired_species.clear();species_get_queue.clear();play_share_record.clear();play_active=false;play_time_remaining=0.0;play_harvest_cm_total=0.0;play_puku_reward_units_total=0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;_reset_endless_economy_stats();rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_time_multiplier=1;habitat_simulation_unix=Time.get_unix_time_from_system();habitat_debug_log.clear();habitat_scroll_tutorial_active=false;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_clear_habitat_items();_save();_update_currency_ui();_update_play_ui()
 	normal_play_count=0;shop_visit_count=0;hidden_species_acquired.clear();tovar_next_play=TOVAR_FIRST_PLAY;tovar_attempt_count=0;tovar_event_active=false;tovar_harvested_this_play=false;armadillo_present=false;_save()
 
 func _reset_progression_for_development(button:Button)->void:
@@ -3801,11 +3867,12 @@ func _start_greenhouse_play(seed_type:String)->void:
 		if not _is_endless_greenhouse_enabled():normal_seed_bags-=1
 		current_target_count=NORMAL_GERMINATION_COUNT
 	if seed_type=="old" and total_play_count==0:_ensure_first_tutorial_species()
-	active_seed_type=seed_type;old_seed_reaction_stage=0;old_seed_harvest_guide_active=false;tutorial_harvest_plant=null;play_time_remaining=0.0;play_active=true;play_modal_open=false;play_harvest_cm_total=0.0;play_puku_gauge_cm_total=0.0;play_puku_earned_total=0;play_harvest_count=0;play_max_size=0.0;play_previous_global_best=_global_best_size();play_updated_global_best=false;play_share_record.clear();play_notable_species.clear();play_hidden_species_unlocked="";result_new_species_queue.clear();result_deferred_species_queue.clear();opening_species.clear();play_seeds_remaining=0 if seed_type=="normal" and _is_endless_greenhouse_enabled() else current_target_count;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=_initial_greenhouse_concurrent_target(seed_type);greenhouse_finish_attempt_count=0;greenhouse_finish_completed_count=0;greenhouse_finish_last_block_reason="";greenhouse_finish_last_snapshot.clear();_clear_greenhouse_plants()
+	active_seed_type=seed_type;old_seed_reaction_stage=0;old_seed_harvest_guide_active=false;tutorial_harvest_plant=null;play_time_remaining=0.0;play_active=true;play_modal_open=false;play_harvest_cm_total=0.0;play_puku_reward_units_total=0;play_harvest_count=0;play_max_size=0.0;play_previous_global_best=_global_best_size();play_updated_global_best=false;play_share_record.clear();play_notable_species.clear();play_hidden_species_unlocked="";result_new_species_queue.clear();result_deferred_species_queue.clear();opening_species.clear();play_seeds_remaining=0 if seed_type=="normal" and _is_endless_greenhouse_enabled() else current_target_count;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=_initial_greenhouse_concurrent_target(seed_type);greenhouse_finish_attempt_count=0;greenhouse_finish_completed_count=0;greenhouse_finish_last_block_reason="";greenhouse_finish_last_snapshot.clear();_clear_greenhouse_plants();_reset_endless_economy_stats()
 	if seed_type=="normal" and _is_endless_greenhouse_enabled():endless_greenhouse.begin_play()
 	if seed_type=="normal":_prepare_story_spawn_guarantee()
 	if result_overlay:result_overlay.visible=false
-	for i in range(play_concurrent_target):_spawn_greenhouse_seed()
+	for i in range(play_concurrent_target):
+		if not _spawn_greenhouse_seed(true):break
 	_prepare_tovar_event_for_play()
 	if seed_type=="normal" and mystery_items_acquired and not normal_play_tutorial_complete:_begin_first_play_tutorial()
 	audio_manager.play_se("rare_seed" if seed_type in ["premium","mystery"] or seed_type.begins_with("series:") else "seed_bag",.72)
@@ -3982,7 +4049,7 @@ func _open_shop()->void:
 	if not _tutorial_fully_complete():
 		shop_overlay.visible=false;_set_shop_purchase_visible(false);_update_play_ui();return
 	play_modal_open=false;shop_current_page="categories";_set_shop_purchase_visible(true);_update_shop_ui();shop_message.text=Localizer.text(language_code,"shop_seed_info");play_overlay.visible=false;shop_chatter_bubble.visible=false;shop_overlay.visible=true;audio_manager.play_bgm("shop");_prepare_shop_visit();_update_play_ui()
-	if _shop_rescue_needed():_show_shop_chatter(Localizer.text(language_code,"shop_rescue_offer"),true)
+	if _shop_rescue_needed():_show_shop_chatter(Localizer.text(language_code,"shop_puku_rescue_offer" if _shop_puku_rescue_needed() else "shop_rescue_offer"),true)
 	elif not pending_armadillo_story_event.is_empty():call_deferred("_start_pending_armadillo_story")
 
 func _prepare_shop_visit(force_armadillo:Variant=null)->void:
@@ -4201,63 +4268,64 @@ func add_seed_pod_gauge_cm(amount_cm:float,save_immediately:=true,show_effect:=t
 	if save_immediately or completed_gauges>0:_save()
 	return earned_bags
 
-func add_puku_coin_gauge_cm(amount_cm:float,save_immediately:=true,show_effect:=true,source_position:=Vector2(-10000,-10000))->int:
-	if amount_cm<=0.0 or not mystery_items_acquired:return 0
-	var target_cm:=_puku_gauge_target_cm()
-	var reward_puku:=_puku_gauge_reward_puku()
-	var previous_cm:=puku_coin_gauge_cm
-	var accumulated:=previous_cm+amount_cm
-	var completed_gauges:=floori(accumulated/target_cm)
-	var earned_puku:=completed_gauges*reward_puku
-	puku_coin_gauge_cm=accumulated-completed_gauges*target_cm
-	puku_points+=earned_puku
-	if completed_gauges>0:_resolve_jurejure_progress_reward("puku")
+func _change_puku_balance(delta_units:int,source:="",save_immediately:=true,show_effect:=true,source_position:=Vector2(-10000,-10000))->int:
+	if delta_units==0:return 0
+	var previous_units:=puku_balance_units
+	puku_balance_units=maxi(0,puku_balance_units+delta_units)
+	var applied_units:=puku_balance_units-previous_units
+	if applied_units==0:return 0
+	_record_endless_economy_change(str(source),applied_units)
 	if show_effect and puku_gauge_meter and effects_layer:
-		if not puku_gauge_animation_running and puku_gauge_animation_queue.is_empty():puku_gauge_display_cm=previous_cm;puku_points_display=puku_points-earned_puku
-		puku_gauge_animation_queue.append({"amount_cm":amount_cm})
-		_launch_harvest_cm_fly(amount_cm,source_position)
+		if not puku_gauge_animation_running and puku_gauge_animation_queue.is_empty():
+			puku_gauge_display_units=float(_puku_fraction_units(previous_units))
+			puku_points_display=_puku_whole_count(previous_units)
+		puku_gauge_animation_queue.append({"delta_units":applied_units})
+		if applied_units>0 and source_position.x>-9999.0:_launch_puku_balance_fly(applied_units,source_position)
 		if not puku_gauge_animation_running:
 			puku_gauge_animation_running=true
 			_run_puku_gauge_animation_queue()
 	else:
 		if puku_gauge_animation_running or not puku_gauge_animation_queue.is_empty():_cancel_puku_gauge_animations()
-		puku_gauge_display_cm=puku_coin_gauge_cm
-		puku_points_display=puku_points
-		if completed_gauges>0 and show_effect:_show_puku_gauge_reward(earned_puku)
+		puku_gauge_display_units=float(_puku_fraction_units())
+		puku_points_display=_puku_whole_count()
 	_update_puku_ui();_update_play_ui()
+	if applied_units>0 and _is_endless_normal_play():call_deferred("_queue_greenhouse_replacements")
 	if save_immediately:_save()
-	return earned_puku
-
-func _effective_puku_cm_for_harvest(diameter_cm:float,is_new_species:bool)->float:
-	var harvested_cm:=maxf(0.0,diameter_cm)
-	var curved_cm:=harvested_cm*harvested_cm/PUKU_GAUGE_SIZE_CURVE_BASE_CM
-	return maxf(harvested_cm,curved_cm) if is_new_species else curved_cm
-
-# Compatibility entry point for old internal smoke helpers. New gameplay calls
-# the explicit pod or coin function above.
-func add_puku_gauge_cm(amount_cm:float,save_immediately:=true,show_effect:=true,source_position:=Vector2(-10000,-10000))->int:
-	return add_puku_coin_gauge_cm(amount_cm,save_immediately,show_effect,source_position)
+	return applied_units
 
 func add_puku_points(amount:int,save_immediately:=true,show_effect:=true)->void:
-	if amount<=0:return
-	puku_points+=amount
-	puku_points_display+=amount
-	_update_puku_ui()
-	if show_effect:_show_puku_point_gain(amount)
-	if save_immediately:_save()
+	_change_puku_balance(amount*PUKU_UNITS_PER_PUKU,"legacy_api",save_immediately,show_effect)
+
+func _harvest_puku_reward_units(diameter_cm:float,is_first_get:bool)->int:
+	var harvested_cm:=maxf(0.0,diameter_cm)
+	var reward_units:=0.0
+	if harvested_cm>=float(HARVEST_PUKU_REWARD_ANCHORS[-1].x):
+		reward_units=float(HARVEST_PUKU_REWARD_ANCHORS[-1].y)+(harvested_cm-float(HARVEST_PUKU_REWARD_ANCHORS[-1].x))/10.0*HARVEST_PUKU_POST_150_UNITS_PER_10_CM
+	else:
+		for index in range(HARVEST_PUKU_REWARD_ANCHORS.size()-1):
+			var left:Vector2=HARVEST_PUKU_REWARD_ANCHORS[index]
+			var right:Vector2=HARVEST_PUKU_REWARD_ANCHORS[index+1]
+			if harvested_cm<=right.x:
+				var ratio:=inverse_lerp(left.x,right.x,harvested_cm)
+				reward_units=lerpf(left.y,right.y,ratio)
+				break
+	var rounded_units:=maxi(0,roundi(reward_units))
+	return maxi(ENDLESS_NORMAL_SEED_COST_UNITS,rounded_units) if is_first_get else rounded_units
+
+func _format_puku_units(units:int)->String:
+	return "%.2f"%(float(abs(units))/float(PUKU_UNITS_PER_PUKU))
 
 func _puku_gauge_text()->String:
-	var rounded:=snappedf(puku_coin_gauge_cm,0.1)
-	return str(int(roundf(rounded))) if is_equal_approx(rounded,roundf(rounded)) else "%.1f"%rounded
+	return _format_puku_units(_puku_fraction_units())
 
 func _update_puku_ui()->void:
 	if puku_gauge_label:puku_gauge_label.text=Localizer.text(language_code,"puku_gauge")
 	if seed_pod_gauge_label:seed_pod_gauge_label.text=Localizer.text(language_code,"seed_pod_gauge")
 	if seed_pod_gauge_meter:seed_pod_gauge_meter.max_value=SEED_POD_GAUGE_TARGET_CM
-	if puku_gauge_meter:puku_gauge_meter.max_value=_puku_gauge_target_cm()
-	if not puku_gauge_animation_running and puku_gauge_animation_queue.is_empty():puku_gauge_display_cm=puku_coin_gauge_cm;puku_points_display=puku_points
+	if puku_gauge_meter:puku_gauge_meter.max_value=PUKU_UNITS_PER_PUKU
+	if not puku_gauge_animation_running and puku_gauge_animation_queue.is_empty():puku_gauge_display_units=float(_puku_fraction_units());puku_points_display=_puku_whole_count()
 	_render_seed_pod_gauge(puku_gauge_cm)
-	_render_puku_gauge(puku_gauge_display_cm)
+	_render_puku_gauge(puku_gauge_display_units)
 	if puku_point_label:puku_point_label.text=Localizer.text(language_code,"puku_count",[puku_points_display])
 
 func _render_seed_pod_gauge(display_cm:float)->void:
@@ -4274,14 +4342,13 @@ func _render_seed_pod_gauge(display_cm:float)->void:
 	if seed_pod_gauge_glow_style:
 		seed_pod_gauge_glow_style.shadow_size=roundi(2.0+5.0*ratio);seed_pod_gauge_glow_style.shadow_color=Color(.28,1.0,.55,lerpf(.12,.42,ratio))
 
-func _render_puku_gauge(display_cm:float)->void:
-	var target_cm:=_puku_gauge_target_cm()
-	var ratio:=clampf(display_cm/target_cm,0.0,1.0)
+func _render_puku_gauge(display_units:float)->void:
+	var ratio:=clampf(display_units/float(PUKU_UNITS_PER_PUKU),0.0,1.0)
 	var gold_progress:=clampf((ratio-.70)/.30,0.0,1.0)
 	var glow_strength:=pow(gold_progress,1.28)
 	var fill_color:=Color("#174b31").lerp(Color("#348a4a"),ratio/.70) if ratio<=.70 else Color("#78c943").lerp(Color("#ffe657"),minf(1.0,gold_progress*1.35))
 	if gold_progress>.72:fill_color=fill_color.lerp(Color("#f4ac22"),(gold_progress-.72)/.28)
-	if puku_gauge_meter:puku_gauge_meter.value=clampf(display_cm,0.0,target_cm)
+	if puku_gauge_meter:puku_gauge_meter.value=clampf(display_units,0.0,float(PUKU_UNITS_PER_PUKU))
 	if puku_gauge_glow:
 		puku_gauge_glow.visible=ratio>.70
 		var meter_width:=maxf(puku_gauge_meter.size.x,puku_gauge_meter.custom_minimum_size.x)
@@ -4296,12 +4363,12 @@ func _render_puku_gauge(display_cm:float)->void:
 		puku_gauge_fill_style.bg_color=fill_color
 		puku_gauge_fill_style.border_color=Color("#73a77b").lerp(Color("#fff2a0"),gold_progress)
 
-func _set_puku_gauge_display_cm(value:float)->void:
-	puku_gauge_display_cm=clampf(value,0.0,_puku_gauge_target_cm())
-	_render_puku_gauge(puku_gauge_display_cm)
+func _set_puku_gauge_display_units(value:float)->void:
+	puku_gauge_display_units=clampf(value,0.0,float(PUKU_UNITS_PER_PUKU))
+	_render_puku_gauge(puku_gauge_display_units)
 
-func _launch_harvest_cm_fly(amount_cm:float,source_position:Vector2)->void:
-	var label:=Label.new();label.name="HarvestCmFly";label.text="+%scm"%_format_cm(amount_cm);label.size=Vector2(150,54);label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.mouse_filter=Control.MOUSE_FILTER_IGNORE;label.add_theme_font_size_override("font_size",25);label.add_theme_color_override("font_color",Color("#d9fbff"));label.add_theme_color_override("font_outline_color",Color("#174651"));label.add_theme_constant_override("outline_size",6)
+func _launch_puku_balance_fly(delta_units:int,source_position:Vector2)->void:
+	var label:=Label.new();label.name="PukuBalanceFly";label.text="%s%sぷく"%["+" if delta_units>0 else "-",_format_puku_units(delta_units)];label.size=Vector2(170,54);label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.mouse_filter=Control.MOUSE_FILTER_IGNORE;label.add_theme_font_size_override("font_size",25);label.add_theme_color_override("font_color",Color("#fff49a") if delta_units>0 else Color("#ffb99f"));label.add_theme_color_override("font_outline_color",Color("#31553c") if delta_units>0 else Color("#6d251b"));label.add_theme_constant_override("outline_size",6)
 	var fallback:=Vector2(288,520);var start:=source_position if source_position.x>-9999.0 else fallback;label.position=start-label.size*.5;label.pivot_offset=label.size*.5;effects_layer.add_child(label)
 	var target:=puku_gauge_meter.global_position+puku_gauge_meter.size*.5
 	var tween:=create_tween().bind_node(label).set_parallel();tween.tween_property(label,"position",target-label.size*.5,.30).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN);tween.tween_property(label,"scale",Vector2(.72,.72),.30).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN);tween.tween_property(label,"modulate:a",.12,.30).set_delay(.17);tween.chain().tween_callback(label.queue_free)
@@ -4316,37 +4383,58 @@ func _run_puku_gauge_animation_queue()->void:
 		var item:Dictionary=puku_gauge_animation_queue.pop_front()
 		await get_tree().create_timer(maxf(.001,.26*puku_gauge_animation_speed_scale)).timeout
 		if generation!=puku_gauge_animation_generation:return
-		await _animate_puku_gauge_amount(float(item.get("amount_cm",0.0)),generation)
+		await _animate_puku_balance_delta(int(item.get("delta_units",0)),generation)
 	if generation!=puku_gauge_animation_generation:return
-	puku_gauge_animation_running=false;puku_gauge_display_cm=puku_coin_gauge_cm;puku_points_display=puku_points;_update_puku_ui()
+	puku_gauge_animation_running=false;puku_gauge_display_units=float(_puku_fraction_units());puku_points_display=_puku_whole_count();_update_puku_ui()
 
-func _animate_puku_gauge_amount(amount_cm:float,generation:int)->void:
-	var remaining:=maxf(0.0,amount_cm)
-	var target_cm:=_puku_gauge_target_cm()
-	var total_duration:=clampf(.40+minf(1.0,remaining/target_cm)*.40,.40,.80)*puku_gauge_animation_speed_scale
-	while remaining>.0001 and generation==puku_gauge_animation_generation:
-		var room:=target_cm-puku_gauge_display_cm
-		if room<=.0001:
-			await _play_puku_gauge_threshold(generation)
-			continue
-		var segment:=minf(remaining,room);var segment_duration:=maxf(.001,total_duration*segment/maxf(amount_cm,.001))
-		puku_gauge_active_tween=create_tween();puku_gauge_active_tween.tween_method(_set_puku_gauge_display_cm,puku_gauge_display_cm,puku_gauge_display_cm+segment,segment_duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-		await puku_gauge_active_tween.finished
-		if generation!=puku_gauge_animation_generation:return
-		remaining-=segment
-		if puku_gauge_display_cm>=target_cm-.001:await _play_puku_gauge_threshold(generation)
+func _animate_puku_balance_delta(delta_units:int,generation:int)->void:
+	var remaining:int=absi(delta_units)
+	if remaining<=0:return
+	var original_amount:int=remaining
+	var total_duration:=clampf(.34+minf(1.0,float(remaining)/2400.0)*.50,.34,.84)*puku_gauge_animation_speed_scale
+	var direction:=1 if delta_units>0 else -1
+	while remaining>0 and generation==puku_gauge_animation_generation:
+		if direction>0:
+			var positive_room:=PUKU_UNITS_PER_PUKU-roundi(puku_gauge_display_units)
+			if positive_room<=0:
+				await _play_puku_balance_boundary(1,generation)
+				continue
+			var positive_segment:=mini(remaining,positive_room)
+			var positive_duration:=maxf(.001,total_duration*float(positive_segment)/float(original_amount))
+			puku_gauge_active_tween=create_tween();puku_gauge_active_tween.tween_method(_set_puku_gauge_display_units,puku_gauge_display_units,puku_gauge_display_units+positive_segment,positive_duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+			await puku_gauge_active_tween.finished
+			if generation!=puku_gauge_animation_generation:return
+			remaining-=positive_segment
+			if puku_gauge_display_units>=PUKU_UNITS_PER_PUKU-.001:await _play_puku_balance_boundary(1,generation)
+		else:
+			if puku_gauge_display_units<=.001:
+				await _play_puku_balance_boundary(-1,generation)
+				if puku_points_display<=0 and puku_gauge_display_units<=.001:return
+			var negative_room:=maxi(0,roundi(puku_gauge_display_units))
+			var negative_segment:=mini(remaining,negative_room)
+			if negative_segment<=0:return
+			var negative_duration:=maxf(.001,total_duration*float(negative_segment)/float(original_amount))
+			puku_gauge_active_tween=create_tween();puku_gauge_active_tween.tween_method(_set_puku_gauge_display_units,puku_gauge_display_units,puku_gauge_display_units-negative_segment,negative_duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+			await puku_gauge_active_tween.finished
+			if generation!=puku_gauge_animation_generation:return
+			remaining-=negative_segment
 
-func _play_puku_gauge_threshold(generation:int)->void:
+func _play_puku_balance_boundary(direction:int,generation:int)->void:
 	if generation!=puku_gauge_animation_generation:return
-	var reward_puku:=_puku_gauge_reward_puku();puku_gauge_threshold_flash_count+=1;puku_points_display+=reward_puku;_set_puku_gauge_display_cm(_puku_gauge_target_cm());if puku_point_label:puku_point_label.text=Localizer.text(language_code,"puku_count",[puku_points_display]);_show_puku_gauge_reward(reward_puku)
-	puku_gauge_meter.pivot_offset=puku_gauge_meter.size*.5;puku_gauge_active_tween=create_tween();puku_gauge_active_tween.tween_property(puku_gauge_meter,"scale",Vector2(1.08,1.32),maxf(.001,.08*puku_gauge_animation_speed_scale)).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT);puku_gauge_active_tween.tween_property(puku_gauge_meter,"scale",Vector2.ONE,maxf(.001,.12*puku_gauge_animation_speed_scale)).set_trans(Tween.TRANS_QUAD)
+	puku_gauge_threshold_flash_count+=1
+	if direction>0:
+		puku_points_display+=1;_set_puku_gauge_display_units(float(PUKU_UNITS_PER_PUKU))
+	else:
+		puku_points_display=maxi(0,puku_points_display-1);_set_puku_gauge_display_units(float(PUKU_UNITS_PER_PUKU))
+	if puku_point_label:puku_point_label.text=Localizer.text(language_code,"puku_count",[puku_points_display])
+	puku_gauge_meter.pivot_offset=puku_gauge_meter.size*.5;puku_gauge_active_tween=create_tween();puku_gauge_active_tween.tween_property(puku_gauge_meter,"scale",Vector2(1.06,1.22),maxf(.001,.025*puku_gauge_animation_speed_scale)).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT);puku_gauge_active_tween.tween_property(puku_gauge_meter,"scale",Vector2.ONE,maxf(.001,.04*puku_gauge_animation_speed_scale)).set_trans(Tween.TRANS_QUAD)
 	await puku_gauge_active_tween.finished
-	if generation==puku_gauge_animation_generation:_set_puku_gauge_display_cm(0.0)
+	if generation==puku_gauge_animation_generation and direction>0:_set_puku_gauge_display_units(0.0)
 
 func _cancel_puku_gauge_animations()->void:
 	puku_gauge_animation_generation+=1;puku_gauge_animation_queue.clear();puku_gauge_animation_running=false
 	if puku_gauge_active_tween and puku_gauge_active_tween.is_valid():puku_gauge_active_tween.kill()
-	puku_gauge_active_tween=null;puku_gauge_display_cm=puku_coin_gauge_cm;puku_points_display=puku_points
+	puku_gauge_active_tween=null;puku_gauge_display_units=float(_puku_fraction_units());puku_points_display=_puku_whole_count()
 	if puku_gauge_meter:puku_gauge_meter.scale=Vector2.ONE
 
 func _start_puku_gauge_glow()->void:
@@ -4354,12 +4442,6 @@ func _start_puku_gauge_glow()->void:
 	if puku_gauge_glow_tween and puku_gauge_glow_tween.is_valid():puku_gauge_glow_tween.kill()
 	puku_gauge_glow.modulate=Color(1.0,1.0,1.0,.82)
 	puku_gauge_glow_tween=create_tween().bind_node(puku_gauge_glow).set_loops();puku_gauge_glow_tween.tween_property(puku_gauge_glow,"modulate:a",1.0,1.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT);puku_gauge_glow_tween.tween_property(puku_gauge_glow,"modulate:a",.82,1.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-
-func _show_puku_point_gain(amount:int)->void:
-	if not puku_gain_label:return
-	if puku_gain_tween and puku_gain_tween.is_valid():puku_gain_tween.kill()
-	puku_gain_label.text=Localizer.text(language_code,"puku_gain",[amount]);puku_gain_label.position=Vector2(24,250);puku_gain_label.size=Vector2(220,60);puku_gain_label.scale=Vector2(.82,.82);puku_gain_label.modulate=Color.WHITE;puku_gain_label.visible=true
-	puku_gain_tween=create_tween().bind_node(puku_gain_label);puku_gain_tween.tween_property(puku_gain_label,"scale",Vector2.ONE,.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT);puku_gain_tween.parallel().tween_property(puku_gain_label,"position:y",226.0,.8).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT);puku_gain_tween.tween_interval(.6);puku_gain_tween.tween_property(puku_gain_label,"modulate:a",0.0,.25);puku_gain_tween.tween_callback(func():puku_gain_label.visible=false;puku_gain_label.modulate=Color.WHITE)
 
 func _play_seed_pod_reward(bag_count:int)->void:
 	if seed_pod_gauge_meter==null:return
@@ -4403,12 +4485,6 @@ func _claim_first_seed_pod_reward_once()->void:
 	_resolve_jurejure_progress_reward("seed_pod")
 	_play_seed_pod_reward(SEED_POD_GAUGE_REWARD_BAGS);_save();_update_currency_ui();_update_play_ui();audio_manager.play_se("daily",.62)
 
-func _show_puku_gauge_reward(puku_amount:int)->void:
-	if not puku_gain_label:return
-	if puku_gain_tween and puku_gain_tween.is_valid():puku_gain_tween.kill()
-	puku_gain_label.text=Localizer.text(language_code,"puku_gauge_reward",[puku_amount]);puku_gain_label.position=Vector2(24,250);puku_gain_label.size=Vector2(300,60);puku_gain_label.scale=Vector2(.82,.82);puku_gain_label.modulate=Color.WHITE;puku_gain_label.visible=true
-	puku_gain_tween=create_tween().bind_node(puku_gain_label);puku_gain_tween.tween_property(puku_gain_label,"scale",Vector2.ONE,.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT);puku_gain_tween.parallel().tween_property(puku_gain_label,"position:y",226.0,.8).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT);puku_gain_tween.tween_interval(.6);puku_gain_tween.tween_property(puku_gain_label,"modulate:a",0.0,.25);puku_gain_tween.tween_callback(func():puku_gain_label.visible=false;puku_gain_label.modulate=Color.WHITE)
-
 func _update_currency_ui()->void:
 	_update_puku_ui()
 
@@ -4420,7 +4496,7 @@ func _show_play_result()->void:
 		else:call_deferred("_start_first_colorata_discovery_event")
 		return
 	result_total_label.visible=true
-	result_total_label.text=Localizer.text(language_code,"result_total",[_format_cm(play_harvest_cm_total),_format_cm(play_puku_gauge_cm_total),play_puku_earned_total]) if mystery_items_acquired else Localizer.text(language_code,"result_total_before_items",[_format_cm(play_harvest_cm_total)]);result_count_label.text=Localizer.text(language_code,"result_count",[play_harvest_count])
+	result_total_label.text=Localizer.text(language_code,"result_total_before_items",[_format_cm(play_harvest_cm_total)]);result_count_label.text=Localizer.text(language_code,"result_count",[play_harvest_count])
 	result_max_label.remove_theme_color_override("font_outline_color");result_max_label.remove_theme_constant_override("outline_size")
 	if play_updated_global_best:
 		result_max_label.text=Localizer.text(language_code,"result_best_update",[play_max_size]);result_max_label.add_theme_font_size_override("font_size",30);result_max_label.add_theme_color_override("font_color",Color("#b83b32"));result_max_label.add_theme_color_override("font_outline_color",Color("#f8e8c8"));result_max_label.add_theme_constant_override("outline_size",3);_play_result_confetti();call_deferred("_start_result_record_pulse");audio_manager.play_se("result_new_best",.48)
@@ -6110,12 +6186,17 @@ func spawn_plant(force_golden := false,spawn_position:Variant=null) -> void:
 	if endless_forced_new:_save()
 	if audio_manager:audio_manager.play_se("sprout",.28)
 
-func _spawn_greenhouse_seed()->void:
+func _spawn_greenhouse_seed(suppress_puku_effect:=false)->bool:
 	var endless_normal:=_is_endless_normal_play()
-	if not play_active or (not endless_normal and play_seeds_remaining<=0):return
+	if not play_active or (not endless_normal and play_seeds_remaining<=0):return false
+	if _endless_puku_economy_active():
+		if not _can_afford_puku_units(ENDLESS_NORMAL_SEED_COST_UNITS):return false
+		var charged_units:=_change_puku_balance(-ENDLESS_NORMAL_SEED_COST_UNITS,"endless_seed",not suppress_puku_effect,not suppress_puku_effect)
+		if charged_units!=-ENDLESS_NORMAL_SEED_COST_UNITS:return false
 	var spawn_position:=_find_spawn_position();pending_seed_positions.append(spawn_position)
 	if not endless_normal:play_seeds_remaining-=1
 	play_seed_animations_pending+=1;_update_play_ui();_animate_and_spawn_greenhouse_seed(spawn_position)
+	return true
 
 func _animate_and_spawn_greenhouse_seed(spawn_position:Vector3)->void:
 	var seed:=UISymbolIcon.new();seed.symbol="seed";seed.icon_color=Color("#6b3f20");seed.size=Vector2(22,22);seed.mouse_filter=Control.MOUSE_FILTER_IGNORE
@@ -6138,6 +6219,7 @@ func _queue_greenhouse_replacements()->void:
 	if not play_active or active_seed_type=="old":return
 	var open_slots:=maxi(0,play_concurrent_target-(plants.size()+play_spawn_queue+play_seed_animations_pending))
 	var add_count:=open_slots if _is_endless_normal_play() else mini(open_slots,play_seeds_remaining-play_spawn_queue)
+	if _endless_puku_economy_active():add_count=mini(add_count,floori(float(puku_balance_units)/float(ENDLESS_NORMAL_SEED_COST_UNITS)))
 	if add_count<=0:return
 	var was_empty:=play_spawn_queue==0;play_spawn_queue+=add_count
 	if was_empty:play_spawn_timer=_next_greenhouse_spawn_interval()
@@ -6169,7 +6251,36 @@ func _complete_endless_virtual_batch()->void:
 	_evaluate_unlock_rules("play_count",float(total_play_count))
 	if formal_play:_maybe_activate_secret_gacha()
 	_prepare_story_spawn_guarantee()
-	_save();_update_play_ui()
+	_save();_update_play_ui();_log_endless_economy("virtual_batch")
+
+func _reset_endless_economy_stats()->void:
+	endless_economy_start_units=puku_balance_units;endless_economy_seed_count=0;endless_economy_seed_cost_units=0;endless_economy_harvest_reward_units=0;endless_economy_jelly_count=0;endless_economy_harvest_count=0;endless_economy_max_harvest_cm=0.0
+
+func _record_endless_economy_change(source:String,applied_units:int)->void:
+	if not _is_endless_normal_play():return
+	match source:
+		"endless_seed":
+			if applied_units<0:endless_economy_seed_count+=1;endless_economy_seed_cost_units+=-applied_units
+		"endless_harvest":
+			if applied_units>0:endless_economy_harvest_reward_units+=applied_units
+
+func _endless_economy_debug_summary()->Dictionary:
+	return {
+		"start_puku":float(endless_economy_start_units)/PUKU_UNITS_PER_PUKU,
+		"seeds_used":endless_economy_seed_count,
+		"seed_cost_puku":float(endless_economy_seed_cost_units)/PUKU_UNITS_PER_PUKU,
+		"harvest_revenue_puku":float(endless_economy_harvest_reward_units)/PUKU_UNITS_PER_PUKU,
+		"jellied":endless_economy_jelly_count,
+		"harvested":endless_economy_harvest_count,
+		"max_harvest_cm":snappedf(endless_economy_max_harvest_cm,0.1),
+		"current_puku":float(puku_balance_units)/PUKU_UNITS_PER_PUKU,
+		"greenhouse_net_puku":float(endless_economy_harvest_reward_units-endless_economy_seed_cost_units)/PUKU_UNITS_PER_PUKU,
+		"wallet_net_puku":float(puku_balance_units-endless_economy_start_units)/PUKU_UNITS_PER_PUKU,
+	}
+
+func _log_endless_economy(reason:String)->void:
+	if not (OS.is_debug_build() or _trial_dev_controls_enabled()) or not _is_endless_normal_play():return
+	print("ENDLESS_PUKU_ECONOMY reason=",reason," ",JSON.stringify(_endless_economy_debug_summary()))
 
 func _record_endless_discovery_settlement(harvested:bool,diameter_cm:float=0.0,forced_roll:float=-1.0)->Dictionary:
 	if not _is_endless_normal_play():return {"set_completed":false}
@@ -6591,7 +6702,8 @@ func _apply_jurejure_battle_loss()->Dictionary:
 	for individual_id in taken_ids:
 		if habitat_plant_panel and habitat_plant_panel.visible and str(habitat_plant_panel.individual_id)==individual_id:habitat_plant_panel.close()
 		HabitatWildSystemClass.remove_individual(habitat_wild_plants,individual_id)
-	var puku_lost:=1 if puku_points>0 else 0;puku_points=maxi(0,puku_points-puku_lost)
+	var puku_lost:=1 if _can_afford_puku_units(PUKU_UNITS_PER_PUKU) else 0
+	if puku_lost>0:_change_puku_balance(-PUKU_UNITS_PER_PUKU,"jurejure_battle_loss",false,true)
 	return {"taken_count":taken_ids.size(),"take_ratio":ratio,"puku_lost":puku_lost}
 
 func _on_puku_puku_battle_resolved(result:Dictionary)->void:
@@ -6696,7 +6808,8 @@ func _format_habitat_debug_duration(seconds:int)->String:
 
 func _open_habitat_test_preview()->void:
 	if not habitat_debug_enabled or habitat_dev_panel==null:return
-	intro_story_complete=true;first_colorata_confirmed=true;trio_originals_confirmed=true;total_play_count=maxi(3,total_play_count);formal_play_count=maxi(1,formal_play_count);habitat_unlocked=true;habitat_arrival_started=true;habitat_awakened=true;habitat_awakening_event_complete=true;habitat_tutorial_started=true;habitat_tutorial_complete=true;habitat_tutorial_returned_to_greenhouse=true;seed_shop_open=true;mystery_items_acquired=true;mystery_catalog_tutorial_complete=true;normal_play_tutorial_complete=true;seed_pod_gauge_discovery_complete=true;seed_pod_first_reward_seen=true;initial_seed_stock_notice_complete=true;puku_buyback_tutorial_complete=true;original_catalog_gifted=true;puku_gauge_intro_complete=true;puku_points=maxi(10,puku_points);unlocked_series[ORIGINAL_SERIES_ID]=true
+	intro_story_complete=true;first_colorata_confirmed=true;trio_originals_confirmed=true;total_play_count=maxi(3,total_play_count);formal_play_count=maxi(1,formal_play_count);habitat_unlocked=true;habitat_arrival_started=true;habitat_awakened=true;habitat_awakening_event_complete=true;habitat_tutorial_started=true;habitat_tutorial_complete=true;habitat_tutorial_returned_to_greenhouse=true;seed_shop_open=true;mystery_items_acquired=true;mystery_catalog_tutorial_complete=true;normal_play_tutorial_complete=true;seed_pod_gauge_discovery_complete=true;seed_pod_first_reward_seen=true;initial_seed_stock_notice_complete=true;puku_buyback_tutorial_complete=true;original_catalog_gifted=true;puku_gauge_intro_complete=true;unlocked_series[ORIGINAL_SERIES_ID]=true
+	if puku_balance_units<10000:_change_puku_balance(10000-puku_balance_units,"habitat_test_preview",false,false)
 	for story_species_id in [FIRST_STORY_SPECIES_ID,PANDA_STORY_SPECIES_ID,ARMADILLO_STORY_SPECIES_ID]:habitat_returned_species[story_species_id]=true
 	if opening_overlay:opening_overlay.visible=false
 	current_mode="habitat";_apply_saved_unlocks();_apply_mode();habitat_dev_panel.open();_refresh_habitat_dev_panel();_save();_update_play_ui()
@@ -7125,19 +7238,21 @@ func _on_harvested(p)->void:
 		bests[p.data.species_id]=p.diameter_cm
 		if play_active and (play_share_record.is_empty() or p.diameter_cm>float(play_share_record.get("size",0.0))):play_share_record={"species_id":str(p.data.species_id),"size":p.diameter_cm}
 		_evaluate_best_spawn_unlocks()
-	var effective_puku_cm:=_effective_puku_cm_for_harvest(float(p.diameter_cm),is_new_species_for_puku)
-	var earned_puku:=0;var harvest_screen_position:=camera.unproject_position(p.global_position)
+	var harvest_reward_units:=0;var harvest_screen_position:=camera.unproject_position(p.global_position)
 	if play_active and active_seed_type!="old":
 		if not _is_endless_greenhouse_enabled():add_seed_pod_gauge_cm(p.diameter_cm,false,true)
-		earned_puku=add_puku_coin_gauge_cm(effective_puku_cm,false,true,harvest_screen_position)
+		elif _is_endless_normal_play() and puku_gauge_intro_complete and not bool(p.get_meta("story_dev_101",false)):
+			harvest_reward_units=_harvest_puku_reward_units(float(p.diameter_cm),is_new_species_for_puku)
+			_change_puku_balance(harvest_reward_units,"endless_harvest",false,true,harvest_screen_position)
+			endless_economy_harvest_count+=1;endless_economy_max_harvest_cm=maxf(endless_economy_max_harvest_cm,float(p.diameter_cm))
 	if play_active:StoryProgressionClass.record_greenhouse_harvest(story_progression_state,float(p.diameter_cm))
 	_evaluate_unlock_rules("harvest_size",p.diameter_cm);_update_main_story_progress(false);_save();_update_best_ui();_update_currency_ui();audio_manager.play_se("harvest",.55)
 	if play_active:
-		play_harvest_cm_total+=p.diameter_cm;play_puku_gauge_cm_total+=effective_puku_cm;play_puku_earned_total+=earned_puku;play_harvest_count+=1;play_max_size=maxf(play_max_size,p.diameter_cm)
+		play_harvest_cm_total+=p.diameter_cm;play_puku_reward_units_total+=harvest_reward_units;play_harvest_count+=1;play_max_size=maxf(play_max_size,p.diameter_cm)
 		if not story_old_seed and p.diameter_cm>play_previous_global_best:play_updated_global_best=true
 		var species_id:=str(p.data.species_id);var notable=play_notable_species.get(species_id,{})
 		if notable.is_empty() or p.diameter_cm>float(notable.get("size",0.0)):play_notable_species[species_id]={"name":Localizer.species_name(language_code,_catalog_entry(species_id)),"size":p.diameter_cm}
-	if active_seed_type!="old" and not terminal_first_tutorial_harvest:_show_harvest_result(p,effective_puku_cm)
+	if active_seed_type!="old" and not terminal_first_tutorial_harvest:_show_harvest_result(p,harvest_reward_units)
 	if is_record:_show_record(p)
 	if play_active and active_seed_type=="normal" and normal_play_tutorial_complete and not terminal_first_tutorial_harvest and not puku_buyback_tutorial_complete and not puku_buyback_tutorial_active:call_deferred("_start_puku_buyback_tutorial")
 	if not restoration_snapshot.is_empty():
@@ -7154,6 +7269,7 @@ func _is_terminal_first_tutorial_plant(plant)->bool:
 func _on_jellied(p)->void:
 	if bool(p.get_meta("catalog_preview",false)):_on_catalog_preview_jellied(p);return
 	if _is_endless_normal_play():
+		endless_economy_jelly_count+=1
 		if bool(p.get_meta("endless_forced_new",false)):endless_greenhouse.fail_forced_new(str(p.data.get("species_id","")))
 		_record_endless_discovery_settlement(false,0.0)
 		_save()
@@ -7189,12 +7305,12 @@ func _show_float(p,text:String,color:Color)->void:
 	var l:=Label.new();l.text=text;l.size=Vector2(230,90);l.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;l.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;l.add_theme_font_size_override("font_size",24);l.add_theme_color_override("font_color",color);l.add_theme_color_override("font_outline_color",UI_BROWN);l.add_theme_constant_override("outline_size",7);l.position=camera.unproject_position(p.global_position)-Vector2(115,40);effects_layer.add_child(l)
 	var tw:=create_tween().bind_node(l).set_parallel();tw.tween_property(l,"position:y",l.position.y-85,.62).set_trans(Tween.TRANS_BACK);tw.tween_property(l,"modulate:a",0.0,.62).set_delay(.18);tw.chain().tween_callback(l.queue_free)
 
-func _show_harvest_result(plant,effective_puku_cm:float)->void:
+func _show_harvest_result(plant,reward_units:int)->void:
 	var panel:=PanelContainer.new();panel.name="HarvestResult";panel.size=Vector2(220,142);panel.position=camera.unproject_position(plant.global_position)-Vector2(110,87);panel.pivot_offset=panel.size*.5;panel.scale=Vector2(.78,.78);panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;panel.add_theme_stylebox_override("panel",_box(Color(0.22,0.12,0.07,.92),Color("#f0cc82"),17,2));effects_layer.add_child(panel)
 	var content:=VBoxContainer.new();content.alignment=BoxContainer.ALIGNMENT_CENTER;content.add_theme_constant_override("separation",0);content.mouse_filter=Control.MOUSE_FILTER_IGNORE;panel.add_child(content)
 	var name_label:=Label.new();name_label.text=Localizer.species_name(language_code,plant.data);name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name_label.add_theme_font_size_override("font_size",20);name_label.add_theme_color_override("font_color",Color.WHITE);content.add_child(name_label)
 	var size_label:=Label.new();size_label.name="HarvestSize";size_label.text=Localizer.text(language_code,"harvest_size",[_format_cm(plant.diameter_cm)]);size_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;size_label.add_theme_font_size_override("font_size",18);size_label.add_theme_color_override("font_color",Color.WHITE);content.add_child(size_label)
-	var gauge_label:=Label.new();gauge_label.name="PukuGaugeGain";gauge_label.text=Localizer.text(language_code,"harvest_to_gauge",[_format_cm(effective_puku_cm)]);gauge_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;gauge_label.add_theme_font_size_override("font_size",18);gauge_label.add_theme_color_override("font_color",UI_CREAM);content.add_child(gauge_label)
+	var gauge_label:=Label.new();gauge_label.name="PukuRewardGain";gauge_label.text=Localizer.text(language_code,"harvest_puku_reward",[_format_puku_units(reward_units)]);gauge_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;gauge_label.add_theme_font_size_override("font_size",18);gauge_label.add_theme_color_override("font_color",UI_CREAM);gauge_label.visible=reward_units>0;content.add_child(gauge_label)
 	var tween:=create_tween().bind_node(panel);tween.tween_property(panel,"scale",Vector2.ONE,.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT);tween.tween_interval(1.12);tween.set_parallel(true);tween.tween_property(panel,"position:y",panel.position.y-34,.5).set_trans(Tween.TRANS_QUAD);tween.tween_property(panel,"modulate:a",0.0,.5);tween.set_parallel(false);tween.tween_callback(panel.queue_free)
 
 func _show_record(p)->void:

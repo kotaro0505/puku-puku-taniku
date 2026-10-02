@@ -106,8 +106,7 @@ static func spawn_101cm_colorata(game) -> bool:
 	game.play_spawn_timer = 0.0
 	game.play_concurrent_target = 1
 	game.play_harvest_cm_total = 0.0
-	game.play_puku_gauge_cm_total = 0.0
-	game.play_puku_earned_total = 0
+	game.play_puku_reward_units_total = 0
 	game.play_harvest_count = 0
 	game.play_max_size = 0.0
 	game.play_previous_global_best = game._global_best_size()
@@ -159,7 +158,9 @@ static func _prepare_common_progress(game) -> void:
 	game.formal_play_count = maxi(10, int(game.formal_play_count))
 	game.normal_play_count = maxi(10, int(game.normal_play_count))
 	game.normal_seed_bags = maxi(5, int(game.normal_seed_bags))
-	game.puku_points = maxi(20, int(game.puku_points))
+	var preset_puku_units:int = 20 * int(game.PUKU_UNITS_PER_PUKU)
+	if int(game.puku_balance_units) < preset_puku_units:
+		game._change_puku_balance(preset_puku_units - int(game.puku_balance_units), "story_dev_preset", false, false)
 	game.unlocked_series["base"] = true
 
 	game.act2_unlocked = true
