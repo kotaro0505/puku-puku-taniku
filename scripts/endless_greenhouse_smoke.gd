@@ -553,7 +553,7 @@ func _test_navigation_pause_resume(game: Node) -> void:
 
 func _test_formal_endless_main_features(game: Node) -> void:
 	game.habitat_debug_enabled = false
-	assert(not game._trial_dev_controls_enabled())
+	assert(game._trial_dev_controls_enabled())
 	var trial_balance:Dictionary=game._greenhouse_jelly_balance_for_spawn()
 	assert(is_equal_approx(float(trial_balance.short_weight),35.0))
 	assert(is_equal_approx(float(trial_balance.normal_weight),35.0))
@@ -633,18 +633,23 @@ func _test_formal_endless_main_features(game: Node) -> void:
 	assert(game.find_child("JellyDevOpen",true,false)!=null)
 	assert(game.find_child("StoryDevOpen",true,false)!=null)
 	assert(game.find_child("TrialDevGachaOpen",true,false)!=null)
-	assert(not game.trial_dev_gacha_button.visible)
+	assert(game.find_child("ProgressionDevReset",true,false)!=null)
+	assert(game.find_child("HabitatDevOpen",true,false)!=null)
+	assert(game.find_child("CatalogPreviewDevOpen",true,false)!=null)
+	assert(game.trial_dev_gacha_button.visible)
 	game._open_story_dev()
-	assert(game.story_dev_panel!=null and not game.story_dev_panel.visible)
+	assert(game.story_dev_panel!=null and game.story_dev_panel.visible)
+	game.story_dev_panel.close()
+	game._open_settings()
 	game._open_jelly_dev()
-	assert(not game.jelly_dev_overlay.visible)
-	game._close_settings()
+	assert(game.jelly_dev_overlay.visible)
+	game._close_jelly_dev()
 
 
 func _test_debug_controls_and_gacha(game: Node) -> void:
-	# Explicit debug mode still exposes the development aids; formal ENDLESS alone
-	# no longer grants these controls in production.
-	game.habitat_debug_enabled = true
+	# The single development switch exposes the aids on every platform without
+	# requiring the legacy habitat-debug runtime flag.
+	game.habitat_debug_enabled = false
 	assert(game._trial_dev_controls_enabled())
 	var observer=game.plants[0]
 	observer.jelly_checks_enabled=false
@@ -672,6 +677,7 @@ func _test_debug_controls_and_gacha(game: Node) -> void:
 	debug_balance=game._greenhouse_jelly_balance_for_spawn()
 	assert(is_equal_approx(float(debug_balance.final_chance),.065))
 	game._dev_reset_jelly()
+	assert(not JellyBalanceClass.override_enabled)
 	var production_balance:Dictionary=game._greenhouse_jelly_balance_for_spawn()
 	assert(is_equal_approx(float(production_balance.short_weight),35.0))
 	assert(is_equal_approx(float(production_balance.normal_weight),35.0))
@@ -733,7 +739,7 @@ func _test_debug_controls_and_gacha(game: Node) -> void:
 	game._process(.25)
 	assert(observer.age>age_before_resume)
 	game.habitat_debug_enabled=false
-	assert(not game._trial_dev_controls_enabled())
+	assert(game._trial_dev_controls_enabled())
 
 
 func _test_fusion_lab_flow(game: Node) -> void:
@@ -995,7 +1001,7 @@ func _test_finite_mode_unchanged(game: Node) -> void:
 	game.arrangement_scene_active=false;game.arrangement_transitioning=false
 	game.endless_greenhouse.configure(false)
 	game.habitat_debug_enabled=false
-	assert(not game._trial_dev_controls_enabled())
+	assert(game._trial_dev_controls_enabled())
 	assert(game._greenhouse_jelly_balance_for_spawn().is_empty())
 	assert(is_equal_approx(float(JellyBalanceClass.FORMAL.short_weight),45.0))
 	assert(is_equal_approx(float(JellyBalanceClass.FORMAL.normal_weight),35.0))

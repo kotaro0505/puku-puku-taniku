@@ -38,6 +38,16 @@ func _ready() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	assert(game._is_endless_greenhouse_enabled())
+	# Codemagic/native development builds use the same master gate as Web. The
+	# legacy habitat-debug flag and URL parameters must not control availability.
+	game.habitat_debug_enabled = false
+	assert(game.TRIAL_DEV_CONTROLS_ENABLED)
+	assert(game._trial_dev_controls_enabled())
+	assert(game._trial_dev_controls_enabled_for_context(false))
+	for control_name in ["StoryDevOpen", "ProgressionDevReset", "JellyDevOpen", "TrialDevGachaOpen", "HabitatDevOpen", "OpeningStoryReplay", "CatalogPreviewDevOpen"]:
+		assert(game.find_child(control_name, true, false) != null)
+	assert(game.story_dev_panel != null and game.habitat_dev_panel != null)
+	assert(game.jelly_dev_overlay != null and game.catalog_preview_ui != null)
 	assert(game.habitat_texture_mode == "full")
 	assert(game.habitat_background_mode == "current")
 	game.current_mode = "habitat"
@@ -83,7 +93,7 @@ func _ready() -> void:
 	assert(FileAccess.get_file_as_string(save_probe_path) == "ios-native-save-ok")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(save_probe_path))
 
-	print("IOS_NATIVE_SMOKE_OK endless_default_without_flags=true renderer=gl_compatibility texture=full background=current audio=ogg share=plugin+web-fallback notification=scheduled-local save=user")
+	print("IOS_NATIVE_SMOKE_OK endless_default_without_flags=true trial_dev_controls_without_debug=true renderer=gl_compatibility texture=full background=current audio=ogg share=plugin+web-fallback notification=scheduled-local save=user")
 	game.free()
 	await get_tree().process_frame
 	get_tree().quit()

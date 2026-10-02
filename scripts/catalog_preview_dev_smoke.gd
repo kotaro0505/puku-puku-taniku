@@ -7,8 +7,11 @@ func _ready()->void:
 	await get_tree().process_frame
 	game._reset_progression_state()
 	assert(game.DEVELOPMENT_CATALOG_PREVIEW_ENABLED)
+	game.habitat_debug_enabled=false
+	assert(game._trial_dev_controls_enabled())
 	assert(game.catalog_preview_ui!=null)
 	assert(game.catalog_preview_settings_button!=null)
+	assert(game.catalog_preview_settings_button.name=="CatalogPreviewDevOpen")
 	var settings_panel:Control=game.settings_overlay.get_child(1)
 	assert(settings_panel.position.y+settings_panel.size.y<=get_viewport().get_visible_rect().size.y)
 	var preview_panel:Control=game.catalog_preview_ui.overlay.get_child(1)

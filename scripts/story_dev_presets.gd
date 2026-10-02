@@ -31,7 +31,9 @@ static func available(debug_enabled: bool) -> bool:
 static func _available_for_game(game) -> bool:
 	if game.has_method("_trial_dev_controls_enabled"):
 		return available(bool(game._trial_dev_controls_enabled()))
-	return available(bool(game.habitat_debug_enabled))
+	# Never fall back to an unrelated runtime/debug flag. A caller without the
+	# project's single master-gate method is not authorized to mutate progress.
+	return false
 
 
 static func options() -> Array[Dictionary]:

@@ -11,7 +11,7 @@ func _ready() -> void:
 	await _test_act3_and_crisis_presets()
 	await _test_restoration_and_101cm_presets()
 	await _test_ending_presets()
-	print("STORY_DEV_PRESETS_SMOKE_OK web_trial_always_on=true release_switch=true native_requires_debug=true endless_does_not_grant_debug=true act3_ready=true crisis_ready=7 restoration=0,4 ending=true thank_you=true harvestable_101=true")
+	print("STORY_DEV_PRESETS_SMOKE_OK all_platforms=true release_switch=true habitat_debug_independent=true act3_ready=true crisis_ready=7 restoration=0,4 ending=true thank_you=true harvestable_101=true")
 	get_tree().quit()
 
 
@@ -21,25 +21,46 @@ func _new_game():
 	await get_tree().process_frame
 	await get_tree().process_frame
 	game.audio_manager.apply_settings({"bgm_enabled": false, "se_enabled": false})
-	assert(game.habitat_debug_enabled)
+	assert(game.TRIAL_DEV_CONTROLS_ENABLED)
+	assert(game.DEVELOPMENT_CATALOG_PREVIEW_ENABLED == game.TRIAL_DEV_CONTROLS_ENABLED)
 	assert(game.story_dev_panel != null)
+	assert(game.habitat_dev_panel != null)
+	assert(game.jelly_dev_overlay != null)
+	assert(game.catalog_preview_ui != null)
 	assert(game.find_child("StoryDevOpen", true, false) != null)
+	assert(game.find_child("ProgressionDevReset", true, false) != null)
+	assert(game.find_child("JellyDevOpen", true, false) != null)
+	assert(game.find_child("TrialDevGachaOpen", true, false) != null)
+	assert(game.find_child("HabitatDevOpen", true, false) != null)
+	assert(game.find_child("OpeningStoryReplay", true, false) != null)
+	assert(game.find_child("CatalogPreviewDevOpen", true, false) != null)
 	for preset_id in StoryDevPresetsClass.PRESET_IDS:
 		assert(game.story_dev_panel.find_child("StoryPreset_%s" % preset_id, true, false) != null)
 	assert(game.story_dev_panel.find_child("StoryDevSpawn101", true, false) != null)
 	game.habitat_debug_enabled = false
-	assert(game.TRIAL_DEV_CONTROLS_ENABLED)
+	assert(game._trial_dev_controls_enabled())
 	assert(game._trial_dev_controls_enabled_for_context(true))
-	assert(not game._trial_dev_controls_enabled_for_context(false))
+	assert(game._trial_dev_controls_enabled_for_context(false))
 	game._open_story_dev()
-	assert(not game.story_dev_panel.visible)
+	assert(game.story_dev_panel.visible)
+	game.story_dev_panel.close()
+	game.settings_overlay.visible = true
+	game._open_habitat_dev()
+	assert(game.habitat_dev_panel.visible)
+	assert(not game.settings_overlay.visible)
+	game.habitat_dev_panel.close()
+	var puku_before_units: int = game.puku_balance_units
+	game._adjust_progression_dev_value("puku_coin", 1)
+	assert(game.puku_balance_units == puku_before_units + game.PUKU_UNITS_PER_PUKU)
+	game._adjust_progression_dev_value("puku_coin", -1)
+	assert(game.puku_balance_units == puku_before_units)
 	game.endless_greenhouse.configure(true)
-	assert(not game._trial_dev_controls_enabled())
+	assert(game._trial_dev_controls_enabled())
 	game.settings_overlay.visible = true
 	game._open_story_dev()
-	assert(not game.story_dev_panel.visible)
-	assert(game.settings_overlay.visible)
-	game.habitat_debug_enabled = true
+	assert(game.story_dev_panel.visible)
+	assert(not game.settings_overlay.visible)
+	game.story_dev_panel.close()
 	assert(game._is_endless_greenhouse_enabled())
 	game.settings_overlay.visible = true
 	game._open_story_dev()

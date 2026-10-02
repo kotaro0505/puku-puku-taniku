@@ -39,8 +39,13 @@ const HabitatRestorationClass = preload("res://scripts/habitat_restoration.gd")
 const HabitatRestorationUIClass = preload("res://scripts/habitat_restoration_ui.gd")
 const EndlessGreenhouseExperimentClass = preload("res://scripts/endless_greenhouse_experiment.gd")
 const SlotMachineScene = preload("res://scenes/slot_machine.tscn")
-const DEVELOPMENT_CATALOG_PREVIEW_ENABLED := true
+# Master release gate for every development-only UI and action. Keep this true
+# for Web, Codemagic iOS, and native development builds. The App Store release
+# can disable the whole group by changing this single value to false.
 const TRIAL_DEV_CONTROLS_ENABLED := true
+# Kept as a compatibility alias for existing tests/callers. Catalog preview is
+# deliberately governed by the same release gate instead of a second switch.
+const DEVELOPMENT_CATALOG_PREVIEW_ENABLED := TRIAL_DEV_CONTROLS_ENABLED
 const SECRET_GACHA_PREVIEW_UNLIMITED := true
 const PROGRESSION_VERSION := 28
 const NORMAL_SAVE_PATH := EndlessGreenhouseExperimentClass.NORMAL_SAVE_PATH
@@ -755,6 +760,7 @@ func _ready() -> void:
 	elif _habitat_test_preview_requested():call_deferred("_open_habitat_test_preview")
 
 func _habitat_debug_requested()->bool:
+	if not _trial_dev_controls_enabled():return false
 	if OS.is_debug_build():return true
 	if OS.has_feature("web"):
 		var requested=JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('habitat_debug')",true)
@@ -763,66 +769,77 @@ func _habitat_debug_requested()->bool:
 	return "--habitat-debug" in OS.get_cmdline_user_args()
 
 func _habitat_test_preview_requested()->bool:
+	if not _trial_dev_controls_enabled():return false
 	if OS.has_feature("web"):
 		var requested=JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('screen')",true)
 		return str(requested)=="habitat-test"
 	return "--habitat-test-preview" in OS.get_cmdline_user_args()
 
 func _opening_story_preview_requested()->bool:
+	if not _trial_dev_controls_enabled():return false
 	if OS.has_feature("web"):
 		var requested=JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('screen')",true)
 		return str(requested)=="opening-story"
 	return "--opening-story-preview" in OS.get_cmdline_user_args()
 
 func _seed_pod_story_preview_requested()->bool:
+	if not _trial_dev_controls_enabled():return false
 	if OS.has_feature("web"):
 		var requested=JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('screen')",true)
 		return str(requested)=="seed-pod-story"
 	return "--seed-pod-story-preview" in OS.get_cmdline_user_args()
 
 func _slot_preview_requested() -> bool:
+	if not _trial_dev_controls_enabled():return false
 	if OS.has_feature("web"):
 		var requested = JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('screen')", true)
 		return str(requested) == "slot"
 	return "--slot-preview" in OS.get_cmdline_user_args()
 
 func _arrangement_test_preview_requested()->bool:
+	if not _trial_dev_controls_enabled():return false
 	if OS.has_feature("web"):
 		var requested=JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('screen')",true)
 		return str(requested)=="arrangement-test"
 	return "--arrangement-test-preview" in OS.get_cmdline_user_args()
 
 func _forest_gacha_preview_requested()->bool:
+	if not _trial_dev_controls_enabled():return false
 	if OS.has_feature("web"):
 		var requested=JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('screen')",true)
 		return str(requested)=="forest-gacha"
 	return "--forest-gacha-preview" in OS.get_cmdline_user_args()
 
 func _secret_gacha_preview_requested()->bool:
+	if not _trial_dev_controls_enabled():return false
 	if OS.has_feature("web"):
 		var requested=JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('screen')",true)
 		return str(requested)=="secret-gacha"
 	return "--secret-gacha-preview" in OS.get_cmdline_user_args()
 
 func _jurejure_habitat_preview_requested()->bool:
+	if not _trial_dev_controls_enabled():return false
 	if OS.has_feature("web"):
 		var requested=JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('screen')",true)
 		return str(requested)=="jurejure-habitat"
 	return "--jurejure-habitat-preview" in OS.get_cmdline_user_args()
 
 func _puku_puku_battle_preview_requested()->bool:
+	if not _trial_dev_controls_enabled():return false
 	if OS.has_feature("web"):
 		var requested=JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('screen')",true)
 		return str(requested)=="puku-puku-battle"
 	return "--puku-puku-battle-preview" in OS.get_cmdline_user_args()
 
 func _configure_habitat_texture_ab()->void:
+	if not _trial_dev_controls_enabled():return
 	if OS.has_feature("web"):
 		var requested=JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('habitat_texture')",true)
 		habitat_texture_mode="thumb" if str(requested)=="thumb" else "full"
 	print("HABITAT_TEXTURE_AB mode=",habitat_texture_mode)
 
 func _configure_habitat_background_ab()->void:
+	if not _trial_dev_controls_enabled():return
 	if OS.has_feature("web"):
 		var requested=JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('habitat_background')",true)
 		habitat_background_mode=str(requested) if str(requested) in ["no_sky","panorama_mesh"] else "current"
@@ -1146,13 +1163,12 @@ func _is_endless_greenhouse_enabled()->bool:
 	return endless_greenhouse.enabled
 
 func _trial_dev_controls_enabled()->bool:
-	return _trial_dev_controls_enabled_for_context(OS.has_feature("web"))
+	return TRIAL_DEV_CONTROLS_ENABLED
 
-func _trial_dev_controls_enabled_for_context(is_web_build:bool)->bool:
-	# Keep one release switch for the whole trial-only group. While it is enabled,
-	# Web trial builds expose the controls without a URL parameter; native builds
-	# still require their existing explicit debug mode.
-	return TRIAL_DEV_CONTROLS_ENABLED and (is_web_build or habitat_debug_enabled)
+func _trial_dev_controls_enabled_for_context(_is_web_build:bool)->bool:
+	# Compatibility seam for existing smoke tests and callers. Platform and URL
+	# parameters intentionally do not participate in the decision anymore.
+	return _trial_dev_controls_enabled()
 
 func _is_endless_normal_play()->bool:
 	return _is_endless_greenhouse_enabled() and play_active and active_seed_type=="normal"
@@ -1161,8 +1177,8 @@ func _endless_puku_economy_active()->bool:
 	return _is_endless_normal_play() and puku_gauge_intro_complete
 
 func _greenhouse_jelly_balance_for_spawn()->Dictionary:
-	# An explicit developer override must win so the habitat_debug jelly controls
-	# affect newly spawned plants during the formal ENDLESS flow as intended.
+	# An explicit developer override must win while the unified development gate
+	# is enabled so device builds can exercise the same tuning controls as Web.
 	if _trial_dev_controls_enabled() and JellyBalanceClass.override_enabled:
 		return JellyBalanceClass.effective().duplicate(true)
 	# Production ENDLESS plants keep their formal resistance mix. Every other
@@ -1651,7 +1667,7 @@ func _build_ui() -> void:
 		else:settings_button=b;b.pressed.connect(_open_settings)
 	mode_button=Button.new();mode_button.text="原生地";mode_button.position=Vector2(398,198);mode_button.size=Vector2(153,55);_skin_button(mode_button,Color("#fff0cf"),16);mode_button.mouse_filter=Control.MOUSE_FILTER_STOP;mode_button.pressed.connect(_toggle_mode);hud.add_child(mode_button)
 	external_navigation_controls.append(mode_button)
-	if habitat_debug_enabled:
+	if _trial_dev_controls_enabled():
 		habitat_dev_open_button=Button.new();habitat_dev_open_button.name="HabitatDevQuickOpen";habitat_dev_open_button.text="原生地テスト";habitat_dev_open_button.position=Vector2(398,262);habitat_dev_open_button.size=Vector2(153,55);_skin_button(habitat_dev_open_button,Color("#adcbb8"),15);habitat_dev_open_button.mouse_filter=Control.MOUSE_FILTER_STOP;habitat_dev_open_button.pressed.connect(_open_habitat_dev);hud.add_child(habitat_dev_open_button)
 	shop_button=Button.new();shop_button.text="おみせ";shop_button.position=Vector2(398,262);shop_button.size=Vector2(153,55);_skin_button(shop_button,Color("#fff0cf"),16);shop_button.mouse_filter=Control.MOUSE_FILTER_STOP;shop_button.pressed.connect(_open_shop);hud.add_child(shop_button)
 	external_navigation_controls.append(shop_button)
@@ -1680,8 +1696,8 @@ func _build_ui() -> void:
 	_build_species_get_overlay(hud)
 	_build_catalog_series_unlock_overlay(hud)
 	_build_fusion_lab_ui(hud)
-	if DEVELOPMENT_CATALOG_PREVIEW_ENABLED:_build_catalog_preview_dev(hud)
-	_build_jelly_dev_overlay(hud)
+	if DEVELOPMENT_CATALOG_PREVIEW_ENABLED and _trial_dev_controls_enabled():_build_catalog_preview_dev(hud)
+	if _trial_dev_controls_enabled():_build_jelly_dev_overlay(hud)
 	_build_intro_story(hud)
 	_build_tutorial_guide(hud)
 	_build_opening_screen(hud)
@@ -1695,7 +1711,7 @@ func _build_ui() -> void:
 	_build_jurejure_first_encounter(hud)
 	_build_puku_puku_battle(hud)
 	_build_scene_transition_fade(hud)
-	if habitat_debug_enabled:
+	if _trial_dev_controls_enabled():
 		_build_habitat_dev_panel(hud)
 	if _trial_dev_controls_enabled():
 		_build_story_dev_panel(hud)
@@ -1828,9 +1844,11 @@ func _on_opening_story_finished(as_replay:bool)->void:
 	_continue_after_opening()
 
 func _replay_opening_story_for_development()->void:
+	if not _trial_dev_controls_enabled():return
 	_start_opening_story(true)
 
 func _open_opening_story_preview()->void:
+	if not _trial_dev_controls_enabled():return
 	if opening_overlay:opening_overlay.visible=false
 	if intro_overlay:intro_overlay.visible=false
 	if shop_overlay:shop_overlay.visible=false
@@ -1838,6 +1856,7 @@ func _open_opening_story_preview()->void:
 	_start_opening_story(true)
 
 func _open_seed_pod_story_preview()->void:
+	if not _trial_dev_controls_enabled():return
 	if opening_overlay:opening_overlay.visible=false
 	if intro_overlay:intro_overlay.visible=false
 	if shop_overlay:shop_overlay.visible=false
@@ -3073,7 +3092,7 @@ func _build_settings(hud:Control)->void:
 	_add_audio_setting_controls(content,Localizer.text(language_code,"audio_bgm"),true)
 	_add_audio_setting_controls(content,Localizer.text(language_code,"audio_se"),false)
 	var note:=Label.new();note.name="AudioSettingsNote";note.text=Localizer.text(language_code,"audio_note");note.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;note.add_theme_font_size_override("font_size",14);note.add_theme_color_override("font_color",Color("#76513b"));content.add_child(note)
-	if habitat_debug_enabled:
+	if _trial_dev_controls_enabled():
 		var habitat_test:=Button.new();habitat_test.name="HabitatDevOpen";habitat_test.text="開発用：通常原生地テスト";habitat_test.custom_minimum_size=Vector2(370,58);_skin_button(habitat_test,Color("#adcbb8"),16);habitat_test.pressed.connect(_open_habitat_dev);content.add_child(habitat_test)
 		var opening_story_replay:=Button.new();opening_story_replay.name="OpeningStoryReplay";opening_story_replay.text="開発用：オープニングストーリー再表示";opening_story_replay.custom_minimum_size=Vector2(370,58);_skin_button(opening_story_replay,Color("#d8c29e"),15);opening_story_replay.pressed.connect(_replay_opening_story_for_development);content.add_child(opening_story_replay)
 	if _trial_dev_controls_enabled():
@@ -3083,8 +3102,8 @@ func _build_settings(hud:Control)->void:
 		_add_progression_dev_counter(content,"puku_coin","ぷくコイン")
 		var jelly_test:=Button.new();jelly_test.name="JellyDevOpen";jelly_test.text="開発用：ジュレテスト";jelly_test.custom_minimum_size=Vector2(370,58);_skin_button(jelly_test,Color("#c7b4d9"),17);jelly_test.pressed.connect(_open_jelly_dev);content.add_child(jelly_test)
 		trial_dev_gacha_button=Button.new();trial_dev_gacha_button.name="TrialDevGachaOpen";trial_dev_gacha_button.text="開発用：品種ガチャ";trial_dev_gacha_button.custom_minimum_size=Vector2(370,58);_skin_button(trial_dev_gacha_button,Color("#d9c77d"),17);trial_dev_gacha_button.pressed.connect(_open_trial_dev_forest_gacha);trial_dev_gacha_button.visible=_is_endless_greenhouse_enabled() and _trial_dev_controls_enabled();content.add_child(trial_dev_gacha_button)
-		if DEVELOPMENT_CATALOG_PREVIEW_ENABLED and habitat_debug_enabled:
-			catalog_preview_settings_button=Button.new();catalog_preview_settings_button.text="開発用：品種プレビュー";catalog_preview_settings_button.custom_minimum_size=Vector2(370,58);_skin_button(catalog_preview_settings_button,Color("#c7d6ad"),17);catalog_preview_settings_button.pressed.connect(_open_catalog_preview_dev);content.add_child(catalog_preview_settings_button)
+		if DEVELOPMENT_CATALOG_PREVIEW_ENABLED:
+			catalog_preview_settings_button=Button.new();catalog_preview_settings_button.name="CatalogPreviewDevOpen";catalog_preview_settings_button.text="開発用：品種プレビュー";catalog_preview_settings_button.custom_minimum_size=Vector2(370,58);_skin_button(catalog_preview_settings_button,Color("#c7d6ad"),17);catalog_preview_settings_button.pressed.connect(_open_catalog_preview_dev);content.add_child(catalog_preview_settings_button)
 	settings_close_button=Button.new();settings_close_button.text="閉じる";settings_close_button.custom_minimum_size=Vector2(280,55);_skin_button(settings_close_button,Color("#ead8b1"),18);settings_close_button.pressed.connect(_close_settings);content.add_child(settings_close_button)
 	_refresh_progression_dev_counters()
 
@@ -3093,6 +3112,7 @@ func _build_habitat_plant_panel(hud:Control)->void:
 	habitat_plant_panel.close_requested.connect(_update_play_ui)
 
 func _build_habitat_dev_panel(hud:Control)->void:
+	if not _trial_dev_controls_enabled():return
 	habitat_dev_panel=HabitatDevPanelClass.new();hud.add_child(habitat_dev_panel)
 	habitat_dev_panel.random_reset_requested.connect(_debug_reset_normal_habitat)
 	habitat_dev_panel.multiplier_requested.connect(_debug_set_habitat_multiplier)
@@ -3100,6 +3120,7 @@ func _build_habitat_dev_panel(hud:Control)->void:
 	habitat_dev_panel.close_requested.connect(_update_play_ui)
 
 func _build_story_dev_panel(hud:Control)->void:
+	if not _trial_dev_controls_enabled():return
 	story_dev_panel=StoryDevPanelClass.new();hud.add_child(story_dev_panel)
 	story_dev_panel.preset_requested.connect(_apply_story_dev_preset)
 	story_dev_panel.spawn_101_requested.connect(_spawn_story_dev_101_colorata)
@@ -3126,7 +3147,7 @@ func _spawn_story_dev_101_colorata()->void:
 	if StoryDevPresetsClass.spawn_101cm_colorata(self):_apply_mode();_update_play_ui()
 
 func _open_habitat_dev()->void:
-	if not habitat_debug_enabled or habitat_dev_panel==null:return
+	if not _trial_dev_controls_enabled() or habitat_dev_panel==null:return
 	settings_overlay.visible=false
 	habitat_dev_panel.open();_refresh_habitat_dev_panel();_update_play_ui()
 
@@ -3137,6 +3158,7 @@ func _add_progression_dev_counter(parent:VBoxContainer,key:String,title:String)-
 		var button:=Button.new();button.text="−1" if delta<0 else "+1";button.custom_minimum_size=Vector2(64,42);_skin_button(button,Color("#d9c49d"),16);button.pressed.connect(_adjust_progression_dev_value.bind(key,delta));row.add_child(button)
 
 func _adjust_progression_dev_value(key:String,delta:int)->void:
+	if not _trial_dev_controls_enabled():return
 	if key=="old_page":
 		if delta>0:_grant_old_catalog_page(delta,true)
 		else:_remove_old_catalog_page(-delta)
@@ -3184,6 +3206,7 @@ func _close_research_catalog_reward()->void:
 	research_catalog_reward_overlay.visible=false;_update_play_ui()
 
 func _build_catalog_preview_dev(hud:Control)->void:
+	if not _trial_dev_controls_enabled() or not DEVELOPMENT_CATALOG_PREVIEW_ENABLED:return
 	catalog_preview_ui=CatalogPreviewDevClass.new();hud.add_child(catalog_preview_ui)
 	catalog_preview_ui.preview_species_requested.connect(_preview_catalog_species)
 	catalog_preview_ui.preview_batch_requested.connect(_preview_catalog_batch)
@@ -3192,15 +3215,16 @@ func _build_catalog_preview_dev(hud:Control)->void:
 	catalog_preview_ui.configure(catalog_species,series_catalog)
 
 func _open_catalog_preview_dev()->void:
-	if not DEVELOPMENT_CATALOG_PREVIEW_ENABLED or catalog_preview_ui==null or play_active or arrangement_scene_active:return
+	if not _trial_dev_controls_enabled() or not DEVELOPMENT_CATALOG_PREVIEW_ENABLED or catalog_preview_ui==null or play_active or arrangement_scene_active:return
 	settings_overlay.visible=false;play_modal_open=false;current_mode="greenhouse";_apply_mode()
 	catalog_preview_ui.configure(catalog_species,series_catalog);catalog_preview_ui.open();_update_play_ui()
 
 func _preview_catalog_species(species_id:String)->void:
+	if not _trial_dev_controls_enabled():return
 	_preview_catalog_batch([species_id],str(_catalog_entry(species_id).get("name_ja",species_id)))
 
 func _preview_catalog_batch(species_ids:Array,_series_name:String)->void:
-	if not DEVELOPMENT_CATALOG_PREVIEW_ENABLED:return
+	if not _trial_dev_controls_enabled() or not DEVELOPMENT_CATALOG_PREVIEW_ENABLED:return
 	_clear_catalog_preview_plants(false)
 	catalog_preview_mode_active=true
 	for species_id_value in species_ids:_spawn_specific_plant(str(species_id_value),true)
@@ -3223,6 +3247,7 @@ func _clear_catalog_preview_plants(update_ui:=true)->void:
 	if update_ui:_update_play_ui()
 
 func _build_jelly_dev_overlay(hud:Control)->void:
+	if not _trial_dev_controls_enabled():return
 	jelly_dev_overlay=Control.new();jelly_dev_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);jelly_dev_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;jelly_dev_overlay.visible=false;hud.add_child(jelly_dev_overlay)
 	var shade:=ColorRect.new();shade.color=Color(0.08,0.04,0.03,.78);shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);shade.mouse_filter=Control.MOUSE_FILTER_STOP;jelly_dev_overlay.add_child(shade)
 	var panel:=PanelContainer.new();panel.position=Vector2(18,28);panel.size=Vector2(540,968);panel.add_theme_stylebox_override("panel",_box(Color("#f7e8c7"),Color("#8f633b"),24,4));jelly_dev_overlay.add_child(panel)
@@ -3259,9 +3284,11 @@ func _open_jelly_dev()->void:
 	JellyBalanceClass.begin_test_defaults();JellyBalanceClass.override_enabled=true;settings_overlay.visible=false;jelly_dev_overlay.visible=true;_refresh_jelly_dev_ui();_update_play_ui()
 
 func _close_jelly_dev()->void:
+	if jelly_dev_overlay==null:return
 	jelly_dev_overlay.visible=false;_update_play_ui()
 
 func _change_jelly_dev_value(key:String,delta:float)->void:
+	if not _trial_dev_controls_enabled():return
 	var value:=float(JellyBalanceClass.values[key])+delta
 	if key.ends_with("_weight") or key in ["slow_short_rate","slow_resilient_rate","regular_short_resilient_rate"]:value=clampf(value,0.0,100.0)
 	elif key in ["final_chance","resilient_final_chance"]:value=clampf(value,.0,.50)
@@ -3291,21 +3318,26 @@ func _refresh_jelly_dev_ui()->void:
 	jelly_dev_total_label.add_theme_color_override("font_color",Color("#47713b") if is_equal_approx(total,100.0) else Color("#b33b31"))
 
 func _dev_add_seed_bag()->void:
+	if not _trial_dev_controls_enabled():return
 	normal_seed_bags+=1;_update_play_ui();_save()
 
 func _dev_reset_jelly()->void:
+	if not _trial_dev_controls_enabled():return
 	JellyBalanceClass.reset_formal();jelly_trait_display_enabled=false
 	if dev_jelly_test_active:
 		dev_jelly_test_active=false;_clear_greenhouse_plants();active_seed_type="normal"
 	_refresh_jelly_dev_ui();_update_play_ui()
 
 func _dev_apply_prediction_v1()->void:
+	if not _trial_dev_controls_enabled():return
 	JellyBalanceClass.apply_prediction_v1_test_values();_refresh_jelly_dev_ui()
 
 func _toggle_jelly_trait_display()->void:
+	if not _trial_dev_controls_enabled():return
 	jelly_trait_display_enabled=not jelly_trait_display_enabled;_refresh_jelly_dev_ui();_update_labels()
 
 func _dev_spawn_50cm()->void:
+	if not _trial_dev_controls_enabled():return
 	JellyBalanceClass.override_enabled=true;dev_jelly_test_active=true;last_jelly_claim_msec=-1000000000
 	jelly_dev_overlay.visible=false;settings_overlay.visible=false;current_mode="greenhouse";_apply_mode();_clear_greenhouse_plants();play_active=false;active_seed_type="dev_jelly";play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0
 	for i in range(4):
@@ -3505,6 +3537,7 @@ func _open_forest_gacha()->void:
 	play_modal_open=false;play_overlay.visible=false;forest_gacha_ui.open_gacha(puku_points,forest_gacha_draw_count);audio_manager.play_bgm("shop");_update_play_ui()
 
 func _open_forest_gacha_preview()->void:
+	if not _trial_dev_controls_enabled():return
 	forest_gacha_preview_mode=true;forest_gacha_trial_dev_mode=false;forest_gacha_preview_puku_points=10;forest_gacha_preview_draw_count=0;forest_gacha_preview_discovered={FIRST_STORY_SPECIES_ID:true};forest_gacha_preview_encountered={}
 	if opening_overlay:opening_overlay.visible=false
 	if intro_overlay:intro_overlay.visible=false
@@ -3524,6 +3557,7 @@ func _open_trial_dev_forest_gacha()->void:
 	_update_play_ui()
 
 func _open_arrangement_test_preview()->void:
+	if not _trial_dev_controls_enabled():return
 	if opening_overlay:opening_overlay.visible=false
 	if intro_overlay:intro_overlay.visible=false
 	if shop_overlay:shop_overlay.visible=false
@@ -3535,6 +3569,7 @@ func _open_arrangement_test_preview()->void:
 	_sync_arrangement_ui();arrangement_ui.set_world_backdrop_mode(false,_arrangement_pot_anchor_screen());arrangement_ui.open_home();arrangement_ui._start_new_arrangement();arrangement_ui._select_editor_pot("shallow_terracotta");arrangement_ui._add_species_to_editor(preview_species_id);_update_play_ui()
 
 func _open_secret_gacha_preview()->void:
+	if not _trial_dev_controls_enabled():return
 	secret_gacha_active=true;secret_gacha_draws_remaining=secret_gacha_system.setting_int("max_draws_per_event",3)
 	if puku_balance_units<10000:_change_puku_balance(10000-puku_balance_units,"secret_gacha_preview",false,false)
 	if opening_overlay:opening_overlay.visible=false
@@ -3544,6 +3579,7 @@ func _open_secret_gacha_preview()->void:
 	secret_gacha_ui.open_gacha(puku_points,secret_gacha_draws_remaining,SECRET_GACHA_PREVIEW_UNLIMITED);audio_manager.play_bgm("shop");_update_play_ui()
 
 func _prepare_jurejure_preview_state()->void:
+	if not _trial_dev_controls_enabled():return
 	if opening_overlay:opening_overlay.visible=false
 	if opening_story_overlay:opening_story_overlay.visible=false
 	if intro_overlay:intro_overlay.visible=false
@@ -3556,11 +3592,13 @@ func _prepare_jurejure_preview_state()->void:
 	current_mode="habitat";_apply_saved_unlocks();_apply_mode();_update_play_ui()
 
 func _open_jurejure_habitat_preview()->void:
+	if not _trial_dev_controls_enabled():return
 	# Browser-only visual QA route; normal visits still choose a random safe point.
 	jurejure_habitat_visit_point=Vector2(640,418)
 	_prepare_jurejure_preview_state()
 
 func _open_puku_puku_battle_preview()->void:
+	if not _trial_dev_controls_enabled():return
 	_prepare_jurejure_preview_state()
 	_start_puku_puku_battle()
 
@@ -3572,6 +3610,7 @@ func _close_forest_gacha()->void:
 func _spin_forest_gacha()->void:
 	if forest_gacha_ui==null or not forest_gacha_ui.visible or forest_gacha_ui.is_busy():return
 	if forest_gacha_preview_mode:
+		if not _trial_dev_controls_enabled():return
 		if forest_gacha_preview_puku_points<FOREST_GACHA_SPIN_COST:return
 		var preview_next:=forest_gacha_preview_draw_count+1
 		var preview_result:Dictionary=forest_gacha_system.draw({INITIAL_SERIES_ID:true},forest_gacha_preview_discovered,forest_gacha_preview_encountered,forest_gacha_rng)
@@ -3582,6 +3621,7 @@ func _spin_forest_gacha()->void:
 		forest_gacha_preview_discovered[preview_species_id]=true
 		forest_gacha_ui.set_wallet(forest_gacha_preview_puku_points,forest_gacha_preview_draw_count);var preview_entry:Dictionary=preview_result.get("species_entry",{});var preview_texture:=_species_texture(preview_entry);forest_gacha_ui.play_spin(preview_result,preview_texture if preview_texture!=null else CatalogImageLoader.placeholder_texture);return
 	if forest_gacha_trial_dev_mode:
+		if not _trial_dev_controls_enabled():return
 		var trial_next:=forest_gacha_draw_count+1
 		var trial_result:Dictionary=forest_gacha_system.draw(unlocked_series,discovered,forest_gacha_encountered,forest_gacha_rng,StoryProgressionClass.fantasy_is_unlocked(story_progression_state),jurejure_species_unlocked)
 		if trial_result.is_empty():return
@@ -3778,6 +3818,7 @@ func _reset_progression_state()->void:
 	normal_play_count=0;shop_visit_count=0;hidden_species_acquired.clear();tovar_next_play=TOVAR_FIRST_PLAY;tovar_attempt_count=0;tovar_event_active=false;tovar_harvested_this_play=false;armadillo_present=false;_save()
 
 func _reset_progression_for_development(button:Button)->void:
+	if not _trial_dev_controls_enabled():return
 	_reset_progression_state();button.text="リセットしました（再読み込みしてください）"
 
 func _build_result_overlay(hud:Control)->void:
@@ -3964,7 +4005,7 @@ func _prepare_armadillo_series_gift()->void:
 	_save()
 
 func _spawn_specific_plant(species_id:String,is_catalog_preview:=false)->void:
-	if is_catalog_preview and not DEVELOPMENT_CATALOG_PREVIEW_ENABLED:return
+	if is_catalog_preview and (not _trial_dev_controls_enabled() or not DEVELOPMENT_CATALOG_PREVIEW_ENABLED):return
 	var chosen:=_catalog_entry(species_id)
 	if chosen.is_empty():return
 	var spawn_rng:=catalog_preview_rng if is_catalog_preview else rng
@@ -4015,7 +4056,7 @@ func _update_play_ui()->void:
 	# Keep the existing ENDLESS habitat return route available while greenhouse
 	# simulation is paused outside the greenhouse.
 	if mode_button:mode_button.visible=(not play_active or _is_endless_normal_play()) and not arrangement_navigation_suspended and habitat_unlocked
-	if habitat_dev_open_button:habitat_dev_open_button.visible=current_mode=="habitat" and not play_active and not arrangement_navigation_suspended
+	if habitat_dev_open_button:habitat_dev_open_button.visible=_trial_dev_controls_enabled() and current_mode=="habitat" and not play_active and not arrangement_navigation_suspended
 	if shop_button:shop_button.visible=(not play_active or _is_endless_normal_play()) and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete()
 	if forest_gacha_button:forest_gacha_button.visible=(not play_active or _is_endless_normal_play()) and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete() and forest_gacha_unlocked and forest_gacha_intro_seen
 	if fusion_lab_button:fusion_lab_button.visible=(not play_active or _is_endless_normal_play()) and not arrangement_navigation_suspended and current_mode=="greenhouse" and _fusion_lab_available()
@@ -6592,7 +6633,7 @@ func _update_habitat_wild_growth(delta:float)->void:
 	if habitat_wild_update_accumulator<1.0:return
 	var elapsed_real:=habitat_wild_update_accumulator;habitat_wild_update_accumulator=0.0
 	var wall_now:=Time.get_unix_time_from_system();var target_unix:=wall_now
-	if habitat_debug_enabled and habitat_time_multiplier>1:target_unix+=elapsed_real*float(habitat_time_multiplier-1)
+	if _trial_dev_controls_enabled() and habitat_time_multiplier>1:target_unix+=elapsed_real*float(habitat_time_multiplier-1)
 	var result:=_ensure_habitat_wild_state(target_unix,habitat_time_multiplier==1)
 	if target_unix>wall_now:_rebase_habitat_clock(target_unix-wall_now)
 	var event_changed:bool=not result.get("jellied",[]).is_empty()
@@ -6772,7 +6813,7 @@ func _refresh_habitat_dev_panel()->void:
 	habitat_dev_panel.refresh({"multiplier":habitat_time_multiplier,"population":habitat_wild_plants.size(),"max_population":HabitatWildSystemClass.MAX_POPULATION,"settled_count":_habitat_population_candidate_ids().size()},habitat_wild_plants,Callable(self,"_habitat_species_name"),Time.get_unix_time_from_system(),habitat_debug_log)
 
 func _debug_reset_normal_habitat()->void:
-	if not habitat_debug_enabled:return
+	if not _trial_dev_controls_enabled():return
 	_clear_active_jurejure_event(false)
 	_cancel_all_habitat_notifications()
 	habitat_wild_plants.clear();habitat_wild_initialized=false;habitat_wild_next_spawn_unix=0.0
@@ -6781,11 +6822,11 @@ func _debug_reset_normal_habitat()->void:
 	_record_habitat_debug_event("原生地の個体だけをランダムリセットしました")
 
 func _debug_set_habitat_multiplier(multiplier:int)->void:
-	if not habitat_debug_enabled or multiplier not in HABITAT_TIME_MULTIPLIERS:return
+	if not _trial_dev_controls_enabled() or multiplier not in HABITAT_TIME_MULTIPLIERS:return
 	habitat_time_multiplier=multiplier;_record_habitat_debug_event("時間倍率を ×%d に変更"%multiplier)
 
 func _debug_jump_habitat_time(seconds:int)->void:
-	if not habitat_debug_enabled or seconds<=0:return
+	if not _trial_dev_controls_enabled() or seconds<=0:return
 	var wall_now:=Time.get_unix_time_from_system()
 	_ensure_habitat_wild_state(wall_now,false)
 	var target:=wall_now+float(seconds)
@@ -6807,7 +6848,7 @@ func _format_habitat_debug_duration(seconds:int)->String:
 	return "%d時間"%(seconds/3600)
 
 func _open_habitat_test_preview()->void:
-	if not habitat_debug_enabled or habitat_dev_panel==null:return
+	if not _trial_dev_controls_enabled() or habitat_dev_panel==null:return
 	intro_story_complete=true;first_colorata_confirmed=true;trio_originals_confirmed=true;total_play_count=maxi(3,total_play_count);formal_play_count=maxi(1,formal_play_count);habitat_unlocked=true;habitat_arrival_started=true;habitat_awakened=true;habitat_awakening_event_complete=true;habitat_tutorial_started=true;habitat_tutorial_complete=true;habitat_tutorial_returned_to_greenhouse=true;seed_shop_open=true;mystery_items_acquired=true;mystery_catalog_tutorial_complete=true;normal_play_tutorial_complete=true;seed_pod_gauge_discovery_complete=true;seed_pod_first_reward_seen=true;initial_seed_stock_notice_complete=true;puku_buyback_tutorial_complete=true;original_catalog_gifted=true;puku_gauge_intro_complete=true;unlocked_series[ORIGINAL_SERIES_ID]=true
 	if puku_balance_units<10000:_change_puku_balance(10000-puku_balance_units,"habitat_test_preview",false,false)
 	for story_species_id in [FIRST_STORY_SPECIES_ID,PANDA_STORY_SPECIES_ID,ARMADILLO_STORY_SPECIES_ID]:habitat_returned_species[story_species_id]=true
