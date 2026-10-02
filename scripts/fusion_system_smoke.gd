@@ -56,7 +56,7 @@ func _ready() -> void:
 	await _test_tier2_game_flow(game)
 	game._reset_progression_state()
 	game.queue_free()
-	print("FUSION_SYSTEM_SMOKE_OK basic_species=55 basic_recipes=55 tier1_species=20 tier1_special=20 tier2_species=10 tier2_exact=5 tier2_series=5 transparent_images=85 unordered=true originals=fallback exact_then_series_special=priority parents=GET_only cost=atomic silhouette=species_specific double_submit=blocked seeds=after_GET languages=3")
+	print("FUSION_SYSTEM_SMOKE_OK basic_species=55 basic_recipes=55 tier1_species=20 tier1_special=20 tier2_species=10 tier2_exact=5 tier2_series=5 transparent_images=85 picker_touch_contract=true unordered=true originals=fallback exact_then_series_special=priority parents=GET_only cost=atomic silhouette=species_specific double_submit=blocked seeds=after_GET languages=3")
 	get_tree().quit()
 
 func _test_catalog_and_recipes(game) -> void:
@@ -357,6 +357,11 @@ func _test_game_flow(game) -> void:
 	assert(game.fusion_system.eligible_parents(game.species_get_counts).size() == 4)
 	game._open_fusion_lab()
 	assert(game.fusion_lab_ui.visible and game.fusion_lab_ui.candidates.size() == 4)
+	await _test_parent_picker_touch_scrolling(game)
+	game.fusion_parent_a_id = ""
+	game.fusion_parent_b_id = ""
+	game.fusion_lab_ui.close_lab()
+	game._open_fusion_lab()
 	game._on_fusion_parent_selected(0, gummy_id)
 	game._on_fusion_parent_selected(1, metal_id)
 	await get_tree().process_frame
@@ -446,6 +451,47 @@ func _test_game_flow(game) -> void:
 	assert(game._species_get_count(hybrid_id) == 2)
 	assert(bool(game.discovered.get(hybrid_id, false)) and bool(game.greenhouse_available.get(hybrid_id, false)))
 	hybrid_entry.erase("fusion_cost_puku")
+
+func _test_parent_picker_touch_scrolling(game) -> void:
+	var scroll_candidates: Array[Dictionary] = []
+	for entry_value in game.fusion_lab_ui.candidates:
+		if entry_value is Dictionary:
+			scroll_candidates.append((entry_value as Dictionary).duplicate(true))
+	for entry_value in game.catalog_species:
+		if not (entry_value is Dictionary):
+			continue
+		var entry := entry_value as Dictionary
+		var species_id := str(entry.get("species_id", ""))
+		if species_id.is_empty() or scroll_candidates.any(func(candidate: Dictionary) -> bool: return str(candidate.get("species_id", "")) == species_id):
+			continue
+		scroll_candidates.append(entry.duplicate(true))
+		if scroll_candidates.size() == 12:
+			break
+	assert(scroll_candidates.size() == 12)
+	game.fusion_lab_ui.open_lab(scroll_candidates, game.species_get_counts)
+	game.fusion_lab_ui._open_picker(0)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var picker_scroll: ScrollContainer = game.fusion_lab_ui.picker_scroll
+	assert(picker_scroll.scroll_deadzone == 12)
+	assert(picker_scroll.mouse_filter == Control.MOUSE_FILTER_STOP)
+	assert(game.fusion_lab_ui.picker_grid.mouse_filter == Control.MOUSE_FILTER_PASS)
+	assert(picker_scroll.get_v_scroll_bar().max_value > picker_scroll.size.y)
+	var first_card := game.fusion_lab_ui.picker_grid.get_child(0) as Button
+	assert(first_card != null)
+	assert(first_card.action_mode == BaseButton.ACTION_MODE_BUTTON_RELEASE)
+	assert(first_card.mouse_filter == Control.MOUSE_FILTER_PASS)
+	assert(first_card.mouse_force_pass_scroll_events)
+	var first_species_id := str(first_card.get_meta("species_id", ""))
+	picker_scroll.scroll_vertical = 100000
+	await get_tree().process_frame
+	assert(picker_scroll.scroll_vertical > 0)
+	assert(game.fusion_lab_ui.picker_page.visible)
+	assert(game.fusion_parent_a_id.is_empty())
+	first_card.pressed.emit()
+	await get_tree().process_frame
+	assert(game.fusion_parent_a_id == first_species_id)
+	assert(game.fusion_lab_ui.main_page.visible and not game.fusion_lab_ui.picker_page.visible)
 
 func _test_tier1_game_flow(game) -> void:
 	game._reset_progression_state()

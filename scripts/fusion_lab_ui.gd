@@ -317,11 +317,14 @@ func _build_picker_page() -> void:
 	picker_scroll.size = Vector2(475, 744)
 	picker_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	picker_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	picker_scroll.scroll_deadzone = 12
+	picker_scroll.mouse_filter = Control.MOUSE_FILTER_STOP
 	picker_page.add_child(picker_scroll)
 	picker_grid = GridContainer.new()
 	picker_grid.columns = 2
 	picker_grid.custom_minimum_size = Vector2(452, 0)
 	picker_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	picker_grid.mouse_filter = Control.MOUSE_FILTER_PASS
 	picker_grid.add_theme_constant_override("h_separation", 8)
 	picker_grid.add_theme_constant_override("v_separation", 8)
 	picker_scroll.add_child(picker_grid)
@@ -548,6 +551,11 @@ func _rebuild_picker() -> void:
 		button.custom_minimum_size = Vector2(222, 222)
 		button.toggle_mode = true
 		button.button_pressed = is_selected
+		# Let the ScrollContainer claim a touch drag after its deadzone. Selection
+		# remains release-only, so a swipe that began on a card is not a tap.
+		button.action_mode = BaseButton.ACTION_MODE_BUTTON_RELEASE
+		button.mouse_filter = Control.MOUSE_FILTER_PASS
+		button.mouse_force_pass_scroll_events = true
 		button.tooltip_text = species_name
 		button.set_meta("species_id", species_id)
 		button.set_meta("selected_for_slot", is_selected)
