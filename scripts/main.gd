@@ -40,6 +40,7 @@ const HabitatRestorationUIClass = preload("res://scripts/habitat_restoration_ui.
 const EndlessGreenhouseExperimentClass = preload("res://scripts/endless_greenhouse_experiment.gd")
 const SlotMachineScene = preload("res://scenes/slot_machine.tscn")
 const DEVELOPMENT_CATALOG_PREVIEW_ENABLED := true
+const TRIAL_DEV_CONTROLS_ENABLED := true
 const SECRET_GACHA_PREVIEW_UNLIMITED := true
 const PROGRESSION_VERSION := 28
 const NORMAL_SAVE_PATH := EndlessGreenhouseExperimentClass.NORMAL_SAVE_PATH
@@ -1110,8 +1111,13 @@ func _is_endless_greenhouse_enabled()->bool:
 	return endless_greenhouse.enabled
 
 func _trial_dev_controls_enabled()->bool:
-	# Endless is production progression now; it must never imply developer access.
-	return habitat_debug_enabled
+	return _trial_dev_controls_enabled_for_context(OS.has_feature("web"))
+
+func _trial_dev_controls_enabled_for_context(is_web_build:bool)->bool:
+	# Keep one release switch for the whole trial-only group. While it is enabled,
+	# Web trial builds expose the controls without a URL parameter; native builds
+	# still require their existing explicit debug mode.
+	return TRIAL_DEV_CONTROLS_ENABLED and (is_web_build or habitat_debug_enabled)
 
 func _is_endless_normal_play()->bool:
 	return _is_endless_greenhouse_enabled() and play_active and active_seed_type=="normal"

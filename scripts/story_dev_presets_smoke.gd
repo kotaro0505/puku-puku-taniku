@@ -11,7 +11,7 @@ func _ready() -> void:
 	await _test_act3_and_crisis_presets()
 	await _test_restoration_and_101cm_presets()
 	await _test_ending_presets()
-	print("STORY_DEV_PRESETS_SMOKE_OK production_hidden=true endless_does_not_grant_debug=true explicit_debug_only=true act3_ready=true crisis_ready=7 restoration=0,4 ending=true thank_you=true harvestable_101=true")
+	print("STORY_DEV_PRESETS_SMOKE_OK web_trial_always_on=true release_switch=true native_requires_debug=true endless_does_not_grant_debug=true act3_ready=true crisis_ready=7 restoration=0,4 ending=true thank_you=true harvestable_101=true")
 	get_tree().quit()
 
 
@@ -28,6 +28,9 @@ func _new_game():
 		assert(game.story_dev_panel.find_child("StoryPreset_%s" % preset_id, true, false) != null)
 	assert(game.story_dev_panel.find_child("StoryDevSpawn101", true, false) != null)
 	game.habitat_debug_enabled = false
+	assert(game.TRIAL_DEV_CONTROLS_ENABLED)
+	assert(game._trial_dev_controls_enabled_for_context(true))
+	assert(not game._trial_dev_controls_enabled_for_context(false))
 	game._open_story_dev()
 	assert(not game.story_dev_panel.visible)
 	game.endless_greenhouse.configure(true)
@@ -178,13 +181,17 @@ func _test_ending_presets() -> void:
 	_finish_dialog(game)
 	await get_tree().process_frame
 	assert(game.scripted_dialog_kind == "restoration_epilogue")
+	game.habitat_restoration_ui.ending_sequence_time_scale = 0.005
 	_finish_dialog(game)
-	await get_tree().process_frame
-	assert(game.habitat_restoration_ui.ending_layer.visible)
-	assert(game.habitat_restoration_ui.slide_index == 99)
+	for _frame in range(240):
+		if game.habitat_restoration_ui.ending_current_phase == "await_return":
+			break
+		await get_tree().process_frame
+	assert(game.habitat_restoration_ui.ending_sequence_layer.visible)
+	assert(game.habitat_restoration_ui.ending_current_phase == "await_return")
 	assert(HabitatRestorationClass.ending_phase(game._restoration_state()) == "thank_you")
-	game.habitat_restoration_ui._advance_ending()
-	await get_tree().process_frame
+	game.habitat_restoration_ui.ending_return_button.pressed.emit()
+	await get_tree().create_timer(game.ENDING_BGM_FADE_OUT_SECONDS + 0.1).timeout
 	assert(bool(game._restoration_state().get("thank_you_seen", false)))
 	assert(game.finale_complete)
 	assert(game.current_mode == "greenhouse")
@@ -192,16 +199,19 @@ func _test_ending_presets() -> void:
 	await get_tree().process_frame
 
 	game = await _new_game()
+	game.habitat_restoration_ui.ending_sequence_time_scale = 0.005
 	result = game._apply_story_dev_preset(StoryDevPresetsClass.THANK_YOU_READY)
 	assert(bool(result.get("ok", false)))
 	assert(HabitatRestorationClass.ending_phase(game._restoration_state()) == "thank_you")
 	assert(bool(game._restoration_state().get("full_recovery_revealed", false)))
 	assert(not bool(game._restoration_state().get("thank_you_seen", false)))
-	await get_tree().process_frame
-	await get_tree().process_frame
-	assert(game.habitat_restoration_ui.ending_layer.visible)
-	assert(game.habitat_restoration_ui.slide_index == 99)
-	assert(game.audio_manager.current_bgm_key == "greenhouse")
+	for _frame in range(240):
+		if game.habitat_restoration_ui.ending_current_phase == "await_return":
+			break
+		await get_tree().process_frame
+	assert(game.habitat_restoration_ui.ending_sequence_layer.visible)
+	assert(game.habitat_restoration_ui.ending_current_phase == "await_return")
+	assert(game.audio_manager.current_bgm_key == "ending")
 	game.free()
 	await get_tree().process_frame
 
