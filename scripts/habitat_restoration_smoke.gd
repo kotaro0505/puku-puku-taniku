@@ -302,7 +302,7 @@ func _test_integrated_final_chapter() -> void:
 	assert(is_zero_approx(StoryProgressionClass.lifetime_harvest_cm_total(game.story_progression_state)))
 	game.play_active = true
 	game.active_seed_type = "normal"
-	game.play_seeds_remaining = 0
+	game.play_seeds_remaining = 2
 	game.play_spawn_queue = 0
 	game.play_seed_animations_pending = 0
 	for diameter in [120.0, 130.0]:

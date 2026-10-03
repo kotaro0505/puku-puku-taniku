@@ -4,7 +4,17 @@ const SucculentClass=preload("res://scripts/succulent.gd")
 const JellyBalanceClass=preload("res://scripts/jelly_balance.gd")
 const MainScript=preload("res://scripts/main.gd")
 const SAMPLE_SEEDS:=50000
-const TARGETS:=[50.0,60.0,70.0,80.0,90.0,100.0]
+const ROUND_SEEDS:=12
+const TARGETS:=[20.0,30.0,40.0,50.0,60.0,70.0,80.0,90.0,100.0,110.0,120.0]
+
+func _combination(n:int,k:int)->float:
+	var result:=1.0
+	var smaller:=mini(k,n-k)
+	for index in range(1,smaller+1):result=result*float(n-smaller+index)/float(index)
+	return result
+
+func _binomial_probability(n:int,k:int,p:float)->float:
+	return _combination(n,k)*pow(p,k)*pow(1.0-p,n-k)
 
 func _ready()->void:
 	var balance:Dictionary=JellyBalanceClass.endless_normal_trial_balance()
@@ -20,32 +30,39 @@ func _ready()->void:
 			survival_sums[target]=float(survival_sums[target])+(1.0-jelly_probability)
 		plant.free()
 	var rows:Array=[]
-	var best_mid_net:float=-INF
-	var net_100:float=-INF
+	var net_by_target:Dictionary={}
 	for target in TARGETS:
 		var survival:float=float(survival_sums[target])/SAMPLE_SEEDS
 		var reward_puku:float=float(economy._harvest_puku_reward_units(float(target),false))/economy.PUKU_UNITS_PER_PUKU
-		var harvested_per_100:float=100.0*survival
-		var jellied_per_100:float=100.0-harvested_per_100
-		var gross_per_100:float=harvested_per_100*reward_puku
-		var net_per_100:float=gross_per_100-100.0*float(economy.ENDLESS_NORMAL_SEED_COST_UNITS)/economy.PUKU_UNITS_PER_PUKU
-		var seeds_per_success:float=1.0/maxf(survival,.000001)
+		var reached_plants:float=ROUND_SEEDS*survival
+		var average_gross:float=reached_plants*reward_puku
+		var average_net:float=average_gross-float(economy.NORMAL_ROUND_COST_UNITS)/float(economy.PUKU_UNITS_PER_PUKU)
+		var net_variance:float=ROUND_SEEDS*survival*(1.0-survival)*reward_puku*reward_puku
+		var red_rate:float=0.0;var black_rate:float=0.0;var break_even_rate:float=0.0;var big_win_rate:float=0.0
+		for successes in range(ROUND_SEEDS+1):
+			var probability:float=_binomial_probability(ROUND_SEEDS,successes,survival)
+			var round_net:float=successes*reward_puku-1.0
+			if round_net<-0.000001:red_rate+=probability
+			elif round_net>0.000001:black_rate+=probability
+			else:break_even_rate+=probability
+			if round_net>=5.0:big_win_rate+=probability
 		rows.append({
 			"target_cm":target,
 			"survival_percent":snappedf(survival*100.0,.01),
-			"seeds_used":100,
-			"harvested":snappedf(harvested_per_100,.01),
-			"jellied":snappedf(jellied_per_100,.01),
+			"expected_reached_plants":snappedf(reached_plants,.01),
+			"expected_jellied_plants":snappedf(ROUND_SEEDS-reached_plants,.01),
 			"reward_puku":reward_puku,
-			"net_puku_per_100_seeds":snappedf(net_per_100,.01),
-			"seeds_per_success":snappedf(seeds_per_success,.01),
-			"jellies_per_success":snappedf(seeds_per_success-1.0,.01),
-			"net_puku_per_success_cycle":snappedf(reward_puku-float(economy.ENDLESS_NORMAL_SEED_COST_UNITS)/economy.PUKU_UNITS_PER_PUKU/maxf(survival,.000001),.01),
+			"average_harvest_reward_puku":snappedf(average_gross,.01),
+			"average_net_puku":snappedf(average_net,.01),
+			"net_variance":snappedf(net_variance,.01),
+			"red_game_percent":snappedf(red_rate*100.0,.01),
+			"break_even_percent":snappedf(break_even_rate*100.0,.01),
+			"black_game_percent":snappedf(black_rate*100.0,.01),
+			"big_win_net_5plus_percent":snappedf(big_win_rate*100.0,.01),
 		})
-		if target>=70.0 and target<=90.0:best_mid_net=maxf(best_mid_net,net_per_100)
-		if is_equal_approx(float(target),100.0):net_100=net_per_100
-	assert(net_100<best_mid_net)
-	print("PUKU_ECONOMY_BALANCE_REPORT settings=35/35/22/8 safe=3.8-6.2 final=6% seed_cost=.20 samples=",SAMPLE_SEEDS," rows=",JSON.stringify(rows))
-	print("PUKU_ECONOMY_BALANCE_SMOKE_OK hundred_not_best=true")
+		net_by_target[target]=average_net
+	assert(float(net_by_target[20.0])<0.0 and float(net_by_target[30.0])<float(net_by_target[50.0]))
+	print("PUKU_ECONOMY_BALANCE_REPORT settings=35/35/22/8 safe=3.8-6.2 final=6% round_seeds=12 entry_cost=1.00 samples=",SAMPLE_SEEDS," rows=",JSON.stringify(rows))
+	print("PUKU_ECONOMY_BALANCE_SMOKE_OK targets=20-120 round_model=true")
 	economy.free()
 	get_tree().quit()

@@ -48,6 +48,8 @@ func _ready() -> void:
 		assert(game.find_child(control_name, true, false) != null)
 	assert(game.story_dev_panel != null and game.habitat_dev_panel != null)
 	assert(game.jelly_dev_overlay != null and game.catalog_preview_ui != null)
+	game.puku_balance_units=1000;game._adjust_progression_dev_value("puku_coin",0.1);assert(game.puku_balance_units==1100);game._adjust_progression_dev_value("puku_coin",-0.1);assert(game.puku_balance_units==1000)
+	assert(game.endless_economy_debug_label!=null)
 	assert(game.habitat_texture_mode == "full")
 	assert(game.habitat_background_mode == "current")
 	game.current_mode = "habitat"

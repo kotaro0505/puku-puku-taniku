@@ -211,6 +211,9 @@ func _ready() -> void:
 	assert(game.scripted_dialog_kind == "first_normal_sow_prompt")
 	assert(game.intro_dialogue_label.text == Localizer.text("ja", "tutorial_normal_pre_sow_endless"))
 	game._advance_scripted_dialog()
+	await get_tree().process_frame
+	assert(game.tutorial_guide_overlay.visible and str(game.tutorial_guide_button.get_meta("target", "")) == "play_open_normal")
+	game._complete_tutorial_guide()
 	await get_tree().create_timer(.75).timeout
 	assert(game.play_active and game.active_seed_type == "normal" and game.normal_seed_bags == 0)
 	assert(not game.play_open_button.visible and not game.play_overlay.visible and game.first_play_tutorial_active)
@@ -231,7 +234,7 @@ func _ready() -> void:
 	game._ensure_habitat_wild_state(now_unix, false)
 	assert(game.habitat_wild_plants.size() >= population_before)
 
-	print("EARLY_GAME_HABITAT_SMOKE_OK empty=true dormant=true awakening=rain+ghosts+three_green_sprouts promise=two_pages observation=true items=pod+catalog image_fade=true return_dialog=5 stock=endless catalog_tutorial=4 autostart=true shop=true beacon=retired settlement=true")
+	print("EARLY_GAME_HABITAT_SMOKE_OK empty=true dormant=true awakening=rain+ghosts+three_green_sprouts promise=two_pages observation=true items=pod+catalog image_fade=true return_dialog=5 stock=round12 catalog_tutorial=4 player_start=true shop=true beacon=retired settlement=true")
 	get_tree().quit()
 
 func _prepare_trio_complete(game: Node) -> void:

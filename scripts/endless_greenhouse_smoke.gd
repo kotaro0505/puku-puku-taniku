@@ -62,8 +62,8 @@ func _ready() -> void:
 	var jellied = game.plants[0]
 	jellied.jelly()
 	await get_tree().create_timer(1.75).timeout
-	assert(game.play_active and game.plants.size() == concurrent_target and game.plants.size()<=10)
-	assert(game.play_seeds_remaining == 0)
+	assert(game.play_active and game.plants.size() == mini(concurrent_target,9) and game.plants.size()<=10)
+	assert(game.play_seeds_remaining == maxi(0,game.NORMAL_GERMINATION_COUNT-concurrent_target-3))
 	game._finish_greenhouse_play()
 	assert(game.play_active and not game.result_overlay.visible)
 
@@ -101,7 +101,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	_remove_test_file(NORMAL_PATH)
 	_remove_test_file(EXPERIMENT_PATH)
-	print("ENDLESS_GREENHOUSE_SMOKE_OK default_without_flags=true autostart=true modal=false infinite=true concurrent=7-10 paid_refill=.20 harvest_direct=true wallet=fixed_point jelly_refund=false result=false longevity=35/35/22/8 new_roll=per_harvest jelly_new_roll=false discovery_curve=unchanged forced_new=true candidate_pool=uniform immediate_get=true virtual_batch=12 pause=true navigation=habitat+catalog+shop+gacha production_gacha=3puku+species_get fusion=1-2-3puku restoration_pending=true finite=true save_isolated=true")
+	print("ENDLESS_GREENHOUSE_SMOKE_OK default_without_flags=true player_start=true round_seeds=12 round_cost=1 concurrent=7-10 refill_free=true harvest_direct=true wallet=fixed_point jelly_extra_penalty=false result=true longevity=35/35/22/8 new_roll=per_harvest jelly_new_roll=false discovery_curve=unchanged forced_new=true candidate_pool=uniform immediate_get=true virtual_batch=12 pause=true navigation=habitat+catalog+shop+gacha production_gacha=1puku+species_get fusion=1-2-3puku restoration_pending=true finite=true save_isolated=true")
 	get_tree().quit()
 
 
@@ -335,6 +335,9 @@ func _test_endless_first_play_tutorial(game: Node) -> void:
 	assert(game.scripted_dialog_pages[0].text == Localizer.text("ja", "tutorial_normal_pre_sow_endless"))
 	assert(not game.play_modal_open and not game.play_overlay.visible and not game.tutorial_guide_overlay.visible)
 	game._advance_scripted_dialog()
+	await get_tree().process_frame
+	assert(game.tutorial_guide_overlay.visible and str(game.tutorial_guide_button.get_meta("target",""))=="play_open_normal")
+	game._complete_tutorial_guide()
 	await get_tree().create_timer(.72).timeout
 	assert(game.play_active and game.first_play_tutorial_active)
 	assert(game.active_seed_type == "normal")
@@ -491,8 +494,12 @@ func _test_forced_new_lifecycle(game: Node) -> void:
 	assert(is_equal_approx(float(saved_discovery.get("discovery_set_max_harvest_cm", -1.0)), 44.0))
 	assert(is_equal_approx(float(saved_discovery.get("discovery_cycle_best_cm", -1.0)), 73.0))
 	game.endless_greenhouse.reset_discovery_state()
-	game._queue_greenhouse_replacements()
-	await get_tree().create_timer(1.6).timeout
+	# A completed 12-seed round does not refill forever. Start the next round
+	# explicitly before continuing the pause/navigation regression checks.
+	game.play_active=false;game.play_spawn_queue=0;game.play_seed_animations_pending=0;game._clear_greenhouse_plants();game.result_overlay.visible=false
+	game.puku_balance_units=maxi(game.puku_balance_units,game.NORMAL_ROUND_COST_UNITS)
+	game._start_greenhouse_play("normal")
+	await get_tree().create_timer(.72).timeout
 	assert(not game.plants.is_empty())
 
 
@@ -533,8 +540,8 @@ func _test_navigation_pause_resume(game: Node) -> void:
 	game._process(.25)
 	assert(observer.age > age_before_dialog_resume)
 
-	# If a safe transition ever leaves the loop inactive, returning to the plain
-	# greenhouse reconstructs it without exposing a start button or seed modal.
+	# Inactive rounds never auto-restart. Returning to the greenhouse exposes the
+	# explicit one-Puku start button and the player starts the next round.
 	game.current_mode = "habitat"
 	game.play_active = false
 	game.play_spawn_queue = 0
@@ -546,6 +553,9 @@ func _test_navigation_pause_resume(game: Node) -> void:
 	game.current_mode = "greenhouse"
 	game._apply_mode()
 	game._process(.01)
+	assert(not game.play_active and game.play_open_button.visible and not game.play_overlay.visible)
+	game.puku_balance_units=maxi(game.puku_balance_units,game.NORMAL_ROUND_COST_UNITS)
+	game._open_play_modal()
 	await get_tree().create_timer(.72).timeout
 	assert(game.play_active and game.active_seed_type == "normal")
 	assert(not game.play_open_button.visible and not game.play_overlay.visible)
@@ -864,12 +874,12 @@ func _test_gauges(game: Node) -> void:
 	gauge_probe.diameter_cm = 100.0
 	gauge_probe.harvest()
 	assert(is_equal_approx(game.puku_gauge_cm, 123.0))
-	assert(game.puku_balance_units==17821 and game.puku_points==17 and game._puku_fraction_units()==821)
+	assert(game.puku_balance_units==12571 and game.puku_points==12 and game._puku_fraction_units()==571)
 	var fly_label:=game.effects_layer.find_child("PukuBalanceFly",true,false) as Label
 	var harvest_panel:=game.effects_layer.find_child("HarvestResult",true,false) as PanelContainer
-	assert(fly_label and fly_label.text=="+9.00ぷく" and harvest_panel)
+	assert(fly_label and fly_label.text=="+3.75ぷく" and harvest_panel)
 	assert((harvest_panel.find_child("HarvestSize",true,false) as Label).text=="収穫 100cm")
-	assert((harvest_panel.find_child("PukuRewardGain",true,false) as Label).text=="+9.00ぷく")
+	assert((harvest_panel.find_child("PukuRewardGain",true,false) as Label).text=="+3.75ぷく")
 	game._clear_greenhouse_plants()
 	game.play_spawn_queue = 0
 	game.play_seed_animations_pending = 0
@@ -1025,7 +1035,7 @@ func _test_finite_mode_unchanged(game: Node) -> void:
 	game._start_greenhouse_play("normal")
 	assert(game.play_active and game.normal_seed_bags == 0)
 	assert(game.play_concurrent_target>=game.PLAY_INITIAL_MIN_PLANTS and game.play_concurrent_target<=game.PLAY_INITIAL_MAX_PLANTS)
-	assert(game.PUKU_UNITS_PER_PUKU==1000 and game.ENDLESS_NORMAL_SEED_COST_UNITS==200)
+	assert(game.PUKU_UNITS_PER_PUKU==1000 and game.NORMAL_ROUND_COST_UNITS==1000)
 	assert(game.play_seeds_remaining < game.NORMAL_GERMINATION_COUNT)
 	assert(game.seed_pod_gauge_area.visible and game.puku_gauge_area.visible)
 	game._clear_greenhouse_plants()

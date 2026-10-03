@@ -56,25 +56,25 @@ const ORIGINAL_SERIES_ID := "base"
 const FIRST_STORY_SPECIES_ID := "colorata"
 const PANDA_STORY_SPECIES_ID := "affinis"
 const ARMADILLO_STORY_SPECIES_ID := "shaviana"
-const FOREST_GACHA_SPIN_COST := 3
+const FOREST_GACHA_SPIN_COST := 1
 const TRIAL_DEV_GACHA_WALLET := 9999
 const LEGACY_COMBINED_GAUGE_TARGET_CM := 600.0
 const SEED_POD_GAUGE_TARGET_CM := 750.0
 const SEED_POD_GAUGE_REWARD_BAGS := 3
 const PUKU_UNITS_PER_PUKU := 1000
-const ENDLESS_NORMAL_SEED_COST_UNITS := 200
+const NORMAL_ROUND_COST_UNITS := 1000
+const FIRST_GET_MIN_REWARD_UNITS := 200
 const INITIAL_PUKU_CAPITAL_UNITS := 5000
-const PANDA_HELP_REWARD_UNITS := 5000
 const LEGACY_PUKU_GAUGE_TARGET_CM := 500.0
 const LEGACY_PUKU_GAUGE_REWARD_UNITS := 3000
 const HARVEST_PUKU_REWARD_ANCHORS := [
-	Vector2(0.0,0.0),Vector2(20.0,200.0),Vector2(30.0,360.0),
-	Vector2(40.0,620.0),Vector2(50.0,1100.0),Vector2(60.0,1700.0),
-	Vector2(70.0,2700.0),Vector2(80.0,4200.0),Vector2(90.0,6500.0),
-	Vector2(100.0,9000.0),Vector2(110.0,12500.0),Vector2(120.0,17500.0),
-	Vector2(130.0,23000.0),Vector2(140.0,30000.0),Vector2(150.0,38000.0),
+	Vector2(0.0,0.0),Vector2(20.0,50.0),Vector2(30.0,120.0),
+	Vector2(40.0,220.0),Vector2(50.0,400.0),Vector2(60.0,650.0),
+	Vector2(70.0,1050.0),Vector2(80.0,1650.0),Vector2(90.0,2500.0),
+	Vector2(100.0,3750.0),Vector2(110.0,5600.0),Vector2(120.0,8400.0),
+	Vector2(130.0,12000.0),Vector2(140.0,17000.0),Vector2(150.0,24000.0),
 ]
-const HARVEST_PUKU_POST_150_UNITS_PER_10_CM := 8000.0
+const HARVEST_PUKU_POST_150_UNITS_PER_10_CM := 7000.0
 const ENDLESS_AUTO_SOW_TUTORIAL_STEP := "endless_auto_sow_prompt_seen"
 const HABITAT_TIME_MULTIPLIERS := [1, 60, 3600, 21600, 86400]
 const DEFAULT_POT_ID := "shallow_terracotta"
@@ -463,6 +463,7 @@ var settings_close_button:Button
 var settings_language_status:Label
 var language_buttons:Dictionary={}
 var progression_dev_labels:Dictionary={}
+var endless_economy_debug_label:Label
 var jelly_dev_overlay: Control
 var jelly_dev_labels:Dictionary={}
 var jelly_dev_total_label:Label
@@ -537,6 +538,7 @@ var external_navigation_controls: Array[Control] = []
 var encyclopedia_navigation_controls: Array[Control] = []
 var puku_gauge_cm := 0.0
 var puku_balance_units := 0
+var normal_round_free_plays := 0
 var puku_points:int:
 	get:
 		return maxi(0,floori(float(puku_balance_units)/float(PUKU_UNITS_PER_PUKU)))
@@ -936,6 +938,7 @@ func _load_save() -> void:
 	_cancel_puku_gauge_animations()
 	legacy_habitat_migration_dirty=false;puku_balance_migration_dirty=false;legacy_habitat_notification_ids_to_cancel.clear();panda_beacon_unread_log.clear()
 	puku_balance_units=0
+	normal_round_free_plays=0
 	save_file_present_on_boot=false
 	language_selected=false
 	var save_path:=_active_save_path()
@@ -954,6 +957,7 @@ func _load_save() -> void:
 			else:
 				puku_balance_units=legacy_puku_points*PUKU_UNITS_PER_PUKU+roundi(legacy_puku_coin_gauge_cm/LEGACY_PUKU_GAUGE_TARGET_CM*LEGACY_PUKU_GAUGE_REWARD_UNITS)
 				puku_balance_migration_dirty=true
+			normal_round_free_plays=maxi(0,int(value.get("normal_round_free_plays",0)))
 			bests=value.get("bests",{});puku_gauge_cm=maxf(0.0,float(value.get("puku_gauge_cm",0.0)));discovered=value.get("discovered",{});habitat_seed_date=str(value.get("habitat_seed_date",""));habitat_seeds_collected=int(value.get("habitat_seeds_collected",0))
 			if saved_progression_version<21:
 				# v20 used one 600 cm gauge for both rewards. Preserve its fill ratio as
@@ -1136,7 +1140,7 @@ func _save() -> void:
 		"mystery_route_assignments":mystery_route_assignments,"mystery_route_completed":mystery_route_completed,"mystery_route_dialog_seen":mystery_route_dialog_seen,
 		"best_100_achieved":best_100_achieved,"login_bonus_date":login_bonus_date,"audio_settings":audio_settings,
 		"series_seed_inventory":series_seed_inventory,"forest_gacha_draw_count":forest_gacha_draw_count,"forest_gacha_encountered":forest_gacha_encountered,
-		"puku_gauge_cm":puku_gauge_cm,"puku_balance_units":puku_balance_units,"puku_coin_gauge_cm":_legacy_puku_coin_gauge_cm_for_save(),"puku_points":puku_points,"old_catalog_pages":old_catalog_pages,"old_catalog_page_inventory":old_catalog_page_inventory,
+		"puku_gauge_cm":puku_gauge_cm,"puku_balance_units":puku_balance_units,"normal_round_free_plays":normal_round_free_plays,"puku_coin_gauge_cm":_legacy_puku_coin_gauge_cm_for_save(),"puku_points":puku_points,"old_catalog_pages":old_catalog_pages,"old_catalog_page_inventory":old_catalog_page_inventory,
 		"old_catalog_intro_seen":old_catalog_intro_seen,"old_catalog_intro_pending":old_catalog_intro_pending,"research_catalog_reward_pending":research_catalog_reward_pending,
 		"habitat_old_catalog_page_pending":habitat_old_catalog_page_pending,"habitat_old_catalog_page_series_id":habitat_old_catalog_page_series_id,
 		"habitat_old_catalog_page_point_x":habitat_old_catalog_page_point.x,"habitat_old_catalog_page_point_y":habitat_old_catalog_page_point.y,
@@ -1237,15 +1241,14 @@ func _endless_greenhouse_auto_start_blocked()->bool:
 	return false
 
 func _ensure_endless_greenhouse_running()->void:
-	# ENDLESS normal seeds belong to the greenhouse itself. Once the story hands
-	# over the pod, no start button or seed-selection modal participates in the
-	# normal loop. Existing plants resume; an inactive loop safely starts here.
+	# Compatibility entry point retained for story callbacks from older saves.
+	# Formal normal play is now a player-started 12-seed round, never an
+	# automatically restarted endless loop.
 	if not _endless_greenhouse_auto_start_unlocked() or play_active:return
 	if play_modal_open:
 		play_modal_open=false
 		if play_overlay:play_overlay.visible=false
-	if _endless_greenhouse_auto_start_blocked():return
-	_start_greenhouse_play("normal")
+	_update_play_ui()
 
 func _puku_whole_count(balance_units:int=-1)->int:
 	var resolved_units:=puku_balance_units if balance_units<0 else balance_units
@@ -2204,7 +2207,7 @@ func _has_any_playable_seed_stock()->bool:
 	return false
 
 func _shop_puku_rescue_needed()->bool:
-	return mystery_items_acquired and habitat_tutorial_complete and current_mode=="greenhouse" and _endless_puku_economy_active() and puku_balance_units<ENDLESS_NORMAL_SEED_COST_UNITS
+	return mystery_items_acquired and habitat_tutorial_complete and puku_gauge_intro_complete and current_mode=="greenhouse" and _endless_normal_flow_owns_play_controls() and not play_active and normal_round_free_plays<=0 and puku_balance_units<NORMAL_ROUND_COST_UNITS
 
 func _shop_seed_rescue_needed()->bool:
 	return mystery_items_acquired and habitat_tutorial_complete and current_mode=="greenhouse" and not play_active and plants.is_empty() and normal_seed_bags<=0 and not _has_any_playable_seed_stock()
@@ -2229,7 +2232,7 @@ func _on_rescue_reward_ad_completed(reward_earned:bool)->void:
 		shop_chatter_action_button.disabled=false;shop_chatter_action_button.text=Localizer.text(language_code,"shop_help_action") if rescue_reward_context=="shop_puku_rescue" else Localizer.text(language_code,"ad_seed");rescue_reward_context=""
 		return
 	var completed_context:=rescue_reward_context;rescue_reward_context=""
-	if completed_context=="shop_puku_rescue":_change_puku_balance(PANDA_HELP_REWARD_UNITS,"panda_help",false,true)
+	if completed_context=="shop_puku_rescue":normal_round_free_plays+=1
 	else:_grant_rescue_seed_bags()
 	_save();_update_shop_ui();_update_play_ui();audio_manager.play_se("daily",.48)
 	_show_shop_chatter(Localizer.text(language_code,"shop_puku_rescue_success" if completed_context=="shop_puku_rescue" else "shop_rescue_success"),false)
@@ -2488,7 +2491,7 @@ func _finish_scripted_dialog()->void:
 		if _is_endless_greenhouse_enabled():call_deferred("_start_first_normal_sow_prompt")
 		else:call_deferred("_show_tutorial_guide","play_open_normal")
 	elif finished_kind=="first_normal_sow_prompt":
-		if _is_endless_greenhouse_enabled():call_deferred("_ensure_endless_greenhouse_running")
+		if _is_endless_greenhouse_enabled():call_deferred("_show_tutorial_guide","play_open_normal")
 		else:
 			call_deferred("_open_play_modal");call_deferred("_show_tutorial_guide","normal_seed")
 	elif finished_kind=="first_seed_pod_reward":
@@ -2901,7 +2904,7 @@ func _complete_tutorial_guide()->void:
 	elif target=="habitat":_toggle_mode()
 	elif target=="play_open":_open_play_modal();call_deferred("_show_tutorial_guide","old_seed")
 	elif target=="play_open_normal":
-		_start_first_normal_sow_prompt()
+		_start_greenhouse_play("normal")
 	elif target=="old_seed":_start_greenhouse_play("old")
 	elif target=="normal_seed":_start_greenhouse_play("normal")
 
@@ -3100,6 +3103,7 @@ func _build_settings(hud:Control)->void:
 		var reset:=Button.new();reset.name="ProgressionDevReset";reset.text="開発用：進行を初期状態へ戻す";reset.custom_minimum_size=Vector2(370,58);_skin_button(reset,Color("#d9c49d"),16);reset.pressed.connect(_reset_progression_for_development.bind(reset));content.add_child(reset)
 		_add_progression_dev_counter(content,"old_page","古びた図鑑のページ")
 		_add_progression_dev_counter(content,"puku_coin","ぷくコイン")
+		endless_economy_debug_label=Label.new();endless_economy_debug_label.custom_minimum_size=Vector2(410,132);endless_economy_debug_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;endless_economy_debug_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;endless_economy_debug_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;endless_economy_debug_label.add_theme_font_size_override("font_size",14);endless_economy_debug_label.add_theme_color_override("font_color",UI_BROWN);content.add_child(endless_economy_debug_label)
 		var jelly_test:=Button.new();jelly_test.name="JellyDevOpen";jelly_test.text="開発用：ジュレテスト";jelly_test.custom_minimum_size=Vector2(370,58);_skin_button(jelly_test,Color("#c7b4d9"),17);jelly_test.pressed.connect(_open_jelly_dev);content.add_child(jelly_test)
 		trial_dev_gacha_button=Button.new();trial_dev_gacha_button.name="TrialDevGachaOpen";trial_dev_gacha_button.text="開発用：品種ガチャ";trial_dev_gacha_button.custom_minimum_size=Vector2(370,58);_skin_button(trial_dev_gacha_button,Color("#d9c77d"),17);trial_dev_gacha_button.pressed.connect(_open_trial_dev_forest_gacha);trial_dev_gacha_button.visible=_is_endless_greenhouse_enabled() and _trial_dev_controls_enabled();content.add_child(trial_dev_gacha_button)
 		if DEVELOPMENT_CATALOG_PREVIEW_ENABLED:
@@ -3154,20 +3158,26 @@ func _open_habitat_dev()->void:
 func _add_progression_dev_counter(parent:VBoxContainer,key:String,title:String)->void:
 	var row:=HBoxContainer.new();row.alignment=BoxContainer.ALIGNMENT_CENTER;row.add_theme_constant_override("separation",8);parent.add_child(row)
 	var label:=Label.new();label.custom_minimum_size=Vector2(250,42);label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.add_theme_font_size_override("font_size",15);label.add_theme_color_override("font_color",UI_BROWN);row.add_child(label);progression_dev_labels[key]=label
-	for delta in [-1,1]:
-		var button:=Button.new();button.text="−1" if delta<0 else "+1";button.custom_minimum_size=Vector2(64,42);_skin_button(button,Color("#d9c49d"),16);button.pressed.connect(_adjust_progression_dev_value.bind(key,delta));row.add_child(button)
+	var deltas:Array=[-1.0,-0.1,0.1,1.0] if key=="puku_coin" else [-1.0,1.0]
+	for delta_value in deltas:
+		var delta:=float(delta_value)
+		var button:=Button.new();button.text=("−" if delta<0.0 else "+")+("%.1f"%absf(delta) if absf(delta)<1.0 else "%d"%roundi(absf(delta)));button.custom_minimum_size=Vector2(64,42);_skin_button(button,Color("#d9c49d"),15);button.pressed.connect(_adjust_progression_dev_value.bind(key,delta));row.add_child(button)
 
-func _adjust_progression_dev_value(key:String,delta:int)->void:
+func _adjust_progression_dev_value(key:String,delta:float)->void:
 	if not _trial_dev_controls_enabled():return
 	if key=="old_page":
-		if delta>0:_grant_old_catalog_page(delta,true)
-		else:_remove_old_catalog_page(-delta)
-	elif key=="puku_coin":_change_puku_balance(delta*PUKU_UNITS_PER_PUKU,"dev_adjustment",false,true)
+		var page_delta:=roundi(delta)
+		if page_delta>0:_grant_old_catalog_page(page_delta,true)
+		else:_remove_old_catalog_page(-page_delta)
+	elif key=="puku_coin":_change_puku_balance(roundi(delta*PUKU_UNITS_PER_PUKU),"dev_adjustment",false,true)
 	_save();_refresh_progression_dev_counters();_update_currency_ui();_sync_arrangement_ui()
 
 func _refresh_progression_dev_counters()->void:
 	if progression_dev_labels.has("old_page"):progression_dev_labels["old_page"].text="古びた図鑑のページ　×%d"%old_catalog_pages
-	if progression_dev_labels.has("puku_coin"):progression_dev_labels["puku_coin"].text="ぷくコイン　×%d"%puku_points
+	if progression_dev_labels.has("puku_coin"):progression_dev_labels["puku_coin"].text="ぷく残高　%.2fぷく"%(float(puku_balance_units)/PUKU_UNITS_PER_PUKU)
+	if endless_economy_debug_label:
+		var summary:=_endless_economy_debug_summary()
+		endless_economy_debug_label.text="12粒ラウンド試遊ログ\n開始 %.2f / 費用 -%.2f / 収穫 +%.2f / 純収支 %+.2fぷく\n使用種 %d / 収穫 %d / ジュレ %d / 最大 %.1fcm"%[float(summary.start_puku),float(summary.seed_cost_puku),float(summary.harvest_revenue_puku),float(summary.greenhouse_net_puku),int(summary.seeds_used),int(summary.harvested),int(summary.jellied),float(summary.max_harvest_cm)]
 
 func _build_research_catalog_reward(hud:Control)->void:
 	research_catalog_reward_overlay=Control.new();research_catalog_reward_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);research_catalog_reward_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;research_catalog_reward_overlay.visible=false;hud.add_child(research_catalog_reward_overlay)
@@ -3357,7 +3367,7 @@ func _add_audio_setting_controls(parent:VBoxContainer,label_text:String,is_bgm:b
 	toggle.toggled.connect(_change_audio_enabled.bind(is_bgm));slider.value_changed.connect(_change_audio_volume.bind(is_bgm))
 
 func _open_settings()->void:
-	settings_overlay.visible=true;_update_play_ui()
+	_refresh_progression_dev_counters();settings_overlay.visible=true;_update_play_ui()
 
 func _close_settings()->void:
 	settings_overlay.visible=false;_save();_update_play_ui()
@@ -3815,6 +3825,7 @@ func _reset_progression_state()->void:
 	first_seed_pod_reward_event_active=false;habitat_visit_id=0;act3_intro_eligible_visit_id=0;habitat_crisis_eligible_visit_id=0
 	if habitat_crisis_atmosphere:habitat_crisis_atmosphere.deactivate()
 	_cancel_puku_gauge_animations();puku_gauge_cm=0.0;puku_balance_units=0;bests.clear();discovered.clear();species_get_counts.clear();unlocked_series={INITIAL_SERIES_ID:true};series_seed_inventory.clear();forest_gacha_draw_count=0;forest_gacha_encountered.clear();secret_gacha_active=false;secret_gacha_draws_remaining=0;secret_gacha_last_roll_play_count=-1;active_series_seed_id="";owned_pots={DEFAULT_POT_ID:true};saved_arrangements.clear();arrangement_save_capacity=20;greenhouse_available=_initial_greenhouse_state();unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;opening_story_complete=false;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;puku_gauge_intro_complete=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;mystery_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;mystery_seed_pack_unlocked=false;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;habitat_mystery_seeds_pending=0;mystery_seed_count=0;armadillo_research_total=0;armadillo_research_rewards.clear();armadillo_research_intro_seen=false;armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();result_deferred_species_queue.clear();shop_chatter_acquired_species.clear();species_get_queue.clear();play_share_record.clear();play_active=false;play_time_remaining=0.0;play_harvest_cm_total=0.0;play_puku_reward_units_total=0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;_reset_endless_economy_stats();rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_time_multiplier=1;habitat_simulation_unix=Time.get_unix_time_from_system();habitat_debug_log.clear();habitat_scroll_tutorial_active=false;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_clear_habitat_items();_save();_update_currency_ui();_update_play_ui()
+	normal_round_free_plays=0
 	normal_play_count=0;shop_visit_count=0;hidden_species_acquired.clear();tovar_next_play=TOVAR_FIRST_PLAY;tovar_attempt_count=0;tovar_event_active=false;tovar_harvested_this_play=false;armadillo_present=false;_save()
 
 func _reset_progression_for_development(button:Button)->void:
@@ -3827,7 +3838,7 @@ func _build_result_overlay(hud:Control)->void:
 	result_card=PanelContainer.new();result_card.position=Vector2(54,150);result_card.size=Vector2(468,730);result_card.clip_contents=true;result_card.add_theme_stylebox_override("panel",_box(Color("#f7e8c7"),Color("#c8944f"),28,4));result_overlay.add_child(result_card)
 	var content:=VBoxContainer.new();content.alignment=BoxContainer.ALIGNMENT_CENTER;content.add_theme_constant_override("separation",15);result_card.add_child(content)
 	var title:=Label.new();title.name="ResultTitle";title.text="今回の収穫";title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;title.add_theme_font_size_override("font_size",30);title.add_theme_color_override("font_color",UI_BROWN);content.add_child(title)
-	result_total_label=Label.new();result_total_label.custom_minimum_size=Vector2(410,70);result_total_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;result_total_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;result_total_label.add_theme_font_size_override("font_size",21);result_total_label.add_theme_color_override("font_color",Color("#b06c24"));content.add_child(result_total_label)
+	result_total_label=Label.new();result_total_label.custom_minimum_size=Vector2(410,108);result_total_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;result_total_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;result_total_label.add_theme_font_size_override("font_size",19);result_total_label.add_theme_color_override("font_color",Color("#b06c24"));content.add_child(result_total_label)
 	result_count_label=_result_line_label();content.add_child(result_count_label)
 	result_max_label=_result_line_label();content.add_child(result_max_label)
 	var divider:=HSeparator.new();divider.custom_minimum_size=Vector2(380,10);content.add_child(divider)
@@ -3874,7 +3885,7 @@ func _open_play_modal()->void:
 	if _endless_normal_flow_owns_play_controls():
 		play_modal_open=false
 		if play_overlay:play_overlay.visible=false
-		call_deferred("_ensure_endless_greenhouse_running")
+		_start_greenhouse_play("normal")
 		return
 	play_modal_open=true;_update_play_ui()
 
@@ -3905,11 +3916,20 @@ func _start_greenhouse_play(seed_type:String)->void:
 		mystery_seed_bags-=1;current_target_count=MYSTERY_GERMINATION_COUNT
 	else:
 		if not _normal_seed_play_available():return
+		if _is_endless_greenhouse_enabled() and puku_gauge_intro_complete and normal_round_free_plays<=0 and not _can_afford_puku_units(NORMAL_ROUND_COST_UNITS):return
 		if not _is_endless_greenhouse_enabled():normal_seed_bags-=1
 		current_target_count=NORMAL_GERMINATION_COUNT
 	if seed_type=="old" and total_play_count==0:_ensure_first_tutorial_species()
-	active_seed_type=seed_type;old_seed_reaction_stage=0;old_seed_harvest_guide_active=false;tutorial_harvest_plant=null;play_time_remaining=0.0;play_active=true;play_modal_open=false;play_harvest_cm_total=0.0;play_puku_reward_units_total=0;play_harvest_count=0;play_max_size=0.0;play_previous_global_best=_global_best_size();play_updated_global_best=false;play_share_record.clear();play_notable_species.clear();play_hidden_species_unlocked="";result_new_species_queue.clear();result_deferred_species_queue.clear();opening_species.clear();play_seeds_remaining=0 if seed_type=="normal" and _is_endless_greenhouse_enabled() else current_target_count;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=_initial_greenhouse_concurrent_target(seed_type);greenhouse_finish_attempt_count=0;greenhouse_finish_completed_count=0;greenhouse_finish_last_block_reason="";greenhouse_finish_last_snapshot.clear();_clear_greenhouse_plants();_reset_endless_economy_stats()
-	if seed_type=="normal" and _is_endless_greenhouse_enabled():endless_greenhouse.begin_play()
+	active_seed_type=seed_type;old_seed_reaction_stage=0;old_seed_harvest_guide_active=false;tutorial_harvest_plant=null;play_time_remaining=0.0;play_active=true;play_modal_open=false;play_harvest_cm_total=0.0;play_puku_reward_units_total=0;play_harvest_count=0;play_max_size=0.0;play_previous_global_best=_global_best_size();play_updated_global_best=false;play_share_record.clear();play_notable_species.clear();play_hidden_species_unlocked="";result_new_species_queue.clear();result_deferred_species_queue.clear();opening_species.clear();play_seeds_remaining=current_target_count;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=_initial_greenhouse_concurrent_target(seed_type);greenhouse_finish_attempt_count=0;greenhouse_finish_completed_count=0;greenhouse_finish_last_block_reason="";greenhouse_finish_last_snapshot.clear();_clear_greenhouse_plants();_reset_endless_economy_stats()
+	if seed_type=="normal" and _is_endless_greenhouse_enabled():
+		endless_greenhouse.begin_play()
+		if puku_gauge_intro_complete:
+			if normal_round_free_plays>0:
+				normal_round_free_plays-=1
+			else:
+				var paid_units:=_change_puku_balance(-NORMAL_ROUND_COST_UNITS,"normal_round_start",false,true)
+				if paid_units!=-NORMAL_ROUND_COST_UNITS:
+					play_active=false;_update_play_ui();return
 	if seed_type=="normal":_prepare_story_spawn_guarantee()
 	if result_overlay:result_overlay.visible=false
 	for i in range(play_concurrent_target):
@@ -3930,31 +3950,31 @@ func _ensure_first_tutorial_species()->String:
 	return first_tutorial_species_id
 
 func _finish_greenhouse_play()->void:
-	if _is_endless_normal_play():
-		greenhouse_finish_last_block_reason="endless_greenhouse"
-		return
 	greenhouse_finish_attempt_count+=1
 	greenhouse_finish_last_snapshot={"play_active":play_active,"plants_size":plants.size(),"play_seeds_remaining":play_seeds_remaining,"play_spawn_queue":play_spawn_queue,"play_seed_animations_pending":play_seed_animations_pending,"first_play_tutorial_active":first_play_tutorial_active,"first_play_tutorial_sequence_complete":first_play_tutorial_sequence_complete,"result_overlay_visible":result_overlay.visible if result_overlay else false}
 	greenhouse_finish_last_block_reason=_greenhouse_finish_block_reason()
 	if not greenhouse_finish_last_block_reason.is_empty():return
 	greenhouse_finish_completed_count+=1
-	play_active=false;play_time_remaining=0.0;play_spawn_timer=0.0;_end_first_play_tutorial_context();total_play_count+=1
-	var formal_play:=_tutorial_fully_complete() and active_seed_type!="old"
-	if formal_play:
-		formal_play_count+=1
-		habitat_mystery_seeds_pending+=rng.randi_range(0,3)
-		_refresh_seed_pack_unlocks()
-	_resolve_tovar_event_after_play()
+	var completed_endless_round:=_is_endless_normal_play()
+	play_active=false;play_time_remaining=0.0;play_spawn_timer=0.0;_end_first_play_tutorial_context()
+	if not completed_endless_round:
+		total_play_count+=1
+		var formal_play:=_tutorial_fully_complete() and active_seed_type!="old"
+		if formal_play:
+			formal_play_count+=1
+			habitat_mystery_seeds_pending+=rng.randi_range(0,3)
+			_refresh_seed_pack_unlocks()
+		_resolve_tovar_event_after_play()
 	if total_play_count==1:
 		if first_tutorial_species_id.is_empty():_ensure_first_tutorial_species()
 		_register_species_discovery(first_tutorial_species_id,false);greenhouse_available[first_tutorial_species_id]=true;unlocked_species=greenhouse_available.duplicate(true);_apply_saved_unlocks();unlocked_series[INITIAL_SERIES_ID]=true
 	_evaluate_unlock_rules("play_count",float(total_play_count))
-	if formal_play:
+	if not completed_endless_round and _tutorial_fully_complete() and active_seed_type!="old":
 		_maybe_activate_secret_gacha()
+	if completed_endless_round:_log_endless_economy("round_complete")
 	_clear_greenhouse_plants();_save();_update_play_ui();_show_play_result();audio_manager.play_se("result",.7)
 
 func _greenhouse_finish_block_reason()->String:
-	if _is_endless_normal_play():return "endless_greenhouse"
 	if habitat_restoration_ui and habitat_restoration_ui.is_modal_visible():return "habitat_restoration_event"
 	if first_seed_pod_reward_event_active:return "first_seed_pod_reward_event"
 	if puku_buyback_tutorial_active:return "puku_buyback_tutorial"
@@ -3968,7 +3988,6 @@ func _greenhouse_finish_block_reason()->String:
 
 func _poll_greenhouse_play_completion()->void:
 	if current_mode!="greenhouse" or not play_active or dev_jelly_test_active or catalog_preview_mode_active:return
-	if _is_endless_normal_play():return
 	greenhouse_finish_last_block_reason=_greenhouse_finish_block_reason()
 	if greenhouse_finish_last_block_reason.is_empty():_finish_greenhouse_play()
 
@@ -4039,6 +4058,7 @@ func _update_play_ui()->void:
 	var arrangement_navigation_suspended:bool=arrangement_scene_active or arrangement_transitioning or catalog_preview_mode_active or preview_overlay_open or gacha_open or habitat_modal_open
 	var arrangement_hud_hidden:bool=arrangement_scene_active or arrangement_transitioning
 	var endless_owns_normal_flow:=_endless_normal_flow_owns_play_controls()
+	var normal_round_start_visible:=not endless_owns_normal_flow or _endless_greenhouse_auto_start_unlocked()
 	var endless_hud_navigation_available:=_is_endless_normal_play() and _should_simulate_endless_greenhouse()
 	var external_navigation_available:=not play_active or endless_hud_navigation_available
 	if main_status_hud:main_status_hud.visible=not arrangement_hud_hidden and not battle_open
@@ -4048,7 +4068,14 @@ func _update_play_ui()->void:
 	if seed_pod_gauge_area:seed_pod_gauge_area.visible=mystery_items_acquired and not _is_endless_greenhouse_enabled()
 	if trial_dev_gacha_button:trial_dev_gacha_button.visible=_is_endless_greenhouse_enabled() and _trial_dev_controls_enabled()
 	play_overlay.visible=current_mode=="greenhouse" and not play_active and play_modal_open and not endless_owns_normal_flow
-	play_open_button.visible=current_mode=="greenhouse" and intro_story_complete and not play_active and not play_modal_open and not endless_owns_normal_flow and not arrangement_navigation_suspended and (not result_overlay or not result_overlay.visible) and (not shop_overlay or not shop_overlay.visible) and (not encyclopedia_overlay or not encyclopedia_overlay.visible) and (not settings_overlay or not settings_overlay.visible) and (not arrangement_ui or not arrangement_ui.visible)
+	play_open_button.visible=current_mode=="greenhouse" and intro_story_complete and not play_active and not play_modal_open and normal_round_start_visible and not arrangement_navigation_suspended and (not result_overlay or not result_overlay.visible) and (not shop_overlay or not shop_overlay.visible) and (not encyclopedia_overlay or not encyclopedia_overlay.visible) and (not settings_overlay or not settings_overlay.visible) and (not arrangement_ui or not arrangement_ui.visible)
+	if endless_owns_normal_flow:
+		var round_is_free:=normal_round_free_plays>0 or not puku_gauge_intro_complete
+		play_open_button.text=Localizer.text(language_code,"play_normal_seed_round_free" if round_is_free else "play_normal_seed_round")
+		play_open_button.disabled=not round_is_free and not _can_afford_puku_units(NORMAL_ROUND_COST_UNITS)
+	else:
+		play_open_button.text=Localizer.text(language_code,"main_play")
+		play_open_button.disabled=false
 	seed_bag_panel.visible=current_mode=="greenhouse" and play_active and active_seed_type!="old" and not _is_endless_normal_play()
 	play_timer_label.visible=seed_bag_panel.visible
 	for control in external_navigation_controls:control.visible=external_navigation_available and not arrangement_navigation_suspended
@@ -4330,7 +4357,6 @@ func _change_puku_balance(delta_units:int,source:="",save_immediately:=true,show
 		puku_gauge_display_units=float(_puku_fraction_units())
 		puku_points_display=_puku_whole_count()
 	_update_puku_ui();_update_play_ui()
-	if applied_units>0 and _is_endless_normal_play():call_deferred("_queue_greenhouse_replacements")
 	if save_immediately:_save()
 	return applied_units
 
@@ -4351,7 +4377,7 @@ func _harvest_puku_reward_units(diameter_cm:float,is_first_get:bool)->int:
 				reward_units=lerpf(left.y,right.y,ratio)
 				break
 	var rounded_units:=maxi(0,roundi(reward_units))
-	return maxi(ENDLESS_NORMAL_SEED_COST_UNITS,rounded_units) if is_first_get else rounded_units
+	return maxi(FIRST_GET_MIN_REWARD_UNITS,rounded_units) if is_first_get else rounded_units
 
 func _format_puku_units(units:int)->String:
 	return "%.2f"%(float(abs(units))/float(PUKU_UNITS_PER_PUKU))
@@ -4537,7 +4563,16 @@ func _show_play_result()->void:
 		else:call_deferred("_start_first_colorata_discovery_event")
 		return
 	result_total_label.visible=true
-	result_total_label.text=Localizer.text(language_code,"result_total_before_items",[_format_cm(play_harvest_cm_total)]);result_count_label.text=Localizer.text(language_code,"result_count",[play_harvest_count])
+	var endless_round_result:=active_seed_type=="normal" and _is_endless_greenhouse_enabled()
+	if endless_round_result:
+		var round_net_units:=endless_economy_harvest_reward_units-endless_economy_seed_cost_units
+		_set_named_localized_text("ResultTitle","round_result_title")
+		result_total_label.text=Localizer.text(language_code,"round_result_economy",[_format_puku_units(endless_economy_seed_cost_units),_format_puku_units(endless_economy_harvest_reward_units),("+" if round_net_units>=0 else "-")+_format_puku_units(round_net_units)])
+		result_count_label.text=Localizer.text(language_code,"round_result_count",[endless_economy_harvest_count,endless_economy_jelly_count])
+	else:
+		_set_named_localized_text("ResultTitle","result_title")
+		result_total_label.text=Localizer.text(language_code,"result_total_before_items",[_format_cm(play_harvest_cm_total)])
+		result_count_label.text=Localizer.text(language_code,"result_count",[play_harvest_count])
 	result_max_label.remove_theme_color_override("font_outline_color");result_max_label.remove_theme_constant_override("outline_size")
 	if play_updated_global_best:
 		result_max_label.text=Localizer.text(language_code,"result_best_update",[play_max_size]);result_max_label.add_theme_font_size_override("font_size",30);result_max_label.add_theme_color_override("font_color",Color("#b83b32"));result_max_label.add_theme_color_override("font_outline_color",Color("#f8e8c8"));result_max_label.add_theme_constant_override("outline_size",3);_play_result_confetti();call_deferred("_start_result_record_pulse");audio_manager.play_se("result_new_best",.48)
@@ -6228,14 +6263,9 @@ func spawn_plant(force_golden := false,spawn_position:Variant=null) -> void:
 	if audio_manager:audio_manager.play_se("sprout",.28)
 
 func _spawn_greenhouse_seed(suppress_puku_effect:=false)->bool:
-	var endless_normal:=_is_endless_normal_play()
-	if not play_active or (not endless_normal and play_seeds_remaining<=0):return false
-	if _endless_puku_economy_active():
-		if not _can_afford_puku_units(ENDLESS_NORMAL_SEED_COST_UNITS):return false
-		var charged_units:=_change_puku_balance(-ENDLESS_NORMAL_SEED_COST_UNITS,"endless_seed",not suppress_puku_effect,not suppress_puku_effect)
-		if charged_units!=-ENDLESS_NORMAL_SEED_COST_UNITS:return false
+	if not play_active or play_seeds_remaining<=0:return false
 	var spawn_position:=_find_spawn_position();pending_seed_positions.append(spawn_position)
-	if not endless_normal:play_seeds_remaining-=1
+	play_seeds_remaining-=1
 	play_seed_animations_pending+=1;_update_play_ui();_animate_and_spawn_greenhouse_seed(spawn_position)
 	return true
 
@@ -6254,20 +6284,20 @@ func _animate_and_spawn_greenhouse_seed(spawn_position:Vector3)->void:
 		spawn_plant(false,spawn_position)
 		_record_normal_greenhouse_seed_sown()
 		_register_endless_greenhouse_spawn()
-	if play_active and not _is_endless_normal_play() and play_seeds_remaining==0 and play_spawn_queue==0 and play_seed_animations_pending==0 and plants.is_empty():call_deferred("_finish_greenhouse_play")
+	if play_active and play_seeds_remaining==0 and play_spawn_queue==0 and play_seed_animations_pending==0 and plants.is_empty():call_deferred("_finish_greenhouse_play")
 
 func _queue_greenhouse_replacements()->void:
 	if not play_active or active_seed_type=="old":return
 	var open_slots:=maxi(0,play_concurrent_target-(plants.size()+play_spawn_queue+play_seed_animations_pending))
-	var add_count:=open_slots if _is_endless_normal_play() else mini(open_slots,play_seeds_remaining-play_spawn_queue)
-	if _endless_puku_economy_active():add_count=mini(add_count,floori(float(puku_balance_units)/float(ENDLESS_NORMAL_SEED_COST_UNITS)))
+	var add_count:=mini(open_slots,maxi(0,play_seeds_remaining-play_spawn_queue))
 	if add_count<=0:return
 	var was_empty:=play_spawn_queue==0;play_spawn_queue+=add_count
 	if was_empty:play_spawn_timer=_next_greenhouse_spawn_interval()
 
 func _register_endless_greenhouse_spawn()->void:
-	if not _is_endless_normal_play() or not endless_greenhouse.register_spawn():return
-	_complete_endless_virtual_batch()
+	if not _is_endless_normal_play():return
+	endless_economy_seed_count+=1
+	if endless_greenhouse.register_spawn():_complete_endless_virtual_batch()
 
 func _record_normal_greenhouse_seed_sown()->bool:
 	if not play_active or active_seed_type!="normal" or dev_jelly_test_active or catalog_preview_mode_active:return false
@@ -6300,8 +6330,8 @@ func _reset_endless_economy_stats()->void:
 func _record_endless_economy_change(source:String,applied_units:int)->void:
 	if not _is_endless_normal_play():return
 	match source:
-		"endless_seed":
-			if applied_units<0:endless_economy_seed_count+=1;endless_economy_seed_cost_units+=-applied_units
+		"normal_round_start":
+			if applied_units<0:endless_economy_seed_cost_units+=-applied_units
 		"endless_harvest":
 			if applied_units>0:endless_economy_harvest_reward_units+=applied_units
 
@@ -6320,7 +6350,7 @@ func _endless_economy_debug_summary()->Dictionary:
 	}
 
 func _log_endless_economy(reason:String)->void:
-	if not (OS.is_debug_build() or _trial_dev_controls_enabled()) or not _is_endless_normal_play():return
+	if not (OS.is_debug_build() or _trial_dev_controls_enabled()) or not _is_endless_greenhouse_enabled() or active_seed_type!="normal":return
 	print("ENDLESS_PUKU_ECONOMY reason=",reason," ",JSON.stringify(_endless_economy_debug_summary()))
 
 func _record_endless_discovery_settlement(harvested:bool,diameter_cm:float=0.0,forced_roll:float=-1.0)->Dictionary:
@@ -6584,7 +6614,6 @@ func _process(delta:float)->void:
 	_update_habitat_view_follow(delta)
 	_update_habitat_wild_growth(delta)
 	_update_habitat_scroll_tutorial()
-	_ensure_endless_greenhouse_running()
 	var endless_simulation_paused:=_is_endless_normal_play() and not _should_simulate_endless_greenhouse()
 	if not endless_simulation_paused and _update_first_play_tutorial(delta):
 		_update_labels()
@@ -7337,7 +7366,7 @@ func _cleanup_later(p,delay:float,track_vacated:=true)->void:
 	plants.erase(p)
 	if play_active and not dev_jelly_test_active:
 		_queue_greenhouse_replacements();_update_play_ui()
-		if not _is_endless_normal_play() and play_seeds_remaining==0 and play_spawn_queue==0 and play_seed_animations_pending==0 and plants.is_empty():
+		if play_seeds_remaining==0 and play_spawn_queue==0 and play_seed_animations_pending==0 and plants.is_empty():
 			if not _queue_first_seed_pod_max_event():call_deferred("_finish_greenhouse_play")
 	await get_tree().create_timer(delay).timeout
 	if is_instance_valid(p):p.label.queue_free();p.queue_free()

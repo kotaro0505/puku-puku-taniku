@@ -329,7 +329,7 @@ const TEXT := {
 		"wallet": "所持　%dぷくコイン",
 		"forest_gacha": "森のガチャ",
 		"secret_gacha": "秘密のガチャ",
-		"gacha_spin": "3ぷくコインで回す",
+		"gacha_spin": "1ぷくコインで回す",
 		"gacha_dial_hint": "ダイヤルをタップして回そう",
 		"secret_gacha_dial_hint": "重いダイヤルを回そう",
 		"gacha_capsule_hint": "カプセルをタップ！",
@@ -393,6 +393,8 @@ const TEXT := {
 		,"play_old_seed": "古いたねをまく　1粒　残り%d袋"
 		,"play_normal_seed": "たねをまく　12粒　残り%dセット"
 		,"play_normal_seed_endless": "たねをまく"
+		,"play_normal_seed_round": "たねをまく　1ぷく"
+		,"play_normal_seed_round_free": "たねをまく　無料"
 		,"normal_sets_endless": "通常のたね：∞"
 		,"normal_sets_held": "たね（12粒）×%dセット"
 		,"play_volume_seed": "ボリュームパックをまく　36粒　残り%d袋"
@@ -419,6 +421,9 @@ const TEXT := {
 		,"result_total": "収穫サイズ合計　+%scm\nぷくゲージ +%scm　/　ぷくコイン +%d"
 		,"result_total_before_items": "収穫サイズ合計　+%scm"
 		,"result_count": "収穫株数　%d株"
+		,"round_result_title": "12粒ラウンド結果"
+		,"round_result_count": "収穫　%d株　　ジュレ　%d株"
+		,"round_result_economy": "開始費用　-%sぷく\n収穫報酬　+%sぷく\n今回の収支　%sぷく"
 		,"result_best_update": "最大サイズ更新！\n%.1fcm"
 		,"result_max": "最大サイズ　%.1fcm"
 		,"result_none": "今回はまだありません"
@@ -555,8 +560,8 @@ const TEXT := {
 		,"arrangement_default_name": "寄せ植え %d"
 		,"shop_rescue_offer": "タネなくなっちゃった？\n少し分けてあげるよ！"
 		,"shop_rescue_success": "はい、どうぞ！大事にまいてみてね。"
-		,"shop_puku_rescue_offer": "ぷくが足りなくて種をまけないの？\nお店のお手伝いをしたら5ぷく渡すよ！"
-		,"shop_puku_rescue_success": "お手伝いありがとう！\n5ぷくで温室をもう一度動かしてみてね。"
+		,"shop_puku_rescue_offer": "ぷくが足りなくて次のゲームを始められないの？\nお店のお手伝いで、通常ゲーム1回を無料にするよ！"
+		,"shop_puku_rescue_success": "お手伝いありがとう！\n次の通常ゲームを無料で始められるよ。"
 		,"shop_help_action": "お手伝いする"
 		,"shop_chatter_touch": "多肉を触ってみて柔らかくなっていたら水やりのタイミングだよ"
 		,"shop_chatter_welcome": "いらっしゃい！"
@@ -963,7 +968,7 @@ const TEXT := {
 		"wallet": "もっている ぷくこいん　%dまい",
 		"forest_gacha": "もりの がちゃ",
 		"secret_gacha": "ひみつの がちゃ",
-		"gacha_spin": "3ぷくこいんで まわす",
+		"gacha_spin": "1ぷくこいんで まわす",
 		"gacha_dial_hint": "だいやるを おして まわそう",
 		"secret_gacha_dial_hint": "おもい だいやるを まわそう",
 		"gacha_capsule_hint": "かぷせるを おしてね！",
@@ -1027,6 +1032,8 @@ const TEXT := {
 		,"play_old_seed": "ふるい たねを まく　1つぶ　のこり%dふくろ"
 		,"play_normal_seed": "たねを まく　12つぶ　のこり%dせっと"
 		,"play_normal_seed_endless": "たねを まく"
+		,"play_normal_seed_round": "たねを まく　1ぷく"
+		,"play_normal_seed_round_free": "たねを まく　むりょう"
 		,"normal_sets_endless": "ふつうの たね：むげん"
 		,"normal_sets_held": "たね（12つぶ）×%dせっと"
 		,"play_volume_seed": "ぼりゅーむぱっくを まく　36つぶ　のこり%dふくろ"
@@ -1053,6 +1060,9 @@ const TEXT := {
 		,"result_total": "しゅうかくした おおきさ　+%sせんち\nぷくげーじ +%sせんち　/　ぷくこいん +%d"
 		,"result_total_before_items": "しゅうかくした おおきさ　+%sせんち"
 		,"result_count": "しゅうかく　%dかぶ"
+		,"round_result_title": "12つぶらうんどの けっか"
+		,"round_result_count": "しゅうかく　%dかぶ　　じゅれ　%dかぶ"
+		,"round_result_economy": "はじめる ひよう　-%sぷく\nしゅうかく ほうしゅう　+%sぷく\nこんかいの しゅうし　%sぷく"
 		,"result_best_update": "いちばん おおきい きろく！\n%.1fせんち"
 		,"result_max": "いちばん おおきい もの　%.1fせんち"
 		,"result_none": "こんかいは まだ ありません"
@@ -1189,8 +1199,8 @@ const TEXT := {
 		,"arrangement_default_name": "よせうえ %d"
 		,"shop_rescue_offer": "たね なくなっちゃった？\nすこし わけてあげるよ！"
 		,"shop_rescue_success": "はい、どうぞ！だいじに まいてみてね。"
-		,"shop_puku_rescue_offer": "ぷくが たりなくて たねを まけないの？\nおてつだいを したら 5ぷく わたすよ！"
-		,"shop_puku_rescue_success": "おてつだい ありがとう！\n5ぷくで おんしつを もういちど うごかしてね。"
+		,"shop_puku_rescue_offer": "ぷくが たりなくて つぎの げーむを はじめられないの？\nおてつだいで、ふつうの げーむを 1かい むりょうに するよ！"
+		,"shop_puku_rescue_success": "おてつだい ありがとう！\nつぎの ふつうの げーむを むりょうで はじめられるよ。"
 		,"shop_help_action": "おてつだいする"
 		,"shop_chatter_touch": "たにくを さわって やわらかくなっていたら、みずやりの たいみんぐだよ"
 		,"shop_chatter_welcome": "いらっしゃい！"
@@ -1597,7 +1607,7 @@ const TEXT := {
 		"wallet": "%d Puku Coins",
 		"forest_gacha": "Forest Gacha",
 		"secret_gacha": "Secret Gacha",
-		"gacha_spin": "Spin for 3 Puku Coins",
+		"gacha_spin": "Spin for 1 Puku Coin",
 		"gacha_dial_hint": "Tap or turn the dial",
 		"secret_gacha_dial_hint": "Turn the heavy dial",
 		"gacha_capsule_hint": "Tap the capsule!",
@@ -1661,6 +1671,8 @@ const TEXT := {
 		,"play_old_seed": "Plant the old seed · 1 seed · %d bags"
 		,"play_normal_seed": "Plant seeds · 12 seeds · %d sets"
 		,"play_normal_seed_endless": "Plant seeds"
+		,"play_normal_seed_round": "Plant 12 seeds · 1 Puku"
+		,"play_normal_seed_round_free": "Plant 12 seeds · Free"
 		,"normal_sets_endless": "Normal seeds: unlimited"
 		,"normal_sets_held": "Seeds (12) × %d sets"
 		,"play_volume_seed": "Plant Volume Pack · 36 seeds · %d bags"
@@ -1687,6 +1699,9 @@ const TEXT := {
 		,"result_total": "Total harvested size +%s cm\nPuku Gauge +%s cm / Puku Coins +%d"
 		,"result_total_before_items": "Total harvested size +%s cm"
 		,"result_count": "%d plants harvested"
+		,"round_result_title": "12-Seed Round Results"
+		,"round_result_count": "Harvested %d    Jellied %d"
+		,"round_result_economy": "Entry cost -%s Puku\nHarvest rewards +%s Puku\nRound net %s Puku"
 		,"result_best_update": "New Largest Size!\n%.1f cm"
 		,"result_max": "Largest size %.1f cm"
 		,"result_none": "Nothing yet this time"
@@ -1823,8 +1838,8 @@ const TEXT := {
 		,"arrangement_default_name": "Arrangement %d"
 		,"shop_rescue_offer": "Run out of seeds?\nI'll share a set with you!"
 		,"shop_rescue_success": "Here you go! Plant them with care."
-		,"shop_puku_rescue_offer": "Not enough Puku to sow another seed?\nHelp at the shop and I'll give you 5 Puku!"
-		,"shop_puku_rescue_success": "Thanks for helping!\nUse these 5 Puku to restart your greenhouse."
+		,"shop_puku_rescue_offer": "Not enough Puku to start another round?\nHelp at the shop and your next normal round will be free!"
+		,"shop_puku_rescue_success": "Thanks for helping!\nYou can start your next normal round for free."
 		,"shop_help_action": "Help at the shop"
 		,"shop_chatter_touch": "When a succulent feels soft, it may be time to water it."
 		,"shop_chatter_welcome": "Welcome!"

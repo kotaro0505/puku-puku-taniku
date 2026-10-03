@@ -16,7 +16,7 @@ const UI_CREAM:=Color("#fff1d2")
 const UI_BROWN:=Color("#4a2618")
 const DIAL_CENTER:=Vector2(385,627)
 const DIAL_SIZE:=Vector2(112,112)
-const SPIN_COST_PUKU:=3
+const SPIN_COST_PUKU:=1
 
 var wallet_label:Label
 var title_label:Label
@@ -71,7 +71,7 @@ func _build_dial()->void:
 	dial_texture=TextureRect.new();dial_texture.name="TemporaryDial";dial_texture.texture=DIAL_TEXTURE;dial_texture.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;dial_texture.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;dial_texture.position=DIAL_CENTER-DIAL_SIZE*.5;dial_texture.size=DIAL_SIZE;dial_texture.pivot_offset=dial_texture.size*.5;dial_texture.mouse_filter=Control.MOUSE_FILTER_IGNORE;add_child(dial_texture)
 	dial_hit_area=Button.new();dial_hit_area.name="DialHitArea";dial_hit_area.flat=true;dial_hit_area.position=Vector2(326,562);dial_hit_area.size=Vector2(128,132);dial_hit_area.mouse_default_cursor_shape=Control.CURSOR_POINTING_HAND;dial_hit_area.focus_mode=Control.FOCUS_NONE;dial_hit_area.gui_input.connect(_on_dial_input);add_child(dial_hit_area)
 	hint_label=Label.new();hint_label.position=Vector2(118,862);hint_label.size=Vector2(340,44);hint_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;hint_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;hint_label.text="ダイヤルをタップして回そう";hint_label.add_theme_font_size_override("font_size",18);hint_label.add_theme_color_override("font_color",Color("#fff4cf"));hint_label.add_theme_color_override("font_outline_color",Color("#3e1d0d"));hint_label.add_theme_constant_override("outline_size",7);add_child(hint_label)
-	spin_button=Button.new();spin_button.name="SpinButton";spin_button.text="3ぷくコインで回す";spin_button.position=Vector2(148,910);spin_button.size=Vector2(280,72);_skin_button(spin_button,Color("#c7923d"),21);spin_button.pressed.connect(_request_spin);add_child(spin_button)
+	spin_button=Button.new();spin_button.name="SpinButton";spin_button.text="1ぷくコインで回す";spin_button.position=Vector2(148,910);spin_button.size=Vector2(280,72);_skin_button(spin_button,Color("#c7923d"),21);spin_button.pressed.connect(_request_spin);add_child(spin_button)
 
 func _build_capsule()->void:
 	capsule=CapsuleClass.new();capsule.name="Capsule";capsule.position=Vector2(244,742);capsule.size=Vector2(88,88);capsule.pivot_offset=capsule.size*.5;capsule.mouse_filter=Control.MOUSE_FILTER_IGNORE;capsule.visible=false;add_child(capsule)
