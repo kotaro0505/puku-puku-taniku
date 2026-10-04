@@ -60,6 +60,19 @@ func _build_ui() -> void:
 	note.add_theme_color_override("font_color", Color("#76513b"))
 	content.add_child(note)
 
+	var preset_scroll := ScrollContainer.new()
+	preset_scroll.name = "StoryPresetScroll"
+	preset_scroll.custom_minimum_size = Vector2(430, 560)
+	preset_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	preset_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	preset_scroll.scroll_deadzone = 12
+	content.add_child(preset_scroll)
+	var preset_list := VBoxContainer.new()
+	preset_list.name = "StoryPresetList"
+	preset_list.custom_minimum_size = Vector2(420, 0)
+	preset_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	preset_list.add_theme_constant_override("separation", 8)
+	preset_scroll.add_child(preset_list)
 	for option in StoryDevPresetsClass.options():
 		var preset_id := str(option.get("id", ""))
 		var button := _button(
@@ -68,7 +81,7 @@ func _build_ui() -> void:
 			Color("#c7d6ad")
 		)
 		button.pressed.connect(_emit_preset.bind(preset_id))
-		content.add_child(button)
+		preset_list.add_child(button)
 
 	var divider := HSeparator.new()
 	divider.custom_minimum_size = Vector2(410, 12)

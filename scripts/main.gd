@@ -158,6 +158,8 @@ const FIRST_PLAY_TUTORIAL_SPEAKERS := ["panda","girl","armadillo"]
 const FIRST_PLAY_TUTORIAL_INITIAL_DELAY := 0.65
 const FIRST_PLAY_TUTORIAL_GROWTH_DIALOG_CM := 9.0
 const FIRST_PLAY_TUTORIAL_JELLY_DIALOG_CM := 18.0
+const FIRST_PLAY_TUTORIAL_JELLY_OBSERVE_SECONDS := 0.55
+const FIRST_PLAY_TUTORIAL_NEW_OBSERVE_SECONDS := 3.0
 const SERIES_CAROUSEL_TRACK_ORIGIN := Vector2(48,0)
 const SERIES_CAROUSEL_CARD_SIZE := Vector2(480,590)
 const SERIES_CAROUSEL_SPACING := 420.0
@@ -445,6 +447,12 @@ var first_play_tutorial_dialog_visible := false
 var first_play_tutorial_message_index := 0
 var first_play_tutorial_wait_remaining := 0.0
 var first_play_tutorial_sequence_complete := false
+var first_play_tutorial_phase := ""
+var first_play_tutorial_reserved_seed_pending := false
+var first_play_tutorial_reserved_species_id := ""
+var first_play_tutorial_reserved_plant: Node
+var first_play_tutorial_forced_jelly_plant: Node
+var first_play_tutorial_observe_remaining := 0.0
 var first_play_harvest_guide_active := false
 var old_seed_harvest_guide_active := false
 var first_play_has_harvested := false
@@ -880,8 +888,8 @@ func _load_species() -> void:
 			var hybrid:Dictionary=raw_hybrid.duplicate(true)
 			var fusion_tier:=int(hybrid.get("fusion_tier",0))
 			var is_special_fusion:=fusion_tier>0
-			hybrid["description_ja"]="特殊配合をさらに掛け合わせて誕生した、上位特殊配合多肉。" if fusion_tier>=2 else ("決められた特別な組み合わせから誕生した、二段目の特殊配合多肉。" if is_special_fusion else "配合ラボで誕生した、ふたつの系統の個性を受け継ぐ特別な多肉。")
-			hybrid["description_en"]="An advanced special fusion succulent born by combining special fusions." if fusion_tier>=2 else ("A second-tier special fusion succulent born from a specific pairing." if is_special_fusion else "A special hybrid succulent born in the Fusion Lab.")
+			hybrid["description_ja"]="特殊配合をさらに掛け合わせて誕生した、上位特殊配合多肉。" if fusion_tier>=2 else ("決められた特別な組み合わせから誕生した、二段目の特殊配合多肉。" if is_special_fusion else "ハイブリッドラボで誕生した、ふたつの系統の個性を受け継ぐ特別な多肉。")
+			hybrid["description_en"]="An advanced special fusion succulent born by combining special fusions." if fusion_tier>=2 else ("A second-tier special fusion succulent born from a specific pairing." if is_special_fusion else "A special hybrid succulent born in the Hybrid Lab.")
 			hybrid["rarity"]="上位特殊配合種" if fusion_tier>=2 else ("特殊配合種" if is_special_fusion else "配合種");hybrid["spawn_weight"]=0.0;hybrid["unlocked_spawn_weight"]=1.0
 			hybrid["series_seed_weight"]=0.0;hybrid["series_seed_eligible"]=false
 			hybrid["base_growth_rate"]=1.0;hybrid["jelly_risk_curve"]=1.0
@@ -1705,7 +1713,7 @@ func _build_ui() -> void:
 	external_navigation_controls.append(shop_button)
 	forest_gacha_button=Button.new();forest_gacha_button.name="ForestGachaButton";forest_gacha_button.text="森のガチャ";forest_gacha_button.position=Vector2(398,326);forest_gacha_button.size=Vector2(153,67);_skin_button(forest_gacha_button,Color("#d9c77d"),15);forest_gacha_button.mouse_filter=Control.MOUSE_FILTER_STOP;forest_gacha_button.pressed.connect(_open_forest_gacha);hud.add_child(forest_gacha_button)
 	external_navigation_controls.append(forest_gacha_button)
-	fusion_lab_button=Button.new();fusion_lab_button.name="FusionLabButton";fusion_lab_button.text="配合ラボ";fusion_lab_button.position=Vector2(398,400);fusion_lab_button.size=Vector2(153,58);_skin_button(fusion_lab_button,Color("#cda4d7"),16);fusion_lab_button.mouse_filter=Control.MOUSE_FILTER_STOP;fusion_lab_button.pressed.connect(_open_fusion_lab);hud.add_child(fusion_lab_button)
+	fusion_lab_button=Button.new();fusion_lab_button.name="FusionLabButton";fusion_lab_button.text="ハイブリッドラボ";fusion_lab_button.position=Vector2(398,400);fusion_lab_button.size=Vector2(153,58);_skin_button(fusion_lab_button,Color("#cda4d7"),16);fusion_lab_button.mouse_filter=Control.MOUSE_FILTER_STOP;fusion_lab_button.pressed.connect(_open_fusion_lab);hud.add_child(fusion_lab_button)
 	external_navigation_controls.append(fusion_lab_button)
 	secret_gacha_button=Button.new();secret_gacha_button.name="SecretGachaButton";secret_gacha_button.text="秘密のガチャ\n1ぷく";secret_gacha_button.position=Vector2(398,466);secret_gacha_button.size=Vector2(153,67);_skin_button(secret_gacha_button,Color("#b88348"),15);secret_gacha_button.mouse_filter=Control.MOUSE_FILTER_STOP;secret_gacha_button.pressed.connect(_open_secret_gacha);secret_gacha_button.visible=false;hud.add_child(secret_gacha_button)
 	external_navigation_controls.append(secret_gacha_button)
@@ -2953,7 +2961,12 @@ func _complete_tutorial_guide()->void:
 	elif target=="normal_seed":_start_greenhouse_play("normal")
 
 func _begin_first_play_tutorial()->void:
-	first_play_tutorial_active=true;first_play_tutorial_dialog_visible=false;first_play_tutorial_message_index=0;first_play_tutorial_wait_remaining=FIRST_PLAY_TUTORIAL_INITIAL_DELAY;first_play_tutorial_sequence_complete=false;first_play_harvest_guide_active=false;old_seed_harvest_guide_active=false;first_play_has_harvested=false;tutorial_harvest_plant=null
+	first_play_tutorial_active=true;first_play_tutorial_dialog_visible=false;first_play_tutorial_message_index=0;first_play_tutorial_wait_remaining=FIRST_PLAY_TUTORIAL_INITIAL_DELAY;first_play_tutorial_sequence_complete=false;first_play_tutorial_phase="growth_dialogs";first_play_harvest_guide_active=false;old_seed_harvest_guide_active=false;first_play_has_harvested=false;tutorial_harvest_plant=null
+	first_play_tutorial_reserved_plant=null;first_play_tutorial_forced_jelly_plant=null;first_play_tutorial_observe_remaining=0.0
+	var original_candidates:=_first_play_tutorial_original_candidates()
+	first_play_tutorial_reserved_species_id=""
+	if not original_candidates.is_empty():first_play_tutorial_reserved_species_id=str(original_candidates[rng.randi_range(0,original_candidates.size()-1)].get("species_id",""))
+	first_play_tutorial_reserved_seed_pending=not first_play_tutorial_reserved_species_id.is_empty()
 	_hide_first_play_tutorial_overlay()
 
 func _update_first_play_tutorial(delta:float)->bool:
@@ -2962,6 +2975,20 @@ func _update_first_play_tutorial(delta:float)->bool:
 		_update_first_play_harvest_guide_focus()
 		return true
 	if first_play_tutorial_dialog_visible:return true
+	if first_play_tutorial_phase=="jelly_observe":
+		first_play_tutorial_observe_remaining=maxf(0.0,first_play_tutorial_observe_remaining-delta)
+		if first_play_tutorial_observe_remaining<=0.0:
+			first_play_tutorial_phase="jelly_reaction"
+			_show_first_play_tutorial_custom_dialog("tutorial_normal_jellied","panda")
+		return true
+	if first_play_tutorial_phase=="reserved_seed_sowing":return true
+	if first_play_tutorial_phase=="reserved_seed_observe":
+		first_play_tutorial_observe_remaining=maxf(0.0,first_play_tutorial_observe_remaining-delta)
+		if first_play_tutorial_observe_remaining<=0.0:
+			first_play_tutorial_phase="new_species_panda"
+			_show_first_play_tutorial_custom_dialog("tutorial_normal_new_panda","panda")
+		return true
+	if first_play_tutorial_phase=="forcing_jelly":return true
 	if first_play_tutorial_sequence_complete:
 		_maybe_activate_first_play_harvest_guide()
 		return first_play_harvest_guide_active
@@ -2981,6 +3008,9 @@ func _first_play_tutorial_stage_ready()->bool:
 
 func _show_first_play_tutorial_dialog()->void:
 	if first_play_tutorial_message_index<0 or first_play_tutorial_message_index>=FIRST_PLAY_TUTORIAL_MESSAGE_KEYS.size():return
+	_show_first_play_tutorial_custom_dialog(str(FIRST_PLAY_TUTORIAL_MESSAGE_KEYS[first_play_tutorial_message_index]),str(FIRST_PLAY_TUTORIAL_SPEAKERS[first_play_tutorial_message_index]))
+
+func _show_first_play_tutorial_custom_dialog(message_key:String,speaker_id:String)->void:
 	first_play_tutorial_dialog_visible=true;tutorial_harvest_plant=null
 	if tutorial_highlight_tween and tutorial_highlight_tween.is_valid():tutorial_highlight_tween.kill()
 	tutorial_highlight_tween=null;tutorial_guide_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_shade.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_shade.material=null;tutorial_guide_shade.color=Color(0.035,0.025,0.02,.34)
@@ -2988,18 +3018,65 @@ func _show_first_play_tutorial_dialog()->void:
 	var empty_style:=StyleBoxEmpty.new()
 	for state in ["normal","hover","pressed","disabled","focus"]:tutorial_guide_button.add_theme_stylebox_override(state,empty_style)
 	for connection in tutorial_guide_button.pressed.get_connections():tutorial_guide_button.pressed.disconnect(connection.callable)
-	tutorial_guide_button.pressed.connect(_dismiss_first_play_tutorial_dialog);tutorial_panda_portrait.texture=_speaker_portrait_texture(str(FIRST_PLAY_TUTORIAL_SPEAKERS[first_play_tutorial_message_index]));tutorial_panda_portrait.visible=true;tutorial_guide_message.text=Localizer.text(language_code,str(FIRST_PLAY_TUTORIAL_MESSAGE_KEYS[first_play_tutorial_message_index]));tutorial_dialog_panel.visible=true;tutorial_dialog_panel.position=Vector2(40,790);tutorial_guide_overlay.visible=true
+	tutorial_guide_button.pressed.connect(_dismiss_first_play_tutorial_dialog);tutorial_panda_portrait.texture=_speaker_portrait_texture(speaker_id);tutorial_panda_portrait.visible=true;tutorial_guide_message.text=Localizer.text(language_code,message_key);tutorial_dialog_panel.visible=true;tutorial_dialog_panel.position=Vector2(40,790);tutorial_guide_overlay.visible=true
 
 func _dismiss_first_play_tutorial_dialog()->void:
 	if not first_play_tutorial_dialog_visible:return
+	if first_play_tutorial_phase=="jelly_reaction":
+		first_play_tutorial_dialog_visible=false;_hide_first_play_tutorial_overlay();_sow_first_play_tutorial_reserved_seed();return
+	if first_play_tutorial_phase=="new_species_panda":
+		first_play_tutorial_phase="new_species_girl";_show_first_play_tutorial_custom_dialog("tutorial_normal_new_girl","girl");return
+	if first_play_tutorial_phase=="new_species_girl":
+		first_play_tutorial_dialog_visible=false;_hide_first_play_tutorial_overlay();_activate_first_play_tutorial_new_harvest_guide();return
 	first_play_tutorial_message_index+=1
 	if first_play_tutorial_message_index>=FIRST_PLAY_TUTORIAL_MESSAGE_KEYS.size():
-		first_play_tutorial_dialog_visible=false;first_play_tutorial_sequence_complete=true;tutorial_steps["first_play_growth_dialogs"]=true;_hide_first_play_tutorial_overlay()
-		_save()
-		_maybe_activate_first_play_harvest_guide()
-		if play_active and play_seeds_remaining==0 and play_spawn_queue==0 and play_seed_animations_pending==0 and plants.is_empty():call_deferred("_finish_greenhouse_play")
+		first_play_tutorial_dialog_visible=false;_hide_first_play_tutorial_overlay()
+		if first_play_tutorial_reserved_seed_pending:
+			first_play_tutorial_phase="forcing_jelly";call_deferred("_force_first_play_tutorial_jelly")
+		else:_complete_first_play_tutorial_dialog_sequence()
 	else:
 		first_play_tutorial_dialog_visible=false;first_play_tutorial_wait_remaining=.20;_hide_first_play_tutorial_overlay()
+
+func _complete_first_play_tutorial_dialog_sequence()->void:
+	first_play_tutorial_sequence_complete=true;first_play_tutorial_phase="harvest_guide";tutorial_steps["first_play_growth_dialogs"]=true;_save()
+	_maybe_activate_first_play_harvest_guide()
+	if play_active and play_seeds_remaining==0 and play_spawn_queue==0 and play_seed_animations_pending==0 and plants.is_empty():call_deferred("_finish_greenhouse_play")
+
+func _force_first_play_tutorial_jelly()->void:
+	if not first_play_tutorial_active or not play_active:return
+	var growing:=_first_play_growing_plants()
+	if growing.is_empty():
+		_complete_first_play_tutorial_dialog_sequence();return
+	first_play_tutorial_forced_jelly_plant=growing[0]
+	first_play_tutorial_forced_jelly_plant.set_meta("first_tutorial_forced_jelly",true)
+	first_play_tutorial_forced_jelly_plant.jelly_checks_enabled=false
+	first_play_tutorial_phase="jelly_observe";first_play_tutorial_observe_remaining=FIRST_PLAY_TUTORIAL_JELLY_OBSERVE_SECONDS
+	first_play_tutorial_forced_jelly_plant.jelly()
+
+func _sow_first_play_tutorial_reserved_seed()->void:
+	if not first_play_tutorial_active or not play_active:return
+	var entry:=_catalog_entry(first_play_tutorial_reserved_species_id)
+	if entry.is_empty() or play_seeds_remaining<=0:
+		first_play_tutorial_reserved_seed_pending=false;_complete_first_play_tutorial_dialog_sequence();return
+	opening_species.push_front(entry)
+	first_play_tutorial_phase="reserved_seed_sowing"
+	if _spawn_greenhouse_seed(true):
+		first_play_tutorial_reserved_seed_pending=false
+	else:
+		opening_species.pop_front();first_play_tutorial_reserved_seed_pending=false;_complete_first_play_tutorial_dialog_sequence()
+
+func _mark_first_play_tutorial_reserved_plant(plant)->void:
+	if not first_play_tutorial_active or first_play_tutorial_phase!="reserved_seed_sowing" or not is_instance_valid(plant):return
+	if str(plant.data.get("species_id",""))!=first_play_tutorial_reserved_species_id:return
+	first_play_tutorial_reserved_plant=plant;plant.set_meta("first_tutorial_reserved_new",true);plant.jelly_checks_enabled=false
+	first_play_tutorial_phase="reserved_seed_observe";first_play_tutorial_observe_remaining=FIRST_PLAY_TUTORIAL_NEW_OBSERVE_SECONDS
+
+func _activate_first_play_tutorial_new_harvest_guide()->void:
+	if not is_instance_valid(first_play_tutorial_reserved_plant) or first_play_tutorial_reserved_plant.state!="growing":
+		_complete_first_play_tutorial_dialog_sequence();return
+	first_play_tutorial_sequence_complete=true;first_play_tutorial_phase="harvest_guide";tutorial_steps["first_play_growth_dialogs"]=true
+	first_play_harvest_guide_active=true;tutorial_harvest_plant=first_play_tutorial_reserved_plant;tutorial_harvest_plant.jelly_checks_enabled=false
+	_clamp_tutorial_harvest_plant(tutorial_harvest_plant);_show_tutorial_harvest_spotlight();_save()
 
 func _hide_first_play_tutorial_overlay()->void:
 	if tutorial_guide_overlay==null:return
@@ -3044,6 +3121,24 @@ func _first_play_growing_plants()->Array:
 	for plant in plants:
 		if is_instance_valid(plant) and plant.state=="growing":growing.append(plant)
 	return growing
+
+func _first_play_tutorial_original_candidates()->Array[Dictionary]:
+	var unseen:Array[Dictionary]=[]
+	var unget:Array[Dictionary]=[]
+	var pools:=_normal_seed_selection_pools()
+	var seed_candidates:Array=[]
+	seed_candidates.append_array(pools.get("unlocked_new",[]))
+	seed_candidates.append_array(pools.get("locked_new",[]))
+	for raw_entry in seed_candidates:
+		if not raw_entry is Dictionary:continue
+		var entry:Dictionary=raw_entry;var species_id:=str(entry.get("species_id",""))
+		if species_id.is_empty() or species_id in pending_round_new_species_ids or _species_get_count(species_id)>0:continue
+		if not bool(entry.get("main_story_original",false)) or str(entry.get("rarity",""))!="通常":continue
+		if bool(entry.get("special_route_only",false)) or _seed_new_species_blocked(species_id):continue
+		if not _species_available_in_current_era(entry) or float(entry.get("spawn_weight",0.0))<=0.0:continue
+		unget.append(entry)
+		if not bool(discovered.get(species_id,false)):unseen.append(entry)
+	return unseen if not unseen.is_empty() else unget
 
 func _old_seed_story_active()->bool:
 	return play_active and active_seed_type=="old" and not first_colorata_confirmed
@@ -3117,7 +3212,7 @@ func _update_first_play_harvest_guide_focus()->void:
 	first_play_harvest_spotlight_material.set_shader_parameter("focus_count",1);first_play_harvest_spotlight_material.set_shader_parameter("viewport_aspect",viewport_size.x/viewport_size.y);_position_tutorial_dialog(avoid)
 
 func _end_first_play_tutorial_context()->void:
-	first_play_tutorial_active=false;first_play_tutorial_dialog_visible=false;first_play_harvest_guide_active=false;old_seed_harvest_guide_active=false;tutorial_harvest_plant=null;_hide_first_play_tutorial_overlay()
+	first_play_tutorial_active=false;first_play_tutorial_dialog_visible=false;first_play_tutorial_sequence_complete=false;first_play_tutorial_phase="";first_play_tutorial_reserved_seed_pending=false;first_play_tutorial_reserved_species_id="";first_play_tutorial_reserved_plant=null;first_play_tutorial_forced_jelly_plant=null;first_play_tutorial_observe_remaining=0.0;first_play_harvest_guide_active=false;old_seed_harvest_guide_active=false;tutorial_harvest_plant=null;_hide_first_play_tutorial_overlay()
 
 func _show_intro_gift_effect()->void:
 	for i in range(7):
@@ -6591,6 +6686,7 @@ func spawn_plant(force_golden := false,spawn_position:Variant=null) -> void:
 	if first_play_tutorial_active:p.jelly_checks_enabled=false
 	p.harvested.connect(_on_harvested); p.jellied.connect(_on_jellied)
 	plants.append(p)
+	_mark_first_play_tutorial_reserved_plant(p)
 	if endless_forced_new:_save()
 	if audio_manager:audio_manager.play_se("sprout",.28)
 
@@ -6620,6 +6716,9 @@ func _animate_and_spawn_greenhouse_seed(spawn_position:Vector3)->void:
 
 func _queue_greenhouse_replacements()->void:
 	if not play_active or active_seed_type=="old":return
+	# One of the formal round's twelve seeds is held back for the scripted NEW
+	# sprout.  Never let ordinary slot refill consume or overtake that seed.
+	if first_play_tutorial_active and (first_play_tutorial_reserved_seed_pending or first_play_tutorial_phase in ["forcing_jelly","jelly_observe","jelly_reaction","reserved_seed_sowing"]):return
 	var open_slots:=maxi(0,play_concurrent_target-(plants.size()+play_spawn_queue+play_seed_animations_pending))
 	var add_count:=mini(open_slots,maxi(0,play_seeds_remaining-play_spawn_queue))
 	if add_count<=0:return
@@ -7656,6 +7755,7 @@ func _on_harvested(p)->void:
 	if old_seed_harvest_guide_active:
 		old_seed_harvest_guide_active=false;tutorial_harvest_plant=null;_hide_first_play_tutorial_overlay()
 	if first_play_harvest_guide_active:
+		if bool(p.get_meta("first_tutorial_reserved_new",false)):tutorial_steps["first_normal_tutorial_species_id"]=str(p.data.get("species_id",""))
 		first_play_harvest_guide_active=false;tutorial_steps["first_harvest_guide"]=true;normal_play_tutorial_complete=true;tutorial_harvest_plant=null;_hide_first_play_tutorial_overlay()
 		for remaining_plant in plants:
 			if is_instance_valid(remaining_plant) and remaining_plant!=p and remaining_plant.state=="growing":remaining_plant.jelly_checks_enabled=true

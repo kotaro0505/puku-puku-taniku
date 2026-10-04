@@ -325,7 +325,7 @@
     "series_id": "hybrid",
     "display_name": "配合多肉",
     "subtitle": "ふたつの系統から生まれる特別な多肉",
-    "description": "配合ラボで誕生した多肉を記録するページです。一度GETした品種は、通常温室のたねからも現れるようになります。",
+    "description": "ハイブリッドラボで誕生した多肉を記録するページです。一度GETした品種は、通常温室のたねからも現れるようになります。",
     "cover_image_path": "res://assets/catalog/hybrid/hyb_gummy_gummy.png",
     "species_ids": [
       "hyb_gummy_gummy",
@@ -388,7 +388,7 @@
     "unlock_type": "future",
     "preview_catalog_when_locked": false,
     "catalog_purchase_enabled": false,
-    "unlock_condition": {"display_text": "配合ラボで初GETすると開放"},
+    "unlock_condition": {"display_text": "ハイブリッドラボで初GETすると開放"},
     "iap_product_id": "",
     "sort_order": 140
   },

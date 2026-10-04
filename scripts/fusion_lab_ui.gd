@@ -8,6 +8,15 @@ signal candidate_image_requested(entry: Dictionary, target: TextureRect, high_pr
 
 const Localizer = preload("res://scripts/game_localizer.gd")
 const UI_BROWN := Color("#4a2618")
+const HYBRID_LAB_BACKGROUND_PATH := "res://assets/fusion/hybrid-lab-background.jpg"
+# One particle keeps the exact pre-revision travel/fade timing.  Extending the
+# emission to three waves makes the energy keep flowing for roughly three times
+# as long without turning any individual mote into slow motion.
+const ENERGY_WAVE_COUNT := 3
+const ENERGY_PARTICLES_PER_WAVE := 8
+const ENERGY_PARTICLE_TRAVEL_SECONDS := 0.42
+const ENERGY_PARTICLE_FADE_SECONDS := 0.18
+const ENERGY_PARTICLE_STAGGER_SECONDS := 0.035
 const SERIES_LABELS := {
 	"ja": {
 		"gummy": "グミ", "metal": "金属", "sweets": "スイーツ", "glow": "蓄光", "jewel": "宝石",
@@ -63,6 +72,7 @@ var current_cost := 1
 var fusion_processing := false
 var result_revealed := false
 var silhouette_material: ShaderMaterial
+var background_image: TextureRect
 
 func _ready() -> void:
 	name = "FusionLabUI"
@@ -73,46 +83,43 @@ func _ready() -> void:
 	set_language(language)
 
 func _build_ui() -> void:
-	var shade := ColorRect.new()
-	shade.color = Color(0.035, 0.025, 0.045, 0.86)
-	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	shade.mouse_filter = Control.MOUSE_FILTER_STOP
-	add_child(shade)
-
-	var panel := PanelContainer.new()
-	panel.position = Vector2(24, 42)
-	panel.size = Vector2(528, 940)
-	panel.add_theme_stylebox_override("panel", _box(Color("#f5ead4"), Color("#a87543"), 28, 4))
-	add_child(panel)
+	background_image = TextureRect.new()
+	background_image.name = "HybridLabBackground"
+	background_image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	background_image.texture = load(HYBRID_LAB_BACKGROUND_PATH)
+	background_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	background_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	background_image.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(background_image)
 
 	title_label = Label.new()
-	title_label.position = Vector2(95, 58)
-	title_label.size = Vector2(336, 62)
+	title_label.position = Vector2(102, 178)
+	title_label.size = Vector2(330, 52)
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	title_label.add_theme_font_size_override("font_size", 29)
-	title_label.add_theme_color_override("font_color", Color("#fff1c2"))
-	title_label.add_theme_color_override("font_outline_color", Color("#57311f"))
-	title_label.add_theme_constant_override("outline_size", 7)
+	title_label.add_theme_font_size_override("font_size", 27)
+	title_label.add_theme_color_override("font_color", UI_BROWN)
+	title_label.add_theme_color_override("font_outline_color", Color("#fff5db"))
+	title_label.add_theme_constant_override("outline_size", 3)
 	add_child(title_label)
 
 	close_button = Button.new()
-	close_button.position = Vector2(438, 65)
-	close_button.size = Vector2(94, 50)
+	close_button.position = Vector2(447, 181)
+	close_button.size = Vector2(72, 44)
 	_skin_button(close_button, Color("#ead8b1"), 16)
 	close_button.pressed.connect(func(): close_requested.emit())
 	add_child(close_button)
 
 	main_page = Control.new()
-	main_page.position = Vector2(46, 124)
-	main_page.size = Vector2(484, 826)
+	main_page.position = Vector2(46, 230)
+	main_page.size = Vector2(484, 520)
 	main_page.mouse_filter = Control.MOUSE_FILTER_PASS
 	add_child(main_page)
 	_build_main_page()
 
 	picker_page = Control.new()
-	picker_page.position = Vector2(46, 124)
-	picker_page.size = Vector2(484, 826)
+	picker_page.position = Vector2(46, 230)
+	picker_page.size = Vector2(484, 532)
 	picker_page.mouse_filter = Control.MOUSE_FILTER_PASS
 	picker_page.visible = false
 	add_child(picker_page)
@@ -130,8 +137,8 @@ func _build_main_page() -> void:
 	main_page.add_child(instruction_label)
 
 	parent_a_button = Button.new()
-	parent_a_button.position = Vector2(2, 84)
-	parent_a_button.size = Vector2(140, 236)
+	parent_a_button.position = Vector2(2, 54)
+	parent_a_button.size = Vector2(140, 210)
 	_skin_button(parent_a_button, Color("#d8ece5"), 16)
 	parent_a_button.pressed.connect(_open_picker.bind(0))
 	main_page.add_child(parent_a_button)
@@ -146,15 +153,15 @@ func _build_main_page() -> void:
 	parent_a_button.add_child(parent_a_heading)
 	parent_a_image = TextureRect.new()
 	parent_a_image.name = "ParentAImage"
-	parent_a_image.position = Vector2(8, 35)
-	parent_a_image.size = Vector2(124, 142)
+	parent_a_image.position = Vector2(8, 34)
+	parent_a_image.size = Vector2(124, 120)
 	parent_a_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	parent_a_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	parent_a_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent_a_button.add_child(parent_a_image)
 	parent_a_name_label = Label.new()
-	parent_a_name_label.position = Vector2(8, 179)
-	parent_a_name_label.size = Vector2(124, 47)
+	parent_a_name_label.position = Vector2(8, 156)
+	parent_a_name_label.size = Vector2(124, 46)
 	parent_a_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	parent_a_name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	parent_a_name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -165,8 +172,8 @@ func _build_main_page() -> void:
 	parent_a_button.add_child(parent_a_name_label)
 
 	parent_b_button = Button.new()
-	parent_b_button.position = Vector2(342, 84)
-	parent_b_button.size = Vector2(140, 236)
+	parent_b_button.position = Vector2(342, 54)
+	parent_b_button.size = Vector2(140, 210)
 	_skin_button(parent_b_button, Color("#f0dbe5"), 16)
 	parent_b_button.pressed.connect(_open_picker.bind(1))
 	main_page.add_child(parent_b_button)
@@ -181,15 +188,15 @@ func _build_main_page() -> void:
 	parent_b_button.add_child(parent_b_heading)
 	parent_b_image = TextureRect.new()
 	parent_b_image.name = "ParentBImage"
-	parent_b_image.position = Vector2(8, 35)
-	parent_b_image.size = Vector2(124, 142)
+	parent_b_image.position = Vector2(8, 34)
+	parent_b_image.size = Vector2(124, 120)
 	parent_b_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	parent_b_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	parent_b_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent_b_button.add_child(parent_b_image)
 	parent_b_name_label = Label.new()
-	parent_b_name_label.position = Vector2(8, 179)
-	parent_b_name_label.size = Vector2(124, 47)
+	parent_b_name_label.position = Vector2(8, 156)
+	parent_b_name_label.size = Vector2(124, 46)
 	parent_b_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	parent_b_name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	parent_b_name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -202,7 +209,7 @@ func _build_main_page() -> void:
 	for marker_data in [{"x": 137.0, "text": "→"}, {"x": 327.0, "text": "←"}]:
 		var inward_marker := Label.new()
 		inward_marker.text = str(marker_data["text"])
-		inward_marker.position = Vector2(float(marker_data["x"]), 174)
+		inward_marker.position = Vector2(float(marker_data["x"]), 142)
 		inward_marker.size = Vector2(20, 40)
 		inward_marker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		inward_marker.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -211,8 +218,8 @@ func _build_main_page() -> void:
 		main_page.add_child(inward_marker)
 
 	var result_frame := PanelContainer.new()
-	result_frame.position = Vector2(154, 64)
-	result_frame.size = Vector2(176, 278)
+	result_frame.position = Vector2(154, 44)
+	result_frame.size = Vector2(176, 238)
 	var result_style := _box(Color("#241c27"), Color("#e0bc72"), 25, 3)
 	result_style.shadow_color = Color(0.4, 0.2, 0.5, 0.3)
 	result_style.shadow_size = 8
@@ -221,18 +228,9 @@ func _build_main_page() -> void:
 	var result_content := Control.new()
 	result_content.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	result_frame.add_child(result_content)
-	var result_heading := Label.new()
-	result_heading.name = "ResultHeading"
-	result_heading.position = Vector2(8, 7)
-	result_heading.size = Vector2(160, 27)
-	result_heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	result_heading.add_theme_font_size_override("font_size", 14)
-	result_heading.add_theme_color_override("font_color", Color("#e8c97f"))
-	result_content.add_child(result_heading)
-
 	result_image = TextureRect.new()
-	result_image.position = Vector2(9, 35)
-	result_image.size = Vector2(158, 174)
+	result_image.position = Vector2(9, 12)
+	result_image.size = Vector2(158, 166)
 	result_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	result_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	result_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -241,8 +239,8 @@ func _build_main_page() -> void:
 	silhouette_material = create_silhouette_material()
 
 	result_name_label = Label.new()
-	result_name_label.position = Vector2(8, 210)
-	result_name_label.size = Vector2(160, 54)
+	result_name_label.position = Vector2(8, 178)
+	result_name_label.size = Vector2(160, 50)
 	result_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	result_name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	result_name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -252,7 +250,7 @@ func _build_main_page() -> void:
 	result_content.add_child(result_name_label)
 	result_new_label = Label.new()
 	result_new_label.text = "NEW"
-	result_new_label.position = Vector2(105, 36)
+	result_new_label.position = Vector2(105, 13)
 	result_new_label.size = Vector2(58, 30)
 	result_new_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	result_new_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -263,8 +261,8 @@ func _build_main_page() -> void:
 	result_content.add_child(result_new_label)
 
 	result_status_label = Label.new()
-	result_status_label.position = Vector2(18, 358)
-	result_status_label.size = Vector2(448, 66)
+	result_status_label.position = Vector2(18, 290)
+	result_status_label.size = Vector2(448, 54)
 	result_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	result_status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	result_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -273,7 +271,7 @@ func _build_main_page() -> void:
 	main_page.add_child(result_status_label)
 
 	fusion_cost_label = Label.new()
-	fusion_cost_label.position = Vector2(92, 438)
+	fusion_cost_label.position = Vector2(92, 348)
 	fusion_cost_label.size = Vector2(300, 44)
 	fusion_cost_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	fusion_cost_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -282,15 +280,15 @@ func _build_main_page() -> void:
 	main_page.add_child(fusion_cost_label)
 
 	fuse_button = Button.new()
-	fuse_button.position = Vector2(62, 494)
-	fuse_button.size = Vector2(360, 72)
+	fuse_button.position = Vector2(62, 398)
+	fuse_button.size = Vector2(360, 64)
 	_skin_button(fuse_button, Color("#d69a45"), 22)
 	fuse_button.pressed.connect(_request_fusion)
 	main_page.add_child(fuse_button)
 
 	back_button = Button.new()
-	back_button.position = Vector2(132, 586)
-	back_button.size = Vector2(220, 58)
+	back_button.position = Vector2(132, 470)
+	back_button.size = Vector2(220, 48)
 	_skin_button(back_button, Color("#ead8b1"), 18)
 	back_button.pressed.connect(_back_to_parent_selection)
 	main_page.add_child(back_button)
@@ -314,7 +312,7 @@ func _build_picker_page() -> void:
 
 	picker_scroll = ScrollContainer.new()
 	picker_scroll.position = Vector2(3, 62)
-	picker_scroll.size = Vector2(475, 744)
+	picker_scroll.size = Vector2(475, 466)
 	picker_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	picker_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	picker_scroll.scroll_deadzone = 12
@@ -371,13 +369,10 @@ func set_language(value: String) -> void:
 	picker_back_button.text = Localizer.text(language, "back")
 	var parent_a_heading := parent_a_button.find_child("ParentAHeading", true, false) as Label
 	var parent_b_heading := parent_b_button.find_child("ParentBHeading", true, false) as Label
-	var result_heading := main_page.find_child("ResultHeading", true, false) as Label
 	if parent_a_heading:
 		parent_a_heading.text = Localizer.text(language, "fusion_parent_a")
 	if parent_b_heading:
 		parent_b_heading.text = Localizer.text(language, "fusion_parent_b")
-	if result_heading:
-		result_heading.text = Localizer.text(language, "fusion_result_label")
 	result_new_label.text = Localizer.text(language, "fusion_new")
 	refresh_selection(selected_a_id, selected_b_id, current_result, current_result_is_new)
 	if picker_page.visible:
@@ -438,6 +433,8 @@ func play_fusion_reveal(texture: Texture2D, is_new: bool) -> void:
 	if texture:
 		result_image.texture = texture
 	result_image.material = silhouette_material if is_new else null
+	result_image.modulate = Color(1, 1, 1, 0)
+	result_image.scale = Vector2.ONE
 	parent_a_button.pivot_offset = parent_a_button.size * 0.5
 	parent_b_button.pivot_offset = parent_b_button.size * 0.5
 	var parent_in := create_tween().set_parallel(true)
@@ -451,10 +448,33 @@ func play_fusion_reveal(texture: Texture2D, is_new: bool) -> void:
 	parent_out.tween_property(parent_b_button, "scale", Vector2.ONE, 0.18)
 	await parent_out.finished
 
+	var result_center := result_image.global_position - main_page.global_position + result_image.size * 0.5
+	for _wave_index in range(ENERGY_WAVE_COUNT):
+		await _play_energy_gather_wave(result_center)
+
+	result_revealed = true
+	result_image.material = null
+	result_image.scale = Vector2(0.92, 0.92)
+	if is_new:
+		result_new_label.visible = true
+		result_new_label.modulate = Color(1, 1, 1, 0)
+	var reveal := create_tween().set_parallel(true)
+	reveal.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	reveal.tween_property(result_image, "modulate:a", 1.0, 0.28)
+	reveal.tween_property(result_image, "scale", Vector2(1.06, 1.06), 0.28)
+	if is_new:
+		reveal.tween_property(result_new_label, "modulate:a", 1.0, 0.22).set_delay(0.08)
+	await reveal.finished
+	var settle := create_tween()
+	settle.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	settle.tween_property(result_image, "scale", Vector2.ONE, 0.18)
+	await settle.finished
+	await get_tree().create_timer(0.18).timeout
+
+func _play_energy_gather_wave(result_center: Vector2) -> void:
 	var particles: Array[ColorRect] = []
 	var gather := create_tween().set_parallel(true)
-	var result_center := result_image.global_position - main_page.global_position + result_image.size * 0.5
-	for index in range(8):
+	for index in range(ENERGY_PARTICLES_PER_WAVE):
 		var particle := ColorRect.new()
 		particle.color = Color(1.0, 0.9, 0.58, 0.88)
 		particle.size = Vector2(6, 6) if index % 2 == 0 else Vector2(4, 4)
@@ -464,36 +484,11 @@ func play_fusion_reveal(texture: Texture2D, is_new: bool) -> void:
 		particle.position = source_button.position + Vector2(source_button.size.x * 0.5, 70.0 + float((index * 23) % 100))
 		main_page.add_child(particle)
 		particles.append(particle)
-		gather.tween_property(particle, "position", result_center - particle.size * 0.5, 0.42).set_delay(float(index % 4) * 0.035).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-		gather.tween_property(particle, "modulate:a", 0.0, 0.18).set_delay(0.30 + float(index % 4) * 0.035)
+		gather.tween_property(particle, "position", result_center - particle.size * 0.5, ENERGY_PARTICLE_TRAVEL_SECONDS).set_delay(float(index % 4) * ENERGY_PARTICLE_STAGGER_SECONDS).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		gather.tween_property(particle, "modulate:a", 0.0, ENERGY_PARTICLE_FADE_SECONDS).set_delay(0.30 + float(index % 4) * ENERGY_PARTICLE_STAGGER_SECONDS)
 	await gather.finished
 	for particle in particles:
 		particle.queue_free()
-
-	var pulse_in := create_tween()
-	pulse_in.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	pulse_in.tween_property(result_image, "scale", Vector2(1.06, 1.06), 0.16)
-	await pulse_in.finished
-	if is_new:
-		result_revealed = true
-		result_image.material = null
-		result_image.modulate = Color(1, 1, 1, 0)
-		result_image.scale = Vector2(0.92, 0.92)
-		result_new_label.visible = true
-		result_new_label.modulate = Color(1, 1, 1, 0)
-		var reveal := create_tween().set_parallel(true)
-		reveal.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-		reveal.tween_property(result_image, "modulate:a", 1.0, 0.28)
-		reveal.tween_property(result_image, "scale", Vector2(1.06, 1.06), 0.28)
-		reveal.tween_property(result_new_label, "modulate:a", 1.0, 0.22).set_delay(0.08)
-		await reveal.finished
-	else:
-		result_image.scale = Vector2(1.06, 1.06)
-	var settle := create_tween()
-	settle.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
-	settle.tween_property(result_image, "scale", Vector2.ONE, 0.18)
-	await settle.finished
-	await get_tree().create_timer(0.18).timeout
 
 func _parent_button_text(slot: int, species_id: String) -> String:
 	var slot_key := "fusion_parent_a" if slot == 0 else "fusion_parent_b"

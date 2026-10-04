@@ -4,6 +4,7 @@ extends RefCounted
 const StoryProgressionClass = preload("res://scripts/story_progression.gd")
 const HabitatRestorationClass = preload("res://scripts/habitat_restoration.gd")
 
+const POST_FIRST_NORMAL_TUTORIAL := "post_first_normal_tutorial"
 const ACT3_READY := "act3_ready"
 const EXPLOITATION_ACTIVE := "exploitation_active"
 const CRISIS_READY := "crisis_ready"
@@ -18,6 +19,7 @@ const THANK_YOU_READY := "thank_you_ready"
 const COMPLETE := "complete"
 
 const PRESET_IDS := [
+	POST_FIRST_NORMAL_TUTORIAL,
 	ACT3_READY,
 	EXPLOITATION_ACTIVE,
 	CRISIS_READY,
@@ -50,6 +52,7 @@ static func _available_for_game(game) -> bool:
 
 static func options() -> Array[Dictionary]:
 	return [
+		{"id": POST_FIRST_NORMAL_TUTORIAL, "label": "12粒チュート後"},
 		{"id": ACT3_READY, "label": "第三幕直前"},
 		{"id": EXPLOITATION_ACTIVE, "label": "酷使中"},
 		{"id": CRISIS_READY, "label": "弱り直前（ジュレ団7種）"},
@@ -74,11 +77,16 @@ static func apply(game, preset_id: String) -> Dictionary:
 	# Begin from the same clean payload used by the existing development reset.
 	# All preset construction stays here so main.gd remains only the UI bridge.
 	game._reset_progression_state()
-	_prepare_common_progress(game)
+	if preset_id == POST_FIRST_NORMAL_TUTORIAL:
+		_prepare_post_first_normal_tutorial(game)
+	else:
+		_prepare_common_progress(game)
 
 	var target_mode := "greenhouse"
 	var should_resume_story := true
 	match preset_id:
+		POST_FIRST_NORMAL_TUTORIAL:
+			should_resume_story = false
 		ACT3_READY:
 			_prepare_act3_ready(game)
 		EXPLOITATION_ACTIVE:
@@ -134,6 +142,73 @@ static func apply(game, preset_id: String) -> Dictionary:
 		"target_mode": target_mode,
 		"resume_story": should_resume_story,
 	}
+
+
+static func _prepare_post_first_normal_tutorial(game) -> void:
+	# Match the playable state immediately after the first paid twelve-seed round:
+	# the tutorial NEW is a real catalog GET, while the separate Act 2 original
+	# guarantee has not even been queued, much less consumed.
+	game.opening_finished = true
+	game.opening_story_complete = true
+	game.intro_story_complete = true
+	game.first_colorata_confirmed = true
+	game.trio_originals_confirmed = true
+	game.habitat_arrival_started = true
+	game.habitat_awakened = true
+	game.habitat_awakening_event_complete = true
+	game.habitat_tutorial_started = true
+	game.habitat_tutorial_complete = true
+	game.habitat_tutorial_returned_to_greenhouse = true
+	game.first_habitat_gift_claimed = true
+	game.seed_shop_open = true
+	game.mystery_items_acquired = true
+	game.mystery_catalog_tutorial_complete = true
+	game.original_catalog_gifted = true
+	game.encyclopedia_unlocked = true
+	game.habitat_unlocked = true
+	game.puku_gauge_intro_complete = true
+	game.normal_play_tutorial_complete = true
+	game.initial_seed_stock_notice_complete = true
+	game.puku_buyback_tutorial_complete = true
+	game.puku_buyback_tutorial_active = false
+	game.seed_pod_gauge_discovery_complete = false
+	game.seed_pod_first_reward_seen = false
+	game.total_play_count = 2
+	game.formal_play_count = 1
+	game.normal_play_count = 1
+	game.normal_seed_bags = 0
+	game.main_story_stage = StoryProgressionClass.ACT_1
+	game.main_story_complete = false
+	game.main_story_completion_seen = false
+	game.act2_unlocked = false
+	game.jurejure_intro_complete = false
+	game.jurejure_enabled = false
+	game.jurejure_battle_count = 0
+	game.jurejure_battle_win_count = 0
+	game.jurejure_return_event_complete = false
+	game.jurejure_waiting_for_seed_pod_reward = false
+	game.active_jurejure_event.clear()
+	game.story_progression_state = StoryProgressionClass.default_runtime_state()
+	game.unlocked_series["base"] = true
+	_grant_species(game, "colorata")
+	game._remember_catalog_cover_species("colorata")
+	for catalog_only_id in ["affinis", "shaviana"]:
+		game.discovered[catalog_only_id] = true
+		game.greenhouse_available.erase(catalog_only_id)
+		game.unlocked_species.erase(catalog_only_id)
+		game.species_get_counts.erase(catalog_only_id)
+	var tutorial_species_id := "lutea"
+	var tutorial_entry: Dictionary = game._catalog_entry(tutorial_species_id)
+	if tutorial_entry.is_empty() or str(tutorial_entry.get("rarity", "")) != "通常":
+		var candidates: Array[Dictionary] = game._first_play_tutorial_original_candidates()
+		if not candidates.is_empty():
+			tutorial_species_id = str(candidates[0].get("species_id", ""))
+	_grant_species(game, tutorial_species_id)
+	game.tutorial_steps["first_play_growth_dialogs"] = true
+	game.tutorial_steps["first_harvest_guide"] = true
+	game.tutorial_steps["first_normal_tutorial_species_id"] = tutorial_species_id
+	game.first_play_has_harvested = true
+	game.puku_balance_units = maxi(4200, int(game.puku_balance_units))
 
 
 static func spawn_101cm_colorata(game) -> bool:
@@ -407,6 +482,7 @@ static func _restoration(game) -> Dictionary:
 
 
 static func _prepare_runtime_view(game, target_mode: String) -> void:
+	game._end_first_play_tutorial_context()
 	game.current_mode = target_mode
 	game.play_active = false
 	game.play_modal_open = false

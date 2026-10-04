@@ -335,6 +335,9 @@ const TEXT := {
 		"tutorial_normal_sprout": "芽が出た！",
 		"tutorial_normal_growth": "どんどん大きくなってる……。",
 		"tutorial_normal_jelly": "突然溶けてしまうこともあるって書いてあったよ。\n『ジュレる』って言うみたい。",
+		"tutorial_normal_jellied": "うわ、ジュレた！",
+		"tutorial_normal_new_panda": "見て！はじめて見る品種が出てる！",
+		"tutorial_normal_new_girl": "ジュレる前に収穫しよう！",
 		"tutorial_harvest_tap": "育った株をタップで収穫！",
 		"main_play": "たねをまく",
 		"main_shop": "パンダのお店",
@@ -649,15 +652,14 @@ const TEXT := {
 		,"jelly_float": "ジュレ"
 		,"preview_finished": "プレビュー終了"
 		,"preview_jelly": "ジュレ（プレビュー）"
-		,"main_fusion": "配合ラボ"
-		,"fusion_title": "配合ラボ"
+		,"main_fusion": "ハイブリッドラボ"
+		,"fusion_title": "ハイブリッドラボ"
 		,"fusion_owned_hint": "GETした多肉を2株えらんで配合します。\n親株はなくならず、GET数も減りません。"
 		,"fusion_parent_a": "親株 A"
 		,"fusion_parent_b": "親株 B"
-		,"fusion_result_label": "配合結果"
 		,"fusion_choose": "えらぶ"
 		,"fusion_result_unknown": "？？？"
-		,"fusion_result_hint": "親株を2株えらぶと、配合結果が表示されます。"
+		,"fusion_result_hint": "親株を2株えらぶと、完成する品種が表示されます。"
 		,"fusion_result_new": "まだGETしていない品種です"
 		,"fusion_result_known": "GET済みの配合多肉です"
 		,"fusion_cost": "%dぷくコイン"
@@ -998,6 +1000,9 @@ const TEXT := {
 		"tutorial_normal_sprout": "めが でた！",
 		"tutorial_normal_growth": "どんどん おおきく なってる……。",
 		"tutorial_normal_jelly": "とつぜん とけてしまうことも あるって かいてあったよ。\n『じゅれる』って いうみたい。",
+		"tutorial_normal_jellied": "うわ、じゅれた！",
+		"tutorial_normal_new_panda": "みて！はじめて みる ひんしゅが でてる！",
+		"tutorial_normal_new_girl": "じゅれる まえに しゅうかくしよう！",
 		"tutorial_harvest_tap": "そだった かぶを おして しゅうかく！",
 		"main_play": "たねをまく",
 		"main_shop": "ぱんだの おみせ",
@@ -1312,15 +1317,14 @@ const TEXT := {
 		,"jelly_float": "じゅれ"
 		,"preview_finished": "ぷれびゅー おわり"
 		,"preview_jelly": "じゅれ（ぷれびゅー）"
-		,"main_fusion": "はいごうらぼ"
-		,"fusion_title": "はいごうらぼ"
+		,"main_fusion": "はいぶりっどらぼ"
+		,"fusion_title": "はいぶりっどらぼ"
 		,"fusion_owned_hint": "GETした たにくを 2かぶ えらんで はいごうします。\nおやかぶは なくならず、GETすうも へりません。"
 		,"fusion_parent_a": "おやかぶ A"
 		,"fusion_parent_b": "おやかぶ B"
-		,"fusion_result_label": "はいごうけっか"
 		,"fusion_choose": "えらぶ"
 		,"fusion_result_unknown": "？？？"
-		,"fusion_result_hint": "おやかぶを 2かぶ えらぶと、はいごうけっかが ひょうじされます。"
+		,"fusion_result_hint": "おやかぶを 2かぶ えらぶと、できあがる ひんしゅが ひょうじされます。"
 		,"fusion_result_new": "まだ GETしていない しゅるいです"
 		,"fusion_result_known": "GETずみの はいごうたにくです"
 		,"fusion_cost": "%dぷくこいん"
@@ -1661,6 +1665,9 @@ const TEXT := {
 		"tutorial_normal_sprout": "It sprouted!",
 		"tutorial_normal_growth": "It's getting bigger and bigger...",
 		"tutorial_normal_jelly": "The old book says they can suddenly melt away.\nIt calls that 'turning to jelly.'",
+		"tutorial_normal_jellied": "Whoa, it turned to jelly!",
+		"tutorial_normal_new_panda": "Look! A species we've never seen before is growing!",
+		"tutorial_normal_new_girl": "Let's harvest it before it turns to jelly!",
 		"tutorial_harvest_tap": "Tap a grown plant to harvest it!",
 		"main_play": "Plant Seeds",
 		"main_shop": "Panda's Shop",
@@ -1975,12 +1982,11 @@ const TEXT := {
 		,"jelly_float": "Jelly"
 		,"preview_finished": "Preview Finished"
 		,"preview_jelly": "Jelly (Preview)"
-		,"main_fusion": "Fusion Lab"
-		,"fusion_title": "Fusion Lab"
+		,"main_fusion": "Hybrid Lab"
+		,"fusion_title": "Hybrid Lab"
 		,"fusion_owned_hint": "Choose two succulents you have obtained to create a hybrid.\nParents are never consumed and their GET counts do not decrease."
 		,"fusion_parent_a": "Parent A"
 		,"fusion_parent_b": "Parent B"
-		,"fusion_result_label": "Result"
 		,"fusion_choose": "Choose"
 		,"fusion_result_unknown": "???"
 		,"fusion_result_hint": "Choose two parents to preview the fusion result."

@@ -227,6 +227,8 @@ func _ready() -> void:
 	assert(game.puku_balance_units == puku_before_round - game.NORMAL_ROUND_COST_UNITS)
 	assert(game.play_concurrent_target >= game.ENDLESS_NORMAL_MIN_PLANTS and game.play_concurrent_target <= game.ENDLESS_NORMAL_MAX_PLANTS)
 	assert(game.play_seeds_remaining == 12 - game.play_concurrent_target)
+	assert(game.first_play_tutorial_reserved_seed_pending)
+	assert(not game.first_play_tutorial_reserved_species_id.is_empty())
 	assert(not game.tutorial_guide_overlay.visible and str(game.tutorial_guide_button.get_meta("target", "")) != "normal_seed")
 	for plant in game.plants:plant.fast_forward_to_diameter(2.0)
 	game._process(game.FIRST_PLAY_TUTORIAL_INITIAL_DELAY+.01)
@@ -239,29 +241,63 @@ func _ready() -> void:
 	for plant in game.plants:plant.fast_forward_to_diameter(game.FIRST_PLAY_TUTORIAL_JELLY_DIALOG_CM)
 	game._process(.21)
 	assert(game.first_play_tutorial_dialog_visible and game.tutorial_guide_message.text==Localizer.text("ja","tutorial_normal_jelly"))
-	game._dismiss_first_play_tutorial_dialog();assert(game.first_play_tutorial_sequence_complete)
-	game._process(.05);await get_tree().process_frame
+	var initially_spawned_count: int = game.endless_economy_seed_count
+	var remaining_before_forced_jelly: int = game.play_seeds_remaining
+	game._dismiss_first_play_tutorial_dialog()
+	await get_tree().process_frame
+	assert(not game.first_play_tutorial_sequence_complete)
+	assert(game.first_play_tutorial_phase == "jelly_observe")
+	assert(game.endless_economy_jelly_count == 1)
+	assert(game.endless_economy_seed_count == initially_spawned_count)
+	assert(game.play_seeds_remaining == remaining_before_forced_jelly)
+	assert(not is_instance_valid(game.first_play_tutorial_forced_jelly_plant) or game.first_play_tutorial_forced_jelly_plant.state == "jelly")
+	game._process(game.FIRST_PLAY_TUTORIAL_JELLY_OBSERVE_SECONDS + .01)
+	assert(game.first_play_tutorial_dialog_visible)
+	assert(game.tutorial_guide_message.text == "うわ、ジュレた！")
+	assert(game.endless_economy_seed_count == initially_spawned_count)
+	game._dismiss_first_play_tutorial_dialog()
+	assert(game.first_play_tutorial_phase == "reserved_seed_sowing")
+	await get_tree().create_timer(.36).timeout
+	assert(game.endless_economy_seed_count == initially_spawned_count + 1)
+	assert(game.play_seeds_remaining == remaining_before_forced_jelly - 1)
+	assert(game.first_play_tutorial_phase == "reserved_seed_observe")
+	assert(is_instance_valid(game.first_play_tutorial_reserved_plant))
+	var tutorial_harvest_species_id := str(game.first_play_tutorial_reserved_plant.data.get("species_id", ""))
+	var tutorial_new_entry: Dictionary = game._catalog_entry(tutorial_harvest_species_id)
+	assert(tutorial_harvest_species_id == game.first_play_tutorial_reserved_species_id)
+	assert(bool(tutorial_new_entry.get("main_story_original", false)))
+	assert(str(tutorial_new_entry.get("rarity", "")) == "通常")
+	assert(not bool(tutorial_new_entry.get("special_route_only", false)))
+	assert(game._species_get_count(tutorial_harvest_species_id) == 0)
+	assert(not game.first_play_tutorial_reserved_plant.jelly_checks_enabled)
+	game._process(game.FIRST_PLAY_TUTORIAL_NEW_OBSERVE_SECONDS - .01)
+	assert(not game.first_play_tutorial_dialog_visible)
+	game._process(.02)
+	assert(game.first_play_tutorial_dialog_visible)
+	assert(game.tutorial_guide_message.text == "見て！はじめて見る品種が出てる！")
+	game._dismiss_first_play_tutorial_dialog()
+	assert(game.first_play_tutorial_phase == "new_species_girl")
+	assert(game.tutorial_guide_message.text == "ジュレる前に収穫しよう！")
+	game._dismiss_first_play_tutorial_dialog()
+	assert(game.first_play_tutorial_sequence_complete)
+	assert(game.first_play_harvest_guide_active)
+	assert(game.tutorial_harvest_plant == game.first_play_tutorial_reserved_plant)
+	assert(game.tutorial_guide_message.text == Localizer.text("ja", "tutorial_harvest_tap"))
+	assert(game.tutorial_guide_overlay.visible)
 	assert(is_zero_approx(game.puku_gauge_cm) and game.puku_balance_units == puku_before_round - game.NORMAL_ROUND_COST_UNITS)
 	assert(not game.seed_pod_gauge_discovery_complete and game.scripted_dialog_kind.is_empty())
-	for plant in game.plants:plant.fast_forward_to_diameter(game.TUTORIAL_HARVEST_CM + .1)
-	game.play_seed_animations_pending=0;game._process(.01)
-	assert(game.first_play_harvest_guide_active and game.tutorial_guide_message.text==Localizer.text("ja","tutorial_harvest_tap"))
-	assert(is_equal_approx(game.tutorial_harvest_plant.diameter_cm, game.TUTORIAL_HARVEST_CM))
-	var tutorial_harvest_species_id := str(game.tutorial_harvest_plant.data.get("species_id", ""))
 	var tutorial_harvest_was_new: bool = game._species_get_count(tutorial_harvest_species_id) <= 0
 	var tutorial_harvest_reward: int = game._harvest_puku_reward_units(game.tutorial_harvest_plant.diameter_cm, tutorial_harvest_was_new)
 	var puku_before_harvest: int = game.puku_balance_units
-	game.tutorial_harvest_plant.harvest();await get_tree().process_frame
+	var tutorial_new_tap: Vector2 = game.camera.unproject_position(game.tutorial_harvest_plant.global_position + Vector3(0, game.tutorial_harvest_plant.visual_scale * .48, 0))
+	game._try_harvest(tutorial_new_tap)
+	await get_tree().process_frame
 	assert(game.normal_play_tutorial_complete and not game.first_play_tutorial_active)
 	assert(game.puku_balance_units == puku_before_harvest + tutorial_harvest_reward)
-	if game.species_get_overlay.visible:
-		await get_tree().create_timer(.65).timeout
-		game.species_get_overlay.close_overlay()
-		await get_tree().create_timer(.45).timeout
-	if game.catalog_series_unlock_overlay.visible:
-		await get_tree().create_timer(.55).timeout
-		game.catalog_series_unlock_overlay.close_overlay()
-		await get_tree().create_timer(.35).timeout
+	assert(tutorial_harvest_reward >= game.FIRST_GET_MIN_REWARD_UNITS)
+	assert(tutorial_harvest_species_id in game.pending_round_new_species_ids)
+	assert(game._species_get_count(tutorial_harvest_species_id) == 0)
+	assert(not game.species_get_overlay.visible)
 	await get_tree().process_frame
 	assert(game.puku_buyback_tutorial_active)
 	assert(game.tutorial_guide_message.text==Localizer.text("ja","puku_buyback_1"));game._advance_puku_buyback_tutorial()
@@ -275,9 +311,10 @@ func _ready() -> void:
 	assert(Localizer.text("ja","puku_buyback_2").contains("1ぷく未満"))
 	assert(not game.first_seed_pod_reward_event_active and game.normal_seed_bags == 0 and is_zero_approx(game.puku_gauge_cm))
 
-	# Settle the other eleven seeds as jelly so this tutorial suite also proves
+	# The scripted jelly and NEW harvest settled two seeds. Settle the remaining
+	# ten as jelly so this tutorial suite also proves
 	# that the first formal round ends at exactly twelve settlements.
-	for settlement_index in range(11):
+	for settlement_index in range(10):
 		assert(game.play_active and not game.plants.is_empty(), "first normal round ended before all 12 seeds settled")
 		var plant_to_jelly = game.plants[0]
 		plant_to_jelly.jelly_checks_enabled=false
@@ -291,9 +328,23 @@ func _ready() -> void:
 	assert(game.endless_economy_seed_count == 12 and game.endless_economy_harvest_count == 1 and game.endless_economy_jelly_count == 11)
 	assert(game.endless_economy_seed_cost_units == game.NORMAL_ROUND_COST_UNITS)
 	assert(game.result_count_label.text.contains("収穫　1株") and game.result_count_label.text.contains("ジュレ　11株"))
+	assert(game.result_new_species_label.text.is_empty() and not game.result_new_species_label.visible)
+	assert(game._species_get_count(tutorial_harvest_species_id) == 0)
+	game._close_result()
+	await get_tree().create_timer(.72).timeout
+	assert(game._species_get_count(tutorial_harvest_species_id) == 1)
+	assert(bool(game.discovered.get(tutorial_harvest_species_id, false)))
+	assert(bool(game.greenhouse_available.get(tutorial_harvest_species_id, false)))
+	assert(game.species_get_overlay.visible)
+	assert(game.species_get_overlay.badge_label.text == Localizer.text("ja", "new"))
+	assert(game.species_get_overlay.name_label.text == Localizer.species_name("ja", tutorial_new_entry))
+	assert(not game.act2_unlocked)
+	assert(not game.StoryProgressionClass.fantasy_is_unlocked(game.story_progression_state))
+	assert(not bool(game.story_progression_state.get("original_new_guarantee_pending", false)))
+	assert(not bool(game.story_progression_state.get("original_new_guarantee_consumed", false)))
 
 	assert(Localizer.text("ja","puku_buyback_1").contains("大きさに合わせて"))
-	print("FIRST_PLAY_TUTORIAL_SMOKE_OK trio_cards=catalog_only pre_sow=true start_guide=play_open_normal no_normal_seed_guide=true old_seed=manual_25cm_harvest normal=12_seed_round round_cost=1 concurrent=7-10 result=1_harvest+11_jelly")
+	print("FIRST_PLAY_TUTORIAL_SMOKE_OK trio_cards=catalog_only pre_sow=true start_guide=play_open_normal forced_jelly=true reserved_original_new=true observed_3s=true post_result_GET=true act2_guarantee_untouched=true total=12 result=1_harvest+11_jelly")
 	get_tree().quit()
 
 

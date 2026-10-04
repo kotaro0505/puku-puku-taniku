@@ -1,6 +1,7 @@
 extends Node
 
 const FusionSystemClass = preload("res://scripts/fusion_system.gd")
+const FusionLabUIClass = preload("res://scripts/fusion_lab_ui.gd")
 const Localizer = preload("res://scripts/game_localizer.gd")
 const CatalogImageLoaderClass = preload("res://scripts/catalog_image_loader.gd")
 const SERIES := ["gummy", "metal", "sweets", "glow", "jewel", "jure", "stone", "sea", "yumekawa", "forest_amber"]
@@ -46,6 +47,7 @@ func _ready() -> void:
 	add_child(game)
 	await get_tree().process_frame
 	await get_tree().process_frame
+	_test_hybrid_lab_presentation(game)
 	_test_catalog_and_recipes(game)
 	_test_special_recipe_precedence(game)
 	_test_original_fallbacks(game)
@@ -56,8 +58,27 @@ func _ready() -> void:
 	await _test_tier2_game_flow(game)
 	game._reset_progression_state()
 	game.queue_free()
-	print("FUSION_SYSTEM_SMOKE_OK basic_species=55 basic_recipes=55 tier1_species=20 tier1_special=20 tier2_species=10 tier2_exact=5 tier2_series=5 transparent_images=85 picker_touch_contract=true unordered=true originals=fallback exact_then_series_special=priority parents=GET_only cost=atomic silhouette=species_specific double_submit=blocked seeds=after_GET languages=3")
+	print("FUSION_SYSTEM_SMOKE_OK hybrid_lab_name=true attached_background=720x1280 result_heading_removed=true energy_speed_unchanged=true energy_emission_3x=true basic_species=55 basic_recipes=55 tier1_species=20 tier1_special=20 tier2_species=10 tier2_exact=5 tier2_series=5 transparent_images=85 picker_touch_contract=true unordered=true originals=fallback exact_then_series_special=priority parents=GET_only cost=atomic silhouette=species_specific double_submit=blocked seeds=after_GET languages=3")
 	get_tree().quit()
+
+func _test_hybrid_lab_presentation(game) -> void:
+	assert(FileAccess.file_exists(FusionLabUIClass.HYBRID_LAB_BACKGROUND_PATH))
+	assert(game.fusion_lab_ui.background_image != null)
+	assert(game.fusion_lab_ui.background_image.texture != null)
+	assert(game.fusion_lab_ui.background_image.texture.resource_path == FusionLabUIClass.HYBRID_LAB_BACKGROUND_PATH)
+	assert(game.fusion_lab_ui.background_image.texture.get_width() == 720)
+	assert(game.fusion_lab_ui.background_image.texture.get_height() == 1280)
+	assert(game.fusion_lab_ui.background_image.stretch_mode == TextureRect.STRETCH_KEEP_ASPECT_COVERED)
+	assert(game.fusion_lab_ui.find_child("ResultHeading", true, false) == null)
+	assert(Localizer.text("ja", "fusion_title") == "ハイブリッドラボ")
+	assert(Localizer.text("hiragana", "fusion_title") == "はいぶりっどらぼ")
+	assert(Localizer.text("en", "fusion_title") == "Hybrid Lab")
+	assert("配合結果" not in Localizer.text("ja", "fusion_result_hint"))
+	assert(FusionLabUIClass.ENERGY_WAVE_COUNT == 3)
+	assert(FusionLabUIClass.ENERGY_PARTICLES_PER_WAVE == 8)
+	assert(is_equal_approx(FusionLabUIClass.ENERGY_PARTICLE_TRAVEL_SECONDS, 0.42))
+	assert(is_equal_approx(FusionLabUIClass.ENERGY_PARTICLE_FADE_SECONDS, 0.18))
+	assert(is_equal_approx(FusionLabUIClass.ENERGY_PARTICLE_STAGGER_SECONDS, 0.035))
 
 func _test_catalog_and_recipes(game) -> void:
 	var hybrid_entries: Array[Dictionary] = []
@@ -396,10 +417,13 @@ func _test_game_flow(game) -> void:
 	assert(game.puku_points == 1)
 	assert(game._species_get_count(hybrid_id) == 1)
 	await get_tree().create_timer(1.25).timeout
+	assert(game.fusion_in_progress)
+	assert(game.fusion_lab_ui.result_image.modulate.a <= 0.01)
+	await get_tree().create_timer(1.05).timeout
 	assert(game.fusion_lab_ui.result_image.material == null)
 	assert(game.fusion_lab_ui.result_new_label.visible)
 	assert(game.fusion_lab_ui.result_new_label.text == "NEW")
-	await get_tree().create_timer(0.75).timeout
+	await get_tree().create_timer(0.85).timeout
 	await get_tree().process_frame
 	await get_tree().process_frame
 	assert(not game.fusion_in_progress)
@@ -426,7 +450,7 @@ func _test_game_flow(game) -> void:
 	assert(not game.fusion_lab_ui.result_new_label.visible)
 	game.puku_points = 2
 	game._perform_fusion(gummy_id, metal_id)
-	await get_tree().create_timer(2.0).timeout
+	await get_tree().create_timer(3.1).timeout
 	assert(game._species_get_count(hybrid_id) == 2)
 	assert(game.puku_points == 0)
 	assert(game.fusion_lab_ui.visible)
@@ -571,7 +595,7 @@ func _test_tier1_game_flow(game) -> void:
 	assert(game.fusion_in_progress)
 	assert(game.puku_points == 0)
 	assert(game._species_get_count(result_id) == 1)
-	await get_tree().create_timer(2.0).timeout
+	await get_tree().create_timer(3.1).timeout
 	await get_tree().process_frame
 	await get_tree().process_frame
 	assert(not game.fusion_in_progress)
@@ -660,7 +684,7 @@ func _test_tier2_game_flow(game) -> void:
 	assert(game.fusion_in_progress)
 	assert(game.puku_points == 0)
 	assert(game._species_get_count(result_id) == 1)
-	await get_tree().create_timer(2.0).timeout
+	await get_tree().create_timer(3.1).timeout
 	await get_tree().process_frame
 	await get_tree().process_frame
 	assert(not game.fusion_in_progress)

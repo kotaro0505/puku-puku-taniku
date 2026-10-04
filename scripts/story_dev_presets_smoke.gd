@@ -8,11 +8,12 @@ const HabitatRestorationClass = preload("res://scripts/habitat_restoration.gd")
 func _ready() -> void:
 	assert(not StoryDevPresetsClass.available(false))
 	assert(StoryDevPresetsClass.available(true))
+	await _test_post_first_normal_tutorial_preset()
 	await _test_act3_and_crisis_presets()
 	await _test_new_route_presets()
 	await _test_restoration_and_101cm_presets()
 	await _test_ending_presets()
-	print("STORY_DEV_PRESETS_SMOKE_OK all_platforms=true release_switch=true habitat_debug_independent=true act3_ready=true exploitation=true crisis_ready=7 weak=0/1 first_return=pending restoration=0,1,4 fifth=pending ending=true thank_you=true complete=true harvestable_101=true")
+	print("STORY_DEV_PRESETS_SMOKE_OK post_12_seed_tutorial=true tutorial_original_GET=true act2_original_guarantee_unconsumed=true all_platforms=true release_switch=true habitat_debug_independent=true act3_ready=true exploitation=true crisis_ready=7 weak=0/1 first_return=pending restoration=0,1,4 fifth=pending ending=true thank_you=true complete=true harvestable_101=true")
 	get_tree().quit()
 
 
@@ -69,6 +70,42 @@ func _new_game():
 	assert(not game.settings_overlay.visible)
 	game.story_dev_panel.close()
 	return game
+
+
+func _test_post_first_normal_tutorial_preset() -> void:
+	var game = await _new_game()
+	var result: Dictionary = game._apply_story_dev_preset(StoryDevPresetsClass.POST_FIRST_NORMAL_TUTORIAL)
+	assert(bool(result.get("ok", false)))
+	await get_tree().process_frame
+	assert(game.current_mode == "greenhouse")
+	assert(not game.play_active and not game.play_modal_open and not game.result_overlay.visible)
+	assert(not game.first_play_tutorial_active and not game.tutorial_guide_overlay.visible)
+	assert(game.normal_play_tutorial_complete)
+	assert(game.total_play_count == 2 and game.formal_play_count == 1 and game.normal_play_count == 1)
+	var tutorial_species_id := str(game.tutorial_steps.get("first_normal_tutorial_species_id", ""))
+	var tutorial_entry: Dictionary = game._catalog_entry(tutorial_species_id)
+	assert(not tutorial_species_id.is_empty() and not tutorial_entry.is_empty())
+	assert(bool(tutorial_entry.get("main_story_original", false)))
+	assert(str(tutorial_entry.get("rarity", "")) == "通常")
+	assert(game._species_get_count(tutorial_species_id) == 1)
+	assert(bool(game.discovered.get(tutorial_species_id, false)))
+	assert(bool(game.greenhouse_available.get(tutorial_species_id, false)))
+	assert(not game.jurejure_intro_complete and game.jurejure_battle_count == 0)
+	assert(game.main_story_stage == StoryProgressionClass.ACT_1 and not game.act2_unlocked)
+	assert(not StoryProgressionClass.fantasy_is_unlocked(game.story_progression_state))
+	assert(not bool(game.story_progression_state.get("original_new_guarantee_pending", false)))
+	assert(not bool(game.story_progression_state.get("original_new_guarantee_consumed", false)))
+
+	# The later first-battle transition independently arms the Act 2 guarantee.
+	# Its candidate pool must exclude the original already earned in this tutorial.
+	StoryProgressionClass.begin_act_two(game.story_progression_state)
+	assert(bool(game.story_progression_state.get("original_new_guarantee_pending", false)))
+	assert(not bool(game.story_progression_state.get("original_new_guarantee_consumed", false)))
+	var act2_candidates: Array[Dictionary] = game._story_spawn_guarantee_candidates(false)
+	assert(not act2_candidates.is_empty())
+	assert(not act2_candidates.any(func(entry: Dictionary) -> bool: return str(entry.get("species_id", "")) == tutorial_species_id))
+	game.free()
+	await get_tree().process_frame
 
 
 func _test_act3_and_crisis_presets() -> void:
