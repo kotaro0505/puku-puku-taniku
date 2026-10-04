@@ -245,12 +245,24 @@ func _ready() -> void:
 	assert(game.first_play_tutorial_dialog_visible and game.tutorial_guide_message.text==Localizer.text("ja","tutorial_normal_sprout"), "sprout dialog missing: active=%s play=%s plants=%s message_index=%s wait=%s text=%s" % [game.first_play_tutorial_active, game.play_active, game.plants.size(), game.first_play_tutorial_message_index, game.first_play_tutorial_wait_remaining, game.tutorial_guide_message.text])
 	game._dismiss_first_play_tutorial_dialog()
 	for plant in game.plants:plant.fast_forward_to_diameter(game.FIRST_PLAY_TUTORIAL_GROWTH_DIALOG_CM)
-	game._process(.21)
-	assert(game.first_play_tutorial_dialog_visible and game.tutorial_guide_message.text==Localizer.text("ja","tutorial_normal_growth"))
+	var growth_diameters: Array[float] = []
+	for plant in game.plants:
+		growth_diameters.append(float(plant.diameter_cm))
+		assert(float(plant.diameter_cm) >= game.FIRST_PLAY_TUTORIAL_GROWTH_DIALOG_CM, "fast-forward undershot growth threshold: %.12f" % float(plant.diameter_cm))
+	var growth_wait_before_process: float = game.first_play_tutorial_wait_remaining
+	assert(growth_wait_before_process > 0.0)
+	game._process(growth_wait_before_process + .001)
+	assert(game.first_play_tutorial_dialog_visible and game.tutorial_guide_message.text==Localizer.text("ja","tutorial_normal_growth"), "growth dialog missing: phase=%s index=%s wait=%.9f visible=%s overlay=%s fade=%s diameters=%s text=%s" % [game.first_play_tutorial_phase, game.first_play_tutorial_message_index, game.first_play_tutorial_wait_remaining, game.first_play_tutorial_dialog_visible, game.tutorial_guide_overlay.visible, game.scene_transition_fade.visible, growth_diameters, game.tutorial_guide_message.text])
 	game._dismiss_first_play_tutorial_dialog()
-	for plant in game.plants:plant.fast_forward_to_diameter(game.FIRST_PLAY_TUTORIAL_JELLY_DIALOG_CM)
-	game._process(.21)
-	assert(game.first_play_tutorial_dialog_visible and game.tutorial_guide_message.text==Localizer.text("ja","tutorial_normal_jelly"))
+	var jelly_diameters: Array[float] = []
+	for plant in game.plants:
+		plant.fast_forward_to_diameter(game.FIRST_PLAY_TUTORIAL_JELLY_DIALOG_CM)
+		jelly_diameters.append(float(plant.diameter_cm))
+		assert(float(plant.diameter_cm) >= game.FIRST_PLAY_TUTORIAL_JELLY_DIALOG_CM, "fast-forward undershot jelly threshold: %.12f" % float(plant.diameter_cm))
+	var jelly_wait_before_process: float = game.first_play_tutorial_wait_remaining
+	assert(jelly_wait_before_process > 0.0)
+	game._process(jelly_wait_before_process + .001)
+	assert(game.first_play_tutorial_dialog_visible and game.tutorial_guide_message.text==Localizer.text("ja","tutorial_normal_jelly"), "jelly dialog missing: phase=%s index=%s wait=%.9f visible=%s overlay=%s fade=%s diameters=%s text=%s" % [game.first_play_tutorial_phase, game.first_play_tutorial_message_index, game.first_play_tutorial_wait_remaining, game.first_play_tutorial_dialog_visible, game.tutorial_guide_overlay.visible, game.scene_transition_fade.visible, jelly_diameters, game.tutorial_guide_message.text])
 	var initially_spawned_count: int = game.endless_economy_seed_count
 	var remaining_before_forced_jelly: int = game.play_seeds_remaining
 	game._dismiss_first_play_tutorial_dialog()
@@ -337,15 +349,14 @@ func _ready() -> void:
 		if game.play_active and game.play_spawn_queue>0:
 			game.play_spawn_timer=0.0;game._process(.01)
 			await get_tree().create_timer(.32).timeout
-	await get_tree().create_timer(.12).timeout
-	assert(not game.play_active and game.result_overlay.visible)
+	assert(await _wait_until(func()->bool:return not game.play_active and game.result_overlay.visible), "round result did not wait for/complete the Puku gauge queue: active=%s result=%s puku_running=%s puku_queue=%s plants=%s seeds_remaining=%s spawn_queue=%s" % [game.play_active, game.result_overlay.visible, game.puku_gauge_animation_running, game.puku_gauge_animation_queue.size(), game.plants.size(), game.play_seeds_remaining, game.play_spawn_queue])
 	assert(game.endless_economy_seed_count == 12 and game.endless_economy_harvest_count == 1 and game.endless_economy_jelly_count == 11)
 	assert(game.endless_economy_seed_cost_units == game.NORMAL_ROUND_COST_UNITS)
 	assert(game.result_count_label.text.contains("収穫　1株") and game.result_count_label.text.contains("ジュレ　11株"))
 	assert(game.result_new_species_label.text.is_empty() and not game.result_new_species_label.visible)
 	assert(game._species_get_count(tutorial_harvest_species_id) == 0)
 	game._close_result()
-	await get_tree().create_timer(.72).timeout
+	assert(await _wait_until(func()->bool:return game._species_get_count(tutorial_harvest_species_id)==1 and game.species_get_overlay.visible), "post-result NEW reveal did not complete: count=%s overlay=%s pending=%s" % [game._species_get_count(tutorial_harvest_species_id), game.species_get_overlay.visible, game.pending_round_new_species_ids])
 	assert(game._species_get_count(tutorial_harvest_species_id) == 1)
 	assert(bool(game.discovered.get(tutorial_harvest_species_id, false)))
 	assert(bool(game.greenhouse_available.get(tutorial_harvest_species_id, false)))
@@ -360,6 +371,14 @@ func _ready() -> void:
 	assert(Localizer.text("ja","puku_buyback_1") == "大きい株ほど高く買い取るよ！")
 	print("FIRST_PLAY_TUTORIAL_SMOKE_OK old_colorata_growth=1.3 normal_growth=unchanged cost_note=once trio_cards=catalog_only pre_sow=true start_guide=play_open_normal forced_jelly=true reserved_original_new=true observed_3s=true post_result_GET=true act2_guarantee_untouched=true total=12 result=1_harvest+11_jelly")
 	get_tree().quit()
+
+
+func _wait_until(predicate:Callable,timeout_seconds:=5.0)->bool:
+	var elapsed:=0.0
+	while elapsed<timeout_seconds and not bool(predicate.call()):
+		await get_tree().create_timer(.02).timeout
+		elapsed+=.02
+	return bool(predicate.call())
 
 
 func _press_species_overlay(overlay:Control,position:Vector2,touch:bool)->void:

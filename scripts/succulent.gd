@@ -348,14 +348,19 @@ static func jelly_chance_per_second(at_age: float, safe_end_seconds := 4.5, ramp
 	return 1.0 - exp(-hazard)
 
 func fast_forward_to_diameter(target_cm:float)->void:
-	var target_growth:=(target_cm-1.6)/(GROWTH_CM_PER_SECOND*growth_rate*effective_growth_speed_multiplier())
+	var clamped_target_cm:=maxf(1.6,target_cm)
+	var target_growth:=(clamped_target_cm-1.6)/(GROWTH_CM_PER_SECOND*growth_rate*effective_growth_speed_multiplier())
 	var low:=0.0;var high:=maxf(1.0,target_growth*1.2)
 	while _integrated_growth_multiplier(0.0,high)<target_growth:high*=2.0
 	for i in range(32):
 		var mid:=(low+high)*.5
 		if _integrated_growth_multiplier(0.0,mid)<target_growth:low=mid
 		else:high=mid
-	age=(low+high)*.5;growth_time=_integrated_growth_multiplier(0.0,age);diameter_cm=1.6+growth_time*GROWTH_CM_PER_SECOND*growth_rate*effective_growth_speed_multiplier();visual_scale=.18+(diameter_cm-1.6)*.058;_update_visual(0.0)
+	# The bisection finds the matching rhythmic age, while this development/test
+	# helper must land on the requested diameter exactly. Re-evaluating the
+	# integral at the approximate age can round microscopically below a story
+	# threshold and make otherwise deterministic smoke tests intermittent.
+	age=(low+high)*.5;growth_time=target_growth;diameter_cm=clamped_target_cm;visual_scale=.18+(diameter_cm-1.6)*.058;_update_visual(0.0)
 
 static func _smooth_hazard(at_age: float, segment_start: float, segment_end: float, start_chance: float, end_chance: float) -> float:
 	var t := clampf((at_age - segment_start) / (segment_end - segment_start), 0.0, 1.0)
