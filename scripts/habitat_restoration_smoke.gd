@@ -12,7 +12,7 @@ func _ready() -> void:
 	_test_localization_contract()
 	_test_ending_asset_contract()
 	await _test_integrated_final_chapter()
-	print("HABITAT_RESTORATION_SMOKE_OK post_crisis=4 sow_gate=retired first_large_before_join=true queued_returns=true joined_after_first=true lamps=5 threshold=100 returned=5 medals=5 stages=0..5 slides=3 finale=true epilogue=true ending_records=5 returned_recap=5 final_image=true ending_bgm=true lifetime_harvest=true save_resume=true")
+	print("HABITAT_RESTORATION_SMOKE_OK post_crisis=4 sow_gate=retired first_large_before_join=true queued_returns=true joined_after_first=true lamps=5 threshold=100 returned=5 medals=5 stages=0..5 slides=3 finale=true epilogue=true ending_records=5 returned_recap=5 final_image=true ending_bgm=true post_ending_greenhouse_once=true lifetime_harvest=true save_resume=true")
 	get_tree().quit()
 
 
@@ -115,7 +115,19 @@ func _test_restoration_state_machine() -> void:
 	HabitatRestorationClass.complete_ending(restored_state)
 	assert(bool(restored_state.get("ending_seen", false)))
 	assert(bool(restored_state.get("thank_you_seen", false)))
+	assert(not HabitatRestorationClass.post_ending_greenhouse_dialog_seen(restored_state))
+	HabitatRestorationClass.mark_post_ending_greenhouse_dialog_seen(restored_state)
+	assert(HabitatRestorationClass.post_ending_greenhouse_dialog_seen(restored_state))
 	assert(not HabitatRestorationClass.should_show_progress(restored_state))
+	var legacy_completed := HabitatRestorationClass.normalize_state({
+		"version": 4,
+		"returned_plants": returned,
+		"full_recovery_revealed": true,
+		"ending_phase": "complete",
+		"ending_seen": true,
+		"thank_you_seen": true,
+	})
+	assert(HabitatRestorationClass.post_ending_greenhouse_dialog_seen(legacy_completed))
 
 
 func _test_localization_contract() -> void:
@@ -153,6 +165,13 @@ func _test_localization_contract() -> void:
 		"restoration_slide_3",
 		"restoration_final_girl_2",
 		"restoration_epilogue_mouse",
+		"post_ending_greenhouse_girl_1",
+		"post_ending_greenhouse_panda_1",
+		"post_ending_greenhouse_armadillo",
+		"post_ending_greenhouse_girl_2",
+		"post_ending_greenhouse_girl_3",
+		"post_ending_greenhouse_girl_4",
+		"post_ending_greenhouse_panda_2",
 		"restoration_record_harvested",
 		"restoration_record_size",
 		"restoration_record_catalog",
@@ -493,6 +512,25 @@ func _test_integrated_final_chapter() -> void:
 	assert(is_equal_approx(game.audio_manager.last_bgm_fade_seconds, game.ENDING_BGM_FADE_OUT_SECONDS))
 	assert(not game.habitat_restoration_ui.ending_sequence_layer.visible)
 	assert(not game.habitat_restoration_ui.lamp_panel.visible)
+	assert(game.scripted_dialog_kind == "post_ending_greenhouse")
+	var expected_post_ending_greenhouse_lines := [
+		"原生地、元気になって良かったね",
+		"ジュレジュレ団も、ジュレジュレ団なりにがんばってたしね",
+		"うん。みんなで戻したんだ",
+		"この先もずっと、多肉植物がある世界だといいね",
+		"よーし",
+		"これからも、いっぱいたね蒔こ！",
+		"まだまだ、僕たちの多肉植物の世界は始まったばかりだ！",
+	]
+	assert(game.scripted_dialog_pages.size() == expected_post_ending_greenhouse_lines.size())
+	for index in expected_post_ending_greenhouse_lines.size():
+		assert(str(game.scripted_dialog_pages[index].get("text", "")) == expected_post_ending_greenhouse_lines[index])
+	assert(HabitatRestorationClass.post_ending_greenhouse_dialog_seen(game._restoration_state()))
+	_finish_dialog(game)
+	await get_tree().process_frame
+	assert(game.scripted_dialog_kind.is_empty())
+	game._try_start_pending_story_event()
+	assert(game.scripted_dialog_kind.is_empty())
 	assert(not game._resume_restoration_ending())
 	game.current_mode="habitat";game._apply_mode();game._build_habitat_items(true)
 	assert(game.habitat_items_root.find_children("RestorationMedalPlant*","Sprite3D",true,false).size()==5)

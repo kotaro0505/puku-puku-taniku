@@ -6,7 +6,7 @@ const Localizer = preload("res://scripts/game_localizer.gd")
 # Durable state for the post-crisis final chapter.  It is stored as one nested
 # payload in StoryProgression rather than spreading one-off flags through
 # main.gd.
-const STATE_VERSION := 4
+const STATE_VERSION := 5
 const REQUIRED_NEW_SPECIES := 3
 const REQUIRED_SEEDS_SOWN_AFTER_CRISIS := 48
 const REQUIRED_RETURNED_PLANTS := 5
@@ -108,6 +108,7 @@ static func default_state() -> Dictionary:
 		"ending_phase": "",
 		"ending_seen": false,
 		"thank_you_seen": false,
+		"post_ending_greenhouse_dialog_seen": false,
 		"last_post_ending_dialog_index": -1,
 	}
 
@@ -115,8 +116,10 @@ static func default_state() -> Dictionary:
 static func normalize_state(raw_state: Variant, migration: Dictionary = {}) -> Dictionary:
 	var state := default_state()
 	var saved_version := 0
+	var saved_post_ending_greenhouse_dialog_flag := false
 	if raw_state is Dictionary:
 		saved_version = int(raw_state.get("version", 0))
+		saved_post_ending_greenhouse_dialog_flag = raw_state.has("post_ending_greenhouse_dialog_seen")
 		for key in state:
 			if raw_state.has(key):
 				state[key] = raw_state[key]
@@ -226,6 +229,15 @@ static func normalize_state(raw_state: Variant, migration: Dictionary = {}) -> D
 		state["ending_seen"] = true
 		state["full_recovery_revealed"] = true
 		state["ending_phase"] = "complete"
+	state["post_ending_greenhouse_dialog_seen"] = bool(
+		state.get("post_ending_greenhouse_dialog_seen", false)
+	)
+	# Older saves that had already completed the ending predate this event. Do
+	# not replay it on an unrelated future launch; only a completion performed
+	# with the v5 flag present may schedule the new immediate greenhouse scene.
+	if saved_version < 5 and not saved_post_ending_greenhouse_dialog_flag \
+			and (bool(state.get("ending_seen", false)) or str(state.get("ending_phase", "")) == "complete"):
+		state["post_ending_greenhouse_dialog_seen"] = true
 	state["join_home_pending"] = bool(state.get("join_home_pending", false)) \
 		and not bool(state.get("join_home_seen", false))
 	return state
@@ -470,6 +482,14 @@ static func last_post_ending_dialog_index(state: Dictionary) -> int:
 
 static func set_last_post_ending_dialog_index(state: Dictionary, index: int) -> void:
 	state["last_post_ending_dialog_index"] = index
+
+
+static func post_ending_greenhouse_dialog_seen(state: Dictionary) -> bool:
+	return bool(state.get("post_ending_greenhouse_dialog_seen", false))
+
+
+static func mark_post_ending_greenhouse_dialog_seen(state: Dictionary) -> void:
+	state["post_ending_greenhouse_dialog_seen"] = true
 
 
 static func complete_ending(state: Dictionary) -> void:

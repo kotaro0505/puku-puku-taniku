@@ -5451,6 +5451,7 @@ func _try_start_pending_story_event()->void:
 	if not pending_round_new_species_ids.is_empty():
 		call_deferred("_play_result_new_species_animations")
 		return
+	if _try_start_post_ending_greenhouse_dialog():return
 	if _try_start_catalog_series_unlock_notice():return
 	if not catalog_series_unlock_notice_queue.is_empty():return
 	if _try_start_pending_habitat_crisis_transition():return
@@ -5583,6 +5584,23 @@ func _start_restoration_final_event()->void:
 
 func _start_restoration_epilogue_event()->void:
 	_start_scripted_dialog("restoration_epilogue",HabitatRestorationClass.dialog_pages(language_code,"epilogue"),false)
+
+func _try_start_post_ending_greenhouse_dialog()->bool:
+	if current_mode!="greenhouse":return false
+	var restoration:=_restoration_state()
+	if HabitatRestorationClass.ending_phase(restoration)!="complete" or not bool(restoration.get("ending_seen",false)):return false
+	if HabitatRestorationClass.post_ending_greenhouse_dialog_seen(restoration):return false
+	HabitatRestorationClass.mark_post_ending_greenhouse_dialog_seen(restoration);story_progression_state["restoration"]=restoration;_save()
+	_start_scripted_dialog("post_ending_greenhouse",[
+		{"speaker":"girl","text":Localizer.text(language_code,"post_ending_greenhouse_girl_1")},
+		{"speaker":"panda","text":Localizer.text(language_code,"post_ending_greenhouse_panda_1")},
+		{"speaker":"armadillo","text":Localizer.text(language_code,"post_ending_greenhouse_armadillo")},
+		{"speaker":"girl","text":Localizer.text(language_code,"post_ending_greenhouse_girl_2")},
+		{"speaker":"girl","text":Localizer.text(language_code,"post_ending_greenhouse_girl_3")},
+		{"speaker":"girl","text":Localizer.text(language_code,"post_ending_greenhouse_girl_4")},
+		{"speaker":"panda","text":Localizer.text(language_code,"post_ending_greenhouse_panda_2")},
+	],false)
+	return true
 
 func _transition_to_restoration_habitat(event_kind:String,stage:int=0)->void:
 	if scene_transition_fade==null or scene_transition_fade.visible:return
@@ -5738,7 +5756,7 @@ func _on_restoration_thank_you_closed()->void:
 	finale_complete=true;current_mode="greenhouse";_apply_mode();_update_main_story_progress(false);_save()
 	await habitat_restoration_ui.fade_out_ending_sequence(ENDING_BGM_FADE_OUT_SECONDS)
 	_update_play_ui()
-	call_deferred("_poll_greenhouse_play_completion")
+	call_deferred("_poll_greenhouse_play_completion");call_deferred("_try_start_pending_story_event")
 
 func _start_forest_gacha_intro_event()->void:
 	if not forest_gacha_unlocked or forest_gacha_intro_seen or current_mode!="greenhouse":return
