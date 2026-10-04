@@ -18,12 +18,12 @@ func _ready()->void:
 func _test_catalog_and_collection_rarity(game)->void:
 	assert(game._series_entry("common").is_empty() and game._series_species_entries("common").is_empty())
 	assert(Localizer.series_name("ja",game._series_entry("base"))=="原種")
-	assert(game._series_species_entries("base").size()==21)
+	assert(game._series_species_entries("base").size()==12)
 	var rarity_data=JSON.parse_string(FileAccess.get_file_as_string("res://data/collection-rarity.json"));assert(rarity_data is Dictionary)
 	for series_value in game.series_catalog:
 		if not series_value is Dictionary:continue
 		var series:Dictionary=series_value;var ids:Array=series.get("species_ids",[]);var series_id:=str(series.get("series_id",""))
-		if series_id in ["hybrid", "fusion_tier1", "fusion_tier2"]:continue
+		if series_id in ["base", "hybrid", "fusion_tier1", "fusion_tier2"]:continue
 		if ids.size()<3:continue
 		assert(rarity_data.has(series_id))
 		var two_star:=0;var one_star:=0

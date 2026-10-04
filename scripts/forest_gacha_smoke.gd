@@ -37,7 +37,7 @@ func _test_assets_and_routes(game)->void:
 	game.act2_unlocked=true;game.forest_gacha_unlocked=true;game._update_play_ui()
 	assert(not game.forest_gacha_button.visible and not shop_route.visible)
 	game._start_forest_gacha_intro_event()
-	assert(game.scripted_dialog_kind=="forest_gacha_intro" and game.intro_dialogue_label.text=="そういえば……森の方で変な機械を見つけたんだ。")
+	assert(game.scripted_dialog_kind=="forest_gacha_intro" and game.intro_dialogue_label.text=="僕が見つけた品種をガチャにしてみたんだ！良かったらやってみてよ！")
 	game._advance_scripted_dialog();assert(game.intro_dialogue_label.text=="森のガチャが使えるようになった！")
 	game._advance_scripted_dialog();game._update_play_ui()
 	assert(game.forest_gacha_intro_seen and game.forest_gacha_button.visible and shop_route.visible)

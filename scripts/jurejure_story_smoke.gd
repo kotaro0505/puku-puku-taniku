@@ -168,6 +168,8 @@ func _test_habitat_group_and_intro(game: Node) -> void:
 	assert(bool(game.story_progression_state.get("post_encounter_greenhouse_seen", false)))
 	game._toggle_mode();await get_tree().process_frame
 	assert(game.current_mode == "habitat" and game.scripted_dialog_kind.is_empty() and not game.jurejure_first_encounter_overlay.visible)
+	# Every later habitat visit briefly frames the gang once before interaction.
+	await get_tree().create_timer(.9).timeout
 
 	game._on_jurejure_group_pressed()
 	assert(game.scripted_dialog_kind == "jurejure_challenge")
@@ -256,12 +258,14 @@ func _test_battle_win_and_respawn(game: Node) -> void:
 	assert(bool(settlement_result.get("set_completed", false)))
 	assert(game.normal_seed_bags == bags_before)
 	assert(not game.jurejure_waiting_for_seed_pod_reward)
+	game.play_active = false
 	game._toggle_mode()
 	await get_tree().process_frame
 	assert(game.current_mode=="greenhouse" and game.scripted_dialog_kind.is_empty())
 	assert(not game.forest_gacha_intro_seen and not game.forest_gacha_button.visible)
 	game._toggle_mode()
 	await get_tree().process_frame
+	await get_tree().create_timer(.9).timeout
 	assert(not _group_item(game).is_empty())
 
 

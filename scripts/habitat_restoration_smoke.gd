@@ -12,7 +12,7 @@ func _ready() -> void:
 	_test_localization_contract()
 	_test_ending_asset_contract()
 	await _test_integrated_final_chapter()
-	print("HABITAT_RESTORATION_SMOKE_OK post_crisis=7 seeds_after_crisis=48 joined=true lamps=5 threshold=100 returned=5 medals=5 stages=0..5 slides=3 finale=true epilogue=true ending_records=5 returned_recap=5 final_image=true ending_bgm=true lifetime_harvest=true save_resume=true")
+	print("HABITAT_RESTORATION_SMOKE_OK post_crisis=4 sow_gate=retired first_large_before_join=true queued_returns=true joined_after_first=true lamps=5 threshold=100 returned=5 medals=5 stages=0..5 slides=3 finale=true epilogue=true ending_records=5 returned_recap=5 final_image=true ending_bgm=true lifetime_harvest=true save_resume=true")
 	get_tree().quit()
 
 
@@ -39,20 +39,18 @@ func _test_restoration_state_machine() -> void:
 	assert(not StoryProgressionClass.record_normal_seed_sown_after_crisis(progression, true, 47))
 	assert(HabitatRestorationClass.seeds_sown_since_crisis(restoration) == 47)
 	assert(not bool(restoration.get("join_home_pending", false)))
-	assert(StoryProgressionClass.record_normal_seed_sown_after_crisis(progression, true, 1))
-	assert(HabitatRestorationClass.seeds_sown_since_crisis(restoration) == 48)
 	assert(not StoryProgressionClass.record_normal_seed_sown_after_crisis(progression, true, 1))
 	assert(HabitatRestorationClass.seeds_sown_since_crisis(restoration) == 48)
-	# The home event stays queued until the preceding post-crisis conversation
-	# has actually completed.
+	assert(not StoryProgressionClass.record_normal_seed_sown_after_crisis(progression, true, 1))
+	assert(HabitatRestorationClass.seeds_sown_since_crisis(restoration) == 49)
+	# The legacy sow count is telemetry only and can never queue the retired
+	# pre-return join conversation.
 	assert(StoryProgressionClass.peek_story_event(progression).is_empty())
 	progression["post_crisis_greenhouse_pending"] = true
 	StoryProgressionClass.complete_post_crisis_greenhouse(progression)
-	assert(StoryProgressionClass.peek_story_event(progression) == StoryProgressionClass.EVENT_RESTORATION_JOIN_HOME)
-	StoryProgressionClass.complete_restoration_join_home(progression)
-	assert(bool(restoration.get("join_habitat_pending", false)))
-	StoryProgressionClass.complete_restoration_join_habitat(progression)
-	assert(StoryProgressionClass.restoration_is_started(progression))
+	assert(StoryProgressionClass.peek_story_event(progression).is_empty())
+	assert(HabitatRestorationClass.large_plant_mission_started(restoration))
+	assert(not StoryProgressionClass.restoration_is_started(progression))
 
 	assert(not HabitatRestorationClass.can_offer_return(restoration, 99.99))
 	assert(HabitatRestorationClass.can_offer_return(restoration, 100.0))
@@ -65,13 +63,21 @@ func _test_restoration_state_machine() -> void:
 		"gold_star_count": 0,
 	}
 	assert(HabitatRestorationClass.returned_count(restoration) == 0)
-	for index in 5:
+	assert(HabitatRestorationClass.queue_pending_return_snapshot(restoration, snapshot))
+	assert(HabitatRestorationClass.returned_count(restoration) == 0)
+	assert(HabitatRestorationClass.pending_return_count(restoration) == 1)
+	assert(HabitatRestorationClass.commit_next_pending_return(restoration) == 1)
+	assert(HabitatRestorationClass.returned_count(restoration) == 1)
+	HabitatRestorationClass.complete_return_event(restoration, 1)
+	StoryProgressionClass.complete_restoration_join_habitat(progression)
+	assert(StoryProgressionClass.restoration_is_started(progression))
+	for index in range(1, 5):
 		var plant := snapshot.duplicate(true)
 		plant["diameter_cm"] = 100.0 + float(index) * 20.0
 		assert(HabitatRestorationClass.add_returned_plant(restoration, plant) == index + 1)
-		assert(HabitatRestorationClass.pending_return_stage(restoration) == 1)
-	assert(HabitatRestorationClass.pending_return_stages(restoration) == [1, 2, 3, 4, 5])
-	for stage in range(1, 6):
+		assert(HabitatRestorationClass.pending_return_stage(restoration) == 2)
+	assert(HabitatRestorationClass.pending_return_stages(restoration) == [2, 3, 4, 5])
+	for stage in range(2, 6):
 		assert(HabitatRestorationClass.pending_return_stage(restoration) == stage)
 		HabitatRestorationClass.complete_return_event(restoration, stage)
 	assert(HabitatRestorationClass.pending_return_stages(restoration).is_empty())
@@ -103,7 +109,7 @@ func _test_restoration_state_machine() -> void:
 		"habitat_crisis_started": true,
 	})
 	var restored_state: Dictionary = StoryProgressionClass.restoration_state(reloaded)
-	assert(HabitatRestorationClass.seeds_sown_since_crisis(restored_state) == 48)
+	assert(HabitatRestorationClass.seeds_sown_since_crisis(restored_state) == 49)
 	assert(HabitatRestorationClass.returned_count(restored_state) == 5)
 	assert(HabitatRestorationClass.ending_phase(restored_state) == "thank_you")
 	HabitatRestorationClass.complete_ending(restored_state)
@@ -114,7 +120,9 @@ func _test_restoration_state_machine() -> void:
 
 func _test_localization_contract() -> void:
 	var keys := [
-		"post_crisis_greenhouse_armadillo_2",
+		"mission_title",
+		"mission_first_large",
+		"mission_return_large",
 		"restoration_join_home_armadillo",
 		"restoration_join_mouse_hurry",
 		"habitat_crisis_departure_panda",
@@ -134,10 +142,12 @@ func _test_localization_contract() -> void:
 		"restoration_lamp_title",
 		"restoration_return_confirm",
 		"restoration_return_1_armadillo",
+		"restoration_return_1_girl",
 		"restoration_return_2_girl",
 		"restoration_return_3_girl_2",
 		"restoration_return_4_panda",
 		"restoration_return_5_system",
+		"restoration_return_5_girl",
 		"restoration_slide_1",
 		"restoration_slide_2",
 		"restoration_slide_3",
@@ -213,66 +223,30 @@ func _test_integrated_final_chapter() -> void:
 	game.story_progression_state["post_crisis_greenhouse_pending"] = true
 	game._start_post_crisis_greenhouse_event()
 	assert(game.scripted_dialog_kind == "post_crisis_greenhouse")
-	assert(game.scripted_dialog_pages.size() == 7)
-	assert(str(game.scripted_dialog_pages[3].get("text", "")) == "育った多肉は、今までどおり原生地にぼくが持って行くよ。")
-	assert(str(game.scripted_dialog_pages[6].get("text", "")) == "うん！とにかくやってみよう！")
+	assert(game.scripted_dialog_pages.size() == 4)
+	assert(str(game.scripted_dialog_pages[0].get("text", "")) == "原生地を元に戻すには、どうしたらいいんだろう……。")
+	assert(str(game.scripted_dialog_pages[2].get("text", "")) == "じゃあ、とにかく大きな株を作って持っていってみない？")
+	assert(str(game.scripted_dialog_pages[3].get("text", "")) == "うん。やってみよう！")
 	_finish_dialog(game)
+	var restoration: Dictionary = game._restoration_state()
+	assert(HabitatRestorationClass.large_plant_mission_started(restoration))
+	assert(game._current_mission_text() == "100cm以上の多肉を1株育てよう！　0/1")
 
 	for species_id in ["colorata", "affinis", "shaviana"]:
 		StoryProgressionClass.record_restoration_new_get(game.story_progression_state, species_id, true)
 	assert(StoryProgressionClass.peek_story_event(game.story_progression_state).is_empty())
 	assert(not StoryProgressionClass.record_normal_seed_sown_after_crisis(game.story_progression_state, true, 47))
-	assert(StoryProgressionClass.record_normal_seed_sown_after_crisis(game.story_progression_state, true, 1))
+	assert(not StoryProgressionClass.record_normal_seed_sown_after_crisis(game.story_progression_state, true, 1))
 	game._try_start_pending_story_event()
-	assert(game.scripted_dialog_kind == "restoration_join_home")
-	assert(game.scripted_dialog_pages.size() == 3)
-	# Inspect the destination scene without waiting for the production fade.
-	StoryProgressionClass.complete_restoration_join_home(game.story_progression_state)
-	game.scripted_dialog_kind = ""
-	game.scripted_dialog_pages.clear()
-	game.intro_overlay.visible = false
-	game.current_mode = "habitat"
-	game._apply_mode()
-	game._start_restoration_join_habitat_event()
-	assert(game.scripted_dialog_kind == "restoration_join_habitat")
-	assert(game.scripted_dialog_pages.size() == 19)
-	assert(str(game.scripted_dialog_pages[0].get("text", "")).begins_with("はぁー"))
-	assert("早くするんだチュー" in str(game.scripted_dialog_pages[18].get("text", "")))
-	StoryProgressionClass.complete_restoration_join_habitat(game.story_progression_state)
-	game.scripted_dialog_kind = ""
-	game.scripted_dialog_pages.clear()
-	game.intro_overlay.visible = false
-	game.current_mode = "greenhouse"
-	game._apply_mode()
-	game._update_play_ui()
-	assert(StoryProgressionClass.restoration_is_started(game.story_progression_state))
-	assert(game.habitat_restoration_ui.lamp_labels.size() == 5)
-	assert(game.habitat_restoration_ui.lamp_panel.visible)
-	assert(game.habitat_restoration_ui.lamp_panel.position == HabitatRestorationUIClass.LAMP_PANEL_POSITION)
-	assert(game.habitat_restoration_ui.lamp_panel.position.y > 724.0)
-	game.current_mode = "habitat"
-	game._apply_mode()
-	game.jurejure_intro_complete = true
-	game.scripted_dialog_kind = ""
-	game.scripted_dialog_pages.clear()
-	game.intro_overlay.visible = false
-	game.puku_puku_battle.visible = false
-	assert(game._should_show_jurejure_group())
-	assert(HabitatRestorationClass.jurejure_interaction_phase(game._restoration_state()) == HabitatRestorationClass.JUREJURE_PHASE_RESTORATION)
-	game._on_jurejure_group_pressed()
-	assert(game.scripted_dialog_kind == "jurejure_restoration_hurry")
-	assert(str(game.scripted_dialog_pages[0].get("text", "")) == "モタモタしてないで早く多肉を持ってくるんだチュー！")
-	_finish_dialog(game)
-	assert(not game.puku_puku_battle.visible)
-	game.current_mode = "greenhouse"
-	game._apply_mode()
+	assert(game.scripted_dialog_kind.is_empty())
+	assert(not StoryProgressionClass.restoration_is_started(game.story_progression_state))
 
 	for stage in range(1, 6):
 		var pages: Array[Dictionary] = game._restoration_return_pages(stage)
-		assert(pages.size() == [5, 5, 7, 7, 2][stage - 1])
-	assert(str(game._restoration_return_pages(5)[0].get("text", "")) == "5株の多肉を原生地に還した！")
+		assert(pages.size() == [3, 5, 7, 7, 2][stage - 1])
+	assert(str(game._restoration_return_pages(5)[0].get("text", "")) == "これで5株目だよ。")
+	assert(str(game._restoration_return_pages(5)[1].get("text", "")) == "5株の多肉を原生地に還した！")
 
-	var restoration: Dictionary = game._restoration_state()
 	var snapshot := {
 		"species_id": "colorata",
 		"display_name": "コロラータ",
@@ -281,9 +255,8 @@ func _test_integrated_final_chapter() -> void:
 		"rarity": "通常",
 		"gold_star_count": 0,
 	}
-	# A real harvest automatically commits every 100cm plant. Formal endless
-	# progression has no finite result screen, so the player carries the queued
-	# return event into the habitat with the always-available navigation button.
+	# A real harvest queues every eligible 100cm plant. It does not commit or
+	# interrupt the twelve-seed round before the result card closes.
 	game.discovered["colorata"] = true
 	game.species_get_counts["colorata"] = 1
 	game.first_colorata_confirmed = true
@@ -312,19 +285,24 @@ func _test_integrated_final_chapter() -> void:
 		game._on_harvested(harvested_plant)
 	assert(StoryProgressionClass.lifetime_harvest_count(game.story_progression_state) == 2)
 	assert(is_equal_approx(StoryProgressionClass.lifetime_harvest_cm_total(game.story_progression_state), 250.0))
-	assert(HabitatRestorationClass.returned_count(restoration) == 2)
-	assert(HabitatRestorationClass.pending_return_stages(restoration) == [1, 2])
+	restoration = game._restoration_state()
+	assert(HabitatRestorationClass.returned_count(restoration) == 0)
+	assert(HabitatRestorationClass.pending_return_count(restoration) == 2)
+	assert(HabitatRestorationClass.pending_return_stages(restoration).is_empty())
 	assert(not game.habitat_restoration_ui.prompt_layer.visible)
 	assert(game.current_mode == "greenhouse" and game.scripted_dialog_kind.is_empty())
 	await get_tree().process_frame
 	await get_tree().process_frame
 	assert(not game.result_overlay.visible and game.current_mode == "greenhouse" and game.play_active)
 	assert(game.scripted_dialog_kind.is_empty())
-	game._toggle_mode()
-	for _frame in range(100):
-		if game.scripted_dialog_kind == "restoration_return_1":
-			break
-		await get_tree().process_frame
+	# The result modal owns the foreground. Only its close may release the queued
+	# automatic habitat transition.
+	game.play_active = false
+	game.result_overlay.visible = true
+	game._try_start_pending_story_event()
+	assert(game.current_mode == "greenhouse")
+	game._close_result()
+	await get_tree().create_timer(1.4).timeout
 	assert(not game.result_overlay.visible and game.current_mode == "habitat", "return transition mode=%s dialog=%s fade=%s pending=%s" % [game.current_mode, game.scripted_dialog_kind, game.scene_transition_fade.visible, HabitatRestorationClass.pending_return_stages(game._restoration_state())])
 	assert(game.scripted_dialog_kind == "restoration_return_1", "unexpected rooted event: %s pending=%s" % [game.scripted_dialog_kind, HabitatRestorationClass.pending_return_stages(game._restoration_state())])
 	assert(game.jurejure_camera_focus_context == "restoration_return_1")
@@ -333,7 +311,17 @@ func _test_integrated_final_chapter() -> void:
 	assert(int(first_medal.get_meta("restoration_stage",0))==1)
 	assert(is_equal_approx(float((first_medal.get_meta("restoration_snapshot",{}) as Dictionary).get("diameter_cm",0.0)),120.0))
 	_finish_dialog(game)
+	await get_tree().create_timer(1.0).timeout
+	assert(game.scripted_dialog_kind == "restoration_join_habitat")
+	assert(game.scripted_dialog_pages.size() == 19)
+	assert(str(game.scripted_dialog_pages[0].get("text", "")).begins_with("はぁー"))
+	assert("早くするんだチュー" in str(game.scripted_dialog_pages[18].get("text", "")))
+	_finish_dialog(game)
 	await get_tree().process_frame
+	assert(StoryProgressionClass.restoration_is_started(game.story_progression_state))
+	# The second plant was queued in the same round and is committed as soon as
+	# the join dialog closes, so the live mission has already advanced to 2/5.
+	assert(game._current_mission_text() == "100cm以上の多肉を5株、原生地へ還そう！　2/5")
 	assert(game.scripted_dialog_kind == "restoration_return_2")
 	assert(game.jurejure_camera_focus_context == "restoration_return_2")
 	var second_medal:Node3D=game._restoration_returned_plant_node(2)
@@ -344,10 +332,10 @@ func _test_integrated_final_chapter() -> void:
 	await get_tree().create_timer(.9).timeout
 	restoration = game._restoration_state()
 	assert(HabitatRestorationClass.pending_return_stages(restoration).is_empty())
-	game._toggle_mode()
-	await get_tree().process_frame
-	assert(game.current_mode=="greenhouse")
-	# Fill the remaining slots directly; their queue behavior was covered above.
+	assert(HabitatRestorationClass.pending_return_count(restoration) == 0)
+	assert(game.habitat_restoration_ui.lamp_labels.size() == 5)
+	# Fill stages three and four while already in the habitat. The pending event
+	# queue must preserve their chronological order.
 	var later_species := ["shaviana", "affinis"]
 	for index in range(2, 4):
 		var plant := snapshot.duplicate(true)
@@ -357,12 +345,20 @@ func _test_integrated_final_chapter() -> void:
 		assert(HabitatRestorationClass.add_returned_plant(restoration, plant) == index + 1)
 	game._try_start_pending_story_event()
 	await get_tree().process_frame
-	assert(game.current_mode=="greenhouse" and not game.scene_transition_fade.visible)
+	assert(game.scripted_dialog_kind=="restoration_return_3")
+	_finish_dialog(game);await get_tree().process_frame
+	assert(game.scripted_dialog_kind=="restoration_return_4")
+	_finish_dialog(game);await get_tree().process_frame
+	assert(HabitatRestorationClass.pending_return_stages(restoration).is_empty())
+	# Let the once-per-visit group focus finish before leaving the habitat.
+	await get_tree().create_timer(.9).timeout
+	game._toggle_mode();await get_tree().process_frame
+	assert(game.current_mode=="greenhouse")
 	var final_plant:=snapshot.duplicate(true)
 	final_plant["species_id"]="laui"
 	final_plant["display_name"]=Localizer.species_name("ja",game._catalog_entry("laui"))
 	final_plant["diameter_cm"]=175.0
-	assert(HabitatRestorationClass.add_returned_plant(restoration,final_plant)==5)
+	assert(HabitatRestorationClass.queue_pending_return_snapshot(restoration,final_plant))
 	game.story_progression_state["restoration"] = restoration
 	game._try_start_pending_story_event()
 	await get_tree().process_frame
@@ -370,14 +366,10 @@ func _test_integrated_final_chapter() -> void:
 	assert(game.scene_transition_fade.color.r>0.99 and game.scene_transition_fade.color.g>0.99 and game.scene_transition_fade.color.b>0.99)
 	await get_tree().create_timer(2.8).timeout
 	assert(game.current_mode=="habitat")
-	assert(game.scripted_dialog_kind=="restoration_return_3")
+	assert(game.scripted_dialog_kind=="restoration_return_5")
 	assert(game.habitat_items_root.find_children("RestorationMedalPlant*","Sprite3D",true,false).size()==5)
 	assert(is_equal_approx(float((game._restoration_returned_plant_node(3).get_meta("restoration_snapshot",{}) as Dictionary).get("diameter_cm",0.0)),145.0))
-	_finish_dialog(game);await get_tree().process_frame
-	assert(game.scripted_dialog_kind=="restoration_return_4")
 	assert(is_equal_approx(float((game._restoration_returned_plant_node(4).get_meta("restoration_snapshot",{}) as Dictionary).get("diameter_cm",0.0)),160.0))
-	_finish_dialog(game);await get_tree().process_frame
-	assert(game.scripted_dialog_kind=="restoration_return_5")
 	assert(game.jurejure_camera_focus_context=="restoration_return_5")
 	assert(is_equal_approx(float((game._restoration_returned_plant_node(5).get_meta("restoration_snapshot",{}) as Dictionary).get("diameter_cm",0.0)),175.0))
 	_finish_dialog(game)
@@ -407,17 +399,33 @@ func _test_integrated_final_chapter() -> void:
 	game.habitat_crisis_atmosphere.set_restoration_stage(5)
 	assert(not game.habitat_crisis_atmosphere.visible)
 	assert(game._should_show_jurejure_group())
+	# This integrated test jumps over the normal first-notice path; discard that
+	# unrelated deferred dialog before exercising the post-ending interaction.
+	game.scripted_dialog_kind = ""
+	game.scripted_dialog_pages.clear()
+	game.intro_overlay.visible = false
+	# The real story can only reach restoration after the first encounter. This
+	# test assembles the late-game state directly, so restore that prerequisite
+	# explicitly before checking the post-ending interaction.
+	game.jurejure_intro_complete = true
+	game.jurejure_enabled = true
 	HabitatRestorationClass.mark_final_dialog_complete(restoration)
 	HabitatRestorationClass.mark_epilogue_complete(restoration)
+	await get_tree().create_timer(.9).timeout
 	game._on_jurejure_group_pressed()
-	assert(game.scripted_dialog_kind == "jurejure_post_ending")
+	assert(game.scripted_dialog_kind == "jurejure_post_ending", "post-ending tap failed: dialog=%s camera=%s context=%s battle=%s mode=%s" % [game.scripted_dialog_kind, game.jurejure_intro_camera_active, game.jurejure_camera_focus_context, game.puku_puku_battle.visible, game.current_mode])
 	assert(game.scripted_dialog_pages.size() == 1)
 	var first_post_ending_text := str(game.scripted_dialog_pages[0].get("text", ""))
 	_finish_dialog(game)
+	await get_tree().process_frame
+	assert(game.puku_puku_battle.visible and game.puku_puku_battle.choice_layer.visible)
+	game.puku_puku_battle._decline_battle()
 	game._on_jurejure_group_pressed()
 	assert(game.scripted_dialog_kind == "jurejure_post_ending")
 	assert(str(game.scripted_dialog_pages[0].get("text", "")) != first_post_ending_text)
 	_finish_dialog(game)
+	await get_tree().process_frame
+	game.puku_puku_battle._decline_battle()
 
 	game._start_restoration_final_event()
 	assert(game.scripted_dialog_pages.size() == 4)

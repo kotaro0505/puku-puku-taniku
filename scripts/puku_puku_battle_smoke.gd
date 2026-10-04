@@ -21,6 +21,7 @@ func _ready() -> void:
 	add_child(battle)
 	await get_tree().process_frame
 	var texture := load("res://assets/plants/sprite-colorata.png") as Texture2D
+	_verify_alpha_hit_mask()
 	battle.start_battle([SAMPLE_SPECIES], {"colorata": texture}, "ja", 20260926)
 	assert(battle.player_points.size() == BattleClass.MAX_ACTIVE_PER_SIDE and battle.opponent_points.size() == BattleClass.MAX_ACTIVE_PER_SIDE)
 	_verify_soil_points(battle.player_points, false)
@@ -73,6 +74,7 @@ func _ready() -> void:
 		assert(is_instance_valid(live_size_label))
 		assert(live_size_label.text == "%.1fcm" % float(unit.get("size_cm", 0.0)))
 	assert(player_count == BattleClass.MAX_ACTIVE_PER_SIDE and opponent_count == BattleClass.MAX_ACTIVE_PER_SIDE)
+	_verify_player_hit_targets(battle)
 	assert(battle.player_spawned == BattleClass.MAX_ACTIVE_PER_SIDE and battle.opponent_spawned == BattleClass.MAX_ACTIVE_PER_SIDE)
 	var growth_unit: Dictionary = battle.units[0]
 	var initial_visual_size: float = float((growth_unit.get("node") as TextureButton).size.x)
@@ -103,13 +105,43 @@ func _ready() -> void:
 
 	print(
 		"PUKU_PUKU_BATTLE_SMOKE_OK sow=manual active=6v6 total=12v12 refill=true random_soil=true shared_growth=true shared_jelly=true " +
-		"ai_jelly_rate=%.3f ai_average_harvest_cm=%.3f ai_average_score=%.3f condition_delta=0.000 main_scale_visual=true unclipped_plants=true" % [
+		"ai_jelly_rate=%.3f ai_average_harvest_cm=%.3f ai_average_score=%.3f condition_delta=0.000 main_scale_visual=true unclipped_plants=true alpha_hit=true frontmost_z=true" % [
 			float(ai_stats.jelly_rate),
 			float(ai_stats.average_harvest_cm),
 			float(ai_stats.average_score)
 		]
 	)
 	get_tree().quit()
+
+
+func _verify_alpha_hit_mask() -> void:
+	var image := Image.create(4, 4, false, Image.FORMAT_RGBA8)
+	image.fill(Color(1.0, 1.0, 1.0, 0.0))
+	image.set_pixel(1, 2, Color(0.3, 0.8, 0.4, 1.0))
+	var texture := ImageTexture.create_from_image(image)
+	var mask := BattleClass.texture_alpha_click_mask(texture)
+	assert(mask != null)
+	assert(not mask.get_bit(0, 0))
+	assert(mask.get_bit(1, 2))
+
+
+func _verify_player_hit_targets(battle: Control) -> void:
+	var player_units: Array[Dictionary] = []
+	for unit_value in battle.units:
+		var unit: Dictionary = unit_value
+		if bool(unit.get("opponent", false)):
+			continue
+		var button := unit.get("node") as TextureButton
+		assert(is_instance_valid(button))
+		assert(button.texture_click_mask != null)
+		assert(button.mouse_filter == Control.MOUSE_FILTER_STOP)
+		assert(button.z_index == int(float((unit.get("point", Vector2.ZERO) as Vector2).y)))
+		player_units.append(unit)
+	assert(player_units.size() == BattleClass.MAX_ACTIVE_PER_SIDE)
+	player_units.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return int((a.get("node") as TextureButton).z_index) < int((b.get("node") as TextureButton).z_index)
+	)
+	assert(int((player_units.back().get("node") as TextureButton).z_index) >= int((player_units.front().get("node") as TextureButton).z_index))
 
 
 func _verify_shared_growth_source() -> void:

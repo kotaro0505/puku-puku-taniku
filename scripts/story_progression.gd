@@ -18,7 +18,7 @@ const ACT_FINALE := 4
 # New Act II/III gates live in one versioned payload instead of adding another
 # row of unrelated booleans to main.gd.  The root scene only forwards gameplay
 # milestones and persists this dictionary.
-const RUNTIME_STATE_VERSION := 7
+const RUNTIME_STATE_VERSION := 8
 # Lifetime ending counters are optional scalar fields normalized to zero below,
 # so they do not require replaying the story-phase migrations for existing v7 saves.
 # Keep the complete Secret Gacha implementation and saved state intact while
@@ -128,6 +128,12 @@ static func normalize_runtime_state(raw_state: Variant, migration: Dictionary = 
 		state.get("restoration", {}),
 		{"habitat_crisis_started": bool(migration.get("habitat_crisis_started", false))}
 	)
+	var normalized_restoration: Dictionary = state.get("restoration", {})
+	if bool(state.get("post_crisis_greenhouse_seen", false)):
+		HabitatRestorationClass.start_large_plant_mission(normalized_restoration)
+	if not bool(normalized_restoration.get("join_home_pending", false)):
+		state["pending_story_events"].erase(EVENT_RESTORATION_JOIN_HOME)
+	state["restoration"] = normalized_restoration
 
 	# Saves made before this payload existed must not lose already available
 	# content.  New games never enter this branch and follow the new gates.
@@ -218,6 +224,9 @@ static func normalize_runtime_state(raw_state: Variant, migration: Dictionary = 
 		state["pending_story_events"].erase(EVENT_EXPLOITATION_MIDPOINT)
 	elif bool(state.get("exploitation_midpoint_pending", false)):
 		queue_story_event(state, EVENT_EXPLOITATION_MIDPOINT)
+	if bool(migration.get("habitat_crisis_pending", false)) \
+			or bool(migration.get("habitat_crisis_started", false)):
+		cancel_exploitation_events_for_crisis(state)
 	var restoration: Dictionary = state.get("restoration", {})
 	if HabitatRestorationClass.can_queue_join_home(
 			restoration, bool(state.get("post_crisis_greenhouse_seen", false))):
@@ -378,8 +387,8 @@ static func complete_post_crisis_greenhouse(state: Dictionary) -> void:
 	state["post_crisis_greenhouse_pending"] = false
 	state["post_crisis_greenhouse_seen"] = true
 	var restoration: Dictionary = state.get("restoration", {})
-	if HabitatRestorationClass.can_queue_join_home(restoration, true):
-		queue_story_event(state, EVENT_RESTORATION_JOIN_HOME)
+	HabitatRestorationClass.start_large_plant_mission(restoration)
+	state["restoration"] = restoration
 
 
 static func begin_habitat_crisis(state: Dictionary) -> void:
@@ -390,8 +399,18 @@ static func begin_habitat_crisis(state: Dictionary) -> void:
 
 
 static func queue_habitat_crisis_transition(state: Dictionary, acquired_in_habitat: bool) -> void:
+	cancel_exploitation_events_for_crisis(state)
 	state["habitat_crisis_route"] = CRISIS_ROUTE_SAME_HABITAT \
 		if acquired_in_habitat else CRISIS_ROUTE_FORCE_TRAVEL
+
+
+static func cancel_exploitation_events_for_crisis(state: Dictionary) -> void:
+	var events: Array = state.get("pending_story_events", [])
+	events.erase(EVENT_ACT3_BATTLE_INTRO)
+	events.erase(EVENT_EXPLOITATION_MIDPOINT)
+	state["pending_story_events"] = events
+	state["act3_battle_intro_pending"] = false
+	state["exploitation_midpoint_pending"] = false
 
 
 static func habitat_crisis_route(state: Dictionary) -> String:
@@ -412,9 +431,6 @@ static func record_restoration_new_get(
 	HabitatRestorationClass.begin_tracking(restoration)
 	var became_ready := HabitatRestorationClass.record_new_species(restoration, species_id)
 	state["restoration"] = restoration
-	if HabitatRestorationClass.can_queue_join_home(
-			restoration, bool(state.get("post_crisis_greenhouse_seen", false))):
-		queue_story_event(state, EVENT_RESTORATION_JOIN_HOME)
 	return became_ready
 
 
@@ -431,9 +447,6 @@ static func record_normal_seed_sown_after_crisis(
 		restoration, amount
 	)
 	state["restoration"] = restoration
-	if HabitatRestorationClass.can_queue_join_home(
-			restoration, bool(state.get("post_crisis_greenhouse_seen", false))):
-		queue_story_event(state, EVENT_RESTORATION_JOIN_HOME)
 	return became_ready
 
 

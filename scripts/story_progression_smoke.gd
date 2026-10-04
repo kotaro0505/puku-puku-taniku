@@ -46,7 +46,15 @@ func _test_catalog_contract(game: Node) -> void:
 		elif str(entry.get("catalog_origin", "")) == "modern_annotation":
 			modern_annotations.append(str(entry.get("species_id", "")))
 	assert(originals == StoryProgressionClass.MAIN_STORY_ORIGINAL_IDS)
-	assert(originals.size() == 12 and modern_annotations.size() == 9)
+	assert(originals.size() == 12 and modern_annotations.is_empty())
+	var former_base_specials := [
+		"golden_laui", "golden_kannte", "transparent_succulent", "glow_colorata",
+		"metal_laui", "seaglass_veria", "amber_agavoides", "yumefuwa_jelly",
+		"peach_jelly_succulent",
+	]
+	for species_id in former_base_specials:
+		assert(not game._catalog_entry(species_id).is_empty())
+		assert(species_id not in originals and species_id not in modern_annotations)
 	for ordinary_id in ["hyalina_san_luis_de_la_paz", "purpusorum", "pinwheel", "tovarensis_tovar", "strictiflora_bustamante"]:
 		var ordinary_entry: Dictionary = game._catalog_entry(ordinary_id)
 		assert(not ordinary_entry.is_empty())
@@ -138,6 +146,19 @@ func _test_three_act_sequence(game: Node) -> void:
 		if game._is_fantasy_species(entry) and not game._is_jurejure_species(entry):
 			fantasy_ids.append(str(entry.get("species_id", "")))
 	assert(fantasy_ids.size() >= 24)
+	# Before fantasy_six, the live candidate rules guarantee one GET from each
+	# line named by the dialogue. Mirror that legitimate acquisition order when
+	# this state-only test awards GETs directly.
+	var ordered_fantasy_ids: Array[String] = []
+	for required_series in game.FANTASY_SIX_REQUIRED_SERIES:
+		for species_id in fantasy_ids:
+			if game._catalog_display_series_id_for_entry(game._catalog_entry(species_id)) == required_series:
+				ordered_fantasy_ids.append(species_id)
+				break
+	for species_id in fantasy_ids:
+		if species_id not in ordered_fantasy_ids:
+			ordered_fantasy_ids.append(species_id)
+	fantasy_ids = ordered_fantasy_ids
 	# Encyclopedia discovery by itself is not a real GET.
 	for index in range(24):
 		game.discovered[fantasy_ids[index]] = true
@@ -202,17 +223,9 @@ func _test_three_act_sequence(game: Node) -> void:
 	assert(game.act3_unlocked and game.act3_intro_pending and not game.act3_intro_seen)
 	assert(game.main_story_stage == StoryProgressionClass.ACT_3)
 	assert(game.scripted_dialog_kind.is_empty())
-	# Merely assigning habitat mode is not a visit; the intro waits for the next
-	# real navigation entry and therefore cannot appear behind a GET screen.
-	game.current_mode = "habitat"
-	game._apply_mode()
-	game._try_start_pending_story_event()
-	assert(game.scripted_dialog_kind.is_empty())
-	game.current_mode = "greenhouse"
-	game._apply_mode()
-	game._toggle_mode()
-	await get_tree().process_frame
-	await get_tree().process_frame
+	# The 24th GET now owns a safe automatic route to the habitat. It waits for
+	# foreground cards in live play, then fades, frames the gang, and starts Act 3.
+	await get_tree().create_timer(2.2).timeout
 	assert(game.current_mode == "habitat" and game.scripted_dialog_kind == "act3_intro")
 	assert(game.audio_manager.current_bgm_key == "jurejure")
 	assert(game.scripted_dialog_index == 0)
@@ -364,18 +377,17 @@ func _test_three_act_sequence(game: Node) -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	assert(game.current_mode == "greenhouse" and game.scripted_dialog_kind == "post_crisis_greenhouse")
-	assert(game.scripted_dialog_pages.size() == 7)
-	assert(str(game.scripted_dialog_pages[0].get("text", "")) == "原生地は限界だったんだ…")
-	assert(str(game.scripted_dialog_pages[1].get("text", "")) == "これじゃあ歴史の繰り返しだ…")
-	assert(str(game.scripted_dialog_pages[2].get("text", "")) == "私たちにできる事は、原生地からもらった種をとにかく蒔き続ける事…")
-	assert(str(game.scripted_dialog_pages[3].get("text", "")) == "育った多肉は、今までどおり原生地にぼくが持って行くよ。")
-	assert(str(game.scripted_dialog_pages[4].get("text", "")) == "ぼくも一緒に行くよ！")
-	assert(str(game.scripted_dialog_pages[5].get("text", "")) == "私はどんどん種を蒔くね！")
-	assert(str(game.scripted_dialog_pages[6].get("text", "")) == "うん！とにかくやってみよう！")
+	assert(game.scripted_dialog_pages.size() == 4)
+	assert(str(game.scripted_dialog_pages[0].get("text", "")) == "原生地を元に戻すには、どうしたらいいんだろう……。")
+	assert(str(game.scripted_dialog_pages[1].get("text", "")) == "弱ってるなら、まずは多肉を戻してあげた方がいいかもしれない。")
+	assert(str(game.scripted_dialog_pages[2].get("text", "")) == "じゃあ、とにかく大きな株を作って持っていってみない？")
+	assert(str(game.scripted_dialog_pages[3].get("text", "")) == "うん。やってみよう！")
 	_finish_dialog(game)
 	assert(bool(game.story_progression_state.get("post_crisis_greenhouse_seen", false)))
 	assert(not bool(game.story_progression_state.get("post_crisis_greenhouse_pending", true)))
+	assert(game._current_mission_text() == "100cm以上の多肉を1株育てよう！　0/1")
 	game._toggle_mode();await get_tree().process_frame
+	await get_tree().create_timer(.9).timeout
 	game._toggle_mode();await get_tree().process_frame
 	assert(game.current_mode == "greenhouse" and game.scripted_dialog_kind.is_empty())
 	game._save()

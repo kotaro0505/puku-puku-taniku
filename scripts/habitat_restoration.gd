@@ -6,7 +6,7 @@ const Localizer = preload("res://scripts/game_localizer.gd")
 # Durable state for the post-crisis final chapter.  It is stored as one nested
 # payload in StoryProgression rather than spreading one-off flags through
 # main.gd.
-const STATE_VERSION := 3
+const STATE_VERSION := 4
 const REQUIRED_NEW_SPECIES := 3
 const REQUIRED_SEEDS_SOWN_AFTER_CRISIS := 48
 const REQUIRED_RETURNED_PLANTS := 5
@@ -24,9 +24,6 @@ static func dialog_pages(language_code: String, kind: String, stage := 0) -> Arr
 				["panda", "post_crisis_greenhouse_panda_1"],
 				["armadillo", "post_crisis_greenhouse_armadillo"],
 				["girl", "post_crisis_greenhouse_girl"],
-				["armadillo", "post_crisis_greenhouse_armadillo_2"],
-				["panda", "post_crisis_greenhouse_panda_2"],
-				["girl", "post_crisis_greenhouse_girl_2"],
 				["panda", "post_crisis_greenhouse_panda_3"],
 			]
 		"join_home":
@@ -59,11 +56,11 @@ static func dialog_pages(language_code: String, kind: String, stage := 0) -> Arr
 			]
 		"return":
 			var stage_specs := {
-				1: [["armadillo", "restoration_return_1_armadillo"], ["panda", "restoration_return_1_panda"], ["mouse", "restoration_return_1_mouse"], ["peccary", "restoration_return_1_peccary"], ["skunk", "restoration_return_1_skunk"]],
+				1: [["armadillo", "restoration_return_1_armadillo"], ["panda", "restoration_return_1_panda"], ["girl", "restoration_return_1_girl"]],
 				2: [["girl", "restoration_return_2_girl"], ["armadillo", "restoration_return_2_armadillo"], ["mouse", "restoration_return_2_mouse"], ["peccary", "restoration_return_2_peccary"], ["skunk", "restoration_return_2_skunk"]],
 				3: [["girl", "restoration_return_3_girl_1"], ["panda", "restoration_return_3_panda"], ["armadillo", "restoration_return_3_armadillo"], ["girl", "restoration_return_3_girl_2"], ["mouse", "restoration_return_3_mouse"], ["peccary", "restoration_return_3_peccary"], ["skunk", "restoration_return_3_skunk"]],
 				4: [["girl", "restoration_return_4_girl"], ["armadillo", "restoration_return_4_armadillo"], ["girl", "restoration_return_4_girl_2"], ["mouse", "restoration_return_4_mouse"], ["peccary", "restoration_return_4_peccary"], ["skunk", "restoration_return_4_skunk"], ["panda", "restoration_return_4_panda"]],
-				5: [["", "restoration_return_5_system"], ["girl", "restoration_return_5_girl"]],
+				5: [["girl", "restoration_return_5_girl"], ["", "restoration_return_5_system"]],
 			}
 			specs = stage_specs.get(stage, [])
 		"final":
@@ -97,12 +94,14 @@ static func default_state() -> Dictionary:
 		"tracking_started": false,
 		"new_species_ids": [],
 		"seeds_sown_since_crisis": 0,
+		"large_plant_mission_started": false,
 		"join_home_pending": false,
 		"join_home_seen": false,
 		"join_habitat_pending": false,
 		"jurejure_joined": false,
 		"started": false,
 		"returned_plants": [],
+		"pending_return_snapshots": [],
 		"return_event_pending_stage": 0,
 		"return_event_pending_stages": [],
 		"full_recovery_revealed": false,
@@ -115,7 +114,9 @@ static func default_state() -> Dictionary:
 
 static func normalize_state(raw_state: Variant, migration: Dictionary = {}) -> Dictionary:
 	var state := default_state()
+	var saved_version := 0
 	if raw_state is Dictionary:
+		saved_version = int(raw_state.get("version", 0))
 		for key in state:
 			if raw_state.has(key):
 				state[key] = raw_state[key]
@@ -153,6 +154,26 @@ static func normalize_state(raw_state: Variant, migration: Dictionary = {}) -> D
 				"slot": returned.size(),
 			})
 	state["returned_plants"] = returned
+	var pending_snapshots: Array[Dictionary] = []
+	var raw_pending_snapshots: Variant = state.get("pending_return_snapshots", [])
+	if raw_pending_snapshots is Array:
+		for value in raw_pending_snapshots:
+			if not value is Dictionary \
+					or returned.size() + pending_snapshots.size() >= REQUIRED_RETURNED_PLANTS:
+				continue
+			var species_id := str(value.get("species_id", ""))
+			var diameter_cm := float(value.get("diameter_cm", 0.0))
+			if species_id.is_empty() or diameter_cm < MIN_RETURN_DIAMETER_CM:
+				continue
+			pending_snapshots.append({
+				"species_id": species_id,
+				"display_name": str(value.get("display_name", species_id)),
+				"diameter_cm": diameter_cm,
+				"visual_scale": maxf(0.01, float(value.get("visual_scale", 1.0))),
+				"rarity": str(value.get("rarity", "")),
+				"gold_star_count": clampi(int(value.get("gold_star_count", 0)), 0, 2),
+			})
+	state["pending_return_snapshots"] = pending_snapshots
 	# v1 could keep only the latest stage. v2 keeps every stage reached during a
 	# single greenhouse play so the rooted-plant scenes can run in order after
 	# the normal result card closes.
@@ -184,12 +205,21 @@ static func normalize_state(raw_state: Variant, migration: Dictionary = {}) -> D
 	# Historical sowings cannot be dated reliably, so they are not inferred.
 	if bool(migration.get("habitat_crisis_started", false)):
 		state["tracking_started"] = true
-	if not returned.is_empty():
+	# v3 and older could only return plants after the gang had joined. v4 may
+	# persist the first rooted plant before its follow-up join conversation.
+	if saved_version < 4 and not returned.is_empty():
 		state["tracking_started"] = true
 		state["join_home_seen"] = true
 		state["join_habitat_pending"] = false
 		state["jurejure_joined"] = true
 		state["started"] = true
+	if bool(state.get("jurejure_joined", false)):
+		state["started"] = true
+	if not returned.is_empty() or not pending_snapshots.is_empty():
+		state["tracking_started"] = true
+	# The retired sow-count gate must not revive the pre-return join route.
+	if not bool(state.get("join_home_seen", false)):
+		state["join_home_pending"] = false
 	if returned.size() >= REQUIRED_RETURNED_PLANTS and bool(state.get("ending_seen", false)):
 		state["full_recovery_revealed"] = true
 	if bool(state.get("thank_you_seen", false)):
@@ -222,20 +252,12 @@ static func new_species_count(state: Dictionary) -> int:
 
 
 static func record_normal_seed_sown_after_crisis(state: Dictionary, amount := 1) -> bool:
-	if amount <= 0 \
-			or not bool(state.get("tracking_started", false)) \
-			or bool(state.get("join_home_pending", false)) \
-			or bool(state.get("join_home_seen", false)) \
-			or bool(state.get("jurejure_joined", false)):
+	if amount <= 0 or not bool(state.get("tracking_started", false)):
 		return false
-	var previous := maxi(0, int(state.get("seeds_sown_since_crisis", 0)))
-	var current := previous + amount
-	state["seeds_sown_since_crisis"] = current
-	if previous < REQUIRED_SEEDS_SOWN_AFTER_CRISIS \
-			and current >= REQUIRED_SEEDS_SOWN_AFTER_CRISIS \
-			and not bool(state.get("join_home_pending", false)):
-		state["join_home_pending"] = true
-		return true
+	# Save-compatible telemetry only. Story progression no longer reads it.
+	state["seeds_sown_since_crisis"] = maxi(
+		0, int(state.get("seeds_sown_since_crisis", 0)) + amount
+	)
 	return false
 
 
@@ -244,9 +266,16 @@ static func seeds_sown_since_crisis(state: Dictionary) -> int:
 
 
 static func can_queue_join_home(state: Dictionary, post_crisis_greenhouse_seen: bool) -> bool:
-	return post_crisis_greenhouse_seen \
-		and bool(state.get("join_home_pending", false)) \
-		and not bool(state.get("join_home_seen", false))
+	return false
+
+
+static func start_large_plant_mission(state: Dictionary) -> void:
+	state["large_plant_mission_started"] = true
+	state["join_home_pending"] = false
+
+
+static func large_plant_mission_started(state: Dictionary) -> bool:
+	return bool(state.get("large_plant_mission_started", false)) or is_started(state)
 
 
 static func complete_join_home(state: Dictionary) -> void:
@@ -275,16 +304,57 @@ static func returned_count(state: Dictionary) -> int:
 
 
 static func can_offer_return(state: Dictionary, diameter_cm: float) -> bool:
-	return is_started(state) \
-		and returned_count(state) < REQUIRED_RETURNED_PLANTS \
+	return large_plant_mission_started(state) \
+		and returned_count(state) + pending_return_count(state) < REQUIRED_RETURNED_PLANTS \
 		and diameter_cm >= MIN_RETURN_DIAMETER_CM
+
+
+static func pending_return_snapshots(state: Dictionary) -> Array:
+	var value: Variant = state.get("pending_return_snapshots", [])
+	return value if value is Array else []
+
+
+static func pending_return_count(state: Dictionary) -> int:
+	return pending_return_snapshots(state).size()
+
+
+static func queue_pending_return_snapshot(state: Dictionary, snapshot: Dictionary) -> bool:
+	if not can_offer_return(state, float(snapshot.get("diameter_cm", 0.0))):
+		return false
+	var species_id := str(snapshot.get("species_id", ""))
+	if species_id.is_empty():
+		return false
+	var pending: Array = pending_return_snapshots(state)
+	pending.append({
+		"species_id": species_id,
+		"display_name": str(snapshot.get("display_name", species_id)),
+		"diameter_cm": float(snapshot.get("diameter_cm", MIN_RETURN_DIAMETER_CM)),
+		"visual_scale": maxf(0.01, float(snapshot.get("visual_scale", 1.0))),
+		"rarity": str(snapshot.get("rarity", "")),
+		"gold_star_count": clampi(int(snapshot.get("gold_star_count", 0)), 0, 2),
+	})
+	state["pending_return_snapshots"] = pending
+	return true
+
+
+static func commit_next_pending_return(state: Dictionary) -> int:
+	var pending: Array = pending_return_snapshots(state)
+	if pending.is_empty() or returned_count(state) >= REQUIRED_RETURNED_PLANTS:
+		return 0
+	var snapshot: Dictionary = pending.pop_front()
+	state["pending_return_snapshots"] = pending
+	return _store_returned_plant(state, snapshot)
 
 
 static func add_returned_plant(state: Dictionary, snapshot: Dictionary) -> int:
 	if not can_offer_return(state, float(snapshot.get("diameter_cm", 0.0))):
 		return 0
+	return _store_returned_plant(state, snapshot)
+
+
+static func _store_returned_plant(state: Dictionary, snapshot: Dictionary) -> int:
 	var species_id := str(snapshot.get("species_id", ""))
-	if species_id.is_empty():
+	if species_id.is_empty() or returned_count(state) >= REQUIRED_RETURNED_PLANTS:
 		return 0
 	var returned: Array = returned_plants(state)
 	var stored := {

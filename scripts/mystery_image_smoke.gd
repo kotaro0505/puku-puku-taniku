@@ -88,11 +88,9 @@ func _ready() -> void:
 			if str(game.encyclopedia_card_entries[i].get("species_id", "")) == species_id:
 				card_index = i
 				break
-		assert(card_index >= 0)
-		var card_image: TextureRect = game.encyclopedia_card_images[card_index]
-		assert(card_image.expand_mode == TextureRect.EXPAND_IGNORE_SIZE)
-		assert(card_image.stretch_mode == TextureRect.STRETCH_KEEP_ASPECT_CENTERED)
-		assert(card_image.material==null and card_image.modulate.is_equal_approx(Color(0.12,0.09,0.08,0.82)))
+		# These mystery-route species still keep their catalog entries, art, GET
+		# cards, and acquisition routes, but no longer belong on the originals page.
+		assert(card_index == -1)
 
 		var plant := SucculentClass.new()
 		game.add_child(plant)

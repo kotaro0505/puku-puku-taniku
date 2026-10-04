@@ -340,6 +340,9 @@ func _create_unit(opponent: bool, point_index: int, entries: Array[Dictionary], 
 	button.ignore_texture_size = true
 	button.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
 	button.texture_normal = texture
+	var alpha_mask := texture_alpha_click_mask(texture)
+	if alpha_mask != null:
+		button.texture_click_mask = alpha_mask
 	button.focus_mode = Control.FOCUS_NONE
 	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	button.mouse_filter = Control.MOUSE_FILTER_IGNORE if opponent else Control.MOUSE_FILTER_STOP
@@ -400,6 +403,17 @@ func _create_unit(opponent: bool, point_index: int, entries: Array[Dictionary], 
 		germinate.tween_property(button, "scale", Vector2.ONE, GERMINATION_SECONDS).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		germinate.tween_property(button, "modulate:a", 1.0, GERMINATION_SECONDS * 0.72)
 		germinate.tween_property(size_label, "modulate:a", 1.0, GERMINATION_SECONDS * 0.72)
+
+
+static func texture_alpha_click_mask(texture: Texture2D, threshold := 0.08) -> BitMap:
+	if texture == null:
+		return null
+	var image := texture.get_image()
+	if image == null or image.is_empty():
+		return null
+	var mask := BitMap.new()
+	mask.create_from_image_alpha(image, clampf(threshold, 0.0, 1.0))
+	return mask
 
 
 static func ai_harvest_plan(safe_end: float, ramp_end: float, style_roll: float, timing_roll: float) -> Dictionary:

@@ -84,6 +84,7 @@ func _test_act3_and_crisis_presets() -> void:
 	game.habitat_visit_id += 1
 	game._apply_mode()
 	game._try_start_pending_story_event()
+	await get_tree().create_timer(1.0).timeout
 	assert(game.scripted_dialog_kind == "act3_intro")
 	game.free()
 	await get_tree().process_frame
@@ -112,6 +113,7 @@ func _test_act3_and_crisis_presets() -> void:
 	game.current_mode = "habitat"
 	game._apply_mode()
 	game._try_start_pending_story_event()
+	await get_tree().create_timer(1.0).timeout
 	assert(game.habitat_crisis_started)
 	game.free()
 	await get_tree().process_frame
@@ -164,10 +166,10 @@ func _test_restoration_and_101cm_presets() -> void:
 	assert(not plant.jelly_checks_enabled)
 	plant.harvest()
 	assert(not game.habitat_restoration_ui.prompt_layer.visible)
-	assert(HabitatRestorationClass.returned_count(restoration) == 5)
-	assert(str(HabitatRestorationClass.returned_plants(restoration)[4].get("species_id", "")) == "colorata")
-	assert(float(HabitatRestorationClass.returned_plants(restoration)[4].get("diameter_cm", 0.0)) >= 100.0)
-	assert(HabitatRestorationClass.pending_return_stage(restoration) == 5)
+	assert(HabitatRestorationClass.returned_count(restoration) == 4)
+	assert(HabitatRestorationClass.pending_return_count(restoration) == 1)
+	assert(str(HabitatRestorationClass.pending_return_snapshots(restoration)[0].get("species_id", "")) == "colorata")
+	assert(float(HabitatRestorationClass.pending_return_snapshots(restoration)[0].get("diameter_cm", 0.0)) >= 100.0)
 	assert(game.current_mode == "greenhouse")
 	await get_tree().process_frame
 	await get_tree().process_frame
@@ -182,6 +184,8 @@ func _test_restoration_and_101cm_presets() -> void:
 	await get_tree().create_timer(2.8).timeout
 	assert(game.current_mode == "habitat")
 	assert(game.scripted_dialog_kind == "restoration_return_5")
+	assert(HabitatRestorationClass.returned_count(restoration) == 5)
+	assert(str(HabitatRestorationClass.returned_plants(restoration)[4].get("species_id", "")) == "colorata")
 	_finish_dialog(game)
 	await get_tree().create_timer(1.2).timeout
 	assert(HabitatRestorationClass.ending_phase(restoration) == "slides")

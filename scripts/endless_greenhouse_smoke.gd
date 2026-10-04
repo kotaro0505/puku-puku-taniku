@@ -379,21 +379,17 @@ func _test_immediate_species_get_and_pause(game: Node) -> void:
 	newcomer.harvest()
 	await get_tree().process_frame
 	await get_tree().process_frame
-	assert(game.species_get_overlay.visible)
-	assert(game.result_new_species_queue.is_empty())
-	assert(not game._should_simulate_endless_greenhouse())
+	assert(not game.species_get_overlay.visible)
+	assert(species_id in game.result_new_species_queue)
+	assert(game._should_simulate_endless_greenhouse())
 	var observer = game.plants[0]
 	observer.jelly_checks_enabled = false
 	var age_before: float = observer.age
 	var spawn_queue_before: int = game.play_spawn_queue
 	game._process(1.0)
-	assert(is_equal_approx(observer.age, age_before))
+	assert(observer.age > age_before)
 	assert(game.play_spawn_queue == spawn_queue_before)
-	await get_tree().create_timer(.55).timeout
-	await game.species_get_overlay.close_overlay()
-	assert(not game.species_get_overlay.visible)
-	if game.catalog_series_unlock_overlay.visible:
-		game.catalog_series_unlock_overlay.busy=false;await game.catalog_series_unlock_overlay.close_overlay()
+	game.result_new_species_queue.erase(species_id)
 	assert(game._should_simulate_endless_greenhouse())
 
 
@@ -432,14 +428,14 @@ func _test_forced_new_lifecycle(game: Node) -> void:
 	forced_plant.harvest()
 	await get_tree().process_frame
 	await get_tree().process_frame
-	assert(game.species_get_overlay.visible)
+	assert(not game.species_get_overlay.visible)
+	assert(forced_species_id in game.result_new_species_queue)
 	assert(not game.endless_greenhouse.has_forced_new())
 	assert(is_zero_approx(game.endless_greenhouse.discovery_cycle_best_cm))
 	assert(game.endless_greenhouse.discovery_settled_count == 3)
-	await get_tree().create_timer(.55).timeout
-	await game.species_get_overlay.close_overlay()
-	if game.catalog_series_unlock_overlay.visible:
-		game.catalog_series_unlock_overlay.busy=false;await game.catalog_series_unlock_overlay.close_overlay()
+	game.result_new_species_queue.erase(forced_species_id)
+	game.catalog_series_unlock_notice_queue.clear()
+	game.catalog_series_unlock_notice_ready.clear()
 	var resumed_roll: Dictionary = game._record_endless_discovery_settlement(true, 50.0, 0.0)
 	assert(is_equal_approx(float(resumed_roll.get("new_chance", -1.0)), 0.05))
 	assert(game.endless_greenhouse.forced_new_pending)
@@ -508,28 +504,17 @@ func _test_navigation_pause_resume(game: Node) -> void:
 	game.scripted_dialog_kind = ""
 	game.scripted_dialog_pages.clear()
 	game.intro_overlay.visible = false
-	assert(game._greenhouse_area_navigation_available())
+	assert(not game._greenhouse_area_navigation_available())
 	var observer = game.plants[0]
 	observer.jelly_checks_enabled = false
-	var age_before_habitat: float = observer.age
-	game._toggle_mode()
-	assert(game.current_mode == "habitat" and game.play_active)
-	assert(game.mode_button.visible)
-	assert(not game._should_simulate_endless_greenhouse())
-	game._process(1.0)
-	assert(is_equal_approx(observer.age, age_before_habitat))
+	var age_before_blocked_navigation: float = observer.age
 	game._toggle_mode()
 	assert(game.current_mode == "greenhouse" and game.play_active)
-	var age_before_resume: float = observer.age
+	assert(not game.mode_button.visible)
+	game._open_arrangements()
+	assert(not game.arrangement_scene_active)
 	game._process(.25)
-	assert(observer.age > age_before_resume)
-	game.arrangement_scene_active = true
-	var age_before_arrangement: float = observer.age
-	game._process(1.0)
-	assert(is_equal_approx(observer.age, age_before_arrangement))
-	game.arrangement_scene_active = false
-	game._update_play_ui()
-	assert(game._greenhouse_area_navigation_available())
+	assert(observer.age > age_before_blocked_navigation)
 	var age_before_dialog: float = observer.age
 	game._start_scripted_dialog("endless_smoke_pause", [{"speaker": "panda", "text": "pause"}], false)
 	game._process(1.0)
@@ -585,25 +570,29 @@ func _test_formal_endless_main_features(game: Node) -> void:
 	game.forest_gacha_unlocked=true
 	game.forest_gacha_intro_seen=true
 	game._update_play_ui()
-	assert(game.settings_button.visible and game.encyclopedia_icon_button.visible and game.shop_button.visible and game.forest_gacha_button.visible)
+	assert(not game.settings_button.visible and not game.encyclopedia_icon_button.visible and not game.shop_button.visible and not game.forest_gacha_button.visible)
 	var observer=game.plants[0]
 	observer.jelly_checks_enabled=false
-
-	var age_before_catalog:float=observer.age
+	var age_before_blocked_navigation:float=observer.age
 	game._open_encyclopedia()
-	assert(game.encyclopedia_overlay.visible and not game._should_simulate_endless_greenhouse())
-	game._process(1.0)
-	assert(is_equal_approx(observer.age,age_before_catalog))
-	game._close_encyclopedia()
-	assert(game._should_simulate_endless_greenhouse())
-
-	var age_before_shop:float=observer.age
+	assert(not game.encyclopedia_overlay.visible)
 	game._open_shop()
-	assert(game.shop_overlay.visible and not game._should_simulate_endless_greenhouse())
-	game._process(1.0)
-	assert(is_equal_approx(observer.age,age_before_shop))
+	assert(not game.shop_overlay.visible)
+	game._open_forest_gacha()
+	assert(not game.forest_gacha_ui.visible)
+	game._open_settings()
+	assert(not game.settings_overlay.visible)
+	game._process(.25)
+	assert(observer.age>age_before_blocked_navigation)
+	game.play_active=false
+	game._update_play_ui()
+	assert(game.settings_button.visible and game.encyclopedia_icon_button.visible and game.shop_button.visible and game.forest_gacha_button.visible)
+	game._open_encyclopedia()
+	assert(game.encyclopedia_overlay.visible)
+	game._close_encyclopedia()
+	game._open_shop()
+	assert(game.shop_overlay.visible)
 	game._close_shop()
-	assert(game._should_simulate_endless_greenhouse())
 
 	game.puku_balance_units=maxi(game.puku_balance_units,5000)
 	var puku_before_units:int=game.puku_balance_units
@@ -611,7 +600,6 @@ func _test_formal_endless_main_features(game: Node) -> void:
 	game.forest_gacha_ui.animation_time_scale=.001
 	game._open_forest_gacha()
 	assert(game.forest_gacha_ui.visible and not game.forest_gacha_trial_dev_mode and not game.forest_gacha_preview_mode)
-	assert(not game._should_simulate_endless_greenhouse())
 	game._spin_forest_gacha()
 	assert(not game.forest_gacha_ui.pending_result.is_empty())
 	assert(game.puku_balance_units==puku_before_units-game.FOREST_GACHA_SPIN_COST*game.PUKU_UNITS_PER_PUKU)
@@ -632,14 +620,9 @@ func _test_formal_endless_main_features(game: Node) -> void:
 	game._close_forest_gacha()
 	game.story_progression_state["pending_story_events"]=[]
 	game.scripted_dialog_kind="";game.scripted_dialog_pages.clear();game.intro_overlay.visible=false
-	assert(game._should_simulate_endless_greenhouse())
 
-	var age_before_settings:float=observer.age
 	game._open_settings()
-	assert(game.settings_overlay.visible and not game._should_simulate_endless_greenhouse())
-	assert(not game.settings_button.visible and not game.encyclopedia_icon_button.visible)
-	game._process(1.0)
-	assert(is_equal_approx(observer.age,age_before_settings))
+	assert(game.settings_overlay.visible)
 	assert(game.find_child("JellyDevOpen",true,false)!=null)
 	assert(game.find_child("StoryDevOpen",true,false)!=null)
 	assert(game.find_child("TrialDevGachaOpen",true,false)!=null)
@@ -654,6 +637,10 @@ func _test_formal_endless_main_features(game: Node) -> void:
 	game._open_jelly_dev()
 	assert(game.jelly_dev_overlay.visible)
 	game._close_jelly_dev()
+	game._close_settings()
+	game.play_active=true
+	game._update_play_ui()
+	assert(game._should_simulate_endless_greenhouse())
 
 
 func _test_debug_controls_and_gacha(game: Node) -> void:
@@ -663,6 +650,7 @@ func _test_debug_controls_and_gacha(game: Node) -> void:
 	assert(game._trial_dev_controls_enabled())
 	var observer=game.plants[0]
 	observer.jelly_checks_enabled=false
+	game.play_active=false
 	game._update_play_ui()
 	game._open_settings()
 	assert(game.find_child("JellyDevOpen",true,false)!=null)
@@ -672,11 +660,10 @@ func _test_debug_controls_and_gacha(game: Node) -> void:
 
 	game._open_story_dev()
 	assert(game.story_dev_panel!=null and game.story_dev_panel.visible)
-	assert(not game._should_simulate_endless_greenhouse())
 	game.story_dev_panel.close()
 	game._open_settings()
 	game._open_jelly_dev()
-	assert(game.jelly_dev_overlay.visible and not game._should_simulate_endless_greenhouse())
+	assert(game.jelly_dev_overlay.visible)
 	var debug_balance:Dictionary=game._greenhouse_jelly_balance_for_spawn()
 	assert(is_equal_approx(float(debug_balance.short_weight),45.0))
 	assert(is_equal_approx(float(debug_balance.normal_weight),35.0))
@@ -689,10 +676,7 @@ func _test_debug_controls_and_gacha(game: Node) -> void:
 	game._dev_reset_jelly()
 	assert(not JellyBalanceClass.override_enabled)
 	var production_balance:Dictionary=game._greenhouse_jelly_balance_for_spawn()
-	assert(is_equal_approx(float(production_balance.short_weight),35.0))
-	assert(is_equal_approx(float(production_balance.normal_weight),35.0))
-	assert(is_equal_approx(float(production_balance.long_weight),22.0))
-	assert(is_equal_approx(float(production_balance.ultra_weight),8.0))
+	assert(production_balance.is_empty())
 	game._close_jelly_dev()
 	assert(game._should_simulate_endless_greenhouse())
 
@@ -712,7 +696,6 @@ func _test_debug_controls_and_gacha(game: Node) -> void:
 	game._open_trial_dev_forest_gacha()
 	assert(game.forest_gacha_trial_dev_mode and game.forest_gacha_ui.visible)
 	assert(game.forest_gacha_ui.current_puku_points==game.TRIAL_DEV_GACHA_WALLET)
-	assert(not game._should_simulate_endless_greenhouse())
 	game.forest_gacha_ui.animation_time_scale=.001
 	game.forest_gacha_rng.seed=selected_seed
 	game._spin_forest_gacha()
@@ -744,10 +727,9 @@ func _test_debug_controls_and_gacha(game: Node) -> void:
 	assert(not game.forest_gacha_trial_dev_mode and game.puku_points==puku_before)
 	game.story_progression_state["pending_story_events"]=[]
 	game.scripted_dialog_kind="";game.scripted_dialog_pages.clear();game.intro_overlay.visible=false
+	game.play_active=true
+	game._update_play_ui()
 	assert(game._should_simulate_endless_greenhouse())
-	var age_before_resume:float=observer.age
-	game._process(.25)
-	assert(observer.age>age_before_resume)
 	game.habitat_debug_enabled=false
 	assert(game._trial_dev_controls_enabled())
 
@@ -776,18 +758,17 @@ func _test_fusion_lab_flow(game: Node) -> void:
 	game._apply_saved_unlocks()
 	game._update_play_ui()
 	assert(game._fusion_lab_available())
-	assert(game.fusion_lab_button.visible)
+	assert(not game.fusion_lab_button.visible)
 
 	var observer = game.plants[0]
 	observer.jelly_checks_enabled = false
-	var age_before_lab: float = observer.age
-	var spawn_queue_before: int = game.play_spawn_queue
+	game.fusion_lab_button.pressed.emit()
+	assert(not game.fusion_lab_ui.visible)
+	game.play_active=false
+	game._update_play_ui()
+	assert(game.fusion_lab_button.visible)
 	game.fusion_lab_button.pressed.emit()
 	assert(game.fusion_lab_ui.visible)
-	assert(not game._should_simulate_endless_greenhouse())
-	game._process(1.0)
-	assert(is_equal_approx(observer.age, age_before_lab))
-	assert(game.play_spawn_queue == spawn_queue_before)
 
 	game.fusion_lab_ui.parent_a_button.pressed.emit()
 	assert(game.fusion_lab_ui.picker_page.visible and game.fusion_lab_ui.picker_slot == 0)
@@ -843,7 +824,6 @@ func _test_fusion_lab_flow(game: Node) -> void:
 	assert(bool(game.discovered.get(hybrid_id, false)))
 	assert(game.species_get_overlay.visible)
 	assert(game.species_get_overlay.name_label.text == "金箔グミ")
-	assert(not game._should_simulate_endless_greenhouse())
 
 	await get_tree().create_timer(.55).timeout
 	await game.species_get_overlay.close_overlay()
@@ -851,6 +831,8 @@ func _test_fusion_lab_flow(game: Node) -> void:
 	assert(game._is_series_unlocked(game._series_entry("hybrid")))
 	assert(not game.catalog_series_unlock_overlay.visible and game.catalog_series_unlock_notice_queue.is_empty())
 	assert(game.scripted_dialog_kind.is_empty())
+	game.play_active=true
+	game._update_play_ui()
 	assert(game._is_endless_normal_play() and game._should_simulate_endless_greenhouse())
 	var age_before_resume: float = observer.age
 	game._process(.25)
@@ -878,7 +860,7 @@ func _test_gauges(game: Node) -> void:
 	var fly_label:=game.effects_layer.find_child("PukuBalanceFly",true,false) as Label
 	var harvest_panel:=game.effects_layer.find_child("HarvestResult",true,false) as PanelContainer
 	assert(fly_label and fly_label.text=="+3.75ぷく" and harvest_panel)
-	assert((harvest_panel.find_child("HarvestSize",true,false) as Label).text=="収穫 100cm")
+	assert((harvest_panel.find_child("HarvestSize",true,false) as Label).text==Localizer.text("ja","harvest_size",[game._format_cm(100.0)]))
 	assert((harvest_panel.find_child("PukuRewardGain",true,false) as Label).text=="+3.75ぷく")
 	game._clear_greenhouse_plants()
 	game.play_spawn_queue = 0
@@ -919,11 +901,13 @@ func _test_restoration_pending_until_habitat(game: Node) -> void:
 		plant.harvest()
 	await get_tree().process_frame
 	var saved_restoration: Dictionary = game._restoration_state()
-	assert(HabitatRestorationClass.returned_count(saved_restoration) == 2)
-	assert(HabitatRestorationClass.pending_return_stages(saved_restoration) == [1, 2])
+	assert(HabitatRestorationClass.returned_count(saved_restoration) == 0)
+	assert(HabitatRestorationClass.pending_return_count(saved_restoration) == 2)
 	assert(game.current_mode == "greenhouse" and game.play_active)
 	assert(game.scripted_dialog_kind.is_empty())
-	game._toggle_mode()
+	game.play_active=false
+	game.result_overlay.visible=true
+	game._close_result()
 	for _frame in range(120):
 		if game.current_mode == "habitat" and game.scripted_dialog_kind == "restoration_return_1":
 			break
@@ -933,7 +917,13 @@ func _test_restoration_pending_until_habitat(game: Node) -> void:
 	game.scripted_dialog_kind = ""
 	game.scripted_dialog_pages.clear()
 	game.scripted_dialog_index = -1
+	saved_restoration["pending_return_snapshots"] = []
+	saved_restoration["return_event_pending_stages"] = []
+	game.story_progression_state["restoration"] = saved_restoration
 	game.intro_overlay.visible = false
+	game.scene_transition_fade.visible = false
+	game.jurejure_intro_camera_active = false
+	game.jurejure_camera_focus_context = ""
 	game.current_mode = "greenhouse"
 	game._apply_mode()
 
