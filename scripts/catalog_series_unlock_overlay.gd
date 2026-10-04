@@ -34,6 +34,7 @@ func _ready()->void:
 func show_series(_series_entry:Dictionary,texture:Texture2D,display_name:String,context:String,language:String="ja")->void:
 	current_context=context;current_language=Localizer.normalize_language(language);visible=true;busy=true
 	title_label.text=Localizer.text(current_language,"catalog_series_unlock_title")
+	cover_image.set_meta("catalog_loaded_path","");cover_image.set_meta("catalog_request_path","")
 	cover_image.texture=texture;cover_image.visible=texture!=null;cover_placeholder.visible=texture==null;cover_placeholder.text=Localizer.text(current_language,"catalog_cover_preparing")
 	message_label.text=Localizer.text(current_language,"catalog_series_first_unlock",[display_name]);hint_label.text=Localizer.text(current_language,"tap_to_close")
 	card.scale=Vector2(.56,.56);card.rotation=-.035;flash.color.a=.94
@@ -55,11 +56,11 @@ func close_overlay()->void:
 	var context:=current_context
 	var hide:=create_tween().set_parallel(true);hide.tween_property(card,"scale",Vector2(.86,.86),.16).set_trans(Tween.TRANS_QUAD);hide.tween_property(self,"modulate:a",0.0,.16)
 	await hide.finished
-	visible=false;modulate.a=1.0;card.scale=Vector2.ONE;cover_image.texture=null;current_context="";busy=false;closed.emit(context)
+	visible=false;modulate.a=1.0;card.scale=Vector2.ONE;cover_image.texture=null;cover_image.set_meta("catalog_loaded_path","");cover_image.set_meta("catalog_request_path","");current_context="";busy=false;closed.emit(context)
 
 func reset_overlay()->void:
 	visible=false;modulate.a=1.0;busy=false;current_context=""
 	if card:card.scale=Vector2.ONE;card.rotation=0.0
-	if cover_image:cover_image.texture=null
+	if cover_image:cover_image.texture=null;cover_image.set_meta("catalog_loaded_path","");cover_image.set_meta("catalog_request_path","")
 
 func is_open()->bool:return visible

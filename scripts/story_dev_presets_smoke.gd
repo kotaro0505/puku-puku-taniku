@@ -171,9 +171,15 @@ func _test_restoration_and_101cm_presets() -> void:
 	assert(game.current_mode == "greenhouse")
 	await get_tree().process_frame
 	await get_tree().process_frame
-	assert(not game.result_overlay.visible)
-	game._toggle_mode()
-	await get_tree().create_timer(1.2).timeout
+	# The 101 cm helper is a one-plant development round. Under the formal
+	# 12-seed round result flow, settling its only plant opens the round result
+	# before queued story transitions are resumed.
+	assert(game.result_overlay.visible)
+	game._close_result()
+	await get_tree().process_frame
+	assert(game.scene_transition_fade.visible)
+	assert(game.scene_transition_fade.color.r > 0.99 and game.scene_transition_fade.color.g > 0.99 and game.scene_transition_fade.color.b > 0.99)
+	await get_tree().create_timer(2.8).timeout
 	assert(game.current_mode == "habitat")
 	assert(game.scripted_dialog_kind == "restoration_return_5")
 	_finish_dialog(game)

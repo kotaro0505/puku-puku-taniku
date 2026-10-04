@@ -548,8 +548,10 @@ var bests: Dictionary = {}
 var discovered: Dictionary = {}
 var species_get_counts: Dictionary = {}
 var unlocked_series: Dictionary = {INITIAL_SERIES_ID:true}
+var catalog_cover_species: Dictionary = {}
 var get_counts_migration_dirty := false
 var puku_balance_migration_dirty := false
+var catalog_cover_migration_dirty := false
 var pot_catalog: Array = []
 var owned_pots: Dictionary = {DEFAULT_POT_ID:true}
 var saved_arrangements: Array = []
@@ -738,11 +740,11 @@ func _ready() -> void:
 	if not legacy_habitat_notification_ids_to_cancel.is_empty():
 		habitat_notification_service=HabitatNotificationServiceClass.new();add_child(habitat_notification_service)
 		habitat_notification_service.cancel_all(legacy_habitat_notification_ids_to_cancel);legacy_habitat_notification_ids_to_cancel.clear()
-	if best_spawn_unlocks_dirty or get_counts_migration_dirty or puku_balance_migration_dirty or recovered_forest_encounters:
+	if best_spawn_unlocks_dirty or get_counts_migration_dirty or puku_balance_migration_dirty or catalog_cover_migration_dirty or recovered_forest_encounters:
 		# A true cold start must reach the language choice before creating its
 		# first save.  The selected language then persists all initialized state.
 		if save_file_present_on_boot or language_selected:_save()
-		best_spawn_unlocks_dirty=false;get_counts_migration_dirty=false;puku_balance_migration_dirty=false
+		best_spawn_unlocks_dirty=false;get_counts_migration_dirty=false;puku_balance_migration_dirty=false;catalog_cover_migration_dirty=false
 	_build_world()
 	_build_ui()
 	if habitat_awakened and (habitat_wild_initialized or habitat_unlocked):_ensure_habitat_wild_state(Time.get_unix_time_from_system(),true)
@@ -936,9 +938,10 @@ func _load_pot_data()->void:
 
 func _load_save() -> void:
 	_cancel_puku_gauge_animations()
-	legacy_habitat_migration_dirty=false;puku_balance_migration_dirty=false;legacy_habitat_notification_ids_to_cancel.clear();panda_beacon_unread_log.clear()
+	legacy_habitat_migration_dirty=false;puku_balance_migration_dirty=false;catalog_cover_migration_dirty=false;legacy_habitat_notification_ids_to_cancel.clear();panda_beacon_unread_log.clear()
 	puku_balance_units=0
 	normal_round_free_plays=0
+	catalog_cover_species={}
 	save_file_present_on_boot=false
 	language_selected=false
 	var save_path:=_active_save_path()
@@ -965,10 +968,11 @@ func _load_save() -> void:
 				puku_gauge_cm=clampf(puku_gauge_cm/LEGACY_COMBINED_GAUGE_TARGET_CM*SEED_POD_GAUGE_TARGET_CM,0.0,SEED_POD_GAUGE_TARGET_CM-.001)
 			else:
 				puku_gauge_cm=fposmod(puku_gauge_cm,SEED_POD_GAUGE_TARGET_CM)
-			species_get_counts=value.get("species_get_counts",{});unlocked_series=value.get("unlocked_series",{INITIAL_SERIES_ID:true})
+			species_get_counts=value.get("species_get_counts",{});unlocked_series=value.get("unlocked_series",{INITIAL_SERIES_ID:true});catalog_cover_species=value.get("catalog_cover_species",{})
 			owned_pots=value.get("owned_pots",{DEFAULT_POT_ID:true});saved_arrangements=value.get("saved_arrangements",[]);arrangement_save_capacity=maxi(1,int(value.get("arrangement_save_capacity",20)))
 			if not species_get_counts is Dictionary:species_get_counts={}
 			if not unlocked_series is Dictionary:unlocked_series={INITIAL_SERIES_ID:true}
+			if not catalog_cover_species is Dictionary:catalog_cover_species={}
 			if not owned_pots is Dictionary:owned_pots={DEFAULT_POT_ID:true}
 			if not saved_arrangements is Array:saved_arrangements=[]
 			unlocked_series[INITIAL_SERIES_ID]=true
@@ -1102,6 +1106,7 @@ func _load_save() -> void:
 			best_spawn_unlocks_dirty=false
 			_refresh_seed_pack_unlocks()
 			_migrate_mystery_route_progress()
+			if _normalize_catalog_cover_species() or not value.has("catalog_cover_species"):catalog_cover_migration_dirty=true
 			if _is_endless_greenhouse_enabled():
 				endless_greenhouse.restore_discovery_state(value.get("endless_discovery_state",{}))
 			if migrating_legacy_puku_balance and _ensure_initial_puku_capital(false):puku_balance_migration_dirty=true
@@ -1113,7 +1118,7 @@ func _save() -> void:
 		return
 	if audio_manager:audio_settings=audio_manager.settings_dictionary()
 	var payload:={
-		"progression_version":PROGRESSION_VERSION,"bests":bests,"discovered":discovered,"species_get_counts":species_get_counts,
+		"progression_version":PROGRESSION_VERSION,"bests":bests,"discovered":discovered,"species_get_counts":species_get_counts,"catalog_cover_species":catalog_cover_species,
 		"unlocked_series":unlocked_series,"owned_pots":owned_pots,"saved_arrangements":saved_arrangements,"arrangement_save_capacity":arrangement_save_capacity,
 		"unlocked_species":unlocked_species,"greenhouse_available":greenhouse_available,"completed_unlock_conditions":completed_unlock_conditions,"pending_habitat_species":pending_habitat_species,
 		"total_play_count":total_play_count,"normal_play_count":normal_play_count,"formal_play_count":formal_play_count,"shop_visit_count":shop_visit_count,
@@ -3824,7 +3829,7 @@ func _reset_progression_state()->void:
 	original_catalog_complete_event_seen=false;habitat_tutorial_returned_to_greenhouse=false;jurejure_intro_complete=false;jurejure_enabled=false;jurejure_growth_stage=JureJureSystemClass.GROWTH_EARLY;jurejure_growth_event_mask=0;active_jurejure_event={};jurejure_next_check_unix=0.0;jurejure_cooldown_until_unix=0.0;jurejure_return_event_complete=false;jurejure_waiting_for_seed_pod_reward=false;jurejure_battle_count=0;jurejure_battle_win_count=0;jurejure_habitat_visit_point=Vector2(-1.0,-1.0);jurejure_pending_reward_species_id="";jurejure_last_battle_result.clear();habitat_second_awakened=false;habitat_second_awakening_complete=false;jurejure_update_accumulator=0.0
 	first_seed_pod_reward_event_active=false;habitat_visit_id=0;act3_intro_eligible_visit_id=0;habitat_crisis_eligible_visit_id=0
 	if habitat_crisis_atmosphere:habitat_crisis_atmosphere.deactivate()
-	_cancel_puku_gauge_animations();puku_gauge_cm=0.0;puku_balance_units=0;bests.clear();discovered.clear();species_get_counts.clear();unlocked_series={INITIAL_SERIES_ID:true};series_seed_inventory.clear();forest_gacha_draw_count=0;forest_gacha_encountered.clear();secret_gacha_active=false;secret_gacha_draws_remaining=0;secret_gacha_last_roll_play_count=-1;active_series_seed_id="";owned_pots={DEFAULT_POT_ID:true};saved_arrangements.clear();arrangement_save_capacity=20;greenhouse_available=_initial_greenhouse_state();unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;opening_story_complete=false;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;puku_gauge_intro_complete=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;mystery_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;mystery_seed_pack_unlocked=false;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;habitat_mystery_seeds_pending=0;mystery_seed_count=0;armadillo_research_total=0;armadillo_research_rewards.clear();armadillo_research_intro_seen=false;armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();result_deferred_species_queue.clear();shop_chatter_acquired_species.clear();species_get_queue.clear();play_share_record.clear();play_active=false;play_time_remaining=0.0;play_harvest_cm_total=0.0;play_puku_reward_units_total=0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;_reset_endless_economy_stats();rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_time_multiplier=1;habitat_simulation_unix=Time.get_unix_time_from_system();habitat_debug_log.clear();habitat_scroll_tutorial_active=false;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_clear_habitat_items();_save();_update_currency_ui();_update_play_ui()
+	_cancel_puku_gauge_animations();puku_gauge_cm=0.0;puku_balance_units=0;bests.clear();discovered.clear();species_get_counts.clear();catalog_cover_species.clear();unlocked_series={INITIAL_SERIES_ID:true};series_seed_inventory.clear();forest_gacha_draw_count=0;forest_gacha_encountered.clear();secret_gacha_active=false;secret_gacha_draws_remaining=0;secret_gacha_last_roll_play_count=-1;active_series_seed_id="";owned_pots={DEFAULT_POT_ID:true};saved_arrangements.clear();arrangement_save_capacity=20;greenhouse_available=_initial_greenhouse_state();unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;opening_story_complete=false;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;puku_gauge_intro_complete=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;mystery_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;mystery_seed_pack_unlocked=false;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;habitat_mystery_seeds_pending=0;mystery_seed_count=0;armadillo_research_total=0;armadillo_research_rewards.clear();armadillo_research_intro_seen=false;armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();result_deferred_species_queue.clear();shop_chatter_acquired_species.clear();species_get_queue.clear();play_share_record.clear();play_active=false;play_time_remaining=0.0;play_harvest_cm_total=0.0;play_puku_reward_units_total=0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;_reset_endless_economy_stats();rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_time_multiplier=1;habitat_simulation_unix=Time.get_unix_time_from_system();habitat_debug_log.clear();habitat_scroll_tutorial_active=false;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_clear_habitat_items();_save();_update_currency_ui();_update_play_ui()
 	normal_round_free_plays=0
 	normal_play_count=0;shop_visit_count=0;hidden_species_acquired.clear();tovar_next_play=TOVAR_FIRST_PLAY;tovar_attempt_count=0;tovar_event_active=false;tovar_harvested_this_play=false;armadillo_present=false;_save()
 
@@ -4837,6 +4842,51 @@ func _catalog_display_entries_for_series(series_id:String)->Array[Dictionary]:
 				entries.append(entry);included[species_id]=true
 	return entries
 
+func _catalog_cover_entry_for_series(series_id:String)->Dictionary:
+	var species_id:=str(catalog_cover_species.get(series_id,""))
+	if species_id.is_empty() or _species_get_count(species_id)<=0:return {}
+	var entry:=_catalog_entry(species_id)
+	if entry.is_empty() or _catalog_display_series_id_for_entry(entry)!=series_id:return {}
+	return entry
+
+func _remember_catalog_cover_species(species_id:String)->bool:
+	if species_id.is_empty() or _species_get_count(species_id)<=0:return false
+	var entry:=_catalog_entry(species_id)
+	if entry.is_empty():return false
+	var series_id:=_catalog_display_series_id_for_entry(entry)
+	if series_id.is_empty() or catalog_cover_species.has(series_id):return false
+	var series_entry:=_series_entry(series_id)
+	if series_entry.is_empty() or _catalog_series_hidden_from_navigation(series_entry):return false
+	catalog_cover_species[series_id]=species_id
+	return true
+
+func _normalize_catalog_cover_species()->bool:
+	var previous:Dictionary=catalog_cover_species.duplicate(true)
+	var normalized:Dictionary={}
+	for raw_series_id in catalog_cover_species:
+		var series_id:=str(raw_series_id)
+		if series_id=="jure":series_id=JUREJURE_SERIES_ID
+		var species_id:=str(catalog_cover_species.get(raw_series_id,""))
+		var entry:=_catalog_entry(species_id)
+		var series_entry:=_series_entry(series_id)
+		if species_id.is_empty() or entry.is_empty() or series_entry.is_empty():continue
+		if _species_get_count(species_id)<=0 or _catalog_series_hidden_from_navigation(series_entry):continue
+		if _catalog_display_series_id_for_entry(entry)!=series_id or normalized.has(series_id):continue
+		normalized[series_id]=species_id
+	# Old saves do not know acquisition order. Choose the first owned card in the
+	# exact catalog display order once, then persist it like every new cover.
+	for raw_series in series_catalog:
+		if not raw_series is Dictionary or _catalog_series_hidden_from_navigation(raw_series):continue
+		var series_id:=str(raw_series.get("series_id",""))
+		if series_id.is_empty() or normalized.has(series_id):continue
+		for entry in _catalog_display_entries_for_series(series_id):
+			var species_id:=str(entry.get("species_id",""))
+			if _species_get_count(species_id)>0:
+				normalized[series_id]=species_id
+				break
+	catalog_cover_species=normalized
+	return catalog_cover_species!=previous
+
 func _series_id_for_species(species_id:String)->String:
 	for raw_series in series_catalog:
 		if not raw_series is Dictionary:continue
@@ -5046,6 +5096,7 @@ func _record_species_get(species_id:String,amount:int=1)->void:
 	var previous_count:=_species_get_count(species_id)
 	species_get_counts[species_id]=previous_count+amount
 	if previous_count==0:
+		_remember_catalog_cover_species(species_id)
 		var entry:=_catalog_entry(species_id)
 		var transition:=StoryProgressionClass.record_new_get(story_progression_state,{
 			"act2_unlocked":act2_unlocked,
@@ -5130,9 +5181,6 @@ func _catalog_series_notice_name(series_entry:Dictionary)->String:
 	return display_name
 
 func _catalog_series_notice_cover(series_entry:Dictionary)->Texture2D:
-	var cover_path:=str(series_entry.get("cover_image_path",""))
-	if not cover_path.is_empty() and ResourceLoader.exists(cover_path):
-		return load(cover_path) as Texture2D
 	return _series_cover_texture(series_entry)
 
 func _show_catalog_series_unlock_notice(series_id:String,context:String="")->bool:
@@ -5149,6 +5197,8 @@ func _show_catalog_series_unlock_notice(series_id:String,context:String="")->boo
 	catalog_series_unlock_notice_ready.erase(series_id)
 	catalog_series_unlock_active_id=series_id
 	catalog_series_unlock_overlay.show_series(series_entry,_catalog_series_notice_cover(series_entry),_catalog_series_notice_name(series_entry),context,language_code)
+	var cover_entry:=_catalog_cover_entry_for_series(series_id)
+	if not cover_entry.is_empty():_request_species_texture(cover_entry,catalog_series_unlock_overlay.cover_image,true)
 	if audio_manager:audio_manager.play_se("new_species",.72)
 	return true
 
@@ -5568,23 +5618,20 @@ func _refresh_series_carousel_cards()->void:
 	_set_series_carousel_offset(series_carousel_offset)
 
 func _populate_series_card(card:Dictionary,series_index:int,owned:Array[Dictionary])->void:
-	var entry:Dictionary=owned[series_index];var series_id:=str(entry.get("series_id",""));var entries:=_series_species_entries(series_id);var unlocked:=_is_series_unlocked(entry)
+	var entry:Dictionary=owned[series_index];var series_id:=str(entry.get("series_id",""));var cover_entry:=_catalog_cover_entry_for_series(series_id);var unlocked:=_is_series_unlocked(entry)
 	var container:Control=card.container;var cover_image:TextureRect=card.cover_image
 	card.title.text=Localizer.series_name(language_code,entry);card.subtitle.text=Localizer.series_subtitle(language_code,entry);card.description.text=Localizer.series_description(language_code,entry)
+	cover_image.set_meta("catalog_loaded_path","");cover_image.set_meta("catalog_request_path","")
 	cover_image.texture=_series_cover_texture(entry)
-	if not entries.is_empty():_request_species_texture(entries[0],cover_image,true)
+	if not cover_entry.is_empty():_request_species_texture(cover_entry,cover_image,true)
 	card.cover_placeholder.visible=cover_image.texture==null and unlocked;card.cover_placeholder.text=Localizer.text(language_code,"catalog_cover_preparing");card.lock_label.visible=not unlocked;card.lock_label.text=Localizer.text(language_code,"catalog_locked_preparing" if cover_image.texture==null else "catalog_locked")
 	var lock_icon:Control=card.get("lock_icon")
 	if is_instance_valid(lock_icon):lock_icon.visible=not unlocked
 	container.visible=owned.size()>1 or int(card.relative_index)==0;container.set_meta("series_index",series_index);container.set_meta("series_id",series_id)
 
 func _series_cover_texture(entry:Dictionary)->Texture2D:
-	var ids=entry.get("species_ids",[])
-	if ids is Array and not ids.is_empty():
-		var first:=_catalog_entry(str(ids[0]));var first_texture:=_species_texture(first)
-		if first_texture!=null:return first_texture
-	var cover_path:=str(entry.get("cover_image_path",""))
-	return load(cover_path) as Texture2D if not cover_path.is_empty() and ResourceLoader.exists(cover_path) else null
+	var cover_entry:=_catalog_cover_entry_for_series(str(entry.get("series_id","")))
+	return _species_texture(cover_entry) if not cover_entry.is_empty() else null
 
 func _change_series_selection(direction:int)->void:
 	if _owned_series_entries().size()<2 or direction==0 or series_carousel_animating:return

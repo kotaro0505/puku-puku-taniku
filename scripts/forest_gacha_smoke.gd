@@ -121,7 +121,8 @@ func _test_spin_capsule_and_reveal(game)->void:
 	game.species_get_overlay.busy=false;await game.species_get_overlay.close_overlay();await get_tree().process_frame
 	assert(not game.species_get_overlay.visible and game.catalog_series_unlock_overlay.visible and game.scripted_dialog_kind.is_empty())
 	assert(game.catalog_series_unlock_overlay.title_label.text=="図鑑ページ解放！" and game.catalog_series_unlock_overlay.message_label.text.contains(game._catalog_series_notice_name(game._series_entry(series_id))))
-	assert(game.catalog_series_unlock_overlay.cover_image.texture!=null and game.catalog_series_unlock_overlay.cover_image.texture.resource_path==str(game._series_entry(series_id).get("cover_image_path","")))
+	assert(str(game.catalog_cover_species.get(series_id,""))==species_id)
+	assert(game.catalog_series_unlock_overlay.cover_image.texture!=null and game.catalog_series_unlock_overlay.cover_image.texture.resource_path==str(game._catalog_entry(species_id).get("image_path","")))
 	game.catalog_series_unlock_overlay.busy=false;await game.catalog_series_unlock_overlay.close_overlay();await get_tree().process_frame
 	assert(not game.catalog_series_unlock_overlay.visible and not game.forest_gacha_ui.busy);game._close_forest_gacha()
 	game.puku_balance_units=999;var previous_count:int=game.forest_gacha_draw_count;game._open_forest_gacha();game._spin_forest_gacha();assert(game.forest_gacha_draw_count==previous_count and game.puku_balance_units==999);game._close_forest_gacha()

@@ -60,7 +60,7 @@ func _ready() -> void:
 		assert(image.get_pixel(0, 0).a < 0.01 and image.get_pixel(width - 1, 0).a < 0.01)
 		assert(image.get_pixel(0, height - 1).a < 0.01 and image.get_pixel(width - 1, height - 1).a < 0.01)
 		assert(used.position.x > 0 and used.position.y > 0 and used.end.x < width and used.end.y < height)
-	assert(game._series_cover_texture(series).resource_path == "res://assets/catalog/yumekawa/yumekawa-milky-dream.png")
+	assert(game._series_cover_texture(series) == null)
 
 	game.unlocked_series["yumekawa"] = true
 	var habitat_candidates: Array[Dictionary] = game._habitat_new_species_candidates()
@@ -73,16 +73,17 @@ func _ready() -> void:
 	assert(game._current_series_entry().get("series_id", "") == "yumekawa")
 	assert(game.encyclopedia_list_title.text == "ゆめふわ")
 	assert(game.encyclopedia_grid.get_child_count() == 18)
-	assert(game.series_cover_image.texture.resource_path == "res://assets/catalog/yumekawa/yumekawa-milky-dream.png")
+	assert(game.series_cover_image.texture == null and game.series_cover_placeholder.visible)
 	var first_card: Button = game.encyclopedia_grid.get_child(0)
 	assert(first_card.disabled)
-	game._register_species_discovery(YUMEKAWA_IDS[0], false)
-	game.species_get_counts[YUMEKAWA_IDS[0]] = 1
+	game._register_species_discovery(YUMEKAWA_IDS[0], true)
+	game._refresh_series_selection()
 	game._refresh_encyclopedia_header()
 	game._refresh_encyclopedia_cards()
 	await get_tree().process_frame
 	first_card = game.encyclopedia_grid.get_child(0)
 	assert(not first_card.disabled)
+	assert(game.series_cover_image.texture.resource_path == "res://assets/catalog/yumekawa/yumekawa-milky-dream.png")
 	first_card.pressed.emit()
 	assert(game.encyclopedia_detail_page.find_child("SpeciesName", true, false).text == "ミルキードリーム")
 	assert(game.encyclopedia_detail_page.find_child("SpeciesImage", true, false).texture.resource_path == "res://assets/catalog/yumekawa/yumekawa-milky-dream.png")
