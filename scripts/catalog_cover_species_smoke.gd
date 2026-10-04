@@ -15,7 +15,7 @@ func _ready()->void:
 	_test_fusion_display_series(game)
 	_test_legacy_migration(game)
 	_test_cover_request_identity(game)
-	print("CATALOG_COVER_SPECIES_SMOKE_OK first_get=fixed fusion=display_series jure=jurejure migration=display_order persistence=true")
+	print("CATALOG_COVER_SPECIES_SMOKE_OK first_get=fixed fusion=display_series jure=jurejure migration=display_order+listed_entry persistence=true")
 	get_tree().quit()
 
 func _test_first_get_and_persistence(game:Node)->void:
@@ -53,6 +53,18 @@ func _test_fusion_display_series(game:Node)->void:
 	assert(not game.catalog_cover_species.has("hybrid") and not game.catalog_cover_species.has("fusion_tier1"))
 
 func _test_legacy_migration(game:Node)->void:
+	game._reset_progression_state()
+	# A historical base cover is invalid when that species no longer has a card
+	# on the base page, even if its raw species data still says series_id=base.
+	game.species_get_counts={"golden_laui":1,"colorata":1}
+	game.discovered={"golden_laui":true,"colorata":true}
+	game.catalog_cover_species={"base":"golden_laui"}
+	assert(game._normalize_catalog_cover_species())
+	assert(str(game.catalog_cover_species.get("base",""))=="colorata")
+	game.catalog_cover_species.clear()
+	assert(not game._remember_catalog_cover_species("golden_laui"))
+	assert(not game.catalog_cover_species.has("base"))
+
 	game._reset_progression_state()
 	# Deliberately insert the later catalog card first. Migration must use catalog
 	# display order rather than Dictionary insertion order or guessed chronology.

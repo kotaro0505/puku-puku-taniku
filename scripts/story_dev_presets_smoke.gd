@@ -9,9 +9,10 @@ func _ready() -> void:
 	assert(not StoryDevPresetsClass.available(false))
 	assert(StoryDevPresetsClass.available(true))
 	await _test_act3_and_crisis_presets()
+	await _test_new_route_presets()
 	await _test_restoration_and_101cm_presets()
 	await _test_ending_presets()
-	print("STORY_DEV_PRESETS_SMOKE_OK all_platforms=true release_switch=true habitat_debug_independent=true act3_ready=true crisis_ready=7 restoration=0,4 ending=true thank_you=true harvestable_101=true")
+	print("STORY_DEV_PRESETS_SMOKE_OK all_platforms=true release_switch=true habitat_debug_independent=true act3_ready=true exploitation=true crisis_ready=7 weak=0/1 first_return=pending restoration=0,1,4 fifth=pending ending=true thank_you=true complete=true harvestable_101=true")
 	get_tree().quit()
 
 
@@ -115,6 +116,45 @@ func _test_act3_and_crisis_presets() -> void:
 	game._try_start_pending_story_event()
 	await get_tree().create_timer(1.0).timeout
 	assert(game.habitat_crisis_started)
+	game.free()
+	await get_tree().process_frame
+
+
+func _test_new_route_presets() -> void:
+	var game = await _new_game()
+	var result: Dictionary = StoryDevPresetsClass.apply(game, StoryDevPresetsClass.EXPLOITATION_ACTIVE)
+	assert(bool(result.get("ok", false)))
+	assert(StoryProgressionClass.exploitation_is_started(game.story_progression_state))
+	assert(game._unique_jurejure_species_get_count() == 0)
+
+	result = StoryDevPresetsClass.apply(game, StoryDevPresetsClass.CRISIS_ACTIVE)
+	assert(bool(result.get("ok", false)))
+	assert(game.habitat_crisis_started)
+	assert(HabitatRestorationClass.large_plant_mission_started(game._restoration_state()))
+	assert(not bool(game._restoration_state().get("jurejure_joined", false)))
+	assert(game._current_mission_text() == "100cm以上の多肉を1株育てよう！　0/1")
+
+	result = StoryDevPresetsClass.apply(game, StoryDevPresetsClass.FIRST_RETURN_READY)
+	assert(bool(result.get("ok", false)))
+	assert(HabitatRestorationClass.returned_count(game._restoration_state()) == 0)
+	assert(HabitatRestorationClass.pending_return_count(game._restoration_state()) == 1)
+	assert(not bool(game._restoration_state().get("jurejure_joined", false)))
+
+	result = StoryDevPresetsClass.apply(game, StoryDevPresetsClass.RESTORATION_ONE)
+	assert(bool(result.get("ok", false)))
+	assert(HabitatRestorationClass.returned_count(game._restoration_state()) == 1)
+	assert(bool(game._restoration_state().get("jurejure_joined", false)))
+	assert(game._current_mission_text() == "100cm以上の多肉を5株、原生地へ還そう！　1/5")
+
+	result = StoryDevPresetsClass.apply(game, StoryDevPresetsClass.RESTORATION_FIVE_READY)
+	assert(bool(result.get("ok", false)))
+	assert(HabitatRestorationClass.returned_count(game._restoration_state()) == 4)
+	assert(HabitatRestorationClass.pending_return_count(game._restoration_state()) == 1)
+
+	result = StoryDevPresetsClass.apply(game, StoryDevPresetsClass.COMPLETE)
+	assert(bool(result.get("ok", false)))
+	assert(HabitatRestorationClass.ending_phase(game._restoration_state()) == "complete")
+	assert(game.finale_complete)
 	game.free()
 	await get_tree().process_frame
 

@@ -29,13 +29,14 @@ func _ready() -> void:
 	_test_round_navigation_lock(game)
 	_test_new_gate(game)
 	_test_fantasy_six_candidate_contract(game)
+	_test_fusion_fantasy_count(game)
 	_test_crisis_exploitation_lockout(game)
 	await _test_result_before_new_card(game)
 	_test_story_copy()
 	game._reset_progression_state()
 	game.queue_free()
 	await get_tree().process_frame
-	print("STORY_GUIDANCE_SMOKE_OK mission=single+live new_gate=first_encounter result_order=result_then_get nav=hidden arrangement=locked base=originals_only fantasy_six=four_series crisis=exploit_locked copy=updated dev_controls=all_builds")
+	print("STORY_GUIDANCE_SMOKE_OK mission=single+live new_gate=first_encounter result_order=result_then_formal_get result_spoiler=none pending_duplicate=false nav=hidden arrangement=locked base=originals_only fantasy_six=four_series fusion_fantasy_count=display_series crisis=exploit_locked copy=updated dev_controls=all_builds")
 	get_tree().quit()
 
 
@@ -57,6 +58,9 @@ func _hide_foreground(game: Node) -> void:
 	game.species_get_queue.clear()
 	game.catalog_series_unlock_notice_queue.clear()
 	game.catalog_series_unlock_notice_ready.clear()
+	game.pending_round_new_species_ids.clear()
+	game.round_result_species_finalize_queue.clear()
+	game.round_result_species_finalize_active = false
 
 
 func _test_base_catalog_contract(game: Node) -> void:
@@ -265,21 +269,47 @@ func _test_result_before_new_card(game: Node) -> void:
 	game.endless_economy_seed_cost_units = 1000
 	game.endless_economy_harvest_reward_units = 650
 	game.result_new_species_queue.clear()
-	game.result_new_species_queue.append("lutea")
 	game.result_deferred_species_queue.clear()
+	game.pending_round_new_species_ids.clear()
+	game.pending_round_new_species_ids.append("lutea")
+	game.discovered.erase("lutea")
+	game.species_get_counts.erase("lutea")
+	game.play_notable_species = {"lutea": {"name": "ルテア", "size": 64.0}}
 	game._show_play_result()
 	assert(game.result_overlay.visible)
 	assert(not game.species_get_overlay.visible)
-	assert(game.result_new_species_queue == ["lutea"])
+	assert(not game.result_new_species_label.visible and game.result_new_species_label.text.is_empty())
+	assert("ルテア" not in game.result_notable_label.text)
+	assert(game._species_get_count("lutea") == 0 and not bool(game.discovered.get("lutea", false)))
+	assert(game.pending_round_new_species_ids == ["lutea"])
 	game._close_result()
 	assert(not game.result_overlay.visible and not game.species_get_overlay.visible)
 	await get_tree().create_timer(.62).timeout
+	assert(game._species_get_count("lutea") == 1 and bool(game.discovered.get("lutea", false)))
+	assert("lutea" not in game.pending_round_new_species_ids)
 	assert(game.species_get_overlay.visible)
-	assert(game.species_get_active_context == "main_result")
+	assert(game.species_get_active_context == "round_result_new")
 	game.species_get_overlay.visible = false
-	game.species_get_active_context = ""
-	game.species_get_active_series_id = ""
-	game.species_get_queue.clear()
+	game._on_species_get_overlay_closed("round_result_new")
+	await get_tree().process_frame
+
+
+func _test_fusion_fantasy_count(game: Node) -> void:
+	game.species_get_counts.clear()
+	var fantasy_fusions := ["hyb_gummy_sea", "fus1_rainbow_bubble", "fus2_planet_specimen"]
+	for species_id in fantasy_fusions:
+		var entry: Dictionary = game._catalog_entry(species_id)
+		assert(not entry.is_empty() and game._is_fantasy_species(entry))
+		game.species_get_counts[species_id] = 1
+	var jure_fusion: Dictionary = game._catalog_entry("fus1_bonus_time")
+	assert(not jure_fusion.is_empty())
+	assert(game._catalog_display_series_id_for_entry(jure_fusion) == "jurejure")
+	assert(not game._is_fantasy_species(jure_fusion))
+	for entry_value in game.catalog_species:
+		if entry_value is Dictionary and game._is_jurejure_species(entry_value):
+			assert(not game._is_fantasy_species(entry_value))
+			break
+	assert(game._unique_fantasy_species_get_count() == fantasy_fusions.size())
 
 
 func _test_story_copy() -> void:

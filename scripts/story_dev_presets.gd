@@ -5,19 +5,31 @@ const StoryProgressionClass = preload("res://scripts/story_progression.gd")
 const HabitatRestorationClass = preload("res://scripts/habitat_restoration.gd")
 
 const ACT3_READY := "act3_ready"
+const EXPLOITATION_ACTIVE := "exploitation_active"
 const CRISIS_READY := "crisis_ready"
+const CRISIS_ACTIVE := "crisis_active"
+const FIRST_RETURN_READY := "first_return_ready"
 const RESTORATION_ZERO := "restoration_zero"
+const RESTORATION_ONE := "restoration_one"
 const RESTORATION_FOUR := "restoration_four"
+const RESTORATION_FIVE_READY := "restoration_five_ready"
 const ENDING_READY := "ending_ready"
 const THANK_YOU_READY := "thank_you_ready"
+const COMPLETE := "complete"
 
 const PRESET_IDS := [
 	ACT3_READY,
+	EXPLOITATION_ACTIVE,
 	CRISIS_READY,
+	CRISIS_ACTIVE,
+	FIRST_RETURN_READY,
 	RESTORATION_ZERO,
+	RESTORATION_ONE,
 	RESTORATION_FOUR,
+	RESTORATION_FIVE_READY,
 	ENDING_READY,
 	THANK_YOU_READY,
+	COMPLETE,
 ]
 
 const RETURNED_PLANT_IDS := ["colorata", "laui", "kannte", "affinis", "shaviana"]
@@ -39,11 +51,17 @@ static func _available_for_game(game) -> bool:
 static func options() -> Array[Dictionary]:
 	return [
 		{"id": ACT3_READY, "label": "第三幕直前"},
+		{"id": EXPLOITATION_ACTIVE, "label": "酷使中"},
 		{"id": CRISIS_READY, "label": "弱り直前（ジュレ団7種）"},
+		{"id": CRISIS_ACTIVE, "label": "弱り直後（大株 0/1）"},
+		{"id": FIRST_RETURN_READY, "label": "1株目返還直前"},
 		{"id": RESTORATION_ZERO, "label": "回復開始 0/5"},
+		{"id": RESTORATION_ONE, "label": "ジュレ団加入直後 1/5"},
 		{"id": RESTORATION_FOUR, "label": "回復 4/5"},
+		{"id": RESTORATION_FIVE_READY, "label": "5株目返還直前"},
 		{"id": ENDING_READY, "label": "エンディング直前"},
 		{"id": THANK_YOU_READY, "label": "Thank you直前"},
+		{"id": COMPLETE, "label": "クリア後"},
 	]
 
 
@@ -63,13 +81,26 @@ static func apply(game, preset_id: String) -> Dictionary:
 	match preset_id:
 		ACT3_READY:
 			_prepare_act3_ready(game)
+		EXPLOITATION_ACTIVE:
+			_prepare_exploitation(game)
+			target_mode = "habitat"
 		CRISIS_READY:
 			_prepare_crisis_ready(game)
 			target_mode = "habitat"
+		CRISIS_ACTIVE:
+			_prepare_crisis_active(game)
+		FIRST_RETURN_READY:
+			_prepare_crisis_active(game)
+			_queue_story_return(game, 0)
 		RESTORATION_ZERO:
 			_prepare_restoration(game, 0)
+		RESTORATION_ONE:
+			_prepare_restoration(game, 1)
 		RESTORATION_FOUR:
 			_prepare_restoration(game, 4)
+		RESTORATION_FIVE_READY:
+			_prepare_restoration(game, 4)
+			_queue_story_return(game, 4)
 		ENDING_READY:
 			_prepare_restoration(game, 5)
 			var ending_restoration: Dictionary = _restoration(game)
@@ -85,6 +116,16 @@ static func apply(game, preset_id: String) -> Dictionary:
 			HabitatRestorationClass.mark_epilogue_complete(thank_you_restoration)
 			game.story_progression_state["restoration"] = thank_you_restoration
 			target_mode = "habitat"
+		COMPLETE:
+			_prepare_restoration(game, 5)
+			var complete_restoration: Dictionary = _restoration(game)
+			HabitatRestorationClass.complete_ending(complete_restoration)
+			game.story_progression_state["restoration"] = complete_restoration
+			game.finale_complete = true
+			game.main_story_complete = true
+			game.main_story_completion_seen = true
+			target_mode = "greenhouse"
+			should_resume_story = false
 
 	_prepare_runtime_view(game, target_mode)
 	return {
@@ -117,6 +158,9 @@ static func spawn_101cm_colorata(game) -> bool:
 	game.play_notable_species.clear()
 	game.result_new_species_queue.clear()
 	game.result_deferred_species_queue.clear()
+	game.pending_round_new_species_ids.clear()
+	game.round_result_species_finalize_queue.clear()
+	game.round_result_species_finalize_active = false
 	game._spawn_specific_plant("colorata")
 	if game.plants.is_empty():
 		return false
@@ -242,6 +286,40 @@ static func _prepare_exploitation(game) -> void:
 	for entry_value in game.catalog_species:
 		if entry_value is Dictionary and str(entry_value.get("story_group", "")).to_lower() == "jurejure":
 			game.jurejure_species_unlocked[str(entry_value.get("species_id", ""))] = true
+
+
+static func _prepare_crisis_active(game) -> void:
+	_prepare_exploitation(game)
+	_grant_jurejure_species(game, 8)
+	game.jurejure_battle_count = 8
+	game.jurejure_battle_win_count = 8
+	game.jurejure_species_first_seen = true
+	game.habitat_crisis_pending = false
+	game.habitat_crisis_started = true
+	var progression: Dictionary = game.story_progression_state
+	StoryProgressionClass.begin_habitat_crisis(progression)
+	progression["post_crisis_greenhouse_pending"] = false
+	progression["post_crisis_greenhouse_seen"] = true
+	var restoration: Dictionary = StoryProgressionClass.restoration_state(progression)
+	HabitatRestorationClass.start_large_plant_mission(restoration)
+	progression["restoration"] = restoration
+	game.story_progression_state = progression
+
+
+static func _queue_story_return(game, index: int) -> void:
+	var restoration: Dictionary = _restoration(game)
+	var safe_index := clampi(index, 0, RETURNED_PLANT_IDS.size() - 1)
+	var species_id: String = RETURNED_PLANT_IDS[safe_index]
+	var entry: Dictionary = game._catalog_entry(species_id)
+	HabitatRestorationClass.queue_pending_return_snapshot(restoration, {
+		"species_id": species_id,
+		"display_name": str(entry.get("name_ja", species_id)),
+		"diameter_cm": RETURNED_PLANT_SIZES[safe_index],
+		"visual_scale": 0.18 + (RETURNED_PLANT_SIZES[safe_index] - 1.6) * 0.058,
+		"rarity": str(entry.get("rarity", "")),
+		"gold_star_count": int(entry.get("gold_star_count", 0)),
+	})
+	game.story_progression_state["restoration"] = restoration
 
 
 static func _prepare_restoration(game, returned_count: int) -> void:

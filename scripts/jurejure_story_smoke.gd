@@ -2,6 +2,7 @@ extends Node
 
 const JureJureSystemClass = preload("res://scripts/jurejure_system.gd")
 const StoryProgressionClass = preload("res://scripts/story_progression.gd")
+const HabitatRestorationClass = preload("res://scripts/habitat_restoration.gd")
 const Localizer = preload("res://scripts/game_localizer.gd")
 const JUREJURE_SPECIES_IDS: Array[String] = [
 	"jurejure_pure_gold", "jurejure_guilty_burger", "jurejure_motemote",
@@ -27,8 +28,9 @@ func _ready() -> void:
 	await _test_external_crisis_transition(game)
 	_test_first_loss_unlocks_act_two(game)
 	await _test_save_compatibility(game)
+	_test_post_ending_friendly_battle(game)
 	game._reset_progression_state()
-	print("JUREJURE_STORY_SMOKE_OK group=three_close first_encounter=camera+bgm home_warning=once battle=active6_total12 act2_only=true exploitation=act3+choice+permanent midpoint=4+camera crisis=8 exploit_dialog=three-pattern-nonrepeat secret_gacha=disabled pool_unlock=all_10 ownership=exact reward=random save_fresh=true")
+	print("JUREJURE_STORY_SMOKE_OK group=three_close first_encounter=camera+bgm home_warning=once battle=active6_total12 act2_only=true exploitation=act3+choice+permanent midpoint=4+camera crisis=8 exploit_dialog=three-pattern-nonrepeat secret_gacha=disabled pool_unlock=all_10 ownership=exact reward=random post_ending=friendly+normal_pool+known_not_new save_fresh=true")
 	get_tree().quit()
 
 
@@ -362,7 +364,7 @@ func _test_creative_gate(game: Node) -> void:
 	game.story_progression_state["fantasy_unlocked"] = true
 	assert(game._species_available_in_current_era(creative))
 	var official_entry: Dictionary = game._catalog_entry(JUREJURE_SPECIES_IDS[0])
-	assert(game._is_jurejure_species(official_entry) and game._is_fantasy_species(official_entry))
+	assert(game._is_jurejure_species(official_entry) and not game._is_fantasy_species(official_entry))
 	assert(not game._species_available_in_current_era(official_entry))
 	assert(not game._register_species_discovery(JUREJURE_SPECIES_IDS[0], true))
 	game.act3_intro_seen = true
@@ -720,6 +722,67 @@ func _test_first_loss_unlocks_act_two(game: Node) -> void:
 	assert(game.jurejure_battle_count==1 and game.jurejure_battle_win_count==0)
 	assert(game.act2_unlocked and not game.forest_gacha_unlocked and not game.forest_gacha_intro_seen)
 	assert(game.main_story_stage==game.StoryProgressionClass.ACT_2)
+
+
+func _test_post_ending_friendly_battle(game: Node) -> void:
+	_prepare_act_one(game)
+	game.act2_unlocked = true
+	game.story_progression_state["fantasy_unlocked"] = true
+	var restoration: Dictionary = HabitatRestorationClass.default_state()
+	HabitatRestorationClass.complete_ending(restoration)
+	game.story_progression_state["restoration"] = restoration
+	game.finale_complete = true
+	assert(game._is_post_ending_jurejure_battle())
+
+	game.species_get_counts = {"colorata": 1}
+	game.discovered["colorata"] = true
+	game.greenhouse_available["colorata"] = true
+	game.unlocked_species["colorata"] = true
+	var candidates: Array[Dictionary] = game._jurejure_reward_candidates()
+	assert(not candidates.is_empty())
+	var has_known := false
+	var unknown_id := ""
+	for entry in candidates:
+		var species_id := str(entry.get("species_id", ""))
+		assert(str(entry.get("series_id", "")) not in ["hybrid", "fusion_tier1", "fusion_tier2"])
+		assert(not bool(entry.get("fusion_only_until_discovered", false)))
+		assert(not bool(entry.get("special_route_only", false)))
+		assert(str(entry.get("rarity", "")) not in ["隠し原種", "謎品種"])
+		if game._species_get_count(species_id) > 0:
+			has_known = true
+		elif unknown_id.is_empty():
+			unknown_id = species_id
+	assert(has_known and not unknown_id.is_empty())
+
+	# Existing and undiscovered plants share one flat eligible pool. A known
+	# reward must never be presented as NEW, while the one remaining unknown is.
+	for entry in candidates:
+		var species_id := str(entry.get("species_id", ""))
+		game.species_get_counts[species_id] = 1
+		game.discovered[species_id] = true
+	game.rng.seed = 20261004
+	var known_reward: String = game._grant_jurejure_battle_reward()
+	assert(not known_reward.is_empty() and not game.jurejure_pending_reward_is_new)
+	game.species_get_counts.erase(unknown_id)
+	game.discovered.erase(unknown_id)
+	var found_unknown := false
+	for seed_value in range(128):
+		game.rng.seed = seed_value
+		var reward_id: String = game._grant_jurejure_battle_reward()
+		if reward_id == unknown_id:
+			found_unknown = true
+			assert(game.jurejure_pending_reward_is_new)
+			break
+	assert(found_unknown)
+
+	game.puku_points = 4
+	game.habitat_wild_plants = _population(game, 6)
+	var puku_before: int = game.puku_balance_units
+	var habitat_before: Array = game.habitat_wild_plants.duplicate(true)
+	var penalty: Dictionary = game._apply_jurejure_battle_loss()
+	assert(bool(penalty.get("friendly", false)))
+	assert(int(penalty.get("taken_count", -1)) == 0 and int(penalty.get("puku_lost", -1)) == 0)
+	assert(game.puku_balance_units == puku_before and game.habitat_wild_plants == habitat_before)
 
 
 func _group_item(game: Node) -> Dictionary:

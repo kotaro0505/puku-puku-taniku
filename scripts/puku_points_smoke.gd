@@ -81,8 +81,12 @@ func _test_round_entry_and_harvest(game)->void:
 	var panel:=game.effects_layer.find_child("HarvestResult",true,false) as PanelContainer
 	assert(panel and (panel.find_child("PukuRewardGain",true,false) as Label).text=="+3.75ぷく")
 	game._clear_greenhouse_plants();game.species_get_counts.erase("colorata");game.puku_balance_units=0;game.play_active=true;game.active_seed_type="normal";game.play_seeds_remaining=0;game.play_concurrent_target=0;game._reset_endless_economy_stats();game._spawn_specific_plant("colorata");var new_plant=game.plants.back();new_plant.jelly_checks_enabled=false;new_plant.diameter_cm=8.0;new_plant.harvest();await get_tree().process_frame
-	assert(game.puku_balance_units==200)
-	game.play_active=false;game._clear_greenhouse_plants();game._cancel_puku_gauge_animations()
+	assert(game.puku_balance_units==200 and game._species_get_count("colorata")==0 and "colorata" in game.pending_round_new_species_ids)
+	game.play_active=false;game._play_result_new_species_animations();await get_tree().create_timer(.62).timeout
+	assert(game._species_get_count("colorata")==1 and "colorata" not in game.pending_round_new_species_ids)
+	assert(game.species_get_overlay.visible and game.species_get_active_context=="round_result_new")
+	game.species_get_overlay.visible=false;game._on_species_get_overlay_closed("round_result_new");await get_tree().process_frame
+	game._clear_greenhouse_plants();game._cancel_puku_gauge_animations()
 
 func _test_catalog_auto_record(game)->void:
 	var gummy:Dictionary=game._series_entry("gummy");game.unlocked_series.erase("gummy");game.current_encyclopedia_series_id="gummy";game.puku_balance_units=5500

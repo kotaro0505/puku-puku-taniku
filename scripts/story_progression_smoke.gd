@@ -28,7 +28,7 @@ func _test_catalog_contract(game: Node) -> void:
 	var jurejure_entries: Array[Dictionary] = game._series_species_entries("jurejure")
 	assert(jurejure_entries.size() == 10)
 	for entry in jurejure_entries:
-		assert(game._is_jurejure_species(entry) and game._is_fantasy_species(entry))
+		assert(game._is_jurejure_species(entry) and not game._is_fantasy_species(entry))
 		var image_path := str(entry.get("image_path", ""))
 		assert(image_path.ends_with(".png") and FileAccess.file_exists(image_path))
 		var texture := load(image_path) as Texture2D
@@ -486,7 +486,9 @@ func _test_legacy_three_act_migration(game: Node) -> void:
 	game._load_save()
 	assert(game.act2_unlocked and game.forest_gacha_unlocked)
 	assert(game.fantasy_first_discovery_seen and game.fantasy_realization_seen)
-	assert(game._unique_fantasy_species_get_count() == 25)
+	# Base-page route specials such as transparent_succulent are not fantasy
+	# story progress; the count follows the integrated catalog display series.
+	assert(game._unique_fantasy_species_get_count() == 24)
 	assert(game.act3_unlocked and game.act3_intro_pending and not game.act3_intro_seen)
 	assert(game.scripted_dialog_kind.is_empty())
 	assert(game.normal_seed_bags == 6 and game.volume_seed_bags == 2 and game.premium_seed_bags == 1 and game.mystery_seed_bags == 3)

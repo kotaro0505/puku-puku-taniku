@@ -76,7 +76,7 @@ func _ready() -> void:
 	assert(game.normal_play_count == normal_before_batch + 1)
 	assert(game.play_active and not game.result_overlay.visible)
 
-	await _test_immediate_species_get_and_pause(game)
+	await _test_deferred_species_get_and_pause(game)
 	await _test_forced_new_lifecycle(game)
 	await _test_navigation_pause_resume(game)
 	await _test_formal_endless_main_features(game)
@@ -101,7 +101,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	_remove_test_file(NORMAL_PATH)
 	_remove_test_file(EXPERIMENT_PATH)
-	print("ENDLESS_GREENHOUSE_SMOKE_OK default_without_flags=true player_start=true round_seeds=12 round_cost=1 concurrent=7-10 refill_free=true harvest_direct=true wallet=fixed_point jelly_extra_penalty=false result=true longevity=35/35/22/8 new_roll=per_harvest jelly_new_roll=false discovery_curve=unchanged forced_new=true candidate_pool=uniform immediate_get=true virtual_batch=12 pause=true navigation=habitat+catalog+shop+gacha production_gacha=1puku+species_get fusion=1-2-3puku restoration_pending=true finite=true save_isolated=true")
+	print("ENDLESS_GREENHOUSE_SMOKE_OK default_without_flags=true player_start=true round_seeds=12 round_cost=1 concurrent=7-10 refill_free=true harvest_direct=true wallet=fixed_point jelly_extra_penalty=false result=true longevity=35/35/22/8 new_roll=per_harvest jelly_new_roll=false discovery_curve=unchanged forced_new=true candidate_pool=uniform deferred_formal_get=true pending_duplicate=false first_get_floor=once virtual_batch=12 pause=true navigation=habitat+catalog+shop+gacha production_gacha=1puku+species_get fusion=1-2-3puku restoration_pending=true finite=true save_isolated=true")
 	get_tree().quit()
 
 
@@ -368,19 +368,38 @@ func _test_endless_first_play_tutorial(game: Node) -> void:
 	assert(game.play_active and game.plants.size() == game.play_concurrent_target)
 
 
-func _test_immediate_species_get_and_pause(game: Node) -> void:
+func _test_deferred_species_get_and_pause(game: Node) -> void:
 	var species_id := "laui"
 	game.discovered.erase(species_id)
 	game.species_get_counts.erase(species_id)
 	game._spawn_specific_plant(species_id)
 	var newcomer = game.plants.back()
 	newcomer.jelly_checks_enabled = false
-	newcomer.diameter_cm = 34.0
+	newcomer.diameter_cm = 8.0
+	var puku_before_first: int = game.puku_balance_units
 	newcomer.harvest()
 	await get_tree().process_frame
 	await get_tree().process_frame
 	assert(not game.species_get_overlay.visible)
-	assert(species_id in game.result_new_species_queue)
+	assert(game._species_get_count(species_id) == 0 and not bool(game.discovered.get(species_id, false)))
+	assert(species_id in game.pending_round_new_species_ids)
+	assert(species_id not in game.result_new_species_queue)
+	assert(game.puku_balance_units - puku_before_first == game.FIRST_GET_MIN_REWARD_UNITS)
+	for entry in game._eligible_endless_forced_new_candidates():
+		assert(str(entry.get("species_id", "")) != species_id)
+
+	# While the catalog GET is pending, the same species is not NEW again and
+	# cannot receive the first-GET reward floor a second time.
+	game._spawn_specific_plant(species_id)
+	var duplicate = game.plants.back()
+	duplicate.jelly_checks_enabled = false
+	duplicate.diameter_cm = 8.0
+	var puku_before_duplicate: int = game.puku_balance_units
+	duplicate.harvest()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert(game.pending_round_new_species_ids.count(species_id) == 1)
+	assert(game.puku_balance_units - puku_before_duplicate == game._harvest_puku_reward_units(8.0, false))
 	assert(game._should_simulate_endless_greenhouse())
 	var observer = game.plants[0]
 	observer.jelly_checks_enabled = false
@@ -389,7 +408,7 @@ func _test_immediate_species_get_and_pause(game: Node) -> void:
 	game._process(1.0)
 	assert(observer.age > age_before)
 	assert(game.play_spawn_queue == spawn_queue_before)
-	game.result_new_species_queue.erase(species_id)
+	game.pending_round_new_species_ids.erase(species_id)
 	assert(game._should_simulate_endless_greenhouse())
 
 
@@ -429,11 +448,12 @@ func _test_forced_new_lifecycle(game: Node) -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	assert(not game.species_get_overlay.visible)
-	assert(forced_species_id in game.result_new_species_queue)
+	assert(forced_species_id in game.pending_round_new_species_ids)
+	assert(game._species_get_count(forced_species_id) == 0)
 	assert(not game.endless_greenhouse.has_forced_new())
 	assert(is_zero_approx(game.endless_greenhouse.discovery_cycle_best_cm))
 	assert(game.endless_greenhouse.discovery_settled_count == 3)
-	game.result_new_species_queue.erase(forced_species_id)
+	game.pending_round_new_species_ids.erase(forced_species_id)
 	game.catalog_series_unlock_notice_queue.clear()
 	game.catalog_series_unlock_notice_ready.clear()
 	var resumed_roll: Dictionary = game._record_endless_discovery_settlement(true, 50.0, 0.0)
