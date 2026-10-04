@@ -5,14 +5,17 @@ func _ready()->void:
 	await get_tree().process_frame;await get_tree().process_frame
 	game.audio_manager.apply_settings({"bgm_enabled":false,"se_enabled":false})
 	game._reset_progression_state()
+	game._set_language("ja")
 	game.endless_greenhouse.configure(true)
 	game.opening_finished=true;game.opening_story_complete=true;game.intro_story_complete=true;game.opening_overlay.visible=false;game.opening_story_overlay.visible=false
-	game.first_habitat_gift_claimed=true;game.initial_seed_stock_notice_complete=true
+	game.first_habitat_gift_claimed=true;game.initial_seed_stock_notice_complete=true;game.habitat_awakened=true;game.seed_shop_open=true
 	game.habitat_tutorial_complete=true;game.mystery_items_acquired=true;game.mystery_catalog_tutorial_complete=true
 	game.normal_play_tutorial_complete=true;game.puku_buyback_tutorial_complete=true;game.puku_gauge_intro_complete=true
 	game.current_mode="greenhouse";game.puku_balance_units=999;game._apply_mode();game._update_play_ui()
-	assert(game.play_open_button.visible and game.play_open_button.disabled)
-	game._open_play_modal();assert(not game.play_active and game.puku_balance_units==999)
+	assert(game.play_open_button.visible and not game.play_open_button.disabled)
+	assert(game.play_open_button.text=="パンダのお手伝いをする\n＋1ぷくコイン")
+	game._open_play_modal();assert(not game.play_active and game.puku_balance_units==999 and game.shop_overlay.visible)
+	game._close_shop()
 	game.puku_balance_units=5000;game._update_play_ui()
 	assert(game.play_open_button.visible and game.play_open_button.text=="たねをまく　1ぷく")
 	game._open_play_modal()

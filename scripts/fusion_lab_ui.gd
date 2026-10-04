@@ -402,7 +402,7 @@ func refresh_selection(parent_a_id: String, parent_b_id: String, result: Diction
 		result_name_label.text = Localizer.species_name(language, result_entry)
 		result_status_label.text = Localizer.text(language, "fusion_result_new" if is_new else "fusion_result_known")
 		result_image.material = silhouette_material if is_new else null
-		fuse_button.disabled = fusion_processing
+		fuse_button.disabled = fusion_processing or not is_new
 
 func set_result_texture(texture: Texture2D) -> void:
 	if result_image:
@@ -424,7 +424,7 @@ func set_processing_state(value: bool) -> void:
 	if back_button:
 		back_button.disabled = value
 	if fuse_button:
-		fuse_button.disabled = value or current_result.is_empty()
+		fuse_button.disabled = value or current_result.is_empty() or not current_result_is_new
 
 func play_fusion_reveal(texture: Texture2D, is_new: bool) -> void:
 	set_processing_state(true)

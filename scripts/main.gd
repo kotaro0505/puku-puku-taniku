@@ -54,6 +54,7 @@ const LEGACY_HABITAT_REGENERATION_VERSION := 17
 const INITIAL_SERIES_ID := "base"
 const ORIGINAL_SERIES_ID := "base"
 const FIRST_STORY_SPECIES_ID := "colorata"
+const FIRST_STORY_COLORATA_GROWTH_MULTIPLIER := 1.3
 const PANDA_STORY_SPECIES_ID := "affinis"
 const ARMADILLO_STORY_SPECIES_ID := "shaviana"
 const FOREST_GACHA_SPIN_COST := 1
@@ -144,9 +145,8 @@ const FANTASY_SIX_REQUIRED_SERIES := ["jelly", "yumekawa", "stone", "jewel"]
 const JUREJURE_STORY_GROUP := "jurejure"
 const JUREJURE_SERIES_ID := "jurejure"
 const SHOP_CHATTER_KEYS := [
-	"shop_chatter_touch","shop_chatter_welcome","shop_chatter_edible","shop_chatter_encounter",
-	"shop_chatter_seasons","shop_chatter_water","shop_chatter_growing","shop_chatter_world",
-	"shop_chatter_leaf","shop_chatter_affinis","shop_chatter_browse"
+	"shop_chatter_today","shop_chatter_share","shop_chatter_welcome",
+	"shop_chatter_living_jewel","shop_chatter_puku_help"
 ]
 const HABITAT_SAFE_PLANT_POINTS := [Vector2(70,400),Vector2(155,410),Vector2(245,400),Vector2(335,420),Vector2(430,405),Vector2(535,415),Vector2(705,430),Vector2(820,410),Vector2(920,395),Vector2(1025,420),Vector2(1130,400),Vector2(1220,415)]
 const HABITAT_SAFE_SEED_POINTS := [Vector2(45,430),Vector2(115,445),Vector2(190,430),Vector2(275,445),Vector2(360,440),Vector2(455,435),Vector2(545,445),Vector2(625,455),Vector2(715,450),Vector2(805,440),Vector2(895,430),Vector2(980,445),Vector2(1060,435),Vector2(1140,445),Vector2(1210,435),Vector2(1260,455)]
@@ -165,7 +165,7 @@ const SERIES_CAROUSEL_CARD_SIZE := Vector2(480,590)
 const SERIES_CAROUSEL_SPACING := 420.0
 const SERIES_CAROUSEL_SWIPE_THRESHOLD := 78.0
 const SERIES_CAROUSEL_SLIDE_SECONDS := 0.28
-const ENDING_BGM_FADE_IN_SECONDS := 1.75
+const ENDING_BGM_FADE_IN_SECONDS := 2.5
 const ENDING_BGM_FADE_OUT_SECONDS := 1.25
 
 var rng := RandomNumberGenerator.new()
@@ -305,6 +305,9 @@ var puku_gauge_glow_tween: Tween
 var puku_point_label: Label
 var puku_gain_label: Label
 var puku_gain_tween: Tween
+var puku_combo_label: Label
+var puku_combo_tween: Tween
+var puku_gauge_combo_count := 0
 var puku_gauge_display_units := 0.0
 var puku_points_display := 0
 var puku_gauge_animation_queue: Array[Dictionary] = []
@@ -440,6 +443,8 @@ var tutorial_highlight_tween: Tween
 var tutorial_guide_message: Label
 var tutorial_panda_portrait: TextureRect
 var tutorial_dialog_panel: PanelContainer
+var tutorial_cost_note_panel: PanelContainer
+var tutorial_cost_note_label: Label
 var tutorial_habitat_item: Dictionary = {}
 var tutorial_harvest_plant: Node
 var first_play_tutorial_active := false
@@ -515,6 +520,7 @@ var fusion_lab_ui
 var fusion_parent_a_id:=""
 var fusion_parent_b_id:=""
 var fusion_in_progress:=false
+var fusion_return_pending:=false
 var language_code:="ja"
 var language_selected:=false
 var save_file_present_on_boot:=false
@@ -1696,6 +1702,7 @@ func _build_ui() -> void:
 	puku_gauge_glow=Panel.new();puku_gauge_glow.name="PukuGaugeGlow";puku_gauge_glow.show_behind_parent=true;puku_gauge_glow.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_gauge_glow.position=Vector2(1,1);puku_gauge_glow.size=Vector2(2,8);puku_gauge_glow_style=StyleBoxFlat.new();puku_gauge_glow_style.bg_color=Color(0,0,0,0);puku_gauge_glow_style.border_color=Color(1.0,.82,.22,.0);puku_gauge_glow_style.set_border_width_all(1);puku_gauge_glow_style.set_corner_radius_all(5);puku_gauge_glow_style.shadow_color=Color(1.0,.67,.08,0.0);puku_gauge_glow_style.shadow_size=2;puku_gauge_glow.add_theme_stylebox_override("panel",puku_gauge_glow_style);puku_gauge_meter.add_child(puku_gauge_glow);call_deferred("_start_puku_gauge_glow");call_deferred("_update_puku_ui")
 	puku_point_label=Label.new();puku_point_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;puku_point_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_point_label.add_theme_font_size_override("font_size",14);puku_point_label.add_theme_color_override("font_color",Color("#fff7c2"));puku_point_label.add_theme_color_override("font_outline_color",Color("#193923"));puku_point_label.add_theme_constant_override("outline_size",4);puku_content.add_child(puku_point_label)
 	puku_gain_label=Label.new();puku_gain_label.position=Vector2(138,246);puku_gain_label.size=Vector2(300,60);puku_gain_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;puku_gain_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;puku_gain_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_gain_label.add_theme_font_size_override("font_size",27);puku_gain_label.add_theme_color_override("font_color",Color("#fff49a"));puku_gain_label.add_theme_color_override("font_outline_color",Color("#31553c"));puku_gain_label.add_theme_constant_override("outline_size",7);puku_gain_label.visible=false;effects_layer.add_child(puku_gain_label)
+	puku_combo_label=Label.new();puku_combo_label.name="PukuComboLabel";puku_combo_label.position=Vector2(168,326);puku_combo_label.size=Vector2(240,104);puku_combo_label.pivot_offset=puku_combo_label.size*.5;puku_combo_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;puku_combo_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;puku_combo_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;puku_combo_label.add_theme_font_size_override("font_size",58);puku_combo_label.add_theme_color_override("font_color",Color("#fff36b"));puku_combo_label.add_theme_color_override("font_outline_color",Color("#6f3c16"));puku_combo_label.add_theme_constant_override("outline_size",10);puku_combo_label.visible=false;effects_layer.add_child(puku_combo_label)
 	mission_panel=PanelContainer.new();mission_panel.name="MissionPanel";mission_panel.position=Vector2(18,276);mission_panel.size=Vector2(354,108);mission_panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;mission_panel.add_theme_stylebox_override("panel",_box(Color(0.16,.09,.16,.92),Color("#e4bd62"),18,2));main_status_hud.add_child(mission_panel)
 	var mission_content:=VBoxContainer.new();mission_content.alignment=BoxContainer.ALIGNMENT_CENTER;mission_content.mouse_filter=Control.MOUSE_FILTER_IGNORE;mission_content.add_theme_constant_override("separation",1);mission_panel.add_child(mission_content)
 	mission_title_label=Label.new();mission_title_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;mission_title_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;mission_title_label.add_theme_font_size_override("font_size",15);mission_title_label.add_theme_color_override("font_color",Color("#f6cf69"));mission_content.add_child(mission_title_label)
@@ -1720,7 +1727,7 @@ func _build_ui() -> void:
 	habitat_status_label=Label.new();habitat_status_label.position=Vector2(163,42);habitat_status_label.size=Vector2(250,56);habitat_status_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;habitat_status_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;habitat_status_label.add_theme_font_size_override("font_size",18);habitat_status_label.add_theme_color_override("font_color",UI_CREAM);habitat_status_label.add_theme_stylebox_override("normal",_box(Color("#4b2d20"),Color("#d8ad68"),18,2));habitat_status_label.visible=false;hud.add_child(habitat_status_label)
 	seed_bag_panel=PanelContainer.new();seed_bag_panel.position=Vector2(210,125);seed_bag_panel.size=Vector2(156,92);seed_bag_panel.add_theme_stylebox_override("panel",_box(Color("#cda66a"),Color("#6f4325"),28,3));seed_bag_panel.visible=false;hud.add_child(seed_bag_panel)
 	play_timer_label=Label.new();play_timer_label.text="たね\n残り 12粒";play_timer_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;play_timer_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;play_timer_label.add_theme_font_size_override("font_size",20);play_timer_label.add_theme_color_override("font_color",Color("#4f2e1d"));play_timer_label.add_theme_color_override("font_outline_color",Color("#f4dbac"));play_timer_label.add_theme_constant_override("outline_size",2);seed_bag_panel.add_child(play_timer_label)
-	play_open_button=Button.new();play_open_button.text="たねをまく";play_open_button.position=Vector2(198,499);play_open_button.size=Vector2(180,58);_skin_button(play_open_button,Color("#8b5a35"),21);play_open_button.mouse_filter=Control.MOUSE_FILTER_STOP;play_open_button.pressed.connect(_open_play_modal);hud.add_child(play_open_button)
+	play_open_button=Button.new();play_open_button.text="たねをまく";play_open_button.position=Vector2(198,499);play_open_button.size=Vector2(180,58);play_open_button.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS;play_open_button.clip_text=true;_skin_button(play_open_button,Color("#8b5a35"),21);play_open_button.mouse_filter=Control.MOUSE_FILTER_STOP;play_open_button.pressed.connect(_open_play_modal);hud.add_child(play_open_button)
 	record_card=PanelContainer.new(); record_card.position=Vector2(394,816); record_card.size=Vector2(164,134); record_card.add_theme_stylebox_override("panel",_box(Color("#674135"),Color("#f4d36e"),18,3)); record_card.visible=false; hud.add_child(record_card)
 	record_text=Label.new(); record_text.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; record_text.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; record_text.add_theme_font_size_override("font_size",19); record_text.add_theme_color_override("font_color",Color.WHITE); record_card.add_child(record_text)
 	_build_encyclopedia(hud)
@@ -2214,19 +2221,8 @@ func _set_shop_speaker(speaker_id:String)->void:
 	shop_chatter_portrait.clip_contents=false
 
 func _pick_shop_chatter()->String:
-	var date:=Time.get_date_dict_from_system();var month:=int(date.get("month",1));var day:=int(date.get("day",1));var japan:=_is_japan_region();var new_year:=Localizer.text(language_code,"shop_season_new_year")
-	if japan and month==1 and day<=3 and last_shop_chatter!=new_year and rng.randf()<.68:
-		last_shop_chatter=new_year
-		return new_year
 	var candidates:Array=[]
 	for key in SHOP_CHATTER_KEYS:candidates.append(Localizer.text(language_code,str(key)))
-	if japan:
-		if month==1 and day<=3:candidates.append(new_year)
-		elif month==9:candidates.append(Localizer.text(language_code,"shop_season_autumn"))
-		elif month>=6 and month<=8:
-			candidates.append(Localizer.text(language_code,"shop_season_summer_heat"));candidates.append(Localizer.text(language_code,"shop_season_summer_water"))
-		elif month==12 or month<=2:candidates.append(Localizer.text(language_code,"shop_season_winter"))
-		elif month>=3 and month<=5:candidates.append(Localizer.text(language_code,"shop_season_spring"))
 	candidates.erase(last_shop_chatter)
 	var chosen:=str(candidates[rng.randi_range(0,candidates.size()-1)]);last_shop_chatter=chosen;return chosen
 
@@ -2269,7 +2265,7 @@ func _on_rescue_reward_ad_completed(reward_earned:bool)->void:
 		shop_chatter_action_button.disabled=false;shop_chatter_action_button.text=Localizer.text(language_code,"shop_help_action") if rescue_reward_context=="shop_puku_rescue" else Localizer.text(language_code,"ad_seed");rescue_reward_context=""
 		return
 	var completed_context:=rescue_reward_context;rescue_reward_context=""
-	if completed_context=="shop_puku_rescue":normal_round_free_plays+=1
+	if completed_context=="shop_puku_rescue":_change_puku_balance(PUKU_UNITS_PER_PUKU,"shop_puku_rescue",false,true)
 	else:_grant_rescue_seed_bags()
 	_save();_update_shop_ui();_update_play_ui();audio_manager.play_se("daily",.48)
 	_show_shop_chatter(Localizer.text(language_code,"shop_puku_rescue_success" if completed_context=="shop_puku_rescue" else "shop_rescue_success"),false)
@@ -2394,6 +2390,7 @@ func _advance_scripted_dialog()->void:
 	var speaker_id:=str(page.get("speaker","panda"))
 	_set_intro_speaker(speaker_id);intro_speaker_label.visible=not speaker_id.is_empty()
 	intro_dialogue_label.text=str(page.get("text",""));intro_continue_button.text=str(page.get("button",Localizer.text(language_code,"continue")));_position_intro_dialog()
+	if bool(page.get("start_ending_bgm",false)):_start_restoration_ending_bgm_if_needed()
 	var lookaround_context:=str(page.get("lookaround",""))
 	if not lookaround_context.is_empty():call_deferred("_start_habitat_lookaround",lookaround_context)
 
@@ -2905,6 +2902,8 @@ void fragment(){
 	var tutorial_row:=HBoxContainer.new();tutorial_row.alignment=BoxContainer.ALIGNMENT_CENTER;tutorial_row.add_theme_constant_override("separation",12);tutorial_row.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_dialog_panel.add_child(tutorial_row)
 	tutorial_panda_portrait=TextureRect.new();tutorial_panda_portrait.texture=_panda_portrait_texture();tutorial_panda_portrait.custom_minimum_size=Vector2(126,164);tutorial_panda_portrait.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;tutorial_panda_portrait.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;tutorial_panda_portrait.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_row.add_child(tutorial_panda_portrait)
 	tutorial_guide_message=Label.new();tutorial_guide_message.custom_minimum_size=Vector2(330,150);tutorial_guide_message.size_flags_horizontal=Control.SIZE_EXPAND_FILL;tutorial_guide_message.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;tutorial_guide_message.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;tutorial_guide_message.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;tutorial_guide_message.add_theme_font_size_override("font_size",22);tutorial_guide_message.add_theme_color_override("font_color",UI_BROWN);tutorial_guide_message.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_row.add_child(tutorial_guide_message)
+	tutorial_cost_note_panel=PanelContainer.new();tutorial_cost_note_panel.name="FirstNormalCostNote";tutorial_cost_note_panel.position=Vector2(118,418);tutorial_cost_note_panel.size=Vector2(340,64);tutorial_cost_note_panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_cost_note_panel.add_theme_stylebox_override("panel",_box(Color("#fff4cd"),Color("#d28a2d"),16,3));tutorial_cost_note_panel.visible=false;tutorial_guide_overlay.add_child(tutorial_cost_note_panel)
+	tutorial_cost_note_label=Label.new();tutorial_cost_note_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;tutorial_cost_note_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;tutorial_cost_note_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;tutorial_cost_note_label.add_theme_font_size_override("font_size",18);tutorial_cost_note_label.add_theme_color_override("font_color",UI_BROWN);tutorial_cost_note_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_cost_note_panel.add_child(tutorial_cost_note_label)
 
 func _show_tutorial_guide(target:String)->void:
 	var source:Button
@@ -2928,10 +2927,16 @@ func _show_tutorial_guide(target:String)->void:
 	for connection in tutorial_guide_button.pressed.get_connections():tutorial_guide_button.pressed.disconnect(connection.callable)
 	tutorial_guide_button.pressed.connect(_complete_tutorial_guide)
 	tutorial_guide_overlay.visible=true
+	if target=="play_open_normal" and not bool(tutorial_steps.get("first_normal_cost_notice_seen",false)):
+		tutorial_cost_note_label.text=Localizer.text(language_code,"first_normal_cost_notice")
+		tutorial_cost_note_panel.visible=true
+		tutorial_steps["first_normal_cost_notice_seen"]=true
+		_save()
 	if target!="habitat":_start_tutorial_target_pulse(tutorial_guide_button,Color(1.25,1.18,.7,1))
 
 func _prepare_standard_tutorial_guide()->void:
 	tutorial_guide_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_shade.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_shade.material=null;tutorial_guide_shade.color=Color(0.05,0.035,0.025,.72)
+	if tutorial_cost_note_panel:tutorial_cost_note_panel.visible=false
 	first_play_harvest_spotlight_material.set_shader_parameter("focus_ellipse",false)
 	tutorial_guide_button.visible=true;tutorial_guide_button.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_button.flat=false;tutorial_guide_button.focus_mode=Control.FOCUS_ALL
 
@@ -2947,7 +2952,9 @@ func _start_tutorial_target_pulse(target:Control,glow_color:Color)->void:
 func _complete_tutorial_guide()->void:
 	if tutorial_highlight_tween and tutorial_highlight_tween.is_valid():tutorial_highlight_tween.kill()
 	tutorial_highlight_tween=null;tutorial_guide_button.self_modulate=Color.WHITE;tutorial_guide_button.scale=Vector2.ONE
-	var target:=str(tutorial_guide_button.get_meta("target",""));tutorial_guide_overlay.visible=false;tutorial_steps[target+"_guide"]=true;_save()
+	var target:=str(tutorial_guide_button.get_meta("target",""));tutorial_guide_overlay.visible=false
+	if tutorial_cost_note_panel:tutorial_cost_note_panel.visible=false
+	tutorial_steps[target+"_guide"]=true;_save()
 	if target=="encyclopedia":
 		_open_encyclopedia()
 		if mystery_items_acquired and not mystery_catalog_tutorial_complete:
@@ -3012,6 +3019,7 @@ func _show_first_play_tutorial_dialog()->void:
 
 func _show_first_play_tutorial_custom_dialog(message_key:String,speaker_id:String)->void:
 	first_play_tutorial_dialog_visible=true;tutorial_harvest_plant=null
+	_set_tutorial_dialog_system_style(false)
 	if tutorial_highlight_tween and tutorial_highlight_tween.is_valid():tutorial_highlight_tween.kill()
 	tutorial_highlight_tween=null;tutorial_guide_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_shade.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_shade.material=null;tutorial_guide_shade.color=Color(0.035,0.025,0.02,.34)
 	tutorial_guide_button.visible=true;tutorial_guide_button.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_button.position=Vector2.ZERO;tutorial_guide_button.size=get_viewport().get_visible_rect().size;tutorial_guide_button.text="";tutorial_guide_button.icon=null;tutorial_guide_button.expand_icon=false;tutorial_guide_button.flat=true;tutorial_guide_button.focus_mode=Control.FOCUS_NONE;tutorial_guide_button.set_meta("target","first_play_dialog")
@@ -3080,7 +3088,17 @@ func _activate_first_play_tutorial_new_harvest_guide()->void:
 
 func _hide_first_play_tutorial_overlay()->void:
 	if tutorial_guide_overlay==null:return
-	tutorial_guide_overlay.visible=false;tutorial_dialog_panel.visible=false;tutorial_guide_button.visible=false;tutorial_guide_shade.material=null;first_play_harvest_spotlight_material.set_shader_parameter("focus_ellipse",false)
+	tutorial_guide_overlay.visible=false;tutorial_dialog_panel.visible=false;tutorial_guide_button.visible=false;tutorial_guide_shade.material=null
+	if tutorial_cost_note_panel:tutorial_cost_note_panel.visible=false
+	_set_tutorial_dialog_system_style(false)
+	first_play_harvest_spotlight_material.set_shader_parameter("focus_ellipse",false)
+
+func _set_tutorial_dialog_system_style(system_page:bool)->void:
+	if tutorial_dialog_panel==null:return
+	tutorial_panda_portrait.visible=not system_page
+	tutorial_guide_message.custom_minimum_size=Vector2(454 if system_page else 330,150)
+	tutorial_guide_message.add_theme_font_size_override("font_size",20 if system_page else 22)
+	tutorial_dialog_panel.add_theme_stylebox_override("panel",_box(Color("#edf5df") if system_page else Color(0.97,0.90,0.75,.97),Color("#739158") if system_page else Color("#a86f36"),24,4))
 
 func _start_puku_buyback_tutorial()->void:
 	if puku_buyback_tutorial_complete or puku_buyback_tutorial_active or puku_gauge_area==null:return
@@ -3107,6 +3125,7 @@ func _show_puku_buyback_tutorial_page()->void:
 	for state in ["normal","hover","pressed","disabled","focus"]:tutorial_guide_button.add_theme_stylebox_override(state,empty_style)
 	for connection in tutorial_guide_button.pressed.get_connections():tutorial_guide_button.pressed.disconnect(connection.callable)
 	tutorial_guide_button.pressed.connect(_advance_puku_buyback_tutorial);tutorial_panda_portrait.texture=_speaker_portrait_texture("panda");tutorial_panda_portrait.visible=true;tutorial_guide_message.text=Localizer.text(language_code,str(keys[puku_buyback_tutorial_index]));tutorial_dialog_panel.visible=true;tutorial_dialog_panel.position=Vector2(40,790);tutorial_guide_overlay.visible=true
+	_set_tutorial_dialog_system_style(puku_buyback_tutorial_index==1)
 
 func _advance_puku_buyback_tutorial()->void:
 	if not puku_buyback_tutorial_active:return
@@ -3225,15 +3244,15 @@ func _build_settings(hud:Control)->void:
 	var panel:=PanelContainer.new();panel.position=Vector2(44,64);panel.size=Vector2(488,896);panel.add_theme_stylebox_override("panel",_box(Color("#f7e8c7"),Color("#9b642f"),26,4));settings_overlay.add_child(panel)
 	var scroll:=ScrollContainer.new();scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;scroll.vertical_scroll_mode=ScrollContainer.SCROLL_MODE_AUTO;scroll.scroll_deadzone=12;panel.add_child(scroll)
 	var content:=VBoxContainer.new();content.custom_minimum_size=Vector2(450,0);content.alignment=BoxContainer.ALIGNMENT_CENTER;content.add_theme_constant_override("separation",11);scroll.add_child(content)
-	settings_title_label=Label.new();settings_title_label.text="設定";settings_title_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;settings_title_label.add_theme_font_size_override("font_size",30);settings_title_label.add_theme_color_override("font_color",UI_BROWN);content.add_child(settings_title_label)
-	settings_language_heading=Label.new();settings_language_heading.name="LanguageHeading";settings_language_heading.text=Localizer.text(language_code,"language_heading");settings_language_heading.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;settings_language_heading.add_theme_font_size_override("font_size",19);settings_language_heading.add_theme_color_override("font_color",UI_BROWN);content.add_child(settings_language_heading)
+	settings_title_label=Label.new();settings_title_label.text="設定";settings_title_label.custom_minimum_size=Vector2(420,42);settings_title_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;settings_title_label.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS;settings_title_label.add_theme_font_size_override("font_size",30);settings_title_label.add_theme_color_override("font_color",UI_BROWN);content.add_child(settings_title_label)
+	settings_language_heading=Label.new();settings_language_heading.name="LanguageHeading";settings_language_heading.text=Localizer.text(language_code,"language_heading");settings_language_heading.custom_minimum_size=Vector2(420,30);settings_language_heading.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;settings_language_heading.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS;settings_language_heading.add_theme_font_size_override("font_size",19);settings_language_heading.add_theme_color_override("font_color",UI_BROWN);content.add_child(settings_language_heading)
 	var language_row:=HBoxContainer.new();language_row.alignment=BoxContainer.ALIGNMENT_CENTER;language_row.add_theme_constant_override("separation",7);content.add_child(language_row)
 	for option in [{"code":"ja","label":"日本語"},{"code":"hiragana","label":"ひらがな"},{"code":"en","label":"English"}]:
-		var language_button:=Button.new();language_button.text=str(option.label);language_button.custom_minimum_size=Vector2(134,50);_skin_button(language_button,Color("#d9c49d"),15);language_button.pressed.connect(_set_language.bind(str(option.code)));language_row.add_child(language_button);language_buttons[str(option.code)]=language_button
-	settings_language_status=Label.new();settings_language_status.custom_minimum_size=Vector2(420,28);settings_language_status.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;settings_language_status.add_theme_font_size_override("font_size",13);settings_language_status.add_theme_color_override("font_color",Color("#76513b"));content.add_child(settings_language_status)
+		var language_button:=Button.new();language_button.text=str(option.label);language_button.custom_minimum_size=Vector2(134,50);language_button.clip_text=true;language_button.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS;_skin_button(language_button,Color("#d9c49d"),15);language_button.pressed.connect(_set_language.bind(str(option.code)));language_row.add_child(language_button);language_buttons[str(option.code)]=language_button
+	settings_language_status=Label.new();settings_language_status.custom_minimum_size=Vector2(420,36);settings_language_status.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;settings_language_status.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;settings_language_status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;settings_language_status.add_theme_font_size_override("font_size",13);settings_language_status.add_theme_color_override("font_color",Color("#76513b"));content.add_child(settings_language_status)
 	_add_audio_setting_controls(content,Localizer.text(language_code,"audio_bgm"),true)
 	_add_audio_setting_controls(content,Localizer.text(language_code,"audio_se"),false)
-	var note:=Label.new();note.name="AudioSettingsNote";note.text=Localizer.text(language_code,"audio_note");note.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;note.add_theme_font_size_override("font_size",14);note.add_theme_color_override("font_color",Color("#76513b"));content.add_child(note)
+	var note:=Label.new();note.name="AudioSettingsNote";note.text=Localizer.text(language_code,"audio_note");note.custom_minimum_size=Vector2(420,40);note.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;note.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;note.add_theme_font_size_override("font_size",14);note.add_theme_color_override("font_color",Color("#76513b"));content.add_child(note)
 	if _trial_dev_controls_enabled():
 		var habitat_test:=Button.new();habitat_test.name="HabitatDevOpen";habitat_test.text="開発用：通常原生地テスト";habitat_test.custom_minimum_size=Vector2(370,58);_skin_button(habitat_test,Color("#adcbb8"),16);habitat_test.pressed.connect(_open_habitat_dev);content.add_child(habitat_test)
 		var opening_story_replay:=Button.new();opening_story_replay.name="OpeningStoryReplay";opening_story_replay.text="開発用：オープニングストーリー再表示";opening_story_replay.custom_minimum_size=Vector2(370,58);_skin_button(opening_story_replay,Color("#d8c29e"),15);opening_story_replay.pressed.connect(_replay_opening_story_for_development);content.add_child(opening_story_replay)
@@ -3501,7 +3520,7 @@ func _try_claim_jelly()->bool:
 
 func _add_audio_setting_controls(parent:VBoxContainer,label_text:String,is_bgm:bool)->void:
 	var row:=HBoxContainer.new();row.alignment=BoxContainer.ALIGNMENT_CENTER;row.add_theme_constant_override("separation",12);parent.add_child(row)
-	var toggle:=CheckButton.new();toggle.name="BgmToggle" if is_bgm else "SeToggle";toggle.text=label_text+" ON";toggle.button_pressed=bool(audio_settings.get("bgm_enabled" if is_bgm else "se_enabled",true));toggle.custom_minimum_size=Vector2(145,48);row.add_child(toggle)
+	var toggle:=CheckButton.new();toggle.name="BgmToggle" if is_bgm else "SeToggle";toggle.text=Localizer.text(language_code,"audio_bgm_on" if is_bgm else "audio_se_on");toggle.button_pressed=bool(audio_settings.get("bgm_enabled" if is_bgm else "se_enabled",true));toggle.custom_minimum_size=Vector2(145,48);toggle.clip_text=true;toggle.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS;row.add_child(toggle)
 	var slider:=HSlider.new();slider.min_value=0;slider.max_value=100;slider.step=1;slider.value=float(audio_settings.get("bgm_volume" if is_bgm else "se_volume",.65)) * 100.0;slider.custom_minimum_size=Vector2(210,48);row.add_child(slider)
 	toggle.toggled.connect(_change_audio_enabled.bind(is_bgm));slider.value_changed.connect(_change_audio_volume.bind(is_bgm))
 
@@ -3519,6 +3538,7 @@ func _set_language(value:String)->void:
 func _apply_language_to_ui()->void:
 	_refresh_opening_prompt()
 	if puku_gauge_label:puku_gauge_label.text=Localizer.text(language_code,"puku_gauge")
+	if tutorial_cost_note_label:tutorial_cost_note_label.text=Localizer.text(language_code,"first_normal_cost_notice")
 	if play_open_button:play_open_button.text=Localizer.text(language_code,"main_play")
 	if shop_button:shop_button.text=Localizer.text(language_code,"main_shop")
 	if arrangement_button:arrangement_button.text=Localizer.text(language_code,"main_arrangement")
@@ -3531,6 +3551,12 @@ func _apply_language_to_ui()->void:
 	if settings_title_label:settings_title_label.text=Localizer.text(language_code,"settings")
 	if settings_language_heading:settings_language_heading.text=Localizer.text(language_code,"language_heading")
 	if settings_close_button:settings_close_button.text=Localizer.text(language_code,"close")
+	var bgm_toggle:=find_child("BgmToggle",true,false) as CheckButton
+	var se_toggle:=find_child("SeToggle",true,false) as CheckButton
+	if bgm_toggle:bgm_toggle.text=Localizer.text(language_code,"audio_bgm_on")
+	if se_toggle:se_toggle.text=Localizer.text(language_code,"audio_se_on")
+	var audio_note:=find_child("AudioSettingsNote",true,false) as Label
+	if audio_note:audio_note.text=Localizer.text(language_code,"audio_note")
 	if intro_speaker_label:intro_speaker_label.text=Localizer.text(language_code,"story_speaker_panda")
 	for code in language_buttons:
 		var button:Button=language_buttons[code];button.disabled=str(code)==language_code
@@ -3617,6 +3643,7 @@ func _open_fusion_lab()->void:
 	if (encyclopedia_overlay and encyclopedia_overlay.visible) or (settings_overlay and settings_overlay.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible):return
 	play_modal_open=false
 	if play_overlay:play_overlay.visible=false
+	fusion_return_pending=false
 	fusion_parent_a_id="";fusion_parent_b_id=""
 	fusion_lab_ui.set_language(language_code)
 	fusion_lab_ui.open_lab(fusion_system.eligible_parents(species_get_counts),species_get_counts)
@@ -3624,6 +3651,7 @@ func _open_fusion_lab()->void:
 
 func _close_fusion_lab()->void:
 	if fusion_in_progress:return
+	fusion_return_pending=false
 	if fusion_lab_ui:fusion_lab_ui.close_lab()
 	fusion_parent_a_id="";fusion_parent_b_id=""
 	_update_play_ui()
@@ -3654,6 +3682,10 @@ func _perform_fusion(parent_a_id:String,parent_b_id:String)->void:
 	var result_species_id:=str(resolution.get("result_species_id",""))
 	if result_entry.is_empty() or result_species_id.is_empty():
 		fusion_lab_ui.show_error(Localizer.text(language_code,"fusion_recipe_missing"));return
+	if _species_get_count(result_species_id)>0:
+		fusion_lab_ui.set_processing_state(false)
+		fusion_lab_ui.show_error(Localizer.text(language_code,"fusion_result_known"))
+		return
 	var fusion_cost:=maxi(1,int(resolution.get("fusion_cost_puku",1)))
 	var fusion_cost_units:=_puku_cost_units(fusion_cost)
 	if not _can_afford_puku_units(fusion_cost_units):
@@ -3670,11 +3702,21 @@ func _perform_fusion(parent_a_id:String,parent_b_id:String)->void:
 	await fusion_lab_ui.play_fusion_reveal(_species_texture(result_entry),is_new)
 	fusion_in_progress=false
 	if is_new:
-		fusion_lab_ui.close_lab();fusion_parent_a_id="";fusion_parent_b_id="";_update_play_ui()
+		fusion_return_pending=true;fusion_lab_ui.visible=false;_update_play_ui()
 		_queue_species_get(result_entry,true,"fusion_lab")
 	else:
 		fusion_lab_ui.set_processing_state(false)
 		fusion_lab_ui.show_error(Localizer.text(language_code,"fusion_result_known"))
+
+func _resume_fusion_lab_after_get()->void:
+	if not fusion_return_pending or fusion_lab_ui==null or current_mode!="greenhouse":return
+	if not species_get_queue.is_empty() or species_get_overlay and species_get_overlay.visible or catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible:return
+	fusion_return_pending=false
+	fusion_lab_ui.set_language(language_code)
+	fusion_lab_ui.open_lab(fusion_system.eligible_parents(species_get_counts),species_get_counts,fusion_parent_a_id,fusion_parent_b_id)
+	_refresh_fusion_lab_result()
+	fusion_lab_ui.move_to_front()
+	_update_play_ui()
 
 func _open_forest_gacha()->void:
 	if forest_gacha_ui==null or not forest_gacha_unlocked or play_active or arrangement_scene_active or not _tutorial_fully_complete():return
@@ -3870,6 +3912,12 @@ func _continue_after_species_get_card(context:String)->void:
 				if close_foreground_for_story:
 					secret_gacha_ui.close_gacha();_play_current_area_bgm();_update_play_ui()
 				else:secret_gacha_ui.resume_after_species_reveal()
+		"fusion_lab":
+			if close_foreground_for_story:
+				if fusion_lab_ui:fusion_lab_ui.visible=false
+			else:
+				followup_started=true
+				call_deferred("_resume_fusion_lab_after_get")
 		"habitat_tutorial":
 			followup_started=true;call_deferred("_start_seed_pod_story")
 		"pinwheel_gift":
@@ -3963,7 +4011,7 @@ func _change_audio_volume(value:float,is_bgm:bool)->void:
 
 func _reset_progression_state()->void:
 	_end_first_play_tutorial_context()
-	fusion_parent_a_id="";fusion_parent_b_id="";fusion_in_progress=false
+	fusion_parent_a_id="";fusion_parent_b_id="";fusion_in_progress=false;fusion_return_pending=false
 	if fusion_lab_ui:fusion_lab_ui.close_lab()
 	if catalog_series_unlock_overlay:catalog_series_unlock_overlay.reset_overlay()
 	catalog_series_unlock_active_id="";species_get_active_series_id=""
@@ -4042,6 +4090,9 @@ func _open_play_modal()->void:
 	if _endless_normal_flow_owns_play_controls():
 		play_modal_open=false
 		if play_overlay:play_overlay.visible=false
+		if puku_gauge_intro_complete and normal_round_free_plays<=0 and not _can_afford_puku_units(NORMAL_ROUND_COST_UNITS):
+			_open_shop()
+			return
 		_start_greenhouse_play("normal")
 		return
 	play_modal_open=true;_update_play_ui()
@@ -4147,6 +4198,7 @@ func _greenhouse_finish_block_reason()->String:
 	if play_spawn_queue>0:return "play_spawn_queue"
 	if play_seed_animations_pending>0:return "play_seed_animations_pending"
 	if not plants.is_empty():return "plants_remaining"
+	if _is_endless_normal_play() and (puku_gauge_animation_running or not puku_gauge_animation_queue.is_empty()):return "puku_gauge_animation"
 	return ""
 
 func _poll_greenhouse_play_completion()->void:
@@ -4217,36 +4269,17 @@ func _current_mission_text()->String:
 	var ending_phase:=HabitatRestorationClass.ending_phase(restoration)
 	if ending_phase=="complete" or bool(restoration.get("ending_seen",false)):
 		return ""
-	if not ending_phase.is_empty() or HabitatRestorationClass.returned_count(restoration)>=HabitatRestorationClass.REQUIRED_RETURNED_PLANTS:
-		return Localizer.text(language_code,"mission_watch_restoration")
-	if habitat_crisis_pending:
-		return Localizer.text(language_code,"mission_check_habitat")
+	if not ending_phase.is_empty() or HabitatRestorationClass.returned_count(restoration)>=HabitatRestorationClass.REQUIRED_RETURNED_PLANTS:return ""
+	if habitat_crisis_pending:return ""
 	if habitat_crisis_started:
-		if not bool(story_progression_state.get("post_crisis_greenhouse_seen",false)):
-			return Localizer.text(language_code,"mission_return_greenhouse")
+		if not bool(story_progression_state.get("post_crisis_greenhouse_seen",false)):return ""
 		var returned:=HabitatRestorationClass.returned_count(restoration)
-		var pending:=HabitatRestorationClass.pending_return_count(restoration)
-		if not bool(restoration.get("jurejure_joined",false)):
-			return Localizer.text(language_code,"mission_first_large",[mini(1,returned+pending)])
 		return Localizer.text(language_code,"mission_return_large",[mini(5,returned)])
-	if act3_unlocked and not act3_intro_seen:
-		return Localizer.text(language_code,"mission_check_habitat")
+	if act3_unlocked and not act3_intro_seen:return ""
 	if StoryProgressionClass.exploitation_is_started(story_progression_state) or act3_intro_seen:
 		return Localizer.text(language_code,"mission_jurejure_species",[mini(8,_unique_jurejure_species_get_count())])
 	if act2_unlocked:
 		return Localizer.text(language_code,"mission_fantasy_species",[mini(24,_unique_fantasy_species_get_count())])
-	if jurejure_intro_complete:
-		return Localizer.text(language_code,"mission_battle_jurejure")
-	if habitat_tutorial_complete:
-		return Localizer.text(language_code,"mission_meet_jurejure")
-	if habitat_awakened:
-		return Localizer.text(language_code,"mission_return_tutorial")
-	if trio_originals_confirmed:
-		return Localizer.text(language_code,"mission_visit_habitat")
-	if first_colorata_confirmed:
-		return Localizer.text(language_code,"mission_listen")
-	if opening_story_complete or intro_story_complete:
-		return Localizer.text(language_code,"mission_old_seed")
 	return ""
 
 func _mission_foreground_safe()->bool:
@@ -4304,10 +4337,13 @@ func _update_play_ui()->void:
 	play_open_button.visible=current_mode=="greenhouse" and intro_story_complete and not play_active and not play_modal_open and normal_round_start_visible and not arrangement_navigation_suspended and (not result_overlay or not result_overlay.visible) and (not shop_overlay or not shop_overlay.visible) and (not encyclopedia_overlay or not encyclopedia_overlay.visible) and (not settings_overlay or not settings_overlay.visible) and (not arrangement_ui or not arrangement_ui.visible)
 	if endless_owns_normal_flow:
 		var round_is_free:=normal_round_free_plays>0 or not puku_gauge_intro_complete
-		play_open_button.text=Localizer.text(language_code,"play_normal_seed_round_free" if round_is_free else "play_normal_seed_round")
-		play_open_button.disabled=not round_is_free and not _can_afford_puku_units(NORMAL_ROUND_COST_UNITS)
+		var rescue_needed:=not round_is_free and not _can_afford_puku_units(NORMAL_ROUND_COST_UNITS)
+		play_open_button.text=Localizer.text(language_code,"play_normal_seed_round_help" if rescue_needed else ("play_normal_seed_round_free" if round_is_free else "play_normal_seed_round"))
+		play_open_button.add_theme_font_size_override("font_size",14 if rescue_needed else 17)
+		play_open_button.disabled=false
 	else:
 		play_open_button.text=Localizer.text(language_code,"main_play")
+		play_open_button.add_theme_font_size_override("font_size",21)
 		play_open_button.disabled=false
 	seed_bag_panel.visible=current_mode=="greenhouse" and play_active and active_seed_type!="old" and not _is_endless_normal_play()
 	play_timer_label.visible=seed_bag_panel.visible
@@ -4579,8 +4615,8 @@ func _change_puku_balance(delta_units:int,source:="",save_immediately:=true,show
 		if not puku_gauge_animation_running and puku_gauge_animation_queue.is_empty():
 			puku_gauge_display_units=float(_puku_fraction_units(previous_units))
 			puku_points_display=_puku_whole_count(previous_units)
+			_reset_puku_combo_display()
 		puku_gauge_animation_queue.append({"delta_units":applied_units})
-		if applied_units>0 and source_position.x>-9999.0:_launch_puku_balance_fly(applied_units,source_position)
 		if not puku_gauge_animation_running:
 			puku_gauge_animation_running=true
 			_run_puku_gauge_animation_queue()
@@ -4666,25 +4702,29 @@ func _set_puku_gauge_display_units(value:float)->void:
 	puku_gauge_display_units=clampf(value,0.0,float(PUKU_UNITS_PER_PUKU))
 	_render_puku_gauge(puku_gauge_display_units)
 
-func _launch_puku_balance_fly(delta_units:int,source_position:Vector2)->void:
-	var label:=Label.new();label.name="PukuBalanceFly";label.text="%s%sぷく"%["+" if delta_units>0 else "-",_format_puku_units(delta_units)];label.size=Vector2(170,54);label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.mouse_filter=Control.MOUSE_FILTER_IGNORE;label.add_theme_font_size_override("font_size",25);label.add_theme_color_override("font_color",Color("#fff49a") if delta_units>0 else Color("#ffb99f"));label.add_theme_color_override("font_outline_color",Color("#31553c") if delta_units>0 else Color("#6d251b"));label.add_theme_constant_override("outline_size",6)
-	var fallback:=Vector2(288,520);var start:=source_position if source_position.x>-9999.0 else fallback;label.position=start-label.size*.5;label.pivot_offset=label.size*.5;effects_layer.add_child(label)
-	var target:=puku_gauge_meter.global_position+puku_gauge_meter.size*.5
-	var tween:=create_tween().bind_node(label).set_parallel();tween.tween_property(label,"position",target-label.size*.5,.30).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN);tween.tween_property(label,"scale",Vector2(.72,.72),.30).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN);tween.tween_property(label,"modulate:a",.12,.30).set_delay(.17);tween.chain().tween_callback(label.queue_free)
-
 func _format_cm(amount_cm:float)->String:
 	var rounded:=snappedf(amount_cm,0.1)
 	return str(int(roundf(rounded))) if is_equal_approx(rounded,roundf(rounded)) else "%.1f"%rounded
 
 func _run_puku_gauge_animation_queue()->void:
 	var generation:=puku_gauge_animation_generation
-	while not puku_gauge_animation_queue.is_empty() and generation==puku_gauge_animation_generation:
-		var item:Dictionary=puku_gauge_animation_queue.pop_front()
-		await get_tree().create_timer(maxf(.001,.26*puku_gauge_animation_speed_scale)).timeout
+	while generation==puku_gauge_animation_generation:
+		while not puku_gauge_animation_queue.is_empty() and generation==puku_gauge_animation_generation:
+			var item:Dictionary=puku_gauge_animation_queue.pop_front()
+			await get_tree().create_timer(maxf(.001,.26*puku_gauge_animation_speed_scale)).timeout
+			if generation!=puku_gauge_animation_generation:return
+			await _animate_puku_balance_delta(int(item.get("delta_units",0)),generation)
 		if generation!=puku_gauge_animation_generation:return
-		await _animate_puku_balance_delta(int(item.get("delta_units",0)),generation)
-	if generation!=puku_gauge_animation_generation:return
-	puku_gauge_animation_running=false;puku_gauge_display_units=float(_puku_fraction_units());puku_points_display=_puku_whole_count();_update_puku_ui()
+		if puku_gauge_combo_count>=2 and puku_combo_label and puku_combo_label.visible:
+			await get_tree().create_timer(maxf(.001,.14*puku_gauge_animation_speed_scale)).timeout
+			if generation!=puku_gauge_animation_generation:return
+			puku_combo_tween=create_tween();puku_combo_tween.tween_property(puku_combo_label,"modulate:a",0.0,maxf(.001,.12*puku_gauge_animation_speed_scale))
+			await puku_combo_tween.finished
+			if generation!=puku_gauge_animation_generation:return
+		if puku_gauge_animation_queue.is_empty():break
+		if puku_combo_label:puku_combo_label.modulate.a=1.0
+	_reset_puku_combo_display()
+	puku_gauge_animation_running=false;puku_gauge_display_units=float(_puku_fraction_units());puku_points_display=_puku_whole_count();_update_puku_ui();call_deferred("_poll_greenhouse_play_completion")
 
 func _animate_puku_balance_delta(delta_units:int,generation:int)->void:
 	var remaining:int=absi(delta_units)
@@ -4722,18 +4762,38 @@ func _play_puku_balance_boundary(direction:int,generation:int)->void:
 	if generation!=puku_gauge_animation_generation:return
 	puku_gauge_threshold_flash_count+=1
 	if direction>0:
-		puku_points_display+=1;_set_puku_gauge_display_units(float(PUKU_UNITS_PER_PUKU))
+		puku_points_display+=1;puku_gauge_combo_count+=1;_set_puku_gauge_display_units(float(PUKU_UNITS_PER_PUKU))
 	else:
 		puku_points_display=maxi(0,puku_points_display-1);_set_puku_gauge_display_units(float(PUKU_UNITS_PER_PUKU))
 	if puku_point_label:puku_point_label.text=Localizer.text(language_code,"puku_count",[puku_points_display])
 	puku_gauge_meter.pivot_offset=puku_gauge_meter.size*.5;puku_gauge_active_tween=create_tween();puku_gauge_active_tween.tween_property(puku_gauge_meter,"scale",Vector2(1.06,1.22),maxf(.001,.025*puku_gauge_animation_speed_scale)).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT);puku_gauge_active_tween.tween_property(puku_gauge_meter,"scale",Vector2.ONE,maxf(.001,.04*puku_gauge_animation_speed_scale)).set_trans(Tween.TRANS_QUAD)
 	await puku_gauge_active_tween.finished
+	if generation==puku_gauge_animation_generation and direction>0 and puku_gauge_combo_count>=2:
+		await _pulse_puku_combo_display(generation)
 	if generation==puku_gauge_animation_generation and direction>0:_set_puku_gauge_display_units(0.0)
+
+func _pulse_puku_combo_display(generation:int)->void:
+	if generation!=puku_gauge_animation_generation or puku_combo_label==null:return
+	puku_combo_label.text="×%d"%puku_gauge_combo_count;puku_combo_label.visible=true;puku_combo_label.modulate.a=1.0;puku_combo_label.scale=Vector2.ONE
+	if puku_combo_tween and puku_combo_tween.is_valid():puku_combo_tween.kill()
+	puku_combo_tween=create_tween();puku_combo_tween.tween_property(puku_combo_label,"scale",Vector2(1.28,1.28),maxf(.001,.085*puku_gauge_animation_speed_scale)).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT);puku_combo_tween.tween_property(puku_combo_label,"scale",Vector2.ONE,maxf(.001,.10*puku_gauge_animation_speed_scale)).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	await puku_combo_tween.finished
+
+func _reset_puku_combo_display()->void:
+	puku_gauge_combo_count=0
+	if puku_combo_tween and puku_combo_tween.is_valid():puku_combo_tween.kill()
+	puku_combo_tween=null
+	if puku_combo_label:
+		puku_combo_label.visible=false
+		puku_combo_label.modulate=Color.WHITE
+		puku_combo_label.scale=Vector2.ONE
+		puku_combo_label.text=""
 
 func _cancel_puku_gauge_animations()->void:
 	puku_gauge_animation_generation+=1;puku_gauge_animation_queue.clear();puku_gauge_animation_running=false
 	if puku_gauge_active_tween and puku_gauge_active_tween.is_valid():puku_gauge_active_tween.kill()
 	puku_gauge_active_tween=null;puku_gauge_display_units=float(_puku_fraction_units());puku_points_display=_puku_whole_count()
+	_reset_puku_combo_display()
 	if puku_gauge_meter:puku_gauge_meter.scale=Vector2.ONE
 
 func _start_puku_gauge_glow()->void:
@@ -5503,7 +5563,6 @@ func _show_catalog_series_unlock_notice(series_id:String,context:String="")->boo
 	catalog_series_unlock_overlay.show_series(series_entry,_catalog_series_notice_cover(series_entry),_catalog_series_notice_name(series_entry),context,language_code)
 	var cover_entry:=_catalog_cover_entry_for_series(series_id)
 	if not cover_entry.is_empty():_request_species_texture(cover_entry,catalog_series_unlock_overlay.cover_image,true)
-	if audio_manager:audio_manager.play_se("new_species",.72)
 	return true
 
 func _try_start_catalog_series_unlock_notice()->bool:
@@ -5549,6 +5608,9 @@ func _try_start_pending_story_event()->void:
 	if _try_start_post_ending_greenhouse_dialog():return
 	if _try_start_catalog_series_unlock_notice():return
 	if not catalog_series_unlock_notice_queue.is_empty():return
+	if fusion_return_pending and current_mode=="greenhouse" and not _immediate_get_story_transition_pending():
+		call_deferred("_resume_fusion_lab_after_get")
+		return
 	if _try_start_pending_habitat_crisis_transition():return
 	var queued_story_event:=StoryProgressionClass.peek_story_event(story_progression_state)
 	if act3_intro_pending and not act3_intro_seen:
@@ -5678,7 +5740,9 @@ func _start_restoration_final_event()->void:
 	_start_scripted_dialog("restoration_final",HabitatRestorationClass.dialog_pages(language_code,"final"),false)
 
 func _start_restoration_epilogue_event()->void:
-	_start_scripted_dialog("restoration_epilogue",HabitatRestorationClass.dialog_pages(language_code,"epilogue"),false)
+	var pages:=HabitatRestorationClass.dialog_pages(language_code,"epilogue")
+	if pages.size()>2:pages[2]["start_ending_bgm"]=true
+	_start_scripted_dialog("restoration_epilogue",pages,false)
 
 func _try_start_post_ending_greenhouse_dialog()->bool:
 	if current_mode!="greenhouse":return false
@@ -5799,8 +5863,12 @@ func _restoration_ending_plant_slides()->Array[Dictionary]:
 	return slides
 
 func _on_restoration_ending_bgm_requested()->void:
-	# `restart=true` guarantees the attached ending track begins at 0:00. The
-	# UI emits this synchronously with the first record's fade-in.
+	# The ending UI still emits this as a resume fallback, but the normal story
+	# has already started the same track on Peccary's SDGs line.
+	_start_restoration_ending_bgm_if_needed()
+
+func _start_restoration_ending_bgm_if_needed()->void:
+	if audio_manager==null or audio_manager.current_bgm_key=="ending":return
 	audio_manager.play_bgm("ending",true,ENDING_BGM_FADE_IN_SECONDS)
 
 func _resume_restoration_ending()->bool:
@@ -6683,6 +6751,9 @@ func spawn_plant(force_golden := false,spawn_position:Variant=null) -> void:
 	var p = SucculentClass.new()
 	var chosen_species_id:=str(chosen.get("species_id",""))
 	p.original_pos=pos; p.position=pos;p.set_meta("new_species_candidate",_species_get_count(chosen_species_id)<=0 and chosen_species_id not in pending_round_new_species_ids);p.set_meta("endless_forced_new",endless_forced_new); world_root.add_child(p); p.setup(chosen,rng.randi(),label,null,false,_greenhouse_jelly_balance_for_spawn());p.jelly_permission=Callable(self,"_allow_plant_jelly").bind(p)
+	if active_seed_type=="old" and chosen_species_id==FIRST_STORY_SPECIES_ID and not first_colorata_confirmed:
+		p.growth_rate*=FIRST_STORY_COLORATA_GROWTH_MULTIPLIER
+		p.set_meta("first_story_growth_multiplier",FIRST_STORY_COLORATA_GROWTH_MULTIPLIER)
 	if first_play_tutorial_active:p.jelly_checks_enabled=false
 	p.harvested.connect(_on_harvested); p.jellied.connect(_on_jellied)
 	plants.append(p)

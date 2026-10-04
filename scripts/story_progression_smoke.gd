@@ -385,7 +385,7 @@ func _test_three_act_sequence(game: Node) -> void:
 	_finish_dialog(game)
 	assert(bool(game.story_progression_state.get("post_crisis_greenhouse_seen", false)))
 	assert(not bool(game.story_progression_state.get("post_crisis_greenhouse_pending", true)))
-	assert(game._current_mission_text() == "100cm以上の多肉を1株育てよう！　0/1")
+	assert(game._current_mission_text() == "100cm以上の多肉を5株、原生地へ還そう！　0/5")
 	game._toggle_mode();await get_tree().process_frame
 	await get_tree().create_timer(.9).timeout
 	game._toggle_mode();await get_tree().process_frame

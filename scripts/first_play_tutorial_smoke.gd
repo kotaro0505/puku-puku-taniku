@@ -11,6 +11,7 @@ func _ready() -> void:
 	# This suite deliberately preserves the complete legacy finite tutorial flow.
 	game.endless_greenhouse.configure(false)
 	game._reset_progression_state()
+	game._set_language("ja")
 	game.audio_manager.apply_settings({"bgm_enabled": false, "se_enabled": false})
 	game.opening_story_complete = true
 	game.opening_story_overlay.visible = false
@@ -40,6 +41,8 @@ func _ready() -> void:
 	assert(game.plants.size() == 1 and game.first_tutorial_species_id == FIRST_SPECIES_ID)
 	var first_plant = game.plants[0]
 	assert(str(first_plant.data.get("species_id", "")) == FIRST_SPECIES_ID)
+	assert(is_equal_approx(first_plant.growth_rate, game.FIRST_STORY_COLORATA_GROWTH_MULTIPLIER))
+	assert(is_equal_approx(float(first_plant.get_meta("first_story_growth_multiplier", 0.0)), 1.3))
 	assert(not game._allow_plant_jelly(first_plant))
 	game._update_play_ui()
 	game._update_labels()
@@ -219,8 +222,12 @@ func _ready() -> void:
 	assert(game.scripted_dialog_kind.is_empty())
 	assert(str(game.tutorial_guide_button.get_meta("target", "")) == "play_open_normal")
 	assert(game.tutorial_guide_overlay.visible)
+	assert(game.tutorial_cost_note_panel.visible)
+	assert(game.tutorial_cost_note_label.text == "1ぷくコインを消費します")
+	assert(bool(game.tutorial_steps.get("first_normal_cost_notice_seen", false)))
 	var puku_before_round: int = game.puku_balance_units
 	game._complete_tutorial_guide()
+	assert(not game.tutorial_cost_note_panel.visible)
 	assert(game._should_simulate_endless_greenhouse(), "formal round remained blocked: intro=%s play_overlay=%s result=%s tutorial=%s scripted=%s" % [game.intro_overlay.visible, game.play_overlay.visible, game.result_overlay.visible, game.tutorial_guide_overlay.visible, game.scripted_dialog_kind])
 	await get_tree().create_timer(.45).timeout
 	assert(game.play_active and game.first_play_tutorial_active and game.normal_seed_bags==0 and game.current_target_count==12)
@@ -229,6 +236,9 @@ func _ready() -> void:
 	assert(game.play_seeds_remaining == 12 - game.play_concurrent_target)
 	assert(game.first_play_tutorial_reserved_seed_pending)
 	assert(not game.first_play_tutorial_reserved_species_id.is_empty())
+	for normal_tutorial_plant in game.plants:
+		assert(is_equal_approx(normal_tutorial_plant.growth_rate, 1.0))
+		assert(not normal_tutorial_plant.has_meta("first_story_growth_multiplier"))
 	assert(not game.tutorial_guide_overlay.visible and str(game.tutorial_guide_button.get_meta("target", "")) != "normal_seed")
 	for plant in game.plants:plant.fast_forward_to_diameter(2.0)
 	game._process(game.FIRST_PLAY_TUTORIAL_INITIAL_DELAY+.01)
@@ -300,15 +310,19 @@ func _ready() -> void:
 	assert(not game.species_get_overlay.visible)
 	await get_tree().process_frame
 	assert(game.puku_buyback_tutorial_active)
-	assert(game.tutorial_guide_message.text==Localizer.text("ja","puku_buyback_1"));game._advance_puku_buyback_tutorial()
+	assert(game.tutorial_guide_message.text=="大きい株ほど高く買い取るよ！")
+	assert(game.tutorial_panda_portrait.visible)
+	game._advance_puku_buyback_tutorial()
 	assert(bool(game.first_play_harvest_spotlight_material.get_shader_parameter("focus_ellipse")))
 	var puku_center: Vector2 = game.first_play_harvest_spotlight_material.get_shader_parameter("focus_uv_a")
 	var puku_half_size: Vector2 = game.first_play_harvest_spotlight_material.get_shader_parameter("focus_half_size_uv")
 	var seed_center: Vector2 = (game.seed_pod_gauge_area.global_position + game.seed_pod_gauge_area.size * .5) / game.get_viewport().get_visible_rect().size
 	assert(((seed_center - puku_center) / puku_half_size).length() > 1.0)
-	assert(game.tutorial_guide_message.text==Localizer.text("ja","puku_buyback_2"));game._advance_puku_buyback_tutorial()
+	assert(game.tutorial_guide_message.text=="大きい株を収穫するほど\nぷくゲージが溜まります。\n満タンになると +1ぷくコインGET！")
+	assert(not game.tutorial_panda_portrait.visible)
+	game._advance_puku_buyback_tutorial()
 	assert(game.puku_buyback_tutorial_complete and not game.puku_buyback_tutorial_active)
-	assert(Localizer.text("ja","puku_buyback_2").contains("1ぷく未満"))
+	assert(not Localizer.text("ja","puku_buyback_2").contains("1ぷく未満"))
 	assert(not game.first_seed_pod_reward_event_active and game.normal_seed_bags == 0 and is_zero_approx(game.puku_gauge_cm))
 
 	# The scripted jelly and NEW harvest settled two seeds. Settle the remaining
@@ -343,8 +357,8 @@ func _ready() -> void:
 	assert(not bool(game.story_progression_state.get("original_new_guarantee_pending", false)))
 	assert(not bool(game.story_progression_state.get("original_new_guarantee_consumed", false)))
 
-	assert(Localizer.text("ja","puku_buyback_1").contains("大きさに合わせて"))
-	print("FIRST_PLAY_TUTORIAL_SMOKE_OK trio_cards=catalog_only pre_sow=true start_guide=play_open_normal forced_jelly=true reserved_original_new=true observed_3s=true post_result_GET=true act2_guarantee_untouched=true total=12 result=1_harvest+11_jelly")
+	assert(Localizer.text("ja","puku_buyback_1") == "大きい株ほど高く買い取るよ！")
+	print("FIRST_PLAY_TUTORIAL_SMOKE_OK old_colorata_growth=1.3 normal_growth=unchanged cost_note=once trio_cards=catalog_only pre_sow=true start_guide=play_open_normal forced_jelly=true reserved_original_new=true observed_3s=true post_result_GET=true act2_guarantee_untouched=true total=12 result=1_harvest+11_jelly")
 	get_tree().quit()
 
 

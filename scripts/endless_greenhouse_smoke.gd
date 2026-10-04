@@ -835,7 +835,7 @@ func _test_fusion_lab_flow(game: Node) -> void:
 	assert(game.fusion_in_progress)
 	assert(game.puku_points == puku_before_fusion - 1)
 	assert(game._species_get_count(hybrid_id) == 1)
-	await get_tree().create_timer(2.0).timeout
+	await get_tree().create_timer(3.1).timeout
 	await get_tree().process_frame
 	await get_tree().process_frame
 	assert(game._species_get_count(gummy_id) == gummy_before)
@@ -847,10 +847,14 @@ func _test_fusion_lab_flow(game: Node) -> void:
 
 	await get_tree().create_timer(.55).timeout
 	await game.species_get_overlay.close_overlay()
+	await get_tree().process_frame
 	assert(not game.species_get_overlay.visible)
+	assert(game.fusion_lab_ui.visible and game.fusion_lab_ui.fuse_button.disabled)
+	assert(game.fusion_parent_a_id == gummy_id and game.fusion_parent_b_id == metal_id)
 	assert(game._is_series_unlocked(game._series_entry("hybrid")))
 	assert(not game.catalog_series_unlock_overlay.visible and game.catalog_series_unlock_notice_queue.is_empty())
 	assert(game.scripted_dialog_kind.is_empty())
+	game._close_fusion_lab()
 	game.play_active=true
 	game._update_play_ui()
 	assert(game._is_endless_normal_play() and game._should_simulate_endless_greenhouse())
@@ -877,9 +881,8 @@ func _test_gauges(game: Node) -> void:
 	gauge_probe.harvest()
 	assert(is_equal_approx(game.puku_gauge_cm, 123.0))
 	assert(game.puku_balance_units==12571 and game.puku_points==12 and game._puku_fraction_units()==571)
-	var fly_label:=game.effects_layer.find_child("PukuBalanceFly",true,false) as Label
 	var harvest_panel:=game.effects_layer.find_child("HarvestResult",true,false) as PanelContainer
-	assert(fly_label and fly_label.text=="+3.75ぷく" and harvest_panel)
+	assert(game.effects_layer.find_child("PukuBalanceFly",true,false)==null and harvest_panel)
 	assert((harvest_panel.find_child("HarvestSize",true,false) as Label).text==Localizer.text("ja","harvest_size",[game._format_cm(100.0)]))
 	assert((harvest_panel.find_child("PukuRewardGain",true,false) as Label).text=="+3.75ぷく")
 	game._clear_greenhouse_plants()

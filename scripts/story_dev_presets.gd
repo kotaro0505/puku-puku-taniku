@@ -206,6 +206,8 @@ static func _prepare_post_first_normal_tutorial(game) -> void:
 	_grant_species(game, tutorial_species_id)
 	game.tutorial_steps["first_play_growth_dialogs"] = true
 	game.tutorial_steps["first_harvest_guide"] = true
+	game.tutorial_steps["play_open_normal_guide"] = true
+	game.tutorial_steps["first_normal_cost_notice_seen"] = true
 	game.tutorial_steps["first_normal_tutorial_species_id"] = tutorial_species_id
 	game.first_play_has_harvested = true
 	game.puku_balance_units = maxi(4200, int(game.puku_balance_units))

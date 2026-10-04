@@ -14,7 +14,7 @@ func _ready()->void:
 	_test_save_and_legacy_load(game)
 	await _test_panda_rescue(game)
 	game._reset_progression_state();game.queue_free()
-	print("PUKU_POINTS_SMOKE_OK unit=1/1000 round_cost=1.00 direct_harvest=true new_floor=.20 migration=points+legacy_gauge forest_cost=1 rescue=free_round")
+	print("PUKU_POINTS_SMOKE_OK unit=1/1000 round_cost=1.00 direct_harvest=true new_floor=.20 migration=points+legacy_gauge forest_cost=1 rescue=wallet_plus_1 combo=true fly_removed=true result_waits=true")
 	get_tree().quit()
 
 func _test_seed_pod_thresholds(game)->void:
@@ -56,6 +56,17 @@ func _test_signed_balance_animation(game)->void:
 	assert(game._change_puku_balance(2400,"test_gain",false,true)==2400)
 	await _wait_for_puku_animation(game)
 	assert(game.puku_balance_units==6400 and game.puku_points_display==6 and roundi(game.puku_gauge_display_units)==400 and game.puku_gauge_threshold_flash_count==2)
+	assert(not game.puku_combo_label.visible and game.puku_gauge_combo_count==0)
+	var combo_generation: int = game.puku_gauge_animation_generation
+	game.puku_gauge_animation_speed_scale=.02
+	await game._play_puku_balance_boundary(1,combo_generation)
+	assert(game.puku_gauge_combo_count==1 and not game.puku_combo_label.visible)
+	await game._play_puku_balance_boundary(1,combo_generation)
+	assert(game.puku_combo_label.visible and game.puku_combo_label.text=="×2")
+	await game._play_puku_balance_boundary(1,combo_generation)
+	assert(game.puku_combo_label.visible and game.puku_combo_label.text=="×3")
+	game._reset_puku_combo_display()
+	game.puku_gauge_threshold_flash_count=2
 	assert(game._change_puku_balance(-200,"test_spend",false,true)==-200)
 	await _wait_for_puku_animation(game)
 	assert(game.puku_balance_units==6200 and game.puku_points_display==6 and roundi(game.puku_gauge_display_units)==200)
@@ -65,7 +76,7 @@ func _test_signed_balance_animation(game)->void:
 	game.puku_gauge_animation_speed_scale=1.0
 
 func _test_round_entry_and_harvest(game)->void:
-	game._cancel_puku_gauge_animations();game._clear_greenhouse_plants();game.opening_finished=true;game.opening_overlay.visible=false;game.current_mode="greenhouse";game._apply_mode();game.first_habitat_gift_claimed=true;game.puku_balance_units=1400;game.normal_round_free_plays=0
+	game._cancel_puku_gauge_animations();game.puku_gauge_animation_speed_scale=.02;game._clear_greenhouse_plants();game.opening_finished=true;game.opening_overlay.visible=false;game.current_mode="greenhouse";game._apply_mode();game.first_habitat_gift_claimed=true;game.puku_balance_units=1400;game.normal_round_free_plays=0
 	game._start_greenhouse_play("normal")
 	assert(game.play_active and game.current_target_count==12 and game.play_concurrent_target>=7 and game.play_concurrent_target<=10)
 	assert(game.puku_balance_units==400 and game.endless_economy_seed_cost_units==1000)
@@ -80,13 +91,18 @@ func _test_round_entry_and_harvest(game)->void:
 	assert(game.puku_balance_units==3750 and game.play_puku_reward_units_total==3750 and game.endless_economy_harvest_reward_units==3750)
 	var panel:=game.effects_layer.find_child("HarvestResult",true,false) as PanelContainer
 	assert(panel and (panel.find_child("PukuRewardGain",true,false) as Label).text=="+3.75ぷく")
+	assert(game.effects_layer.find_child("PukuBalanceFly",true,false)==null)
+	assert(game.play_active and not game.result_overlay.visible and game._greenhouse_finish_block_reason()=="puku_gauge_animation")
+	await _wait_for_puku_animation(game);await get_tree().process_frame;await get_tree().process_frame
+	assert(not game.play_active and game.result_overlay.visible)
+	game._close_result();await get_tree().process_frame
 	game._clear_greenhouse_plants();game.species_get_counts.erase("colorata");game.puku_balance_units=0;game.play_active=true;game.active_seed_type="normal";game.play_seeds_remaining=0;game.play_concurrent_target=0;game._reset_endless_economy_stats();game._spawn_specific_plant("colorata");var new_plant=game.plants.back();new_plant.jelly_checks_enabled=false;new_plant.diameter_cm=8.0;new_plant.harvest();await get_tree().process_frame
 	assert(game.puku_balance_units==200 and game._species_get_count("colorata")==0 and "colorata" in game.pending_round_new_species_ids)
 	game.play_active=false;game._play_result_new_species_animations();await get_tree().create_timer(.62).timeout
 	assert(game._species_get_count("colorata")==1 and "colorata" not in game.pending_round_new_species_ids)
 	assert(game.species_get_overlay.visible and game.species_get_active_context=="round_result_new")
 	game.species_get_overlay.visible=false;game._on_species_get_overlay_closed("round_result_new");await get_tree().process_frame
-	game._clear_greenhouse_plants();game._cancel_puku_gauge_animations()
+	game._clear_greenhouse_plants();game._cancel_puku_gauge_animations();game.puku_gauge_animation_speed_scale=1.0
 
 func _test_catalog_auto_record(game)->void:
 	var gummy:Dictionary=game._series_entry("gummy");game.unlocked_series.erase("gummy");game.current_encyclopedia_series_id="gummy";game.puku_balance_units=5500
@@ -109,10 +125,17 @@ func _test_save_and_legacy_load(game)->void:
 	game._save();var migrated=JSON.parse_string(FileAccess.get_file_as_string(save_path));assert(int(migrated.get("puku_balance_units",-1))==5000)
 
 func _test_panda_rescue(game)->void:
-	game.play_active=false;game.active_seed_type="normal";game.current_mode="greenhouse";game.first_habitat_gift_claimed=true;game.puku_gauge_intro_complete=true;game.mystery_items_acquired=true;game.habitat_tutorial_complete=true;game.puku_balance_units=100;game.normal_round_free_plays=0
+	game.play_active=false;game.active_seed_type="normal";game.current_mode="greenhouse";game.first_habitat_gift_claimed=true;game.puku_gauge_intro_complete=true;game.mystery_items_acquired=true;game.mystery_catalog_tutorial_complete=true;game.initial_seed_stock_notice_complete=true;game.normal_play_tutorial_complete=true;game.habitat_awakened=true;game.habitat_tutorial_complete=true;game.seed_shop_open=true;game.puku_balance_units=100;game.normal_round_free_plays=0
+	game.opening_finished=true;game.opening_overlay.visible=false;game.play_modal_open=false;game.result_overlay.visible=false;game.shop_overlay.visible=false;game.encyclopedia_overlay.visible=false;game.settings_overlay.visible=false;game.fusion_lab_ui.visible=false;game.species_get_overlay.visible=false;game.catalog_series_unlock_overlay.visible=false;game.forest_gacha_ui.visible=false;game.secret_gacha_ui.visible=false;game.arrangement_ui.visible=false
 	assert(game._shop_puku_rescue_needed())
+	game._update_play_ui()
+	assert(game.play_open_button.visible and not game.play_open_button.disabled)
+	assert(game.play_open_button.text=="パンダのお手伝いをする\n＋1ぷくコイン")
+	game._open_play_modal();assert(game.shop_overlay.visible and game.shop_chatter_action_button.visible and not game.play_active)
 	game._request_rescue_reward_ad();await get_tree().create_timer(.8).timeout
-	assert(game.puku_balance_units==100 and game.normal_round_free_plays==1 and not game.rescue_reward_in_progress)
-	game._start_greenhouse_play("normal");assert(game.play_active and game.normal_round_free_plays==0 and game.puku_balance_units==100 and game.endless_economy_seed_cost_units==0)
+	assert(game.puku_balance_units==1100 and game.normal_round_free_plays==0 and not game.rescue_reward_in_progress and not game.play_active)
+	game._close_shop();game._update_play_ui()
+	assert(game.play_open_button.text=="たねをまく　1ぷく")
+	game._start_greenhouse_play("normal");assert(game.play_active and game.normal_round_free_plays==0 and game.puku_balance_units==100 and game.endless_economy_seed_cost_units==1000)
 	assert(game.FOREST_GACHA_SPIN_COST==1)
 	game.play_active=false

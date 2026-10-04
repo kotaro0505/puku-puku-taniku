@@ -249,7 +249,7 @@ func _test_integrated_final_chapter() -> void:
 	_finish_dialog(game)
 	var restoration: Dictionary = game._restoration_state()
 	assert(HabitatRestorationClass.large_plant_mission_started(restoration))
-	assert(game._current_mission_text() == "100cm以上の多肉を1株育てよう！　0/1")
+	assert(game._current_mission_text() == "100cm以上の多肉を5株、原生地へ還そう！　0/5")
 
 	for species_id in ["colorata", "affinis", "shaviana"]:
 		StoryProgressionClass.record_restoration_new_get(game.story_progression_state, species_id, true)
@@ -455,6 +455,15 @@ func _test_integrated_final_chapter() -> void:
 	game._start_restoration_epilogue_event()
 	assert(game.scripted_dialog_pages.size() == 6)
 	assert("SDGs" in str(game.scripted_dialog_pages[2].get("text", "")))
+	assert(game.audio_manager.current_bgm_key != "ending")
+	game._advance_scripted_dialog()
+	assert(game.audio_manager.current_bgm_key != "ending")
+	game._advance_scripted_dialog()
+	assert(game.audio_manager.current_bgm_key == "ending")
+	assert(is_equal_approx(game.audio_manager.last_bgm_fade_seconds, 2.5))
+	# A later ending-UI request must continue this exact track rather than
+	# restarting it at the record slides.
+	game.audio_manager.last_bgm_fade_seconds = 9.75
 	game.scripted_dialog_kind = ""
 	game.scripted_dialog_pages.clear()
 	game.intro_overlay.visible = false
@@ -468,7 +477,7 @@ func _test_integrated_final_chapter() -> void:
 	assert(game.habitat_restoration_ui.ending_sequence_layer.visible)
 	assert(not game.habitat_restoration_ui.ending_layer.visible)
 	assert(game.habitat_restoration_ui.ending_current_phase == "darkening")
-	assert(game.audio_manager.current_bgm_key != "ending")
+	assert(game.audio_manager.current_bgm_key == "ending")
 	for _frame in range(240):
 		if game.habitat_restoration_ui.ending_current_phase == "await_return":
 			break
@@ -476,7 +485,7 @@ func _test_integrated_final_chapter() -> void:
 	assert(game.habitat_restoration_ui.ending_current_phase == "await_return")
 	assert(int(ending_bgm_requests["count"]) == 1)
 	assert(game.audio_manager.current_bgm_key == "ending")
-	assert(is_equal_approx(game.audio_manager.last_bgm_fade_seconds, game.ENDING_BGM_FADE_IN_SECONDS))
+	assert(is_equal_approx(game.audio_manager.last_bgm_fade_seconds, 9.75))
 	var record_events: Array[Dictionary] = []
 	var plant_events: Array[Dictionary] = []
 	for event_value in game.habitat_restoration_ui.ending_sequence_history:

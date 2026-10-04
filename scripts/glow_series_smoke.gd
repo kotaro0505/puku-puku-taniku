@@ -23,6 +23,7 @@ const EXPECTED_IMAGE_SIZE := COMPLETE_SUBJECT_SIZE + SUBJECT_PADDING * 2
 func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
+	game._set_language("ja")
 	game.mystery_items_acquired=true;game.encyclopedia_unlocked=true;game.unlocked_series={"base":true};game.discovered.clear();game.species_get_counts.clear()
 	var glow:Dictionary=game._series_entry("glow")
 	assert(str(glow.get("display_name",""))=="蓄光多肉")

@@ -78,6 +78,13 @@ func _test_base_catalog_contract(game: Node) -> void:
 func _test_mission_copy_and_progress(game: Node) -> void:
 	game.language_code = "ja"
 	game.species_get_counts.clear()
+	game.opening_story_complete = true
+	game.intro_story_complete = true
+	game.first_colorata_confirmed = true
+	game.habitat_tutorial_complete = true
+	game.jurejure_intro_complete = false
+	game.act2_unlocked = false
+	assert(game._current_mission_text().is_empty())
 	game.act2_unlocked = true
 	game.story_progression_state["fantasy_unlocked"] = true
 	var fantasy_ids: Array[String] = []
@@ -108,7 +115,7 @@ func _test_mission_copy_and_progress(game: Node) -> void:
 	var restoration := HabitatRestorationClass.default_state()
 	HabitatRestorationClass.start_large_plant_mission(restoration)
 	game.story_progression_state["restoration"] = restoration
-	assert(game._current_mission_text() == "100cm以上の多肉を1株育てよう！　0/1")
+	assert(game._current_mission_text() == "100cm以上の多肉を5株、原生地へ還そう！　0/5")
 	var snapshot := {
 		"species_id": "colorata",
 		"display_name": "コロラータ",
@@ -118,7 +125,7 @@ func _test_mission_copy_and_progress(game: Node) -> void:
 		"gold_star_count": 0,
 	}
 	assert(HabitatRestorationClass.queue_pending_return_snapshot(restoration, snapshot))
-	assert(game._current_mission_text() == "100cm以上の多肉を1株育てよう！　1/1")
+	assert(game._current_mission_text() == "100cm以上の多肉を5株、原生地へ還そう！　0/5")
 	assert(HabitatRestorationClass.commit_next_pending_return(restoration) == 1)
 	HabitatRestorationClass.complete_return_event(restoration, 1)
 	HabitatRestorationClass.complete_join_habitat(restoration)

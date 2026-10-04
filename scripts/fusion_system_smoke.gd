@@ -58,7 +58,7 @@ func _ready() -> void:
 	await _test_tier2_game_flow(game)
 	game._reset_progression_state()
 	game.queue_free()
-	print("FUSION_SYSTEM_SMOKE_OK hybrid_lab_name=true attached_background=720x1280 result_heading_removed=true energy_speed_unchanged=true energy_emission_3x=true basic_species=55 basic_recipes=55 tier1_species=20 tier1_special=20 tier2_species=10 tier2_exact=5 tier2_series=5 transparent_images=85 picker_touch_contract=true unordered=true originals=fallback exact_then_series_special=priority parents=GET_only cost=atomic silhouette=species_specific double_submit=blocked seeds=after_GET languages=3")
+	print("FUSION_SYSTEM_SMOKE_OK hybrid_lab_name=true attached_background=720x1280 result_heading_removed=true energy_speed_unchanged=true energy_emission_3x=true basic_species=55 basic_recipes=55 tier1_species=20 tier1_special=20 tier2_species=10 tier2_exact=5 tier2_series=5 transparent_images=85 picker_touch_contract=true unordered=true originals=fallback exact_then_series_special=priority parents=GET_only cost=atomic silhouette=species_specific double_submit=blocked known_result=disabled return_after_GET=lab seeds=after_GET languages=3")
 	get_tree().quit()
 
 func _test_hybrid_lab_presentation(game) -> void:
@@ -437,25 +437,27 @@ func _test_game_flow(game) -> void:
 	assert(game.species_get_overlay.visible)
 	assert(game.species_get_overlay.name_label.text == "金箔グミ")
 	assert(game.species_get_overlay.result_image.texture != null)
-	game.species_get_overlay.visible = false
-	game.species_get_queue.clear()
-	game._open_fusion_lab()
-	game._on_fusion_parent_selected(0, gummy_id)
-	game._on_fusion_parent_selected(1, metal_id)
+	while game.species_get_overlay.busy:
+		await get_tree().process_frame
+	game.species_get_overlay.close_overlay()
+	await get_tree().create_timer(.25).timeout
 	await get_tree().process_frame
-	await get_tree().process_frame
+	assert(game.fusion_lab_ui.visible)
+	assert(game.fusion_parent_a_id == gummy_id and game.fusion_parent_b_id == metal_id)
 	assert(game.fusion_lab_ui.result_name_label.text == "金箔グミ")
 	assert(game.fusion_lab_ui.result_image.texture != null)
 	assert(game.fusion_lab_ui.result_image.material == null)
 	assert(not game.fusion_lab_ui.result_new_label.visible)
+	assert(game.fusion_lab_ui.fuse_button.disabled)
 	game.puku_points = 2
+	var known_balance_before: int = game.puku_balance_units
 	game._perform_fusion(gummy_id, metal_id)
-	await get_tree().create_timer(3.1).timeout
-	assert(game._species_get_count(hybrid_id) == 2)
-	assert(game.puku_points == 0)
+	assert(game._species_get_count(hybrid_id) == 1)
+	assert(game.puku_balance_units == known_balance_before)
 	assert(game.fusion_lab_ui.visible)
 	assert(not game.fusion_lab_ui.result_new_label.visible)
 	assert(not game.species_get_overlay.visible)
+	assert(game.fusion_lab_ui.result_status_label.text == Localizer.text("ja", "fusion_result_known"))
 	var normal_pools: Dictionary = game._normal_seed_selection_pools()
 	var known_ids: Dictionary = {}
 	for entry in normal_pools.get("all_known", []):
@@ -471,8 +473,8 @@ func _test_game_flow(game) -> void:
 	game.greenhouse_available.erase(hybrid_id)
 	game.species_get_counts.erase(hybrid_id)
 	game._load_save()
-	assert(game.puku_points == 0)
-	assert(game._species_get_count(hybrid_id) == 2)
+	assert(game.puku_points == 2)
+	assert(game._species_get_count(hybrid_id) == 1)
 	assert(bool(game.discovered.get(hybrid_id, false)) and bool(game.greenhouse_available.get(hybrid_id, false)))
 	hybrid_entry.erase("fusion_cost_puku")
 

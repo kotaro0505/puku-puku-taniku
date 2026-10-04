@@ -13,12 +13,14 @@ func _ready() -> void:
 	game.audio_manager.apply_settings({"bgm_enabled": false, "se_enabled": false})
 	_prepare_safe_greenhouse(game)
 	_test_localized_copy()
+	_test_language_ui_geometry(game)
+	_test_shop_chatter_contract(game)
 	_test_habitat_attention_glow(game)
 	_test_arrangement_gate_and_direction(game)
 	_test_progression_thresholds()
 	_test_phase_bgm_policy(game)
 	game._reset_progression_state()
-	print("PROGRESSION_UI_REVISION_SMOKE_OK copy=3 glow=gang_only arrangement=1+swipe forest=6 bgm=phase-aware migration=preserved")
+	print("PROGRESSION_UI_REVISION_SMOKE_OK copy=updated language_ui=fixed shop_chatter=5 glow=gang_only arrangement=1+swipe forest=6 bgm=phase-aware migration=preserved")
 	get_tree().quit()
 
 
@@ -48,10 +50,20 @@ func _prepare_safe_greenhouse(game: Node) -> void:
 
 
 func _test_localized_copy() -> void:
-	assert(Localizer.text("ja", "puku_buyback_1").contains("大きさに合わせて"))
+	assert(Localizer.text("ja", "puku_buyback_1") == "大きい株ほど高く買い取るよ！")
+	assert(Localizer.text("ja", "puku_buyback_2") == "大きい株を収穫するほど\nぷくゲージが溜まります。\n満タンになると +1ぷくコインGET！")
 	assert(Localizer.text("ja", "jurejure_first_peccary") == "いっぱい生えてるッペー！\nぜーんぶ頂きだッペー！")
 	assert(Localizer.text("ja", "fantasy_first_armadillo") == "こんな多肉、あの本には載ってないよ…。")
 	assert(Localizer.text("ja", "habitat_crisis_no_battle") == "……今はバトルする気にならないチュー……。")
+	assert(Localizer.text("ja", "puku_gauge") == "ぷくゲージ")
+	assert(Localizer.text("hiragana", "puku_gauge") == "ぷくげーじ")
+	assert(Localizer.text("en", "puku_gauge") == "Puku Gauge")
+	assert(Localizer.text("hiragana", "new") == "にゅー！")
+	assert(Localizer.text("hiragana", "original_catalog_new") == "にゅー！")
+	assert(Localizer.text("hiragana", "fusion_new") == "にゅー")
+	assert(Localizer.text("hiragana", "self_best", [12.3]).begins_with("こじこべすと"))
+	assert(Localizer.text("hiragana", "self_best_none") == "こじこべすと　ー")
+	assert(Localizer.text("hiragana", "share_record") == "こじこべすと！")
 	for locale in Localizer.SUPPORTED_LANGUAGES:
 		for key in [
 			"puku_buyback_1", "jurejure_first_peccary", "fantasy_first_armadillo",
@@ -63,6 +75,41 @@ func _test_localized_copy() -> void:
 			"post_crisis_greenhouse_girl", "post_crisis_greenhouse_panda_2",
 		]:
 			assert(not Localizer.text(locale, key).is_empty())
+
+
+func _test_language_ui_geometry(game: Node) -> void:
+	var settings_panel := game.settings_overlay.get_child(1) as PanelContainer
+	var original_panel_rect := Rect2(settings_panel.position, settings_panel.size)
+	var original_play_rect := Rect2(game.play_open_button.position, game.play_open_button.size)
+	for locale in Localizer.SUPPORTED_LANGUAGES:
+		game._set_language(locale)
+		assert(Rect2(settings_panel.position, settings_panel.size) == original_panel_rect)
+		assert(Rect2(game.play_open_button.position, game.play_open_button.size) == original_play_rect)
+		assert(game.settings_title_label.custom_minimum_size.x == 420.0)
+		assert(game.settings_language_heading.custom_minimum_size.x == 420.0)
+		for language_button_value in game.language_buttons.values():
+			var language_button := language_button_value as Button
+			assert(language_button.custom_minimum_size.x == 134.0 and language_button.clip_text)
+		var bgm_toggle := game.find_child("BgmToggle", true, false) as CheckButton
+		var se_toggle := game.find_child("SeToggle", true, false) as CheckButton
+		assert(bgm_toggle.custom_minimum_size.x == 145.0 and se_toggle.custom_minimum_size.x == 145.0)
+		assert(bgm_toggle.text == "BGM" and se_toggle.text == "SE")
+	game._set_language("ja")
+
+
+func _test_shop_chatter_contract(game: Node) -> void:
+	assert(game.SHOP_CHATTER_KEYS == [
+		"shop_chatter_today", "shop_chatter_share", "shop_chatter_welcome",
+		"shop_chatter_living_jewel", "shop_chatter_puku_help",
+	])
+	assert(Localizer.text("ja", "shop_chatter_today") == "今日はどんな多肉に出会えるかな。")
+	assert(Localizer.text("ja", "shop_chatter_share") == "沢山の人に多肉植物を知ってもらうにはどうしたらいいんだろうね。")
+	assert(Localizer.text("ja", "shop_chatter_welcome") == "いらっしゃい！")
+	assert(Localizer.text("ja", "shop_chatter_living_jewel") == "多肉はまさに生きる宝石だよね。")
+	assert(Localizer.text("ja", "shop_chatter_puku_help") == "もし、ぷくコインがなくなったら僕に声かけてよ！")
+	for locale in Localizer.SUPPORTED_LANGUAGES:
+		for chatter_key in game.SHOP_CHATTER_KEYS:
+			assert(not Localizer.text(locale, chatter_key).is_empty())
 
 
 func _test_habitat_attention_glow(game: Node) -> void:

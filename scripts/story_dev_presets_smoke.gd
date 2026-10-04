@@ -81,6 +81,7 @@ func _test_post_first_normal_tutorial_preset() -> void:
 	assert(not game.play_active and not game.play_modal_open and not game.result_overlay.visible)
 	assert(not game.first_play_tutorial_active and not game.tutorial_guide_overlay.visible)
 	assert(game.normal_play_tutorial_complete)
+	assert(bool(game.tutorial_steps.get("first_normal_cost_notice_seen", false)))
 	assert(game.total_play_count == 2 and game.formal_play_count == 1 and game.normal_play_count == 1)
 	var tutorial_species_id := str(game.tutorial_steps.get("first_normal_tutorial_species_id", ""))
 	var tutorial_entry: Dictionary = game._catalog_entry(tutorial_species_id)
@@ -169,7 +170,7 @@ func _test_new_route_presets() -> void:
 	assert(game.habitat_crisis_started)
 	assert(HabitatRestorationClass.large_plant_mission_started(game._restoration_state()))
 	assert(not bool(game._restoration_state().get("jurejure_joined", false)))
-	assert(game._current_mission_text() == "100cm以上の多肉を1株育てよう！　0/1")
+	assert(game._current_mission_text() == "100cm以上の多肉を5株、原生地へ還そう！　0/5")
 
 	result = StoryDevPresetsClass.apply(game, StoryDevPresetsClass.FIRST_RETURN_READY)
 	assert(bool(result.get("ok", false)))
@@ -241,6 +242,7 @@ func _test_restoration_and_101cm_presets() -> void:
 	assert(is_equal_approx(float(plant.diameter_cm), 101.0))
 	assert(plant.state == "growing")
 	assert(not plant.jelly_checks_enabled)
+	game.puku_gauge_animation_speed_scale = .02
 	plant.harvest()
 	assert(not game.habitat_restoration_ui.prompt_layer.visible)
 	assert(HabitatRestorationClass.returned_count(restoration) == 4)
@@ -248,12 +250,16 @@ func _test_restoration_and_101cm_presets() -> void:
 	assert(str(HabitatRestorationClass.pending_return_snapshots(restoration)[0].get("species_id", "")) == "colorata")
 	assert(float(HabitatRestorationClass.pending_return_snapshots(restoration)[0].get("diameter_cm", 0.0)) >= 100.0)
 	assert(game.current_mode == "greenhouse")
-	await get_tree().process_frame
-	await get_tree().process_frame
+	for _frame in range(300):
+		if game.result_overlay.visible:
+			break
+		await get_tree().process_frame
 	# The 101 cm helper is a one-plant development round. Under the formal
 	# 12-seed round result flow, settling its only plant opens the round result
 	# before queued story transitions are resumed.
 	assert(game.result_overlay.visible)
+	assert(not game.puku_gauge_animation_running and game.puku_gauge_animation_queue.is_empty())
+	game.puku_gauge_animation_speed_scale = 1.0
 	game._close_result()
 	await get_tree().process_frame
 	assert(game.scene_transition_fade.visible)
