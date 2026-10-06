@@ -6,17 +6,24 @@ func _ready()->void:
 	game._reset_progression_state();game.story_progression_state["arrangement_unlocked"]=true;game.story_progression_state["arrangement_intro_seen"]=true;game.intro_story_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.habitat_awakened=true;game.habitat_awakening_event_complete=true;game.habitat_tutorial_complete=true;game.seed_shop_open=true;game.panda_beacon_unlocked=true;game.puku_gauge_intro_complete=true;game.total_play_count=3;game.formal_play_count=3
 	game.discovered={"colorata":true,"laui":false};game.species_get_counts={"colorata":4};game.bests={"colorata":11.1};game.puku_points=12;game._sync_arrangement_ui();game._update_play_ui()
 	var ui=game.arrangement_ui
-	assert(game.pot_catalog.size()==8 and bool(game.owned_pots.get("shallow_terracotta",false)))
+	var localizer=load("res://scripts/game_localizer.gd")
+	for locale in ["ja","hiragana","en"]:
+		for key in ["pot_available_count","pot_all_in_use","pot_save_unavailable","pot_owned_total","pot_bought_count","arrangement_dismantle","arrangement_dismantle_confirm","arrangement_dismantle_confirm_button","arrangement_dismantle_cancel"]:assert(localizer.text(locale,key)!=key)
+	assert(game.pot_catalog.size()==8 and int(game.owned_pots.get("shallow_terracotta",0))==1 and typeof(game.owned_pots.get("shallow_terracotta"))==TYPE_INT)
 	for pot_value in game.pot_catalog:
-		for required_key in ["pot_id","display_name","image_path","price_puku","unlock_condition","iap_product_id","placement_area","sort_order"]:assert(pot_value.has(required_key))
+		for required_key in ["pot_id","display_name","image_path","price_puku","sales_stage","unlock_condition","iap_product_id","placement_area","sort_order"]:assert(pot_value.has(required_key))
 		assert(int(pot_value.price_puku)==1)
+	assert(game._current_pot_sales_stage()==0 and not game._pot_unlocked({"sales_stage":1,"unlock_condition":{"type":"default"}}))
+	game.forest_gacha_unlocked=true;assert(game._current_pot_sales_stage()==1 and game._pot_unlocked({"sales_stage":1,"unlock_condition":{"type":"default"}}));game.forest_gacha_unlocked=false
+	game.act3_unlocked=true;assert(game._current_pot_sales_stage()==2 and game._pot_unlocked({"sales_stage":2,"unlock_condition":{"type":"default"}}));game.act3_unlocked=false
 	for added_pot_id in ["shallow_terracotta","classic_terracotta","black_ceramic","white_ceramic","clear_crystal","amethyst_crystal","glass_bowl","tin_bucket"]:
 		var added_pot:Dictionary=game._pot_entry(added_pot_id);assert(not added_pot.is_empty() and ResourceLoader.exists(str(added_pot.image_path)))
 		var pot_image:Image=(load(str(added_pot.image_path)) as Texture2D).get_image();assert(pot_image.get_pixel(0,0).a<.05 and pot_image.get_pixel(pot_image.get_width()-1,pot_image.get_height()-1).a<.05)
 	assert(game.arrangement_button == null)
 	var available:Array=ui._available_species_entries("all");assert(available.size()==1 and str(available[0].species_id)=="colorata")
-	ui.open_home();ui._start_new_arrangement();assert(ui.pot_select_page.visible and ui.pot_select_grid.get_child_count()==1)
+	ui.open_home();ui._start_new_arrangement();assert(ui.pot_select_page.visible and ui.pot_select_grid.get_child_count()==1 and not (ui.pot_select_grid.get_child(0) as Button).disabled and _has_label_text_containing(ui.pot_select_grid.get_child(0),"使用可能 ×1"))
 	ui._select_editor_pot("shallow_terracotta");assert(ui.editor_page.visible and str(ui.current_arrangement.pot_id)=="shallow_terracotta")
+	assert(game._pot_available_count("shallow_terracotta")==1 and ui._pot_available_count("shallow_terracotta")==1)
 	assert(not _has_button_text(ui.editor_page,"鉢を変更") and not ui.has_method("_change_editor_pot"))
 	ui._add_species_to_editor("laui");assert(ui.editor_plants.is_empty())
 	ui._add_species_to_editor("colorata");assert(ui.editor_plants.size()==1 and ui.selected_plant_index==0)
@@ -77,7 +84,7 @@ func _ready()->void:
 	var get_before:Dictionary=game.species_get_counts.duplicate(true);var best_before:Dictionary=game.bests.duplicate(true);var discovered_before:Dictionary=game.discovered.duplicate(true)
 	var edit_snapshots:Array=[];var editor_pot:Control=ui.editor_pot_layer.get_child(0);var edit_pot_position:=editor_pot.position
 	for editor_node in ui.editor_plant_nodes:edit_snapshots.append({"position":editor_node.position,"scale":editor_node.scale,"rotation":editor_node.rotation_degrees,"z":editor_node.z_index})
-	ui.editor_name.text="春の寄せ植え";ui._save_current_arrangement();assert(game.saved_arrangements.size()==1 and ui.editor_page.visible and ui.completion_overlay.visible and ui.completion_label.text=="寄せ植え完成！" and ui.completion_confetti_layer.get_child_count()==40)
+	ui.editor_name.text="春の寄せ植え";ui._save_current_arrangement();assert(game.saved_arrangements.size()==1 and game._owned_pot_total("shallow_terracotta")==1 and game._pot_usage_count("shallow_terracotta")==1 and game._pot_available_count("shallow_terracotta")==0 and ui.editor_page.visible and ui.completion_overlay.visible and ui.completion_label.text=="寄せ植え完成！" and ui.completion_confetti_layer.get_child_count()==40)
 	await get_tree().create_timer(ui.COMPLETION_DISPLAY_SECONDS+.08).timeout
 	assert(ui.viewer_page.visible and ui.viewer_plant_layer.get_child_count()==2 and ui.viewer_plant_layer.find_child("SelectionBorder",true,false)==null and not ui.completion_overlay.visible)
 	var viewed_pot:Control=ui.viewer_pot_layer.get_child(0);assert(viewed_pot.position.is_equal_approx(edit_pot_position))
@@ -91,10 +98,15 @@ func _ready()->void:
 	var saved_id:=str(saved.arrangement_id);var saved_position:=Vector2(float(saved.plants[0].x),float(saved.plants[0].y));var saved_scale:=float(saved.plants[0].scale)
 	game._save();game.saved_arrangements.clear();game._load_save();assert(game.saved_arrangements.size()==1 and str(game.saved_arrangements[0].arrangement_id)==saved_id)
 	assert(Vector2(float(game.saved_arrangements[0].plants[0].x),float(game.saved_arrangements[0].plants[0].y)).is_equal_approx(saved_position) and is_equal_approx(float(game.saved_arrangements[0].plants[0].scale),saved_scale))
-	game._sync_arrangement_ui();ui.open_home();assert(not _has_button_text(ui.home_page,"編集"));ui._open_viewer(game.saved_arrangements[0]);assert(not _has_button_text(ui.viewer_page,"編集") and not ui.has_method("_edit_arrangement"))
-	ui.selected_plant_index=0;var locked_scale:=float(ui.editor_plants[0].scale);ui._adjust_selected_scale(.1);assert(is_equal_approx(float(ui.editor_plants[0].scale),locked_scale))
-	var puku_before:int=game.puku_points;game._on_pot_purchase_requested("classic_terracotta");assert(bool(game.owned_pots.get("classic_terracotta",false)) and game.puku_points==puku_before-1 and "購入しました" in ui.shop_message.text)
-	game._save();game.owned_pots.erase("classic_terracotta");game._load_save();assert(bool(game.owned_pots.get("classic_terracotta",false)))
+	game._on_arrangement_save_requested({"arrangement_id":"blocked_no_pot","name":"保存不可","pot_id":"shallow_terracotta","created_at":"test","completed":true,"plants":[]});assert(game.saved_arrangements.size()==1 and not ui.save_request_accepted)
+	game._sync_arrangement_ui();ui.selected_plant_index=0;var locked_scale:=float(ui.editor_plants[0].scale);ui._adjust_selected_scale(.1);assert(is_equal_approx(float(ui.editor_plants[0].scale),locked_scale))
+	ui.open_home();ui._start_new_arrangement();assert(ui.pot_select_grid.get_child_count()==1 and (ui.pot_select_grid.get_child(0) as Button).disabled and _has_label_text_containing(ui.pot_select_grid.get_child(0),"使用中（空きなし）"));ui._return_from_pot_selection();assert(not _has_button_text(ui.home_page,"編集"));ui._open_viewer(game.saved_arrangements[0]);assert(not _has_button_text(ui.viewer_page,"編集") and not ui.has_method("_edit_arrangement") and _has_button_text(ui.viewer_page,"寄せ植えをばらす"))
+	ui._show_dismantle_confirmation();assert(ui.dismantle_confirmation_overlay.visible);ui._hide_dismantle_confirmation();assert(game.saved_arrangements.size()==1)
+	ui._show_dismantle_confirmation();ui._confirm_dismantle();assert(game.saved_arrangements.is_empty() and ui.home_page.visible and not ui.dismantle_confirmation_overlay.visible and game._owned_pot_total("shallow_terracotta")==1 and game._pot_usage_count("shallow_terracotta")==0 and game._pot_available_count("shallow_terracotta")==1)
+	assert(game.species_get_counts==get_before and game.bests==best_before and game.discovered==discovered_before)
+	var puku_before:int=game.puku_points;game._on_pot_purchase_requested("classic_terracotta");game._on_pot_purchase_requested("classic_terracotta");assert(int(game.owned_pots.get("classic_terracotta",0))==2 and game.puku_points==puku_before-2 and "所持 ×2" in ui.shop_message.text)
+	ui.open_pot_shop();var classic_shop_card:Node=ui.shop_grid.get_child(1);var classic_buy_buttons:=classic_shop_card.find_children("*","Button",true,false);assert(_has_label_text_containing(classic_shop_card,"所持 ×2") and classic_buy_buttons.size()==1 and not (classic_buy_buttons[0] as Button).disabled and "1ぷくコイン" in (classic_buy_buttons[0] as Button).text)
+	game._save();game.owned_pots.erase("classic_terracotta");game._load_save();assert(int(game.owned_pots.get("classic_terracotta",0))==2 and typeof(game.owned_pots.get("classic_terracotta"))==TYPE_INT)
 	game._sync_arrangement_ui();ui.open_home();ui._start_new_arrangement();assert(ui.pot_select_grid.get_child_count()==2);ui._select_editor_pot("classic_terracotta");assert(ui.editor_page.visible and str(ui.current_arrangement.pot_id)=="classic_terracotta")
 	assert(game.species_get_counts==get_before and game.bests==best_before and game.discovered==discovered_before)
 	var migrated:Dictionary=game._normalize_arrangement({"arrangement_id":"legacy","name":"旧作品","pot_id":"starter_terracotta","plants":[]});assert(str(migrated.pot_id)=="shallow_terracotta")
@@ -110,6 +122,20 @@ func _ready()->void:
 	ui.current_arrangement={"arrangement_id":"limit_test","name":"上限テスト","pot_id":"shallow_terracotta","created_at":"test","plants":[]};ui._load_editor_from_current()
 	for plant_index in range(ui.MAX_PLANTS_PER_ARRANGEMENT+3):ui._add_species_to_editor("colorata")
 	assert(ui.editor_plants.size()==ui.MAX_PLANTS_PER_ARRANGEMENT and ui.add_plant_button.disabled)
+	for classic_index in range(2):game._on_arrangement_save_requested({"arrangement_id":"classic_%d"%classic_index,"name":"鉢在庫テスト","pot_id":"classic_terracotta","created_at":"test","completed":true,"plants":[]})
+	assert(game._owned_pot_total("classic_terracotta")==2 and game._pot_usage_count("classic_terracotta")==2 and game._pot_available_count("classic_terracotta")==0)
+	game._on_arrangement_save_requested({"arrangement_id":"classic_blocked","name":"保存不可","pot_id":"classic_terracotta","created_at":"test","completed":true,"plants":[]});assert(game.saved_arrangements.size()==2 and not ui.save_request_accepted)
+	# Loading a legacy bool inventory preserves every existing arrangement by
+	# raising each total to at least that pot's completed-work usage count.
+	game.owned_pots={"shallow_terracotta":true,"black_ceramic":true,"white_ceramic":true}
+	game.saved_arrangements=[]
+	for legacy_index in range(3):game.saved_arrangements.append({"arrangement_id":"legacy_black_%d"%legacy_index,"name":"旧作品","pot_id":"black_ceramic","created_at":"test","completed":true,"plants":[]})
+	game.saved_arrangements.append({"arrangement_id":"legacy_retired","name":"旧鉢作品","pot_id":"starter_terracotta","created_at":"test","completed":true,"plants":[]})
+	game._save();game.owned_pots={};game.saved_arrangements=[];game._load_save()
+	assert(game.saved_arrangements.size()==4 and int(game.owned_pots.get("black_ceramic",0))==3 and int(game.owned_pots.get("white_ceramic",0))==1 and int(game.owned_pots.get("shallow_terracotta",0))==1)
+	assert(game._pot_usage_count("black_ceramic")==3 and game._pot_available_count("black_ceramic")==0 and game._pot_usage_count("shallow_terracotta")==1 and typeof(game.owned_pots.get("black_ceramic"))==TYPE_INT)
+	for arrangement_value in game.saved_arrangements:assert(str(arrangement_value.pot_id)!="starter_terracotta")
+	game._save();var migrated_save=JSON.parse_string(FileAccess.get_file_as_string(game._active_save_path()));assert(migrated_save is Dictionary and typeof(migrated_save.owned_pots.black_ceramic)==TYPE_FLOAT and int(migrated_save.owned_pots.black_ceramic)==3)
 	print("ARRANGEMENT_SMOKE_OK pots=",game.pot_catalog.size()," saved=",game.saved_arrangements.size()," max_plants=",ui.MAX_PLANTS_PER_ARRANGEMENT)
 	get_tree().quit()
 
@@ -133,4 +159,9 @@ func _send_editor_touch(ui,event:InputEvent)->void:
 func _has_button_text(root:Node,text:String)->bool:
 	for node in root.find_children("*","Button",true,false):
 		if node is Button and (node as Button).text==text:return true
+	return false
+
+func _has_label_text_containing(root:Node,text:String)->bool:
+	for node in root.find_children("*","Label",true,false):
+		if node is Label and text in (node as Label).text:return true
 	return false

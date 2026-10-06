@@ -79,6 +79,7 @@ const HARVEST_PUKU_POST_150_UNITS_PER_10_CM := 3000.0
 const ENDLESS_AUTO_SOW_TUTORIAL_STEP := "endless_auto_sow_prompt_seen"
 const HABITAT_TIME_MULTIPLIERS := [1, 60, 3600, 21600, 86400]
 const DEFAULT_POT_ID := "shallow_terracotta"
+const POT_PRICE_PUKU := 1
 const NORMAL_GERMINATION_COUNT := 12
 const VOLUME_GERMINATION_COUNT := 36
 const PREMIUM_GERMINATION_COUNT := 24
@@ -571,8 +572,9 @@ var catalog_cover_species: Dictionary = {}
 var get_counts_migration_dirty := false
 var puku_balance_migration_dirty := false
 var catalog_cover_migration_dirty := false
+var pot_inventory_migration_dirty := false
 var pot_catalog: Array = []
-var owned_pots: Dictionary = {DEFAULT_POT_ID:true}
+var owned_pots: Dictionary = {DEFAULT_POT_ID:1}
 var saved_arrangements: Array = []
 var arrangement_save_capacity := 20
 var arrangement_ui
@@ -763,11 +765,11 @@ func _ready() -> void:
 	if not legacy_habitat_notification_ids_to_cancel.is_empty():
 		habitat_notification_service=HabitatNotificationServiceClass.new();add_child(habitat_notification_service)
 		habitat_notification_service.cancel_all(legacy_habitat_notification_ids_to_cancel);legacy_habitat_notification_ids_to_cancel.clear()
-	if best_spawn_unlocks_dirty or get_counts_migration_dirty or puku_balance_migration_dirty or catalog_cover_migration_dirty or recovered_forest_encounters:
+	if best_spawn_unlocks_dirty or get_counts_migration_dirty or puku_balance_migration_dirty or catalog_cover_migration_dirty or pot_inventory_migration_dirty or recovered_forest_encounters:
 		# A true cold start must reach the language choice before creating its
 		# first save.  The selected language then persists all initialized state.
 		if save_file_present_on_boot or language_selected:_save()
-		best_spawn_unlocks_dirty=false;get_counts_migration_dirty=false;puku_balance_migration_dirty=false;catalog_cover_migration_dirty=false
+		best_spawn_unlocks_dirty=false;get_counts_migration_dirty=false;puku_balance_migration_dirty=false;catalog_cover_migration_dirty=false;pot_inventory_migration_dirty=false
 	_build_world()
 	_build_ui()
 	if habitat_awakened and (habitat_wild_initialized or habitat_unlocked):_ensure_habitat_wild_state(Time.get_unix_time_from_system(),true)
@@ -955,13 +957,16 @@ func _load_pot_data()->void:
 	var parsed_pots=JSON.parse_string(FileAccess.get_file_as_string("res://data/pots.json"))
 	if parsed_pots is Array:
 		for raw_pot in parsed_pots:
-			if raw_pot is Dictionary and not str(raw_pot.get("pot_id","")).is_empty():pot_catalog.append(raw_pot.duplicate(true))
+			if raw_pot is Dictionary and not str(raw_pot.get("pot_id","")).is_empty():
+				var pot:Dictionary=raw_pot.duplicate(true);pot["price_puku"]=POT_PRICE_PUKU
+				if not pot.has("sales_stage"):pot["sales_stage"]=0
+				pot_catalog.append(pot)
 	pot_catalog.sort_custom(func(a:Dictionary,b:Dictionary)->bool:return int(a.get("sort_order",0))<int(b.get("sort_order",0)))
-	if pot_catalog.is_empty():pot_catalog.append({"pot_id":DEFAULT_POT_ID,"display_name":"浅型素焼き鉢","image_path":"","price_puku":1,"unlock_condition":{"type":"default"},"iap_product_id":"","placement_area":{"x":.06,"y":.10,"width":.88,"height":.56},"sort_order":0})
+	if pot_catalog.is_empty():pot_catalog.append({"pot_id":DEFAULT_POT_ID,"display_name":"浅型素焼き鉢","image_path":"","price_puku":POT_PRICE_PUKU,"sales_stage":0,"unlock_condition":{"type":"default"},"iap_product_id":"","placement_area":{"x":.06,"y":.10,"width":.88,"height":.56},"sort_order":0})
 
 func _load_save() -> void:
 	_cancel_puku_gauge_animations()
-	legacy_habitat_migration_dirty=false;puku_balance_migration_dirty=false;catalog_cover_migration_dirty=false;legacy_habitat_notification_ids_to_cancel.clear();panda_beacon_unread_log.clear()
+	legacy_habitat_migration_dirty=false;puku_balance_migration_dirty=false;catalog_cover_migration_dirty=false;pot_inventory_migration_dirty=false;legacy_habitat_notification_ids_to_cancel.clear();panda_beacon_unread_log.clear()
 	puku_balance_units=0
 	normal_round_free_plays=0
 	catalog_cover_species={}
@@ -997,23 +1002,24 @@ func _load_save() -> void:
 			else:
 				puku_gauge_cm=fposmod(puku_gauge_cm,SEED_POD_GAUGE_TARGET_CM)
 			species_get_counts=value.get("species_get_counts",{});unlocked_series=value.get("unlocked_series",{INITIAL_SERIES_ID:true});catalog_cover_species=value.get("catalog_cover_species",{})
-			owned_pots=value.get("owned_pots",{DEFAULT_POT_ID:true});saved_arrangements=value.get("saved_arrangements",[]);arrangement_save_capacity=maxi(1,int(value.get("arrangement_save_capacity",20)))
+			owned_pots=value.get("owned_pots",{DEFAULT_POT_ID:1});saved_arrangements=value.get("saved_arrangements",[]);arrangement_save_capacity=maxi(1,int(value.get("arrangement_save_capacity",20)))
+			if not value.has("owned_pots"):pot_inventory_migration_dirty=true
 			if not species_get_counts is Dictionary:species_get_counts={}
 			if not unlocked_series is Dictionary:unlocked_series={INITIAL_SERIES_ID:true}
 			if not catalog_cover_species is Dictionary:catalog_cover_species={}
-			if not owned_pots is Dictionary:owned_pots={DEFAULT_POT_ID:true}
+			if not owned_pots is Dictionary:owned_pots={DEFAULT_POT_ID:1};pot_inventory_migration_dirty=true
 			if not saved_arrangements is Array:saved_arrangements=[]
 			unlocked_series[INITIAL_SERIES_ID]=true
-			# The first three legacy pots were retired. Old saves and arrangements are
-			# migrated to the new default without discarding the arrangement itself.
-			owned_pots[DEFAULT_POT_ID]=true
-			for retired_pot_id in ["starter_terracotta","cream_ceramic","wooden_box"]:owned_pots.erase(retired_pot_id)
+			# Legacy bool ownership is upgraded to numeric totals. Retired/unknown pots
+			# are removed here; their arrangements are mapped to the current default.
+			if _normalize_owned_pot_counts():pot_inventory_migration_dirty=true
 			var normalized_arrangements:Array=[]
 			for saved_arrangement in saved_arrangements:
 				if saved_arrangement is Dictionary:
 					var normalized_arrangement:=_normalize_arrangement(saved_arrangement)
 					if not normalized_arrangement.is_empty():normalized_arrangements.append(normalized_arrangement)
 			saved_arrangements=normalized_arrangements.slice(0,arrangement_save_capacity)
+			if _reconcile_pot_inventory_with_arrangements():pot_inventory_migration_dirty=true
 			intro_story_complete=bool(value.get("intro_story_complete",false));opening_story_complete=bool(value.get("opening_story_complete",intro_story_complete));total_play_count=int(value.get("total_play_count",0));completed_unlock_conditions=value.get("completed_unlock_conditions",{});pending_habitat_species=value.get("pending_habitat_species",[]);audio_settings=value.get("audio_settings",audio_settings)
 			encyclopedia_unlocked=bool(value.get("encyclopedia_unlocked",intro_story_complete and total_play_count>=1));habitat_unlocked=bool(value.get("habitat_unlocked",intro_story_complete and total_play_count>=3));tutorial_steps=value.get("tutorial_steps",{});old_seed_bags=int(value.get("old_seed_bags",0));puku_gauge_intro_complete=bool(value.get("puku_gauge_intro_complete",value.get("buyback_unlocked",total_play_count>=4)));first_tutorial_species_id=str(value.get("first_tutorial_species_id",""))
 			first_colorata_confirmed=bool(value.get("first_colorata_confirmed",false));trio_originals_confirmed=bool(value.get("trio_originals_confirmed",false));habitat_arrival_started=bool(value.get("habitat_arrival_started",false));habitat_awakened=bool(value.get("habitat_awakened",false));habitat_awakening_event_complete=bool(value.get("habitat_awakening_event_complete",habitat_awakened));seed_shop_open=bool(value.get("seed_shop_open",false));mystery_items_acquired=bool(value.get("mystery_items_acquired",false));mystery_catalog_tutorial_complete=bool(value.get("mystery_catalog_tutorial_complete",false));habitat_returned_species=value.get("habitat_returned_species",{});special_series_explanation_seen=bool(value.get("special_series_explanation_seen",false));main_story_stage=clampi(int(value.get("main_story_stage",StoryProgressionClass.ACT_1)),StoryProgressionClass.LEGACY_STAGE_MIN,StoryProgressionClass.LEGACY_STAGE_MAX);main_story_complete=bool(value.get("main_story_complete",false));main_story_completion_seen=bool(value.get("main_story_completion_seen",main_story_complete))
@@ -1996,6 +2002,7 @@ func _build_arrangement_ui(hud:Control)->void:
 	arrangement_ui=ArrangementUIClass.new();hud.add_child(arrangement_ui)
 	arrangement_ui.close_requested.connect(_on_arrangement_close_requested)
 	arrangement_ui.save_requested.connect(_on_arrangement_save_requested)
+	arrangement_ui.dismantle_requested.connect(_on_arrangement_dismantle_requested)
 	arrangement_ui.pot_purchase_requested.connect(_on_pot_purchase_requested)
 	arrangement_ui.catalog_purchase_requested.connect(_on_catalog_purchase_requested)
 	arrangement_ui.seed_purchase_requested.connect(_buy_seed_bag)
@@ -2010,7 +2017,7 @@ func _build_arrangement_navigation_hint(hud:Control)->void:
 
 func _sync_arrangement_ui()->void:
 	if arrangement_ui==null:return
-	arrangement_ui.configure(catalog_species,[],pot_catalog,discovered,owned_pots,saved_arrangements,arrangement_save_capacity,puku_points,_species_texture,_request_species_texture,bests,language_code)
+	arrangement_ui.configure(catalog_species,[],pot_catalog,discovered,owned_pots,saved_arrangements,arrangement_save_capacity,puku_points,_species_texture,_request_species_texture,bests,language_code,_current_pot_sales_stage())
 	arrangement_ui.sync_catalog_state(unlocked_series,puku_points)
 	arrangement_ui.sync_seed_shop_state(_seed_shop_products(),puku_points)
 
@@ -2079,27 +2086,44 @@ func _finish_arrangement_return()->void:
 	arrangement_ui.set_world_backdrop_mode(false,_arrangement_pot_anchor_screen());_update_greenhouse_pan();_update_play_ui()
 
 func _on_arrangement_save_requested(arrangement:Dictionary)->void:
+	arrangement_ui.set_save_request_result(false)
+	var requested_pot_id:=str(arrangement.get("pot_id",DEFAULT_POT_ID))
+	if _pot_entry(requested_pot_id).is_empty():
+		arrangement_ui.set_save_request_result(false,Localizer.text(language_code,"pot_missing"))
+		return
 	var normalized:=_normalize_arrangement(arrangement)
 	if normalized.is_empty():return
 	var arrangement_id:=str(normalized.get("arrangement_id",""));var existing_index:=-1
 	for index in range(saved_arrangements.size()):
 		if saved_arrangements[index] is Dictionary and str(saved_arrangements[index].get("arrangement_id",""))==arrangement_id:existing_index=index;break
+	if _pot_available_count_for_arrangement(requested_pot_id,arrangement_id)<=0:
+		arrangement_ui.set_save_request_result(false,Localizer.text(language_code,"pot_save_unavailable"))
+		return
 	if existing_index>=0:saved_arrangements[existing_index]=normalized
 	elif saved_arrangements.size()<arrangement_save_capacity:saved_arrangements.append(normalized)
-	else:return
-	_save();arrangement_ui.sync_state(owned_pots,saved_arrangements,arrangement_save_capacity)
+	else:
+		arrangement_ui.set_save_request_result(false,Localizer.text(language_code,"arrangement_capacity_full"))
+		return
+	_save();arrangement_ui.sync_state(owned_pots,saved_arrangements,arrangement_save_capacity);arrangement_ui.set_save_request_result(true)
+
+func _on_arrangement_dismantle_requested(arrangement_id:String)->void:
+	arrangement_ui.set_dismantle_request_result(false)
+	if arrangement_id.is_empty():return
+	for index in range(saved_arrangements.size()):
+		var arrangement_value=saved_arrangements[index]
+		if arrangement_value is Dictionary and str(arrangement_value.get("arrangement_id",""))==arrangement_id:
+			saved_arrangements.remove_at(index)
+			_save();arrangement_ui.sync_state(owned_pots,saved_arrangements,arrangement_save_capacity);arrangement_ui.set_dismantle_request_result(true)
+			return
 
 func _on_pot_purchase_requested(pot_id:String)->void:
 	var pot:=_pot_entry(pot_id)
 	if pot.is_empty():arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"pot_missing"));return
-	if bool(owned_pots.get(pot_id,false)):arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"pot_owned"));return
 	if not _pot_unlocked(pot):arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"pot_locked"));return
-	var price_value=pot.get("price_puku")
-	if not (price_value is int or price_value is float):arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"pot_price_tbd"));return
-	var price:=maxi(0,int(price_value))
+	var price:=POT_PRICE_PUKU
 	var price_units:=_puku_cost_units(price)
 	if not _can_afford_puku_units(price_units):arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"not_enough_puku"));return
-	_change_puku_balance(-price_units,"pot_purchase",false,true);owned_pots[pot_id]=true;_save();_update_currency_ui();arrangement_ui.sync_state(owned_pots,saved_arrangements,arrangement_save_capacity);arrangement_ui.sync_catalog_state(unlocked_series,puku_points);arrangement_ui.sync_seed_shop_state(_seed_shop_products(),puku_points);arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"pot_bought",[Localizer.pot_name(language_code,pot)]))
+	_change_puku_balance(-price_units,"pot_purchase",false,true);owned_pots[pot_id]=_owned_pot_total(pot_id)+1;_save();_update_currency_ui();arrangement_ui.sync_state(owned_pots,saved_arrangements,arrangement_save_capacity);arrangement_ui.sync_catalog_state(unlocked_series,puku_points);arrangement_ui.sync_seed_shop_state(_seed_shop_products(),puku_points);arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"pot_bought_count",[Localizer.pot_name(language_code,pot),_owned_pot_total(pot_id)]))
 	audio_manager.notify_user_gesture();audio_manager.play_se("purchase",1.0)
 
 func _on_catalog_purchase_requested(series_id:String)->void:
@@ -2112,6 +2136,7 @@ func _pot_entry(pot_id:String)->Dictionary:
 	return {}
 
 func _pot_unlocked(pot:Dictionary)->bool:
+	if int(pot.get("sales_stage",0))>_current_pot_sales_stage():return false
 	var condition=pot.get("unlock_condition",{})
 	if not condition is Dictionary:return true
 	match str(condition.get("type","default")):
@@ -2120,9 +2145,67 @@ func _pot_unlocked(pot:Dictionary)->bool:
 		"default":return true
 		_:return false
 
+func _current_pot_sales_stage()->int:
+	if act3_unlocked:return 2
+	if forest_gacha_unlocked:return 1
+	return 0
+
+func _owned_pot_total(pot_id:String)->int:
+	var value=owned_pots.get(pot_id,0)
+	if value is bool:return 1 if bool(value) else 0
+	if value is int or value is float:return maxi(0,int(value))
+	return 0
+
+func _pot_usage_count(pot_id:String,excluded_arrangement_id:String="")->int:
+	var count:=0
+	for arrangement_value in saved_arrangements:
+		if not arrangement_value is Dictionary:continue
+		if not excluded_arrangement_id.is_empty() and str(arrangement_value.get("arrangement_id",""))==excluded_arrangement_id:continue
+		if str(arrangement_value.get("pot_id",""))==pot_id:count+=1
+	return count
+
+func _pot_available_count(pot_id:String)->int:
+	return maxi(0,_owned_pot_total(pot_id)-_pot_usage_count(pot_id))
+
+func _pot_available_count_for_arrangement(pot_id:String,arrangement_id:String)->int:
+	return maxi(0,_owned_pot_total(pot_id)-_pot_usage_count(pot_id,arrangement_id))
+
+func _normalize_owned_pot_counts()->bool:
+	var changed:=false;var normalized:Dictionary={}
+	for pot_id_value in owned_pots:
+		var pot_id:=str(pot_id_value);var raw_value=owned_pots[pot_id_value];var count:=0
+		if raw_value is bool:
+			count=1 if bool(raw_value) else 0;changed=true
+		elif raw_value is int or raw_value is float:
+			count=maxi(0,int(raw_value))
+			if float(raw_value)!=float(count):changed=true
+		else:
+			changed=true
+		if _pot_entry(pot_id).is_empty():
+			changed=true
+			continue
+		if count>0:normalized[pot_id]=count
+		elif owned_pots.has(pot_id):changed=true
+	if int(normalized.get(DEFAULT_POT_ID,0))<1:
+		normalized[DEFAULT_POT_ID]=1;changed=true
+	owned_pots=normalized
+	return changed
+
+func _reconcile_pot_inventory_with_arrangements()->bool:
+	var changed:=false;var usage:Dictionary={}
+	for arrangement_value in saved_arrangements:
+		if not arrangement_value is Dictionary:continue
+		var pot_id:=str(arrangement_value.get("pot_id",DEFAULT_POT_ID))
+		usage[pot_id]=int(usage.get(pot_id,0))+1
+	for pot_id_value in usage:
+		var pot_id:=str(pot_id_value);var required:=int(usage[pot_id_value])
+		if _owned_pot_total(pot_id)<required:
+			owned_pots[pot_id]=required;changed=true
+	return changed
+
 func _normalize_arrangement(source:Dictionary)->Dictionary:
 	var pot_id:=str(source.get("pot_id",DEFAULT_POT_ID))
-	if _pot_entry(pot_id).is_empty() or not bool(owned_pots.get(pot_id,false)):pot_id=DEFAULT_POT_ID
+	if _pot_entry(pot_id).is_empty():pot_id=DEFAULT_POT_ID
 	var source_plants=source.get("plants",[]);var plants_data:Array=[]
 	if source_plants is Array:
 		for plant_value in source_plants:
@@ -3757,7 +3840,7 @@ func _open_arrangement_test_preview()->void:
 	var preview_species_id:="colorata"
 	if _catalog_entry(preview_species_id).is_empty() and not catalog_species.is_empty():preview_species_id=str(catalog_species[0].get("species_id",""))
 	if preview_species_id.is_empty():return
-	discovered[preview_species_id]=true;bests[preview_species_id]=90.0;owned_pots["shallow_terracotta"]=true
+	discovered[preview_species_id]=true;bests[preview_species_id]=90.0;owned_pots["shallow_terracotta"]=maxi(1,_owned_pot_total("shallow_terracotta"))
 	_sync_arrangement_ui();arrangement_ui.set_world_backdrop_mode(false,_arrangement_pot_anchor_screen());arrangement_ui.open_home();arrangement_ui._start_new_arrangement();arrangement_ui._select_editor_pot("shallow_terracotta");arrangement_ui._add_species_to_editor(preview_species_id);_update_play_ui()
 
 func _open_secret_gacha_preview()->void:
@@ -3974,7 +4057,7 @@ func _apply_secret_gacha_reward(result:Dictionary)->Texture2D:
 		"species":
 			var species_id:=str(result.get("species_id",""));_register_species_discovery(species_id,true);texture=_species_texture(result.get("species_entry",{}))
 		"pot":
-			owned_pots[str(result.get("pot_id",""))]=true;var pot_path:=str(result.get("image_path",""));texture=load(pot_path) as Texture2D if not pot_path.is_empty() and ResourceLoader.exists(pot_path) else null
+			var pot_id:=str(result.get("pot_id",""));owned_pots[pot_id]=_owned_pot_total(pot_id)+1;var pot_path:=str(result.get("image_path",""));texture=load(pot_path) as Texture2D if not pot_path.is_empty() and ResourceLoader.exists(pot_path) else null
 		"catalog_page":
 			_grant_old_catalog_page(1,false,str(result.get("series_id","")));var page_path:=str(result.get("image_path",""));texture=load(page_path) as Texture2D if not page_path.is_empty() and ResourceLoader.exists(page_path) else null
 	return texture
@@ -4029,7 +4112,7 @@ func _reset_progression_state()->void:
 	original_catalog_complete_event_seen=false;habitat_tutorial_returned_to_greenhouse=false;jurejure_intro_complete=false;jurejure_enabled=false;jurejure_growth_stage=JureJureSystemClass.GROWTH_EARLY;jurejure_growth_event_mask=0;active_jurejure_event={};jurejure_next_check_unix=0.0;jurejure_cooldown_until_unix=0.0;jurejure_return_event_complete=false;jurejure_waiting_for_seed_pod_reward=false;jurejure_battle_count=0;jurejure_battle_win_count=0;jurejure_habitat_visit_point=Vector2(-1.0,-1.0);jurejure_pending_reward_species_id="";jurejure_pending_reward_is_new=false;jurejure_last_battle_result.clear();habitat_second_awakened=false;habitat_second_awakening_complete=false;jurejure_update_accumulator=0.0
 	first_seed_pod_reward_event_active=false;habitat_visit_id=0;jurejure_focused_habitat_visit_id=-1;act3_intro_eligible_visit_id=0;habitat_crisis_eligible_visit_id=0
 	if habitat_crisis_atmosphere:habitat_crisis_atmosphere.deactivate()
-	_cancel_puku_gauge_animations();puku_gauge_cm=0.0;puku_balance_units=0;bests.clear();discovered.clear();species_get_counts.clear();catalog_cover_species.clear();unlocked_series={INITIAL_SERIES_ID:true};series_seed_inventory.clear();forest_gacha_draw_count=0;forest_gacha_encountered.clear();secret_gacha_active=false;secret_gacha_draws_remaining=0;secret_gacha_last_roll_play_count=-1;active_series_seed_id="";owned_pots={DEFAULT_POT_ID:true};saved_arrangements.clear();arrangement_save_capacity=20;greenhouse_available=_initial_greenhouse_state();unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;opening_story_complete=false;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;puku_gauge_intro_complete=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;mystery_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;mystery_seed_pack_unlocked=false;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;habitat_mystery_seeds_pending=0;mystery_seed_count=0;armadillo_research_total=0;armadillo_research_rewards.clear();armadillo_research_intro_seen=false;armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();result_deferred_species_queue.clear();pending_round_new_species_ids.clear();round_result_species_finalize_queue.clear();round_result_species_finalize_active=false;shop_chatter_acquired_species.clear();species_get_queue.clear();play_share_record.clear();play_active=false;play_time_remaining=0.0;play_harvest_cm_total=0.0;play_puku_reward_units_total=0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;_reset_endless_economy_stats();rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_time_multiplier=1;habitat_simulation_unix=Time.get_unix_time_from_system();habitat_debug_log.clear();habitat_scroll_tutorial_active=false;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_clear_habitat_items();_save();_update_currency_ui();_update_play_ui()
+	_cancel_puku_gauge_animations();puku_gauge_cm=0.0;puku_balance_units=0;bests.clear();discovered.clear();species_get_counts.clear();catalog_cover_species.clear();unlocked_series={INITIAL_SERIES_ID:true};series_seed_inventory.clear();forest_gacha_draw_count=0;forest_gacha_encountered.clear();secret_gacha_active=false;secret_gacha_draws_remaining=0;secret_gacha_last_roll_play_count=-1;active_series_seed_id="";owned_pots={DEFAULT_POT_ID:1};saved_arrangements.clear();arrangement_save_capacity=20;greenhouse_available=_initial_greenhouse_state();unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;opening_story_complete=false;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;puku_gauge_intro_complete=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;mystery_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;mystery_seed_pack_unlocked=false;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;habitat_mystery_seeds_pending=0;mystery_seed_count=0;armadillo_research_total=0;armadillo_research_rewards.clear();armadillo_research_intro_seen=false;armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();result_deferred_species_queue.clear();pending_round_new_species_ids.clear();round_result_species_finalize_queue.clear();round_result_species_finalize_active=false;shop_chatter_acquired_species.clear();species_get_queue.clear();play_share_record.clear();play_active=false;play_time_remaining=0.0;play_harvest_cm_total=0.0;play_puku_reward_units_total=0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;_reset_endless_economy_stats();rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_time_multiplier=1;habitat_simulation_unix=Time.get_unix_time_from_system();habitat_debug_log.clear();habitat_scroll_tutorial_active=false;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_clear_habitat_items();_save();_update_currency_ui();_update_play_ui()
 	normal_round_free_plays=0
 	normal_play_count=0;shop_visit_count=0;hidden_species_acquired.clear();tovar_next_play=TOVAR_FIRST_PLAY;tovar_attempt_count=0;tovar_event_active=false;tovar_harvested_this_play=false;armadillo_present=false;_save()
 

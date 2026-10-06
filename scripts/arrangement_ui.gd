@@ -3,6 +3,7 @@ extends Control
 
 signal close_requested(context:String)
 signal save_requested(arrangement:Dictionary)
+signal dismantle_requested(arrangement_id:String)
 signal pot_purchase_requested(pot_id:String)
 signal catalog_purchase_requested(series_id:String)
 signal seed_purchase_requested(seed_type:String)
@@ -40,6 +41,7 @@ var wallet_puku_points:=0
 var seed_shop_products:Array=[]
 var saved_arrangements:Array=[]
 var save_capacity:=20
+var pot_sales_stage:=0
 var texture_resolver:Callable
 var texture_requester:Callable
 var return_context:="greenhouse"
@@ -71,6 +73,9 @@ var viewer_name:Label
 var viewer_canvas:Panel
 var viewer_pot_layer:Control
 var viewer_plant_layer:Control
+var viewer_dismantle_button:Button
+var dismantle_confirmation_overlay:Control
+var dismantle_confirmation_label:Label
 var completion_overlay:Control
 var completion_confetti_layer:Control
 var completion_label:Label
@@ -112,6 +117,8 @@ var web_touch_callback
 var web_touch_listener_options
 var web_multitouch_active:=false
 var web_multitouch_suppress_native:=false
+var save_request_accepted:=false
+var dismantle_request_accepted:=false
 
 func _ready()->void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -141,7 +148,7 @@ void fragment() {
 func _exit_tree()->void:
 	_remove_web_multitouch_fallback()
 
-func configure(species_data:Array,series_data:Array,pots_data:Array,discovery:Dictionary,purchased_pots:Dictionary,arrangements:Array,capacity:int,puku_points:int,resolver:Callable,requester:Callable=Callable(),best_records:Dictionary={},locale:String="ja")->void:
+func configure(species_data:Array,series_data:Array,pots_data:Array,discovery:Dictionary,purchased_pots:Dictionary,arrangements:Array,capacity:int,puku_points:int,resolver:Callable,requester:Callable=Callable(),best_records:Dictionary={},locale:String="ja",sales_stage:int=0)->void:
 	catalog_species=species_data
 	series_catalog=series_data
 	pot_catalog=pots_data
@@ -154,6 +161,7 @@ func configure(species_data:Array,series_data:Array,pots_data:Array,discovery:Di
 	texture_requester=requester
 	species_bests=best_records
 	language_code=GameLocalizer.normalize_language(locale)
+	pot_sales_stage=clampi(sales_stage,0,2)
 
 func set_language(locale:String)->void:
 	language_code=GameLocalizer.normalize_language(locale)
@@ -207,7 +215,7 @@ func open_seed_shop()->void:
 	set_world_backdrop_mode(false,world_pot_anchor_screen);return_context="shop";visible=true;_show_page(seed_shop_page);_refresh_seed_shop()
 
 func close()->void:
-	_cancel_editor_gesture();_clear_completion_overlay();visible=false;close_requested.emit(return_context)
+	_cancel_editor_gesture();_clear_completion_overlay();_hide_dismantle_confirmation();visible=false;close_requested.emit(return_context)
 
 func show_pot_shop_message(message:String)->void:
 	shop_message.text=message;_refresh_pot_shop_cards()
@@ -241,6 +249,7 @@ func _build_ui()->void:
 	catalog_shop_page=_page();_build_catalog_shop_page()
 	seed_shop_page=_page();_build_seed_shop_page()
 	_build_completion_overlay()
+	_build_dismantle_confirmation()
 	_apply_static_language()
 
 func _build_completion_overlay()->void:
@@ -253,11 +262,41 @@ func _clear_completion_overlay()->void:
 	if completion_confetti_layer:
 		for child in completion_confetti_layer.get_children():child.queue_free()
 
+func _build_dismantle_confirmation()->void:
+	dismantle_confirmation_overlay=Control.new();dismantle_confirmation_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);dismantle_confirmation_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;dismantle_confirmation_overlay.visible=false;add_child(dismantle_confirmation_overlay)
+	var shade:=ColorRect.new();shade.color=Color(0.08,0.04,0.025,.76);shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);shade.mouse_filter=Control.MOUSE_FILTER_STOP;dismantle_confirmation_overlay.add_child(shade)
+	var card:=Panel.new();card.position=Vector2(42,320);card.size=Vector2(492,300);card.add_theme_stylebox_override("panel",_box(Color("#f7e8c7"),Color("#b87962"),26,4));dismantle_confirmation_overlay.add_child(card)
+	dismantle_confirmation_label=Label.new();_mark_localized(dismantle_confirmation_label,"arrangement_dismantle_confirm");dismantle_confirmation_label.position=Vector2(66,354);dismantle_confirmation_label.size=Vector2(444,116);dismantle_confirmation_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;dismantle_confirmation_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;dismantle_confirmation_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;dismantle_confirmation_label.add_theme_font_size_override("font_size",20);dismantle_confirmation_label.add_theme_color_override("font_color",UI_BROWN);dismantle_confirmation_overlay.add_child(dismantle_confirmation_label)
+	var cancel:=_button(GameLocalizer.text(language_code,"arrangement_dismantle_cancel"),Vector2(66,514),Vector2(204,62),Color("#ead4a5"),18);_mark_localized(cancel,"arrangement_dismantle_cancel");cancel.pressed.connect(_hide_dismantle_confirmation);dismantle_confirmation_overlay.add_child(cancel)
+	var confirm:=_button(GameLocalizer.text(language_code,"arrangement_dismantle_confirm_button"),Vector2(306,514),Vector2(204,62),Color("#b87962"),18);_mark_localized(confirm,"arrangement_dismantle_confirm_button");confirm.pressed.connect(_confirm_dismantle);dismantle_confirmation_overlay.add_child(confirm)
+
+func _show_dismantle_confirmation()->void:
+	if current_arrangement.is_empty() or not bool(current_arrangement.get("completed",false)):return
+	dismantle_request_accepted=false;dismantle_confirmation_overlay.visible=true;dismantle_confirmation_overlay.move_to_front()
+
+func _hide_dismantle_confirmation()->void:
+	if dismantle_confirmation_overlay:dismantle_confirmation_overlay.visible=false
+
+func _confirm_dismantle()->void:
+	if current_arrangement.is_empty():_hide_dismantle_confirmation();return
+	dismantle_request_accepted=false
+	dismantle_requested.emit(str(current_arrangement.get("arrangement_id","")))
+	if not dismantle_request_accepted:return
+	_hide_dismantle_confirmation();current_arrangement={};_show_page(home_page);_refresh_home()
+
+func set_dismantle_request_result(accepted:bool)->void:
+	dismantle_request_accepted=accepted
+
+func set_save_request_result(accepted:bool,message:String="")->void:
+	save_request_accepted=accepted
+	if not accepted and not message.is_empty():editor_message.text=message
+
 func _page()->Control:
 	var page:=Control.new();page.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);page.mouse_filter=Control.MOUSE_FILTER_STOP;page.visible=false;add_child(page);return page
 
 func _show_page(page:Control)->void:
 	if editor_page and editor_page.visible and page!=editor_page:_cancel_editor_gesture()
+	if page!=viewer_page:_hide_dismantle_confirmation()
 	for candidate in [home_page,pot_select_page,editor_page,picker_page,viewer_page,shop_page,catalog_shop_page,seed_shop_page]:
 		if candidate:candidate.visible=candidate==page
 
@@ -267,7 +306,7 @@ func is_editor_active()->bool:
 func is_navigation_hint_safe()->bool:
 	# The edge hint belongs only on the passive arrangement views; it should not
 	# cover pot selection, editing, shops, or the completion presentation.
-	return visible and not completion_overlay.visible and ((home_page and home_page.visible) or (viewer_page and viewer_page.visible))
+	return visible and not completion_overlay.visible and not dismantle_confirmation_overlay.visible and ((home_page and home_page.visible) or (viewer_page and viewer_page.visible))
 
 func _input(event:InputEvent)->void:
 	# Web/mobile browsers do not reliably route the second finger of a
@@ -350,11 +389,12 @@ func _refresh_pot_selection()->void:
 	_clear_children(pot_select_grid)
 	for pot_value in pot_catalog:
 		if not pot_value is Dictionary:continue
-		var pot:Dictionary=pot_value;var pot_id:=str(pot.get("pot_id",""));var owned:=bool(owned_pots.get(pot_id,false))
-		if not owned:continue
-		var card:=Button.new();card.custom_minimum_size=Vector2(248,230);_skin_button(card,Color("#f4e1bc"),15);pot_select_grid.add_child(card)
+		var pot:Dictionary=pot_value;var pot_id:=str(pot.get("pot_id",""));var total:=_pot_total_count(pot_id);var available:=_pot_available_count(pot_id)
+		if total<=0:continue
+		var card:=Button.new();card.custom_minimum_size=Vector2(248,230);_skin_button(card,Color("#f4e1bc") if available>0 else Color("#c9b8a2"),15);card.disabled=available<=0;pot_select_grid.add_child(card)
 		var preview:=Control.new();preview.position=Vector2(14,10);preview.size=Vector2(220,150);preview.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(preview);_render_pot(preview,pot,true)
-		var label:=Label.new();label.text=GameLocalizer.pot_name(language_code,pot)+"\n"+GameLocalizer.text(language_code,"choose");label.position=Vector2(10,164);label.size=Vector2(228,56);label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.add_theme_font_size_override("font_size",16);label.add_theme_color_override("font_color",UI_BROWN);label.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(label)
+		var availability_text:=GameLocalizer.text(language_code,"pot_available_count",[available]) if available>0 else GameLocalizer.text(language_code,"pot_all_in_use")
+		var label:=Label.new();label.text=GameLocalizer.pot_name(language_code,pot)+"\n"+availability_text;label.position=Vector2(10,164);label.size=Vector2(228,56);label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.add_theme_font_size_override("font_size",16);label.add_theme_color_override("font_color",UI_BROWN);label.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(label)
 		card.pressed.connect(_select_editor_pot.bind(pot_id))
 
 func _start_new_arrangement()->void:
@@ -365,7 +405,7 @@ func _return_from_pot_selection()->void:
 	_show_page(home_page);_refresh_home()
 
 func _select_editor_pot(pot_id:String)->void:
-	if not bool(owned_pots.get(pot_id,false)):return
+	if _pot_available_count(pot_id)<=0:return
 	current_arrangement={"arrangement_id":_new_arrangement_id(),"name":_default_arrangement_name(),"pot_id":pot_id,"created_at":Time.get_datetime_string_from_system(false,true),"completed":false,"plants":[]}
 	_show_page(editor_page);_load_editor_from_current()
 
@@ -742,11 +782,16 @@ func _return_to_editor()->void:
 
 func _save_current_arrangement()->void:
 	if current_arrangement.is_empty() or bool(current_arrangement.get("completed",false)):return
+	if _pot_available_count(str(current_arrangement.get("pot_id",DEFAULT_POT_ID)))<=0:
+		editor_message.text=GameLocalizer.text(language_code,"pot_save_unavailable")
+		return
 	var name:=editor_name.text.strip_edges()
 	if name.is_empty():name=_default_arrangement_name();editor_name.text=name
 	_cancel_editor_gesture();selected_plant_index=-1;_update_editor_selection()
 	var saved:={"arrangement_id":str(current_arrangement.get("arrangement_id",_new_arrangement_id())),"name":name,"pot_id":str(current_arrangement.get("pot_id",DEFAULT_POT_ID)),"created_at":str(current_arrangement.get("created_at",Time.get_datetime_string_from_system(false,true))),"completed":true,"plants":editor_plants.duplicate(true)}
-	current_arrangement=saved.duplicate(true);save_requested.emit(saved.duplicate(true))
+	save_request_accepted=false;save_requested.emit(saved.duplicate(true))
+	if not save_request_accepted:return
+	current_arrangement=saved.duplicate(true)
 	completion_overlay.visible=true;completion_confetti_requested.emit(completion_confetti_layer)
 	await get_tree().create_timer(COMPLETION_DISPLAY_SECONDS).timeout
 	_clear_completion_overlay()
@@ -759,9 +804,10 @@ func _build_viewer_page()->void:
 	viewer_canvas=Panel.new();viewer_canvas.position=ARRANGEMENT_CANVAS_POSITION;viewer_canvas.size=Vector2(536,552);viewer_canvas.clip_contents=false;viewer_canvas.mouse_filter=Control.MOUSE_FILTER_IGNORE;viewer_canvas.add_theme_stylebox_override("panel",StyleBoxEmpty.new());viewer_page.add_child(viewer_canvas)
 	viewer_pot_layer=Control.new();viewer_pot_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);viewer_pot_layer.mouse_filter=Control.MOUSE_FILTER_IGNORE;viewer_canvas.add_child(viewer_pot_layer)
 	viewer_plant_layer=Control.new();viewer_plant_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);viewer_plant_layer.z_index=PLANT_LAYER_Z;viewer_plant_layer.mouse_filter=Control.MOUSE_FILTER_IGNORE;viewer_canvas.add_child(viewer_plant_layer)
+	viewer_dismantle_button=_button(GameLocalizer.text(language_code,"arrangement_dismantle"),Vector2(154,868),Vector2(268,60),Color("#b87962"),18);_mark_localized(viewer_dismantle_button,"arrangement_dismantle");viewer_dismantle_button.pressed.connect(_show_dismantle_confirmation);viewer_page.add_child(viewer_dismantle_button)
 
 func _open_viewer(arrangement:Dictionary)->void:
-	current_arrangement=arrangement.duplicate(true);current_arrangement["completed"]=true;viewer_name.text=str(arrangement.get("name",GameLocalizer.text(language_code,"arrangement_title")));_show_page(viewer_page);_render_readonly_arrangement(current_arrangement)
+	_hide_dismantle_confirmation();current_arrangement=arrangement.duplicate(true);current_arrangement["completed"]=true;viewer_name.text=str(arrangement.get("name",GameLocalizer.text(language_code,"arrangement_title")));_show_page(viewer_page);_render_readonly_arrangement(current_arrangement)
 
 func _render_readonly_arrangement(arrangement:Dictionary)->void:
 	_clear_children(viewer_pot_layer);_clear_children(viewer_plant_layer)
@@ -799,14 +845,14 @@ func _refresh_pot_shop_cards()->void:
 	_clear_children(shop_grid)
 	for pot_value in pot_catalog:
 		if not pot_value is Dictionary:continue
-		var pot:Dictionary=pot_value;var pot_id:=str(pot.get("pot_id",""));var owned:=bool(owned_pots.get(pot_id,false));var price_value=pot.get("price_puku");var priced:=price_value is int or price_value is float;var price:=maxi(0,int(price_value)) if priced else 0
+		var pot:Dictionary=pot_value;var pot_id:=str(pot.get("pot_id",""));var total:=_pot_total_count(pot_id);var stage_unlocked:=_pot_sales_stage_unlocked(pot);var price_value=pot.get("price_puku");var priced:=price_value is int or price_value is float;var price:=maxi(0,int(price_value)) if priced else 0
 		var card:=PanelContainer.new();card.custom_minimum_size=Vector2(504,204);card.mouse_filter=Control.MOUSE_FILTER_PASS;card.add_theme_stylebox_override("panel",_box(Color("#f4e1bc"),Color("#b77c48"),20,3));shop_grid.add_child(card)
 		var content:=Control.new();content.custom_minimum_size=Vector2(484,184);content.mouse_filter=Control.MOUSE_FILTER_PASS;card.add_child(content)
 		var preview:=Control.new();preview.position=Vector2(2,2);preview.size=Vector2(214,176);preview.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.add_child(preview);_render_pot(preview,pot,true)
 		var name:=Label.new();name.text=GameLocalizer.pot_name(language_code,pot);name.position=Vector2(220,12);name.size=Vector2(258,45);name.mouse_filter=Control.MOUSE_FILTER_IGNORE;name.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name.add_theme_font_size_override("font_size",19);name.add_theme_color_override("font_color",UI_BROWN);content.add_child(name)
-		var condition:=Label.new();condition.text=str(pot.get("unlock_condition",{}).get("display_text",""));condition.position=Vector2(220,55);condition.size=Vector2(258,34);condition.mouse_filter=Control.MOUSE_FILTER_IGNORE;condition.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;condition.add_theme_font_size_override("font_size",13);condition.add_theme_color_override("font_color",Color("#79543a"));content.add_child(condition)
-		var buy_text:=GameLocalizer.text(language_code,"bought") if owned else (GameLocalizer.text(language_code,"buy_puku",[price]) if priced else GameLocalizer.text(language_code,"price_tbd"))
-		var buy:=_button(buy_text,Vector2(248,102),Vector2(204,58),Color("#b9a17d") if owned or not priced else Color("#d7aa64"),17);_prepare_scroll_button(buy);buy.disabled=owned or not priced or wallet_puku_points<price;buy.pressed.connect(_request_pot_purchase.bind(pot_id));content.add_child(buy)
+		var condition:=Label.new();condition.text=GameLocalizer.text(language_code,"pot_owned_total",[total]) if stage_unlocked else GameLocalizer.text(language_code,"pot_locked");condition.position=Vector2(220,55);condition.size=Vector2(258,34);condition.mouse_filter=Control.MOUSE_FILTER_IGNORE;condition.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;condition.add_theme_font_size_override("font_size",13);condition.add_theme_color_override("font_color",Color("#79543a"));content.add_child(condition)
+		var buy_text:=GameLocalizer.text(language_code,"buy_puku",[price]) if stage_unlocked and priced else GameLocalizer.text(language_code,"locked" if not stage_unlocked else "price_tbd")
+		var buy:=_button(buy_text,Vector2(248,102),Vector2(204,58),Color("#d7aa64") if stage_unlocked and priced else Color("#b9a17d"),17);_prepare_scroll_button(buy);buy.disabled=not stage_unlocked or not priced or wallet_puku_points<price;buy.pressed.connect(_request_pot_purchase.bind(pot_id));content.add_child(buy)
 
 func _request_pot_purchase(pot_id:String)->void:
 	pot_purchase_requested.emit(pot_id)
@@ -915,10 +961,28 @@ func _plant_array(arrangement:Dictionary)->Array:
 	var value=arrangement.get("plants",[])
 	return value if value is Array else []
 
+func _pot_total_count(pot_id:String)->int:
+	var value=owned_pots.get(pot_id,0)
+	if value is bool:return 1 if bool(value) else 0
+	if value is int or value is float:return maxi(0,int(value))
+	return 0
+
+func _pot_used_count(pot_id:String)->int:
+	var count:=0
+	for arrangement_value in saved_arrangements:
+		if arrangement_value is Dictionary and str(arrangement_value.get("pot_id",""))==pot_id:count+=1
+	return count
+
+func _pot_available_count(pot_id:String)->int:
+	return maxi(0,_pot_total_count(pot_id)-_pot_used_count(pot_id))
+
+func _pot_sales_stage_unlocked(pot:Dictionary)->bool:
+	return int(pot.get("sales_stage",0))<=pot_sales_stage
+
 func _owned_pot_count()->int:
 	var count:=0
 	for pot_value in pot_catalog:
-		if pot_value is Dictionary and bool(owned_pots.get(str(pot_value.get("pot_id","")),false)):count+=1
+		if pot_value is Dictionary:count+=_pot_total_count(str(pot_value.get("pot_id","")))
 	return count
 
 func _default_arrangement_name()->String:

@@ -110,7 +110,7 @@ func _ready()->void:
 	else:
 		var screenshot_dir_absolute:=ProjectSettings.globalize_path(SCREENSHOT_DIR)
 		DirAccess.make_dir_recursive_absolute(screenshot_dir_absolute)
-		game.owned_pots["classic_terracotta"]=true;game._sync_arrangement_ui()
+		game.owned_pots["classic_terracotta"]=1;game._sync_arrangement_ui()
 		game.arrangement_ui.visible=false
 		for shot in [{"ratio":0.0,"name":"00-main.png"},{"ratio":.25,"name":"25-percent.png"},{"ratio":.50,"name":"50-percent.png"},{"ratio":.75,"name":"75-percent.png"},{"ratio":1.0,"name":"100-arrangement.png"}]:
 			game.arrangement_transition_x=expected_arrangement_transition*float(shot.ratio);game._update_greenhouse_pan();game._resolve_crowding(0.0);game._update_labels()
