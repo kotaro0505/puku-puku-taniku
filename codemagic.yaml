@@ -13,6 +13,7 @@ workflows:
         GODOT_VERSION: "4.7.2"
         GODOT_TEMPLATE_VERSION: "4.7.2.stable"
         STOREKIT2_VERSION: "v0.2"
+        IOS_MIN_VERSION: "15.6"
         APP_VERSION: "1.0.0"
         APPLE_TEAM_ID: "UK8FRB9XKH"
         BUNDLE_ID: "com.ohanayanouen.pukupukutaniku"
@@ -22,7 +23,7 @@ workflows:
     cache:
       cache_paths:
         - $HOME/.cache/puku-puku-taniku/godot-4.7.2
-        - $HOME/.cache/puku-puku-taniku/storekit2-v0.2-godot-4.7.2
+        - $HOME/.cache/puku-puku-taniku/storekit2-v0.2-godot-4.7.2-ios15.6
         - $HOME/Library/Application Support/Godot/export_templates/4.7.2.stable
     scripts:
       - name: Validate iOS release configuration
@@ -32,9 +33,11 @@ workflows:
           test "$BUNDLE_ID" = "com.ohanayanouen.pukupukutaniku"
           test "$APPLE_TEAM_ID" = "UK8FRB9XKH"
           test "$APP_VERSION" = "1.0.0"
+          test "$IOS_MIN_VERSION" = "15.6"
           grep -Fq 'application/bundle_identifier="com.ohanayanouen.pukupukutaniku"' export_presets.cfg
           grep -Fq 'application/app_store_team_id="UK8FRB9XKH"' export_presets.cfg
           grep -Fq 'application/targeted_device_family=0' export_presets.cfg
+          grep -Fq 'application/min_ios_version="15.6"' export_presets.cfg
           grep -Fq 'entitlements/game_center=false' export_presets.cfg
           grep -Fq 'entitlements/push_notifications="Disabled"' export_presets.cfg
           grep -Fq 'plugins/SharePlugin=true' export_presets.cfg
@@ -114,7 +117,7 @@ workflows:
           test -d ios/plugins/godot-storekit2/godot-storekit2.debug.xcframework
           test -d ios/plugins/godot-storekit2/godot-storekit2.release.xcframework
           grep -Fq 'StoreKit.framework' ios/plugins/godot-storekit2/godot-storekit2.gdip
-          echo "STOREKIT2_PLUGIN_OK version=$STOREKIT2_VERSION godot=$GODOT_VERSION"
+          echo "STOREKIT2_PLUGIN_OK version=$STOREKIT2_VERSION godot=$GODOT_VERSION ios=$IOS_MIN_VERSION"
 
       - name: Import project and run regression smoke tests
         script: |
@@ -207,6 +210,21 @@ workflows:
           grep -Fq 'NotificationSchedulerPlugin' "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
           grep -Fq 'godot-storekit2' "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
           grep -Fq 'StoreKit.framework' "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
+          python3 - "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj" "$IOS_MIN_VERSION" <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+
+          project_path = Path(sys.argv[1])
+          expected = sys.argv[2]
+          targets = sorted(set(re.findall(r"IPHONEOS_DEPLOYMENT_TARGET\s*=\s*([^;]+);", project_path.read_text(encoding="utf-8"))))
+          if targets != [expected]:
+              actual = ", ".join(targets) if targets else "missing"
+              raise SystemExit(
+                  f"Unexpected exported app deployment target: expected {expected}, found {actual} in {project_path}"
+              )
+          print(f"GODOT_IOS_DEPLOYMENT_TARGET_OK target={expected} project={project_path}")
+          PY
           test -f "$CM_BUILD_DIR/build/ios/puku_puku_taniku/Images.xcassets/AppIcon.appiconset/Icon-1024.png"
           test "$(grep -c '<key>ITSAppUsesNonExemptEncryption</key>' "$CM_BUILD_DIR/build/ios/puku_puku_taniku/puku_puku_taniku-Info.plist")" = "1"
           echo "GODOT_IOS_EXPORT_OK project=$XCODE_PROJECT"
