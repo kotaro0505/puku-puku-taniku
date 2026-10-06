@@ -17,6 +17,8 @@ const RESTORATION_FIVE_READY := "restoration_five_ready"
 const ENDING_READY := "ending_ready"
 const THANK_YOU_READY := "thank_you_ready"
 const COMPLETE := "complete"
+const COLLECTION_ONE_REMAINING := "collection_one_remaining"
+const COLLECTION_DEV_LAST_SPECIES_ID := "hyb_jelly_jelly"
 
 const PRESET_IDS := [
 	POST_FIRST_NORMAL_TUTORIAL,
@@ -32,6 +34,7 @@ const PRESET_IDS := [
 	ENDING_READY,
 	THANK_YOU_READY,
 	COMPLETE,
+	COLLECTION_ONE_REMAINING,
 ]
 
 const RETURNED_PLANT_IDS := ["colorata", "laui", "kannte", "affinis", "shaviana"]
@@ -65,6 +68,7 @@ static func options() -> Array[Dictionary]:
 		{"id": ENDING_READY, "label": "エンディング直前"},
 		{"id": THANK_YOU_READY, "label": "Thank you直前"},
 		{"id": COMPLETE, "label": "クリア後"},
+		{"id": COLLECTION_ONE_REMAINING, "label": "図鑑コンプ残り1種（ゼリー×ゼリー）"},
 	]
 
 
@@ -134,6 +138,18 @@ static func apply(game, preset_id: String) -> Dictionary:
 			game.main_story_completion_seen = true
 			target_mode = "greenhouse"
 			should_resume_story = false
+		COLLECTION_ONE_REMAINING:
+			_prepare_restoration(game, 5)
+			var collection_restoration: Dictionary = _restoration(game)
+			HabitatRestorationClass.complete_ending(collection_restoration)
+			HabitatRestorationClass.mark_post_ending_greenhouse_dialog_seen(collection_restoration)
+			game.story_progression_state["restoration"] = collection_restoration
+			game.finale_complete = true
+			game.main_story_complete = true
+			game.main_story_completion_seen = true
+			_prepare_collection_one_remaining(game)
+			target_mode = "greenhouse"
+			should_resume_story = false
 
 	_prepare_runtime_view(game, target_mode)
 	return {
@@ -141,7 +157,35 @@ static func apply(game, preset_id: String) -> Dictionary:
 		"preset_id": preset_id,
 		"target_mode": target_mode,
 		"resume_story": should_resume_story,
+		"collection_last_species_id": COLLECTION_DEV_LAST_SPECIES_ID if preset_id == COLLECTION_ONE_REMAINING else "",
 	}
+
+
+static func _prepare_collection_one_remaining(game) -> void:
+	# This is intentionally a normal ownership setup, not a direct trigger. The
+	# tester still creates the final species through Jelly x Jelly in the lab, so
+	# the production GET-card and completion follow-up paths are exercised.
+	for species_id in game._collection_complete_species_ids():
+		if species_id != COLLECTION_DEV_LAST_SPECIES_ID:
+			_grant_species(game, species_id)
+	game.species_get_counts.erase(COLLECTION_DEV_LAST_SPECIES_ID)
+	game.discovered.erase(COLLECTION_DEV_LAST_SPECIES_ID)
+	game.greenhouse_available.erase(COLLECTION_DEV_LAST_SPECIES_ID)
+	game.unlocked_species.erase(COLLECTION_DEV_LAST_SPECIES_ID)
+	game.habitat_returned_species.erase(COLLECTION_DEV_LAST_SPECIES_ID)
+	for index in range(game.species.size() - 1, -1, -1):
+		if str(game.species[index].get("species_id", "")) == COLLECTION_DEV_LAST_SPECIES_ID:
+			game.species.remove_at(index)
+	game.collection_complete_versions.clear()
+	game.collection_complete_pending_species_id = ""
+	game.collection_complete_resume_context = ""
+	game.collection_complete_resume_shop_visible = false
+	game.species_get_queue.clear()
+	game.catalog_series_unlock_notice_queue.clear()
+	game.catalog_series_unlock_notice_ready.clear()
+	game.fusion_return_pending = false
+	game.fusion_parent_a_id = ""
+	game.fusion_parent_b_id = ""
 
 
 static func _prepare_post_first_normal_tutorial(game) -> void:
@@ -485,6 +529,9 @@ static func _restoration(game) -> Dictionary:
 
 static func _prepare_runtime_view(game, target_mode: String) -> void:
 	game._end_first_play_tutorial_context()
+	# Development presets bypass the boot screen by design. Keep the runtime flag
+	# aligned with the hidden opening overlay so normal pending-event guards work.
+	game.opening_finished = true
 	game.current_mode = target_mode
 	game.play_active = false
 	game.play_modal_open = false

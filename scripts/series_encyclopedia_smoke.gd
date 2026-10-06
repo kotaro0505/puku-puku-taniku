@@ -4,25 +4,26 @@ func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
 	game._reset_progression_state();game.opening_story_complete=true;game.intro_story_complete=true;game.first_colorata_confirmed=true;game.trio_originals_confirmed=true;game.mystery_items_acquired=true;game.mystery_catalog_tutorial_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.habitat_arrival_started=true;game.habitat_awakened=true;game.habitat_awakening_event_complete=true;game.habitat_tutorial_started=true;game.habitat_tutorial_complete=true;game.seed_shop_open=true;game.panda_beacon_unlocked=true;game.panda_beacon_count=1;game.puku_gauge_intro_complete=true
-	assert(game.series_catalog.size()==17)
+	assert(game.series_catalog.size()==18)
 	var expected_ids:=["base","metal","jewel","jelly","sweets","gummy","stardust","glow","neon","stone","sea","yumekawa","forest_amber"]
 	for index in range(expected_ids.size()):
 		var series_entry:Dictionary=game.series_catalog[index]
 		assert(str(series_entry.get("series_id",""))==expected_ids[index])
 		for required_key in ["series_id","display_name","subtitle","description","cover_image_path","species_ids","field_id","unlock_type","unlock_condition","iap_product_id","sort_order"]:assert(series_entry.has(required_key))
 	assert(game._series_entry("common").is_empty() and game._series_species_entries("common").is_empty())
-	var base:Dictionary=game._series_entry("base");assert(game._is_series_unlocked(base));assert(str(base.get("display_name",""))=="原種" and game._series_species_entries("base").size()==12 and game.catalog_species.size()==232)
+	var base:Dictionary=game._series_entry("base");assert(game._is_series_unlocked(base));assert(str(base.get("display_name",""))=="原種" and game._series_species_entries("base").size()==12 and game.catalog_species.size()==238)
 	var hybrid:Dictionary=game._series_entry("hybrid");assert(hybrid.species_ids.size()==66 and not game._is_series_unlocked(hybrid) and not game._can_browse_series(hybrid))
 	var fusion_tier1:Dictionary=game._series_entry("fusion_tier1");assert(fusion_tier1.species_ids.size()==22 and not game._is_series_unlocked(fusion_tier1) and not game._can_browse_series(fusion_tier1))
-	var fusion_tier2:Dictionary=game._series_entry("fusion_tier2");assert(fusion_tier2.species_ids.size()==10 and not game._is_series_unlocked(fusion_tier2) and not game._can_browse_series(fusion_tier2) and str(fusion_tier2.get("display_name",""))=="上位特殊配合")
-	for source_page in [hybrid,fusion_tier1,fusion_tier2]:assert(game._catalog_series_hidden_from_navigation(source_page))
-	game.unlocked_series["hybrid"]=true;game.unlocked_series["fusion_tier1"]=true;game.unlocked_series["fusion_tier2"]=true
-	assert(not game._can_browse_series(hybrid) and not game._can_browse_series(fusion_tier1) and not game._can_browse_series(fusion_tier2))
+	var fusion_tier2:Dictionary=game._series_entry("fusion_tier2");assert(fusion_tier2.species_ids.size()==11 and not game._is_series_unlocked(fusion_tier2) and not game._can_browse_series(fusion_tier2) and str(fusion_tier2.get("display_name",""))=="上位特殊配合")
+	var fusion_tier3:Dictionary=game._series_entry("fusion_tier3");assert(fusion_tier3.species_ids.size()==5 and not game._is_series_unlocked(fusion_tier3) and not game._can_browse_series(fusion_tier3) and str(fusion_tier3.get("display_name",""))=="最上位特殊配合")
+	for source_page in [hybrid,fusion_tier1,fusion_tier2,fusion_tier3]:assert(game._catalog_series_hidden_from_navigation(source_page))
+	game.unlocked_series["hybrid"]=true;game.unlocked_series["fusion_tier1"]=true;game.unlocked_series["fusion_tier2"]=true;game.unlocked_series["fusion_tier3"]=true
+	assert(not game._can_browse_series(hybrid) and not game._can_browse_series(fusion_tier1) and not game._can_browse_series(fusion_tier2) and not game._can_browse_series(fusion_tier3))
 	var navigation_ids:Array=game._owned_series_entries().map(func(entry):return str(entry.get("series_id","")))
-	assert("hybrid" not in navigation_ids and "fusion_tier1" not in navigation_ids and "fusion_tier2" not in navigation_ids)
-	for source_page_id in ["hybrid","fusion_tier1","fusion_tier2"]:game._queue_catalog_series_unlock_notice(source_page_id,true)
+	assert("hybrid" not in navigation_ids and "fusion_tier1" not in navigation_ids and "fusion_tier2" not in navigation_ids and "fusion_tier3" not in navigation_ids)
+	for source_page_id in ["hybrid","fusion_tier1","fusion_tier2","fusion_tier3"]:game._queue_catalog_series_unlock_notice(source_page_id,true)
 	assert(game.catalog_series_unlock_notice_queue.is_empty())
-	var display_series_ids:=["metal","sweets","gummy","glow","jewel","stone","sea","yumekawa","forest_amber","jurejure"]
+	var display_series_ids:=["metal","sweets","gummy","glow","jewel","stone","sea","yumekawa","forest_amber","jelly","jurejure"]
 	for display_series_id in display_series_ids:
 		var normal_entries:Array[Dictionary]=game._series_species_entries(display_series_id)
 		var display_entries:Array[Dictionary]=game._catalog_display_entries_for_series(display_series_id)
@@ -34,10 +35,10 @@ func _ready()->void:
 			assert(game._catalog_entry_is_fusion(fusion_entry) and game._catalog_display_series_id_for_entry(fusion_entry)==display_series_id)
 			var rank:=1 if str(fusion_entry.get("series_id",""))=="hybrid" else 1+int(fusion_entry.get("fusion_tier",0))
 			assert(rank>=previous_rank);previous_rank=rank
-	assert(game._catalog_display_entries_for_series("hybrid").is_empty() and game._catalog_display_entries_for_series("fusion_tier1").is_empty() and game._catalog_display_entries_for_series("fusion_tier2").is_empty())
+	assert(game._catalog_display_entries_for_series("hybrid").is_empty() and game._catalog_display_entries_for_series("fusion_tier1").is_empty() and game._catalog_display_entries_for_series("fusion_tier2").is_empty() and game._catalog_display_entries_for_series("fusion_tier3").is_empty())
 	var sea_fusion_ids:Array=game._catalog_display_entries_for_series("sea").slice(game._series_species_entries("sea").size()).map(func(entry):return str(entry.get("species_id","")))
-	assert(sea_fusion_ids==["hyb_gummy_sea","hyb_glow_sea","hyb_jewel_sea","hyb_stone_sea","hyb_sea_sea","hyb_sea_yumekawa","fus1_deep_sea_aquarium","fus1_tide_pool","fus2_abyss_glass"])
-	assert(game._catalog_display_series_id_for_entry(game._catalog_entry("hyb_sweets_jure"))=="jurejure" and game._catalog_display_series_id_for_entry(game._catalog_entry("fus1_bonus_time"))=="jurejure" and game._catalog_display_series_id_for_entry(game._catalog_entry("fus2_moon_resort"))=="jurejure")
+	assert(sea_fusion_ids==["hyb_gummy_sea","hyb_glow_sea","hyb_jewel_sea","hyb_stone_sea","hyb_sea_sea","hyb_sea_yumekawa","fus1_deep_sea_aquarium","fus1_tide_pool","fus2_abyss_glass","fus3_lagoon_lutea"])
+	assert(game._catalog_display_series_id_for_entry(game._catalog_entry("hyb_sweets_jure"))=="jurejure" and game._catalog_display_series_id_for_entry(game._catalog_entry("fus1_bonus_time"))=="jurejure" and game._catalog_display_series_id_for_entry(game._catalog_entry("fus2_moon_resort"))=="jurejure" and game._catalog_display_series_id_for_entry(game._catalog_entry("fus3_black_hole"))=="jurejure")
 	assert(game._series_species_entries("sea").size()==10 and game._series_seed_draw_candidates("sea").all(func(entry):return not game._catalog_entry_is_fusion(entry)))
 	var unique_base_ids:Dictionary={}
 	for entry in game._series_species_entries("base"):unique_base_ids[str(entry.species_id)]=true
@@ -139,7 +140,7 @@ func _ready()->void:
 	var first_sweets_card:Button=game.encyclopedia_grid.get_child(0);assert(not first_sweets_card.disabled);first_sweets_card.pressed.emit();assert(game.encyclopedia_detail_page.find_child("SpeciesName",true,false).text=="いちごショート多肉" and game.encyclopedia_detail_page.find_child("SpeciesImage",true,false).texture.resource_path=="res://assets/catalog/sweets/sweets-strawberry-shortcake.png")
 	game._close_encyclopedia();game.discovered.erase("sweets_strawberry_shortcake");game.species_get_counts.erase("sweets_strawberry_shortcake");game.selected_series_index=0
 	game.unlocked_series["jelly"]=true;game.selected_series_index=1;game._open_encyclopedia();await get_tree().process_frame
-	assert(game.encyclopedia_list_page.visible and game.encyclopedia_list_title.text=="ゼリー" and game.encyclopedia_grid.get_child_count()==23 and game.series_cover_image.texture==null and game.series_cover_placeholder.visible)
+	assert(game.encyclopedia_list_page.visible and game.encyclopedia_list_title.text=="ゼリー" and game.encyclopedia_grid.get_child_count()==24 and game.series_cover_image.texture==null and game.series_cover_placeholder.visible)
 	game._register_species_discovery("jelly_grape",true);game._record_species_get("jelly_grape",1);game._refresh_series_selection();await get_tree().process_frame;game._update_encyclopedia_visible_textures()
 	var first_jelly_card:Button=game.encyclopedia_grid.get_child(0);assert(not first_jelly_card.disabled);first_jelly_card.pressed.emit();assert(game.encyclopedia_detail_page.find_child("SpeciesName",true,false).text=="ぶどうゼリー" and game.encyclopedia_detail_page.find_child("SpeciesGetCount",true,false).text=="GET 2" and game.encyclopedia_detail_page.find_child("SpeciesImage",true,false).texture.resource_path=="res://assets/catalog/jelly/jelly-grape.png")
 	game._close_encyclopedia();game.unlocked_series.erase("jelly");game.discovered.erase("jelly_grape");game.species_get_counts.erase("jelly_grape");game.selected_series_index=0

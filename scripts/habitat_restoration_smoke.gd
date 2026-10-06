@@ -206,6 +206,7 @@ func _test_integrated_final_chapter() -> void:
 	await get_tree().process_frame
 	game.audio_manager.apply_settings({"bgm_enabled": false, "se_enabled": false})
 	game._reset_progression_state()
+	game.opening_finished = true
 	game.opening_overlay.visible = false
 	game.opening_story_overlay.visible = false
 	game.intro_overlay.visible = false
@@ -461,22 +462,28 @@ func _test_integrated_final_chapter() -> void:
 	game._advance_scripted_dialog()
 	assert(game.audio_manager.current_bgm_key == "ending")
 	assert(is_equal_approx(game.audio_manager.last_bgm_fade_seconds, 2.5))
-	# A later ending-UI request must continue this exact track rather than
-	# restarting it at the record slides.
-	game.audio_manager.last_bgm_fade_seconds = 9.75
-	game.scripted_dialog_kind = ""
-	game.scripted_dialog_pages.clear()
-	game.intro_overlay.visible = false
 	game.species_get_counts["affinis"] = 2
 	game.jurejure_battle_count = 7
 	game.jurejure_battle_win_count = 4
 	var ending_bgm_requests := {"count": 0}
 	game.habitat_restoration_ui.ending_bgm_requested.connect(func() -> void: ending_bgm_requests["count"] = int(ending_bgm_requests["count"]) + 1)
 	game.habitat_restoration_ui.ending_sequence_time_scale = 0.005
-	game._show_restoration_thank_you()
+	# Finish the real epilogue path. Every remaining speaker, the generic
+	# dialog cleanup, and the deferred ending sequence must preserve the track
+	# that started on Peccary's SDGs line.
+	game.audio_manager.last_bgm_fade_seconds = 9.75
+	for expected_page in range(3, 6):
+		game._advance_scripted_dialog()
+		assert(game.scripted_dialog_index == expected_page)
+		assert(game.audio_manager.current_bgm_key == "ending")
+	game._advance_scripted_dialog()
+	assert(game.scripted_dialog_kind.is_empty())
+	assert(game.audio_manager.current_bgm_key == "ending")
+	assert(is_equal_approx(game.audio_manager.last_bgm_fade_seconds, 9.75))
+	await get_tree().process_frame
 	assert(game.habitat_restoration_ui.ending_sequence_layer.visible)
 	assert(not game.habitat_restoration_ui.ending_layer.visible)
-	assert(game.habitat_restoration_ui.ending_current_phase == "darkening")
+	assert(not game.habitat_restoration_ui.ending_current_phase.is_empty())
 	assert(game.audio_manager.current_bgm_key == "ending")
 	for _frame in range(240):
 		if game.habitat_restoration_ui.ending_current_phase == "await_return":

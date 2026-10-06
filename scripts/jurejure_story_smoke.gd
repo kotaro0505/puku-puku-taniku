@@ -36,6 +36,8 @@ func _ready() -> void:
 
 func _prepare_act_one(game: Node) -> void:
 	game._reset_progression_state()
+	game.opening_finished = true
+	game.opening_overlay.visible = false
 	game.opening_story_overlay.visible = false
 	game.intro_overlay.visible = false
 	game.habitat_unlocked = true
@@ -474,7 +476,7 @@ func _test_act_three_reward_flow(game: Node) -> void:
 	assert(game.scripted_dialog_kind == "jurejure_species_first")
 	assert(game.scripted_dialog_pages.size() == 3)
 	assert(str(game.scripted_dialog_pages[0].get("text", "")) == "なにこの多肉！？")
-	assert(str(game.scripted_dialog_pages[1].get("text", "")) == "ジュレジュレ団の頭の中がそのまま多肉になってるようだね……。")
+	assert(str(game.scripted_dialog_pages[1].get("text", "")) == "ジュレジュレ団の頭の中がそのまま多肉になってるんだ……。")
 	assert(str(game.scripted_dialog_pages[2].get("text", "")) == "……。")
 	_finish_dialog(game)
 	assert(game.jurejure_species_first_seen)
@@ -744,7 +746,7 @@ func _test_post_ending_friendly_battle(game: Node) -> void:
 	var unknown_id := ""
 	for entry in candidates:
 		var species_id := str(entry.get("species_id", ""))
-		assert(str(entry.get("series_id", "")) not in ["hybrid", "fusion_tier1", "fusion_tier2"])
+		assert(str(entry.get("series_id", "")) not in ["hybrid", "fusion_tier1", "fusion_tier2", "fusion_tier3"])
 		assert(not bool(entry.get("fusion_only_until_discovered", false)))
 		assert(not bool(entry.get("special_route_only", false)))
 		assert(str(entry.get("rarity", "")) not in ["隠し原種", "謎品種"])

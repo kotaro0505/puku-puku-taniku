@@ -23,6 +23,7 @@ func _ready() -> void:
 	var texture := load("res://assets/plants/sprite-colorata.png") as Texture2D
 	_verify_alpha_hit_mask()
 	battle.start_battle([SAMPLE_SPECIES], {"colorata": texture}, "ja", 20260926)
+	_verify_score_labels_are_numbers_only(battle)
 	assert(battle.player_points.size() == BattleClass.MAX_ACTIVE_PER_SIDE and battle.opponent_points.size() == BattleClass.MAX_ACTIVE_PER_SIDE)
 	_verify_soil_points(battle.player_points, false)
 	_verify_soil_points(battle.opponent_points, true)
@@ -112,6 +113,23 @@ func _ready() -> void:
 		]
 	)
 	get_tree().quit()
+
+
+func _verify_score_labels_are_numbers_only(battle: Control) -> void:
+	var original_language: String = battle.language_code
+	var original_opponent_score: float = battle.opponent_score
+	var original_player_score: float = battle.player_score
+	battle.opponent_score = 123.4
+	battle.player_score = 98.7
+	for locale in ["ja", "hiragana", "en"]:
+		battle.language_code = locale
+		battle._update_scores()
+		assert(battle.opponent_score_label.text == "123.4 cm")
+		assert(battle.player_score_label.text == "98.7 cm")
+	battle.language_code = original_language
+	battle.opponent_score = original_opponent_score
+	battle.player_score = original_player_score
+	battle._update_scores()
 
 
 func _verify_alpha_hit_mask() -> void:

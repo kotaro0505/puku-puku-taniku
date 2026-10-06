@@ -60,6 +60,7 @@ func _ready() -> void:
 	assert("……何も起こらない。" not in awakening_text and "聞いてくれたのかな" not in awakening_text)
 	assert(game.habitat_awakening_overlay.SPEAKER_KEYS == ["story_speaker_armadillo", "story_speaker_panda", "story_speaker_armadillo", "story_speaker_panda", "", "story_speaker_panda", "story_speaker_armadillo", "story_speaker_girl", "story_speaker_girl", "story_speaker_armadillo", "story_speaker_girl", "story_speaker_girl", "story_speaker_panda", "", "story_speaker_girl", "story_speaker_panda"])
 	assert(Localizer.text("ja", "awakening_overharvest") == "乱獲や密猟も、絶滅の大きな原因だったみたいだ……。")
+	assert(Localizer.text("ja", "awakening_empty_2") == "何もないね……。")
 	assert(Localizer.text("ja", "awakening_promise_2") == "これから新しく見つけた品種は、\nここにお返していきます。")
 	assert(Localizer.text("ja", "awakening_promise_3") == "だから、また沢山の可愛い多肉植物を\n私たちにも見せてください！")
 	for expected_page in range(1, 3):
@@ -181,6 +182,8 @@ func _ready() -> void:
 	assert(not game.scene_transition_fade.visible and game.scripted_dialog_kind == "habitat_return")
 	assert(game.scripted_dialog_pages.size() == 5)
 	var return_keys := ["habitat_return_panda", "habitat_return_girl_1", "habitat_return_armadillo_1", "habitat_return_girl_2", "habitat_return_armadillo_2"]
+	assert(game.scripted_dialog_pages.map(func(page: Dictionary) -> String: return str(page.get("speaker", ""))) == ["panda", "girl", "armadillo", "girl", "girl"])
+	assert(game.scripted_dialog_pages.map(func(page: Dictionary) -> String: return str(page.get("text", ""))) == ["……すごかったね。長い間何もなかった原生地から芽が出るなんて。", "原生地、また多肉でいっぱいになるといいな。", "昔の景色まで見せてくれたし……やっぱり、ただの場所じゃないよ。", "うん。まだ何かありそう。", "このさやと図鑑も、原生地がくれたんだよ、きっと。"])
 	for expected_page in range(return_keys.size()):
 		assert(game.intro_dialogue_label.text == Localizer.text("ja", return_keys[expected_page]))
 		game._advance_scripted_dialog()
@@ -203,6 +206,7 @@ func _ready() -> void:
 	assert(game.scripted_dialog_kind == "initial_seed_stock")
 	assert(game.normal_seed_bags == 0 and game.scripted_dialog_pages.size() == 2)
 	assert(game.intro_dialogue_label.text == Localizer.text("ja", "initial_seed_stock_endless_girl"))
+	assert(game.intro_dialogue_label.text == "原生地がくれたさやから種がどんどんでてくるよ！")
 	game._advance_scripted_dialog()
 	assert(game.intro_dialogue_label.text == Localizer.text("ja", "initial_seed_stock_endless_armadillo"))
 	game._advance_scripted_dialog()

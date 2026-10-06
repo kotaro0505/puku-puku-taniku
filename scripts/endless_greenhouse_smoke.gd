@@ -397,6 +397,10 @@ func _test_endless_first_play_tutorial(game: Node) -> void:
 	assert(game.puku_buyback_tutorial_active)
 	assert(game.tutorial_guide_message.text == Localizer.text("ja", "puku_buyback_2"))
 	game._advance_puku_buyback_tutorial()
+	assert(game.puku_buyback_tutorial_active)
+	assert(game.tutorial_guide_message.text == Localizer.text("ja", "puku_buyback_2_endless"))
+	assert(not game.tutorial_panda_portrait.visible)
+	game._advance_puku_buyback_tutorial()
 	assert(game.puku_buyback_tutorial_complete and not game.puku_buyback_tutorial_active)
 	await get_tree().create_timer(1.55).timeout
 	assert(game.play_active and game.plants.size() == game.play_concurrent_target)
@@ -635,7 +639,9 @@ func _test_formal_endless_main_features(game: Node) -> void:
 	assert(is_equal_approx(float(JellyBalanceClass.FORMAL.ultra_weight),4.0))
 	game.puku_gauge_intro_complete=false
 	game._start_puku_gauge_intro_dialog()
-	assert(game.scripted_dialog_kind=="puku_gauge_first_gift" and game.scripted_dialog_pages.size()==2)
+	assert(game.scripted_dialog_kind=="puku_gauge_first_gift" and game.scripted_dialog_pages.size()==3)
+	assert(game.scripted_dialog_pages.map(func(page: Dictionary) -> String: return str(page.get("speaker", ""))) == ["panda", "panda", ""])
+	game._advance_scripted_dialog()
 	game._advance_scripted_dialog()
 	game._advance_scripted_dialog()
 	assert(game.puku_gauge_intro_complete)

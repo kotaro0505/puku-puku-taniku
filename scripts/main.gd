@@ -7,6 +7,7 @@ const AudioManagerClass = preload("res://scripts/audio_manager.gd")
 const JellyBalanceClass = preload("res://scripts/jelly_balance.gd")
 const ArrangementUIClass = preload("res://scripts/arrangement_ui.gd")
 const ArrangementNavigationHintClass = preload("res://scripts/arrangement_navigation_hint.gd")
+const PotUnlockIAPServiceClass = preload("res://scripts/pot_unlock_iap_service.gd")
 const CatalogPreviewDevClass = preload("res://scripts/catalog_preview_dev.gd")
 const ForestGachaSystemClass = preload("res://scripts/forest_gacha_system.gd")
 const ForestGachaUIClass = preload("res://scripts/forest_gacha_ui.gd")
@@ -166,6 +167,11 @@ const SERIES_CAROUSEL_CARD_SIZE := Vector2(480,590)
 const SERIES_CAROUSEL_SPACING := 420.0
 const SERIES_CAROUSEL_SWIPE_THRESHOLD := 78.0
 const SERIES_CAROUSEL_SLIDE_SECONDS := 0.28
+const COLLECTION_COMPLETE_FADE_OUT_SECONDS := 0.55
+const COLLECTION_COMPLETE_FADE_IN_SECONDS := 1.0
+const COLLECTION_COMPLETE_SILHOUETTE_SECONDS := 0.72
+const COLLECTION_COMPLETE_REVEAL_SECONDS := 0.56
+const COLLECTION_COMPLETE_LIGHT_SECONDS := 0.9
 const ENDING_BGM_FADE_IN_SECONDS := 2.5
 const ENDING_BGM_FADE_OUT_SECONDS := 1.25
 
@@ -365,6 +371,27 @@ var encyclopedia_list_get: Label
 var encyclopedia_unlock_panel: PanelContainer
 var encyclopedia_unlock_status: Label
 var encyclopedia_unlock_puku_button: Button
+var encyclopedia_complete_badge_label: Label
+var collection_complete_versions: Dictionary = {}
+var collection_complete_pending_species_id := ""
+var collection_complete_resume_context := ""
+var collection_complete_resume_shop_visible := false
+var collection_complete_presentation_active := false
+var collection_complete_presentation_phase := ""
+var collection_complete_catalog_ready_before_fade_in := false
+var collection_complete_prepared_series_id := ""
+var collection_complete_prepared_species_id := ""
+var collection_complete_prepared_scroll := 0
+var collection_complete_target_image: TextureRect
+var collection_complete_silhouette_image: TextureRect
+var collection_complete_overlay: Control
+var collection_complete_effect_layer: Control
+var collection_complete_card: PanelContainer
+var collection_complete_title_label: Label
+var collection_complete_message_label: Label
+var collection_complete_version_label: Label
+var collection_complete_continue_button: Button
+var collection_complete_animation_speed_scale := 1.0
 var habitat_status_label: Label
 var seed_bag_panel: PanelContainer
 var play_timer_label: Label
@@ -514,6 +541,7 @@ var species_get_overlay
 var species_get_queue:Array[Dictionary]=[]
 var species_get_active_context:=""
 var species_get_active_series_id:=""
+var species_get_active_species_id:=""
 var catalog_series_unlock_overlay
 var catalog_series_unlock_active_id:=""
 var fusion_system
@@ -572,9 +600,12 @@ var catalog_cover_species: Dictionary = {}
 var get_counts_migration_dirty := false
 var puku_balance_migration_dirty := false
 var catalog_cover_migration_dirty := false
+var collection_completion_migration_dirty := false
 var pot_inventory_migration_dirty := false
 var pot_catalog: Array = []
 var owned_pots: Dictionary = {DEFAULT_POT_ID:1}
+var pot_design_unlocks: Dictionary = {}
+var pot_unlock_iap_service
 var saved_arrangements: Array = []
 var arrangement_save_capacity := 20
 var arrangement_ui
@@ -755,6 +786,7 @@ func _ready() -> void:
 	_load_pot_data()
 	secret_gacha_system=SecretGachaSystemClass.new();secret_gacha_system.load_config();secret_gacha_system.configure(series_catalog,catalog_species,pot_catalog,catalog_progression)
 	_load_save()
+	_setup_pot_unlock_iap()
 	habitat_simulation_unix=Time.get_unix_time_from_system()
 	var recovered_forest_encounters:=_register_encountered_species_for_unlocked_series()
 	_apply_saved_unlocks()
@@ -765,11 +797,11 @@ func _ready() -> void:
 	if not legacy_habitat_notification_ids_to_cancel.is_empty():
 		habitat_notification_service=HabitatNotificationServiceClass.new();add_child(habitat_notification_service)
 		habitat_notification_service.cancel_all(legacy_habitat_notification_ids_to_cancel);legacy_habitat_notification_ids_to_cancel.clear()
-	if best_spawn_unlocks_dirty or get_counts_migration_dirty or puku_balance_migration_dirty or catalog_cover_migration_dirty or pot_inventory_migration_dirty or recovered_forest_encounters:
+	if best_spawn_unlocks_dirty or get_counts_migration_dirty or puku_balance_migration_dirty or catalog_cover_migration_dirty or collection_completion_migration_dirty or pot_inventory_migration_dirty or recovered_forest_encounters:
 		# A true cold start must reach the language choice before creating its
 		# first save.  The selected language then persists all initialized state.
 		if save_file_present_on_boot or language_selected:_save()
-		best_spawn_unlocks_dirty=false;get_counts_migration_dirty=false;puku_balance_migration_dirty=false;catalog_cover_migration_dirty=false;pot_inventory_migration_dirty=false
+		best_spawn_unlocks_dirty=false;get_counts_migration_dirty=false;puku_balance_migration_dirty=false;catalog_cover_migration_dirty=false;collection_completion_migration_dirty=false;pot_inventory_migration_dirty=false
 	_build_world()
 	_build_ui()
 	if habitat_awakened and (habitat_wild_initialized or habitat_unlocked):_ensure_habitat_wild_state(Time.get_unix_time_from_system(),true)
@@ -954,22 +986,59 @@ func _load_collection_rarity()->void:
 
 func _load_pot_data()->void:
 	pot_catalog.clear()
-	var parsed_pots=JSON.parse_string(FileAccess.get_file_as_string("res://data/pots.json"))
-	if parsed_pots is Array:
+	var seen_pot_ids:Dictionary={}
+	var seen_product_ids:Dictionary={}
+	for data_path in ["res://data/pots.json","res://data/pot-iap-catalog.json"]:
+		var parsed_pots=JSON.parse_string(FileAccess.get_file_as_string(data_path))
+		if not parsed_pots is Array:continue
 		for raw_pot in parsed_pots:
-			if raw_pot is Dictionary and not str(raw_pot.get("pot_id","")).is_empty():
-				var pot:Dictionary=raw_pot.duplicate(true);pot["price_puku"]=POT_PRICE_PUKU
-				if not pot.has("sales_stage"):pot["sales_stage"]=0
-				pot_catalog.append(pot)
+			if not raw_pot is Dictionary:continue
+			var pot:Dictionary=raw_pot.duplicate(true)
+			var pot_id:=str(pot.get("pot_id","")).strip_edges()
+			if pot_id.is_empty() or seen_pot_ids.has(pot_id):
+				push_error("Duplicate or empty pot_id in %s: %s"%[data_path,pot_id])
+				continue
+			pot["pot_id"]=pot_id
+			pot["price_puku"]=maxi(0,int(pot.get("price_puku",POT_PRICE_PUKU)))
+			if not pot.has("sales_group"):pot["sales_group"]="initial"
+			if not pot.has("unlock_type"):pot["unlock_type"]="free"
+			if not pot.has("sales_stage"):pot["sales_stage"]={"initial":0,"group_1":1,"group_2":2}.get(str(pot.get("sales_group","initial")),0)
+			if not pot.has("unlock_condition"):pot["unlock_condition"]={"type":"default"}
+			if not pot.has("placement_area"):pot["placement_area"]={"x":.08,"y":.10,"width":.84,"height":.56}
+			var product_id:=str(pot.get("iap_product_id","")).strip_edges()
+			if str(pot.get("unlock_type","free"))=="iap_unlock":
+				if product_id.is_empty() or seen_product_ids.has(product_id):
+					push_error("Missing or duplicate pot IAP product id in %s: %s"%[data_path,product_id])
+					continue
+				seen_product_ids[product_id]=true
+			seen_pot_ids[pot_id]=true
+			pot_catalog.append(pot)
 	pot_catalog.sort_custom(func(a:Dictionary,b:Dictionary)->bool:return int(a.get("sort_order",0))<int(b.get("sort_order",0)))
-	if pot_catalog.is_empty():pot_catalog.append({"pot_id":DEFAULT_POT_ID,"display_name":"浅型素焼き鉢","image_path":"","price_puku":POT_PRICE_PUKU,"sales_stage":0,"unlock_condition":{"type":"default"},"iap_product_id":"","placement_area":{"x":.06,"y":.10,"width":.88,"height":.56},"sort_order":0})
+	if pot_catalog.is_empty():pot_catalog.append({"pot_id":DEFAULT_POT_ID,"display_name":"浅型素焼き鉢","image_path":"","price_puku":POT_PRICE_PUKU,"sales_group":"initial","unlock_type":"free","sales_stage":0,"unlock_condition":{"type":"default"},"iap_product_id":"","placement_area":{"x":.06,"y":.10,"width":.88,"height":.56},"sort_order":0})
+
+func _setup_pot_unlock_iap()->void:
+	pot_unlock_iap_service=PotUnlockIAPServiceClass.new()
+	add_child(pot_unlock_iap_service)
+	pot_unlock_iap_service.state_changed.connect(_on_pot_iap_state_changed)
+	pot_unlock_iap_service.entitlement_changed.connect(_on_pot_iap_entitlement_changed)
+	pot_unlock_iap_service.purchase_failed.connect(_on_pot_iap_purchase_failed)
+	pot_unlock_iap_service.restore_finished.connect(_on_pot_iap_restore_finished)
+	pot_unlock_iap_service.configure(pot_catalog,pot_design_unlocks)
 
 func _load_save() -> void:
 	_cancel_puku_gauge_animations()
-	legacy_habitat_migration_dirty=false;puku_balance_migration_dirty=false;catalog_cover_migration_dirty=false;pot_inventory_migration_dirty=false;legacy_habitat_notification_ids_to_cancel.clear();panda_beacon_unread_log.clear()
+	_reset_collection_complete_presentation(true)
+	legacy_habitat_migration_dirty=false;puku_balance_migration_dirty=false;catalog_cover_migration_dirty=false;collection_completion_migration_dirty=false;pot_inventory_migration_dirty=false;legacy_habitat_notification_ids_to_cancel.clear();panda_beacon_unread_log.clear()
 	puku_balance_units=0
 	normal_round_free_plays=0
 	catalog_cover_species={}
+	collection_complete_versions={}
+	collection_complete_pending_species_id=""
+	collection_complete_resume_context=""
+	collection_complete_resume_shop_visible=false
+	collection_complete_presentation_active=false
+	collection_complete_presentation_phase=""
+	collection_complete_catalog_ready_before_fade_in=false
 	jurejure_pending_reward_species_id=""
 	jurejure_pending_reward_is_new=false
 	pending_round_new_species_ids.clear()
@@ -977,6 +1046,7 @@ func _load_save() -> void:
 	round_result_species_finalize_active=false
 	save_file_present_on_boot=false
 	language_selected=false
+	pot_design_unlocks={}
 	var save_path:=_active_save_path()
 	if FileAccess.file_exists(save_path):
 		var value = JSON.parse_string(FileAccess.get_file_as_string(save_path))
@@ -1002,7 +1072,8 @@ func _load_save() -> void:
 			else:
 				puku_gauge_cm=fposmod(puku_gauge_cm,SEED_POD_GAUGE_TARGET_CM)
 			species_get_counts=value.get("species_get_counts",{});unlocked_series=value.get("unlocked_series",{INITIAL_SERIES_ID:true});catalog_cover_species=value.get("catalog_cover_species",{})
-			owned_pots=value.get("owned_pots",{DEFAULT_POT_ID:1});saved_arrangements=value.get("saved_arrangements",[]);arrangement_save_capacity=maxi(1,int(value.get("arrangement_save_capacity",20)))
+			collection_complete_versions=_normalize_collection_complete_versions(value.get("collection_complete_versions",{}))
+			owned_pots=value.get("owned_pots",{DEFAULT_POT_ID:1});pot_design_unlocks=_normalize_pot_design_unlocks(value.get("pot_design_unlocks",{}));saved_arrangements=value.get("saved_arrangements",[]);arrangement_save_capacity=maxi(1,int(value.get("arrangement_save_capacity",20)))
 			if not value.has("owned_pots"):pot_inventory_migration_dirty=true
 			if not species_get_counts is Dictionary:species_get_counts={}
 			if not unlocked_series is Dictionary:unlocked_series={INITIAL_SERIES_ID:true}
@@ -1147,6 +1218,7 @@ func _load_save() -> void:
 			_refresh_seed_pack_unlocks()
 			_migrate_mystery_route_progress()
 			if _normalize_catalog_cover_species() or not value.has("catalog_cover_species"):catalog_cover_migration_dirty=true
+			if _reconcile_collection_completion_after_load():collection_completion_migration_dirty=true
 			if _is_endless_greenhouse_enabled():
 				endless_greenhouse.restore_discovery_state(value.get("endless_discovery_state",{}))
 			if migrating_legacy_puku_balance and _ensure_initial_puku_capital(false):puku_balance_migration_dirty=true
@@ -1158,8 +1230,8 @@ func _save() -> void:
 		return
 	if audio_manager:audio_settings=audio_manager.settings_dictionary()
 	var payload:={
-		"progression_version":PROGRESSION_VERSION,"bests":bests,"discovered":discovered,"species_get_counts":species_get_counts,"catalog_cover_species":catalog_cover_species,
-		"unlocked_series":unlocked_series,"owned_pots":owned_pots,"saved_arrangements":saved_arrangements,"arrangement_save_capacity":arrangement_save_capacity,
+		"progression_version":PROGRESSION_VERSION,"bests":bests,"discovered":discovered,"species_get_counts":species_get_counts,"catalog_cover_species":catalog_cover_species,"collection_complete_versions":collection_complete_versions,
+		"unlocked_series":unlocked_series,"owned_pots":owned_pots,"pot_design_unlocks":pot_design_unlocks,"saved_arrangements":saved_arrangements,"arrangement_save_capacity":arrangement_save_capacity,
 		"unlocked_species":unlocked_species,"greenhouse_available":greenhouse_available,"completed_unlock_conditions":completed_unlock_conditions,"pending_habitat_species":pending_habitat_species,
 		"total_play_count":total_play_count,"normal_play_count":normal_play_count,"formal_play_count":formal_play_count,"shop_visit_count":shop_visit_count,
 		"hidden_species_acquired":hidden_species_acquired,"tovar_next_play":tovar_next_play,"tovar_attempt_count":tovar_attempt_count,
@@ -1495,6 +1567,7 @@ func _migrate_three_act_progress(saved_progression_version:int)->void:
 	jurejure_pool_unlocked=jurejure_pool_unlocked or legacy_jurejure_unlock_found
 	if jurejure_pool_unlocked:_sync_jurejure_pool_unlock_state()
 	var fantasy_count:=_unique_fantasy_species_get_count()
+	var act2_species_count:=_unique_act2_species_get_count()
 	var jurejure_count:=_unique_jurejure_species_get_count()
 	if jurejure_battle_count>=1 or habitat_second_awakened or fantasy_count>0:
 		act2_unlocked=true
@@ -1528,7 +1601,7 @@ func _migrate_three_act_progress(saved_progression_version:int)->void:
 	elif saved_progression_version<PROGRESSION_VERSION:
 		if fantasy_count>=1 and not fantasy_first_discovery_seen:StoryProgressionClass.queue_story_event(story_progression_state,StoryProgressionClass.EVENT_FANTASY_FIRST)
 		if fantasy_count>=6 and not fantasy_realization_seen:StoryProgressionClass.queue_story_event(story_progression_state,StoryProgressionClass.EVENT_FANTASY_SIX)
-	if fantasy_count>=24:
+	if act2_species_count>=24:
 		act3_unlocked=true
 		if not act3_intro_seen:act3_intro_pending=true
 	if act3_intro_seen:
@@ -1764,6 +1837,7 @@ func _build_ui() -> void:
 	_build_jurejure_first_encounter(hud)
 	_build_puku_puku_battle(hud)
 	_build_scene_transition_fade(hud)
+	_build_collection_complete_overlay(hud)
 	if _trial_dev_controls_enabled():
 		_build_habitat_dev_panel(hud)
 	if _trial_dev_controls_enabled():
@@ -1878,6 +1952,17 @@ func _build_puku_puku_battle(hud:Control)->void:
 
 func _build_scene_transition_fade(hud:Control)->void:
 	scene_transition_fade=ColorRect.new();scene_transition_fade.name="SceneTransitionFade";scene_transition_fade.color=Color.BLACK;scene_transition_fade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);scene_transition_fade.mouse_filter=Control.MOUSE_FILTER_STOP;scene_transition_fade.z_index=980;scene_transition_fade.visible=false;hud.add_child(scene_transition_fade)
+
+func _build_collection_complete_overlay(hud:Control)->void:
+	collection_complete_overlay=Control.new();collection_complete_overlay.name="CollectionCompleteOverlay";collection_complete_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);collection_complete_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;collection_complete_overlay.z_index=970;collection_complete_overlay.visible=false;hud.add_child(collection_complete_overlay)
+	collection_complete_effect_layer=Control.new();collection_complete_effect_layer.name="CollectionCompleteEffects";collection_complete_effect_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);collection_complete_effect_layer.mouse_filter=Control.MOUSE_FILTER_IGNORE;collection_complete_overlay.add_child(collection_complete_effect_layer)
+	collection_complete_card=PanelContainer.new();collection_complete_card.name="CollectionCompleteCard";collection_complete_card.position=Vector2(38,244);collection_complete_card.size=Vector2(500,452);collection_complete_card.pivot_offset=collection_complete_card.size*.5;collection_complete_card.add_theme_stylebox_override("panel",_box(Color(.13,.07,.075,.97),Color("#f1c45f"),30,4));collection_complete_card.visible=false;collection_complete_overlay.add_child(collection_complete_card)
+	var content:=VBoxContainer.new();content.alignment=BoxContainer.ALIGNMENT_CENTER;content.add_theme_constant_override("separation",13);content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);content.offset_left=28;content.offset_top=24;content.offset_right=-28;content.offset_bottom=-24;collection_complete_card.add_child(content)
+	collection_complete_title_label=Label.new();collection_complete_title_label.custom_minimum_size=Vector2(430,66);collection_complete_title_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;collection_complete_title_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;collection_complete_title_label.add_theme_font_size_override("font_size",31);collection_complete_title_label.add_theme_color_override("font_color",Color("#fff19a"));collection_complete_title_label.add_theme_color_override("font_outline_color",Color("#6f3021"));collection_complete_title_label.add_theme_constant_override("outline_size",7);content.add_child(collection_complete_title_label)
+	collection_complete_message_label=Label.new();collection_complete_message_label.custom_minimum_size=Vector2(430,112);collection_complete_message_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;collection_complete_message_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;collection_complete_message_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;collection_complete_message_label.add_theme_font_size_override("font_size",23);collection_complete_message_label.add_theme_color_override("font_color",Color("#fff5dc"));content.add_child(collection_complete_message_label)
+	var divider:=HSeparator.new();divider.custom_minimum_size=Vector2(390,8);content.add_child(divider)
+	collection_complete_version_label=Label.new();collection_complete_version_label.custom_minimum_size=Vector2(430,68);collection_complete_version_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;collection_complete_version_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;collection_complete_version_label.add_theme_font_size_override("font_size",17);collection_complete_version_label.add_theme_color_override("font_color",Color("#efc86e"));content.add_child(collection_complete_version_label)
+	collection_complete_continue_button=Button.new();collection_complete_continue_button.name="CollectionCompleteContinue";collection_complete_continue_button.custom_minimum_size=Vector2(330,56);_skin_button(collection_complete_continue_button,Color("#f2d58a"),18);collection_complete_continue_button.pressed.connect(_on_collection_complete_card_closed);content.add_child(collection_complete_continue_button)
 
 func _start_opening_story(as_replay:=false,start_page:=0)->void:
 	if opening_story_overlay==null:return
@@ -2004,6 +2089,8 @@ func _build_arrangement_ui(hud:Control)->void:
 	arrangement_ui.save_requested.connect(_on_arrangement_save_requested)
 	arrangement_ui.dismantle_requested.connect(_on_arrangement_dismantle_requested)
 	arrangement_ui.pot_purchase_requested.connect(_on_pot_purchase_requested)
+	arrangement_ui.pot_unlock_requested.connect(_on_pot_unlock_requested)
+	arrangement_ui.pot_restore_requested.connect(_on_pot_restore_requested)
 	arrangement_ui.catalog_purchase_requested.connect(_on_catalog_purchase_requested)
 	arrangement_ui.seed_purchase_requested.connect(_buy_seed_bag)
 	arrangement_ui.world_scroll_input.connect(_on_arrangement_world_scroll_input)
@@ -2017,7 +2104,10 @@ func _build_arrangement_navigation_hint(hud:Control)->void:
 
 func _sync_arrangement_ui()->void:
 	if arrangement_ui==null:return
-	arrangement_ui.configure(catalog_species,[],pot_catalog,discovered,owned_pots,saved_arrangements,arrangement_save_capacity,puku_points,_species_texture,_request_species_texture,bests,language_code,_current_pot_sales_stage())
+	var iap_states:Dictionary=pot_unlock_iap_service.product_states_snapshot() if pot_unlock_iap_service!=null else {}
+	var restore_available:bool=pot_unlock_iap_service.restore_available() if pot_unlock_iap_service!=null else false
+	var restore_in_progress:bool=pot_unlock_iap_service.restore_in_progress() if pot_unlock_iap_service!=null else false
+	arrangement_ui.configure(catalog_species,[],pot_catalog,discovered,owned_pots,saved_arrangements,arrangement_save_capacity,puku_points,_species_texture,_request_species_texture,bests,language_code,_current_pot_sales_stage(),pot_design_unlocks,iap_states,restore_available,restore_in_progress)
 	arrangement_ui.sync_catalog_state(unlocked_series,puku_points)
 	arrangement_ui.sync_seed_shop_state(_seed_shop_products(),puku_points)
 
@@ -2088,8 +2178,12 @@ func _finish_arrangement_return()->void:
 func _on_arrangement_save_requested(arrangement:Dictionary)->void:
 	arrangement_ui.set_save_request_result(false)
 	var requested_pot_id:=str(arrangement.get("pot_id",DEFAULT_POT_ID))
-	if _pot_entry(requested_pot_id).is_empty():
+	var requested_pot:=_pot_entry(requested_pot_id)
+	if requested_pot.is_empty():
 		arrangement_ui.set_save_request_result(false,Localizer.text(language_code,"pot_missing"))
+		return
+	if not _pot_unlocked(requested_pot):
+		arrangement_ui.set_save_request_result(false,Localizer.text(language_code,"pot_unlock_required"))
 		return
 	var normalized:=_normalize_arrangement(arrangement)
 	if normalized.is_empty():return
@@ -2119,12 +2213,54 @@ func _on_arrangement_dismantle_requested(arrangement_id:String)->void:
 func _on_pot_purchase_requested(pot_id:String)->void:
 	var pot:=_pot_entry(pot_id)
 	if pot.is_empty():arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"pot_missing"));return
-	if not _pot_unlocked(pot):arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"pot_locked"));return
-	var price:=POT_PRICE_PUKU
+	if not _pot_progression_unlocked(pot):arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"pot_locked"));return
+	if not _pot_design_unlocked(pot):arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"pot_unlock_required"));return
+	var price:=maxi(0,int(pot.get("price_puku",POT_PRICE_PUKU)))
 	var price_units:=_puku_cost_units(price)
 	if not _can_afford_puku_units(price_units):arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"not_enough_puku"));return
 	_change_puku_balance(-price_units,"pot_purchase",false,true);owned_pots[pot_id]=_owned_pot_total(pot_id)+1;_save();_update_currency_ui();arrangement_ui.sync_state(owned_pots,saved_arrangements,arrangement_save_capacity);arrangement_ui.sync_catalog_state(unlocked_series,puku_points);arrangement_ui.sync_seed_shop_state(_seed_shop_products(),puku_points);arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"pot_bought_count",[Localizer.pot_name(language_code,pot),_owned_pot_total(pot_id)]))
 	audio_manager.notify_user_gesture();audio_manager.play_se("purchase",1.0)
+
+func _on_pot_unlock_requested(product_id:String)->void:
+	var pot:=_pot_entry_for_product(product_id)
+	if pot.is_empty() or not _pot_progression_unlocked(pot):
+		arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"pot_locked"))
+		return
+	if _pot_design_unlocked(pot):
+		arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"pot_already_unlocked"))
+		return
+	if pot_unlock_iap_service==null or not pot_unlock_iap_service.purchase(product_id):
+		arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"iap_purchase_unavailable"))
+		return
+	arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"iap_purchase_processing"))
+
+func _on_pot_restore_requested()->void:
+	if pot_unlock_iap_service==null or not pot_unlock_iap_service.restore_purchases():
+		arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"iap_restore_unavailable"))
+		return
+	arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"iap_restore_processing"))
+	_sync_arrangement_ui()
+
+func _on_pot_iap_state_changed()->void:
+	if arrangement_ui!=null:_sync_arrangement_ui()
+
+func _on_pot_iap_entitlement_changed(product_id:String,unlocked:bool)->void:
+	if unlocked:pot_design_unlocks[product_id]=true
+	else:pot_design_unlocks.erase(product_id)
+	if save_file_present_on_boot or language_selected:_save()
+	if arrangement_ui!=null:
+		_sync_arrangement_ui()
+		var pot:=_pot_entry_for_product(product_id)
+		if unlocked and not pot.is_empty():arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"pot_unlock_success",[Localizer.pot_name(language_code,pot)]))
+
+func _on_pot_iap_purchase_failed(_product_id:String,reason:String)->void:
+	if arrangement_ui==null:return
+	arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"iap_purchase_canceled" if reason=="canceled" else "iap_purchase_failed"))
+
+func _on_pot_iap_restore_finished(success:bool)->void:
+	if arrangement_ui==null:return
+	arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"iap_restore_complete" if success else "iap_restore_failed"))
+	_sync_arrangement_ui()
 
 func _on_catalog_purchase_requested(series_id:String)->void:
 	# Catalog pages are recorded automatically on first GET; they are never sold.
@@ -2135,7 +2271,15 @@ func _pot_entry(pot_id:String)->Dictionary:
 		if value is Dictionary and str(value.get("pot_id",""))==pot_id:return value
 	return {}
 
+func _pot_entry_for_product(product_id:String)->Dictionary:
+	for value in pot_catalog:
+		if value is Dictionary and str(value.get("iap_product_id",""))==product_id:return value
+	return {}
+
 func _pot_unlocked(pot:Dictionary)->bool:
+	return _pot_progression_unlocked(pot) and _pot_design_unlocked(pot)
+
+func _pot_progression_unlocked(pot:Dictionary)->bool:
 	if int(pot.get("sales_stage",0))>_current_pot_sales_stage():return false
 	var condition=pot.get("unlock_condition",{})
 	if not condition is Dictionary:return true
@@ -2145,10 +2289,28 @@ func _pot_unlocked(pot:Dictionary)->bool:
 		"default":return true
 		_:return false
 
+func _pot_design_unlocked(pot:Dictionary)->bool:
+	if str(pot.get("unlock_type","free"))!="iap_unlock":return true
+	var product_id:=str(pot.get("iap_product_id",""))
+	return not product_id.is_empty() and bool(pot_design_unlocks.get(product_id,false))
+
 func _current_pot_sales_stage()->int:
 	if act3_unlocked:return 2
-	if forest_gacha_unlocked:return 1
+	if forest_gacha_unlocked or fantasy_realization_seen or _unique_fantasy_species_get_count()>=6:return 1
 	return 0
+
+func _normalize_pot_design_unlocks(value:Variant)->Dictionary:
+	var normalized:Dictionary={}
+	if not value is Dictionary:return normalized
+	var known_products:Dictionary={}
+	for pot_value in pot_catalog:
+		if not pot_value is Dictionary or str(pot_value.get("unlock_type","free"))!="iap_unlock":continue
+		var product_id:=str(pot_value.get("iap_product_id",""))
+		if not product_id.is_empty():known_products[product_id]=true
+	for product_id_value in value:
+		var product_id:=str(product_id_value)
+		if known_products.has(product_id) and bool(value[product_id_value]):normalized[product_id]=true
+	return normalized
 
 func _owned_pot_total(pot_id:String)->int:
 	var value=owned_pots.get(pot_id,0)
@@ -2443,7 +2605,7 @@ func _start_scripted_dialog(kind:String,pages:Array,shop_context:=false)->void:
 	else:
 		# Gang confrontations deliberately take over the habitat theme. Act III's
 		# opening does so before exploitation_started is persisted.
-		_play_current_area_bgm(kind in ["jurejure_intro","jurejure_challenge","jurejure_exploitation_challenge","act3_intro","act3_exploitation_battle_intro"])
+		if kind!="collection_complete":_play_current_area_bgm(kind in ["jurejure_intro","jurejure_challenge","jurejure_exploitation_challenge","act3_intro","act3_exploitation_battle_intro"])
 	_advance_scripted_dialog()
 
 func _advance_scripted_dialog()->void:
@@ -2481,7 +2643,7 @@ func _finish_scripted_dialog()->void:
 	var finished_kind:=scripted_dialog_kind;var keep_shop:=scripted_dialog_shop_context
 	scripted_dialog_kind="";scripted_dialog_pages.clear();scripted_dialog_index=-1;scripted_dialog_shop_context=false;intro_overlay.visible=false
 	var acquired:Array[String]=[];var open_puku_intro:=false;var open_catalog:=false;var guide_habitat:=false;var guide_catalog:=false;var show_pinwheel_get:=false;var show_armadillo_gift:=false;var start_second_awakening:=false;var start_trio_event:=false;var start_jurejure_reveal:=false;var show_jurejure_choice:=false;var queue_jurejure_reward:=false;var focus_act3_exploitation:=false;var show_arrangement_swipe_intro:=false
-	var begin_restoration_join_habitat:=false;var restoration_return_stage:=0;var next_restoration_return_stage:=0;var start_restoration_join_after_return:=false;var start_restoration_epilogue:=false;var show_restoration_thank_you:=false;var start_habitat_crisis_travel:=false
+	var begin_restoration_join_habitat:=false;var restoration_return_stage:=0;var next_restoration_return_stage:=0;var start_restoration_join_after_return:=false;var start_restoration_epilogue:=false;var show_restoration_thank_you:=false;var start_habitat_crisis_travel:=false;var finish_collection_complete:=false
 	if finished_kind.begins_with("restoration_return_"):
 		restoration_return_stage=int(finished_kind.trim_prefix("restoration_return_"))
 		var restoration:=_restoration_state()
@@ -2583,6 +2745,8 @@ func _finish_scripted_dialog()->void:
 			armadillo_research_intro_seen=true
 		"puku_gauge_first_gift":
 			puku_gauge_intro_complete=true;tutorial_steps["puku_gauge_intro_complete"]=true;_ensure_initial_puku_capital(true);shop_current_page="categories";_set_shop_purchase_visible(true)
+		"collection_complete":
+			finish_collection_complete=true
 	_update_main_story_progress(false);_save();shop_overlay.visible=keep_shop
 	if (habitat_crisis_pending or habitat_crisis_started) and finished_kind in ["jurejure_exploitation_challenge","act3_exploitation_battle_intro"]:
 		show_jurejure_choice=false
@@ -2593,10 +2757,11 @@ func _finish_scripted_dialog()->void:
 		if show_pinwheel_get:call_deferred("_queue_species_get_by_id",HIDDEN_PINWHEEL_ID,true,"pinwheel_gift")
 		elif show_armadillo_gift and not armadillo_gift_species_id.is_empty():call_deferred("_queue_species_get_by_id",armadillo_gift_species_id,true,"armadillo_gift")
 	else:
-		if finished_kind not in ["jurejure_intro","jurejure_challenge","jurejure_exploitation_challenge"]:
+		if finished_kind not in ["jurejure_intro","jurejure_challenge","jurejure_exploitation_challenge","restoration_epilogue","collection_complete"]:
 			_play_current_area_bgm()
 	_update_play_ui()
-	if start_habitat_crisis_travel:call_deferred("_transition_to_habitat_crisis")
+	if finish_collection_complete:call_deferred("_finish_collection_complete_presentation")
+	elif start_habitat_crisis_travel:call_deferred("_transition_to_habitat_crisis")
 	elif begin_restoration_join_habitat:call_deferred("_transition_to_restoration_habitat","join",0)
 	elif restoration_return_stage>0:
 		if start_restoration_join_after_return:
@@ -2699,7 +2864,7 @@ func _start_habitat_return_dialog()->void:
 		{"speaker":"girl","text":Localizer.text(language_code,"habitat_return_girl_1")},
 		{"speaker":"armadillo","text":Localizer.text(language_code,"habitat_return_armadillo_1")},
 		{"speaker":"girl","text":Localizer.text(language_code,"habitat_return_girl_2")},
-		{"speaker":"armadillo","text":Localizer.text(language_code,"habitat_return_armadillo_2")}
+		{"speaker":"girl","text":Localizer.text(language_code,"habitat_return_armadillo_2")}
 	],false)
 
 func _start_initial_seed_stock_notice()->void:
@@ -2931,7 +3096,8 @@ func _start_puku_gauge_intro_dialog()->void:
 	if puku_gauge_intro_complete:return
 	_start_scripted_dialog("puku_gauge_first_gift",[
 		{"speaker":"panda","text":Localizer.text(language_code,"puku_intro_1")},
-		{"speaker":"panda","text":Localizer.text(language_code,"puku_intro_2"),"button":Localizer.text(language_code,"continue")}
+		{"speaker":"panda","text":Localizer.text(language_code,"puku_intro_2")},
+		{"speaker":"","text":Localizer.text(language_code,"puku_buyback_2_endless"),"button":Localizer.text(language_code,"continue")}
 	],true)
 
 func _claim_first_habitat_gift_once()->void:
@@ -2988,6 +3154,28 @@ void fragment(){
 	tutorial_cost_note_panel=PanelContainer.new();tutorial_cost_note_panel.name="FirstNormalCostNote";tutorial_cost_note_panel.position=Vector2(118,418);tutorial_cost_note_panel.size=Vector2(340,64);tutorial_cost_note_panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_cost_note_panel.add_theme_stylebox_override("panel",_box(Color("#fff4cd"),Color("#d28a2d"),16,3));tutorial_cost_note_panel.visible=false;tutorial_guide_overlay.add_child(tutorial_cost_note_panel)
 	tutorial_cost_note_label=Label.new();tutorial_cost_note_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;tutorial_cost_note_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;tutorial_cost_note_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;tutorial_cost_note_label.add_theme_font_size_override("font_size",18);tutorial_cost_note_label.add_theme_color_override("font_color",UI_BROWN);tutorial_cost_note_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_cost_note_panel.add_child(tutorial_cost_note_label)
 
+func _mirror_habitat_tutorial_button(source:Button)->void:
+	# Habitat is intentionally not pulsed: it must remain the exact same runtime
+	# rect as the real navigation button. Stop any tween left by the preceding
+	# guide before reusing this shared overlay button.
+	if tutorial_highlight_tween and tutorial_highlight_tween.is_valid():tutorial_highlight_tween.kill()
+	tutorial_highlight_tween=null
+	tutorial_guide_button.scale=Vector2.ONE;tutorial_guide_button.rotation=0.0;tutorial_guide_button.self_modulate=Color.WHITE
+	tutorial_guide_button.anchor_left=0.0;tutorial_guide_button.anchor_top=0.0;tutorial_guide_button.anchor_right=0.0;tutorial_guide_button.anchor_bottom=0.0
+	tutorial_guide_button.custom_minimum_size=Vector2.ZERO
+	tutorial_guide_button.text=source.text;tutorial_guide_button.alignment=source.alignment;tutorial_guide_button.clip_text=source.clip_text;tutorial_guide_button.text_overrun_behavior=source.text_overrun_behavior
+	for state in ["normal","hover","pressed","disabled","focus"]:
+		var source_style:=source.get_theme_stylebox(state)
+		if source_style:tutorial_guide_button.add_theme_stylebox_override(state,source_style.duplicate())
+	tutorial_guide_button.add_theme_font_size_override("font_size",source.get_theme_font_size("font_size"))
+	for color_name in ["font_color","font_hover_color","font_pressed_color","font_disabled_color","font_focus_color"]:
+		tutorial_guide_button.add_theme_color_override(color_name,source.get_theme_color(color_name))
+	var overlay_inverse:=tutorial_guide_overlay.get_global_transform_with_canvas().affine_inverse()
+	var source_transform:=source.get_global_transform_with_canvas()
+	var local_top_left:=overlay_inverse*(source_transform*Vector2.ZERO)
+	var local_bottom_right:=overlay_inverse*(source_transform*source.size)
+	tutorial_guide_button.position=local_top_left;tutorial_guide_button.size=local_bottom_right-local_top_left;tutorial_guide_button.pivot_offset=tutorial_guide_button.size*.5
+
 func _show_tutorial_guide(target:String)->void:
 	var source:Button
 	if target=="encyclopedia":source=encyclopedia_icon_button
@@ -2997,16 +3185,11 @@ func _show_tutorial_guide(target:String)->void:
 	elif target=="normal_seed":source=normal_play_button
 	else:return
 	_prepare_standard_tutorial_guide();tutorial_guide_button.icon=null;tutorial_guide_button.expand_icon=false;tutorial_dialog_panel.visible=false
-	tutorial_guide_button.position=source.global_position;tutorial_guide_button.custom_minimum_size=source.size;tutorial_guide_button.size=source.size;tutorial_guide_button.text=source.text;tutorial_guide_button.set_meta("target",target);_skin_button(tutorial_guide_button,Color("#fff0cf"),17 if target=="encyclopedia" else (16 if target=="habitat" else 15))
 	if target=="habitat":
-		# This is the real navigation control mirrored above the dimmer, not a
-		# temporary oversized tutorial button.
-		for state in ["normal","hover","pressed","disabled","focus"]:
-			var source_style:=source.get_theme_stylebox(state)
-			if source_style:tutorial_guide_button.add_theme_stylebox_override(state,source_style.duplicate())
-		tutorial_guide_button.add_theme_font_size_override("font_size",source.get_theme_font_size("font_size"))
-		for color_name in ["font_color","font_hover_color","font_pressed_color","font_disabled_color","font_focus_color"]:
-			tutorial_guide_button.add_theme_color_override(color_name,source.get_theme_color(color_name))
+		_mirror_habitat_tutorial_button(source)
+	else:
+		tutorial_guide_button.position=source.global_position;tutorial_guide_button.custom_minimum_size=source.size;tutorial_guide_button.size=source.size;tutorial_guide_button.text=source.text;_skin_button(tutorial_guide_button,Color("#fff0cf"),17 if target=="encyclopedia" else 15)
+	tutorial_guide_button.set_meta("target",target)
 	for connection in tutorial_guide_button.pressed.get_connections():tutorial_guide_button.pressed.disconnect(connection.callable)
 	tutorial_guide_button.pressed.connect(_complete_tutorial_guide)
 	tutorial_guide_overlay.visible=true
@@ -3190,7 +3373,7 @@ func _start_puku_buyback_tutorial()->void:
 	_show_puku_buyback_tutorial_page()
 
 func _show_puku_buyback_tutorial_page()->void:
-	var keys:=["puku_buyback_1","puku_buyback_2"]
+	var keys:=["puku_buyback_1","puku_buyback_2","puku_buyback_2_endless"]
 	if puku_buyback_tutorial_index>=keys.size():
 		puku_buyback_tutorial_active=false;puku_buyback_tutorial_complete=true;_hide_first_play_tutorial_overlay();_save()
 		if first_seed_pod_reward_event_active:call_deferred("_start_first_seed_pod_max_event")
@@ -3208,7 +3391,7 @@ func _show_puku_buyback_tutorial_page()->void:
 	for state in ["normal","hover","pressed","disabled","focus"]:tutorial_guide_button.add_theme_stylebox_override(state,empty_style)
 	for connection in tutorial_guide_button.pressed.get_connections():tutorial_guide_button.pressed.disconnect(connection.callable)
 	tutorial_guide_button.pressed.connect(_advance_puku_buyback_tutorial);tutorial_panda_portrait.texture=_speaker_portrait_texture("panda");tutorial_panda_portrait.visible=true;tutorial_guide_message.text=Localizer.text(language_code,str(keys[puku_buyback_tutorial_index]));tutorial_dialog_panel.visible=true;tutorial_dialog_panel.position=Vector2(40,790);tutorial_guide_overlay.visible=true
-	_set_tutorial_dialog_system_style(puku_buyback_tutorial_index==1)
+	_set_tutorial_dialog_system_style(puku_buyback_tutorial_index==2)
 
 func _advance_puku_buyback_tutorial()->void:
 	if not puku_buyback_tutorial_active:return
@@ -3674,7 +3857,7 @@ func _apply_language_to_ui()->void:
 	_set_named_localized_text("BgmToggle","audio_bgm_on")
 	_set_named_localized_text("SeToggle","audio_se_on")
 	_set_named_localized_text("AudioSettingsNote","audio_note")
-	_refresh_series_selection();_refresh_encyclopedia_header();_refresh_encyclopedia_cards();_refresh_research_catalog_reward();_update_currency_ui();_update_shop_ui();_update_play_ui()
+	_refresh_series_selection();_refresh_encyclopedia_header();_refresh_encyclopedia_cards();_refresh_collection_complete_badge();_refresh_research_catalog_reward();_update_currency_ui();_update_shop_ui();_update_play_ui()
 
 func _set_named_localized_text(node_name:String,key:String,args:Array=[])->void:
 	var control:=find_child(node_name,true,false)
@@ -3959,6 +4142,7 @@ func _queue_species_get_by_id(species_id:String,is_new:bool,context:String)->voi
 func _show_next_species_get()->void:
 	if species_get_overlay==null or species_get_overlay.visible or catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible or species_get_queue.is_empty():return
 	var queued:Dictionary=species_get_queue.pop_front();var entry:Dictionary=queued.get("entry",{});species_get_active_context=str(queued.get("context",""))
+	species_get_active_species_id=str(entry.get("species_id",""))
 	species_get_active_series_id=_series_id_for_species(str(entry.get("species_id","")))
 	if species_get_active_series_id in catalog_series_unlock_notice_queue:catalog_series_unlock_notice_ready[species_get_active_series_id]=true
 	var texture:=_species_texture(entry)
@@ -3967,7 +4151,9 @@ func _show_next_species_get()->void:
 	if audio_manager:audio_manager.play_se("new_species",.9)
 
 func _on_species_get_overlay_closed(context:String)->void:
+	_mark_collection_complete_get_card_seen(species_get_active_species_id)
 	species_get_active_context=""
+	species_get_active_species_id=""
 	var closed_series_id:=species_get_active_series_id
 	species_get_active_series_id=""
 	if not closed_series_id.is_empty() and closed_series_id in catalog_series_unlock_notice_queue:
@@ -3978,7 +4164,26 @@ func _on_catalog_series_unlock_overlay_closed(context:String)->void:
 	catalog_series_unlock_active_id=""
 	_continue_after_species_get_card(context)
 
+func _defer_followup_for_collection_complete(context:String)->bool:
+	if collection_complete_presentation_active or not _collection_completion_pending():return false
+	if collection_complete_resume_context.is_empty() and not context.is_empty():collection_complete_resume_context=context
+	collection_complete_resume_shop_visible=collection_complete_resume_shop_visible or (shop_overlay!=null and shop_overlay.visible)
+	if not species_get_queue.is_empty():
+		call_deferred("_show_next_species_get")
+		return true
+	if context=="round_result_new" or round_result_species_finalize_active or not round_result_species_finalize_queue.is_empty():
+		call_deferred("_show_next_round_result_species")
+		return true
+	if not _collection_complete_get_card_seen():
+		call_deferred("_queue_species_get_by_id",_collection_completion_last_species_id(),true,"collection_complete_recovery")
+		return true
+	if _try_start_catalog_series_unlock_notice():return true
+	if not catalog_series_unlock_notice_queue.is_empty():return true
+	call_deferred("_start_collection_complete_presentation")
+	return true
+
 func _continue_after_species_get_card(context:String)->void:
+	if _defer_followup_for_collection_complete(context):return
 	var followup_started:=false
 	var continue_round_result_queue:=false
 	var close_foreground_for_story:=_immediate_get_story_transition_pending()
@@ -4094,10 +4299,12 @@ func _change_audio_volume(value:float,is_bgm:bool)->void:
 
 func _reset_progression_state()->void:
 	_end_first_play_tutorial_context()
+	_reset_collection_complete_presentation(true)
+	collection_complete_versions.clear();collection_complete_pending_species_id="";collection_complete_resume_context="";collection_complete_resume_shop_visible=false
 	fusion_parent_a_id="";fusion_parent_b_id="";fusion_in_progress=false;fusion_return_pending=false
 	if fusion_lab_ui:fusion_lab_ui.close_lab()
 	if catalog_series_unlock_overlay:catalog_series_unlock_overlay.reset_overlay()
-	catalog_series_unlock_active_id="";species_get_active_series_id=""
+	catalog_series_unlock_active_id="";species_get_active_series_id="";species_get_active_species_id=""
 	endless_greenhouse.reset_discovery_state()
 	pending_restoration_snapshot.clear()
 	if habitat_restoration_ui:habitat_restoration_ui.reset_view()
@@ -4362,7 +4569,7 @@ func _current_mission_text()->String:
 	if StoryProgressionClass.exploitation_is_started(story_progression_state) or act3_intro_seen:
 		return Localizer.text(language_code,"mission_jurejure_species",[mini(8,_unique_jurejure_species_get_count())])
 	if act2_unlocked:
-		return Localizer.text(language_code,"mission_fantasy_species",[mini(24,_unique_fantasy_species_get_count())])
+		return Localizer.text(language_code,"mission_fantasy_species",[mini(24,_unique_act2_species_get_count())])
 	return ""
 
 func _mission_foreground_safe()->bool:
@@ -5152,6 +5359,7 @@ func _build_series_selection_page()->void:
 	series_position_label=Label.new();series_position_label.visible=false;cover_section.add_child(series_position_label)
 	var species_header:=Control.new();species_header.name="SpeciesListHeader";species_header.custom_minimum_size=Vector2(576,58);species_header.mouse_filter=Control.MOUSE_FILTER_PASS;scroll_content.add_child(species_header)
 	encyclopedia_list_title=Label.new();encyclopedia_list_title.position=Vector2(28,0);encyclopedia_list_title.size=Vector2(520,42);encyclopedia_list_title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;encyclopedia_list_title.add_theme_font_size_override("font_size",27);encyclopedia_list_title.add_theme_color_override("font_color",UI_CREAM);species_header.add_child(encyclopedia_list_title)
+	encyclopedia_complete_badge_label=Label.new();encyclopedia_complete_badge_label.name="CollectionCompleteBadge";encyclopedia_complete_badge_label.position=Vector2(28,43);encyclopedia_complete_badge_label.size=Vector2(520,35);encyclopedia_complete_badge_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;encyclopedia_complete_badge_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;encyclopedia_complete_badge_label.add_theme_font_size_override("font_size",14);encyclopedia_complete_badge_label.add_theme_color_override("font_color",Color("#f6cf69"));encyclopedia_complete_badge_label.add_theme_color_override("font_outline_color",Color("#4d271b"));encyclopedia_complete_badge_label.add_theme_constant_override("outline_size",4);encyclopedia_complete_badge_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;encyclopedia_complete_badge_label.visible=false;species_header.add_child(encyclopedia_complete_badge_label)
 	encyclopedia_list_progress=Label.new();encyclopedia_list_progress.visible=false;species_header.add_child(encyclopedia_list_progress)
 	encyclopedia_list_get=Label.new();encyclopedia_list_get.visible=false;species_header.add_child(encyclopedia_list_get)
 	encyclopedia_unlock_panel=PanelContainer.new();encyclopedia_unlock_panel.visible=false;species_header.add_child(encyclopedia_unlock_panel)
@@ -5181,6 +5389,7 @@ func _open_encyclopedia()->void:
 	play_modal_open=false;encyclopedia_detail_page.visible=false;encyclopedia_series_page.visible=true;play_overlay.visible=false;encyclopedia_overlay.visible=true;encyclopedia_scroll.scroll_vertical=0;_refresh_series_selection();_update_play_ui()
 
 func _close_encyclopedia()->void:
+	if collection_complete_presentation_active:return
 	_cancel_series_carousel_motion()
 	encyclopedia_overlay.visible=false
 	_release_encyclopedia_textures()
@@ -5270,6 +5479,307 @@ func _catalog_entry_is_listed_for_series(entry:Dictionary,series_id:String)->boo
 	for listed_entry in _catalog_display_entries_for_series(series_id):
 		if str(listed_entry.get("species_id",""))==species_id:return true
 	return false
+
+func _game_version_key()->String:
+	var version:=str(ProjectSettings.get_setting("application/config/version","1.0.0")).strip_edges()
+	return "1.0.0" if version.is_empty() else version.trim_prefix("v").trim_prefix("V")
+
+func _is_collection_complete_species(entry:Dictionary)->bool:
+	if entry.is_empty():return false
+	var species_id:=str(entry.get("species_id","")).strip_edges()
+	if species_id.is_empty():return false
+	for excluded_flag in ["development_only","dev_only","preview_only","test_only","retired","removed","placeholder","future_placeholder"]:
+		if bool(entry.get(excluded_flag,false)):return false
+	if entry.has("collectible") and not bool(entry.get("collectible",true)):return false
+	if entry.has("collection_complete_required") and not bool(entry.get("collection_complete_required",true)):return false
+	var lifecycle:=str(entry.get("status","")).to_lower()
+	if lifecycle in ["development","preview","test","retired","removed","placeholder","future"]:return false
+	var display_series_id:=_catalog_display_series_id_for_entry(entry)
+	var display_series:=_series_entry(display_series_id)
+	if display_series_id.is_empty() or display_series.is_empty() or _catalog_series_hidden_from_navigation(display_series):return false
+	# A species only contributes when it owns a real card on its current display
+	# page. This includes integrated fusion tiers and excludes route-only species
+	# intentionally removed from every catalog page.
+	return _catalog_entry_is_listed_for_series(entry,display_series_id)
+
+func _collection_complete_species_ids()->Array[String]:
+	var ids:Array[String]=[];var included:Dictionary={}
+	for entry_value in catalog_species:
+		if not entry_value is Dictionary:continue
+		var entry:Dictionary=entry_value
+		if not _is_collection_complete_species(entry):continue
+		var species_id:=str(entry.get("species_id",""))
+		if included.has(species_id):continue
+		included[species_id]=true;ids.append(species_id)
+	return ids
+
+func _collection_complete_target_count()->int:
+	return _collection_complete_species_ids().size()
+
+func _collection_complete_get_count()->int:
+	var count:=0
+	for species_id in _collection_complete_species_ids():
+		if _species_get_count(species_id)>0:count+=1
+	return count
+
+func _normalize_collection_complete_versions(raw_value:Variant)->Dictionary:
+	var normalized:Dictionary={}
+	if not raw_value is Dictionary:return normalized
+	for raw_version in raw_value:
+		var version:=str(raw_version).strip_edges()
+		var raw_record:Variant=raw_value.get(raw_version,{})
+		if version.is_empty() or not raw_record is Dictionary:continue
+		var record:Dictionary=raw_record.duplicate(true)
+		record["completed"]=bool(record.get("completed",false))
+		record["presentation_seen"]=bool(record.get("presentation_seen",false))
+		record["last_get_card_seen"]=bool(record.get("last_get_card_seen",true))
+		record["completed_at"]=str(record.get("completed_at",""))
+		record["species_count"]=maxi(0,int(record.get("species_count",0)))
+		record["last_species_id"]=str(record.get("last_species_id",""))
+		normalized[version]=record
+	return normalized
+
+func _collection_complete_current_record()->Dictionary:
+	var record:Variant=collection_complete_versions.get(_game_version_key(),{})
+	return record if record is Dictionary else {}
+
+func _collection_is_currently_complete()->bool:
+	var target_count:=_collection_complete_target_count()
+	return target_count>0 and _collection_complete_get_count()==target_count
+
+func _collection_completion_pending()->bool:
+	var record:=_collection_complete_current_record()
+	return bool(record.get("completed",false)) and not bool(record.get("presentation_seen",false)) and _collection_is_currently_complete()
+
+func _collection_completion_last_species_id()->String:
+	var record:=_collection_complete_current_record()
+	var species_id:=str(record.get("last_species_id",collection_complete_pending_species_id))
+	if _is_collection_complete_species(_catalog_entry(species_id)):return species_id
+	var target_ids:=_collection_complete_species_ids()
+	return "" if target_ids.is_empty() else target_ids[-1]
+
+func _new_collection_complete_record(last_species_id:String)->Dictionary:
+	return {
+		"completed":true,
+		"presentation_seen":false,
+		"last_get_card_seen":false,
+		"completed_at":Time.get_datetime_string_from_system(false,true),
+		"species_count":_collection_complete_target_count(),
+		"last_species_id":last_species_id,
+	}
+
+func _mark_collection_complete_if_earned(last_species_id:String)->bool:
+	if not _is_collection_complete_species(_catalog_entry(last_species_id)) or not _collection_is_currently_complete():return false
+	var version:=_game_version_key();var record:=_collection_complete_current_record()
+	if bool(record.get("completed",false)):return false
+	collection_complete_versions[version]=_new_collection_complete_record(last_species_id)
+	collection_complete_pending_species_id=last_species_id
+	# The species itself has already been formally registered. Persist both that
+	# GET and the achievement before any optional presentation begins.
+	_save()
+	_refresh_collection_complete_badge()
+	return true
+
+func _reconcile_collection_completion_after_load()->bool:
+	var changed:=false;var version:=_game_version_key();var record:=_collection_complete_current_record()
+	if _collection_is_currently_complete() and not bool(record.get("completed",false)):
+		var target_ids:=_collection_complete_species_ids()
+		var last_species_id:="" if target_ids.is_empty() else target_ids[-1]
+		record=_new_collection_complete_record(last_species_id)
+		record["last_get_card_seen"]=true
+		collection_complete_versions[version]=record;changed=true
+	if bool(record.get("completed",false)) and not bool(record.get("presentation_seen",false)) and _collection_is_currently_complete():
+		collection_complete_pending_species_id=_collection_completion_last_species_id()
+	return changed
+
+func _collection_complete_get_card_seen()->bool:
+	return bool(_collection_complete_current_record().get("last_get_card_seen",false))
+
+func _mark_collection_complete_get_card_seen(species_id:String)->void:
+	if species_id.is_empty() or species_id!=_collection_completion_last_species_id():return
+	var record:=_collection_complete_current_record()
+	if not bool(record.get("completed",false)) or bool(record.get("last_get_card_seen",false)):return
+	record["last_get_card_seen"]=true
+	collection_complete_versions[_game_version_key()]=record
+	_save()
+
+func _collection_complete_date_text(record:Dictionary)->String:
+	var completed_at:=str(record.get("completed_at",""))
+	if completed_at.length()<10:return ""
+	return completed_at.substr(0,10).replace("-",".")
+
+func _refresh_collection_complete_badge()->void:
+	if encyclopedia_complete_badge_label==null:return
+	var record:=_collection_complete_current_record();var completed:=bool(record.get("completed",false))
+	encyclopedia_complete_badge_label.visible=completed
+	var species_header:=encyclopedia_complete_badge_label.get_parent() as Control
+	if species_header:
+		species_header.custom_minimum_size.y=86.0 if completed else 58.0
+	if not completed:return
+	var date_text:=_collection_complete_date_text(record)
+	encyclopedia_complete_badge_label.text="Ver.%s COMPLETE ✓"%_game_version_key()
+	if not date_text.is_empty():encyclopedia_complete_badge_label.text+="　"+date_text
+
+func _collection_complete_seconds(base_seconds:float)->float:
+	return maxf(.001,base_seconds*maxf(.001,collection_complete_animation_speed_scale))
+
+func _clear_collection_complete_effects()->void:
+	if collection_complete_effect_layer==null:return
+	for child in collection_complete_effect_layer.get_children():child.queue_free()
+
+func _reset_collection_complete_card_visual()->void:
+	if is_instance_valid(collection_complete_target_image):
+		collection_complete_target_image.material=null
+		collection_complete_target_image.modulate=Color.WHITE
+	if is_instance_valid(collection_complete_silhouette_image):collection_complete_silhouette_image.queue_free()
+	collection_complete_target_image=null;collection_complete_silhouette_image=null
+
+func _reset_collection_complete_presentation(reset_fade:=false)->void:
+	_reset_collection_complete_card_visual();_clear_collection_complete_effects()
+	collection_complete_presentation_active=false;collection_complete_presentation_phase="";collection_complete_catalog_ready_before_fade_in=false
+	collection_complete_prepared_series_id="";collection_complete_prepared_species_id="";collection_complete_prepared_scroll=0
+	if collection_complete_card:collection_complete_card.visible=false;collection_complete_card.modulate=Color.WHITE;collection_complete_card.scale=Vector2.ONE
+	if collection_complete_overlay:collection_complete_overlay.visible=false
+	if reset_fade and scene_transition_fade:scene_transition_fade.visible=false;scene_transition_fade.color=Color.BLACK
+
+func _collection_complete_card_index(species_id:String)->int:
+	for index in range(encyclopedia_card_entries.size()):
+		if str(encyclopedia_card_entries[index].get("species_id",""))==species_id:return index
+	return -1
+
+func _prepare_collection_complete_catalog(species_id:String):
+	var entry:=_catalog_entry(species_id)
+	if entry.is_empty():return null
+	var series_id:=_catalog_display_series_id_for_entry(entry)
+	if not _catalog_entry_is_listed_for_series(entry,series_id):return null
+	unlocked_series[series_id]=true
+	var owned:=_owned_series_entries();var series_index:=-1
+	for index in range(owned.size()):
+		if str(owned[index].get("series_id",""))==series_id:series_index=index;break
+	if series_index<0:return null
+	selected_series_index=series_index;current_encyclopedia_series_id=series_id
+	encyclopedia_detail_page.visible=false;encyclopedia_series_page.visible=true;play_overlay.visible=false
+	encyclopedia_overlay.visible=true;encyclopedia_overlay.move_to_front();encyclopedia_scroll.scroll_vertical=0
+	_refresh_series_selection();_update_play_ui()
+	await get_tree().process_frame;await get_tree().process_frame
+	var card_index:=_collection_complete_card_index(species_id)
+	if card_index<0 or card_index>=encyclopedia_grid.get_child_count():return null
+	var card:=encyclopedia_grid.get_child(card_index) as Control
+	var current_scroll:=float(encyclopedia_scroll.scroll_vertical)
+	var card_content_y:=card.global_position.y-encyclopedia_scroll.global_position.y+current_scroll
+	var desired_scroll:=card_content_y+card.size.y*.5-encyclopedia_scroll.size.y*.58
+	var scroll_bar:=encyclopedia_scroll.get_v_scroll_bar()
+	var maximum_scroll:=maxf(0.0,scroll_bar.max_value-scroll_bar.page)
+	encyclopedia_scroll.scroll_vertical=roundi(clampf(desired_scroll,0.0,maximum_scroll))
+	await get_tree().process_frame;await get_tree().process_frame
+	_update_encyclopedia_visible_textures()
+	var image:=encyclopedia_card_images[card_index]
+	_request_species_texture(entry,image,true)
+	var expected_path:=_species_image_path(entry)
+	for _frame in range(180):
+		if not is_instance_valid(image):return null
+		var request_path:=str(image.get_meta("catalog_request_path",""))
+		var loaded_path:=str(image.get_meta("catalog_loaded_path",""))
+		if request_path.is_empty() and (not CatalogImageLoader.is_external_path(expected_path) or loaded_path==expected_path):break
+		await get_tree().process_frame
+	collection_complete_target_image=image
+	image.material=null;image.modulate=Color(1,1,1,0)
+	var silhouette:=TextureRect.new();silhouette.name="CollectionCompleteSilhouette";silhouette.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);silhouette.expand_mode=image.expand_mode;silhouette.stretch_mode=image.stretch_mode;silhouette.texture=image.texture;silhouette.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	if encyclopedia_silhouette_material==null:encyclopedia_silhouette_material=FusionLabUIClass.create_silhouette_material()
+	silhouette.material=encyclopedia_silhouette_material;silhouette.modulate=Color.WHITE;image.get_parent().add_child(silhouette);silhouette.move_to_front()
+	collection_complete_silhouette_image=silhouette
+	collection_complete_prepared_series_id=series_id;collection_complete_prepared_species_id=species_id;collection_complete_prepared_scroll=encyclopedia_scroll.scroll_vertical
+	collection_complete_catalog_ready_before_fade_in=true
+	return image
+
+func _play_collection_complete_light()->void:
+	_clear_collection_complete_effects()
+	var sweep:=Panel.new();sweep.name="CollectionCompleteLightSweep";sweep.position=Vector2(-190,-70);sweep.size=Vector2(150,1160);sweep.rotation=.10;sweep.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	var sweep_style:=StyleBoxFlat.new();sweep_style.bg_color=Color(1.0,.78,.28,.18);sweep_style.shadow_color=Color(1.0,.65,.16,.26);sweep_style.shadow_size=42;sweep_style.set_corner_radius_all(75);sweep.add_theme_stylebox_override("panel",sweep_style);collection_complete_effect_layer.add_child(sweep)
+	var light_duration:=_collection_complete_seconds(COLLECTION_COMPLETE_LIGHT_SECONDS)
+	var sweep_tween:=create_tween();sweep_tween.tween_property(sweep,"position:x",760.0,light_duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT);sweep_tween.parallel().tween_property(sweep,"modulate:a",0.0,light_duration*.35).set_delay(light_duration*.65)
+	var sparkle_positions:=[Vector2(62,168),Vector2(168,312),Vector2(286,202),Vector2(438,354),Vector2(510,510),Vector2(92,612),Vector2(238,738),Vector2(390,664),Vector2(486,806),Vector2(146,876),Vector2(322,906),Vector2(522,248)]
+	for index in range(sparkle_positions.size()):
+		var sparkle:=UISymbolIconClass.new();sparkle.symbol="sparkle";sparkle.icon_color=Color("#ffe98b");sparkle.position=sparkle_positions[index];sparkle.size=Vector2(22,22) if index%3 else Vector2(30,30);sparkle.pivot_offset=sparkle.size*.5;sparkle.scale=Vector2(.35,.35);sparkle.modulate.a=0.0;sparkle.mouse_filter=Control.MOUSE_FILTER_IGNORE;collection_complete_effect_layer.add_child(sparkle)
+		var delay:=light_duration*(.08+.055*float(index%8));var sparkle_tween:=create_tween().bind_node(sparkle);sparkle_tween.tween_interval(delay);sparkle_tween.tween_property(sparkle,"modulate:a",1.0,light_duration*.18);sparkle_tween.parallel().tween_property(sparkle,"scale",Vector2(1.18,1.18),light_duration*.32).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT);sparkle_tween.tween_property(sparkle,"modulate:a",0.0,light_duration*.28);sparkle_tween.parallel().tween_property(sparkle,"scale",Vector2(.72,.72),light_duration*.28);sparkle_tween.tween_callback(sparkle.queue_free)
+	await sweep_tween.finished
+	if is_instance_valid(sweep):sweep.queue_free()
+
+func _show_collection_complete_card()->void:
+	collection_complete_title_label.text=Localizer.text(language_code,"collection_complete_title")
+	collection_complete_message_label.text=Localizer.text(language_code,"collection_complete_message")
+	collection_complete_version_label.text="COLLECTION COMPLETE\nVer.%s"%_game_version_key()
+	collection_complete_continue_button.text=Localizer.text(language_code,"continue")
+	collection_complete_card.visible=true;collection_complete_card.modulate=Color(1,1,1,0);collection_complete_card.scale=Vector2(.88,.88)
+	var reveal:=create_tween().set_parallel();reveal.tween_property(collection_complete_card,"modulate:a",1.0,_collection_complete_seconds(.34));reveal.tween_property(collection_complete_card,"scale",Vector2.ONE,_collection_complete_seconds(.42)).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	if audio_manager:audio_manager.play_se("new_species",.68)
+	collection_complete_presentation_phase="complete"
+
+func _start_collection_complete_presentation()->void:
+	if collection_complete_presentation_active or not _collection_completion_pending():return
+	if collection_complete_overlay==null or scene_transition_fade==null:return
+	collection_complete_presentation_active=true;collection_complete_presentation_phase="fade_out";collection_complete_catalog_ready_before_fade_in=false
+	var species_id:=_collection_completion_last_species_id();collection_complete_pending_species_id=species_id
+	collection_complete_resume_shop_visible=collection_complete_resume_shop_visible or (shop_overlay!=null and shop_overlay.visible)
+	collection_complete_overlay.visible=true;collection_complete_overlay.move_to_front();collection_complete_card.visible=false;_clear_collection_complete_effects()
+	scene_transition_fade.color=Color.BLACK;scene_transition_fade.color.a=0.0;scene_transition_fade.visible=true;scene_transition_fade.move_to_front()
+	var fade_out:=create_tween();fade_out.tween_property(scene_transition_fade,"color:a",1.0,_collection_complete_seconds(COLLECTION_COMPLETE_FADE_OUT_SECONDS)).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	await fade_out.finished
+	if not collection_complete_presentation_active:return
+	var target_image=await _prepare_collection_complete_catalog(species_id)
+	if not collection_complete_presentation_active:return
+	collection_complete_overlay.move_to_front();scene_transition_fade.move_to_front()
+	collection_complete_presentation_phase="fade_in"
+	var fade_in:=create_tween();fade_in.tween_property(scene_transition_fade,"color:a",0.0,_collection_complete_seconds(COLLECTION_COMPLETE_FADE_IN_SECONDS)).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	await fade_in.finished
+	scene_transition_fade.visible=false;scene_transition_fade.color=Color.BLACK
+	collection_complete_presentation_phase="silhouette"
+	await get_tree().create_timer(_collection_complete_seconds(COLLECTION_COMPLETE_SILHOUETTE_SECONDS)).timeout
+	if not collection_complete_presentation_active:return
+	collection_complete_presentation_phase="reveal"
+	if is_instance_valid(target_image):
+		var reveal:=create_tween().set_parallel();reveal.tween_property(target_image,"modulate:a",1.0,_collection_complete_seconds(COLLECTION_COMPLETE_REVEAL_SECONDS)).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		if is_instance_valid(collection_complete_silhouette_image):reveal.tween_property(collection_complete_silhouette_image,"modulate:a",0.0,_collection_complete_seconds(COLLECTION_COMPLETE_REVEAL_SECONDS)).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+		await reveal.finished
+	if audio_manager:audio_manager.play_se("level_up",.58)
+	if is_instance_valid(collection_complete_silhouette_image):collection_complete_silhouette_image.queue_free()
+	collection_complete_silhouette_image=null
+	await _play_collection_complete_light()
+	if collection_complete_presentation_active:_show_collection_complete_card()
+
+func _on_collection_complete_card_closed()->void:
+	if not collection_complete_presentation_active or collection_complete_presentation_phase!="complete":return
+	collection_complete_continue_button.disabled=true
+	var hide:=create_tween().set_parallel();hide.tween_property(collection_complete_card,"modulate:a",0.0,_collection_complete_seconds(.18));hide.tween_property(collection_complete_card,"scale",Vector2(.92,.92),_collection_complete_seconds(.18))
+	await hide.finished
+	collection_complete_continue_button.disabled=false;collection_complete_card.visible=false;collection_complete_overlay.visible=false;_clear_collection_complete_effects()
+	collection_complete_presentation_phase="dialogue"
+	_start_scripted_dialog("collection_complete",[
+		{"speaker":"girl","text":Localizer.text(language_code,"collection_complete_dialog_1")},
+		{"speaker":"armadillo","text":Localizer.text(language_code,"collection_complete_dialog_2")},
+		{"speaker":"panda","text":Localizer.text(language_code,"collection_complete_dialog_3")},
+		{"speaker":"girl","text":Localizer.text(language_code,"collection_complete_dialog_4")},
+		{"speaker":"armadillo","text":Localizer.text(language_code,"collection_complete_dialog_5")},
+		{"speaker":"panda","text":Localizer.text(language_code,"collection_complete_dialog_6")},
+	],collection_complete_resume_shop_visible)
+
+func _close_collection_complete_catalog()->void:
+	_cancel_series_carousel_motion();encyclopedia_overlay.visible=false;_release_encyclopedia_textures()
+	for card in series_carousel_cards:
+		var cover_image=card.get("cover_image")
+		if cover_image is TextureRect:cover_image.texture=null
+	for child in encyclopedia_detail_page.get_children():child.free()
+
+func _finish_collection_complete_presentation()->void:
+	var version:=_game_version_key();var record:=_collection_complete_current_record()
+	if bool(record.get("completed",false)):
+		record["presentation_seen"]=true;collection_complete_versions[version]=record
+	var resume_context:=collection_complete_resume_context
+	_close_collection_complete_catalog();_reset_collection_complete_card_visual();_clear_collection_complete_effects()
+	collection_complete_pending_species_id="";collection_complete_resume_context="";collection_complete_resume_shop_visible=false;collection_complete_presentation_active=false;collection_complete_presentation_phase="";collection_complete_overlay.visible=false
+	_save();_refresh_collection_complete_badge();_update_play_ui()
+	if not resume_context.is_empty():call_deferred("_continue_after_species_get_card",resume_context)
+	else:call_deferred("_try_start_pending_story_event")
 
 func _remember_catalog_cover_species(species_id:String)->bool:
 	if species_id.is_empty() or _species_get_count(species_id)<=0:return false
@@ -5473,7 +5983,7 @@ func _is_fantasy_species(entry:Dictionary)->bool:
 	if entry.is_empty():return false
 	# Story counts follow the page the player actually sees in the integrated
 	# catalog. This includes every fusion tier while keeping JureJure's separate
-	# eight-species progression out of the 1/6/24 fantasy milestones.
+	# eight-species progression out of the fantasy-only 1/6 milestones.
 	if _is_jurejure_species(entry):return false
 	return _catalog_display_series_id_for_entry(entry) in FANTASY_SERIES_IDS
 
@@ -5507,6 +6017,18 @@ func _unique_fantasy_species_get_count()->int:
 		if entry_value is Dictionary and _is_fantasy_species(entry_value) and _species_get_count(str(entry_value.get("species_id","")))>0:count+=1
 	return count
 
+func _unique_act2_species_get_count()->int:
+	var counted:Dictionary={}
+	for entry_value in catalog_species:
+		if not entry_value is Dictionary:continue
+		var entry:Dictionary=entry_value
+		if _is_jurejure_species(entry):continue
+		if not bool(entry.get("main_story_original",false)) and not _is_fantasy_species(entry):continue
+		var species_id:=str(entry.get("species_id",""))
+		if species_id.is_empty() or counted.has(species_id) or _species_get_count(species_id)<=0:continue
+		counted[species_id]=true
+	return counted.size()
+
 func _unique_jurejure_species_get_count()->int:
 	var count:=0
 	for entry_value in catalog_species:
@@ -5514,8 +6036,8 @@ func _unique_jurejure_species_get_count()->int:
 	return count
 
 func _refresh_narrative_species_progress()->void:
-	var fantasy_count:=_unique_fantasy_species_get_count()
-	if fantasy_count>=24 and not act3_unlocked:
+	var act2_species_count:=_unique_act2_species_get_count()
+	if act2_species_count>=24 and not act3_unlocked:
 		act3_unlocked=true;act3_intro_pending=not act3_intro_seen;act3_intro_eligible_visit_id=habitat_visit_id
 	var jurejure_count:=_unique_jurejure_species_get_count()
 	StoryProgressionClass.update_jurejure_progress(story_progression_state,jurejure_count)
@@ -5591,6 +6113,7 @@ func _register_species_discovery(species_id:String,count_get:=true)->bool:
 			_queue_catalog_series_unlock_notice(series_id)
 		encyclopedia_unlocked=mystery_items_acquired;_refresh_seed_pack_unlocks()
 		_update_main_story_progress(false)
+	if first_get:_mark_collection_complete_if_earned(species_id)
 	return first_discovery or first_get
 
 func _register_story_catalog_species(species_id:String)->void:
@@ -5659,6 +6182,8 @@ func _try_start_catalog_series_unlock_notice()->bool:
 
 func _try_start_pending_story_event()->void:
 	if play_active:return
+	if collection_complete_presentation_active:return
+	if not opening_finished or opening_overlay and opening_overlay.visible:return
 	# A newly harvested species owns the foreground first. Its story transition
 	# is reconsidered by _on_species_get_overlay_closed after the full card queue.
 	if not species_get_queue.is_empty():return
@@ -5688,9 +6213,15 @@ func _try_start_pending_story_event()->void:
 	if not pending_round_new_species_ids.is_empty():
 		call_deferred("_play_result_new_species_animations")
 		return
+	if _collection_completion_pending() and not _collection_complete_get_card_seen():
+		call_deferred("_queue_species_get_by_id",_collection_completion_last_species_id(),true,"collection_complete_recovery")
+		return
 	if _try_start_post_ending_greenhouse_dialog():return
 	if _try_start_catalog_series_unlock_notice():return
 	if not catalog_series_unlock_notice_queue.is_empty():return
+	if _collection_completion_pending():
+		call_deferred("_start_collection_complete_presentation")
+		return
 	if fusion_return_pending and current_mode=="greenhouse" and not _immediate_get_story_transition_pending():
 		call_deferred("_resume_fusion_lab_after_get")
 		return
@@ -6162,6 +6693,7 @@ func _series_cover_texture(entry:Dictionary)->Texture2D:
 	return _species_texture(cover_entry) if not cover_entry.is_empty() else null
 
 func _change_series_selection(direction:int)->void:
+	if collection_complete_presentation_active:return
 	if _owned_series_entries().size()<2 or direction==0 or series_carousel_animating:return
 	_animate_series_selection(signi(direction))
 
@@ -6238,8 +6770,7 @@ func _refresh_encyclopedia_header()->void:
 	if encyclopedia_list_title==null:return
 	var entry:=_series_entry(current_encyclopedia_series_id)
 	encyclopedia_list_title.text=Localizer.series_name(language_code,entry)
-	var species_header:=encyclopedia_list_title.get_parent() as Control
-	if species_header:species_header.custom_minimum_size.y=58.0
+	_refresh_collection_complete_badge()
 	encyclopedia_unlock_panel.visible=false;encyclopedia_unlock_puku_button.visible=false
 
 func _acquire_current_catalog(method:String)->void:
@@ -6673,6 +7204,7 @@ func _update_habitat_button_glow()->void:
 	habitat_glow_tween=create_tween().set_loops();habitat_glow_tween.tween_property(mode_button,"self_modulate",glow_color,.75).set_trans(Tween.TRANS_SINE);habitat_glow_tween.parallel().tween_property(habitat_sparkle,"position:x",72.0,.75).set_trans(Tween.TRANS_SINE);habitat_glow_tween.parallel().tween_property(habitat_sparkle,"modulate:a",.25,.75);habitat_glow_tween.tween_property(mode_button,"self_modulate",Color.WHITE,.75);habitat_glow_tween.parallel().tween_property(habitat_sparkle,"position:x",5.0,.01);habitat_glow_tween.parallel().tween_property(habitat_sparkle,"modulate:a",1.0,.01);habitat_glow_tween.tween_interval(1.25)
 
 func _open_species_detail(entry:Dictionary)->void:
+	if collection_complete_presentation_active:return
 	for child in encyclopedia_detail_page.get_children():child.free()
 	encyclopedia_list_page.visible=false;encyclopedia_detail_page.visible=true
 	var back:=Button.new();back.text=Localizer.text(language_code,"list_back");back.position=Vector2(24,28);back.size=Vector2(105,55);_skin_button(back,Color("#fff0cf"),17);back.pressed.connect(func():encyclopedia_detail_page.visible=false;encyclopedia_list_page.visible=true);encyclopedia_detail_page.add_child(back)

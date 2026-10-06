@@ -457,7 +457,8 @@
       "fus2_sunset_stone",
       "fus2_moon_resort",
       "fus2_fever_lagoon",
-      "fus2_rust_garden"
+      "fus2_rust_garden",
+      "fus2_toro_pork_jelly"
     ],
     "field_id": "",
     "unlock_type": "future",
@@ -466,5 +467,26 @@
     "unlock_condition": {"display_text": "上位特殊配合で初GETすると開放"},
     "iap_product_id": "",
     "sort_order": 160
+  },
+  {
+    "series_id": "fusion_tier3",
+    "display_name": "最上位特殊配合",
+    "subtitle": "上位配合と原種から生まれる多肉",
+    "description": "上位配合種と特定の原種を掛け合わせて誕生した、多肉を記録するページです。",
+    "cover_image_path": "res://assets/catalog/fusion_tier3/fus3_black_hole.png",
+    "species_ids": [
+      "fus3_black_hole",
+      "fus3_golden_crown",
+      "fus3_star_fragment",
+      "fus3_lagoon_lutea",
+      "fus3_heart_of_magma"
+    ],
+    "field_id": "",
+    "unlock_type": "future",
+    "preview_catalog_when_locked": false,
+    "catalog_purchase_enabled": false,
+    "unlock_condition": {"display_text": "最上位特殊配合で初GETすると開放"},
+    "iap_product_id": "",
+    "sort_order": 170
   }
 ]

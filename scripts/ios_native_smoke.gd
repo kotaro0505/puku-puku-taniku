@@ -18,6 +18,13 @@ func _ready() -> void:
 	assert(FileAccess.file_exists("res://ios/plugins/NotificationSchedulerPlugin.gdip"))
 	assert(FileAccess.file_exists("res://ios/plugins/NotificationSchedulerPlugin.release.xcframework/ios-arm64/NotificationSchedulerPlugin.a"))
 	assert(FileAccess.get_file_as_string("res://export_presets.cfg").contains("plugins/NotificationSchedulerPlugin=true"))
+	var storekit_plugin_path:="res://ios/plugins/godot-storekit2/godot-storekit2.gdip"
+	var storekit_plugin_present:=FileAccess.file_exists(storekit_plugin_path)
+	# The exact Godot-version XCFramework is generated on the macOS CI runner;
+	# local Windows source checks therefore accept the reproducible build script.
+	assert(storekit_plugin_present or FileAccess.file_exists("res://scripts/ci/build_storekit2_plugin.sh"))
+	if storekit_plugin_present:assert(FileAccess.get_file_as_string(storekit_plugin_path).contains("StoreKit.framework"))
+	assert(FileAccess.get_file_as_string("res://export_presets.cfg").contains("plugins/godot-storekit2=true"))
 	assert(FileAccess.get_file_as_string("res://project.godot").contains("res://addons/NotificationSchedulerPlugin/plugin.cfg"))
 	var main_source:=FileAccess.get_file_as_string("res://scripts/main.gd")
 	assert(main_source.contains('Engine.has_singleton("SharePlugin")'))
@@ -32,6 +39,11 @@ func _ready() -> void:
 	assert(notification_source.contains("_plugin.cancel("))
 	assert(notification_source.contains('"post_notifications_permission_granted"'))
 	assert(notification_source.contains("_on_notification_permission_granted"))
+	var pot_iap_source:=FileAccess.get_file_as_string("res://scripts/pot_unlock_iap_service.gd")
+	assert(pot_iap_source.contains('const STOREKIT2_CLASS_NAME := "GodotStoreKit2"'))
+	assert(pot_iap_source.contains('ClassDB.instantiate(STOREKIT2_CLASS_NAME)'))
+	assert(pot_iap_source.contains('localized_price'))
+	assert(pot_iap_source.contains('_store_kit.call("sync")'))
 
 	var game = load("res://main.tscn").instantiate()
 	add_child(game)

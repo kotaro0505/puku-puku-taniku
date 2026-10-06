@@ -27,7 +27,13 @@
     {"parent_species_ids":["fus1_jellyfish_parfait","fus1_deep_sea_aquarium"],"result_species_id":"fus2_abyss_glass"},
     {"parent_species_ids":["fus1_kaleidoscope","fus1_geode"],"result_species_id":"fus2_kaleido_geode"},
     {"parent_species_ids":["fus1_firefly_dome","fus1_amber_forest"],"result_species_id":"fus2_amber_lantern"},
-    {"parent_species_ids":["fus1_pukupuku_planet","fus1_dream_specimen"],"result_species_id":"fus2_planet_specimen"}
+    {"parent_species_ids":["fus1_pukupuku_planet","fus1_dream_specimen"],"result_species_id":"fus2_planet_specimen"},
+    {"parent_species_ids":["fus1_jelly_bomb","fus1_bonus_time"],"result_species_id":"fus2_toro_pork_jelly"},
+    {"parent_species_ids":["fus2_moon_resort","shaviana"],"result_species_id":"fus3_black_hole"},
+    {"parent_species_ids":["fus2_rust_garden","laui"],"result_species_id":"fus3_golden_crown"},
+    {"parent_species_ids":["fus2_moonbow","kannte"],"result_species_id":"fus3_star_fragment"},
+    {"parent_species_ids":["fus2_abyss_glass","lutea"],"result_species_id":"fus3_lagoon_lutea"},
+    {"parent_species_ids":["fus2_sunset_stone","colorata"],"result_species_id":"fus3_heart_of_magma"}
   ],
   "series_special_recipes": [
     {"parent_species_id":"fus1_diving_sphere","parent_series":"glow","result_species_id":"fus2_deep_sea_light"},

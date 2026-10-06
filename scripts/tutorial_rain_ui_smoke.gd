@@ -10,9 +10,14 @@ func _ready()->void:
 	for guide_target in ["play_open","encyclopedia","habitat","old_seed"]:
 		game._show_tutorial_guide(guide_target)
 		assert(game.tutorial_guide_overlay.visible and game.tutorial_guide_shade.visible)
-		assert(game.tutorial_guide_shade.color.a>=.7 and game.tutorial_highlight_tween!=null)
+		assert(game.tutorial_guide_shade.color.a>=.7)
 		assert(game.tutorial_guide_button.visible and str(game.tutorial_guide_button.get_meta("target",""))==guide_target)
 		assert(game.tutorial_guide_overlay.find_child("*Finger*",true,false)==null)
+		if guide_target=="habitat":
+			assert(game.tutorial_highlight_tween==null)
+			assert(game.tutorial_guide_button.scale.is_equal_approx(Vector2.ONE))
+			assert(game.tutorial_guide_button.get_global_rect().is_equal_approx(game.mode_button.get_global_rect()))
+		else:assert(game.tutorial_highlight_tween!=null)
 		if game.tutorial_highlight_tween and game.tutorial_highlight_tween.is_valid():game.tutorial_highlight_tween.kill()
 	game.tutorial_guide_overlay.visible=false
 	# The post-awakening rain bonus is retired. The first-awakening story overlay

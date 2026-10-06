@@ -20,7 +20,6 @@ const SPIN_COST_PUKU:=1
 
 var wallet_label:Label
 var title_label:Label
-var draw_count_label:Label
 var close_button:Button
 var spin_button:Button
 var hint_label:Label
@@ -64,7 +63,6 @@ func _build_background()->void:
 func _build_header()->void:
 	title_label=Label.new();title_label.text="森のガチャ";title_label.position=Vector2(138,24);title_label.size=Vector2(300,66);title_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;title_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;title_label.add_theme_font_size_override("font_size",31);title_label.add_theme_color_override("font_color",Color("#fff5d6"));title_label.add_theme_color_override("font_outline_color",Color("#45220f"));title_label.add_theme_constant_override("outline_size",8);add_child(title_label)
 	wallet_label=Label.new();wallet_label.name="WalletLabel";wallet_label.position=Vector2(22,92);wallet_label.size=Vector2(238,48);wallet_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;wallet_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;wallet_label.add_theme_font_size_override("font_size",18);wallet_label.add_theme_color_override("font_color",Color("#fff4ba"));wallet_label.add_theme_stylebox_override("normal",_box(Color(0.18,.09,.035,.82),Color("#d7ad63"),18,2));add_child(wallet_label)
-	draw_count_label=Label.new();draw_count_label.position=Vector2(276,96);draw_count_label.size=Vector2(136,40);draw_count_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;draw_count_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;draw_count_label.add_theme_font_size_override("font_size",14);draw_count_label.add_theme_color_override("font_color",UI_CREAM);draw_count_label.add_theme_color_override("font_outline_color",Color("#45220f"));draw_count_label.add_theme_constant_override("outline_size",5);add_child(draw_count_label)
 	close_button=Button.new();close_button.name="CloseButton";close_button.text="もどる";close_button.position=Vector2(448,28);close_button.size=Vector2(106,54);_skin_button(close_button,Color("#fff0cf"),17);close_button.pressed.connect(_request_close);add_child(close_button)
 
 func _build_dial()->void:
@@ -111,11 +109,11 @@ func close_gacha()->void:
 
 func set_wallet(puku_points:int,draw_count:int)->void:
 	current_puku_points=puku_points;current_draw_count=draw_count
-	wallet_label.text=Localizer.text(language,"wallet",[puku_points]);draw_count_label.text=Localizer.text(language,"gacha_draw_count",[draw_count]);spin_button.disabled=busy or capsule_ready or result_overlay.visible or puku_points<SPIN_COST_PUKU;dial_hit_area.disabled=spin_button.disabled
+	wallet_label.text=Localizer.text(language,"wallet",[puku_points]);spin_button.disabled=busy or capsule_ready or result_overlay.visible or puku_points<SPIN_COST_PUKU;dial_hit_area.disabled=spin_button.disabled
 
 func play_spin(result:Dictionary,texture:Texture2D)->void:
 	if busy:return
-	pending_result=result.duplicate(true);busy=true;capsule_ready=false;close_button.disabled=true;spin_button.disabled=true;dial_hit_area.disabled=true;hint_label.text=Localizer.text(language,"gacha_selecting");result_image.texture=texture
+	pending_result=result.duplicate(true);busy=true;capsule_ready=false;close_button.disabled=true;spin_button.disabled=true;dial_hit_area.disabled=true;hint_label.text="";result_image.texture=texture
 	dial_texture.rotation=0.0;background_stage.position=Vector2.ZERO
 	var turn:=create_tween().set_parallel(true)
 	turn.tween_property(dial_texture,"rotation",TAU*3.4,.92*animation_time_scale).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)

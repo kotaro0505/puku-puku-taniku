@@ -8,12 +8,13 @@ func _ready()->void:
 	await get_tree().process_frame;await get_tree().process_frame
 	game._reset_progression_state();game.opening_story_complete=true;game.intro_story_complete=true;game.first_colorata_confirmed=true;game.trio_originals_confirmed=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.habitat_arrival_started=true;game.habitat_awakened=true;game.habitat_awakening_event_complete=true;game.habitat_tutorial_started=true;game.habitat_tutorial_complete=true;game.seed_shop_open=true;game.panda_beacon_unlocked=true;game.panda_beacon_count=1;game.puku_gauge_intro_complete=true;game.total_play_count=3;game.puku_points=20;game.current_mode="greenhouse";game._update_play_ui()
 	_test_assets_and_routes(game)
+	_test_removed_status_text(game)
 	_test_draw_rules(game)
 	_test_jurejure_species_gate(game)
 	await _test_spin_capsule_and_reveal(game)
 	_test_encounter_save_and_unlock(game)
 	game._reset_progression_state();game.queue_free()
-	print("FOREST_GACHA_SMOKE_OK routes=2 series=uniform first_draw=all_eligible jurejure=pool_all_10 cards=species_then_catalog encounter=save+autoregister checker=backed")
+	print("FOREST_GACHA_SMOKE_OK routes=2 series=uniform first_draw=all_eligible jurejure=pool_all_10 status_text=hidden cards=species_then_catalog encounter=save+autoregister checker=backed")
 	get_tree().quit()
 
 func _test_assets_and_routes(game)->void:
@@ -43,6 +44,22 @@ func _test_assets_and_routes(game)->void:
 	assert(game.forest_gacha_intro_seen and game.forest_gacha_button.visible and shop_route.visible)
 	game._open_shop();assert(game.shop_overlay.visible);shop_route.pressed.emit();assert(game.forest_gacha_ui.visible and not game.shop_overlay.visible);game._close_forest_gacha()
 	game._open_forest_gacha();assert(game.forest_gacha_ui.visible);game._close_forest_gacha()
+
+func _test_removed_status_text(game)->void:
+	var ui=game.forest_gacha_ui
+	for test_language in ["ja","hiragana","en"]:
+		ui.set_language(test_language);ui.open_gacha(20,37)
+		assert(ui.current_draw_count==37)
+		var visible_text:=_visible_control_text(ui)
+		assert(Localizer.text(test_language,"gacha_draw_count",[37]) not in visible_text)
+	ui.close_gacha();ui.set_language("ja")
+
+func _visible_control_text(root:Node)->String:
+	var texts:Array[String]=[]
+	for node in root.find_children("*","Control",true,false):
+		if node is Control and not (node as Control).is_visible_in_tree():continue
+		if node is Label or node is Button:texts.append(str(node.text))
+	return "\n".join(texts)
 
 func _test_draw_rules(game)->void:
 	var test_rng:=RandomNumberGenerator.new();test_rng.seed=20260909
@@ -113,7 +130,9 @@ func _test_spin_capsule_and_reveal(game)->void:
 		var candidate:Dictionary=game.forest_gacha_system.draw(game.unlocked_series,game.discovered,game.forest_gacha_encountered,probe,true,game.jurejure_species_unlocked)
 		if str(candidate.get("source",""))=="locked":locked_seed=seed_value;break
 	assert(locked_seed>0);game.forest_gacha_rng.seed=locked_seed;game._open_forest_gacha()
-	game._spin_forest_gacha();await get_tree().create_timer(.45).timeout
+	game._spin_forest_gacha();assert(game.forest_gacha_ui.hint_label.text.is_empty())
+	for test_language in ["ja","hiragana","en"]:assert(Localizer.text(test_language,"gacha_selecting") not in game.forest_gacha_ui.hint_label.text)
+	await get_tree().create_timer(.45).timeout
 	assert(game.puku_points==4 and game.forest_gacha_draw_count==1 and game.forest_gacha_ui.capsule_ready and game.forest_gacha_ui.capsule.visible and absf(game.forest_gacha_ui.dial_texture.rotation)>1.0)
 	var species_id:=str(game.forest_gacha_ui.pending_result.get("species_id",""));var series_id:=str(game.forest_gacha_ui.pending_result.get("series_id",""));assert(not species_id.is_empty() and series_id!="base" and bool(game.discovered.get(species_id,false)) and bool(game.greenhouse_available.get(species_id,false)))
 	assert(series_id in game.catalog_series_unlock_notice_queue and not game.catalog_series_unlock_overlay.visible)

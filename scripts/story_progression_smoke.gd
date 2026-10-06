@@ -24,7 +24,7 @@ func _test_catalog_contract(game: Node) -> void:
 	assert(game.INITIAL_SERIES_ID == "base")
 	assert(game._series_entry("common").is_empty())
 	assert(bool(game.unlocked_series.get("base", false)))
-	assert(game.catalog_species.size() == 232)
+	assert(game.catalog_species.size() == 238)
 	var jurejure_entries: Array[Dictionary] = game._series_species_entries("jurejure")
 	assert(jurejure_entries.size() == 10)
 	for entry in jurejure_entries:
@@ -77,6 +77,8 @@ func _test_catalog_contract(game: Node) -> void:
 
 func _test_three_act_sequence(game: Node) -> void:
 	game._reset_progression_state()
+	game.opening_finished = true
+	game.opening_overlay.visible = false
 	game.opening_story_overlay.visible = false
 	game.intro_overlay.visible = false
 	game.intro_story_complete = true
@@ -222,13 +224,20 @@ func _test_three_act_sequence(game: Node) -> void:
 	_finish_dialog(game)
 	assert(game.forest_gacha_intro_seen)
 
-	for index in range(6, 24):
+	# The Act III gate counts the one owned original above together with unique
+	# fantasy GETs. The fantasy-only 1/6 events remain unchanged.
+	for index in range(6, 22):
 		game._record_species_get(fantasy_ids[index])
-	assert(game._unique_fantasy_species_get_count() == 24)
+	assert(game._unique_fantasy_species_get_count() == 22)
+	assert(game._unique_act2_species_get_count() == 23)
+	assert(not game.act3_unlocked)
+	game._record_species_get(fantasy_ids[22])
+	assert(game._unique_fantasy_species_get_count() == 23)
+	assert(game._unique_act2_species_get_count() == 24)
 	assert(game.act3_unlocked and game.act3_intro_pending and not game.act3_intro_seen)
 	assert(game.main_story_stage == StoryProgressionClass.ACT_3)
 	assert(game.scripted_dialog_kind.is_empty())
-	# The 24th GET now owns a safe automatic route to the habitat. It waits for
+	# The 24th original-or-fantasy GET owns a safe automatic route to the habitat. It waits for
 	# foreground cards in live play, then fades, frames the gang, and starts Act 3.
 	await get_tree().create_timer(2.2).timeout
 	assert(game.current_mode == "habitat" and game.scripted_dialog_kind == "act3_intro")
@@ -457,7 +466,10 @@ func _test_legacy_three_act_migration(game: Node) -> void:
 	game.mystery_seed_bags = 3
 	game.bests = {"colorata": 100.0, "laui": 62.0}
 	game.discovered = {"colorata": true, "hyalina_san_luis_de_la_paz": true, "purpusorum": true, "pinwheel": true, "tovarensis_tovar": true, "transparent_succulent": true}
-	game.species_get_counts = {"colorata": 3, "hyalina_san_luis_de_la_paz": 1, "purpusorum": 1, "pinwheel": 1, "tovarensis_tovar": 1, "transparent_succulent": 1}
+	game.species_get_counts = {"transparent_succulent": 1}
+	for original_id in StoryProgressionClass.MAIN_STORY_ORIGINAL_IDS:
+		game.discovered[original_id] = true
+		game.species_get_counts[original_id] = 1
 	game.greenhouse_available = game.discovered.duplicate(true)
 	game.unlocked_species = game.greenhouse_available.duplicate(true)
 	game.habitat_returned_species = {"colorata": true, "laui": true, "transparent_succulent": true}
@@ -465,7 +477,7 @@ func _test_legacy_three_act_migration(game: Node) -> void:
 	for entry in game.catalog_species:
 		if game._is_fantasy_species(entry) and not game._is_jurejure_species(entry):
 			fantasy_ids.append(str(entry.get("species_id", "")))
-	for index in range(24):
+	for index in range(13):
 		game.discovered[fantasy_ids[index]] = true
 		game.species_get_counts[fantasy_ids[index]] = 1
 		game.greenhouse_available[fantasy_ids[index]] = true
@@ -493,7 +505,8 @@ func _test_legacy_three_act_migration(game: Node) -> void:
 	assert(game.fantasy_first_discovery_seen and game.fantasy_realization_seen)
 	# Base-page route specials such as transparent_succulent are not fantasy
 	# story progress; the count follows the integrated catalog display series.
-	assert(game._unique_fantasy_species_get_count() == 24)
+	assert(game._unique_fantasy_species_get_count() == 13)
+	assert(game._unique_act2_species_get_count() == 25)
 	assert(game.act3_unlocked and game.act3_intro_pending and not game.act3_intro_seen)
 	assert(game.scripted_dialog_kind.is_empty())
 	assert(game.normal_seed_bags == 6 and game.volume_seed_bags == 2 and game.premium_seed_bags == 1 and game.mystery_seed_bags == 3)

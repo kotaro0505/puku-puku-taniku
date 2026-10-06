@@ -23,6 +23,7 @@ func _ready() -> void:
 	# "leftover seed" story.
 	game._start_intro_story()
 	assert(game.intro_dialogue_label.text == Localizer.text("ja", "intro_old_seed"))
+	assert(game.intro_dialogue_label.text == "はい、これ。きみの分の1粒だよ。古いから、芽が出るかは分からないけど…")
 	assert(not "売れ残った" in game.intro_dialogue_label.text)
 	game._advance_intro_story()
 	assert(game.intro_dialogue_label.text == Localizer.text("ja", "intro_old_seed_get"))
@@ -103,6 +104,7 @@ func _ready() -> void:
 	assert(game.scripted_dialog_kind == "first_colorata_discovery")
 	assert(game.scripted_dialog_pages.size() == 3)
 	assert([game.scripted_dialog_pages[0].speaker, game.scripted_dialog_pages[1].speaker, game.scripted_dialog_pages[2].speaker] == ["panda", "armadillo", "panda"])
+	assert([game.scripted_dialog_pages[0].text, game.scripted_dialog_pages[1].text, game.scripted_dialog_pages[2].text] == ["本当に多肉植物のタネだったなんて！", "この本によると、これは『コロラータ』っていう種類らしいよ！", "すごい。世界に多肉植物が帰って来てくれたんだ……！"])
 	var discovery_text := ""
 	for page in game.scripted_dialog_pages:
 		discovery_text += str(page.get("text", ""))
@@ -204,12 +206,34 @@ func _ready() -> void:
 	assert(game.main_story_stage == game.StoryProgressionClass.ACT_1)
 	assert(game.tutorial_guide_overlay.visible and str(game.tutorial_guide_button.get_meta("target", "")) == "habitat")
 	assert(game.tutorial_guide_button.size.is_equal_approx(game.mode_button.size))
-	assert(game.tutorial_guide_button.custom_minimum_size.is_equal_approx(game.mode_button.size))
+	assert(game.tutorial_guide_button.custom_minimum_size.is_zero_approx())
+	for locale in ["ja", "hiragana", "en"]:
+		game._set_language(locale)
+		game._show_tutorial_guide("habitat")
+		await get_tree().process_frame
+		await get_tree().process_frame
+		var source_rect:Rect2=game.mode_button.get_global_rect()
+		var guide_rect:Rect2=game.tutorial_guide_button.get_global_rect()
+		assert(source_rect.position.is_equal_approx(Vector2(398,198)))
+		assert(source_rect.size.is_equal_approx(Vector2(153,55)))
+		assert(guide_rect.position.is_equal_approx(source_rect.position))
+		assert(guide_rect.size.is_equal_approx(source_rect.size))
+		assert(game.tutorial_guide_button.scale.is_equal_approx(Vector2.ONE))
+		assert(game.tutorial_guide_button.custom_minimum_size.is_zero_approx())
+		assert(guide_rect.end.x<=game.get_viewport().get_visible_rect().end.x)
+		assert(game.tutorial_guide_button.get_theme_font_size("font_size")==game.mode_button.get_theme_font_size("font_size"))
+		print("HABITAT_GUIDE_RECT locale=",locale," source=",source_rect," guide=",guide_rect)
+	game._set_language("ja")
+	game._show_tutorial_guide("habitat")
+	assert(game.tutorial_guide_button.pressed.is_connected(Callable(game,"_complete_tutorial_guide")))
+	var normal_habitat_rect:Rect2=game.mode_button.get_global_rect()
+	game._hide_first_play_tutorial_overlay()
+	await get_tree().process_frame
+	assert(game.mode_button.get_global_rect().is_equal_approx(normal_habitat_rect))
 
 	# The formal normal game uses the current twelve-seed round flow.  Keep the
 	# finite compatibility mode above for the old-seed prologue only, then verify
 	# the production order: pre-sow dialog -> start-button guide -> round start.
-	game._hide_first_play_tutorial_overlay()
 	game.endless_greenhouse.configure(true)
 	game.opening_finished=true;game.opening_overlay.visible=false;game.opening_story_overlay.visible=false
 	game.mystery_items_acquired=true;game.encyclopedia_unlocked=true;game.seed_shop_open=true;game.habitat_awakened=true;game.habitat_tutorial_complete=true;game.mystery_catalog_tutorial_complete=true;game.initial_seed_stock_notice_complete=true;game.first_habitat_gift_claimed=true;game.normal_seed_bags=0;game.current_mode="greenhouse";game.normal_play_tutorial_complete=false;game.seed_pod_gauge_discovery_complete=false;game.seed_pod_first_reward_seen=false;game.puku_buyback_tutorial_complete=false;game.puku_gauge_intro_complete=true;game.puku_gauge_cm=0.0;game.puku_balance_units=game.INITIAL_PUKU_CAPITAL_UNITS
@@ -322,7 +346,10 @@ func _ready() -> void:
 	assert(not game.species_get_overlay.visible)
 	await get_tree().process_frame
 	assert(game.puku_buyback_tutorial_active)
-	assert(game.tutorial_guide_message.text=="大きい株ほど高く買い取るよ！")
+	assert(game.tutorial_guide_message.text=="そうだ！育てた多肉はうちのお店で買い取るよ！")
+	assert(game.tutorial_panda_portrait.visible)
+	game._advance_puku_buyback_tutorial()
+	assert(game.tutorial_guide_message.text=="大きい株ほど高く買い取るからね！")
 	assert(game.tutorial_panda_portrait.visible)
 	game._advance_puku_buyback_tutorial()
 	assert(bool(game.first_play_harvest_spotlight_material.get_shader_parameter("focus_ellipse")))
@@ -330,7 +357,7 @@ func _ready() -> void:
 	var puku_half_size: Vector2 = game.first_play_harvest_spotlight_material.get_shader_parameter("focus_half_size_uv")
 	var seed_center: Vector2 = (game.seed_pod_gauge_area.global_position + game.seed_pod_gauge_area.size * .5) / game.get_viewport().get_visible_rect().size
 	assert(((seed_center - puku_center) / puku_half_size).length() > 1.0)
-	assert(game.tutorial_guide_message.text=="大きい株を収穫するほど\nぷくゲージが溜まります。\n満タンになると +1ぷくコインGET！")
+	assert(game.tutorial_guide_message.text==Localizer.text("ja","puku_buyback_2_endless"))
 	assert(not game.tutorial_panda_portrait.visible)
 	game._advance_puku_buyback_tutorial()
 	assert(game.puku_buyback_tutorial_complete and not game.puku_buyback_tutorial_active)
@@ -368,7 +395,8 @@ func _ready() -> void:
 	assert(not bool(game.story_progression_state.get("original_new_guarantee_pending", false)))
 	assert(not bool(game.story_progression_state.get("original_new_guarantee_consumed", false)))
 
-	assert(Localizer.text("ja","puku_buyback_1") == "大きい株ほど高く買い取るよ！")
+	assert(Localizer.text("ja","puku_buyback_1") == "そうだ！育てた多肉はうちのお店で買い取るよ！")
+	assert(Localizer.text("ja","puku_buyback_2") == "大きい株ほど高く買い取るからね！")
 	print("FIRST_PLAY_TUTORIAL_SMOKE_OK old_colorata_growth=1.3 normal_growth=unchanged cost_note=once trio_cards=catalog_only pre_sow=true start_guide=play_open_normal forced_jelly=true reserved_original_new=true observed_3s=true post_result_GET=true act2_guarantee_untouched=true total=12 result=1_harvest+11_jelly")
 	get_tree().quit()
 

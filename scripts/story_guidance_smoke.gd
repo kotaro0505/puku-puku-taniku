@@ -87,16 +87,61 @@ func _test_mission_copy_and_progress(game: Node) -> void:
 	assert(game._current_mission_text().is_empty())
 	game.act2_unlocked = true
 	game.story_progression_state["fantasy_unlocked"] = true
+	var original_ids: Array[String] = []
 	var fantasy_ids: Array[String] = []
+	var jurejure_ids: Array[String] = []
 	for entry_value in game.catalog_species:
-		if entry_value is Dictionary and game._is_fantasy_species(entry_value) and not game._is_jurejure_species(entry_value):
+		if not entry_value is Dictionary:
+			continue
+		if bool(entry_value.get("main_story_original", false)):
+			original_ids.append(str(entry_value.get("species_id", "")))
+		elif game._is_fantasy_species(entry_value) and not game._is_jurejure_species(entry_value):
 			fantasy_ids.append(str(entry_value.get("species_id", "")))
-	for index in range(17):
+		elif game._is_jurejure_species(entry_value):
+			jurejure_ids.append(str(entry_value.get("species_id", "")))
+	assert(original_ids.size() == 12 and fantasy_ids.size() >= 12 and jurejure_ids.size() >= 8)
+	for index in range(5):
+		game.species_get_counts[original_ids[index]] = 1
+	for index in range(10):
 		game.species_get_counts[fantasy_ids[index]] = 1
-	assert(game._current_mission_text() == "新しい品種を24種類見つけよう！　17/24")
+	assert(game._unique_fantasy_species_get_count() == 10)
+	assert(game._unique_act2_species_get_count() == 15)
+	assert(game._current_mission_text() == "新しい品種を24種類見つけよう！　15/24")
 	game._update_mission_ui()
 	assert(game.mission_panel.visible)
 	assert(game.mission_title_label.text == "ミッション")
+
+	game.species_get_counts.clear()
+	for species_id in original_ids:
+		game.species_get_counts[species_id] = 1
+	for index in range(11):
+		game.species_get_counts[fantasy_ids[index]] = 1
+	game.act3_unlocked = false
+	game.act3_intro_pending = false
+	game.act3_intro_seen = false
+	assert(game._unique_fantasy_species_get_count() == 11)
+	assert(game._unique_act2_species_get_count() == 23)
+	assert(game._current_mission_text() == "新しい品種を24種類見つけよう！　23/24")
+	game._refresh_narrative_species_progress()
+	assert(not game.act3_unlocked)
+	game.species_get_counts[fantasy_ids[11]] = 1
+	game._refresh_narrative_species_progress()
+	assert(game._unique_fantasy_species_get_count() == 12)
+	assert(game._unique_act2_species_get_count() == 24)
+	assert(game.act3_unlocked and game.act3_intro_pending)
+
+	game.species_get_counts.clear()
+	for species_id in original_ids:
+		game.species_get_counts[species_id] = 1
+	for index in range(10):
+		game.species_get_counts[fantasy_ids[index]] = 1
+	for index in range(8):
+		game.species_get_counts[jurejure_ids[index]] = 1
+	game.act3_unlocked = false
+	game.act3_intro_pending = false
+	assert(game._unique_fantasy_species_get_count() == 10)
+	assert(game._unique_act2_species_get_count() == 22)
+	assert(game._current_mission_text() == "新しい品種を24種類見つけよう！　22/24")
 
 	game.species_get_counts.clear()
 	game.act3_intro_seen = true

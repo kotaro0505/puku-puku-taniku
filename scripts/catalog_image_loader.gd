@@ -8,6 +8,7 @@ const CACHE_VERSION_BY_PREFIX := {
 	"assets/catalog/hybrid/": "hybrid-20261002-2",
 	"assets/catalog/fusion_tier1/": "fusion-tier1-20261002-2",
 	"assets/catalog/fusion_tier2/": "fusion-tier2-20261002-2",
+	"assets/catalog/fusion_tier3/": "fusion-tier3-20261006-1",
 }
 
 var placeholder_texture: ImageTexture

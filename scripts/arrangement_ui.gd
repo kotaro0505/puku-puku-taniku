@@ -5,6 +5,8 @@ signal close_requested(context:String)
 signal save_requested(arrangement:Dictionary)
 signal dismantle_requested(arrangement_id:String)
 signal pot_purchase_requested(pot_id:String)
+signal pot_unlock_requested(product_id:String)
+signal pot_restore_requested
 signal catalog_purchase_requested(series_id:String)
 signal seed_purchase_requested(seed_type:String)
 signal world_scroll_input(event:InputEvent)
@@ -42,6 +44,10 @@ var seed_shop_products:Array=[]
 var saved_arrangements:Array=[]
 var save_capacity:=20
 var pot_sales_stage:=0
+var pot_design_unlocks:Dictionary={}
+var pot_iap_products:Dictionary={}
+var pot_restore_available:=false
+var pot_restore_in_progress:=false
 var texture_resolver:Callable
 var texture_requester:Callable
 var return_context:="greenhouse"
@@ -83,6 +89,7 @@ var shop_page:Control
 var shop_wallet:Label
 var shop_message:Label
 var shop_grid:VBoxContainer
+var shop_restore_button:Button
 var catalog_shop_page:Control
 var catalog_shop_wallet:Label
 var catalog_shop_message:Label
@@ -148,7 +155,7 @@ void fragment() {
 func _exit_tree()->void:
 	_remove_web_multitouch_fallback()
 
-func configure(species_data:Array,series_data:Array,pots_data:Array,discovery:Dictionary,purchased_pots:Dictionary,arrangements:Array,capacity:int,puku_points:int,resolver:Callable,requester:Callable=Callable(),best_records:Dictionary={},locale:String="ja",sales_stage:int=0)->void:
+func configure(species_data:Array,series_data:Array,pots_data:Array,discovery:Dictionary,purchased_pots:Dictionary,arrangements:Array,capacity:int,puku_points:int,resolver:Callable,requester:Callable=Callable(),best_records:Dictionary={},locale:String="ja",sales_stage:int=0,design_unlocks:Dictionary={},iap_products:Dictionary={},restore_available:bool=false,restore_in_progress:bool=false)->void:
 	catalog_species=species_data
 	series_catalog=series_data
 	pot_catalog=pots_data
@@ -162,6 +169,10 @@ func configure(species_data:Array,series_data:Array,pots_data:Array,discovery:Di
 	species_bests=best_records
 	language_code=GameLocalizer.normalize_language(locale)
 	pot_sales_stage=clampi(sales_stage,0,2)
+	pot_design_unlocks=design_unlocks
+	pot_iap_products=iap_products
+	pot_restore_available=restore_available
+	pot_restore_in_progress=restore_in_progress
 
 func set_language(locale:String)->void:
 	language_code=GameLocalizer.normalize_language(locale)
@@ -196,7 +207,13 @@ func sync_state(purchased_pots:Dictionary,arrangements:Array,capacity:int)->void
 
 func sync_catalog_state(purchased_catalogs:Dictionary,puku_points:int)->void:
 	owned_catalogs=purchased_catalogs;wallet_puku_points=maxi(0,puku_points)
+	if visible and shop_page.visible:_refresh_pot_shop()
 	if visible and catalog_shop_page.visible:_refresh_catalog_shop()
+
+func sync_pot_iap_state(design_unlocks:Dictionary,iap_products:Dictionary,restore_available:bool,restore_in_progress:bool)->void:
+	pot_design_unlocks=design_unlocks;pot_iap_products=iap_products;pot_restore_available=restore_available;pot_restore_in_progress=restore_in_progress
+	if visible and shop_page.visible:_refresh_pot_shop()
+	if visible and pot_select_page.visible:_refresh_pot_selection()
 
 func sync_seed_shop_state(products:Array,puku_points:int)->void:
 	seed_shop_products=products;wallet_puku_points=maxi(0,puku_points)
@@ -389,11 +406,12 @@ func _refresh_pot_selection()->void:
 	_clear_children(pot_select_grid)
 	for pot_value in pot_catalog:
 		if not pot_value is Dictionary:continue
-		var pot:Dictionary=pot_value;var pot_id:=str(pot.get("pot_id",""));var total:=_pot_total_count(pot_id);var available:=_pot_available_count(pot_id)
-		if total<=0:continue
-		var card:=Button.new();card.custom_minimum_size=Vector2(248,230);_skin_button(card,Color("#f4e1bc") if available>0 else Color("#c9b8a2"),15);card.disabled=available<=0;pot_select_grid.add_child(card)
+		var pot:Dictionary=pot_value
+		if not _pot_sales_stage_unlocked(pot):continue
+		var pot_id:=str(pot.get("pot_id",""));var total:=_pot_total_count(pot_id);var available:=_pot_available_count(pot_id);var design_unlocked:=_pot_design_unlocked(pot);var selectable:=design_unlocked and available>0
+		var card:=Button.new();card.custom_minimum_size=Vector2(248,230);_skin_button(card,Color("#f4e1bc") if selectable else Color("#c9b8a2"),15);card.disabled=not selectable;pot_select_grid.add_child(card)
 		var preview:=Control.new();preview.position=Vector2(14,10);preview.size=Vector2(220,150);preview.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(preview);_render_pot(preview,pot,true)
-		var availability_text:=GameLocalizer.text(language_code,"pot_available_count",[available]) if available>0 else GameLocalizer.text(language_code,"pot_all_in_use")
+		var availability_text:=GameLocalizer.text(language_code,"pot_iap_locked_short") if not design_unlocked else (GameLocalizer.text(language_code,"pot_not_owned") if total<=0 else (GameLocalizer.text(language_code,"pot_available_count",[available]) if available>0 else GameLocalizer.text(language_code,"pot_all_in_use")))
 		var label:=Label.new();label.text=GameLocalizer.pot_name(language_code,pot)+"\n"+availability_text;label.position=Vector2(10,164);label.size=Vector2(228,56);label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.add_theme_font_size_override("font_size",16);label.add_theme_color_override("font_color",UI_BROWN);label.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(label)
 		card.pressed.connect(_select_editor_pot.bind(pot_id))
 
@@ -405,7 +423,8 @@ func _return_from_pot_selection()->void:
 	_show_page(home_page);_refresh_home()
 
 func _select_editor_pot(pot_id:String)->void:
-	if _pot_available_count(pot_id)<=0:return
+	var pot:=_pot_entry(pot_id)
+	if pot.is_empty() or not _pot_sales_stage_unlocked(pot) or not _pot_design_unlocked(pot) or _pot_available_count(pot_id)<=0:return
 	current_arrangement={"arrangement_id":_new_arrangement_id(),"name":_default_arrangement_name(),"pot_id":pot_id,"created_at":Time.get_datetime_string_from_system(false,true),"completed":false,"plants":[]}
 	_show_page(editor_page);_load_editor_from_current()
 
@@ -782,7 +801,12 @@ func _return_to_editor()->void:
 
 func _save_current_arrangement()->void:
 	if current_arrangement.is_empty() or bool(current_arrangement.get("completed",false)):return
-	if _pot_available_count(str(current_arrangement.get("pot_id",DEFAULT_POT_ID)))<=0:
+	var current_pot_id:=str(current_arrangement.get("pot_id",DEFAULT_POT_ID))
+	var current_pot:=_pot_entry(current_pot_id)
+	if current_pot.is_empty() or not _pot_sales_stage_unlocked(current_pot) or not _pot_design_unlocked(current_pot):
+		editor_message.text=GameLocalizer.text(language_code,"pot_unlock_required")
+		return
+	if _pot_available_count(current_pot_id)<=0:
 		editor_message.text=GameLocalizer.text(language_code,"pot_save_unavailable")
 		return
 	var name:=editor_name.text.strip_edges()
@@ -833,29 +857,62 @@ func _build_shop_page()->void:
 	_build_header(shop_page,"pot_shop_title",close)
 	shop_wallet=Label.new();shop_wallet.position=Vector2(30,92);shop_wallet.size=Vector2(516,38);shop_wallet.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;shop_wallet.add_theme_font_size_override("font_size",20);shop_wallet.add_theme_color_override("font_color",Color("#f5d36d"));shop_page.add_child(shop_wallet)
 	shop_message=Label.new();shop_message.position=Vector2(30,132);shop_message.size=Vector2(516,52);shop_message.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;shop_message.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;shop_message.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;shop_message.add_theme_font_size_override("font_size",16);shop_message.add_theme_color_override("font_color",UI_CREAM);shop_page.add_child(shop_message)
-	var scroll:=_shop_scroll(Vector2(26,194),Vector2(524,790));shop_page.add_child(scroll)
+	shop_restore_button=_button(GameLocalizer.text(language_code,"iap_restore_purchases"),Vector2(168,190),Vector2(240,50),Color("#c29c72"),15);_prepare_scroll_button(shop_restore_button);shop_restore_button.pressed.connect(_request_pot_restore);shop_page.add_child(shop_restore_button)
+	var scroll:=_shop_scroll(Vector2(26,252),Vector2(524,732));shop_page.add_child(scroll)
 	shop_grid=VBoxContainer.new();shop_grid.custom_minimum_size=Vector2(504,0);shop_grid.mouse_filter=Control.MOUSE_FILTER_PASS;shop_grid.add_theme_constant_override("separation",14);scroll.add_child(shop_grid)
 
 func _refresh_pot_shop()->void:
 	shop_wallet.text=GameLocalizer.text(language_code,"wallet",[wallet_puku_points])
 	if shop_message.text.is_empty():shop_message.text=GameLocalizer.text(language_code,"all_pots_one_puku")
+	shop_restore_button.visible=_has_visible_iap_pots()
+	shop_restore_button.text=GameLocalizer.text(language_code,"iap_restore_processing" if pot_restore_in_progress else "iap_restore_purchases")
+	shop_restore_button.disabled=not pot_restore_available or pot_restore_in_progress
 	_refresh_pot_shop_cards()
 
 func _refresh_pot_shop_cards()->void:
 	_clear_children(shop_grid)
 	for pot_value in pot_catalog:
 		if not pot_value is Dictionary:continue
-		var pot:Dictionary=pot_value;var pot_id:=str(pot.get("pot_id",""));var total:=_pot_total_count(pot_id);var stage_unlocked:=_pot_sales_stage_unlocked(pot);var price_value=pot.get("price_puku");var priced:=price_value is int or price_value is float;var price:=maxi(0,int(price_value)) if priced else 0
+		var pot:Dictionary=pot_value
+		if not _pot_sales_stage_unlocked(pot):continue
+		var pot_id:=str(pot.get("pot_id",""));var total:=_pot_total_count(pot_id);var design_unlocked:=_pot_design_unlocked(pot);var price_value=pot.get("price_puku");var priced:=price_value is int or price_value is float;var price:=maxi(0,int(price_value)) if priced else 0
 		var card:=PanelContainer.new();card.custom_minimum_size=Vector2(504,204);card.mouse_filter=Control.MOUSE_FILTER_PASS;card.add_theme_stylebox_override("panel",_box(Color("#f4e1bc"),Color("#b77c48"),20,3));shop_grid.add_child(card)
 		var content:=Control.new();content.custom_minimum_size=Vector2(484,184);content.mouse_filter=Control.MOUSE_FILTER_PASS;card.add_child(content)
 		var preview:=Control.new();preview.position=Vector2(2,2);preview.size=Vector2(214,176);preview.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.add_child(preview);_render_pot(preview,pot,true)
 		var name:=Label.new();name.text=GameLocalizer.pot_name(language_code,pot);name.position=Vector2(220,12);name.size=Vector2(258,45);name.mouse_filter=Control.MOUSE_FILTER_IGNORE;name.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name.add_theme_font_size_override("font_size",19);name.add_theme_color_override("font_color",UI_BROWN);content.add_child(name)
-		var condition:=Label.new();condition.text=GameLocalizer.text(language_code,"pot_owned_total",[total]) if stage_unlocked else GameLocalizer.text(language_code,"pot_locked");condition.position=Vector2(220,55);condition.size=Vector2(258,34);condition.mouse_filter=Control.MOUSE_FILTER_IGNORE;condition.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;condition.add_theme_font_size_override("font_size",13);condition.add_theme_color_override("font_color",Color("#79543a"));content.add_child(condition)
-		var buy_text:=GameLocalizer.text(language_code,"buy_puku",[price]) if stage_unlocked and priced else GameLocalizer.text(language_code,"locked" if not stage_unlocked else "price_tbd")
-		var buy:=_button(buy_text,Vector2(248,102),Vector2(204,58),Color("#d7aa64") if stage_unlocked and priced else Color("#b9a17d"),17);_prepare_scroll_button(buy);buy.disabled=not stage_unlocked or not priced or wallet_puku_points<price;buy.pressed.connect(_request_pot_purchase.bind(pot_id));content.add_child(buy)
+		var condition:=Label.new();condition.text=GameLocalizer.text(language_code,"pot_owned_total",[total]) if design_unlocked else GameLocalizer.text(language_code,"pot_permanent_unlock");condition.position=Vector2(220,55);condition.size=Vector2(258,34);condition.mouse_filter=Control.MOUSE_FILTER_IGNORE;condition.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;condition.add_theme_font_size_override("font_size",13);condition.add_theme_color_override("font_color",Color("#79543a"));content.add_child(condition)
+		var buy_text:="";var buy_enabled:=false;var product_id:=str(pot.get("iap_product_id",""));var buy_action:=Callable()
+		if design_unlocked:
+			buy_text=GameLocalizer.text(language_code,"buy_puku",[price]) if priced else GameLocalizer.text(language_code,"price_tbd")
+			buy_enabled=priced and wallet_puku_points>=price
+			buy_action=_request_pot_purchase.bind(pot_id)
+		else:
+			var product_state:Dictionary=pot_iap_products.get(product_id,{"status":"loading","localized_price":""})
+			var status:=str(product_state.get("status","loading"));var localized_price:=str(product_state.get("localized_price","")).strip_edges()
+			match status:
+				"available":buy_text=GameLocalizer.text(language_code,"iap_unlock_for_price",[localized_price]);buy_enabled=not localized_price.is_empty()
+				"purchasing":buy_text=GameLocalizer.text(language_code,"iap_purchase_processing")
+				"loading":buy_text=GameLocalizer.text(language_code,"iap_price_loading")
+				_:buy_text=GameLocalizer.text(language_code,"iap_purchase_unavailable")
+			buy_action=_request_pot_unlock.bind(product_id)
+		var buy:=_button(buy_text,Vector2(232,102),Vector2(236,58),Color("#d7aa64") if buy_enabled else Color("#b9a17d"),15)
+		_prepare_scroll_button(buy);buy.disabled=not buy_enabled
+		if buy_action.is_valid():buy.pressed.connect(buy_action)
+		content.add_child(buy)
 
 func _request_pot_purchase(pot_id:String)->void:
 	pot_purchase_requested.emit(pot_id)
+
+func _request_pot_unlock(product_id:String)->void:
+	pot_unlock_requested.emit(product_id)
+
+func _request_pot_restore()->void:
+	pot_restore_requested.emit()
+
+func _has_visible_iap_pots()->bool:
+	for pot_value in pot_catalog:
+		if pot_value is Dictionary and _pot_sales_stage_unlocked(pot_value) and str(pot_value.get("unlock_type","free"))=="iap_unlock":return true
+	return false
 
 func _build_catalog_shop_page()->void:
 	_build_header(catalog_shop_page,"catalog_shop_title",close)
@@ -978,6 +1035,11 @@ func _pot_available_count(pot_id:String)->int:
 
 func _pot_sales_stage_unlocked(pot:Dictionary)->bool:
 	return int(pot.get("sales_stage",0))<=pot_sales_stage
+
+func _pot_design_unlocked(pot:Dictionary)->bool:
+	if str(pot.get("unlock_type","free"))!="iap_unlock":return true
+	var product_id:=str(pot.get("iap_product_id",""))
+	return not product_id.is_empty() and bool(pot_design_unlocks.get(product_id,false))
 
 func _owned_pot_count()->int:
 	var count:=0

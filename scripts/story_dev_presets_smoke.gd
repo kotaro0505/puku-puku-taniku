@@ -9,11 +9,12 @@ func _ready() -> void:
 	assert(not StoryDevPresetsClass.available(false))
 	assert(StoryDevPresetsClass.available(true))
 	await _test_post_first_normal_tutorial_preset()
+	await _test_collection_one_remaining_preset()
 	await _test_act3_and_crisis_presets()
 	await _test_new_route_presets()
 	await _test_restoration_and_101cm_presets()
 	await _test_ending_presets()
-	print("STORY_DEV_PRESETS_SMOKE_OK post_12_seed_tutorial=true tutorial_original_GET=true act2_original_guarantee_unconsumed=true all_platforms=true release_switch=true habitat_debug_independent=true act3_ready=true exploitation=true crisis_ready=7 weak=0/1 first_return=pending restoration=0,1,4 fifth=pending ending=true thank_you=true complete=true harvestable_101=true")
+	print("STORY_DEV_PRESETS_SMOKE_OK post_12_seed_tutorial=true tutorial_original_GET=true act2_original_guarantee_unconsumed=true collection_one_remaining=true all_platforms=true release_switch=true habitat_debug_independent=true act3_ready=true exploitation=true crisis_ready=7 weak=0/1 first_return=pending restoration=0,1,4 fifth=pending ending=true thank_you=true complete=true harvestable_101=true")
 	get_tree().quit()
 
 
@@ -105,6 +106,26 @@ func _test_post_first_normal_tutorial_preset() -> void:
 	var act2_candidates: Array[Dictionary] = game._story_spawn_guarantee_candidates(false)
 	assert(not act2_candidates.is_empty())
 	assert(not act2_candidates.any(func(entry: Dictionary) -> bool: return str(entry.get("species_id", "")) == tutorial_species_id))
+	game.free()
+	await get_tree().process_frame
+
+
+func _test_collection_one_remaining_preset() -> void:
+	var game = await _new_game()
+	var result: Dictionary = game._apply_story_dev_preset(StoryDevPresetsClass.COLLECTION_ONE_REMAINING)
+	assert(bool(result.get("ok", false)))
+	await get_tree().process_frame
+	var last_species_id := str(result.get("collection_last_species_id", ""))
+	assert(last_species_id == StoryDevPresetsClass.COLLECTION_DEV_LAST_SPECIES_ID)
+	assert(game._collection_complete_target_count() == 229)
+	assert(game._collection_complete_get_count() == game._collection_complete_target_count() - 1)
+	assert(game._species_get_count(last_species_id) == 0)
+	assert(not bool(game.discovered.get(last_species_id, false)))
+	assert(game.collection_complete_versions.is_empty())
+	assert(game._species_get_count("jelly_grape") > 0)
+	assert(game.fusion_system.resolve("jelly_grape", "jelly_grape").get("result_species_id", "") == last_species_id)
+	assert(game.current_mode == "greenhouse" and not game.play_active)
+	game._reset_progression_state()
 	game.free()
 	await get_tree().process_frame
 
@@ -261,7 +282,13 @@ func _test_restoration_and_101cm_presets() -> void:
 	assert(not game.puku_gauge_animation_running and game.puku_gauge_animation_queue.is_empty())
 	game.puku_gauge_animation_speed_scale = 1.0
 	game._close_result()
-	await get_tree().process_frame
+	# Result close dispatches the pending-story check, which in turn dispatches
+	# the habitat transition. Wait for that two-stage deferred handoff instead of
+	# depending on both callbacks landing in one idle frame.
+	for _frame in range(10):
+		if game.scene_transition_fade.visible:
+			break
+		await get_tree().process_frame
 	assert(game.scene_transition_fade.visible)
 	assert(game.scene_transition_fade.color.r > 0.99 and game.scene_transition_fade.color.g > 0.99 and game.scene_transition_fade.color.b > 0.99)
 	await get_tree().create_timer(2.8).timeout

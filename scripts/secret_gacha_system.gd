@@ -13,7 +13,11 @@ func load_config()->void:
 	config=parsed if parsed is Dictionary else {}
 
 func configure(series_catalog:Array,species_catalog:Array,pot_catalog:Array,catalog_progression:Dictionary)->void:
-	species_by_id.clear();series_by_id.clear();series_for_species.clear();pots=pot_catalog.duplicate(true);hidden_series_ids.clear()
+	species_by_id.clear();series_by_id.clear();series_for_species.clear();pots.clear();hidden_series_ids.clear()
+	# Paid designs are cosmetic non-consumable entitlements. Secret gacha may
+	# still award the original free-design pots, but it must never bypass IAP.
+	for raw_pot in pot_catalog:
+		if raw_pot is Dictionary and str(raw_pot.get("unlock_type","free"))!="iap_unlock":pots.append(raw_pot.duplicate(true))
 	for raw_series in series_catalog:
 		if not raw_series is Dictionary:continue
 		var series_id:=str(raw_series.get("series_id",""));series_by_id[series_id]=raw_series
