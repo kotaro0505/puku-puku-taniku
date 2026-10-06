@@ -39,6 +39,10 @@ const PLAYER_SAFE_SOIL_POLYGON := [
 ]
 const OPPONENT_SAMPLE_BOUNDS := Rect2(54, 40, 408, 118)
 const PLAYER_SAMPLE_BOUNDS := Rect2(54, 24, 408, 116)
+const BATTLE_VIEW_WIDTH := 576.0
+const SCORE_LABEL_SIZE := Vector2(136, 50)
+const SCORE_LABEL_RIGHT_MARGIN := 20.0
+const SCORE_LABEL_FIELD_TOP_GAP := 170.0
 
 var language_code := "ja"
 var choice_layer: Control
@@ -148,9 +152,9 @@ func _build_ui() -> void:
 	logic_root = Node.new()
 	logic_root.name = "BattlePlantLogic"
 	add_child(logic_root)
-	opponent_score_label = _score_label(Vector2(316, 202), Color("#ffd6b1"))
+	opponent_score_label = _score_label(_score_label_position(OPPONENT_FIELD_RECT), Color("#ffd6b1"))
 	battle_layer.add_child(opponent_score_label)
-	player_score_label = _score_label(Vector2(316, 680), Color("#e0ffd2"))
+	player_score_label = _score_label(_score_label_position(PLAYER_FIELD_RECT), Color("#e0ffd2"))
 	battle_layer.add_child(player_score_label)
 	sow_button = Button.new()
 	sow_button.name = "SowBattleSeedsButton"
@@ -706,7 +710,7 @@ func debug_force_result(forced_player_score: float, forced_opponent_score: float
 func _score_label(position_value: Vector2, color: Color) -> Label:
 	var label := Label.new()
 	label.position = position_value
-	label.size = Vector2(244, 58)
+	label.size = SCORE_LABEL_SIZE
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -716,6 +720,13 @@ func _score_label(position_value: Vector2, color: Color) -> Label:
 	label.add_theme_constant_override("outline_size", 6)
 	label.add_theme_stylebox_override("normal", _box(Color(0.10, 0.045, 0.022, 0.82), Color(0.92, 0.72, 0.35, 0.72), 16, 2))
 	return label
+
+
+func _score_label_position(field_rect: Rect2) -> Vector2:
+	return Vector2(
+		BATTLE_VIEW_WIDTH - SCORE_LABEL_RIGHT_MARGIN - SCORE_LABEL_SIZE.x,
+		field_rect.position.y - SCORE_LABEL_FIELD_TOP_GAP
+	)
 
 
 func _field_control(field_name: String, field_rect: Rect2) -> Control:

@@ -13,6 +13,8 @@ const SAMPLE_SPECIES := {
 }
 const SAMPLE_COUNT := 600
 const SIMULATION_STEP := 1.0 / 30.0
+const OPPONENT_RIGHT_CHARACTER_MAJOR_RECT := Rect2(360, 142, 190, 150)
+const PLAYER_RIGHT_CHARACTER_MAJOR_RECT := Rect2(382, 590, 170, 150)
 
 
 func _ready() -> void:
@@ -23,7 +25,7 @@ func _ready() -> void:
 	var texture := load("res://assets/plants/sprite-colorata.png") as Texture2D
 	_verify_alpha_hit_mask()
 	battle.start_battle([SAMPLE_SPECIES], {"colorata": texture}, "ja", 20260926)
-	_verify_score_labels_are_numbers_only(battle)
+	_verify_score_label_layout_and_content(battle)
 	assert(battle.player_points.size() == BattleClass.MAX_ACTIVE_PER_SIDE and battle.opponent_points.size() == BattleClass.MAX_ACTIVE_PER_SIDE)
 	_verify_soil_points(battle.player_points, false)
 	_verify_soil_points(battle.opponent_points, true)
@@ -115,21 +117,49 @@ func _ready() -> void:
 	get_tree().quit()
 
 
-func _verify_score_labels_are_numbers_only(battle: Control) -> void:
+func _verify_score_label_layout_and_content(battle: Control) -> void:
+	var expected_x: float = BattleClass.BATTLE_VIEW_WIDTH - BattleClass.SCORE_LABEL_RIGHT_MARGIN - BattleClass.SCORE_LABEL_SIZE.x
+	var expected_opponent_position := Vector2(expected_x, BattleClass.OPPONENT_FIELD_RECT.position.y - BattleClass.SCORE_LABEL_FIELD_TOP_GAP)
+	var expected_player_position := Vector2(expected_x, BattleClass.PLAYER_FIELD_RECT.position.y - BattleClass.SCORE_LABEL_FIELD_TOP_GAP)
+	assert(battle.opponent_score_label.size == BattleClass.SCORE_LABEL_SIZE)
+	assert(battle.player_score_label.size == BattleClass.SCORE_LABEL_SIZE)
+	assert(battle.opponent_score_label.position == expected_opponent_position)
+	assert(battle.player_score_label.position == expected_player_position)
+	assert(is_equal_approx(
+		BattleClass.OPPONENT_FIELD_RECT.position.y - battle.opponent_score_label.position.y,
+		BattleClass.PLAYER_FIELD_RECT.position.y - battle.player_score_label.position.y
+	))
+	assert(is_equal_approx(battle.opponent_score_label.position.x + battle.opponent_score_label.size.x, BattleClass.BATTLE_VIEW_WIDTH - BattleClass.SCORE_LABEL_RIGHT_MARGIN))
+	assert(is_equal_approx(battle.player_score_label.position.x + battle.player_score_label.size.x, BattleClass.BATTLE_VIEW_WIDTH - BattleClass.SCORE_LABEL_RIGHT_MARGIN))
+	assert(not Rect2(battle.opponent_score_label.position, battle.opponent_score_label.size).intersects(OPPONENT_RIGHT_CHARACTER_MAJOR_RECT))
+	assert(not Rect2(battle.player_score_label.position, battle.player_score_label.size).intersects(PLAYER_RIGHT_CHARACTER_MAJOR_RECT))
+	assert(Rect2(Vector2.ZERO, Vector2(576, 1024)).encloses(Rect2(battle.opponent_score_label.position, battle.opponent_score_label.size)))
+	assert(Rect2(Vector2.ZERO, Vector2(576, 1024)).encloses(Rect2(battle.player_score_label.position, battle.player_score_label.size)))
 	var original_language: String = battle.language_code
 	var original_opponent_score: float = battle.opponent_score
 	var original_player_score: float = battle.player_score
-	battle.opponent_score = 123.4
-	battle.player_score = 98.7
-	for locale in ["ja", "hiragana", "en"]:
-		battle.language_code = locale
-		battle._update_scores()
-		assert(battle.opponent_score_label.text == "123.4 cm")
-		assert(battle.player_score_label.text == "98.7 cm")
+	for score in [0.0, 38.3, 87.8, 999.9]:
+		battle.opponent_score = score
+		battle.player_score = score
+		for locale in ["ja", "hiragana", "en"]:
+			battle.language_code = locale
+			battle._update_scores()
+			var expected_text := "%.1f cm" % score
+			assert(battle.opponent_score_label.text == expected_text)
+			assert(battle.player_score_label.text == expected_text)
+			_verify_score_text_fits(battle.opponent_score_label)
+			_verify_score_text_fits(battle.player_score_label)
 	battle.language_code = original_language
 	battle.opponent_score = original_opponent_score
 	battle.player_score = original_player_score
 	battle._update_scores()
+
+
+func _verify_score_text_fits(label: Label) -> void:
+	var font := label.get_theme_font("font")
+	var font_size := label.get_theme_font_size("font_size")
+	var text_width := font.get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+	assert(text_width <= label.size.x - 20.0)
 
 
 func _verify_alpha_hit_mask() -> void:
