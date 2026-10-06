@@ -3,6 +3,7 @@ extends Control
 
 signal close_requested(context:String)
 signal save_requested(arrangement:Dictionary)
+signal viewer_transform_save_requested(arrangement_id:String,viewer_transform:Dictionary)
 signal dismantle_requested(arrangement_id:String)
 signal pot_purchase_requested(pot_id:String)
 signal pot_unlock_requested(product_id:String)
@@ -28,6 +29,10 @@ const POT_VERTICAL_OFFSET := 62.0
 const POT_HOLDER_SIZE := Vector2(516,292)
 const POT_LOCAL_BASELINE_Y := 538.0
 const PLANT_LAYER_Z := 200
+const VIEWER_SCALE_DEFAULT := 1.0
+const VIEWER_SCALE_MIN := 0.6
+const VIEWER_SCALE_MAX := 2.25
+const VIEWER_MIN_VISIBLE_PIXELS := 96.0
 const COMPLETION_DISPLAY_SECONDS := 1.65
 const DEFAULT_POT_ID := "shallow_terracotta"
 const UI_CREAM := Color("#fff1d2")
@@ -81,6 +86,7 @@ var picker_grid:GridContainer
 var viewer_page:Control
 var viewer_name:Label
 var viewer_canvas:Panel
+var viewer_artwork_root:Control
 var viewer_pot_layer:Control
 var viewer_plant_layer:Control
 var viewer_dismantle_button:Button
@@ -129,6 +135,19 @@ var web_touch_callback
 var web_touch_listener_options
 var web_multitouch_active:=false
 var web_multitouch_suppress_native:=false
+var viewer_touch_positions:Dictionary={}
+var viewer_drag_active:=false
+var viewer_drag_pointer_id:=-999
+var viewer_drag_last_position:=Vector2.ZERO
+var viewer_pinch_active:=false
+var viewer_pinch_touch_ids:Array[int]=[]
+var viewer_pinch_start_distance:=1.0
+var viewer_pinch_start_scale:=VIEWER_SCALE_DEFAULT
+var viewer_pinch_start_position:=Vector2.ZERO
+var viewer_pinch_start_midpoint:=Vector2.ZERO
+var viewer_transform_dirty:=false
+var viewer_web_multitouch_active:=false
+var viewer_web_multitouch_suppress_native:=false
 var save_request_accepted:=false
 var dismantle_request_accepted:=false
 
@@ -237,7 +256,7 @@ func open_seed_shop()->void:
 	set_world_backdrop_mode(false,world_pot_anchor_screen);return_context="shop";visible=true;_show_page(seed_shop_page);_refresh_seed_shop()
 
 func close()->void:
-	_cancel_editor_gesture();_clear_completion_overlay();_hide_dismantle_confirmation();visible=false;close_requested.emit(return_context)
+	_cancel_editor_gesture();_commit_viewer_transform_if_dirty();_cancel_viewer_gesture(false);_clear_completion_overlay();_hide_dismantle_confirmation();visible=false;close_requested.emit(return_context)
 
 func show_pot_shop_message(message:String)->void:
 	shop_message.text=message;_refresh_pot_shop_cards()
@@ -304,7 +323,7 @@ func _confirm_dismantle()->void:
 	dismantle_request_accepted=false
 	dismantle_requested.emit(str(current_arrangement.get("arrangement_id","")))
 	if not dismantle_request_accepted:return
-	_hide_dismantle_confirmation();current_arrangement={}
+	viewer_transform_dirty=false;_hide_dismantle_confirmation();current_arrangement={}
 	if viewer_return_context=="saved":_show_page(saved_arrangements_page);_refresh_saved_arrangements()
 	else:_show_page(home_page);_refresh_home()
 
@@ -320,6 +339,7 @@ func _page()->Control:
 
 func _show_page(page:Control)->void:
 	if editor_page and editor_page.visible and page!=editor_page:_cancel_editor_gesture()
+	if viewer_page and viewer_page.visible and page!=viewer_page:_cancel_viewer_gesture(false)
 	if page!=viewer_page:_hide_dismantle_confirmation()
 	for candidate in [home_page,saved_arrangements_page,editor_page,picker_page,viewer_page,shop_page,catalog_shop_page,seed_shop_page]:
 		if candidate:candidate.visible=candidate==page
@@ -327,16 +347,27 @@ func _show_page(page:Control)->void:
 func is_editor_active()->bool:
 	return visible and editor_page!=null and editor_page.visible
 
+func is_viewer_active()->bool:
+	return visible and viewer_page!=null and viewer_page.visible
+
 func is_navigation_hint_safe()->bool:
-	# Keep the greenhouse return hint on the main arrangement views. The home
-	# grid ends above its fixed bottom panel so the hint does not cover a card.
-	return visible and not completion_overlay.visible and not dismantle_confirmation_overlay.visible and ((home_page and home_page.visible) or (viewer_page and viewer_page.visible))
+	# Viewer gestures are exclusively owned by the finished artwork. Keep the
+	# greenhouse return hint on the pot-selection home only.
+	return visible and not completion_overlay.visible and not dismantle_confirmation_overlay.visible and home_page!=null and home_page.visible
 
 func _input(event:InputEvent)->void:
 	# Web/mobile browsers do not reliably route the second finger of a
 	# multi-touch gesture through a Control's gui_input signal. Track touch
-	# events at viewport level while the editor is active so both fingers use
-	# the same path. Mouse input remains owned by editor_canvas.gui_input.
+	# events at viewport level while an interactive canvas is active so both
+	# fingers use the same path. Mouse input remains owned by each canvas.
+	if is_viewer_active() and viewer_canvas!=null:
+		if event is InputEventScreenTouch or event is InputEventScreenDrag:
+			if viewer_web_multitouch_suppress_native:
+				# The capture-phase DOM bridge already applied this exact Web gesture.
+				get_viewport().set_input_as_handled()
+				return
+			if _route_viewer_touch_event(event,false):get_viewport().set_input_as_handled()
+		return
 	if not is_editor_active() or editor_canvas==null:return
 	if event is InputEventScreenTouch or event is InputEventScreenDrag:
 		if web_multitouch_suppress_native:
@@ -363,11 +394,34 @@ func _route_editor_touch_event(event:InputEvent,position_is_editor_local:bool)->
 		return true
 	return false
 
+func _route_viewer_touch_event(event:InputEvent,position_is_viewer_local:bool)->bool:
+	if not is_viewer_active() or viewer_canvas==null:return false
+	if event is InputEventScreenTouch:
+		var touch:=event as InputEventScreenTouch
+		var local_position:=touch.position if position_is_viewer_local else _viewer_local_touch_position(touch.position)
+		if touch.pressed and not _viewer_canvas_has_point(local_position):return false
+		if not touch.pressed and not viewer_touch_positions.has(touch.index):return false
+		var local_touch:=touch.duplicate() as InputEventScreenTouch;local_touch.position=local_position;_handle_viewer_touch(local_touch)
+		return true
+	if event is InputEventScreenDrag:
+		var drag:=event as InputEventScreenDrag
+		var local_position:=drag.position if position_is_viewer_local else _viewer_local_touch_position(drag.position)
+		if not viewer_touch_positions.has(drag.index) and not _viewer_canvas_has_point(local_position):return false
+		var local_drag:=drag.duplicate() as InputEventScreenDrag;local_drag.position=local_position;_handle_viewer_touch(local_drag)
+		return true
+	return false
+
 func _editor_local_touch_position(screen_position:Vector2)->Vector2:
 	return editor_canvas.get_global_transform_with_canvas().affine_inverse()*screen_position
 
 func _editor_canvas_has_point(local_position:Vector2)->bool:
 	return Rect2(Vector2.ZERO,editor_canvas.size).has_point(local_position)
+
+func _viewer_local_touch_position(screen_position:Vector2)->Vector2:
+	return viewer_canvas.get_global_transform_with_canvas().affine_inverse()*screen_position
+
+func _viewer_canvas_has_point(local_position:Vector2)->bool:
+	return Rect2(Vector2.ZERO,viewer_canvas.size).has_point(local_position)
 
 func _on_home_world_scroll_input(event:InputEvent)->void:
 	if world_backdrop_enabled and visible and home_page.visible:world_scroll_input.emit(event)
@@ -502,6 +556,19 @@ func _on_editor_canvas_gui_input(event:InputEvent)->void:
 		# viewport path marks handled events, so the same event cannot run twice.
 		if _route_editor_touch_event(event,true):accept_event()
 
+func _on_viewer_canvas_gui_input(event:InputEvent)->void:
+	if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT:
+		if event.pressed:_begin_viewer_drag(-1,event.position)
+		else:_finish_viewer_pointer(-1)
+		accept_event()
+	elif event is InputEventMouseMotion:
+		if viewer_drag_active and viewer_drag_pointer_id==-1:_update_viewer_drag(event.position)
+		accept_event()
+	elif event is InputEventScreenTouch or event is InputEventScreenDrag:
+		# Fallback for ports which deliver a finger only to the Control. Viewport
+		# input marks handled events, so a touch cannot transform the work twice.
+		if _route_viewer_touch_event(event,true):accept_event()
+
 func _install_web_multitouch_fallback()->void:
 	if not OS.has_feature("web"):return
 	var document=JavaScriptBridge.get_interface("document")
@@ -528,6 +595,26 @@ func _on_web_touch_event(arguments:Array)->void:
 	if touches==null:return
 	var touch_count:=int(touches.length)
 	var event_type:=str(event.type)
+	if is_viewer_active():
+		if web_multitouch_active or web_multitouch_suppress_native:_reset_web_multitouch_state()
+		if touch_count<2 and not viewer_web_multitouch_active:
+			if viewer_web_multitouch_suppress_native and event_type=="touchstart":
+				# Keep suppression through the trailing Godot touchend mirror, then
+				# return the next one-finger gesture to the native path.
+				viewer_web_multitouch_suppress_native=false
+				return
+			if not viewer_web_multitouch_suppress_native:return
+		if bool(event.cancelable):event.preventDefault()
+		var viewer_rect=web_touch_canvas.getBoundingClientRect();var viewer_rect_size:=Vector2(maxf(1.0,float(viewer_rect.width)),maxf(1.0,float(viewer_rect.height)));var viewer_viewport_size:=get_viewport().get_visible_rect().size
+		var viewer_positions:Dictionary={}
+		for index in range(touch_count):
+			var viewer_touch=touches.item(index)
+			if viewer_touch==null:continue
+			var viewer_screen_position:=_web_touch_viewport_position(Vector2(float(viewer_touch.clientX),float(viewer_touch.clientY)),Vector2(float(viewer_rect.left),float(viewer_rect.top)),viewer_rect_size,viewer_viewport_size)
+			viewer_positions[int(viewer_touch.identifier)]=_viewer_local_touch_position(viewer_screen_position)
+		_handle_viewer_web_multitouch_snapshot(viewer_positions)
+		return
+	if viewer_web_multitouch_active or viewer_web_multitouch_suppress_native:_reset_viewer_web_multitouch_state(false)
 	if not is_editor_active():
 		if web_multitouch_active or web_multitouch_suppress_native:_reset_web_multitouch_state()
 		return
@@ -581,6 +668,27 @@ func _handle_web_multitouch_snapshot(positions:Dictionary)->void:
 func _reset_web_multitouch_state()->void:
 	web_multitouch_active=false;web_multitouch_suppress_native=false;touch_positions.clear();pinch_target_index=-1
 	if pinch_active:_finish_selected_gesture(GameLocalizer.text(language_code,"arrangement_gesture_transform"))
+
+func _handle_viewer_web_multitouch_snapshot(positions:Dictionary)->void:
+	if positions.size()>=2:
+		if not viewer_web_multitouch_active:
+			var inside_count:=0
+			for point_value in positions.values():
+				if _viewer_canvas_has_point(point_value as Vector2):inside_count+=1
+			if inside_count<2:return
+			viewer_web_multitouch_active=true;viewer_web_multitouch_suppress_native=true;viewer_drag_active=false;viewer_drag_pointer_id=-999;viewer_touch_positions=positions.duplicate(true);_begin_viewer_pinch()
+		else:
+			viewer_touch_positions=positions.duplicate(true);_update_viewer_pinch()
+		return
+	if viewer_web_multitouch_active:
+		viewer_web_multitouch_active=false
+		_finish_viewer_gesture(true)
+		viewer_touch_positions.clear()
+
+func _reset_viewer_web_multitouch_state(commit_changes:bool)->void:
+	viewer_web_multitouch_active=false;viewer_web_multitouch_suppress_native=false
+	if viewer_pinch_active:_finish_viewer_gesture(commit_changes)
+	viewer_touch_positions.clear()
 
 func _handle_editor_touch(event:InputEvent)->void:
 	if event is InputEventScreenTouch:
@@ -674,6 +782,107 @@ func _cancel_background_for_pinch()->void:
 
 func _cancel_editor_gesture()->void:
 	drag_active=false;drag_pointer_id=-999;pinch_active=false;pinch_touch_ids.clear();touch_positions.clear();pinch_target_index=-1;pinch_start_angle=0.0;pinch_start_rotation=0.0;web_multitouch_active=false;web_multitouch_suppress_native=false;_clear_background_pointer()
+
+static func normalize_viewer_transform(value:Variant)->Dictionary:
+	var source:Dictionary={}
+	if value is Dictionary:source=value
+	var position_x:=float(source.get("x",0.0))
+	var position_y:=float(source.get("y",0.0))
+	var scale_value:=float(source.get("scale",VIEWER_SCALE_DEFAULT))
+	if is_nan(position_x) or is_inf(position_x):position_x=0.0
+	if is_nan(position_y) or is_inf(position_y):position_y=0.0
+	if is_nan(scale_value) or is_inf(scale_value):scale_value=VIEWER_SCALE_DEFAULT
+	return {"x":position_x,"y":position_y,"scale":clampf(scale_value,VIEWER_SCALE_MIN,VIEWER_SCALE_MAX)}
+
+func _handle_viewer_touch(event:InputEvent)->void:
+	if event is InputEventScreenTouch:
+		var touch:=event as InputEventScreenTouch
+		if touch.pressed:
+			viewer_touch_positions[touch.index]=touch.position
+			if viewer_touch_positions.size()>=2:_begin_viewer_pinch()
+			else:_begin_viewer_drag(touch.index,touch.position)
+		else:
+			viewer_touch_positions.erase(touch.index)
+			if viewer_pinch_active and touch.index in viewer_pinch_touch_ids:_finish_viewer_gesture(true)
+			elif viewer_drag_active and viewer_drag_pointer_id==touch.index:_finish_viewer_gesture(true)
+	elif event is InputEventScreenDrag:
+		var drag:=event as InputEventScreenDrag
+		viewer_touch_positions[drag.index]=drag.position
+		if viewer_pinch_active:_update_viewer_pinch()
+		elif viewer_touch_positions.size()>=2:_begin_viewer_pinch()
+		elif viewer_drag_active and viewer_drag_pointer_id==drag.index:_update_viewer_drag(drag.position)
+
+func _begin_viewer_drag(pointer_id:int,pointer_position:Vector2)->void:
+	if not is_viewer_active() or viewer_artwork_root==null:return
+	viewer_drag_active=true;viewer_drag_pointer_id=pointer_id;viewer_drag_last_position=pointer_position
+
+func _update_viewer_drag(pointer_position:Vector2)->void:
+	if not viewer_drag_active or viewer_artwork_root==null:return
+	var delta:=pointer_position-viewer_drag_last_position
+	viewer_drag_last_position=pointer_position
+	if delta.is_zero_approx():return
+	_set_viewer_artwork_transform(viewer_artwork_root.position+delta,viewer_artwork_root.scale.x,true)
+
+func _finish_viewer_pointer(pointer_id:int)->void:
+	if viewer_drag_active and viewer_drag_pointer_id==pointer_id:_finish_viewer_gesture(true)
+
+func _begin_viewer_pinch()->void:
+	if viewer_artwork_root==null or viewer_touch_positions.size()<2:return
+	viewer_drag_active=false;viewer_drag_pointer_id=-999;viewer_pinch_active=true;viewer_pinch_touch_ids.clear()
+	var pointer_ids:Array=[]
+	for pointer_value in viewer_touch_positions.keys():pointer_ids.append(int(pointer_value))
+	pointer_ids.sort()
+	for pointer_value in pointer_ids:
+		viewer_pinch_touch_ids.append(int(pointer_value))
+		if viewer_pinch_touch_ids.size()>=2:break
+	var first:Vector2=viewer_touch_positions.get(viewer_pinch_touch_ids[0],Vector2.ZERO);var second:Vector2=viewer_touch_positions.get(viewer_pinch_touch_ids[1],Vector2.ZERO)
+	viewer_pinch_start_distance=maxf(first.distance_to(second),1.0);viewer_pinch_start_scale=viewer_artwork_root.scale.x;viewer_pinch_start_position=viewer_artwork_root.position;viewer_pinch_start_midpoint=(first+second)*.5
+
+func _update_viewer_pinch()->void:
+	if not viewer_pinch_active or viewer_pinch_touch_ids.size()<2 or viewer_artwork_root==null:return
+	if not viewer_touch_positions.has(viewer_pinch_touch_ids[0]) or not viewer_touch_positions.has(viewer_pinch_touch_ids[1]):return
+	var first:Vector2=viewer_touch_positions[viewer_pinch_touch_ids[0]];var second:Vector2=viewer_touch_positions[viewer_pinch_touch_ids[1]];var midpoint:=(first+second)*.5
+	var scale_value:=clampf(viewer_pinch_start_scale*maxf(first.distance_to(second),1.0)/viewer_pinch_start_distance,VIEWER_SCALE_MIN,VIEWER_SCALE_MAX)
+	var artwork_point:=(viewer_pinch_start_midpoint-viewer_pinch_start_position)/maxf(viewer_pinch_start_scale,0.001)
+	_set_viewer_artwork_transform(midpoint-artwork_point*scale_value,scale_value,true)
+
+func _set_viewer_artwork_transform(position_value:Vector2,scale_value:float,mark_dirty:bool)->void:
+	if viewer_artwork_root==null:return
+	var safe_scale:=clampf(scale_value,VIEWER_SCALE_MIN,VIEWER_SCALE_MAX)
+	var safe_position:=_clamp_viewer_position(position_value,safe_scale)
+	var changed:=not viewer_artwork_root.position.is_equal_approx(safe_position) or not is_equal_approx(viewer_artwork_root.scale.x,safe_scale)
+	viewer_artwork_root.position=safe_position;viewer_artwork_root.scale=Vector2.ONE*safe_scale;viewer_artwork_root.rotation=0.0
+	if mark_dirty and changed:viewer_transform_dirty=true
+
+func _clamp_viewer_position(position_value:Vector2,scale_value:float)->Vector2:
+	if viewer_canvas==null:return position_value
+	var scaled_size:=viewer_canvas.size*scale_value
+	var minimum:=Vector2(VIEWER_MIN_VISIBLE_PIXELS,VIEWER_MIN_VISIBLE_PIXELS)-scaled_size
+	var maximum:=viewer_canvas.size-Vector2(VIEWER_MIN_VISIBLE_PIXELS,VIEWER_MIN_VISIBLE_PIXELS)
+	return Vector2(clampf(position_value.x,minimum.x,maximum.x),clampf(position_value.y,minimum.y,maximum.y))
+
+func _viewer_transform_state()->Dictionary:
+	if viewer_artwork_root==null:return normalize_viewer_transform({})
+	return {"x":viewer_artwork_root.position.x,"y":viewer_artwork_root.position.y,"scale":viewer_artwork_root.scale.x}
+
+func _restore_viewer_transform(arrangement:Dictionary)->void:
+	var state:=normalize_viewer_transform(arrangement.get("viewer_transform",{}))
+	_set_viewer_artwork_transform(Vector2(float(state.x),float(state.y)),float(state.scale),false)
+	current_arrangement["viewer_transform"]=_viewer_transform_state();viewer_transform_dirty=false
+
+func _commit_viewer_transform_if_dirty()->void:
+	if not viewer_transform_dirty or current_arrangement.is_empty():return
+	var arrangement_id:=str(current_arrangement.get("arrangement_id",""))
+	if arrangement_id.is_empty():viewer_transform_dirty=false;return
+	var state:=_viewer_transform_state();current_arrangement["viewer_transform"]=state.duplicate(true);viewer_transform_dirty=false
+	viewer_transform_save_requested.emit(arrangement_id,state.duplicate(true))
+
+func _finish_viewer_gesture(commit_changes:bool)->void:
+	viewer_drag_active=false;viewer_drag_pointer_id=-999;viewer_pinch_active=false;viewer_pinch_touch_ids.clear()
+	if commit_changes:_commit_viewer_transform_if_dirty()
+
+func _cancel_viewer_gesture(commit_changes:bool)->void:
+	_finish_viewer_gesture(commit_changes);viewer_touch_positions.clear();viewer_web_multitouch_active=false;viewer_web_multitouch_suppress_native=false
 
 func _plant_index_at(canvas_position:Vector2)->int:
 	var canvas_global:=editor_canvas.get_global_transform_with_canvas()*canvas_position;var selected_index:=-1;var selected_z:=-1000000
@@ -838,17 +1047,19 @@ func _save_current_arrangement()->void:
 	if visible:_open_viewer(saved)
 
 func _build_viewer_page()->void:
-	viewer_page.gui_input.connect(_on_viewer_world_scroll_input)
 	_build_header(viewer_page,"viewer_title",_return_from_viewer)
-	viewer_name=Label.new();viewer_name.position=Vector2(30,90);viewer_name.size=Vector2(516,48);viewer_name.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;viewer_name.add_theme_font_size_override("font_size",24);_style_overlay_label(viewer_name,Color("#ffe0a0"),5);viewer_page.add_child(viewer_name)
-	viewer_canvas=Panel.new();viewer_canvas.position=ARRANGEMENT_CANVAS_POSITION;viewer_canvas.size=Vector2(536,552);viewer_canvas.clip_contents=false;viewer_canvas.mouse_filter=Control.MOUSE_FILTER_IGNORE;viewer_canvas.add_theme_stylebox_override("panel",StyleBoxEmpty.new());viewer_page.add_child(viewer_canvas)
-	viewer_pot_layer=Control.new();viewer_pot_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);viewer_pot_layer.mouse_filter=Control.MOUSE_FILTER_IGNORE;viewer_canvas.add_child(viewer_pot_layer)
-	viewer_plant_layer=Control.new();viewer_plant_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);viewer_plant_layer.z_index=PLANT_LAYER_Z;viewer_plant_layer.mouse_filter=Control.MOUSE_FILTER_IGNORE;viewer_canvas.add_child(viewer_plant_layer)
-	viewer_dismantle_button=_button(GameLocalizer.text(language_code,"arrangement_dismantle"),Vector2(154,868),Vector2(268,60),Color("#b87962"),18);_mark_localized(viewer_dismantle_button,"arrangement_dismantle");viewer_dismantle_button.pressed.connect(_show_dismantle_confirmation);viewer_page.add_child(viewer_dismantle_button)
+	for header_control in viewer_page.get_children():
+		if header_control is Control:(header_control as Control).z_index=500
+	viewer_name=Label.new();viewer_name.position=Vector2(30,90);viewer_name.size=Vector2(516,48);viewer_name.z_index=500;viewer_name.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;viewer_name.add_theme_font_size_override("font_size",24);_style_overlay_label(viewer_name,Color("#ffe0a0"),5);viewer_page.add_child(viewer_name)
+	viewer_canvas=Panel.new();viewer_canvas.position=ARRANGEMENT_CANVAS_POSITION;viewer_canvas.size=Vector2(536,552);viewer_canvas.clip_contents=false;viewer_canvas.mouse_filter=Control.MOUSE_FILTER_STOP;viewer_canvas.gui_input.connect(_on_viewer_canvas_gui_input);viewer_canvas.add_theme_stylebox_override("panel",StyleBoxEmpty.new());viewer_page.add_child(viewer_canvas)
+	viewer_artwork_root=Control.new();viewer_artwork_root.name="ViewerArtworkRoot";viewer_artwork_root.size=viewer_canvas.size;viewer_artwork_root.mouse_filter=Control.MOUSE_FILTER_IGNORE;viewer_canvas.add_child(viewer_artwork_root)
+	viewer_pot_layer=Control.new();viewer_pot_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);viewer_pot_layer.mouse_filter=Control.MOUSE_FILTER_IGNORE;viewer_artwork_root.add_child(viewer_pot_layer)
+	viewer_plant_layer=Control.new();viewer_plant_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);viewer_plant_layer.z_index=PLANT_LAYER_Z;viewer_plant_layer.mouse_filter=Control.MOUSE_FILTER_IGNORE;viewer_artwork_root.add_child(viewer_plant_layer)
+	viewer_dismantle_button=_button(GameLocalizer.text(language_code,"arrangement_dismantle"),Vector2(154,868),Vector2(268,60),Color("#b87962"),18);viewer_dismantle_button.z_index=500;_mark_localized(viewer_dismantle_button,"arrangement_dismantle");viewer_dismantle_button.pressed.connect(_show_dismantle_confirmation);viewer_page.add_child(viewer_dismantle_button)
 
 func _open_viewer(arrangement:Dictionary,return_target:String="home")->void:
 	viewer_return_context="saved" if return_target=="saved" else "home"
-	_hide_dismantle_confirmation();current_arrangement=arrangement.duplicate(true);current_arrangement["completed"]=true;viewer_name.text=str(arrangement.get("name",GameLocalizer.text(language_code,"arrangement_title")));_show_page(viewer_page);_render_readonly_arrangement(current_arrangement)
+	_cancel_viewer_gesture(false);_hide_dismantle_confirmation();current_arrangement=arrangement.duplicate(true);current_arrangement["completed"]=true;viewer_name.text=str(arrangement.get("name",GameLocalizer.text(language_code,"arrangement_title")));_show_page(viewer_page);_render_readonly_arrangement(current_arrangement)
 
 func _render_readonly_arrangement(arrangement:Dictionary)->void:
 	_clear_children(viewer_pot_layer);_clear_children(viewer_plant_layer)
@@ -859,17 +1070,21 @@ func _render_readonly_arrangement(arrangement:Dictionary)->void:
 		if texture==null:continue
 		var root:=Control.new();root.size=PLANT_CONTROL_SIZE;root.pivot_offset=PLANT_CONTROL_SIZE*.5;root.position=Vector2(float(plant.get("x",0.0)),float(plant.get("y",0.0)))-PLANT_CONTROL_SIZE*.5;root.scale=Vector2.ONE*clampf(float(plant.get("scale",PLANT_SCALE_MIN)),PLANT_SCALE_MIN,_plant_scale_max(plant));root.rotation_degrees=fposmod(float(plant.get("rotation",0.0)),360.0);root.z_index=int(plant.get("z_index",0));root.mouse_filter=Control.MOUSE_FILTER_IGNORE;viewer_plant_layer.add_child(root)
 		var image:=TextureRect.new();image.texture=texture;image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.mouse_filter=Control.MOUSE_FILTER_IGNORE;root.add_child(image);_request_texture(_species_entry(str(plant.get("species_id",""))),image,true)
+	_restore_viewer_transform(arrangement)
 
 func _pot_holder_position(canvas:Control,holder_size:Vector2)->Vector2:
 	if not world_backdrop_enabled:return Vector2((canvas.size.x-holder_size.x)*.5,POT_LOCAL_BASELINE_Y-holder_size.y)
 	return Vector2(world_pot_anchor_screen.x-canvas.position.x-holder_size.x*.5,world_pot_anchor_screen.y+POT_VERTICAL_OFFSET-canvas.position.y-holder_size.y*.94)
 
 func _return_from_viewer()->void:
+	_commit_viewer_transform_if_dirty()
 	if viewer_return_context=="saved":_show_page(saved_arrangements_page);_refresh_saved_arrangements()
 	else:_show_page(home_page);_refresh_home()
 
-func _on_viewer_world_scroll_input(event:InputEvent)->void:
-	if world_backdrop_enabled and visible and viewer_page.visible:world_scroll_input.emit(event)
+func _on_viewer_world_scroll_input(_event:InputEvent)->void:
+	# Compatibility hook for older tooling. Finished-viewer gestures are never
+	# forwarded to greenhouse/arrangement world navigation.
+	pass
 
 func _build_shop_page()->void:
 	_build_header(shop_page,"pot_shop_title",close)

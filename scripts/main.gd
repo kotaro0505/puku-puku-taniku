@@ -2061,6 +2061,7 @@ func _build_arrangement_ui(hud:Control)->void:
 	arrangement_ui=ArrangementUIClass.new();hud.add_child(arrangement_ui)
 	arrangement_ui.close_requested.connect(_on_arrangement_close_requested)
 	arrangement_ui.save_requested.connect(_on_arrangement_save_requested)
+	arrangement_ui.viewer_transform_save_requested.connect(_on_arrangement_viewer_transform_save_requested)
 	arrangement_ui.dismantle_requested.connect(_on_arrangement_dismantle_requested)
 	arrangement_ui.pot_purchase_requested.connect(_on_pot_purchase_requested)
 	arrangement_ui.pot_unlock_requested.connect(_on_pot_unlock_requested)
@@ -2183,6 +2184,20 @@ func _on_arrangement_dismantle_requested(arrangement_id:String)->void:
 			saved_arrangements.remove_at(index)
 			_save();arrangement_ui.sync_state(owned_pots,saved_arrangements,arrangement_save_capacity);arrangement_ui.set_dismantle_request_result(true)
 			return
+
+func _on_arrangement_viewer_transform_save_requested(arrangement_id:String,viewer_transform:Dictionary)->void:
+	if arrangement_id.is_empty():return
+	var normalized_transform:=ArrangementUIClass.normalize_viewer_transform(viewer_transform)
+	for index in range(saved_arrangements.size()):
+		var arrangement_value=saved_arrangements[index]
+		if not arrangement_value is Dictionary or str(arrangement_value.get("arrangement_id",""))!=arrangement_id:continue
+		var updated:Dictionary=arrangement_value.duplicate(true)
+		updated["viewer_transform"]=normalized_transform.duplicate(true)
+		saved_arrangements[index]=updated
+		# Viewer framing is display metadata only. Do not pass through the new-work
+		# save path, which owns pot availability and completion accounting.
+		_save();arrangement_ui.sync_state(owned_pots,saved_arrangements,arrangement_save_capacity)
+		return
 
 func _on_pot_purchase_requested(pot_id:String)->void:
 	var pot:=_pot_entry(pot_id)
@@ -2363,7 +2378,8 @@ func _normalize_arrangement(source:Dictionary)->Dictionary:
 	if arrangement_id.is_empty():arrangement_id="arrangement_%d_%d"%[Time.get_unix_time_from_system(),Time.get_ticks_msec()%100000]
 	var arrangement_name:=str(source.get("name","")).strip_edges()
 	if arrangement_name.is_empty():arrangement_name=Localizer.text(language_code,"arrangement_default_name",[saved_arrangements.size()+1])
-	return {"arrangement_id":arrangement_id,"name":arrangement_name,"pot_id":pot_id,"created_at":str(source.get("created_at",Time.get_datetime_string_from_system(false,true))),"completed":true,"plants":plants_data}
+	var viewer_transform:=ArrangementUIClass.normalize_viewer_transform(source.get("viewer_transform",{}))
+	return {"arrangement_id":arrangement_id,"name":arrangement_name,"pot_id":pot_id,"created_at":str(source.get("created_at",Time.get_datetime_string_from_system(false,true))),"completed":true,"plants":plants_data,"viewer_transform":viewer_transform}
 
 func _on_shop_panda_tapped()->void:
 	if shop_chatter_bubble.visible:_dismiss_or_advance_shop_chatter();return
@@ -8127,7 +8143,7 @@ func _update_labels()->void:
 
 func _greenhouse_area_navigation_available()->bool:
 	if not StoryProgressionClass.arrangement_is_unlocked(story_progression_state) or not _tutorial_fully_complete() or current_mode!="greenhouse" or play_active or catalog_preview_mode_active or arrangement_transitioning:return false
-	if arrangement_scene_active and arrangement_ui and arrangement_ui.is_editor_active():return false
+	if arrangement_scene_active and arrangement_ui and (arrangement_ui.is_editor_active() or arrangement_ui.is_viewer_active()):return false
 	return not ((opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible) or jurejure_first_encounter_active or (puku_puku_battle and puku_puku_battle.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (story_dev_panel and story_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible))
 
 func _arrangement_navigation_hint_safe()->bool:
@@ -8139,11 +8155,14 @@ func _arrangement_navigation_hint_safe()->bool:
 	return true
 
 func _unhandled_input(event:InputEvent)->void:
+	if arrangement_ui and arrangement_ui.is_viewer_active():
+		if greenhouse_area_drag_tracking:_cancel_greenhouse_area_drag()
+		return
 	if greenhouse_area_drag_tracking or (not arrangement_scene_active and _greenhouse_area_navigation_available()):
 		_handle_greenhouse_area_scroll_input(event,false)
 
 func _on_arrangement_world_scroll_input(event:InputEvent)->void:
-	if arrangement_ui and arrangement_ui.is_editor_active():
+	if arrangement_ui and (arrangement_ui.is_editor_active() or arrangement_ui.is_viewer_active()):
 		if greenhouse_area_drag_tracking:_cancel_greenhouse_area_drag()
 		return
 	if greenhouse_area_drag_tracking or (arrangement_scene_active and _greenhouse_area_navigation_available()):

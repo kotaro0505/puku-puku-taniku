@@ -91,24 +91,41 @@ func _ready()->void:
 	ui.editor_name.text="春の寄せ植え";ui._save_current_arrangement();assert(game.saved_arrangements.size()==1 and game._owned_pot_total("shallow_terracotta")==1 and game._pot_usage_count("shallow_terracotta")==1 and game._pot_available_count("shallow_terracotta")==0 and ui.editor_page.visible and ui.completion_overlay.visible and ui.completion_label.text=="寄せ植え完成！" and ui.completion_confetti_layer.get_child_count()==40)
 	await get_tree().create_timer(ui.COMPLETION_DISPLAY_SECONDS+.08).timeout
 	assert(ui.viewer_page.visible and ui.viewer_plant_layer.get_child_count()==2 and ui.viewer_plant_layer.find_child("SelectionBorder",true,false)==null and not ui.completion_overlay.visible)
+	assert(ui.is_viewer_active() and ui.viewer_pot_layer.get_parent()==ui.viewer_artwork_root and ui.viewer_plant_layer.get_parent()==ui.viewer_artwork_root and ui.viewer_artwork_root.position.is_zero_approx() and ui.viewer_artwork_root.scale.is_equal_approx(Vector2.ONE))
 	var viewed_pot:Control=ui.viewer_pot_layer.get_child(0);assert(viewed_pot.position.is_equal_approx(edit_pot_position) and viewed_pot.size.is_equal_approx(editor_pot.size))
 	for index in range(ui.viewer_plant_layer.get_child_count()):
 		var viewed_plant:Control=ui.viewer_plant_layer.get_child(index);var edit_snapshot:Dictionary=edit_snapshots[index]
 		assert(viewed_plant.position.is_equal_approx(edit_snapshot.position) and viewed_plant.scale.is_equal_approx(edit_snapshot.scale) and is_equal_approx(viewed_plant.rotation_degrees,float(edit_snapshot.rotation)) and viewed_plant.z_index==int(edit_snapshot.z))
-	assert(ui.editor_canvas.position==ui.viewer_canvas.position and ui.viewer_plant_layer.z_index==ui.PLANT_LAYER_Z and ui.viewer_canvas.get_theme_stylebox("panel") is StyleBoxEmpty)
+	assert(ui.editor_canvas.position==ui.viewer_canvas.position and ui.viewer_plant_layer.z_index==ui.PLANT_LAYER_Z and not ui.viewer_canvas.clip_contents and ui.viewer_dismantle_button.z_index>ui.viewer_canvas.z_index and ui.viewer_canvas.get_theme_stylebox("panel") is StyleBoxEmpty)
 	assert(game.species_get_counts==get_before and game.bests==best_before and game.discovered==discovered_before)
-	var saved:Dictionary=game.saved_arrangements[0];assert(saved.has("arrangement_id") and saved.has("name") and saved.has("pot_id") and saved.has("created_at") and saved.has("plants") and bool(saved.completed));assert(saved.plants.size()==2 and int(saved.plants[0].z_index)>int(saved.plants[1].z_index) and is_equal_approx(float(saved.plants[0].scale),2.35))
+	var pot_global_before:=viewed_pot.get_global_transform_with_canvas().origin;var plant_global_before:=(ui.viewer_plant_layer.get_child(0) as Control).get_global_transform_with_canvas().origin
+	ui._on_viewer_canvas_gui_input(_mouse_button(Vector2(220,280),true));ui._on_viewer_canvas_gui_input(_mouse_motion(Vector2(262,316)))
+	# Viewer metadata is not written every motion frame.
+	assert((game.saved_arrangements[0].viewer_transform as Dictionary)=={"x":0.0,"y":0.0,"scale":1.0})
+	ui._on_viewer_canvas_gui_input(_mouse_button(Vector2(262,316),false))
+	assert(ui.viewer_artwork_root.position.is_equal_approx(Vector2(42,36)))
+	var pot_drag_delta:=viewed_pot.get_global_transform_with_canvas().origin-pot_global_before;var plant_drag_delta:=(ui.viewer_plant_layer.get_child(0) as Control).get_global_transform_with_canvas().origin-plant_global_before
+	assert(pot_drag_delta.is_equal_approx(Vector2(42,36)) and plant_drag_delta.is_equal_approx(pot_drag_delta))
+	var plant_local_scale_before:=(ui.viewer_plant_layer.get_child(0) as Control).scale
+	_send_viewer_touch(ui,_screen_touch(10,Vector2(170,270),true));_send_viewer_touch(ui,_screen_touch(11,Vector2(350,270),true));_send_viewer_touch(ui,_screen_drag(11,Vector2(440,270)))
+	assert(ui.viewer_artwork_root.scale.x>1.0 and ui.viewer_artwork_root.scale.x<=ui.VIEWER_SCALE_MAX and is_zero_approx(ui.viewer_artwork_root.rotation) and (ui.viewer_plant_layer.get_child(0) as Control).scale.is_equal_approx(plant_local_scale_before))
+	_send_viewer_touch(ui,_screen_touch(11,Vector2(440,270),false));_send_viewer_touch(ui,_screen_touch(10,Vector2(170,270),false))
+	var saved_viewer_transform:Dictionary=game.saved_arrangements[0].viewer_transform;assert(float(saved_viewer_transform.scale)>1.0 and Vector2(float(saved_viewer_transform.x),float(saved_viewer_transform.y)).is_equal_approx(ui.viewer_artwork_root.position))
+	ui._set_viewer_artwork_transform(Vector2(100000,100000),99.0,false);assert(is_equal_approx(ui.viewer_artwork_root.scale.x,ui.VIEWER_SCALE_MAX) and ui.viewer_artwork_root.position.x<=ui.viewer_canvas.size.x-ui.VIEWER_MIN_VISIBLE_PIXELS and ui.viewer_artwork_root.position.y<=ui.viewer_canvas.size.y-ui.VIEWER_MIN_VISIBLE_PIXELS)
+	ui._set_viewer_artwork_transform(Vector2(-100000,-100000),.01,false);assert(is_equal_approx(ui.viewer_artwork_root.scale.x,ui.VIEWER_SCALE_MIN) and ui.viewer_artwork_root.position.x+0.01>=ui.VIEWER_MIN_VISIBLE_PIXELS-ui.viewer_canvas.size.x*ui.VIEWER_SCALE_MIN and ui.viewer_artwork_root.position.y+0.01>=ui.VIEWER_MIN_VISIBLE_PIXELS-ui.viewer_canvas.size.y*ui.VIEWER_SCALE_MIN)
+	ui._restore_viewer_transform(game.saved_arrangements[0])
+	var saved:Dictionary=game.saved_arrangements[0];assert(saved.has("arrangement_id") and saved.has("name") and saved.has("pot_id") and saved.has("created_at") and saved.has("plants") and saved.has("viewer_transform") and bool(saved.completed));assert(saved.plants.size()==2 and int(saved.plants[0].z_index)>int(saved.plants[1].z_index) and is_equal_approx(float(saved.plants[0].scale),2.35))
 	for plant_key in ["species_id","x","y","scale","rotation","z_index"]:assert(saved.plants[0].has(plant_key))
 	var saved_id:=str(saved.arrangement_id);var saved_position:=Vector2(float(saved.plants[0].x),float(saved.plants[0].y));var saved_scale:=float(saved.plants[0].scale)
 	game._save();game.saved_arrangements.clear();game._load_save();assert(game.saved_arrangements.size()==1 and str(game.saved_arrangements[0].arrangement_id)==saved_id)
-	assert(Vector2(float(game.saved_arrangements[0].plants[0].x),float(game.saved_arrangements[0].plants[0].y)).is_equal_approx(saved_position) and is_equal_approx(float(game.saved_arrangements[0].plants[0].scale),saved_scale))
+	assert(Vector2(float(game.saved_arrangements[0].plants[0].x),float(game.saved_arrangements[0].plants[0].y)).is_equal_approx(saved_position) and is_equal_approx(float(game.saved_arrangements[0].plants[0].scale),saved_scale) and (game.saved_arrangements[0].viewer_transform as Dictionary)==saved_viewer_transform)
 	game._on_arrangement_save_requested({"arrangement_id":"blocked_no_pot","name":"保存不可","pot_id":"shallow_terracotta","created_at":"test","completed":true,"plants":[]});assert(game.saved_arrangements.size()==1 and not ui.save_request_accepted)
 	game._sync_arrangement_ui();ui.selected_plant_index=0;var locked_scale:=float(ui.editor_plants[0].scale);ui._adjust_selected_scale(.1);assert(is_equal_approx(float(ui.editor_plants[0].scale),locked_scale))
 	# Completion returns directly to the viewer; its back button returns to the
 	# creation-first pot grid. Saved-work viewing retains its own return route.
 	ui._return_from_viewer();assert(ui.home_page.visible)
 	ui._open_saved_arrangements();assert(ui.saved_arrangements_page.visible and _has_label_text_containing(ui.saved_arrangements_page,"作った作品") and ui.saved_arrangements_list.get_child_count()==1)
-	ui._open_saved_arrangement(game.saved_arrangements[0]);assert(ui.viewer_page.visible and not _has_button_text(ui.viewer_page,"編集") and not ui.has_method("_edit_arrangement") and _has_button_text(ui.viewer_page,"寄せ植えをばらす"))
+	ui._open_saved_arrangement(game.saved_arrangements[0]);assert(ui.viewer_page.visible and ui.viewer_artwork_root.position.is_equal_approx(Vector2(float(saved_viewer_transform.x),float(saved_viewer_transform.y))) and is_equal_approx(ui.viewer_artwork_root.scale.x,float(saved_viewer_transform.scale)) and not _has_button_text(ui.viewer_page,"編集") and not ui.has_method("_edit_arrangement") and _has_button_text(ui.viewer_page,"寄せ植えをばらす"))
 	ui._return_from_viewer();assert(ui.saved_arrangements_page.visible)
 	ui._return_from_saved_arrangements();assert(ui.home_page.visible and ui.pot_select_grid.get_child_count()==8 and (ui.pot_select_grid.get_child(0) as Button).disabled and _has_label_text_containing(ui.pot_select_grid.get_child(0),"使用中（空きなし）") and not _has_button_text(ui.home_page,"編集"))
 	# The grid remains visible at capacity, but even an otherwise available pot
@@ -134,7 +151,8 @@ func _ready()->void:
 	game._save();game.owned_pots.erase("classic_terracotta");game._load_save();assert(int(game.owned_pots.get("classic_terracotta",0))==2 and typeof(game.owned_pots.get("classic_terracotta"))==TYPE_INT)
 	game._sync_arrangement_ui();ui.open_home();assert(ui.pot_select_grid.get_child_count()==8);ui._select_editor_pot("classic_terracotta");assert(ui.editor_page.visible and str(ui.current_arrangement.pot_id)=="classic_terracotta")
 	assert(game.species_get_counts==get_before and game.bests==best_before and game.discovered==discovered_before)
-	var migrated:Dictionary=game._normalize_arrangement({"arrangement_id":"legacy","name":"旧作品","pot_id":"starter_terracotta","plants":[]});assert(str(migrated.pot_id)=="shallow_terracotta")
+	var migrated:Dictionary=game._normalize_arrangement({"arrangement_id":"legacy","name":"旧作品","pot_id":"starter_terracotta","plants":[]});assert(str(migrated.pot_id)=="shallow_terracotta" and (migrated.viewer_transform as Dictionary)=={"x":0.0,"y":0.0,"scale":1.0})
+	ui._open_viewer(migrated);assert(ui.viewer_plant_layer.get_child_count()==0 and ui.viewer_artwork_root.position.is_zero_approx() and ui.viewer_artwork_root.scale.is_equal_approx(Vector2.ONE));ui._return_from_viewer();ui._select_editor_pot("classic_terracotta")
 	var free_scale:Dictionary=game._normalize_arrangement({"arrangement_id":"free_scale","name":"自由拡大","pot_id":"shallow_terracotta","plants":[{"species_id":"colorata","x":211.0,"y":287.0,"scale":2.75,"rotation":73.0,"z_index":4}]})
 	assert(is_equal_approx(float(free_scale.plants[0].scale),2.75) and is_equal_approx(float(free_scale.plants[0].rotation),73.0) and int(free_scale.plants[0].z_index)==4)
 	for species_entry in game.catalog_species:game.discovered[str(species_entry.get("species_id",""))]=true
@@ -179,6 +197,11 @@ func _screen_drag(index:int,position:Vector2)->InputEventScreenDrag:
 func _send_editor_touch(ui,event:InputEvent)->void:
 	var screen_event:=event.duplicate()
 	screen_event.position=ui.editor_canvas.get_global_transform_with_canvas()*event.position
+	ui._input(screen_event)
+
+func _send_viewer_touch(ui,event:InputEvent)->void:
+	var screen_event:=event.duplicate()
+	screen_event.position=ui.viewer_canvas.get_global_transform_with_canvas()*event.position
 	ui._input(screen_event)
 
 func _has_button_text(root:Node,text:String)->bool:

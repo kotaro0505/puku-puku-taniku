@@ -88,10 +88,15 @@ func _ready()->void:
 	game.arrangement_ui._return_home_from_editor()
 	assert(not game.arrangement_ui.is_editor_active() and game._greenhouse_area_navigation_available())
 	game.arrangement_ui._open_viewer({"arrangement_id":"gesture_viewer","name":"完成作品","pot_id":"shallow_terracotta","completed":true,"plants":[]})
-	assert(game.arrangement_ui.viewer_page.visible and game._greenhouse_area_navigation_available())
+	assert(game.arrangement_ui.is_viewer_active() and game.arrangement_ui.viewer_page.visible and not game._greenhouse_area_navigation_available() and not game.arrangement_ui.is_navigation_hint_safe())
 	var viewer_press:=InputEventScreenTouch.new();viewer_press.index=0;viewer_press.position=Vector2(520,450);viewer_press.pressed=true;game.arrangement_ui._on_viewer_world_scroll_input(viewer_press)
-	assert(game.greenhouse_area_drag_tracking)
-	game._cancel_greenhouse_area_drag();game.arrangement_ui._return_from_viewer()
+	game._on_arrangement_world_scroll_input(viewer_press);assert(not game.greenhouse_area_drag_tracking and not game.arrangement_transitioning)
+	var artwork_start:Vector2=game.arrangement_ui.viewer_artwork_root.position
+	var viewer_mouse_press:=InputEventMouseButton.new();viewer_mouse_press.button_index=MOUSE_BUTTON_LEFT;viewer_mouse_press.pressed=true;viewer_mouse_press.position=Vector2(260,300);game.arrangement_ui._on_viewer_canvas_gui_input(viewer_mouse_press)
+	var viewer_motion:=InputEventMouseMotion.new();viewer_motion.position=Vector2(300,330);game.arrangement_ui._on_viewer_canvas_gui_input(viewer_motion)
+	var viewer_mouse_release:=InputEventMouseButton.new();viewer_mouse_release.button_index=MOUSE_BUTTON_LEFT;viewer_mouse_release.pressed=false;viewer_mouse_release.position=viewer_motion.position;game.arrangement_ui._on_viewer_canvas_gui_input(viewer_mouse_release)
+	assert(game.arrangement_ui.viewer_page.visible and game.arrangement_ui.viewer_artwork_root.position.is_equal_approx(artwork_start+Vector2(40,30)) and not game.greenhouse_area_drag_tracking and not game.arrangement_transitioning)
+	game.arrangement_ui._return_from_viewer();assert(game.arrangement_ui.home_page.visible and game._greenhouse_area_navigation_available())
 
 	game._begin_greenhouse_area_drag(Vector2(520,450),true)
 	game._update_greenhouse_area_drag(Vector2(520-expected_arrangement_transition*.20,450))
