@@ -4,16 +4,10 @@ const StoryProgressionClass = preload("res://scripts/story_progression.gd")
 const HabitatRestorationClass = preload("res://scripts/habitat_restoration.gd")
 const Localizer = preload("res://scripts/game_localizer.gd")
 
-const FORMER_BASE_SPECIALS := [
+const PROTECTED_BASE_SPECIALS := [
 	"golden_laui",
 	"golden_kannte",
 	"transparent_succulent",
-	"glow_colorata",
-	"metal_laui",
-	"seaglass_veria",
-	"amber_agavoides",
-	"yumefuwa_jelly",
-	"peach_jelly_succulent",
 ]
 
 
@@ -46,7 +40,7 @@ func _hide_foreground(game: Node) -> void:
 		"seed_pod_story_overlay", "habitat_second_awakening_overlay",
 		"jurejure_first_encounter_overlay", "intro_overlay", "tutorial_guide_overlay",
 		"result_overlay", "play_overlay", "species_get_overlay",
-		"catalog_series_unlock_overlay", "forest_gacha_ui", "secret_gacha_ui",
+		"catalog_series_unlock_overlay", "forest_gacha_ui",
 		"fusion_lab_ui", "encyclopedia_overlay", "shop_overlay", "settings_overlay",
 		"habitat_plant_panel", "habitat_dev_panel", "story_dev_panel",
 	]:
@@ -69,9 +63,12 @@ func _test_base_catalog_contract(game: Node) -> void:
 	assert(base_ids.size() == StoryProgressionClass.MAIN_STORY_ORIGINAL_IDS.size())
 	for original_id in StoryProgressionClass.MAIN_STORY_ORIGINAL_IDS:
 		assert(original_id in base_ids)
-	for species_id in FORMER_BASE_SPECIALS:
+	for species_id in PROTECTED_BASE_SPECIALS:
 		assert(species_id not in base_ids)
 		assert(not game._catalog_entry(species_id).is_empty())
+	for species_id in StoryProgressionClass.RETIRED_SPECIAL_BASE_SPECIES_IDS:
+		assert(species_id not in base_ids)
+		assert(game._catalog_entry(species_id).is_empty())
 	assert("現代で生まれた" not in str(base_entry.get("description", "")))
 
 

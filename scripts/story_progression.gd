@@ -18,13 +18,9 @@ const ACT_FINALE := 4
 # New Act II/III gates live in one versioned payload instead of adding another
 # row of unrelated booleans to main.gd.  The root scene only forwards gameplay
 # milestones and persists this dictionary.
-const RUNTIME_STATE_VERSION := 8
+const RUNTIME_STATE_VERSION := 9
 # Lifetime ending counters are optional scalar fields normalized to zero below,
 # so they do not require replaying the story-phase migrations for existing v7 saves.
-# Keep the complete Secret Gacha implementation and saved state intact while
-# disconnecting it from normal progression.  Preview routes remain available,
-# and changing this one flag reconnects the midpoint install flow.
-const SECRET_GACHA_ENABLED := false
 const EVENT_POST_ENCOUNTER_HOME := "post_jurejure_encounter_home"
 const EVENT_POST_CRISIS_GREENHOUSE := "post_crisis_greenhouse"
 const EVENT_FANTASY_FIRST := "fantasy_first_discovery"
@@ -32,7 +28,9 @@ const EVENT_ARRANGEMENT_INTRO := "arrangement_intro"
 const EVENT_FANTASY_SIX := "fantasy_realization"
 const EVENT_ACT3_BATTLE_INTRO := "act3_exploitation_battle_intro"
 const EVENT_EXPLOITATION_MIDPOINT := "exploitation_midpoint"
-const EVENT_SECRET_GACHA_INSTALL := "secret_gacha_install"
+# Tombstone only. This ID is accepted as evidence from old saves, but is never
+# queued or returned by current runtime progression.
+const RETIRED_EVENT_SECRET_GACHA_INSTALL := "secret_gacha_install"
 const EVENT_RESTORATION_JOIN_HOME := "restoration_join_home"
 const CRISIS_ROUTE_NONE := ""
 const CRISIS_ROUTE_SAME_HABITAT := "same_habitat"
@@ -45,7 +43,6 @@ const RUNTIME_EVENT_IDS := [
 	EVENT_FANTASY_SIX,
 	EVENT_ACT3_BATTLE_INTRO,
 	EVENT_EXPLOITATION_MIDPOINT,
-	EVENT_SECRET_GACHA_INSTALL,
 	EVENT_RESTORATION_JOIN_HOME,
 ]
 
@@ -78,8 +75,6 @@ static func default_runtime_state() -> Dictionary:
 		"exploitation_midpoint_pending": false,
 		"exploitation_midpoint_seen": false,
 		"pending_story_events": [],
-		"secret_gacha_unlocked": false,
-		"secret_gacha_install_seen": false,
 		"last_exploitation_dialog_index": -1,
 		"last_crisis_concern_visit": -1,
 		"last_exploitation_concern_phase": "",
@@ -94,6 +89,13 @@ static func default_runtime_state() -> Dictionary:
 static func normalize_runtime_state(raw_state: Variant, migration: Dictionary = {}) -> Dictionary:
 	var state := default_runtime_state()
 	var saved_runtime_version := 0
+	var raw_dictionary: Dictionary = raw_state if raw_state is Dictionary else {}
+	var retired_secret_evidence := bool(migration.get("secret_gacha_evidence", false)) \
+			or bool(raw_dictionary.get("secret_gacha_unlocked", false)) \
+			or bool(raw_dictionary.get("secret_gacha_install_seen", false))
+	var raw_pending_events: Variant = raw_dictionary.get("pending_story_events", [])
+	if raw_pending_events is Array and RETIRED_EVENT_SECRET_GACHA_INSTALL in raw_pending_events:
+		retired_secret_evidence = true
 	if raw_state is Dictionary:
 		saved_runtime_version = int(raw_state.get("version", 0))
 		for key in state:
@@ -153,7 +155,6 @@ static func normalize_runtime_state(raw_state: Variant, migration: Dictionary = 
 			state["post_encounter_greenhouse_seen"] = true
 			state["pending_story_events"].erase(EVENT_POST_ENCOUNTER_HOME)
 		var old_crisis_started := bool(migration.get("habitat_crisis_started", false))
-		var old_secret_evidence := bool(migration.get("secret_gacha_evidence", false))
 		var old_act3_intro_seen := bool(migration.get("act3_intro_seen", false))
 		var old_jurejure_count := maxi(0, int(migration.get("jurejure_get_count", 0)))
 		var old_fantasy_count := maxi(0, int(migration.get("fantasy_get_count", 0)))
@@ -168,24 +169,20 @@ static func normalize_runtime_state(raw_state: Variant, migration: Dictionary = 
 			state["pending_story_events"].erase(EVENT_ARRANGEMENT_INTRO)
 		if old_forest_gacha_evidence:
 			state["forest_gacha_unlock_pending"] = false
-		if old_act3_intro_seen or old_crisis_started or old_secret_evidence:
+		if old_act3_intro_seen or old_crisis_started or retired_secret_evidence:
 			state["exploitation_started"] = true
 			# The dedicated camera/battle introduction is new in v3. Existing
 			# Act III saves have already crossed this story beat.
 			state["act3_battle_intro_pending"] = false
 			state["act3_battle_intro_seen"] = true
 			state["pending_story_events"].erase(EVENT_ACT3_BATTLE_INTRO)
-		if old_crisis_started or old_secret_evidence:
+		if old_crisis_started or retired_secret_evidence:
 			state["exploitation_midpoint_pending"] = false
 			state["exploitation_midpoint_seen"] = true
 			state["pending_story_events"].erase(EVENT_EXPLOITATION_MIDPOINT)
 		elif bool(state.get("exploitation_started", false)) and old_jurejure_count >= 4:
 			state["exploitation_midpoint_pending"] = true
 			queue_story_event(state, EVENT_EXPLOITATION_MIDPOINT)
-		if old_crisis_started or old_secret_evidence:
-			state["secret_gacha_unlocked"] = true
-			state["secret_gacha_install_seen"] = true
-			state["pending_story_events"].erase(EVENT_SECRET_GACHA_INSTALL)
 	# The post-crisis greenhouse scene did not exist before v4.  Established
 	# crisis saves have already returned to normal play, so never surprise them
 	# with a newly inserted historical conversation on load.
@@ -196,10 +193,14 @@ static func normalize_runtime_state(raw_state: Variant, migration: Dictionary = 
 	# A v1 runtime payload can be loaded independently of the outer save version
 	# in tests and tools. Infer the phase from its own durable evidence as a
 	# final guard.
-	if saved_runtime_version < RUNTIME_STATE_VERSION and bool(state.get("secret_gacha_unlocked", false)):
+	if retired_secret_evidence:
 		state["exploitation_started"] = true
+		state["act3_battle_intro_pending"] = false
+		state["act3_battle_intro_seen"] = true
+		state["pending_story_events"].erase(EVENT_ACT3_BATTLE_INTRO)
 		state["exploitation_midpoint_pending"] = false
 		state["exploitation_midpoint_seen"] = true
+		state["pending_story_events"].erase(EVENT_EXPLOITATION_MIDPOINT)
 	if bool(state.get("post_encounter_greenhouse_seen", false)):
 		state["post_encounter_greenhouse_pending"] = false
 		state["pending_story_events"].erase(EVENT_POST_ENCOUNTER_HOME)
@@ -231,15 +232,6 @@ static func normalize_runtime_state(raw_state: Variant, migration: Dictionary = 
 	if HabitatRestorationClass.can_queue_join_home(
 			restoration, bool(state.get("post_crisis_greenhouse_seen", false))):
 		queue_story_event(state, EVENT_RESTORATION_JOIN_HOME)
-	if bool(state.get("secret_gacha_unlocked", false)) or bool(state.get("secret_gacha_install_seen", false)):
-		state["secret_gacha_unlocked"] = true
-		state["secret_gacha_install_seen"] = true
-		state["pending_story_events"].erase(EVENT_SECRET_GACHA_INSTALL)
-	if not SECRET_GACHA_ENABLED:
-		state["pending_story_events"].erase(EVENT_SECRET_GACHA_INSTALL)
-	elif bool(state.get("exploitation_midpoint_seen", false)) \
-			and not bool(state.get("secret_gacha_install_seen", false)):
-		queue_story_event(state, EVENT_SECRET_GACHA_INSTALL)
 	return state
 
 
@@ -333,8 +325,6 @@ static func take_forest_gacha_unlock(state: Dictionary) -> bool:
 static func queue_story_event(state: Dictionary, event_id: String) -> void:
 	if event_id not in RUNTIME_EVENT_IDS:
 		return
-	if event_id == EVENT_SECRET_GACHA_INSTALL and not SECRET_GACHA_ENABLED:
-		return
 	var events: Array = state.get("pending_story_events", [])
 	if event_id not in events:
 		events.append(event_id)
@@ -343,9 +333,6 @@ static func queue_story_event(state: Dictionary, event_id: String) -> void:
 
 static func peek_story_event(state: Dictionary) -> String:
 	var events: Array = state.get("pending_story_events", [])
-	if not SECRET_GACHA_ENABLED and EVENT_SECRET_GACHA_INSTALL in events:
-		events.erase(EVENT_SECRET_GACHA_INSTALL)
-		state["pending_story_events"] = events
 	return "" if events.is_empty() else str(events[0])
 
 
@@ -506,14 +493,6 @@ static func complete_exploitation_midpoint(state: Dictionary) -> void:
 	consume_story_event(state, EVENT_EXPLOITATION_MIDPOINT)
 	state["exploitation_midpoint_pending"] = false
 	state["exploitation_midpoint_seen"] = true
-	if SECRET_GACHA_ENABLED and not bool(state.get("secret_gacha_install_seen", false)):
-		queue_story_event(state, EVENT_SECRET_GACHA_INSTALL)
-
-
-static func complete_secret_gacha_install(state: Dictionary) -> void:
-	consume_story_event(state, EVENT_SECRET_GACHA_INSTALL)
-	state["secret_gacha_install_seen"] = true
-	state["secret_gacha_unlocked"] = true
 
 
 static func fantasy_is_unlocked(state: Dictionary) -> bool:
@@ -532,16 +511,14 @@ static func exploitation_midpoint_is_seen(state: Dictionary) -> bool:
 	return bool(state.get("exploitation_midpoint_seen", false))
 
 
-static func secret_gacha_is_unlocked(state: Dictionary) -> bool:
-	return bool(state.get("secret_gacha_unlocked", false))
-
-
-static func secret_gacha_feature_enabled() -> bool:
-	return SECRET_GACHA_ENABLED
-
 const REMOVED_COMMON_SPECIES_IDS := [
 	"momotaro", "lola", "black_prince", "perle_von_nurnberg", "shirobotan",
 	"shurei", "bronze_hime", "nijinotama", "pink_pretty", "prolidety"
+]
+
+const RETIRED_SPECIAL_BASE_SPECIES_IDS := [
+	"glow_colorata", "metal_laui", "seaglass_veria", "amber_agavoides",
+	"yumefuwa_jelly", "peach_jelly_succulent"
 ]
 
 const MAIN_STORY_ORIGINAL_IDS := [
@@ -562,3 +539,7 @@ static func originals_complete(discovered: Dictionary) -> bool:
 
 static func is_removed_species(species_id: String) -> bool:
 	return species_id in REMOVED_COMMON_SPECIES_IDS
+
+
+static func is_retired_special_base_species(species_id: String) -> bool:
+	return species_id in RETIRED_SPECIAL_BASE_SPECIES_IDS

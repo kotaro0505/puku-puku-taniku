@@ -5,7 +5,7 @@ const KNOWN_ONE := "golden_kannte"
 const KNOWN_TWO := "golden_laui"
 const UNLOCKED_NEW := "shaviana"
 const LOCKED_NEW := "gummy_peach_milk"
-const EXCLUDED := ["glow_colorata","metal_laui"]
+const EXCLUDED := ["transparent_succulent","jurejure_pure_gold"]
 
 func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
@@ -35,9 +35,6 @@ func _configure_probe_catalog(game:Node)->void:
 	var light:Dictionary=game._catalog_entry(KNOWN_ZERO[1]);light["gold_star_count"]=0;light["rarity"]="通常";light["spawn_weight"]=1.0
 	var one:Dictionary=game._catalog_entry(KNOWN_ONE);one["gold_star_count"]=1;one["rarity"]="通常";one["spawn_weight"]=1.0
 	var two:Dictionary=game._catalog_entry(KNOWN_TWO);two["gold_star_count"]=2;two["rarity"]="レア";two["spawn_weight"]=1.0
-	# Keep one route-only probe and make a separate mystery-rarity probe so the
-	# two exclusion paths are exercised independently.
-	var mystery:Dictionary=game._catalog_entry("metal_laui");mystery["special_route_only"]=false
 	game.discovered={KNOWN_ZERO[0]:true,KNOWN_ZERO[1]:true,KNOWN_ONE:true,KNOWN_TWO:true,EXCLUDED[0]:true,EXCLUDED[1]:true}
 	game.discovered[KNOWN_ZERO[2]]=true
 	game.species_get_counts={KNOWN_ZERO[0]:1,KNOWN_ZERO[1]:1,KNOWN_ZERO[2]:1,KNOWN_ONE:1,KNOWN_TWO:1,EXCLUDED[0]:1,EXCLUDED[1]:1}

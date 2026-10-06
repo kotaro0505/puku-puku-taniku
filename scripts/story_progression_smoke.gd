@@ -16,7 +16,7 @@ func _ready() -> void:
 	_test_retired_unlock_conditions(game)
 	_test_legacy_three_act_migration(game)
 	game._reset_progression_state()
-	print("STORY_PROGRESSION_SMOKE_OK acts=3 first_battle=act2 original_guarantee=true fantasy_gate=original_get fantasy_guarantee=true arrangement_gate=1 forest_gate=6 fantasy=1+6+24 safe_queue=true exploitation=act3 midpoint=4 crisis=8 post_crisis_home=once secret_gacha=disabled migration=preserved")
+	print("STORY_PROGRESSION_SMOKE_OK acts=3 first_battle=act2 original_guarantee=true fantasy_gate=original_get fantasy_guarantee=true arrangement_gate=1 forest_gate=6 fantasy=1+6+24 safe_queue=true exploitation=act3 midpoint=4 crisis=8 post_crisis_home=once retired_secret=tombstone")
 	get_tree().quit()
 
 
@@ -24,7 +24,7 @@ func _test_catalog_contract(game: Node) -> void:
 	assert(game.INITIAL_SERIES_ID == "base")
 	assert(game._series_entry("common").is_empty())
 	assert(bool(game.unlocked_series.get("base", false)))
-	assert(game.catalog_species.size() == 238)
+	assert(game.catalog_species.size() == 232)
 	var jurejure_entries: Array[Dictionary] = game._series_species_entries("jurejure")
 	assert(jurejure_entries.size() == 10)
 	for entry in jurejure_entries:
@@ -47,21 +47,17 @@ func _test_catalog_contract(game: Node) -> void:
 			modern_annotations.append(str(entry.get("species_id", "")))
 	assert(originals == StoryProgressionClass.MAIN_STORY_ORIGINAL_IDS)
 	assert(originals.size() == 12 and modern_annotations.is_empty())
-	var former_base_specials := [
-		"golden_laui", "golden_kannte", "transparent_succulent", "glow_colorata",
-		"metal_laui", "seaglass_veria", "amber_agavoides", "yumefuwa_jelly",
-		"peach_jelly_succulent",
-	]
-	for species_id in former_base_specials:
+	for species_id in ["golden_laui", "golden_kannte", "transparent_succulent"]:
 		assert(not game._catalog_entry(species_id).is_empty())
 		assert(species_id not in originals and species_id not in modern_annotations)
+	for species_id in StoryProgressionClass.RETIRED_SPECIAL_BASE_SPECIES_IDS:
+		assert(game._catalog_entry(str(species_id)).is_empty())
 	for ordinary_id in ["hyalina_san_luis_de_la_paz", "purpusorum", "pinwheel", "tovarensis_tovar", "strictiflora_bustamante"]:
 		var ordinary_entry: Dictionary = game._catalog_entry(ordinary_id)
 		assert(not ordinary_entry.is_empty())
 		assert(bool(ordinary_entry.get("main_story_original", false)))
 		assert(str(ordinary_entry.get("rarity", "")) == "通常")
 		assert(float(ordinary_entry.get("spawn_weight", 0.0)) > 0.0)
-		assert(not bool(ordinary_entry.get("special_route_only", false)))
 	var unlock_rules = JSON.parse_string(FileAccess.get_file_as_string("res://data/unlock-rules.json"))
 	assert(unlock_rules is Array and unlock_rules.is_empty())
 	var main_source := FileAccess.get_file_as_string("res://scripts/main.gd")
@@ -321,10 +317,9 @@ func _test_three_act_sequence(game: Node) -> void:
 	assert(StoryProgressionClass.exploitation_midpoint_is_seen(game.story_progression_state))
 	StoryProgressionClass.update_jurejure_progress(game.story_progression_state, 4)
 	assert(not bool(game.story_progression_state.get("exploitation_midpoint_pending", false)))
-	assert(not StoryProgressionClass.secret_gacha_feature_enabled())
-	assert(StoryProgressionClass.peek_story_event(game.story_progression_state) != StoryProgressionClass.EVENT_SECRET_GACHA_INSTALL)
-	assert(not StoryProgressionClass.secret_gacha_is_unlocked(game.story_progression_state))
-	assert(not game.secret_gacha_active and not game.secret_gacha_button.visible)
+	assert(StoryProgressionClass.peek_story_event(game.story_progression_state) != StoryProgressionClass.RETIRED_EVENT_SECRET_GACHA_INSTALL)
+	assert(not game.story_progression_state.has("secret_gacha_unlocked") and not game.story_progression_state.has("secret_gacha_install_seen"))
+	assert(game.find_child("SecretGachaButton",true,false)==null)
 	assert(not game.habitat_crisis_started and not game.habitat_crisis_atmosphere.crisis_active)
 	game.habitat_visit_id = 6
 	assert(not game.jurejure_intro_camera_active)
@@ -382,9 +377,9 @@ func _test_three_act_sequence(game: Node) -> void:
 	assert(bool(game.story_progression_state.get("post_crisis_greenhouse_pending", false)))
 	assert(not bool(game.story_progression_state.get("post_crisis_greenhouse_seen", false)))
 	assert(StoryProgressionClass.peek_story_event(game.story_progression_state) != StoryProgressionClass.EVENT_POST_CRISIS_GREENHOUSE)
-	assert(not StoryProgressionClass.secret_gacha_is_unlocked(game.story_progression_state))
-	assert(not game.secret_gacha_active and not game.secret_gacha_button.visible)
-	assert(StoryProgressionClass.peek_story_event(game.story_progression_state) != StoryProgressionClass.EVENT_SECRET_GACHA_INSTALL)
+	assert(not game.story_progression_state.has("secret_gacha_unlocked") and not game.story_progression_state.has("secret_gacha_install_seen"))
+	assert(game.find_child("SecretGachaButton",true,false)==null)
+	assert(StoryProgressionClass.peek_story_event(game.story_progression_state) != StoryProgressionClass.RETIRED_EVENT_SECRET_GACHA_INSTALL)
 	game.jurejure_waiting_for_seed_pod_reward = true
 	assert(game._should_show_jurejure_group())
 	game._toggle_mode()
@@ -429,7 +424,6 @@ func _test_retired_unlock_conditions(game: Node) -> void:
 	assert(game.pending_armadillo_story_event.is_empty() and not game.tovar_event_active)
 	for species_id in special_ids:
 		assert(not bool(game.discovered.get(species_id, false)))
-	assert(game.mystery_route_assignments.is_empty())
 
 	# Formal-play counts no longer unlock inventory. Existing inventory remains
 	# usable with no count gate.
@@ -539,7 +533,7 @@ func _test_legacy_three_act_migration(game: Node) -> void:
 	})
 	assert(StoryProgressionClass.exploitation_is_started(old_crisis_state))
 	assert(StoryProgressionClass.exploitation_midpoint_is_seen(old_crisis_state))
-	assert(StoryProgressionClass.secret_gacha_is_unlocked(old_crisis_state))
+	assert(not old_crisis_state.has("secret_gacha_unlocked") and not old_crisis_state.has("secret_gacha_install_seen"))
 	assert(bool(old_crisis_state.get("post_encounter_greenhouse_seen", false)))
 	assert(not bool(old_crisis_state.get("post_encounter_greenhouse_pending", false)))
 	assert(bool(old_crisis_state.get("post_crisis_greenhouse_seen", false)))
@@ -557,23 +551,22 @@ func _test_legacy_three_act_migration(game: Node) -> void:
 	assert(StoryProgressionClass.exploitation_is_started(old_midpoint_state))
 	assert(bool(old_midpoint_state.get("exploitation_midpoint_pending", false)))
 	assert(StoryProgressionClass.peek_story_event(old_midpoint_state) == StoryProgressionClass.EVENT_EXPLOITATION_MIDPOINT)
-	assert(not StoryProgressionClass.secret_gacha_is_unlocked(old_midpoint_state))
+	assert(not old_midpoint_state.has("secret_gacha_unlocked") and not old_midpoint_state.has("secret_gacha_install_seen"))
 
-	# A queued install from the immediately preceding build cannot block the
-	# normal story queue while the feature flag is off. Its durable milestone is
-	# retained so switching the single flag back on can reconnect the event.
+	# A queued install from a retired build is consumed as phase evidence, then
+	# discarded. Current runtime state never persists the retired keys or event.
 	var disabled_secret_pending := StoryProgressionClass.normalize_runtime_state({
-		"version": StoryProgressionClass.RUNTIME_STATE_VERSION,
+		"version": 8,
 		"exploitation_started": true,
 		"exploitation_midpoint_seen": true,
 		"secret_gacha_unlocked": false,
 		"secret_gacha_install_seen": false,
-		"pending_story_events": [StoryProgressionClass.EVENT_SECRET_GACHA_INSTALL],
+		"pending_story_events": [StoryProgressionClass.RETIRED_EVENT_SECRET_GACHA_INSTALL],
 	})
 	assert(StoryProgressionClass.exploitation_midpoint_is_seen(disabled_secret_pending))
 	assert(StoryProgressionClass.peek_story_event(disabled_secret_pending).is_empty())
-	assert(not StoryProgressionClass.secret_gacha_is_unlocked(disabled_secret_pending))
-	assert(not bool(disabled_secret_pending.get("secret_gacha_install_seen", false)))
+	assert(not disabled_secret_pending.has("secret_gacha_unlocked"))
+	assert(not disabled_secret_pending.has("secret_gacha_install_seen"))
 
 
 func _finish_dialog(game: Node) -> void:

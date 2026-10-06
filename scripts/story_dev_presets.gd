@@ -552,7 +552,7 @@ static func _prepare_runtime_view(game, target_mode: String) -> void:
 		"opening_overlay", "opening_story_overlay", "intro_overlay", "result_overlay",
 		"play_overlay", "shop_overlay", "encyclopedia_overlay", "settings_overlay",
 		"tutorial_guide_overlay", "jelly_dev_overlay", "jurejure_first_encounter_overlay",
-		"puku_puku_battle", "forest_gacha_ui", "secret_gacha_ui", "species_get_overlay", "catalog_series_unlock_overlay",
+		"puku_puku_battle", "forest_gacha_ui", "species_get_overlay", "catalog_series_unlock_overlay",
 		"habitat_plant_panel",
 	]:
 		var control = game.get(property_name)

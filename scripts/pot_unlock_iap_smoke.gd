@@ -90,7 +90,7 @@ func _ready()->void:
 		for key in ["pot_not_owned","pot_iap_locked_short","pot_unlock_required","pot_permanent_unlock","pot_unlock_success","iap_unlock_for_price","iap_price_loading","iap_purchase_unavailable","iap_restore_purchases","iap_restore_complete"]:assert(Localizer.text(locale,key)!=key)
 	for source_path in ["res://data/pot-iap-catalog.json","res://scripts/pot_unlock_iap_service.gd","res://scripts/arrangement_ui.gd","res://scripts/main.gd"]:
 		var source:=FileAccess.get_file_as_string(source_path);assert(not "100円" in source and not "¥100" in source)
-	var secret_source:=FileAccess.get_file_as_string("res://scripts/secret_gacha_system.gd");assert(secret_source.contains('str(raw_pot.get("unlock_type","free"))!="iap_unlock"'))
+	assert(not FileAccess.file_exists("res://scripts/secret_gacha_system.gd"))
 	print("POT_UNLOCK_IAP_SMOKE_OK initial=",initial.size()," group_1=",group_1_count," group_2=",group_2_count," localized_price=€0,99 restore=true safe_preview=true")
 	get_tree().quit()
 

@@ -182,7 +182,7 @@
     "display_name": "ネオン多肉",
     "subtitle": "闇に浮かぶ秘密の光",
     "description": "冷たい光を秘める、ひっそりと現れる隠れシリーズです。",
-    "cover_image_path": "res://assets/plants/mystery-glow-colorata.png",
+    "cover_image_path": "",
     "species_ids": ["neon_cyan_rosette","neon_magenta_spike","neon_lime_cluster"],
     "field_id": "neon_field",
     "unlock_type": "future",

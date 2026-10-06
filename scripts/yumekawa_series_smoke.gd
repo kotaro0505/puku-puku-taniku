@@ -45,7 +45,6 @@ func _ready() -> void:
 		assert(species_id == YUMEKAWA_IDS[index])
 		assert(str(entry.get("series_id", "")) == "yumekawa")
 		assert(bool(entry.get("catalog_only", false)))
-		assert(not bool(entry.get("special_route_only", false)))
 		assert(not bool(entry.get("series_seed_eligible", true)))
 		assert(is_zero_approx(float(entry.get("spawn_weight", -1.0))))
 		assert(is_equal_approx(float(entry.get("unlocked_spawn_weight", 0.0)), 1.0))
@@ -72,7 +71,8 @@ func _ready() -> void:
 	await get_tree().process_frame
 	assert(game._current_series_entry().get("series_id", "") == "yumekawa")
 	assert(game.encyclopedia_list_title.text == "ゆめふわ")
-	assert(game.encyclopedia_grid.get_child_count() == 18)
+	# 10 yumekawa originals plus 9 integrated hybrid/fusion entries.
+	assert(game.encyclopedia_grid.get_child_count() == 19)
 	assert(game.series_cover_image.texture == null and game.series_cover_placeholder.visible)
 	var first_card: Button = game.encyclopedia_grid.get_child(0)
 	assert(first_card.disabled)

@@ -18,7 +18,7 @@ func _ready()->void:
 	get_tree().quit()
 
 func _test_assets_and_routes(game)->void:
-	assert(game.forest_gacha_button!=null and game.forest_gacha_button.position.y<game.secret_gacha_button.position.y and game.forest_gacha_button.size==game.secret_gacha_button.size)
+	assert(game.forest_gacha_button!=null and game.forest_gacha_button.size==Vector2(153,67))
 	assert(is_equal_approx(game.forest_gacha_button.position.y,326.0))
 	assert(is_equal_approx(game.forest_gacha_button.position.y-(game.shop_button.position.y+game.shop_button.size.y),9.0))
 	assert(game.forest_gacha_button.text=="森のガチャ" and "ぷく" not in game.forest_gacha_button.text)

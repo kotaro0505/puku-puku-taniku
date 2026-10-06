@@ -293,9 +293,6 @@ const TEXT := {
 		"habitat_exploit_concern_panda": "また無理をさせてる…。放っておけないぞ。",
 		"habitat_exploit_concern_armadillo": "原生地の元気が、少しずつ失われてる…。",
 		"habitat_exploit_concern_girl": "こんな使い方、絶対におかしいよ…。",
-		"secret_gacha_install_mouse": "もっと珍しいお宝を出させるために、\n怪しいガチャを作ったチュー！",
-		"secret_gacha_install_panda": "なんだこれ？\n原生地の力を勝手に使ってるのか？",
-		"secret_gacha_install_system": "秘密のガチャが使えるようになった！",
 		"jurejure_battle_choice_title": "ぷくぷくバトルで勝負する？",
 		"jurejure_battle_yes": "バトルする",
 		"jurejure_battle_no": "バトルしない",
@@ -346,8 +343,6 @@ const TEXT := {
 		"main_shop": "パンダのお店",
 		"main_arrangement": "寄せ植え",
 		"main_forest_gacha": "森のガチャ",
-		"main_secret_gacha": "秘密のガチャ",
-		"main_secret_gacha_unavailable": "秘密のガチャ\n今は見つからない",
 		"main_habitat": "原生地へ",
 		"main_greenhouse": "温室へ",
 		"settings": "設定",
@@ -358,13 +353,9 @@ const TEXT := {
 		"seed_pod_gauge": "さやゲージ",
 		"wallet": "所持　%dぷくコイン",
 		"forest_gacha": "森のガチャ",
-		"secret_gacha": "秘密のガチャ",
 		"gacha_spin": "1ぷくコインで回す",
 		"gacha_dial_hint": "ダイヤルをタップして回そう",
-		"secret_gacha_dial_hint": "重いダイヤルを回そう",
 		"gacha_capsule_hint": "カプセルをタップ！",
-		"secret_remaining": "あと %d回",
-		"secret_unlimited": "いつでも遊べる",
 		"get": "GET!",
 		"new": "NEW!",
 		"original_catalog_new": "NEW！",
@@ -507,9 +498,6 @@ const TEXT := {
 		,"forest_unlock_complete_one": "『%s』を解放しました！\nこの品種を図鑑に登録しました。"
 		,"forest_unlock_complete_many": "『%s』を解放しました！\n遭遇済みの%d品種を登録しました。"
 		,"forest_deferred": "この品種は不思議な図鑑へ自動で記録されます。"
-		,"secret_turning": "ゴト…ゴトゴト……"
-		,"secret_catalog_page_prize": "%sの記録"
-		,"secret_prize": "秘密の景品"
 		,"arrangement_title": "寄せ植え"
 		,"arrangement_complete": "寄せ植え完成！"
 		,"arrangement_new": "新しく作る"
@@ -626,8 +614,6 @@ const TEXT := {
 		,"research_reward_choose": "%s\nこの図鑑をもらう"
 		,"research_reward_claimed": "%sをどうぞ。\n未発見の品種は、図鑑のシルエットを手がかりに探してみてね。"
 		,"result_hidden_registered": "%sを図鑑登録！"
-		,"mystery_route_best": "100cmなんてすごいね！\nなんだか原生地でも、不思議なことが起きてるみたいだよ。"
-		,"mystery_route_default": "不思議な多肉を見つけたね。まだ知らないことがたくさんありそうだよ。"
 		,"arrangement_default_name": "寄せ植え %d"
 		,"shop_rescue_offer": "タネなくなっちゃった？\n少し分けてあげるよ！"
 		,"shop_rescue_success": "はい、どうぞ！大事にまいてみてね。"
@@ -1006,9 +992,6 @@ const TEXT := {
 		"habitat_exploit_concern_panda": "また むりを させてる…。ほうって おけないぞ。",
 		"habitat_exploit_concern_armadillo": "げんせいちの げんきが、すこしずつ うしなわれてる…。",
 		"habitat_exploit_concern_girl": "こんな つかいかた、ぜったいに おかしいよ…。",
-		"secret_gacha_install_mouse": "もっと めずらしい おたからを ださせるために、\nあやしい がちゃを つくったチュー！",
-		"secret_gacha_install_panda": "なんだ これ？\nげんせいちの ちからを かってに つかってるのか？",
-		"secret_gacha_install_system": "ひみつの がちゃが つかえるように なった！",
 		"jurejure_battle_choice_title": "ぷくぷくばとるで しょうぶする？",
 		"jurejure_battle_yes": "ばとるする",
 		"jurejure_battle_no": "ばとるしない",
@@ -1059,8 +1042,6 @@ const TEXT := {
 		"main_shop": "ぱんだの おみせ",
 		"main_arrangement": "よせうえ",
 		"main_forest_gacha": "もりの がちゃ",
-		"main_secret_gacha": "ひみつの がちゃ",
-		"main_secret_gacha_unavailable": "ひみつの がちゃ\nいまは みつからない",
 		"main_habitat": "げんせいちへ",
 		"main_greenhouse": "おんしつへ",
 		"settings": "せってい",
@@ -1071,13 +1052,9 @@ const TEXT := {
 		"seed_pod_gauge": "さやげーじ",
 		"wallet": "もっている ぷくこいん　%dまい",
 		"forest_gacha": "もりの がちゃ",
-		"secret_gacha": "ひみつの がちゃ",
 		"gacha_spin": "1ぷくこいんで まわす",
 		"gacha_dial_hint": "だいやるを おして まわそう",
-		"secret_gacha_dial_hint": "おもい だいやるを まわそう",
 		"gacha_capsule_hint": "かぷせるを おしてね！",
-		"secret_remaining": "あと %dかい",
-		"secret_unlimited": "いつでも あそべる",
 		"get": "げっと！",
 		"new": "にゅー！",
 		"original_catalog_new": "にゅー！",
@@ -1220,9 +1197,6 @@ const TEXT := {
 		,"forest_unlock_complete_one": "『%s』を ひらきました！\nこの ひんしゅを ずかんに とうろくしました。"
 		,"forest_unlock_complete_many": "『%s』を ひらきました！\nであった %dひんしゅを とうろくしました。"
 		,"forest_deferred": "この ひんしゅは ふしぎな ずかんへ じどうで きろくされます。"
-		,"secret_turning": "ごと…ごとごと……"
-		,"secret_catalog_page_prize": "%sの きろく"
-		,"secret_prize": "ひみつの けいひん"
 		,"arrangement_title": "よせうえ"
 		,"arrangement_complete": "よせうえ かんせい！"
 		,"arrangement_new": "あたらしく つくる"
@@ -1339,8 +1313,6 @@ const TEXT := {
 		,"research_reward_choose": "%s\nこの ずかんを もらう"
 		,"research_reward_claimed": "%sを どうぞ。\nまだ みつけていない ひんしゅは、ずかんの かげを てがかりに さがしてみてね。"
 		,"result_hidden_registered": "%sを ずかんに とうろくしたよ！"
-		,"mystery_route_best": "100せんちなんて すごいね！\nげんせいちでも ふしぎなことが おきてるみたいだよ。"
-		,"mystery_route_default": "ふしぎな たにくを みつけたね。まだ しらないことが たくさん ありそうだよ。"
 		,"arrangement_default_name": "よせうえ %d"
 		,"shop_rescue_offer": "たね なくなっちゃった？\nすこし わけてあげるよ！"
 		,"shop_rescue_success": "はい、どうぞ！だいじに まいてみてね。"
@@ -1719,9 +1691,6 @@ const TEXT := {
 		"habitat_exploit_concern_panda": "They are pushing it again... We cannot ignore this.",
 		"habitat_exploit_concern_armadillo": "The habitat is slowly losing its strength...",
 		"habitat_exploit_concern_girl": "Using it this way is completely wrong...",
-		"secret_gacha_install_mouse": "We built a suspicious gacha to force out\neven rarer treasure, chuu!",
-		"secret_gacha_install_panda": "What is this?\nAre you using the habitat's power without permission?",
-		"secret_gacha_install_system": "The Secret Gacha is now available!",
 		"jurejure_battle_choice_title": "Start a Puku Puku Battle?",
 		"jurejure_battle_yes": "Battle",
 		"jurejure_battle_no": "Not now",
@@ -1772,8 +1741,6 @@ const TEXT := {
 		"main_shop": "Panda's Shop",
 		"main_arrangement": "Arrangement",
 		"main_forest_gacha": "Forest Gacha",
-		"main_secret_gacha": "Secret Gacha",
-		"main_secret_gacha_unavailable": "Secret Gacha\nNot available now",
 		"main_habitat": "Wild Habitat",
 		"main_greenhouse": "Greenhouse",
 		"settings": "Settings",
@@ -1784,13 +1751,9 @@ const TEXT := {
 		"seed_pod_gauge": "Pod Gauge",
 		"wallet": "%d Puku Coins",
 		"forest_gacha": "Forest Gacha",
-		"secret_gacha": "Secret Gacha",
 		"gacha_spin": "Spin for 1 Puku Coin",
 		"gacha_dial_hint": "Tap or turn the dial",
-		"secret_gacha_dial_hint": "Turn the heavy dial",
 		"gacha_capsule_hint": "Tap the capsule!",
-		"secret_remaining": "%d spins left",
-		"secret_unlimited": "Always available",
 		"get": "GET!",
 		"new": "NEW!",
 		"original_catalog_new": "NEW!",
@@ -1933,9 +1896,6 @@ const TEXT := {
 		,"forest_unlock_complete_one": "Unlocked %s!\nAdded this species to your catalog."
 		,"forest_unlock_complete_many": "Unlocked %s!\nAdded %d encountered species."
 		,"forest_deferred": "This species is recorded in the mysterious catalog automatically."
-		,"secret_turning": "Clunk… rumble…"
-		,"secret_catalog_page_prize": "%s record"
-		,"secret_prize": "Secret Prize"
 		,"arrangement_title": "Arrangements"
 		,"arrangement_complete": "Arrangement Complete!"
 		,"arrangement_new": "Create New"
@@ -2052,8 +2012,6 @@ const TEXT := {
 		,"research_reward_choose": "%s\nChoose this catalog"
 		,"research_reward_claimed": "Here is %s.\nUse the silhouettes to look for species you have not found yet."
 		,"result_hidden_registered": "%s registered in the catalog!"
-		,"mystery_route_best": "100 cm is amazing!\nSomething mysterious seems to be happening in the habitat too."
-		,"mystery_route_default": "You found a mysterious succulent. There is still so much we do not know."
 		,"arrangement_default_name": "Arrangement %d"
 		,"shop_rescue_offer": "Run out of seeds?\nI'll share a set with you!"
 		,"shop_rescue_success": "Here you go! Plant them with care."
@@ -2150,7 +2108,7 @@ const TEXT := {
 
 const HIRAGANA_NAMES := {
 	"pinwheel":"ぴんうぃーる", "colorata":"ころらーた", "laui":"らうい", "kannte":"かんて",
-	"transparent_succulent":"とうめいなぞたにく", "glow_colorata":"ちっこうころらーた", "peach_jelly_succulent":"もものぜりーたにく",
+	"transparent_succulent":"とうめいなぞたにく",
 	"sweets_strawberry_shortcake":"いちごしょーとたにく", "sweets_matcha_wafer":"まっちゃうえはーす",
 	"metal_silver_rosette":"きょうぎんろぜっと", "metal_cobalt_cluster":"るりはがねびーず", "metal_rose_copper":"ばらどうろぜっと",
 	"metal_gold_cluster":"おうごんつぶぶーけ", "metal_gunmetal_rosette":"くろがねろぜっと", "metal_iridescent_star":"にじはがねすたー",

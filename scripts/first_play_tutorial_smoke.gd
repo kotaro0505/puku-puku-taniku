@@ -313,7 +313,6 @@ func _ready() -> void:
 	assert(tutorial_harvest_species_id == game.first_play_tutorial_reserved_species_id)
 	assert(bool(tutorial_new_entry.get("main_story_original", false)))
 	assert(str(tutorial_new_entry.get("rarity", "")) == "通常")
-	assert(not bool(tutorial_new_entry.get("special_route_only", false)))
 	assert(game._species_get_count(tutorial_harvest_species_id) == 0)
 	assert(not game.first_play_tutorial_reserved_plant.jelly_checks_enabled)
 	game._process(game.FIRST_PLAY_TUTORIAL_NEW_OBSERVE_SECONDS - .01)

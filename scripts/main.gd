@@ -11,8 +11,6 @@ const PotUnlockIAPServiceClass = preload("res://scripts/pot_unlock_iap_service.g
 const CatalogPreviewDevClass = preload("res://scripts/catalog_preview_dev.gd")
 const ForestGachaSystemClass = preload("res://scripts/forest_gacha_system.gd")
 const ForestGachaUIClass = preload("res://scripts/forest_gacha_ui.gd")
-const SecretGachaSystemClass = preload("res://scripts/secret_gacha_system.gd")
-const SecretGachaUIClass = preload("res://scripts/secret_gacha_ui.gd")
 const SpeciesGetOverlayClass = preload("res://scripts/species_get_overlay.gd")
 const CatalogSeriesUnlockOverlayClass = preload("res://scripts/catalog_series_unlock_overlay.gd")
 const FusionSystemClass = preload("res://scripts/fusion_system.gd")
@@ -47,8 +45,8 @@ const TRIAL_DEV_CONTROLS_ENABLED := true
 # Kept as a compatibility alias for existing tests/callers. Catalog preview is
 # deliberately governed by the same release gate instead of a second switch.
 const DEVELOPMENT_CATALOG_PREVIEW_ENABLED := TRIAL_DEV_CONTROLS_ENABLED
-const SECRET_GACHA_PREVIEW_UNLIMITED := true
 const PROGRESSION_VERSION := 28
+const RETIRED_CONTENT_VERSION := 1
 const NORMAL_SAVE_PATH := EndlessGreenhouseExperimentClass.NORMAL_SAVE_PATH
 const ENDLESS_EXPERIMENT_SAVE_PATH := EndlessGreenhouseExperimentClass.EXPERIMENT_SAVE_PATH
 const LEGACY_HABITAT_REGENERATION_VERSION := 17
@@ -131,8 +129,6 @@ const HIDDEN_PINWHEEL_ID := "pinwheel"
 const HIDDEN_TOVAR_ID := "tovarensis_tovar"
 const HIDDEN_BUSTAMANTE_ID := "strictiflora_bustamante"
 const MYSTERY_RESEARCH_TRANSPARENT_ID := "transparent_succulent"
-const MYSTERY_ROUTE_RESEARCH := "research_25"
-const MYSTERY_ROUTE_BEST_100 := "best_100"
 const BEST_UNLOCK_HYALINA_ID := "hyalina_san_luis_de_la_paz"
 const BEST_UNLOCK_PURPUSORUM_ID := "purpusorum"
 const BEST_UNLOCK_HYALINA_CM := 40.0
@@ -179,7 +175,6 @@ var rng := RandomNumberGenerator.new()
 var endless_greenhouse := EndlessGreenhouseExperimentClass.new()
 var catalog_preview_rng := RandomNumberGenerator.new()
 var forest_gacha_rng := RandomNumberGenerator.new()
-var secret_gacha_rng := RandomNumberGenerator.new()
 var species: Array = []
 var catalog_species: Array = []
 var opening_species: Array = []
@@ -290,7 +285,6 @@ var shop_button: Button
 var arrangement_button: Button
 var forest_gacha_button: Button
 var shop_forest_gacha_button: Button
-var secret_gacha_button: Button
 var fusion_lab_button: Button
 var settings_button:Button
 var current_mode := "greenhouse"
@@ -532,11 +526,6 @@ var forest_gacha_preview_encountered:Dictionary={}
 var trial_dev_gacha_button:Button
 var series_seed_inventory:Dictionary={}
 var active_series_seed_id:=""
-var secret_gacha_system
-var secret_gacha_ui
-var secret_gacha_active:=false
-var secret_gacha_draws_remaining:=0
-var secret_gacha_last_roll_play_count:=-1
 var species_get_overlay
 var species_get_queue:Array[Dictionary]=[]
 var species_get_active_context:=""
@@ -602,6 +591,7 @@ var puku_balance_migration_dirty := false
 var catalog_cover_migration_dirty := false
 var collection_completion_migration_dirty := false
 var pot_inventory_migration_dirty := false
+var retired_content_migration_dirty := false
 var pot_catalog: Array = []
 var owned_pots: Dictionary = {DEFAULT_POT_ID:1}
 var pot_design_unlocks: Dictionary = {}
@@ -656,9 +646,6 @@ var round_result_species_finalize_active := false
 var catalog_series_unlock_notice_queue: Array[String] = []
 var catalog_series_unlock_notice_ready: Dictionary = {}
 var shop_chatter_acquired_species: Array[String] = []
-var mystery_route_assignments: Dictionary = {}
-var mystery_route_completed: Dictionary = {}
-var mystery_route_dialog_seen: Dictionary = {}
 var rain_completion_count := 0
 var best_100_achieved := false
 var login_bonus_date := ""
@@ -777,14 +764,12 @@ func _ready() -> void:
 	rng.randomize()
 	catalog_preview_rng.randomize()
 	forest_gacha_rng.randomize()
-	secret_gacha_rng.randomize()
 	_load_species()
 	_load_series_data()
 	_load_collection_rarity()
 	fusion_system=FusionSystemClass.new();fusion_system.configure(catalog_species)
 	forest_gacha_system=ForestGachaSystemClass.new();forest_gacha_system.configure(series_catalog,catalog_species,catalog_progression)
 	_load_pot_data()
-	secret_gacha_system=SecretGachaSystemClass.new();secret_gacha_system.load_config();secret_gacha_system.configure(series_catalog,catalog_species,pot_catalog,catalog_progression)
 	_load_save()
 	_setup_pot_unlock_iap()
 	habitat_simulation_unix=Time.get_unix_time_from_system()
@@ -797,11 +782,11 @@ func _ready() -> void:
 	if not legacy_habitat_notification_ids_to_cancel.is_empty():
 		habitat_notification_service=HabitatNotificationServiceClass.new();add_child(habitat_notification_service)
 		habitat_notification_service.cancel_all(legacy_habitat_notification_ids_to_cancel);legacy_habitat_notification_ids_to_cancel.clear()
-	if best_spawn_unlocks_dirty or get_counts_migration_dirty or puku_balance_migration_dirty or catalog_cover_migration_dirty or collection_completion_migration_dirty or pot_inventory_migration_dirty or recovered_forest_encounters:
+	if best_spawn_unlocks_dirty or get_counts_migration_dirty or puku_balance_migration_dirty or catalog_cover_migration_dirty or collection_completion_migration_dirty or pot_inventory_migration_dirty or retired_content_migration_dirty or recovered_forest_encounters:
 		# A true cold start must reach the language choice before creating its
 		# first save.  The selected language then persists all initialized state.
 		if save_file_present_on_boot or language_selected:_save()
-		best_spawn_unlocks_dirty=false;get_counts_migration_dirty=false;puku_balance_migration_dirty=false;catalog_cover_migration_dirty=false;collection_completion_migration_dirty=false;pot_inventory_migration_dirty=false
+		best_spawn_unlocks_dirty=false;get_counts_migration_dirty=false;puku_balance_migration_dirty=false;catalog_cover_migration_dirty=false;collection_completion_migration_dirty=false;pot_inventory_migration_dirty=false;retired_content_migration_dirty=false
 	_build_world()
 	_build_ui()
 	if habitat_awakened and (habitat_wild_initialized or habitat_unlocked):_ensure_habitat_wild_state(Time.get_unix_time_from_system(),true)
@@ -815,7 +800,6 @@ func _ready() -> void:
 	elif _seed_pod_story_preview_requested():call_deferred("_open_seed_pod_story_preview")
 	elif _arrangement_test_preview_requested():call_deferred("_open_arrangement_test_preview")
 	elif _forest_gacha_preview_requested():call_deferred("_open_forest_gacha_preview")
-	elif _secret_gacha_preview_requested():call_deferred("_open_secret_gacha_preview")
 	elif _jurejure_habitat_preview_requested():call_deferred("_open_jurejure_habitat_preview")
 	elif _puku_puku_battle_preview_requested():call_deferred("_open_puku_puku_battle_preview")
 	elif _habitat_test_preview_requested():call_deferred("_open_habitat_test_preview")
@@ -870,13 +854,6 @@ func _forest_gacha_preview_requested()->bool:
 		var requested=JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('screen')",true)
 		return str(requested)=="forest-gacha"
 	return "--forest-gacha-preview" in OS.get_cmdline_user_args()
-
-func _secret_gacha_preview_requested()->bool:
-	if not _trial_dev_controls_enabled():return false
-	if OS.has_feature("web"):
-		var requested=JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('screen')",true)
-		return str(requested)=="secret-gacha"
-	return "--secret-gacha-preview" in OS.get_cmdline_user_args()
 
 func _jurejure_habitat_preview_requested()->bool:
 	if not _trial_dev_controls_enabled():return false
@@ -1028,7 +1005,7 @@ func _setup_pot_unlock_iap()->void:
 func _load_save() -> void:
 	_cancel_puku_gauge_animations()
 	_reset_collection_complete_presentation(true)
-	legacy_habitat_migration_dirty=false;puku_balance_migration_dirty=false;catalog_cover_migration_dirty=false;collection_completion_migration_dirty=false;pot_inventory_migration_dirty=false;legacy_habitat_notification_ids_to_cancel.clear();panda_beacon_unread_log.clear()
+	legacy_habitat_migration_dirty=false;puku_balance_migration_dirty=false;catalog_cover_migration_dirty=false;collection_completion_migration_dirty=false;pot_inventory_migration_dirty=false;retired_content_migration_dirty=false;legacy_habitat_notification_ids_to_cancel.clear();panda_beacon_unread_log.clear()
 	puku_balance_units=0
 	normal_round_free_plays=0
 	catalog_cover_species={}
@@ -1053,6 +1030,12 @@ func _load_save() -> void:
 		if value is Dictionary:
 			save_file_present_on_boot=true
 			var saved_progression_version:=int(value.get("progression_version",0))
+			retired_content_migration_dirty=int(value.get("retired_content_version",0))<RETIRED_CONTENT_VERSION
+			var retired_secret_gacha_evidence:=bool(value.get("secret_gacha_active",false)) \
+					or int(value.get("secret_gacha_draws_remaining",0))>0 \
+					or int(value.get("secret_gacha_last_roll_play_count",-1))>=0
+			for retired_key in ["secret_gacha_active","secret_gacha_draws_remaining","secret_gacha_last_roll_play_count","mystery_route_assignments","mystery_route_completed","mystery_route_dialog_seen"]:
+				if value.has(retired_key):retired_content_migration_dirty=true
 			var migrating_legacy_puku_balance:bool=not value.has("puku_balance_units")
 			# Legacy `yen`, `money`, and `coins` fields are intentionally ignored. They
 			# remain valid JSON input, but game progression now uses puku coins only.
@@ -1087,6 +1070,7 @@ func _load_save() -> void:
 			var normalized_arrangements:Array=[]
 			for saved_arrangement in saved_arrangements:
 				if saved_arrangement is Dictionary:
+					if _arrangement_contains_retired_species(saved_arrangement):retired_content_migration_dirty=true
 					var normalized_arrangement:=_normalize_arrangement(saved_arrangement)
 					if not normalized_arrangement.is_empty():normalized_arrangements.append(normalized_arrangement)
 			saved_arrangements=normalized_arrangements.slice(0,arrangement_save_capacity)
@@ -1153,9 +1137,6 @@ func _load_save() -> void:
 			language_code=Localizer.normalize_language(str(value.get("language_code","ja")))
 			language_selected=bool(value.get("language_selected",value.has("language_code")))
 			first_habitat_gift_claimed=bool(value.get("first_habitat_gift_claimed",saved_progression_version<15 and habitat_tutorial_complete))
-			secret_gacha_active=bool(value.get("secret_gacha_active",false));secret_gacha_draws_remaining=maxi(0,int(value.get("secret_gacha_draws_remaining",0)));secret_gacha_last_roll_play_count=int(value.get("secret_gacha_last_roll_play_count",-1))
-			if secret_gacha_draws_remaining<=0:secret_gacha_active=false
-			mystery_route_assignments=value.get("mystery_route_assignments",{});mystery_route_completed=value.get("mystery_route_completed",{});mystery_route_dialog_seen=value.get("mystery_route_dialog_seen",{})
 			rain_completion_count=0;best_100_achieved=bool(value.get("best_100_achieved",false))
 			if value.has("normal_seed_bags"):
 				normal_seed_bags=int(value.get("normal_seed_bags",0));volume_seed_bags=int(value.get("volume_seed_bags",0));premium_seed_bags=int(value.get("premium_seed_bags",0));mystery_seed_bags=int(value.get("mystery_seed_bags",0));login_bonus_date=str(value.get("login_bonus_date",""))
@@ -1202,9 +1183,10 @@ func _load_save() -> void:
 					greenhouse_available.erase(story_catalog_id);unlocked_species.erase(story_catalog_id)
 			for hidden_id in [HIDDEN_PINWHEEL_ID,HIDDEN_TOVAR_ID,HIDDEN_BUSTAMANTE_ID]:
 				if bool(discovered.get(hidden_id,false)):hidden_species_acquired[hidden_id]=true
+			if _sanitize_retired_special_species_progress():retired_content_migration_dirty=true
 			_sanitize_removed_common_progress()
 			_migrate_story_progress(saved_progression_version)
-			_migrate_three_act_progress(saved_progression_version)
+			_migrate_three_act_progress(saved_progression_version,retired_secret_gacha_evidence)
 			_migrate_habitat_settlement()
 			active_jurejure_event={}
 			if saved_progression_version<14:
@@ -1216,7 +1198,6 @@ func _load_save() -> void:
 			pending_armadillo_story_event="";tovar_event_active=false;tovar_harvested_this_play=false
 			best_spawn_unlocks_dirty=false
 			_refresh_seed_pack_unlocks()
-			_migrate_mystery_route_progress()
 			if _normalize_catalog_cover_species() or not value.has("catalog_cover_species"):catalog_cover_migration_dirty=true
 			if _reconcile_collection_completion_after_load():collection_completion_migration_dirty=true
 			if _is_endless_greenhouse_enabled():
@@ -1230,7 +1211,7 @@ func _save() -> void:
 		return
 	if audio_manager:audio_settings=audio_manager.settings_dictionary()
 	var payload:={
-		"progression_version":PROGRESSION_VERSION,"bests":bests,"discovered":discovered,"species_get_counts":species_get_counts,"catalog_cover_species":catalog_cover_species,"collection_complete_versions":collection_complete_versions,
+		"progression_version":PROGRESSION_VERSION,"retired_content_version":RETIRED_CONTENT_VERSION,"bests":bests,"discovered":discovered,"species_get_counts":species_get_counts,"catalog_cover_species":catalog_cover_species,"collection_complete_versions":collection_complete_versions,
 		"unlocked_series":unlocked_series,"owned_pots":owned_pots,"pot_design_unlocks":pot_design_unlocks,"saved_arrangements":saved_arrangements,"arrangement_save_capacity":arrangement_save_capacity,
 		"unlocked_species":unlocked_species,"greenhouse_available":greenhouse_available,"completed_unlock_conditions":completed_unlock_conditions,"pending_habitat_species":pending_habitat_species,
 		"total_play_count":total_play_count,"normal_play_count":normal_play_count,"formal_play_count":formal_play_count,"shop_visit_count":shop_visit_count,
@@ -1254,7 +1235,6 @@ func _save() -> void:
 		"armadillo_research_rewards":armadillo_research_rewards,"armadillo_research_intro_seen":armadillo_research_intro_seen,
 		"normal_seed_bags":normal_seed_bags,"volume_seed_bags":volume_seed_bags,"premium_seed_bags":premium_seed_bags,"mystery_seed_bags":mystery_seed_bags,
 		"volume_seed_unlocked":volume_seed_unlocked,"volume_seed_intro_seen":volume_seed_intro_seen,"premium_seed_unlocked":premium_seed_unlocked,"mystery_seed_pack_unlocked":mystery_seed_pack_unlocked,
-		"mystery_route_assignments":mystery_route_assignments,"mystery_route_completed":mystery_route_completed,"mystery_route_dialog_seen":mystery_route_dialog_seen,
 		"best_100_achieved":best_100_achieved,"login_bonus_date":login_bonus_date,"audio_settings":audio_settings,"pending_round_new_species_ids":pending_round_new_species_ids,
 		"series_seed_inventory":series_seed_inventory,"forest_gacha_draw_count":forest_gacha_draw_count,"forest_gacha_encountered":forest_gacha_encountered,
 		"puku_gauge_cm":puku_gauge_cm,"puku_balance_units":puku_balance_units,"normal_round_free_plays":normal_round_free_plays,"puku_coin_gauge_cm":_legacy_puku_coin_gauge_cm_for_save(),"puku_points":puku_points,"old_catalog_pages":old_catalog_pages,"old_catalog_page_inventory":old_catalog_page_inventory,
@@ -1267,8 +1247,7 @@ func _save() -> void:
 		"habitat_tutorial_species_id":habitat_tutorial_species_id,"original_catalog_gifted":original_catalog_gifted,
 		"armadillo_intro_event_3_completed":armadillo_intro_event_3_completed,"armadillo_series_event_7_completed":armadillo_series_event_7_completed,
 		"pending_armadillo_story_event":pending_armadillo_story_event,"armadillo_gift_series_id":armadillo_gift_series_id,"armadillo_gift_species_id":armadillo_gift_species_id,
-		"language_code":language_code,"language_selected":language_selected,"first_habitat_gift_claimed":first_habitat_gift_claimed,
-		"secret_gacha_active":secret_gacha_active,"secret_gacha_draws_remaining":secret_gacha_draws_remaining,"secret_gacha_last_roll_play_count":secret_gacha_last_roll_play_count
+		"language_code":language_code,"language_selected":language_selected,"first_habitat_gift_claimed":first_habitat_gift_claimed
 	}
 	# Discovery-cycle state belongs only to the endless save namespace. A legacy
 	# finite save never receives these fields, even though both modes share the
@@ -1345,7 +1324,6 @@ func _endless_greenhouse_auto_start_blocked()->bool:
 	if shop_overlay and shop_overlay.visible:return true
 	if result_overlay and result_overlay.visible:return true
 	if forest_gacha_ui and forest_gacha_ui.visible:return true
-	if secret_gacha_ui and secret_gacha_ui.visible:return true
 	if fusion_lab_ui and fusion_lab_ui.visible:return true
 	if species_get_overlay and species_get_overlay.visible:return true
 	if catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible:return true
@@ -1417,7 +1395,6 @@ func _should_simulate_endless_greenhouse()->bool:
 	if play_overlay and play_overlay.visible:return false
 	if result_overlay and result_overlay.visible:return false
 	if forest_gacha_ui and forest_gacha_ui.visible:return false
-	if secret_gacha_ui and secret_gacha_ui.visible:return false
 	if fusion_lab_ui and fusion_lab_ui.visible:return false
 	if species_get_overlay and species_get_overlay.visible:return false
 	if catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible:return false
@@ -1500,6 +1477,49 @@ func _sanitize_removed_common_progress()->void:
 		if not StoryProgressionClass.is_removed_species(str(species_id)):clean_pending.append(str(species_id))
 	pending_habitat_species=clean_pending
 
+func _sanitize_retired_special_species_progress()->bool:
+	# The six retired prototype rewards may occur in old development saves. Drop
+	# only their references; every unrelated plant, currency and story flag stays.
+	var changed:=false
+	var species_dictionaries:Array[Dictionary]=[
+		bests,discovered,species_get_counts,greenhouse_available,unlocked_species,
+		forest_gacha_encountered,hidden_species_acquired,habitat_returned_species,
+	]
+	for species_id in StoryProgressionClass.RETIRED_SPECIAL_BASE_SPECIES_IDS:
+		for state_dictionary in species_dictionaries:
+			if state_dictionary.has(species_id):state_dictionary.erase(species_id);changed=true
+	for series_id_value in catalog_cover_species.keys():
+		if StoryProgressionClass.is_retired_special_base_species(str(catalog_cover_species.get(series_id_value,""))):
+			catalog_cover_species.erase(series_id_value);changed=true
+	var clean_pending:Array=[]
+	for species_id_value in pending_habitat_species:
+		var species_id:=str(species_id_value)
+		if StoryProgressionClass.is_retired_special_base_species(species_id):changed=true
+		elif species_id not in clean_pending:clean_pending.append(species_id)
+	pending_habitat_species=clean_pending
+	var clean_pending_round:Array[String]=[]
+	for species_id_value in pending_round_new_species_ids:
+		var species_id:=str(species_id_value)
+		if StoryProgressionClass.is_retired_special_base_species(species_id):changed=true
+		elif species_id not in clean_pending_round:clean_pending_round.append(species_id)
+	pending_round_new_species_ids=clean_pending_round
+	var clean_result_new:Array[String]=[]
+	for species_id_value in result_new_species_queue:
+		var species_id:=str(species_id_value)
+		if StoryProgressionClass.is_retired_special_base_species(species_id):changed=true
+		elif species_id not in clean_result_new:clean_result_new.append(species_id)
+	result_new_species_queue=clean_result_new
+	var clean_result_deferred:Array[String]=[]
+	for species_id_value in result_deferred_species_queue:
+		var species_id:=str(species_id_value)
+		if StoryProgressionClass.is_retired_special_base_species(species_id):changed=true
+		elif species_id not in clean_result_deferred:clean_result_deferred.append(species_id)
+	result_deferred_species_queue=clean_result_deferred
+	for property_name in ["first_tutorial_species_id","habitat_tutorial_species_id","armadillo_gift_species_id"]:
+		var species_id:=str(get(property_name))
+		if StoryProgressionClass.is_retired_special_base_species(species_id):set(property_name,"");changed=true
+	return changed
+
 func _migrate_story_progress(saved_progression_version:int)->void:
 	unlocked_series[ORIGINAL_SERIES_ID]=true
 	if saved_progression_version>=19:
@@ -1548,7 +1568,7 @@ func _migrate_story_progress(saved_progression_version:int)->void:
 	_migrate_catalog_unlocks_without_puku()
 	legacy_habitat_migration_dirty=true
 
-func _migrate_three_act_progress(saved_progression_version:int)->void:
+func _migrate_three_act_progress(saved_progression_version:int,retired_secret_gacha_evidence:=false)->void:
 	var sanitized_jurejure_unlocks:Dictionary={}
 	var legacy_jurejure_unlock_found:=false
 	for species_id_value in jurejure_species_unlocked:
@@ -1582,7 +1602,7 @@ func _migrate_three_act_progress(saved_progression_version:int)->void:
 		"jurejure_intro_complete":jurejure_intro_complete,
 		"habitat_crisis_started":habitat_crisis_started,
 		"habitat_crisis_pending":habitat_crisis_pending,
-		"secret_gacha_evidence":secret_gacha_active or secret_gacha_draws_remaining>0 or secret_gacha_last_roll_play_count>=0,
+		"secret_gacha_evidence":retired_secret_gacha_evidence,
 	})
 	if fantasy_first_discovery_seen:StoryProgressionClass.consume_story_event(story_progression_state,StoryProgressionClass.EVENT_FANTASY_FIRST)
 	if fantasy_realization_seen:StoryProgressionClass.consume_story_event(story_progression_state,StoryProgressionClass.EVENT_FANTASY_SIX)
@@ -1613,8 +1633,6 @@ func _migrate_three_act_progress(saved_progression_version:int)->void:
 			StoryProgressionClass.queue_habitat_crisis_transition(story_progression_state,false)
 	if habitat_crisis_started:
 		habitat_crisis_pending=false;jurejure_waiting_for_seed_pod_reward=false;StoryProgressionClass.clear_habitat_crisis_transition(story_progression_state)
-	if not StoryProgressionClass.secret_gacha_is_unlocked(story_progression_state):
-		secret_gacha_active=false;secret_gacha_draws_remaining=0
 	for raw_entry in catalog_species:
 		if raw_entry is Dictionary and _is_jurejure_species(raw_entry):
 			var jurejure_species_id:=str(raw_entry.get("species_id",""))
@@ -1646,47 +1664,6 @@ func _apply_saved_unlocks()->void:
 		# pretending that the plant is already owned.
 		var fallback:=_catalog_entry(FIRST_STORY_SPECIES_ID)
 		if not fallback.is_empty():species.append(fallback)
-
-func _migrate_mystery_route_progress()->void:
-	# Keep every legacy assignment and already-owned reward exactly as saved,
-	# but never infer or grant the retired 100 cm / research-25 routes.
-	return
-
-func _mystery_route_candidates()->Array[String]:
-	var assigned:Array=[]
-	for assigned_id in mystery_route_assignments.values():assigned.append(str(assigned_id))
-	var candidates:Array[String]=[]
-	for species_id in _mystery_event_species_ids():
-		if str(species_id) in assigned or bool(discovered.get(str(species_id),false)):continue
-		if not _catalog_entry(str(species_id)).is_empty():candidates.append(str(species_id))
-	return candidates
-
-func _mystery_event_species_ids()->Array[String]:
-	var ids:Array[String]=[]
-	for entry in catalog_species:
-		if str(entry.get("rarity",""))=="謎品種" and bool(entry.get("special_route_only",false)):ids.append(str(entry.get("species_id","")))
-	return ids
-
-func _assign_mystery_route(route_id:String,spawn_in_habitat:bool)->String:
-	var existing:=str(mystery_route_assignments.get(route_id,""))
-	if not existing.is_empty():return existing
-	var candidates:=_mystery_route_candidates()
-	if candidates.is_empty():return ""
-	var chosen:=candidates[rng.randi_range(0,candidates.size()-1)]
-	mystery_route_assignments[route_id]=chosen;mystery_route_completed[route_id]=false
-	best_spawn_unlocks_dirty=true
-	return chosen
-
-func _grant_mystery_route_reward(route_id:String)->String:
-	var species_id:=_assign_mystery_route(route_id,false)
-	if species_id.is_empty():return ""
-	if _grant_hidden_species(species_id):mystery_route_completed[route_id]=true
-	return species_id
-
-func _mystery_route_for_species(species_id:String)->String:
-	for route_id in mystery_route_assignments:
-		if str(mystery_route_assignments[route_id])==species_id:return str(route_id)
-	return ""
 
 func _evaluate_best_spawn_unlocks(apply_now:=true)->bool:
 	# Retained as a compatibility entry point for old smoke helpers. Size-based
@@ -1801,8 +1778,6 @@ func _build_ui() -> void:
 	external_navigation_controls.append(forest_gacha_button)
 	fusion_lab_button=Button.new();fusion_lab_button.name="FusionLabButton";fusion_lab_button.text="ハイブリッドラボ";fusion_lab_button.position=Vector2(398,400);fusion_lab_button.size=Vector2(153,58);_skin_button(fusion_lab_button,Color("#cda4d7"),16);fusion_lab_button.mouse_filter=Control.MOUSE_FILTER_STOP;fusion_lab_button.pressed.connect(_open_fusion_lab);hud.add_child(fusion_lab_button)
 	external_navigation_controls.append(fusion_lab_button)
-	secret_gacha_button=Button.new();secret_gacha_button.name="SecretGachaButton";secret_gacha_button.text="秘密のガチャ\n1ぷく";secret_gacha_button.position=Vector2(398,466);secret_gacha_button.size=Vector2(153,67);_skin_button(secret_gacha_button,Color("#b88348"),15);secret_gacha_button.mouse_filter=Control.MOUSE_FILTER_STOP;secret_gacha_button.pressed.connect(_open_secret_gacha);secret_gacha_button.visible=false;hud.add_child(secret_gacha_button)
-	external_navigation_controls.append(secret_gacha_button)
 	habitat_status_label=Label.new();habitat_status_label.position=Vector2(163,42);habitat_status_label.size=Vector2(250,56);habitat_status_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;habitat_status_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;habitat_status_label.add_theme_font_size_override("font_size",18);habitat_status_label.add_theme_color_override("font_color",UI_CREAM);habitat_status_label.add_theme_stylebox_override("normal",_box(Color("#4b2d20"),Color("#d8ad68"),18,2));habitat_status_label.visible=false;hud.add_child(habitat_status_label)
 	seed_bag_panel=PanelContainer.new();seed_bag_panel.position=Vector2(210,125);seed_bag_panel.size=Vector2(156,92);seed_bag_panel.add_theme_stylebox_override("panel",_box(Color("#cda66a"),Color("#6f4325"),28,3));seed_bag_panel.visible=false;hud.add_child(seed_bag_panel)
 	play_timer_label=Label.new();play_timer_label.text="たね\n残り 12粒";play_timer_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;play_timer_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;play_timer_label.add_theme_font_size_override("font_size",20);play_timer_label.add_theme_color_override("font_color",Color("#4f2e1d"));play_timer_label.add_theme_color_override("font_outline_color",Color("#f4dbac"));play_timer_label.add_theme_constant_override("outline_size",2);seed_bag_panel.add_child(play_timer_label)
@@ -1818,7 +1793,6 @@ func _build_ui() -> void:
 	_build_settings(hud)
 	_build_research_catalog_reward(hud)
 	_build_forest_gacha_ui(hud)
-	_build_secret_gacha_ui(hud)
 	_build_species_get_overlay(hud)
 	_build_catalog_series_unlock_overlay(hud)
 	_build_fusion_lab_ui(hud)
@@ -2365,6 +2339,13 @@ func _reconcile_pot_inventory_with_arrangements()->bool:
 			owned_pots[pot_id]=required;changed=true
 	return changed
 
+func _arrangement_contains_retired_species(source:Dictionary)->bool:
+	var source_plants:Variant=source.get("plants",[])
+	if not source_plants is Array:return false
+	for plant_value in source_plants:
+		if plant_value is Dictionary and StoryProgressionClass.is_retired_special_base_species(str(plant_value.get("species_id",""))):return true
+	return false
+
 func _normalize_arrangement(source:Dictionary)->Dictionary:
 	var pot_id:=str(source.get("pot_id",DEFAULT_POT_ID))
 	if _pot_entry(pot_id).is_empty():pot_id=DEFAULT_POT_ID
@@ -2705,10 +2686,6 @@ func _finish_scripted_dialog()->void:
 			var restoration:=_restoration_state();HabitatRestorationClass.mark_epilogue_complete(restoration);story_progression_state["restoration"]=restoration;show_restoration_thank_you=true
 		"exploitation_midpoint":
 			StoryProgressionClass.complete_exploitation_midpoint(story_progression_state)
-		"secret_gacha_install":
-			if StoryProgressionClass.secret_gacha_feature_enabled():
-				StoryProgressionClass.complete_secret_gacha_install(story_progression_state)
-				secret_gacha_active=true;secret_gacha_draws_remaining=secret_gacha_system.setting_int("max_draws_per_event",3);secret_gacha_last_roll_play_count=formal_play_count
 		"special_origin":
 			special_series_explanation_seen=true;pending_special_series_explanation=false
 		"jurejure_first_notice":
@@ -3419,7 +3396,7 @@ func _first_play_tutorial_original_candidates()->Array[Dictionary]:
 		var entry:Dictionary=raw_entry;var species_id:=str(entry.get("species_id",""))
 		if species_id.is_empty() or species_id in pending_round_new_species_ids or _species_get_count(species_id)>0:continue
 		if not bool(entry.get("main_story_original",false)) or str(entry.get("rarity",""))!="通常":continue
-		if bool(entry.get("special_route_only",false)) or _seed_new_species_blocked(species_id):continue
+		if _seed_new_species_blocked(species_id):continue
 		if not _species_available_in_current_era(entry) or float(entry.get("spawn_weight",0.0))<=0.0:continue
 		unget.append(entry)
 		if not bool(discovered.get(species_id,false)):unseen.append(entry)
@@ -3810,7 +3787,6 @@ func _apply_language_to_ui()->void:
 	if arrangement_button:arrangement_button.text=Localizer.text(language_code,"main_arrangement")
 	if forest_gacha_button:forest_gacha_button.text=Localizer.text(language_code,"main_forest_gacha")
 	if fusion_lab_button:fusion_lab_button.text=Localizer.text(language_code,"main_fusion")
-	_update_secret_gacha_button_state()
 	if mode_button:mode_button.text=Localizer.text(language_code,"main_greenhouse" if current_mode=="habitat" else "main_habitat")
 	if settings_button:settings_button.text=Localizer.text(language_code,"settings")
 	if encyclopedia_icon_button:encyclopedia_icon_button.text=Localizer.text(language_code,"catalog")
@@ -3833,7 +3809,6 @@ func _apply_language_to_ui()->void:
 	if shop_catalog_message:shop_catalog_message.text=Localizer.text(language_code,"shop_catalog_preparing")
 	if shop_chatter_decline_button:shop_chatter_decline_button.text=Localizer.text(language_code,"no")
 	if forest_gacha_ui:forest_gacha_ui.set_language(language_code)
-	if secret_gacha_ui:secret_gacha_ui.set_language(language_code)
 	if fusion_lab_ui:fusion_lab_ui.set_language(language_code)
 	if arrangement_ui and arrangement_ui.has_method("set_language"):arrangement_ui.set_language(language_code)
 	if habitat_restoration_ui:habitat_restoration_ui.set_language(language_code)
@@ -3872,14 +3847,6 @@ func _build_forest_gacha_ui(hud:Control)->void:
 	forest_gacha_ui.species_reveal_requested.connect(_on_forest_gacha_species_reveal)
 	forest_gacha_ui.set_language(language_code)
 
-func _build_secret_gacha_ui(hud:Control)->void:
-	secret_gacha_ui=SecretGachaUIClass.new();hud.add_child(secret_gacha_ui)
-	secret_gacha_ui.close_requested.connect(_close_secret_gacha)
-	secret_gacha_ui.spin_requested.connect(_spin_secret_gacha)
-	secret_gacha_ui.species_reveal_requested.connect(_on_secret_gacha_species_reveal)
-	secret_gacha_ui.configure_timings(secret_gacha_system.setting_float("dial_duration_seconds",2.0),secret_gacha_system.setting_float("machine_shake_seconds",1.4))
-	secret_gacha_ui.set_language(language_code)
-
 func _build_species_get_overlay(hud:Control)->void:
 	species_get_overlay=SpeciesGetOverlayClass.new();hud.add_child(species_get_overlay)
 	species_get_overlay.closed.connect(_on_species_get_overlay_closed)
@@ -3906,7 +3873,7 @@ func _fusion_lab_available()->bool:
 
 func _open_fusion_lab()->void:
 	if fusion_lab_ui==null or play_active or arrangement_scene_active or arrangement_transitioning or current_mode!="greenhouse" or not _fusion_lab_available():return
-	if (encyclopedia_overlay and encyclopedia_overlay.visible) or (settings_overlay and settings_overlay.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible):return
+	if (encyclopedia_overlay and encyclopedia_overlay.visible) or (settings_overlay and settings_overlay.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible):return
 	play_modal_open=false
 	if play_overlay:play_overlay.visible=false
 	fusion_return_pending=false
@@ -3986,7 +3953,7 @@ func _resume_fusion_lab_after_get()->void:
 
 func _open_forest_gacha()->void:
 	if forest_gacha_ui==null or not forest_gacha_unlocked or play_active or arrangement_scene_active or not _tutorial_fully_complete():return
-	if (encyclopedia_overlay and encyclopedia_overlay.visible) or (settings_overlay and settings_overlay.visible) or (secret_gacha_ui and secret_gacha_ui.visible):return
+	if (encyclopedia_overlay and encyclopedia_overlay.visible) or (settings_overlay and settings_overlay.visible):return
 	forest_gacha_preview_mode=false;forest_gacha_trial_dev_mode=false
 	if shop_overlay and shop_overlay.visible:
 		_hide_shop_chatter(true);shop_current_page="categories";shop_overlay.visible=false;shop_background.texture=null
@@ -4005,7 +3972,7 @@ func _open_forest_gacha_preview()->void:
 
 func _open_trial_dev_forest_gacha()->void:
 	if not _is_endless_greenhouse_enabled() or not _trial_dev_controls_enabled() or forest_gacha_ui==null:return
-	if arrangement_scene_active or (secret_gacha_ui and secret_gacha_ui.visible):return
+	if arrangement_scene_active:return
 	forest_gacha_preview_mode=false;forest_gacha_trial_dev_mode=true
 	if settings_overlay:settings_overlay.visible=false
 	play_modal_open=false
@@ -4025,16 +3992,6 @@ func _open_arrangement_test_preview()->void:
 	if preview_species_id.is_empty():return
 	discovered[preview_species_id]=true;bests[preview_species_id]=90.0;owned_pots["shallow_terracotta"]=maxi(1,_owned_pot_total("shallow_terracotta"))
 	_sync_arrangement_ui();arrangement_ui.set_world_backdrop_mode(false,_arrangement_pot_anchor_screen());arrangement_ui.open_home();arrangement_ui._select_editor_pot("shallow_terracotta");arrangement_ui._add_species_to_editor(preview_species_id);_update_play_ui()
-
-func _open_secret_gacha_preview()->void:
-	if not _trial_dev_controls_enabled():return
-	secret_gacha_active=true;secret_gacha_draws_remaining=secret_gacha_system.setting_int("max_draws_per_event",3)
-	if puku_balance_units<10000:_change_puku_balance(10000-puku_balance_units,"secret_gacha_preview",false,false)
-	if opening_overlay:opening_overlay.visible=false
-	if intro_overlay:intro_overlay.visible=false
-	if shop_overlay:shop_overlay.visible=false
-	if play_overlay:play_overlay.visible=false
-	secret_gacha_ui.open_gacha(puku_points,secret_gacha_draws_remaining,SECRET_GACHA_PREVIEW_UNLIMITED);audio_manager.play_bgm("shop");_update_play_ui()
 
 func _prepare_jurejure_preview_state()->void:
 	if not _trial_dev_controls_enabled():return
@@ -4195,11 +4152,6 @@ func _continue_after_species_get_card(context:String)->void:
 				if close_foreground_for_story:
 					forest_gacha_ui.close_gacha();forest_gacha_preview_mode=false;forest_gacha_trial_dev_mode=false;_play_current_area_bgm();_update_play_ui()
 				else:forest_gacha_ui.resume_after_species_reveal()
-		"secret_gacha":
-			if secret_gacha_ui:
-				if close_foreground_for_story:
-					secret_gacha_ui.close_gacha();_play_current_area_bgm();_update_play_ui()
-				else:secret_gacha_ui.resume_after_species_reveal()
 		"fusion_lab":
 			if close_foreground_for_story:
 				if fusion_lab_ui:fusion_lab_ui.visible=false
@@ -4218,9 +4170,6 @@ func _continue_after_species_get_card(context:String)->void:
 		intro_overlay.visible=true
 		intro_overlay.move_to_front()
 		call_deferred("_advance_scripted_dialog")
-	if context.begins_with("habitat_route:"):
-		var route_id:=context.trim_prefix("habitat_route:")
-		if not route_id.is_empty():call_deferred("_start_mystery_route_dialog",route_id)
 	if not species_get_queue.is_empty():call_deferred("_show_next_species_get")
 	elif continue_round_result_queue:call_deferred("_show_next_round_result_species")
 	elif _is_endless_normal_play() and first_play_has_harvested and not puku_buyback_tutorial_complete:
@@ -4232,54 +4181,6 @@ func _immediate_get_story_transition_pending()->bool:
 	var event_id:=StoryProgressionClass.peek_story_event(story_progression_state)
 	if event_id in [StoryProgressionClass.EVENT_FANTASY_FIRST,StoryProgressionClass.EVENT_FANTASY_SIX]:return true
 	return _unique_jurejure_species_get_count()>=1 and not jurejure_species_first_seen
-
-func _open_secret_gacha()->void:
-	if secret_gacha_ui==null or not _secret_gacha_is_playable() or play_active or arrangement_scene_active or not _tutorial_fully_complete():return
-	if (encyclopedia_overlay and encyclopedia_overlay.visible) or (settings_overlay and settings_overlay.visible) or (forest_gacha_ui and forest_gacha_ui.visible):return
-	play_modal_open=false;play_overlay.visible=false;secret_gacha_ui.open_gacha(puku_points,secret_gacha_draws_remaining,false);audio_manager.play_bgm("shop");_update_play_ui()
-
-func _close_secret_gacha()->void:
-	if secret_gacha_ui:secret_gacha_ui.close_gacha()
-	_play_current_area_bgm();_update_play_ui();call_deferred("_try_start_pending_story_event")
-
-func _spin_secret_gacha()->void:
-	if secret_gacha_ui==null or not secret_gacha_ui.visible or secret_gacha_ui.is_busy() or not _secret_gacha_is_playable():return
-	var cost:int=int(secret_gacha_system.setting_int("cost_puku",1))
-	var cost_units:=_puku_cost_units(cost)
-	var unlimited_preview:=_secret_gacha_preview_requested()
-	if not _can_afford_puku_units(cost_units) or (not unlimited_preview and secret_gacha_draws_remaining<=0):secret_gacha_ui.set_wallet(puku_points,secret_gacha_draws_remaining);return
-	var result:Dictionary=secret_gacha_system.draw(unlocked_series,discovered,owned_pots,secret_gacha_rng,"",unlimited_preview or StoryProgressionClass.fantasy_is_unlocked(story_progression_state),jurejure_species_unlocked)
-	if result.is_empty():return
-	_change_puku_balance(-cost_units,"secret_gacha",false,true)
-	if not unlimited_preview:secret_gacha_draws_remaining=maxi(0,secret_gacha_draws_remaining-1)
-	var texture:=_apply_secret_gacha_reward(result)
-	if not unlimited_preview and secret_gacha_draws_remaining<=0:secret_gacha_active=false
-	_save();_update_currency_ui();_sync_arrangement_ui();secret_gacha_ui.set_wallet(puku_points,secret_gacha_draws_remaining);secret_gacha_ui.play_spin(result,texture if texture!=null else CatalogImageLoader.placeholder_texture);_update_play_ui()
-
-func _apply_secret_gacha_reward(result:Dictionary)->Texture2D:
-	var category:=str(result.get("category",""));var texture:Texture2D
-	match category:
-		"species":
-			var species_id:=str(result.get("species_id",""));_register_species_discovery(species_id,true);texture=_species_texture(result.get("species_entry",{}))
-		"pot":
-			var pot_id:=str(result.get("pot_id",""));owned_pots[pot_id]=_owned_pot_total(pot_id)+1;var pot_path:=str(result.get("image_path",""));texture=load(pot_path) as Texture2D if not pot_path.is_empty() and ResourceLoader.exists(pot_path) else null
-		"catalog_page":
-			_grant_old_catalog_page(1,false,str(result.get("series_id","")));var page_path:=str(result.get("image_path",""));texture=load(page_path) as Texture2D if not page_path.is_empty() and ResourceLoader.exists(page_path) else null
-	return texture
-
-func _on_secret_gacha_species_reveal(result:Dictionary)->void:
-	_queue_species_get(result.get("species_entry",{}),not bool(result.get("was_discovered",false)),"secret_gacha")
-
-func _maybe_activate_secret_gacha(forced_roll:float=-1.0)->bool:
-	if not StoryProgressionClass.secret_gacha_feature_enabled():return false
-	if not StoryProgressionClass.secret_gacha_is_unlocked(story_progression_state):return false
-	if secret_gacha_active or secret_gacha_last_roll_play_count==formal_play_count:return false
-	secret_gacha_last_roll_play_count=formal_play_count
-	if not secret_gacha_system.should_activate(formal_play_count,habitat_tutorial_complete,secret_gacha_rng,forced_roll):return false
-	secret_gacha_active=true;secret_gacha_draws_remaining=secret_gacha_system.setting_int("max_draws_per_event",3);_save();_update_play_ui();return true
-
-func _secret_gacha_is_playable()->bool:
-	return _secret_gacha_preview_requested() or (StoryProgressionClass.secret_gacha_feature_enabled() and StoryProgressionClass.secret_gacha_is_unlocked(story_progression_state) and secret_gacha_active and secret_gacha_draws_remaining>0)
 
 func _continue_armadillo_mystery_intro()->void:
 	var pages:Array=[
@@ -4312,14 +4213,14 @@ func _reset_progression_state()->void:
 	_cancel_all_habitat_notifications()
 	old_catalog_pages=0;old_catalog_page_inventory.clear();old_catalog_intro_seen=false;old_catalog_intro_pending=false;habitat_old_catalog_page_pending=false;habitat_old_catalog_page_series_id="";old_catalog_page_roll_play_count=-1;research_catalog_reward_pending=false
 	JellyBalanceClass.reset_formal();jelly_trait_display_enabled=false;dev_jelly_test_active=false;last_jelly_claim_msec=-1000000000
-	mystery_route_assignments.clear();mystery_route_completed.clear();mystery_route_dialog_seen.clear();rain_completion_count=0;best_100_achieved=false;shop_selected_seed_type="normal"
+	rain_completion_count=0;best_100_achieved=false;shop_selected_seed_type="normal"
 	first_tutorial_species_id="";habitat_wild_plants.clear();habitat_wild_initialized=false;habitat_wild_next_spawn_unix=0.0;habitat_tutorial_started=false;habitat_tutorial_complete=false;habitat_tutorial_species_id="";original_catalog_gifted=false;panda_beacon_unlocked=false;panda_beacon_count=0;panda_beacon_unread_log.clear();first_habitat_gift_claimed=false;armadillo_intro_event_3_completed=false;armadillo_series_event_7_completed=false;pending_armadillo_story_event="";armadillo_gift_series_id="";armadillo_gift_species_id="";scripted_dialog_kind="";scripted_dialog_pages.clear();scripted_dialog_index=-1
 	first_colorata_confirmed=false;trio_originals_confirmed=false;habitat_arrival_started=false;habitat_awakened=false;habitat_awakening_event_complete=false;seed_shop_open=false;mystery_items_acquired=false;mystery_catalog_tutorial_complete=false;normal_play_tutorial_complete=false;seed_pod_gauge_discovery_complete=false;seed_pod_first_reward_seen=false;initial_seed_stock_notice_complete=false;puku_buyback_tutorial_complete=false;puku_buyback_tutorial_active=false;puku_buyback_tutorial_index=0;habitat_returned_species.clear();special_series_explanation_seen=false;pending_special_series_explanation=false;main_story_stage=StoryProgressionClass.ACT_1;main_story_complete=false;main_story_completion_seen=false;catalog_series_unlock_notice_queue.clear();catalog_series_unlock_notice_ready.clear()
 	act2_unlocked=false;story_progression_state=StoryProgressionClass.default_runtime_state();forest_gacha_unlocked=false;forest_gacha_intro_seen=false;fantasy_first_discovery_seen=false;fantasy_realization_seen=false;act3_unlocked=false;act3_intro_pending=false;act3_intro_seen=false;jurejure_pool_unlocked=false;jurejure_species_unlocked.clear();jurejure_species_first_seen=false;habitat_crisis_pending=false;habitat_crisis_started=false;finale_complete=false;habitat_return_dialog_seen=false
 	original_catalog_complete_event_seen=false;habitat_tutorial_returned_to_greenhouse=false;jurejure_intro_complete=false;jurejure_enabled=false;jurejure_growth_stage=JureJureSystemClass.GROWTH_EARLY;jurejure_growth_event_mask=0;active_jurejure_event={};jurejure_next_check_unix=0.0;jurejure_cooldown_until_unix=0.0;jurejure_return_event_complete=false;jurejure_waiting_for_seed_pod_reward=false;jurejure_battle_count=0;jurejure_battle_win_count=0;jurejure_habitat_visit_point=Vector2(-1.0,-1.0);jurejure_pending_reward_species_id="";jurejure_pending_reward_is_new=false;jurejure_last_battle_result.clear();habitat_second_awakened=false;habitat_second_awakening_complete=false;jurejure_update_accumulator=0.0
 	first_seed_pod_reward_event_active=false;habitat_visit_id=0;jurejure_focused_habitat_visit_id=-1;act3_intro_eligible_visit_id=0;habitat_crisis_eligible_visit_id=0
 	if habitat_crisis_atmosphere:habitat_crisis_atmosphere.deactivate()
-	_cancel_puku_gauge_animations();puku_gauge_cm=0.0;puku_balance_units=0;bests.clear();discovered.clear();species_get_counts.clear();catalog_cover_species.clear();unlocked_series={INITIAL_SERIES_ID:true};series_seed_inventory.clear();forest_gacha_draw_count=0;forest_gacha_encountered.clear();secret_gacha_active=false;secret_gacha_draws_remaining=0;secret_gacha_last_roll_play_count=-1;active_series_seed_id="";owned_pots={DEFAULT_POT_ID:1};saved_arrangements.clear();arrangement_save_capacity=20;greenhouse_available=_initial_greenhouse_state();unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;opening_story_complete=false;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;puku_gauge_intro_complete=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;mystery_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;mystery_seed_pack_unlocked=false;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;habitat_mystery_seeds_pending=0;mystery_seed_count=0;armadillo_research_total=0;armadillo_research_rewards.clear();armadillo_research_intro_seen=false;armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();result_deferred_species_queue.clear();pending_round_new_species_ids.clear();round_result_species_finalize_queue.clear();round_result_species_finalize_active=false;shop_chatter_acquired_species.clear();species_get_queue.clear();play_share_record.clear();play_active=false;play_time_remaining=0.0;play_harvest_cm_total=0.0;play_puku_reward_units_total=0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;_reset_endless_economy_stats();rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_time_multiplier=1;habitat_simulation_unix=Time.get_unix_time_from_system();habitat_debug_log.clear();habitat_scroll_tutorial_active=false;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_clear_habitat_items();_save();_update_currency_ui();_update_play_ui()
+	_cancel_puku_gauge_animations();puku_gauge_cm=0.0;puku_balance_units=0;bests.clear();discovered.clear();species_get_counts.clear();catalog_cover_species.clear();unlocked_series={INITIAL_SERIES_ID:true};series_seed_inventory.clear();forest_gacha_draw_count=0;forest_gacha_encountered.clear();active_series_seed_id="";owned_pots={DEFAULT_POT_ID:1};saved_arrangements.clear();arrangement_save_capacity=20;greenhouse_available=_initial_greenhouse_state();unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;opening_story_complete=false;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;puku_gauge_intro_complete=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;mystery_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;mystery_seed_pack_unlocked=false;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;habitat_mystery_seeds_pending=0;mystery_seed_count=0;armadillo_research_total=0;armadillo_research_rewards.clear();armadillo_research_intro_seen=false;armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();result_deferred_species_queue.clear();pending_round_new_species_ids.clear();round_result_species_finalize_queue.clear();round_result_species_finalize_active=false;shop_chatter_acquired_species.clear();species_get_queue.clear();play_share_record.clear();play_active=false;play_time_remaining=0.0;play_harvest_cm_total=0.0;play_puku_reward_units_total=0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;_reset_endless_economy_stats();rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_time_multiplier=1;habitat_simulation_unix=Time.get_unix_time_from_system();habitat_debug_log.clear();habitat_scroll_tutorial_active=false;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_clear_habitat_items();_save();_update_currency_ui();_update_play_ui()
 	normal_round_free_plays=0
 	normal_play_count=0;shop_visit_count=0;hidden_species_acquired.clear();tovar_next_play=TOVAR_FIRST_PLAY;tovar_attempt_count=0;tovar_event_active=false;tovar_harvested_this_play=false;armadillo_present=false;_save()
 
@@ -4473,8 +4374,6 @@ func _finish_greenhouse_play()->void:
 		if first_tutorial_species_id.is_empty():_ensure_first_tutorial_species()
 		_register_species_discovery(first_tutorial_species_id,false);greenhouse_available[first_tutorial_species_id]=true;unlocked_species=greenhouse_available.duplicate(true);_apply_saved_unlocks();unlocked_series[INITIAL_SERIES_ID]=true
 	_evaluate_unlock_rules("play_count",float(total_play_count))
-	if not completed_endless_round and _tutorial_fully_complete() and active_seed_type!="old":
-		_maybe_activate_secret_gacha()
 	if completed_endless_round:_log_endless_economy("round_complete")
 	_clear_greenhouse_plants();_save();_update_play_ui();_show_play_result();audio_manager.play_se("result",.7)
 
@@ -4586,7 +4485,6 @@ func _mission_foreground_safe()->bool:
 		or (species_get_overlay and species_get_overlay.visible) \
 		or (catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible) \
 		or (forest_gacha_ui and forest_gacha_ui.visible) \
-		or (secret_gacha_ui and secret_gacha_ui.visible) \
 		or (fusion_lab_ui and fusion_lab_ui.visible) \
 		or (encyclopedia_overlay and encyclopedia_overlay.visible) \
 		or (shop_overlay and shop_overlay.visible) \
@@ -4609,7 +4507,7 @@ func _update_mission_ui()->void:
 func _update_play_ui()->void:
 	if not play_overlay:return
 	var preview_overlay_open:bool=catalog_preview_ui!=null and catalog_preview_ui.is_overlay_open()
-	var gacha_open:bool=(forest_gacha_ui!=null and forest_gacha_ui.visible) or (secret_gacha_ui!=null and secret_gacha_ui.visible) or (species_get_overlay!=null and species_get_overlay.visible) or (catalog_series_unlock_overlay!=null and catalog_series_unlock_overlay.visible) or (fusion_lab_ui!=null and fusion_lab_ui.visible)
+	var gacha_open:bool=(forest_gacha_ui!=null and forest_gacha_ui.visible) or (species_get_overlay!=null and species_get_overlay.visible) or (catalog_series_unlock_overlay!=null and catalog_series_unlock_overlay.visible) or (fusion_lab_ui!=null and fusion_lab_ui.visible)
 	var battle_open:bool=puku_puku_battle!=null and puku_puku_battle.visible
 	var habitat_modal_open:bool=battle_open or (habitat_plant_panel!=null and habitat_plant_panel.visible) or (habitat_dev_panel!=null and habitat_dev_panel.visible) or (story_dev_panel!=null and story_dev_panel.visible) or (habitat_awakening_overlay!=null and habitat_awakening_overlay.visible) or (seed_pod_story_overlay!=null and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay!=null and habitat_second_awakening_overlay.visible)
 	var arrangement_navigation_suspended:bool=arrangement_scene_active or arrangement_transitioning or catalog_preview_mode_active or preview_overlay_open or gacha_open or habitat_modal_open or jurejure_intro_camera_active or habitat_lookaround_active
@@ -4645,9 +4543,6 @@ func _update_play_ui()->void:
 	if forest_gacha_button:forest_gacha_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete() and forest_gacha_unlocked and forest_gacha_intro_seen
 	if fusion_lab_button:fusion_lab_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _fusion_lab_available()
 	if shop_forest_gacha_button:shop_forest_gacha_button.visible=forest_gacha_unlocked and forest_gacha_intro_seen
-	if secret_gacha_button:
-		secret_gacha_button.visible=StoryProgressionClass.secret_gacha_feature_enabled() and not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete() and StoryProgressionClass.secret_gacha_is_unlocked(story_progression_state) and secret_gacha_active
-		_update_secret_gacha_button_state()
 	if arrangement_navigation_hint:
 		arrangement_navigation_hint.update_hint(language_code,arrangement_scene_active,_arrangement_navigation_hint_safe())
 	if habitat_restoration_ui:
@@ -5860,7 +5755,7 @@ func _series_seed_draw_candidates(series_id:String)->Array[Dictionary]:
 	for entry in _series_species_entries(series_id):
 		if not _species_available_in_current_era(entry):continue
 		var species_id:=str(entry.get("species_id",""))
-		if species_id.is_empty() or _seed_new_species_blocked(species_id) or bool(entry.get("special_route_only",false)):continue
+		if species_id.is_empty() or _seed_new_species_blocked(species_id):continue
 		if str(entry.get("rarity","")) in ["隠し原種","謎品種"]:continue
 		candidates.append(entry)
 	return candidates
@@ -6200,7 +6095,6 @@ func _try_start_pending_story_event()->void:
 	if encyclopedia_overlay and encyclopedia_overlay.visible:return
 	if shop_overlay and shop_overlay.visible:return
 	if forest_gacha_ui and forest_gacha_ui.visible:return
-	if secret_gacha_ui and secret_gacha_ui.visible:return
 	if fusion_lab_ui and fusion_lab_ui.visible:return
 	if arrangement_ui and arrangement_ui.visible:return
 	if catalog_preview_ui and catalog_preview_ui.is_overlay_open():return
@@ -6262,8 +6156,6 @@ func _try_start_pending_story_event()->void:
 		_start_fantasy_first_discovery_event()
 	elif queued_story_event==StoryProgressionClass.EVENT_FANTASY_SIX:
 		_start_fantasy_realization_event()
-	elif StoryProgressionClass.secret_gacha_feature_enabled() and current_mode=="habitat" and queued_story_event==StoryProgressionClass.EVENT_SECRET_GACHA_INSTALL:
-		_start_secret_gacha_install_event()
 	elif current_mode=="greenhouse" and forest_gacha_unlocked and not forest_gacha_intro_seen:
 		_start_forest_gacha_intro_event()
 	elif _unique_jurejure_species_get_count()>=1 and not jurejure_species_first_seen:
@@ -6565,14 +6457,6 @@ func _start_fantasy_realization_event()->void:
 		{"speaker":"armadillo","text":Localizer.text(language_code,"fantasy_six_armadillo_2")},
 		{"speaker":"armadillo","text":Localizer.text(language_code,"fantasy_six_armadillo_3")},
 		{"speaker":"armadillo","text":Localizer.text(language_code,"fantasy_six_armadillo_4")}
-	],false)
-
-func _start_secret_gacha_install_event()->void:
-	if not StoryProgressionClass.secret_gacha_feature_enabled() or StoryProgressionClass.secret_gacha_is_unlocked(story_progression_state) or current_mode!="habitat":return
-	_start_scripted_dialog("secret_gacha_install",[
-		{"speaker":"mouse","text":Localizer.text(language_code,"secret_gacha_install_mouse")},
-		{"speaker":"panda","text":Localizer.text(language_code,"secret_gacha_install_panda")},
-		{"speaker":"","text":Localizer.text(language_code,"secret_gacha_install_system")}
 	],false)
 
 func _start_exploitation_midpoint_event()->void:
@@ -7271,13 +7155,6 @@ func _set_intro_speaker(speaker_id:String)->void:
 			"peccary":speaker_key="jurejure_peccary_name"
 		intro_speaker_label.text=Localizer.text(language_code,speaker_key)
 
-func _update_secret_gacha_button_state()->void:
-	if secret_gacha_button==null:return
-	var available:=_secret_gacha_is_playable()
-	secret_gacha_button.disabled=not available
-	secret_gacha_button.self_modulate=Color.WHITE if available else Color(0.58,0.58,0.58,0.88)
-	secret_gacha_button.text=Localizer.text(language_code,"main_secret_gacha" if available else "main_secret_gacha_unavailable")
-
 func _skin_button(b:Button,bg:Color,font_size:int)->void:
 	b.add_theme_font_size_override("font_size",font_size); b.add_theme_color_override("font_color",UI_BROWN if bg.get_luminance()>.55 else Color.WHITE); b.add_theme_color_override("font_hover_color",UI_BROWN); b.add_theme_stylebox_override("normal",_box(bg,bg.lightened(.22),20,3)); b.add_theme_stylebox_override("hover",_box(bg.lightened(.08),Color.WHITE,20,3)); b.add_theme_stylebox_override("pressed",_box(bg.darkened(.08),bg.lightened(.2),20,3))
 	if audio_manager and not b.pressed.is_connected(_play_ui_tap):b.pressed.connect(_play_ui_tap)
@@ -7453,7 +7330,6 @@ func _complete_endless_virtual_batch()->void:
 		_refresh_seed_pack_unlocks()
 	_resolve_tovar_event_after_play()
 	_evaluate_unlock_rules("play_count",float(total_play_count))
-	if formal_play:_maybe_activate_secret_gacha()
 	_prepare_story_spawn_guarantee()
 	_save();_update_play_ui();_log_endless_economy("virtual_batch")
 
@@ -7539,7 +7415,7 @@ func _story_spawn_guarantee_candidates(want_fantasy:bool)->Array[Dictionary]:
 	for raw_entry in catalog_species:
 		if not raw_entry is Dictionary:continue
 		var entry:Dictionary=raw_entry;var species_id:=str(entry.get("species_id",""))
-		if species_id.is_empty() or species_id in pending_round_new_species_ids or _species_get_count(species_id)>0 or bool(entry.get("special_route_only",false)):continue
+		if species_id.is_empty() or species_id in pending_round_new_species_ids or _species_get_count(species_id)>0:continue
 		if _seed_new_species_blocked(species_id) or str(entry.get("rarity","")) in ["隠し原種","謎品種"]:continue
 		if want_fantasy:
 			if not StoryProgressionClass.fantasy_is_unlocked(story_progression_state) or not _is_fantasy_species(entry) or _is_jurejure_species(entry):continue
@@ -7570,7 +7446,6 @@ func _select_species_for_seed(seed_type:String,forced_category_roll:float=-1.0)-
 		var is_found:=_species_get_count(species_id)>0
 		# Route-only species stay exclusive to their dedicated acquisition route,
 		# even after they have been discovered and added to the greenhouse.
-		if bool(entry.get("special_route_only",false)):continue
 		if not is_found:
 			if _seed_new_species_blocked(species_id) or str(entry.get("rarity","")) in ["隠し原種","謎品種"]:continue
 			if _species_is_in_unlocked_series(species_id):unlocked_new_candidates.append(entry)
@@ -7611,7 +7486,7 @@ func _normal_seed_selection_pools()->Dictionary:
 	for entry in catalog_species:
 		if not _species_available_in_current_era(entry):continue
 		var species_id:=str(entry.get("species_id",""))
-		if species_id.is_empty() or species_id in pending_round_new_species_ids or bool(entry.get("special_route_only",false)):continue
+		if species_id.is_empty() or species_id in pending_round_new_species_ids:continue
 		# Legacy rarity is consulted only for the established exclusion rule. The
 		# normal-seed rarity category itself comes exclusively from gold_star_count.
 		if str(entry.get("rarity","")) in ["隠し原種","謎品種"]:continue
@@ -7707,7 +7582,6 @@ func _normal_spawn_weight(entry:Dictionary)->float:
 	return maxf(.001,float(entry.get("spawn_weight",1.0)))
 
 func _seed_new_species_blocked(species_id:String)->bool:
-	if species_id in _mystery_event_species_ids():return true
 	var entry:=_catalog_entry(species_id)
 	if bool(entry.get("fusion_only_until_discovered",false)) and _species_get_count(species_id)<=0:return true
 	return species_id in [MYSTERY_RESEARCH_TRANSPARENT_ID,"golden_laui","golden_kannte"]
@@ -7898,7 +7772,7 @@ func _jurejure_reward_candidates()->Array[Dictionary]:
 			if _species_get_count(species_id)<=0:candidates.append(entry)
 			continue
 		if _species_get_count(species_id)>0:continue
-		if _is_jurejure_species(entry) or not _species_available_in_current_era(entry) or bool(entry.get("special_route_only",false)):continue
+		if _is_jurejure_species(entry) or not _species_available_in_current_era(entry):continue
 		if _seed_new_species_blocked(species_id) or str(entry.get("rarity","")) in ["隠し原種","謎品種"]:continue
 		if not _species_is_in_unlocked_series(species_id):continue
 		candidates.append(entry)
@@ -7921,7 +7795,7 @@ func _post_ending_normal_reward_candidates()->Array[Dictionary]:
 			if species_id.is_empty() or included.has(species_id):continue
 			# A friendly victory may mirror ordinary-greenhouse availability, but
 			# it must never bypass a dedicated fusion/special/hidden acquisition route.
-			if bool(entry.get("fusion_only_until_discovered",false)) or bool(entry.get("special_route_only",false)):continue
+			if bool(entry.get("fusion_only_until_discovered",false)):continue
 			if str(entry.get("rarity","")) in ["隠し原種","謎品種"]:continue
 			included[species_id]=true;candidates.append(entry)
 	return candidates
@@ -8254,7 +8128,7 @@ func _update_labels()->void:
 func _greenhouse_area_navigation_available()->bool:
 	if not StoryProgressionClass.arrangement_is_unlocked(story_progression_state) or not _tutorial_fully_complete() or current_mode!="greenhouse" or play_active or catalog_preview_mode_active or arrangement_transitioning:return false
 	if arrangement_scene_active and arrangement_ui and arrangement_ui.is_editor_active():return false
-	return not ((opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible) or jurejure_first_encounter_active or (puku_puku_battle and puku_puku_battle.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (story_dev_panel and story_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible))
+	return not ((opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible) or jurejure_first_encounter_active or (puku_puku_battle and puku_puku_battle.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (story_dev_panel and story_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible))
 
 func _arrangement_navigation_hint_safe()->bool:
 	# Navigation availability covers gameplay overlays. The opening screen is a
@@ -8340,7 +8214,7 @@ func _input(event:InputEvent)->void:
 	if habitat_lookaround_active or jurejure_intro_camera_active:return
 	if habitat_restoration_ui and habitat_restoration_ui.is_modal_visible():return
 	if arrangement_scene_active or arrangement_transitioning:return
-	if (opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible) or (puku_puku_battle and puku_puku_battle.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible and not first_play_harvest_guide_active and not old_seed_harvest_guide_active) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (story_dev_panel and story_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (secret_gacha_ui and secret_gacha_ui.visible) or (fusion_lab_ui and fusion_lab_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible):return
+	if (opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible) or (puku_puku_battle and puku_puku_battle.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible and not first_play_harvest_guide_active and not old_seed_harvest_guide_active) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (story_dev_panel and story_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (fusion_lab_ui and fusion_lab_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible):return
 	if current_mode=="greenhouse" and not play_active and not catalog_preview_mode_active:return
 	if event is InputEventScreenTouch:
 		if event.pressed:
@@ -8443,13 +8317,6 @@ func _collect_habitat_seed(item:Dictionary)->void:
 func _collect_habitat_old_catalog_page(item:Dictionary)->void:
 	if not habitat_old_catalog_page_pending:return
 	var series_id:=str(item.get("series_id",habitat_old_catalog_page_series_id));habitat_old_catalog_page_pending=false;habitat_old_catalog_page_series_id="";_grant_old_catalog_page(1,true,series_id);habitat_pickups.erase(item);var node:Node3D=item.node;_show_habitat_message(node.global_position,Localizer.text(language_code,"old_catalog_page_get"),Color("#f5dfad"));node.queue_free();_save();_update_habitat_ui();audio_manager.play_se("new_species",.45)
-
-func _start_mystery_route_dialog(route_id:String)->void:
-	tutorial_dialog_kind="mystery_"+route_id;intro_overlay.visible=true;_set_intro_speaker("panda");_position_intro_dialog();intro_speaker_label.visible=true;shop_overlay.visible=false;play_overlay.visible=false;play_open_button.visible=false
-	match route_id:
-		MYSTERY_ROUTE_BEST_100:intro_dialogue_label.text=Localizer.text(language_code,"mystery_route_best")
-		_:intro_dialogue_label.text=Localizer.text(language_code,"mystery_route_default")
-	intro_continue_button.text=Localizer.text(language_code,"understood")
 
 func _show_habitat_message(world_position:Vector3,message:String,color:Color)->void:
 	var label:=Label.new();label.text=message;label.size=Vector2(300,80);label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.add_theme_font_size_override("font_size",25);label.add_theme_color_override("font_color",color);label.add_theme_color_override("font_outline_color",UI_BROWN);label.add_theme_constant_override("outline_size",8);label.position=camera.unproject_position(world_position)-Vector2(150,40);effects_layer.add_child(label)

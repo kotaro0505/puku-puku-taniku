@@ -30,7 +30,7 @@ func _ready() -> void:
 	await _test_save_compatibility(game)
 	_test_post_ending_friendly_battle(game)
 	game._reset_progression_state()
-	print("JUREJURE_STORY_SMOKE_OK group=three_close first_encounter=camera+bgm home_warning=once battle=active6_total12 act2_only=true exploitation=act3+choice+permanent midpoint=4+camera crisis=8 exploit_dialog=three-pattern-nonrepeat secret_gacha=disabled pool_unlock=all_10 ownership=exact reward=random post_ending=friendly+normal_pool+known_not_new save_fresh=true")
+	print("JUREJURE_STORY_SMOKE_OK group=three_close first_encounter=camera+bgm home_warning=once battle=active6_total12 act2_only=true exploitation=act3+choice+permanent midpoint=4+camera crisis=8 exploit_dialog=three-pattern-nonrepeat retired_secret=tombstone pool_unlock=all_10 ownership=exact reward=random post_ending=friendly+normal_pool+known_not_new save_fresh=true")
 	get_tree().quit()
 
 
@@ -353,13 +353,13 @@ func _test_creative_gate(game: Node) -> void:
 	game.unlocked_series["base"] = true
 	game.unlocked_series["metal"] = true
 	var original: Dictionary = game._catalog_entry("colorata")
-	var creative: Dictionary = game._catalog_entry("metal_laui")
+	var creative: Dictionary = game._catalog_entry("metal_silver_rosette")
 	assert(not original.is_empty() and not creative.is_empty())
 	assert(game._species_available_in_current_era(original))
 	assert(not game._species_available_in_current_era(creative))
-	game.discovered["metal_laui"] = true
+	game.discovered["metal_silver_rosette"] = true
 	assert(game._species_available_in_current_era(creative))
-	game.discovered.erase("metal_laui")
+	game.discovered.erase("metal_silver_rosette")
 	game.habitat_second_awakened = true
 	assert(not game._species_available_in_current_era(creative))
 	game.act2_unlocked = true
@@ -598,10 +598,10 @@ func _test_jurejure_crisis_threshold(game: Node) -> void:
 	_finish_dialog(game)
 	game._try_start_pending_story_event()
 	assert(game.scripted_dialog_kind.is_empty())
-	assert(not StoryProgressionClass.secret_gacha_feature_enabled())
-	assert(StoryProgressionClass.peek_story_event(game.story_progression_state) != StoryProgressionClass.EVENT_SECRET_GACHA_INSTALL)
-	assert(not StoryProgressionClass.secret_gacha_is_unlocked(game.story_progression_state))
-	assert(not game.secret_gacha_button.visible)
+	assert(StoryProgressionClass.peek_story_event(game.story_progression_state) != StoryProgressionClass.RETIRED_EVENT_SECRET_GACHA_INSTALL)
+	assert(not game.story_progression_state.has("secret_gacha_unlocked"))
+	assert(not game.story_progression_state.has("secret_gacha_install_seen"))
+	assert(game.find_child("SecretGachaButton", true, false) == null)
 	assert(not game.habitat_crisis_started)
 
 	for index in range(4, 7):
@@ -748,7 +748,6 @@ func _test_post_ending_friendly_battle(game: Node) -> void:
 		var species_id := str(entry.get("species_id", ""))
 		assert(str(entry.get("series_id", "")) not in ["hybrid", "fusion_tier1", "fusion_tier2", "fusion_tier3"])
 		assert(not bool(entry.get("fusion_only_until_discovered", false)))
-		assert(not bool(entry.get("special_route_only", false)))
 		assert(str(entry.get("rarity", "")) not in ["隠し原種", "謎品種"])
 		if game._species_get_count(species_id) > 0:
 			has_known = true

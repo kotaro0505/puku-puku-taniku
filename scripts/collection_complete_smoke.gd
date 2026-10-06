@@ -39,11 +39,12 @@ func _test_target_definition(game) -> void:
 		unique_ids[species_id] = true
 	for required_id in ["colorata", "pinwheel", "jelly_grape", "jurejure_pure_gold", "hyb_jelly_jelly", "fus1_jelly_bomb", "fus1_fruit_terrine", "fus2_moonbow"]:
 		assert(unique_ids.has(required_id))
-	# These route species deliberately have no card on any current catalog page;
-	# their acquisition routes remain valid, but they cannot be an empty catalog
-	# slot and therefore are not part of the page-completion denominator.
+	# Active hidden species remain outside the page denominator. Retired special
+	# species must likewise never leak back into a completion target.
 	for unlisted_id in ["golden_laui", "golden_kannte", "transparent_succulent", "glow_colorata", "metal_laui", "seaglass_veria", "amber_agavoides", "yumefuwa_jelly", "peach_jelly_succulent"]:
 		assert(not unique_ids.has(unlisted_id))
+	for retired_id in ["glow_colorata", "metal_laui", "seaglass_veria", "amber_agavoides", "yumefuwa_jelly", "peach_jelly_succulent"]:
+		assert(game._catalog_entry(retired_id).is_empty())
 	assert(Localizer.text("ja", "collection_complete_title") == "図鑑 COMPLETE！")
 	assert(Localizer.text("ja", "collection_complete_message") == "すべての多肉植物を見つけました！")
 	assert(Localizer.text("hiragana", "collection_complete_title") == "ずかん COMPLETE！")

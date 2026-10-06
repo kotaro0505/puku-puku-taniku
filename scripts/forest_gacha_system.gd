@@ -62,7 +62,7 @@ func eligible_species(series_id:String,creative_allowed:=true,jurejure_species_u
 	var series_entry:Dictionary=series_by_id.get(series_id,{})
 	for species_id_value in series_entry.get("species_ids",[]):
 		var entry:Dictionary=species_by_id.get(str(species_id_value),{})
-		if entry.is_empty() or bool(entry.get("special_route_only",false)):continue
+		if entry.is_empty():continue
 		if str(entry.get("story_group","")).to_lower()=="jurejure" and not bool(jurejure_species_unlocked.get(str(entry.get("species_id","")),false)):continue
 		if not creative_allowed and not bool(entry.get("main_story_original",false)):continue
 		if str(entry.get("rarity","")) in ["隠し原種","謎品種"]:continue
