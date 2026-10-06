@@ -101,7 +101,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	_remove_test_file(NORMAL_PATH)
 	_remove_test_file(EXPERIMENT_PATH)
-	print("ENDLESS_GREENHOUSE_SMOKE_OK default_without_flags=true player_start=true round_seeds=12 round_cost=1 concurrent=7-10 refill_free=true harvest_direct=true wallet=fixed_point jelly_extra_penalty=false result=true longevity=35/35/22/8 new_roll=per_harvest jelly_new_roll=false discovery_curve=unchanged forced_new=true candidate_pool=uniform deferred_formal_get=true pending_duplicate=false first_get_floor=once virtual_batch=12 pause=true navigation=habitat+catalog+shop+gacha production_gacha=1puku+species_get fusion=1-2-3puku restoration_pending=true finite=true save_isolated=true")
+	print("ENDLESS_GREENHOUSE_SMOKE_OK default_without_flags=true player_start=true round_seeds=12 round_cost=1 concurrent=7-10 refill_free=true harvest_direct=true wallet=fixed_point jelly_extra_penalty=false result=true longevity=35/35/22/8 new_roll=max_carryover_x0.4 jelly_new_roll=false discovery_curve=unchanged forced_new=true candidate_pool=uniform deferred_formal_get=true pending_duplicate=false first_get_floor=once virtual_batch=12 pause=true navigation=habitat+catalog+shop+gacha production_gacha=1puku+species_get fusion=1-2-3puku restoration_pending=true finite=true save_isolated=true")
 	get_tree().quit()
 
 
@@ -182,44 +182,71 @@ func _test_discovery_probability_and_set_state() -> void:
 	assert(is_equal_approx(EndlessClass.discovery_base_chance_for_cm(200.0), 0.95))
 	assert(EndlessClass.discovery_base_chance_for_cm(200.0) < 1.0)
 
-	# Every harvest immediately exposes its own size-based roll. Repeating a
-	# size is not background-capped, while jelly settlements never roll.
-	var fifty: Dictionary = trial.register_discovery_settlement(true, 50.0)
-	assert(not bool(fifty.get("set_completed", false)))
-	assert(is_equal_approx(float(fifty.get("new_chance", -1.0)), 0.05) and bool(fifty.get("roll_allowed", false)))
+	assert(is_equal_approx(trial.DISCOVERY_CARRYOVER_DECAY, 0.4))
+	assert(is_equal_approx(trial.DISCOVERY_CARRYOVER_MIN_CHANCE, 0.01))
+	# The unchanged 20 cm base rate still gets its one next-seed roll. Only the
+	# decayed remainder (and persisted sub-1% state) is discarded.
+	var twenty: Dictionary = trial.register_discovery_settlement(true, 20.0)
+	assert(bool(twenty.get("roll_allowed", false)))
+	assert(is_equal_approx(trial.take_carryover_chance_for_seed(), 0.005))
+	assert(is_zero_approx(trial.carryover_chance_for_next_seed()))
+	trial.register_discovery_settlement(true, 20.0)
+	assert(is_zero_approx(float(trial.discovery_state_for_save().get("discovery_carryover_chance", -1.0))))
+	trial.complete_discovery_cycle()
+
+	# A 100 cm harvest stores 65%. Each seed consumes the current value and
+	# decays the remainder by 0.4; a remainder below 1% is discarded.
+	var hundred: Dictionary = trial.register_discovery_settlement(true, 100.0)
+	assert(not bool(hundred.get("set_completed", false)))
+	assert(is_equal_approx(float(hundred.get("base_chance", -1.0)), 0.65))
+	assert(is_equal_approx(float(hundred.get("new_chance", -1.0)), 0.65))
+	var expected_sequence := [0.65, 0.26, 0.104, 0.0416, 0.01664]
+	for expected in expected_sequence:
+		assert(is_equal_approx(trial.take_carryover_chance_for_seed(), float(expected)))
+	assert(is_zero_approx(trial.carryover_chance_for_next_seed()))
+
+	# Harvests update by maximum, never addition: 60 cm cannot lower a remaining
+	# 26%, while 90 cm replaces it with 45%. Jelly does not consume the value.
+	trial.register_discovery_settlement(true, 100.0)
+	assert(is_equal_approx(trial.take_carryover_chance_for_seed(), 0.65))
+	var lower: Dictionary = trial.register_discovery_settlement(true, 60.0)
+	assert(is_equal_approx(float(lower.get("base_chance", -1.0)), 0.10))
+	assert(is_equal_approx(float(lower.get("new_chance", -1.0)), 0.26))
+	var higher: Dictionary = trial.register_discovery_settlement(true, 90.0)
+	assert(is_equal_approx(float(higher.get("new_chance", -1.0)), 0.45))
 	var jelly: Dictionary = trial.register_discovery_settlement(false, 999.0)
-	assert(is_zero_approx(float(jelly.get("new_chance", -1.0))) and not bool(jelly.get("roll_allowed", true)))
-	var repeat_fifty: Dictionary = trial.register_discovery_settlement(true, 50.0)
-	assert(is_equal_approx(float(repeat_fifty.get("new_chance", -1.0)), 0.05))
-	assert(is_equal_approx(float(trial.register_discovery_settlement(true, 60.0).get("new_chance", -1.0)), 0.10))
-	assert(is_equal_approx(float(trial.register_discovery_settlement(true, 80.0).get("new_chance", -1.0)), 0.30))
-	assert(is_equal_approx(float(trial.register_discovery_settlement(true, 100.0).get("new_chance", -1.0)), 0.65))
+	assert(is_equal_approx(float(jelly.get("new_chance", -1.0)), 0.45))
+	assert(not bool(jelly.get("roll_allowed", true)))
 
-	# The old 12-settlement progression hook remains, but it no longer gates or
-	# supplies the NEW probability.
-	for index in range(5):
-		var partial: Dictionary = trial.register_discovery_settlement(false, 0.0)
+	# The old 12-settlement progression hook remains independent from the saved
+	# carryover probability.
+	var set_trial = EndlessClass.new()
+	set_trial.configure(true)
+	for index in range(11):
+		var partial: Dictionary = set_trial.register_discovery_settlement(false, 0.0)
 		assert(not bool(partial.get("set_completed", false)))
-		assert(is_zero_approx(float(partial.get("new_chance", -1.0))))
-	var twelfth: Dictionary = trial.register_discovery_settlement(true, 70.0)
+	var twelfth: Dictionary = set_trial.register_discovery_settlement(true, 70.0)
 	assert(bool(twelfth.get("set_completed", false)))
-	assert(is_equal_approx(float(twelfth.get("set_max_harvest_cm", -1.0)), 100.0))
-	assert(is_equal_approx(float(twelfth.get("new_chance", -1.0)), 0.18) and bool(twelfth.get("roll_allowed", false)))
-	assert(trial.discovery_settled_count == 0 and is_zero_approx(trial.discovery_set_max_harvest_cm))
+	assert(is_equal_approx(float(twelfth.get("set_max_harvest_cm", -1.0)), 70.0))
+	assert(is_equal_approx(set_trial.carryover_chance_for_next_seed(), 0.18))
+	assert(set_trial.discovery_settled_count == 0 and is_zero_approx(set_trial.discovery_set_max_harvest_cm))
 
-	# A pending/active forced NEW is a single-slot reservation. Later harvests
-	# still report their curve value but cannot reserve another NEW.
-	assert(trial.queue_forced_new())
-	var blocked: Dictionary = trial.register_discovery_settlement(true, 120.0)
+	# A pending/active NEW reservation blocks another seed roll without consuming
+	# the held chance. Harvests may still raise the maximum in the meantime.
+	assert(set_trial.queue_forced_new())
+	var blocked: Dictionary = set_trial.register_discovery_settlement(true, 120.0)
 	assert(is_equal_approx(float(blocked.get("new_chance", -1.0)), 0.95))
-	assert(not bool(blocked.get("roll_allowed", true)) and not trial.queue_forced_new())
+	assert(not bool(blocked.get("roll_allowed", true)) and not set_trial.queue_forced_new())
+	assert(is_zero_approx(set_trial.take_carryover_chance_for_seed()))
+	assert(is_equal_approx(set_trial.carryover_chance_for_next_seed(), 0.95))
 
-	# Active forced plants are restored as one reserved pending seed because live
-	# Plant nodes themselves are intentionally not serialized.
+	# Active forced plants and the carryover are both save-compatible. Old saves
+	# without the new field restore with a zero carryover.
 	trial.complete_discovery_cycle()
 	trial.discovery_settled_count = 7
 	trial.discovery_set_max_harvest_cm = 62.0
 	trial.discovery_cycle_best_cm = 80.0
+	trial.register_discovery_settlement(true, 90.0)
 	assert(trial.queue_forced_new())
 	assert(trial.consume_forced_new("laui"))
 	assert(not trial.queue_forced_new())
@@ -227,11 +254,18 @@ func _test_discovery_probability_and_set_state() -> void:
 	var restored = EndlessClass.new()
 	restored.configure(true)
 	restored.restore_discovery_state(saved_state)
-	assert(restored.discovery_settled_count == 7)
-	assert(is_equal_approx(restored.discovery_set_max_harvest_cm, 62.0))
-	assert(is_equal_approx(restored.discovery_cycle_best_cm, 80.0))
+	assert(restored.discovery_settled_count == 8)
+	assert(is_equal_approx(restored.discovery_set_max_harvest_cm, 90.0))
+	assert(is_equal_approx(restored.discovery_cycle_best_cm, 90.0))
+	assert(is_equal_approx(restored.carryover_chance_for_next_seed(), 0.45))
 	assert(restored.forced_new_pending and restored.forced_new_active_species_id.is_empty())
 	assert(restored.forced_new_candidate_hint() == "laui")
+	var old_save = EndlessClass.new()
+	old_save.configure(true)
+	old_save.restore_discovery_state({"discovery_settled_count": 3})
+	assert(is_zero_approx(old_save.carryover_chance_for_next_seed()))
+	old_save.restore_discovery_state({"discovery_carryover_chance": 0.009})
+	assert(is_zero_approx(old_save.carryover_chance_for_next_seed()))
 
 
 func _test_per_spawn_new_switch_and_story_guarantee(game: Node) -> void:
@@ -418,15 +452,25 @@ func _test_forced_new_lifecycle(game: Node) -> void:
 	game.scripted_dialog_pages.clear()
 	game.intro_overlay.visible = false
 	game.endless_greenhouse.reset_discovery_state()
-	# A single 60 cm harvest performs its 10% roll immediately. A second
-	# harvest cannot stack another reservation while that forced NEW is pending.
+	# Harvests only update the maximum. The roll happens when a seed advances.
 	var completed: Dictionary = game._record_endless_discovery_settlement(true, 60.0, 0.0)
 	assert(not bool(completed.get("set_completed", false)))
 	assert(is_equal_approx(float(completed.get("new_chance", -1.0)), 0.10))
-	assert(game.endless_greenhouse.forced_new_pending)
+	assert(not game.endless_greenhouse.has_forced_new())
 	var duplicate_attempt: Dictionary = game._record_endless_discovery_settlement(true, 100.0, 0.0)
 	assert(is_equal_approx(float(duplicate_attempt.get("new_chance", -1.0)), 0.65))
-	assert(not bool(duplicate_attempt.get("roll_allowed", true)) and game.endless_greenhouse.forced_new_pending)
+	var failed_roll: Dictionary = game._roll_endless_carryover_for_seed(0.99)
+	assert(bool(failed_roll.get("consumed", false)))
+	assert(is_equal_approx(float(failed_roll.get("chance", -1.0)), 0.65))
+	assert(not bool(failed_roll.get("queued", true)))
+	assert(is_equal_approx(game.endless_greenhouse.carryover_chance_for_next_seed(), 0.26))
+	var lower_attempt: Dictionary = game._record_endless_discovery_settlement(true, 60.0, 0.0)
+	assert(is_equal_approx(float(lower_attempt.get("new_chance", -1.0)), 0.26))
+	var higher_attempt: Dictionary = game._record_endless_discovery_settlement(true, 90.0, 0.0)
+	assert(is_equal_approx(float(higher_attempt.get("new_chance", -1.0)), 0.45))
+	var winning_roll: Dictionary = game._roll_endless_carryover_for_seed(0.0)
+	assert(bool(winning_roll.get("queued", false)) and game.endless_greenhouse.forced_new_pending)
+	assert(is_equal_approx(game.endless_greenhouse.carryover_chance_for_next_seed(), 0.18))
 	assert(not game.species_get_overlay.visible)
 
 	var before_count: int = game.plants.size()
@@ -437,6 +481,8 @@ func _test_forced_new_lifecycle(game: Node) -> void:
 	assert(game._species_get_count(forced_species_id) == 0)
 	assert(not game.endless_greenhouse.forced_new_pending)
 	assert(game.endless_greenhouse.forced_new_active_species_id == forced_species_id)
+	# The NEW plant appearing, rather than its later GET card, consumes the chain.
+	assert(is_zero_approx(game.endless_greenhouse.carryover_chance_for_next_seed()))
 	game.spawn_plant(false, Vector3(0.5, 0.0, 0.0))
 	var ordinary_plant = game.plants.back()
 	assert(not bool(ordinary_plant.get_meta("endless_forced_new", false)))
@@ -452,13 +498,14 @@ func _test_forced_new_lifecycle(game: Node) -> void:
 	assert(game._species_get_count(forced_species_id) == 0)
 	assert(not game.endless_greenhouse.has_forced_new())
 	assert(is_zero_approx(game.endless_greenhouse.discovery_cycle_best_cm))
-	assert(game.endless_greenhouse.discovery_settled_count == 3)
+	assert(game.endless_greenhouse.discovery_settled_count == 5)
 	game.pending_round_new_species_ids.erase(forced_species_id)
 	game.catalog_series_unlock_notice_queue.clear()
 	game.catalog_series_unlock_notice_ready.clear()
 	var resumed_roll: Dictionary = game._record_endless_discovery_settlement(true, 50.0, 0.0)
 	assert(is_equal_approx(float(resumed_roll.get("new_chance", -1.0)), 0.05))
-	assert(game.endless_greenhouse.forced_new_pending)
+	assert(not game.endless_greenhouse.forced_new_pending)
+	assert(bool(game._roll_endless_carryover_for_seed(0.0).get("queued", false)))
 	game.endless_greenhouse.cancel_forced_new_pending()
 	game.story_progression_state["pending_story_events"] = []
 	game.scripted_dialog_kind = ""
@@ -493,8 +540,11 @@ func _test_forced_new_lifecycle(game: Node) -> void:
 	game.endless_greenhouse.reset_discovery_state()
 	var no_candidate_roll: Dictionary = game._record_endless_discovery_settlement(true, 50.0, 0.0)
 	assert(is_equal_approx(float(no_candidate_roll.get("new_chance", -1.0)), 0.05))
+	var no_candidate_seed: Dictionary = game._roll_endless_carryover_for_seed(0.0)
+	assert(bool(no_candidate_seed.get("consumed", false)) and not bool(no_candidate_seed.get("queued", true)))
 	assert(not game.endless_greenhouse.has_forced_new())
 	assert(is_equal_approx(game.endless_greenhouse.discovery_cycle_best_cm, 50.0))
+	assert(is_equal_approx(game.endless_greenhouse.carryover_chance_for_next_seed(), 0.02))
 	game.species_get_counts = saved_counts
 
 	# The legacy progression counters and forced reservation remain compatible
@@ -502,6 +552,7 @@ func _test_forced_new_lifecycle(game: Node) -> void:
 	game.endless_greenhouse.discovery_settled_count = 5
 	game.endless_greenhouse.discovery_set_max_harvest_cm = 44.0
 	game.endless_greenhouse.discovery_cycle_best_cm = 73.0
+	game.endless_greenhouse.discovery_carryover_chance = 0.45
 	game._save()
 	var saved_payload = JSON.parse_string(FileAccess.get_file_as_string(EXPERIMENT_PATH))
 	assert(saved_payload is Dictionary)
@@ -509,6 +560,10 @@ func _test_forced_new_lifecycle(game: Node) -> void:
 	assert(int(saved_discovery.get("discovery_settled_count", -1)) == 5)
 	assert(is_equal_approx(float(saved_discovery.get("discovery_set_max_harvest_cm", -1.0)), 44.0))
 	assert(is_equal_approx(float(saved_discovery.get("discovery_cycle_best_cm", -1.0)), 73.0))
+	assert(is_equal_approx(float(saved_discovery.get("discovery_carryover_chance", -1.0)), 0.45))
+	game.endless_greenhouse.reset_discovery_state()
+	game.endless_greenhouse.restore_discovery_state(saved_discovery)
+	assert(is_equal_approx(game.endless_greenhouse.carryover_chance_for_next_seed(), 0.45))
 	game.endless_greenhouse.reset_discovery_state()
 	# A completed 12-seed round does not refill forever. Start the next round
 	# explicitly before continuing the pause/navigation regression checks.

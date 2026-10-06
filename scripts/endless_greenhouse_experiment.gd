@@ -9,8 +9,8 @@ const DEFAULT_ENABLED := true
 const NORMAL_SAVE_PATH := "user://records.json"
 const EXPERIMENT_SAVE_PATH := "user://records_endless_experiment.json"
 const VIRTUAL_BATCH_SIZE := 12
-# Kept only for the existing 12-settlement progression hook. NEW rolls are
-# evaluated independently for every harvested plant.
+# Kept only for the existing 12-settlement progression hook. NEW carryover is
+# updated by each harvest and consumed independently as seeds advance.
 const DISCOVERY_SET_SIZE := 12
 const DISCOVERY_CHANCE_ANCHORS := [
 	Vector2(0.0, 0.0),
@@ -26,12 +26,15 @@ const DISCOVERY_CHANCE_ANCHORS := [
 	Vector2(110.0, 0.82),
 	Vector2(120.0, 0.95),
 ]
+const DISCOVERY_CARRYOVER_DECAY := 0.4
+const DISCOVERY_CARRYOVER_MIN_CHANCE := 0.01
 
 var enabled := DEFAULT_ENABLED
 var spawned_in_virtual_batch := 0
 var discovery_settled_count := 0
 var discovery_set_max_harvest_cm := 0.0
 var discovery_cycle_best_cm := 0.0
+var discovery_carryover_chance := 0.0
 var forced_new_pending := false
 var forced_new_active_species_id := ""
 var forced_new_reserved_species_id := ""
@@ -118,6 +121,7 @@ func register_discovery_settlement(harvested: bool, diameter_cm: float = 0.0) ->
 	var previous_cycle_best := discovery_cycle_best_cm
 	var improved := harvested and harvested_cm > previous_cycle_best
 	var base_chance := discovery_base_chance_for_cm(harvested_cm) if harvested else 0.0
+	var carryover_before := discovery_carryover_chance
 	var result := {
 		"set_completed": false,
 		"set_max_harvest_cm": discovery_set_max_harvest_cm,
@@ -125,8 +129,10 @@ func register_discovery_settlement(harvested: bool, diameter_cm: float = 0.0) ->
 		"cycle_best_after_cm": previous_cycle_best,
 		"improved_cycle_best": improved,
 		"base_chance": base_chance,
-		"new_chance": base_chance,
-		"roll_allowed": harvested and not has_forced_new(),
+		"new_chance": discovery_carryover_chance,
+		"carryover_before": carryover_before,
+		"carryover_after": discovery_carryover_chance,
+		"roll_allowed": false,
 	}
 	if not enabled:
 		result["base_chance"] = 0.0
@@ -138,6 +144,10 @@ func register_discovery_settlement(harvested: bool, diameter_cm: float = 0.0) ->
 		discovery_set_max_harvest_cm = maxf(discovery_set_max_harvest_cm, harvested_cm)
 		if improved:
 			discovery_cycle_best_cm = harvested_cm
+		discovery_carryover_chance = maxf(discovery_carryover_chance, base_chance)
+	result["new_chance"] = discovery_carryover_chance
+	result["carryover_after"] = discovery_carryover_chance
+	result["roll_allowed"] = harvested and discovery_carryover_chance > 0.0 and not has_forced_new()
 	result["cycle_best_after_cm"] = discovery_cycle_best_cm
 	result["set_max_harvest_cm"] = discovery_set_max_harvest_cm
 	if discovery_settled_count < DISCOVERY_SET_SIZE:
@@ -149,6 +159,28 @@ func register_discovery_settlement(harvested: bool, diameter_cm: float = 0.0) ->
 	result["set_completed"] = true
 	result["set_max_harvest_cm"] = completed_set_max
 	return result
+
+
+func carryover_chance_for_next_seed() -> float:
+	if not enabled:
+		return 0.0
+	return maxf(0.0, discovery_carryover_chance)
+
+
+func take_carryover_chance_for_seed() -> float:
+	if not enabled or has_forced_new():
+		return 0.0
+	var chance := carryover_chance_for_next_seed()
+	if chance <= 0.0:
+		discovery_carryover_chance = 0.0
+		return 0.0
+	var decayed := chance * DISCOVERY_CARRYOVER_DECAY
+	discovery_carryover_chance = decayed if decayed >= DISCOVERY_CARRYOVER_MIN_CHANCE else 0.0
+	return chance
+
+
+func clear_discovery_carryover() -> void:
+	discovery_carryover_chance = 0.0
 
 
 func has_forced_new() -> bool:
@@ -201,6 +233,7 @@ func complete_forced_new() -> void:
 func complete_discovery_cycle() -> void:
 	discovery_settled_count = 0
 	discovery_set_max_harvest_cm = 0.0
+	clear_discovery_carryover()
 	complete_forced_new()
 
 
@@ -209,10 +242,12 @@ func reset_discovery_state() -> void:
 
 
 func discovery_state_for_save() -> Dictionary:
+	var saved_carryover_chance := discovery_carryover_chance if discovery_carryover_chance >= DISCOVERY_CARRYOVER_MIN_CHANCE else 0.0
 	return {
 		"discovery_settled_count": discovery_settled_count,
 		"discovery_set_max_harvest_cm": discovery_set_max_harvest_cm,
 		"discovery_cycle_best_cm": discovery_cycle_best_cm,
+		"discovery_carryover_chance": saved_carryover_chance,
 		"forced_new_pending": forced_new_pending,
 		"forced_new_active_species_id": forced_new_active_species_id,
 		"forced_new_reserved_species_id": forced_new_reserved_species_id,
@@ -227,6 +262,9 @@ func restore_discovery_state(raw_state: Variant) -> void:
 	discovery_settled_count = clampi(int(state.get("discovery_settled_count", 0)), 0, DISCOVERY_SET_SIZE - 1)
 	discovery_set_max_harvest_cm = maxf(0.0, float(state.get("discovery_set_max_harvest_cm", 0.0)))
 	discovery_cycle_best_cm = maxf(0.0, float(state.get("discovery_cycle_best_cm", 0.0)))
+	discovery_carryover_chance = clampf(float(state.get("discovery_carryover_chance", 0.0)), 0.0, DISCOVERY_CHANCE_ANCHORS[-1].y)
+	if discovery_carryover_chance < DISCOVERY_CARRYOVER_MIN_CHANCE:
+		discovery_carryover_chance = 0.0
 	forced_new_pending = bool(state.get("forced_new_pending", false))
 	forced_new_reserved_species_id = str(state.get("forced_new_reserved_species_id", ""))
 	var saved_active_species_id := str(state.get("forced_new_active_species_id", ""))

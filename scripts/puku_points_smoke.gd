@@ -31,7 +31,7 @@ func _test_fixed_point_and_harvest_curve(game)->void:
 	assert(game.PUKU_UNITS_PER_PUKU==1000)
 	assert(game.NORMAL_ROUND_COST_UNITS==1000 and game.FIRST_GET_MIN_REWARD_UNITS==200)
 	assert(game.INITIAL_PUKU_CAPITAL_UNITS==5000)
-	for sample in [[0.0,0],[20.0,50],[30.0,120],[40.0,220],[50.0,400],[60.0,650],[70.0,1050],[80.0,1650],[90.0,2500],[100.0,3750],[110.0,5600],[120.0,8400],[130.0,12000],[140.0,17000],[150.0,24000],[160.0,31000]]:
+	for sample in [[0.0,0],[20.0,50],[30.0,120],[40.0,220],[50.0,400],[60.0,650],[70.0,1050],[80.0,1650],[90.0,2500],[100.0,3750],[110.0,5500],[120.0,8000],[130.0,11000],[140.0,14000],[150.0,17000],[160.0,20000],[180.0,26000],[200.0,32000]]:
 		assert(game._harvest_puku_reward_units(float(sample[0]),false)==int(sample[1]))
 	assert(game._harvest_puku_reward_units(25.0,false)==85)
 	assert(game._harvest_puku_reward_units(8.0,false)==20)

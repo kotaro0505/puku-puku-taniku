@@ -72,10 +72,10 @@ const HARVEST_PUKU_REWARD_ANCHORS := [
 	Vector2(0.0,0.0),Vector2(20.0,50.0),Vector2(30.0,120.0),
 	Vector2(40.0,220.0),Vector2(50.0,400.0),Vector2(60.0,650.0),
 	Vector2(70.0,1050.0),Vector2(80.0,1650.0),Vector2(90.0,2500.0),
-	Vector2(100.0,3750.0),Vector2(110.0,5600.0),Vector2(120.0,8400.0),
-	Vector2(130.0,12000.0),Vector2(140.0,17000.0),Vector2(150.0,24000.0),
+	Vector2(100.0,3750.0),Vector2(110.0,5500.0),Vector2(120.0,8000.0),
+	Vector2(130.0,11000.0),Vector2(140.0,14000.0),Vector2(150.0,17000.0),
 ]
-const HARVEST_PUKU_POST_150_UNITS_PER_10_CM := 7000.0
+const HARVEST_PUKU_POST_150_UNITS_PER_10_CM := 3000.0
 const ENDLESS_AUTO_SOW_TUTORIAL_STEP := "endless_auto_sow_prompt_seen"
 const HABITAT_TIME_MULTIPLIERS := [1, 60, 3600, 21600, 86400]
 const DEFAULT_POT_ID := "shallow_terracotta"
@@ -5947,7 +5947,10 @@ func _start_fantasy_realization_event()->void:
 	_start_scripted_dialog("fantasy_realization",[
 		{"speaker":"girl","text":Localizer.text(language_code,"fantasy_six_girl_1")},
 		{"speaker":"armadillo","text":Localizer.text(language_code,"fantasy_six_armadillo")},
-		{"speaker":"girl","text":Localizer.text(language_code,"fantasy_six_girl_2")}
+		{"speaker":"girl","text":Localizer.text(language_code,"fantasy_six_girl_2")},
+		{"speaker":"armadillo","text":Localizer.text(language_code,"fantasy_six_armadillo_2")},
+		{"speaker":"armadillo","text":Localizer.text(language_code,"fantasy_six_armadillo_3")},
+		{"speaker":"armadillo","text":Localizer.text(language_code,"fantasy_six_armadillo_4")}
 	],false)
 
 func _start_secret_gacha_install_event()->void:
@@ -6719,6 +6722,7 @@ func _arrangement_pot_anchor_screen()->Vector2:
 func spawn_plant(force_golden := false,spawn_position:Variant=null) -> void:
 	var chosen:Dictionary
 	var endless_forced_new:=false
+	var endless_carryover_advanced:=false
 	if active_seed_type=="old":
 		chosen=_catalog_entry(FIRST_STORY_SPECIES_ID)
 	elif active_seed_type.begins_with("series:"):
@@ -6735,22 +6739,34 @@ func spawn_plant(force_golden := false,spawn_position:Variant=null) -> void:
 		# A stale forced reservation from an older save must not leak a random NEW
 		# into the story before the gang's first encounter is complete.
 		if endless_greenhouse.forced_new_pending:endless_greenhouse.cancel_forced_new_pending()
+		endless_greenhouse.clear_discovery_carryover()
 		chosen=_select_normal_seed_species(-1.0,false)
-	elif _is_endless_normal_play() and endless_greenhouse.forced_new_pending:
-		chosen=_select_endless_forced_new_candidate()
-		if chosen.is_empty():
-			# Eligibility can legitimately disappear between a harvest roll and
-			# the next sprout. Never invent a NEW species.
-			endless_greenhouse.cancel_forced_new_pending()
-			chosen=_select_normal_seed_species(-1.0,false)
-		else:
-			endless_forced_new=endless_greenhouse.consume_forced_new(str(chosen.get("species_id","")))
+	elif _is_endless_normal_play():
+		if not endless_greenhouse.forced_new_pending:
+			var carryover_result:=_roll_endless_carryover_for_seed()
+			endless_carryover_advanced=bool(carryover_result.get("consumed",false))
+		if endless_greenhouse.forced_new_pending:
+			chosen=_select_endless_forced_new_candidate()
+			if chosen.is_empty():
+				# Eligibility can legitimately disappear between a roll and sprout.
+				# Never invent a NEW species.
+				endless_greenhouse.cancel_forced_new_pending()
+				chosen=_select_normal_seed_species(-1.0,false)
+			else:
+				endless_forced_new=endless_greenhouse.consume_forced_new(str(chosen.get("species_id","")))
+		else:chosen=_select_species_for_seed(active_seed_type)
 	else:chosen=_select_species_for_seed(active_seed_type)
 	var pos:Vector3=_find_spawn_position() if spawn_position==null else spawn_position
 	var label:=_plant_label(); labels_layer.add_child(label)
 	var p = SucculentClass.new()
 	var chosen_species_id:=str(chosen.get("species_id",""))
-	p.original_pos=pos; p.position=pos;p.set_meta("new_species_candidate",_species_get_count(chosen_species_id)<=0 and chosen_species_id not in pending_round_new_species_ids);p.set_meta("endless_forced_new",endless_forced_new); world_root.add_child(p); p.setup(chosen,rng.randi(),label,null,false,_greenhouse_jelly_balance_for_spawn());p.jelly_permission=Callable(self,"_allow_plant_jelly").bind(p)
+	var new_species_candidate:=_species_get_count(chosen_species_id)<=0 and chosen_species_id not in pending_round_new_species_ids
+	if _is_endless_normal_play() and new_species_candidate:
+		# Any NEW that actually appears ends the current carryover chain,
+		# regardless of whether it came from the carryover roll or a story slot.
+		endless_greenhouse.clear_discovery_carryover()
+		if not endless_forced_new and endless_greenhouse.forced_new_pending:endless_greenhouse.cancel_forced_new_pending()
+	p.original_pos=pos; p.position=pos;p.set_meta("new_species_candidate",new_species_candidate);p.set_meta("endless_forced_new",endless_forced_new); world_root.add_child(p); p.setup(chosen,rng.randi(),label,null,false,_greenhouse_jelly_balance_for_spawn());p.jelly_permission=Callable(self,"_allow_plant_jelly").bind(p)
 	if active_seed_type=="old" and chosen_species_id==FIRST_STORY_SPECIES_ID and not first_colorata_confirmed:
 		p.growth_rate*=FIRST_STORY_COLORATA_GROWTH_MULTIPLIER
 		p.set_meta("first_story_growth_multiplier",FIRST_STORY_COLORATA_GROWTH_MULTIPLIER)
@@ -6758,7 +6774,7 @@ func spawn_plant(force_golden := false,spawn_position:Variant=null) -> void:
 	p.harvested.connect(_on_harvested); p.jellied.connect(_on_jellied)
 	plants.append(p)
 	_mark_first_play_tutorial_reserved_plant(p)
-	if endless_forced_new:_save()
+	if endless_forced_new or endless_carryover_advanced or (_is_endless_normal_play() and new_species_candidate):_save()
 	if audio_manager:audio_manager.play_se("sprout",.28)
 
 func _spawn_greenhouse_seed(suppress_puku_effect:=false)->bool:
@@ -6855,7 +6871,19 @@ func _log_endless_economy(reason:String)->void:
 	if not (OS.is_debug_build() or _trial_dev_controls_enabled()) or not _is_endless_greenhouse_enabled() or active_seed_type!="normal":return
 	print("ENDLESS_PUKU_ECONOMY reason=",reason," ",JSON.stringify(_endless_economy_debug_summary()))
 
-func _record_endless_discovery_settlement(harvested:bool,diameter_cm:float=0.0,forced_roll:float=-1.0)->Dictionary:
+func _roll_endless_carryover_for_seed(forced_roll:float=-1.0)->Dictionary:
+	var result:={"consumed":false,"chance":0.0,"queued":false}
+	if not _is_endless_normal_play() or not jurejure_intro_complete:return result
+	var chance:=endless_greenhouse.take_carryover_chance_for_seed()
+	if chance<=0.0:return result
+	result["consumed"]=true;result["chance"]=chance
+	var candidates:=_eligible_endless_forced_new_candidates()
+	if candidates.is_empty():return result
+	var roll:=rng.randf() if forced_roll<0.0 else clampf(forced_roll,0.0,.999999)
+	if roll<chance:result["queued"]=endless_greenhouse.queue_forced_new()
+	return result
+
+func _record_endless_discovery_settlement(harvested:bool,diameter_cm:float=0.0,_forced_roll:float=-1.0)->Dictionary:
 	if not _is_endless_normal_play():return {"set_completed":false}
 	var result:=endless_greenhouse.register_discovery_settlement(harvested,diameter_cm)
 	if bool(result.get("set_completed",false)):
@@ -6863,13 +6891,8 @@ func _record_endless_discovery_settlement(harvested:bool,diameter_cm:float=0.0,f
 		_resolve_jurejure_progress_reward("discovery_set")
 	if not jurejure_intro_complete:
 		if endless_greenhouse.forced_new_pending:endless_greenhouse.cancel_forced_new_pending()
+		endless_greenhouse.clear_discovery_carryover()
 		return result
-	if not bool(result.get("roll_allowed",false)):return result
-	var candidates:=_eligible_endless_forced_new_candidates()
-	if candidates.is_empty():return result
-	var chance:=clampf(float(result.get("new_chance",0.0)),0.0,.95)
-	var roll:=rng.randf() if forced_roll<0.0 else clampf(forced_roll,0.0,.999999)
-	if chance>0.0 and roll<chance:endless_greenhouse.queue_forced_new()
 	return result
 
 func _next_greenhouse_spawn_interval()->float:

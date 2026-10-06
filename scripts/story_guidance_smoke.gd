@@ -184,6 +184,9 @@ func _test_new_gate(game: Node) -> void:
 	assert(not game.endless_greenhouse.has_forced_new())
 	game.jurejure_intro_complete = true
 	game._record_endless_discovery_settlement(true, 120.0, 0.0)
+	assert(not game.endless_greenhouse.forced_new_pending)
+	assert(is_equal_approx(game.endless_greenhouse.carryover_chance_for_next_seed(), 0.95))
+	assert(bool(game._roll_endless_carryover_for_seed(0.0).get("queued", false)))
 	assert(game.endless_greenhouse.forced_new_pending)
 	game.endless_greenhouse.reset_discovery_state()
 	game.play_active = false
@@ -220,12 +223,27 @@ func _test_fantasy_six_candidate_contract(game: Node) -> void:
 	game.species_get_counts[str(extra_required[0].get("species_id", ""))] = 1
 	game.species_get_counts[str(extra_required[1].get("species_id", ""))] = 1
 	game.current_mode = "habitat"
-	game._start_fantasy_realization_event()
-	assert(game.scripted_dialog_kind == "fantasy_realization")
-	assert(game.scripted_dialog_pages.size() == 3)
-	game.scripted_dialog_kind = ""
-	game.scripted_dialog_pages.clear()
-	game.intro_overlay.visible = false
+	var page_keys := ["fantasy_six_girl_1", "fantasy_six_armadillo", "fantasy_six_girl_2", "fantasy_six_armadillo_2", "fantasy_six_armadillo_3", "fantasy_six_armadillo_4"]
+	var speakers := ["girl", "armadillo", "girl", "armadillo", "armadillo", "armadillo"]
+	var expected_tail := {
+		"ja": ["そうかもしれない…", "それと、大きな株を収穫するほど、新しい品種が出るような気がするよ", "本当に不思議だ…"],
+		"hiragana": ["そうかもしれない…", "それと、おおきな かぶを しゅうかくするほど、あたらしい ひんしゅが でるような きがするよ", "ほんとうに ふしぎだ…"],
+		"en": ["Maybe you're right...", "And it feels like the bigger the plant you harvest, the more likely a new variety is to appear.", "It's really strange..."],
+	}
+	for test_language in ["ja", "hiragana", "en"]:
+		game._set_language(test_language)
+		game._start_fantasy_realization_event()
+		assert(game.scripted_dialog_kind == "fantasy_realization")
+		assert(game.scripted_dialog_pages.size() == 6)
+		for page_index in range(page_keys.size()):
+			assert(str(game.scripted_dialog_pages[page_index].get("speaker", "")) == speakers[page_index])
+			assert(str(game.scripted_dialog_pages[page_index].get("text", "")) == Localizer.text(test_language, page_keys[page_index]))
+		for tail_index in range(3):
+			assert(Localizer.text(test_language, page_keys[tail_index + 3]) == expected_tail[test_language][tail_index])
+		game.scripted_dialog_kind = ""
+		game.scripted_dialog_pages.clear()
+		game.intro_overlay.visible = false
+	game._set_language("ja")
 	game.fantasy_realization_seen = true
 	assert(game._fantasy_six_new_candidate_allowed(outside_entry))
 
