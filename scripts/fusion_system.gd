@@ -13,6 +13,7 @@ const FUSION_SERIES_BY_CATALOG_SERIES := {
 	"sea": "sea",
 	"yumekawa": "yumekawa",
 	"forest_amber": "forest_amber",
+	"jelly": "jelly",
 }
 
 var species_by_id: Dictionary = {}
@@ -95,7 +96,7 @@ func set_series_special_recipes(recipes: Array) -> void:
 func fusion_series_for_entry(entry: Dictionary) -> String:
 	# Higher-tier fusion species participate only as explicitly named parents.
 	# Their display family is intentionally stored separately and must never act
-	# as the series side of a series-special recipe or enter the 55 basic matrix.
+	# as the series side of a series-special recipe or enter the 66 basic matrix.
 	if int(entry.get("fusion_tier", 0)) > 0:
 		return ""
 	var explicit := str(entry.get("fusion_series", ""))

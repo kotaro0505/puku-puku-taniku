@@ -4,7 +4,20 @@ const FusionSystemClass = preload("res://scripts/fusion_system.gd")
 const FusionLabUIClass = preload("res://scripts/fusion_lab_ui.gd")
 const Localizer = preload("res://scripts/game_localizer.gd")
 const CatalogImageLoaderClass = preload("res://scripts/catalog_image_loader.gd")
-const SERIES := ["gummy", "metal", "sweets", "glow", "jewel", "jure", "stone", "sea", "yumekawa", "forest_amber"]
+const SERIES := ["gummy", "metal", "sweets", "glow", "jewel", "jure", "stone", "sea", "yumekawa", "forest_amber", "jelly"]
+const JELLY_BASIC_RECIPES := [
+	["jelly", "jelly", "hyb_jelly_jelly"],
+	["gummy", "jelly", "hyb_gummy_jelly"],
+	["metal", "jelly", "hyb_metal_jelly"],
+	["sweets", "jelly", "hyb_sweets_jelly"],
+	["glow", "jelly", "hyb_glow_jelly"],
+	["jewel", "jelly", "hyb_jewel_jelly"],
+	["jure", "jelly", "hyb_jure_jelly"],
+	["stone", "jelly", "hyb_stone_jelly"],
+	["sea", "jelly", "hyb_sea_jelly"],
+	["yumekawa", "jelly", "hyb_yumekawa_jelly"],
+	["forest_amber", "jelly", "hyb_forest_amber_jelly"],
+]
 const TIER1_RECIPES := [
 	["hyb_gummy_sea", "hyb_glow_jewel", "fus1_rainbow_bubble"],
 	["hyb_gummy_gummy", "hyb_stone_yumekawa", "fus1_pukupuku_planet"],
@@ -26,6 +39,8 @@ const TIER1_RECIPES := [
 	["hyb_jewel_yumekawa", "hyb_sweets_yumekawa", "fus1_dream_specimen"],
 	["hyb_forest_amber_forest_amber", "hyb_jewel_stone", "fus1_strata"],
 	["hyb_sea_forest_amber", "hyb_sweets_forest_amber", "fus1_amber_forest"],
+	["hyb_gummy_jelly", "hyb_gummy_gummy", "fus1_jelly_bomb"],
+	["hyb_sweets_jelly", "hyb_sweets_sweets", "fus1_fruit_terrine"],
 ]
 const TIER2_EXACT_RECIPES := [
 	["fus1_rainbow_bubble", "fus1_moon_clock", "fus2_moonbow"],
@@ -58,7 +73,7 @@ func _ready() -> void:
 	await _test_tier2_game_flow(game)
 	game._reset_progression_state()
 	game.queue_free()
-	print("FUSION_SYSTEM_SMOKE_OK hybrid_lab_name=true attached_background=720x1280 result_heading_removed=true energy_speed_unchanged=true energy_emission_3x=true basic_species=55 basic_recipes=55 tier1_species=20 tier1_special=20 tier2_species=10 tier2_exact=5 tier2_series=5 transparent_images=85 picker_touch_contract=true unordered=true originals=fallback exact_then_series_special=priority parents=GET_only cost=atomic silhouette=species_specific double_submit=blocked known_result=disabled return_after_GET=lab seeds=after_GET languages=3")
+	print("FUSION_SYSTEM_SMOKE_OK hybrid_lab_name=true attached_background=720x1280 result_heading_removed=true energy_speed_unchanged=true energy_emission_3x=true fusion_series=11 basic_species=66 basic_recipes=66 tier1_species=22 tier1_special=22 tier2_species=10 tier2_exact=5 tier2_series=5 transparent_images=98 jelly_catalog=23 picker_touch_contract=true unordered=true originals=fallback exact_then_series_special=priority parents=GET_only cost=atomic silhouette=species_specific double_submit=blocked known_result=disabled return_after_GET=lab seeds=after_GET languages=3")
 	get_tree().quit()
 
 func _test_hybrid_lab_presentation(game) -> void:
@@ -79,6 +94,9 @@ func _test_hybrid_lab_presentation(game) -> void:
 	assert(is_equal_approx(FusionLabUIClass.ENERGY_PARTICLE_TRAVEL_SECONDS, 0.42))
 	assert(is_equal_approx(FusionLabUIClass.ENERGY_PARTICLE_FADE_SECONDS, 0.18))
 	assert(is_equal_approx(FusionLabUIClass.ENERGY_PARTICLE_STAGGER_SECONDS, 0.035))
+	assert(str(FusionLabUIClass.SERIES_LABELS["ja"].get("jelly", "")) == "ゼリー")
+	assert(str(FusionLabUIClass.SERIES_LABELS["hiragana"].get("jelly", "")) == "ぜりー")
+	assert(str(FusionLabUIClass.SERIES_LABELS["en"].get("jelly", "")) == "Jelly")
 
 func _test_catalog_and_recipes(game) -> void:
 	var hybrid_entries: Array[Dictionary] = []
@@ -90,7 +108,7 @@ func _test_catalog_and_recipes(game) -> void:
 		var entry: Dictionary = entry_value
 		var fusion_series := str(entry.get("fusion_series", ""))
 		var catalog_series := str(entry.get("series_id", ""))
-		if catalog_series in ["gummy", "metal", "sweets", "glow", "jewel", "jurejure", "stone", "sea", "yumekawa", "forest_amber"]:
+		if catalog_series in ["gummy", "metal", "sweets", "glow", "jewel", "jurejure", "stone", "sea", "yumekawa", "forest_amber", "jelly"]:
 			assert(fusion_series in SERIES)
 		if catalog_series != "hybrid":
 			continue
@@ -114,10 +132,10 @@ func _test_catalog_and_recipes(game) -> void:
 		var texture := load(image_path) as Texture2D
 		assert(texture != null and texture.get_width() == 768 and texture.get_height() == 768)
 		_assert_transparent_catalog_image(image_path, Vector2i(768, 768))
-	assert(hybrid_entries.size() == 55 and ids.size() == 55)
-	assert(result_series_counts == {"gummy":6,"metal":5,"sweets":5,"glow":5,"jewel":5,"jure":6,"stone":6,"sea":6,"yumekawa":5,"forest_amber":6})
-	assert(game.fusion_system.basic_recipes_by_pair.size() == 55)
-	assert(game.fusion_system.special_recipes_by_pair.size() == 25)
+	assert(hybrid_entries.size() == 66 and ids.size() == 66)
+	assert(result_series_counts == {"gummy":6,"metal":5,"sweets":5,"glow":5,"jewel":5,"jure":6,"stone":6,"sea":6,"yumekawa":5,"forest_amber":6,"jelly":11})
+	assert(game.fusion_system.basic_recipes_by_pair.size() == 66)
+	assert(game.fusion_system.special_recipes_by_pair.size() == 27)
 	assert(game.fusion_system.series_special_recipes_by_species.size() == 5)
 	var parent_for_series: Dictionary = {}
 	for entry_value in game.catalog_species:
@@ -134,10 +152,26 @@ func _test_catalog_and_recipes(game) -> void:
 			var reverse: Dictionary = game.fusion_system.resolve(second_id, first_id)
 			assert(not forward.is_empty() and str(forward.get("source", "")) == "basic")
 			assert(str(forward.get("result_species_id", "")) == str(reverse.get("result_species_id", "")))
+	for recipe in JELLY_BASIC_RECIPES:
+		var first_id := str(parent_for_series[str(recipe[0])])
+		var second_id := str(parent_for_series[str(recipe[1])])
+		assert(str(game.fusion_system.resolve(first_id, second_id).get("result_species_id", "")) == str(recipe[2]))
+		assert(str(game.fusion_system.resolve(second_id, first_id).get("result_species_id", "")) == str(recipe[2]))
 	assert(str(game._catalog_entry("hyb_gummy_stone").get("fusion_series", "")) == "stone")
 	assert(str(game._catalog_entry("hyb_jure_forest_amber").get("fusion_series", "")) == "forest_amber")
 	assert(str(game._catalog_entry("jurejure_pure_gold").get("fusion_series", "")) == "jure")
-	assert(str(game._catalog_entry("jelly_green_apple").get("fusion_series", "")) == "")
+	assert(str(game._catalog_entry("jelly_green_apple").get("fusion_series", "")) == "jelly")
+	var jelly_parent_ids: Array[String] = []
+	for entry in game.fusion_system.eligible_parents({"jelly_green_apple": 1}):
+		jelly_parent_ids.append(str(entry.get("species_id", "")))
+	assert("jelly_green_apple" in jelly_parent_ids)
+	var jelly_catalog_ids: Array[String] = []
+	for entry in game._catalog_display_entries_for_series("jelly"):
+		jelly_catalog_ids.append(str(entry.get("species_id", "")))
+	assert(jelly_catalog_ids.size() == 23)
+	for recipe in JELLY_BASIC_RECIPES:
+		assert(str(recipe[2]) in jelly_catalog_ids)
+	assert("fus1_jelly_bomb" in jelly_catalog_ids and "fus1_fruit_terrine" in jelly_catalog_ids)
 
 func _test_special_recipe_precedence(game) -> void:
 	var gummy_id := "gummy_peach_milk"
@@ -227,10 +261,10 @@ func _test_tier1_recipes(game) -> void:
 		assert(texture != null and texture.get_width() == 1254 and texture.get_height() == 1254)
 		_assert_transparent_catalog_image(image_path, Vector2i(1254, 1254))
 		tier1_ids[result_id] = true
-	assert(tier1_ids.size() == 20)
+	assert(tier1_ids.size() == 22)
 	var tier1_series: Dictionary = game._series_entry("fusion_tier1")
 	assert(not tier1_series.is_empty())
-	assert((tier1_series.get("species_ids", []) as Array).size() == 20)
+	assert((tier1_series.get("species_ids", []) as Array).size() == 22)
 	# Higher-tier parents are selectable after GET but never enter a basic
 	# series fallback when no species-id recipe exists.
 	var ownership := {"fus1_rainbow_bubble": 1, "fus1_pukupuku_planet": 1}
@@ -318,7 +352,7 @@ func _test_tier2_recipes(game) -> void:
 	assert(game.fusion_system.resolve("fus1_diving_sphere", "fus1_firefly_dome").is_empty())
 	assert(game.fusion_system.resolve("fus1_diving_sphere", "fus2_deep_sea_light").is_empty())
 	# GET makes tier-2 species selectable as future exact-recipe parents, but it
-	# still cannot enter the 55 basic recipe matrix.
+	# still cannot enter the 66 basic recipe matrix.
 	var ownership := {"fus2_moonbow": 1, "fus2_abyss_glass": 1}
 	var eligible_ids: Array[String] = []
 	for entry in game.fusion_system.eligible_parents(ownership):

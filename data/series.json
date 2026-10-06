@@ -382,7 +382,18 @@
       "hyb_sea_forest_amber",
       "hyb_yumekawa_yumekawa",
       "hyb_yumekawa_forest_amber",
-      "hyb_forest_amber_forest_amber"
+      "hyb_forest_amber_forest_amber",
+      "hyb_jelly_jelly",
+      "hyb_gummy_jelly",
+      "hyb_metal_jelly",
+      "hyb_sweets_jelly",
+      "hyb_glow_jelly",
+      "hyb_jewel_jelly",
+      "hyb_jure_jelly",
+      "hyb_stone_jelly",
+      "hyb_sea_jelly",
+      "hyb_yumekawa_jelly",
+      "hyb_forest_amber_jelly"
     ],
     "field_id": "",
     "unlock_type": "future",
@@ -418,7 +429,9 @@
       "fus1_dream_balloon",
       "fus1_dream_specimen",
       "fus1_strata",
-      "fus1_amber_forest"
+      "fus1_amber_forest",
+      "fus1_jelly_bomb",
+      "fus1_fruit_terrine"
     ],
     "field_id": "",
     "unlock_type": "future",

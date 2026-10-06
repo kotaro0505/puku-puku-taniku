@@ -11,9 +11,9 @@ func _ready()->void:
 		assert(str(series_entry.get("series_id",""))==expected_ids[index])
 		for required_key in ["series_id","display_name","subtitle","description","cover_image_path","species_ids","field_id","unlock_type","unlock_condition","iap_product_id","sort_order"]:assert(series_entry.has(required_key))
 	assert(game._series_entry("common").is_empty() and game._series_species_entries("common").is_empty())
-	var base:Dictionary=game._series_entry("base");assert(game._is_series_unlocked(base));assert(str(base.get("display_name",""))=="原種" and game._series_species_entries("base").size()==12 and game.catalog_species.size()==219)
-	var hybrid:Dictionary=game._series_entry("hybrid");assert(hybrid.species_ids.size()==55 and not game._is_series_unlocked(hybrid) and not game._can_browse_series(hybrid))
-	var fusion_tier1:Dictionary=game._series_entry("fusion_tier1");assert(fusion_tier1.species_ids.size()==20 and not game._is_series_unlocked(fusion_tier1) and not game._can_browse_series(fusion_tier1))
+	var base:Dictionary=game._series_entry("base");assert(game._is_series_unlocked(base));assert(str(base.get("display_name",""))=="原種" and game._series_species_entries("base").size()==12 and game.catalog_species.size()==232)
+	var hybrid:Dictionary=game._series_entry("hybrid");assert(hybrid.species_ids.size()==66 and not game._is_series_unlocked(hybrid) and not game._can_browse_series(hybrid))
+	var fusion_tier1:Dictionary=game._series_entry("fusion_tier1");assert(fusion_tier1.species_ids.size()==22 and not game._is_series_unlocked(fusion_tier1) and not game._can_browse_series(fusion_tier1))
 	var fusion_tier2:Dictionary=game._series_entry("fusion_tier2");assert(fusion_tier2.species_ids.size()==10 and not game._is_series_unlocked(fusion_tier2) and not game._can_browse_series(fusion_tier2) and str(fusion_tier2.get("display_name",""))=="上位特殊配合")
 	for source_page in [hybrid,fusion_tier1,fusion_tier2]:assert(game._catalog_series_hidden_from_navigation(source_page))
 	game.unlocked_series["hybrid"]=true;game.unlocked_series["fusion_tier1"]=true;game.unlocked_series["fusion_tier2"]=true
@@ -139,7 +139,7 @@ func _ready()->void:
 	var first_sweets_card:Button=game.encyclopedia_grid.get_child(0);assert(not first_sweets_card.disabled);first_sweets_card.pressed.emit();assert(game.encyclopedia_detail_page.find_child("SpeciesName",true,false).text=="いちごショート多肉" and game.encyclopedia_detail_page.find_child("SpeciesImage",true,false).texture.resource_path=="res://assets/catalog/sweets/sweets-strawberry-shortcake.png")
 	game._close_encyclopedia();game.discovered.erase("sweets_strawberry_shortcake");game.species_get_counts.erase("sweets_strawberry_shortcake");game.selected_series_index=0
 	game.unlocked_series["jelly"]=true;game.selected_series_index=1;game._open_encyclopedia();await get_tree().process_frame
-	assert(game.encyclopedia_list_page.visible and game.encyclopedia_list_title.text=="ゼリー" and game.encyclopedia_grid.get_child_count()==10 and game.series_cover_image.texture==null and game.series_cover_placeholder.visible)
+	assert(game.encyclopedia_list_page.visible and game.encyclopedia_list_title.text=="ゼリー" and game.encyclopedia_grid.get_child_count()==23 and game.series_cover_image.texture==null and game.series_cover_placeholder.visible)
 	game._register_species_discovery("jelly_grape",true);game._record_species_get("jelly_grape",1);game._refresh_series_selection();await get_tree().process_frame;game._update_encyclopedia_visible_textures()
 	var first_jelly_card:Button=game.encyclopedia_grid.get_child(0);assert(not first_jelly_card.disabled);first_jelly_card.pressed.emit();assert(game.encyclopedia_detail_page.find_child("SpeciesName",true,false).text=="ぶどうゼリー" and game.encyclopedia_detail_page.find_child("SpeciesGetCount",true,false).text=="GET 2" and game.encyclopedia_detail_page.find_child("SpeciesImage",true,false).texture.resource_path=="res://assets/catalog/jelly/jelly-grape.png")
 	game._close_encyclopedia();game.unlocked_series.erase("jelly");game.discovered.erase("jelly_grape");game.species_get_counts.erase("jelly_grape");game.selected_series_index=0

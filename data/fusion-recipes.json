@@ -21,6 +21,8 @@
     {"parent_species_ids":["hyb_jewel_yumekawa","hyb_sweets_yumekawa"],"result_species_id":"fus1_dream_specimen"},
     {"parent_species_ids":["hyb_forest_amber_forest_amber","hyb_jewel_stone"],"result_species_id":"fus1_strata"},
     {"parent_species_ids":["hyb_sea_forest_amber","hyb_sweets_forest_amber"],"result_species_id":"fus1_amber_forest"},
+    {"parent_species_ids":["hyb_gummy_jelly","hyb_gummy_gummy"],"result_species_id":"fus1_jelly_bomb"},
+    {"parent_species_ids":["hyb_sweets_jelly","hyb_sweets_sweets"],"result_species_id":"fus1_fruit_terrine"},
     {"parent_species_ids":["fus1_rainbow_bubble","fus1_moon_clock"],"result_species_id":"fus2_moonbow"},
     {"parent_species_ids":["fus1_jellyfish_parfait","fus1_deep_sea_aquarium"],"result_species_id":"fus2_abyss_glass"},
     {"parent_species_ids":["fus1_kaleidoscope","fus1_geode"],"result_species_id":"fus2_kaleido_geode"},
@@ -89,6 +91,17 @@
     {"parent_series":["sea","forest_amber"],"result_species_id":"hyb_sea_forest_amber"},
     {"parent_series":["yumekawa","yumekawa"],"result_species_id":"hyb_yumekawa_yumekawa"},
     {"parent_series":["yumekawa","forest_amber"],"result_species_id":"hyb_yumekawa_forest_amber"},
-    {"parent_series":["forest_amber","forest_amber"],"result_species_id":"hyb_forest_amber_forest_amber"}
+    {"parent_series":["forest_amber","forest_amber"],"result_species_id":"hyb_forest_amber_forest_amber"},
+    {"parent_series":["jelly","jelly"],"result_species_id":"hyb_jelly_jelly"},
+    {"parent_series":["gummy","jelly"],"result_species_id":"hyb_gummy_jelly"},
+    {"parent_series":["metal","jelly"],"result_species_id":"hyb_metal_jelly"},
+    {"parent_series":["sweets","jelly"],"result_species_id":"hyb_sweets_jelly"},
+    {"parent_series":["glow","jelly"],"result_species_id":"hyb_glow_jelly"},
+    {"parent_series":["jewel","jelly"],"result_species_id":"hyb_jewel_jelly"},
+    {"parent_series":["jure","jelly"],"result_species_id":"hyb_jure_jelly"},
+    {"parent_series":["stone","jelly"],"result_species_id":"hyb_stone_jelly"},
+    {"parent_series":["sea","jelly"],"result_species_id":"hyb_sea_jelly"},
+    {"parent_series":["yumekawa","jelly"],"result_species_id":"hyb_yumekawa_jelly"},
+    {"parent_series":["forest_amber","jelly"],"result_species_id":"hyb_forest_amber_jelly"}
   ]
 }

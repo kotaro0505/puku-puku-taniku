@@ -20,15 +20,15 @@ const ENERGY_PARTICLE_STAGGER_SECONDS := 0.035
 const SERIES_LABELS := {
 	"ja": {
 		"gummy": "グミ", "metal": "金属", "sweets": "スイーツ", "glow": "蓄光", "jewel": "宝石",
-		"jure": "ジュレジュレ団", "stone": "ストーン", "sea": "海", "yumekawa": "ゆめふわ", "forest_amber": "森と琥珀",
+		"jure": "ジュレジュレ団", "stone": "ストーン", "sea": "海", "yumekawa": "ゆめふわ", "forest_amber": "森と琥珀", "jelly": "ゼリー",
 	},
 	"hiragana": {
 		"gummy": "ぐみ", "metal": "きんぞく", "sweets": "すいーつ", "glow": "ちっこう", "jewel": "ほうせき",
-		"jure": "じゅれじゅれだん", "stone": "すとーん", "sea": "うみ", "yumekawa": "ゆめふわ", "forest_amber": "もりと こはく",
+		"jure": "じゅれじゅれだん", "stone": "すとーん", "sea": "うみ", "yumekawa": "ゆめふわ", "forest_amber": "もりと こはく", "jelly": "ぜりー",
 	},
 	"en": {
 		"gummy": "Gummy", "metal": "Metal", "sweets": "Sweets", "glow": "Glow", "jewel": "Jewel",
-		"jure": "JureJure Gang", "stone": "Stone", "sea": "Sea", "yumekawa": "Dreamy", "forest_amber": "Forest & Amber",
+		"jure": "JureJure Gang", "stone": "Stone", "sea": "Sea", "yumekawa": "Dreamy", "forest_amber": "Forest & Amber", "jelly": "Jelly",
 	},
 }
 
