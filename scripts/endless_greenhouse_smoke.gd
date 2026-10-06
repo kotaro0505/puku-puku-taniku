@@ -992,10 +992,14 @@ func _test_restoration_pending_until_habitat(game: Node) -> void:
 	game.play_active=false
 	game.result_overlay.visible=true
 	game._close_result()
-	for _frame in range(120):
-		if game.current_mode == "habitat" and game.scripted_dialog_kind == "restoration_return_1":
+	# This transition is driven by real-time tweens (about one second total).
+	# Counting frames is flaky in headless mode because 120 frames can elapse
+	# before those tweens have advanced far enough.
+	var transition_deadline_msec := Time.get_ticks_msec() + 3000
+	while game.current_mode != "habitat" or game.scripted_dialog_kind != "restoration_return_1":
+		if Time.get_ticks_msec() >= transition_deadline_msec:
 			break
-		await get_tree().process_frame
+		await get_tree().create_timer(0.05).timeout
 	assert(game.current_mode == "habitat")
 	assert(game.scripted_dialog_kind == "restoration_return_1")
 	game.scripted_dialog_kind = ""
