@@ -65,16 +65,19 @@ func _ready()->void:
 	game.greenhouse_area_drag_velocity_x=0.0;game._finish_greenhouse_area_drag(Vector2(40+expected_arrangement_transition*.75,450))
 	await get_tree().create_timer(game.ARRANGEMENT_TRANSITION_SECONDS+.08).timeout
 	assert(game.arrangement_scene_active and not game.arrangement_transitioning and game.arrangement_ui.visible and game.arrangement_ui.home_page.visible)
+	assert(game.arrangement_ui.pot_select_grid.get_child_count()==8 and _has_button_text(game.arrangement_ui.home_page,"作った作品を見る") and not _has_button_text(game.arrangement_ui.home_page,"＋ 新しく作る"))
 	assert(not game.main_status_hud.visible and not game.labels_layer.visible)
 	assert(game.arrangement_ui.world_backdrop_enabled)
 	var expected_anchor:Vector2=viewport_size*game.ARRANGEMENT_POT_ANCHOR
 	assert(game.arrangement_ui.world_pot_anchor_screen.distance_to(expected_anchor)<EPSILON)
 	var table_center:Vector2=game.greenhouse_backdrop.position+game.ARRANGEMENT_TABLE_SOURCE_CENTER*backdrop_scale
 	assert(table_center.distance_to(viewport_size*game.ARRANGEMENT_TABLE_SCREEN_TARGET_RATIO)<EPSILON)
-	game.arrangement_ui._start_new_arrangement();game.arrangement_ui._select_editor_pot("shallow_terracotta")
+	game.arrangement_ui._select_editor_pot("shallow_terracotta")
 	# The placement guide was intentionally removed; the pot holder is now the only layer child.
 	assert(game.arrangement_ui.editor_pot_layer.get_child_count()==1)
 	var pot_holder:Control=game.arrangement_ui.editor_pot_layer.get_child(0)
+	assert(pot_holder.size.is_equal_approx(game.arrangement_ui.POT_HOLDER_SIZE))
+	assert(pot_holder.size.x>=432.0*1.19 and pot_holder.size.x<=432.0*1.25)
 	var holder_anchor:Vector2=game.arrangement_ui.editor_canvas.position+pot_holder.position+Vector2(pot_holder.size.x*.5,pot_holder.size.y*.94)
 	var lowered_anchor:=expected_anchor+Vector2(0,game.arrangement_ui.POT_VERTICAL_OFFSET)
 	assert(game.arrangement_ui.POT_VERTICAL_OFFSET>0.0 and holder_anchor.distance_to(lowered_anchor)<EPSILON)
@@ -118,10 +121,15 @@ func _ready()->void:
 			var image:=get_viewport().get_texture().get_image()
 			assert(image!=null and image.get_size()==Vector2i(576,1024))
 			assert(image.save_png(screenshot_dir_absolute.path_join(str(shot.name)))==OK)
-		game.arrangement_scene_active=true;game.arrangement_ui.set_world_backdrop_mode(true,expected_anchor);game.arrangement_ui.open_home();game.arrangement_ui._start_new_arrangement();game.arrangement_ui._select_editor_pot("classic_terracotta");game._update_play_ui()
+		game.arrangement_scene_active=true;game.arrangement_ui.set_world_backdrop_mode(true,expected_anchor);game.arrangement_ui.open_home();game.arrangement_ui._select_editor_pot("classic_terracotta");game._update_play_ui()
 		await get_tree().process_frame;RenderingServer.force_draw()
 		var anchor_image:=get_viewport().get_texture().get_image()
 		assert(anchor_image!=null and anchor_image.save_png(screenshot_dir_absolute.path_join("100-arrangement-pot-anchor.png"))==OK)
 
 	print("ARRANGEMENT_TRANSITION_SMOKE_OK main_x=",game.greenhouse_main_position_x," arrangement_x=",game.greenhouse_arrangement_position_x," transition=",expected_arrangement_transition," soil=",game.SOIL_SOURCE_CENTER," table=",game.ARRANGEMENT_TABLE_SOURCE_CENTER," anchor=",expected_anchor)
 	get_tree().quit()
+
+func _has_button_text(root:Node,text:String)->bool:
+	for node in root.find_children("*","Button",true,false):
+		if node is Button and (node as Button).text==text:return true
+	return false

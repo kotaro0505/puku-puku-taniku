@@ -77,7 +77,7 @@ func _ready()->void:
 	ui.open_pot_shop();assert(ui.shop_grid.get_child_count()==22 and ui.shop_restore_button.visible and ui.shop_restore_button.disabled)
 	var first_paid_card:Node=ui.shop_grid.get_child(8);var unlock_buttons:=first_paid_card.find_children("*","Button",true,false)
 	assert(unlock_buttons.size()==1 and "€0,99" in (unlock_buttons[0] as Button).text and not (unlock_buttons[0] as Button).disabled)
-	ui.open_home();ui._start_new_arrangement();assert(ui.pot_select_grid.get_child_count()==22)
+	ui.open_home();assert(ui.home_page.visible and ui.pot_select_grid.get_child_count()==22)
 	var first_paid_select:=ui.pot_select_grid.get_child(8) as Button;assert(first_paid_select.disabled and _has_label_text_containing(first_paid_select,"デザイン未アンロック"))
 	var unlocks:Dictionary={first_product:true}
 	ui.configure([],[],all_pots,{},owned,[],20,5,Callable(),Callable(),{},"ja",1,unlocks,service.product_states_snapshot(),false,false)

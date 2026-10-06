@@ -4024,7 +4024,7 @@ func _open_arrangement_test_preview()->void:
 	if _catalog_entry(preview_species_id).is_empty() and not catalog_species.is_empty():preview_species_id=str(catalog_species[0].get("species_id",""))
 	if preview_species_id.is_empty():return
 	discovered[preview_species_id]=true;bests[preview_species_id]=90.0;owned_pots["shallow_terracotta"]=maxi(1,_owned_pot_total("shallow_terracotta"))
-	_sync_arrangement_ui();arrangement_ui.set_world_backdrop_mode(false,_arrangement_pot_anchor_screen());arrangement_ui.open_home();arrangement_ui._start_new_arrangement();arrangement_ui._select_editor_pot("shallow_terracotta");arrangement_ui._add_species_to_editor(preview_species_id);_update_play_ui()
+	_sync_arrangement_ui();arrangement_ui.set_world_backdrop_mode(false,_arrangement_pot_anchor_screen());arrangement_ui.open_home();arrangement_ui._select_editor_pot("shallow_terracotta");arrangement_ui._add_species_to_editor(preview_species_id);_update_play_ui()
 
 func _open_secret_gacha_preview()->void:
 	if not _trial_dev_controls_enabled():return
