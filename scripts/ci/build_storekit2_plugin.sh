@@ -4,8 +4,10 @@ set -euo pipefail
 : "${GODOT_VERSION:?GODOT_VERSION is required}"
 STOREKIT2_VERSION="${STOREKIT2_VERSION:-v0.2}"
 IOS_MIN_VERSION="${IOS_MIN_VERSION:-15.6}"
-STOREKIT2_COMPAT_REVISION="${STOREKIT2_COMPAT_REVISION:-compat1}"
+STOREKIT2_COMPAT_REVISION="${STOREKIT2_COMPAT_REVISION:-compat2}"
 PROJECT_DIR="${CM_BUILD_DIR:-$(pwd)}"
+SOURCE_HEAD="$(git -C "$PROJECT_DIR" rev-parse HEAD 2>/dev/null || true)"
+[ -n "$SOURCE_HEAD" ] || SOURCE_HEAD="unavailable"
 CACHE_ROOT="$HOME/.cache/puku-puku-taniku/storekit2-${STOREKIT2_VERSION}-godot-${GODOT_VERSION}-ios${IOS_MIN_VERSION}-${STOREKIT2_COMPAT_REVISION}"
 CACHE_PLUGIN="$CACHE_ROOT/godot-storekit2"
 CACHE_TARGET_FILE="$CACHE_ROOT/ios-min-version.txt"
@@ -17,8 +19,18 @@ if [ "$IOS_MIN_VERSION" != "15.6" ]; then
   exit 1
 fi
 
-if [ "$STOREKIT2_COMPAT_REVISION" != "compat1" ]; then
-  echo "Unexpected StoreKit2 compatibility revision: expected compat1, got $STOREKIT2_COMPAT_REVISION" >&2
+if [ "$GODOT_VERSION" != "4.7.2" ]; then
+  echo "Unexpected Godot version for the StoreKit2 compatibility patch: expected 4.7.2, got $GODOT_VERSION" >&2
+  exit 1
+fi
+
+if [ "$STOREKIT2_VERSION" != "v0.2" ]; then
+  echo "Unexpected StoreKit2 version for the compatibility patch: expected v0.2, got $STOREKIT2_VERSION" >&2
+  exit 1
+fi
+
+if [ "$STOREKIT2_COMPAT_REVISION" != "compat2" ]; then
+  echo "Unexpected StoreKit2 compatibility revision: expected compat2, got $STOREKIT2_COMPAT_REVISION" >&2
   exit 1
 fi
 
@@ -140,6 +152,25 @@ if [ "$TYPE_INFO_INCLUDE_COUNT" -ne 1 ]; then
   exit 1
 fi
 grep -Fqx '#include "core/variant/type_info.h"' "$PLUGIN_HEADER"
+VARIANT_ENUM_CAST_USE_COUNT="$(awk '/^[[:space:]]*VARIANT_ENUM_CAST[[:space:]]*\(GodotStoreKit2::TransactionState\)[[:space:]]*$/ { count++ } END { print count + 0 }' "$PLUGIN_HEADER")"
+if [ "$VARIANT_ENUM_CAST_USE_COUNT" -ne 1 ]; then
+  echo "Expected exactly one GodotStoreKit2::TransactionState VARIANT_ENUM_CAST in $PLUGIN_HEADER, found $VARIANT_ENUM_CAST_USE_COUNT" >&2
+  exit 1
+fi
+TYPE_INFO_INCLUDE_LINE="$(awk '$0 == "#include \"core/variant/type_info.h\"" { print NR; exit }' "$PLUGIN_HEADER")"
+VARIANT_ENUM_CAST_LINE="$(awk '/^[[:space:]]*VARIANT_ENUM_CAST[[:space:]]*\(GodotStoreKit2::TransactionState\)[[:space:]]*$/ { print NR; exit }' "$PLUGIN_HEADER")"
+if [ -z "$TYPE_INFO_INCLUDE_LINE" ] || [ -z "$VARIANT_ENUM_CAST_LINE" ] || [ "$TYPE_INFO_INCLUDE_LINE" -ge "$VARIANT_ENUM_CAST_LINE" ]; then
+  echo "Invalid StoreKit2 macro structure: type_info include line=$TYPE_INFO_INCLUDE_LINE VARIANT_ENUM_CAST line=$VARIANT_ENUM_CAST_LINE" >&2
+  exit 1
+fi
+
+echo "STOREKIT2_BUILD_DIAGNOSTICS godot=$GODOT_VERSION storekit=$STOREKIT2_VERSION ios=$IOS_MIN_VERSION compat=$STOREKIT2_COMPAT_REVISION"
+echo "STOREKIT2_SOURCE_HEAD=$SOURCE_HEAD"
+echo "STOREKIT2_PATCHED_HEADER=$PLUGIN_HEADER"
+echo "STOREKIT2_MACRO_STRUCTURE include_line=$TYPE_INFO_INCLUDE_LINE variant_enum_cast_line=$VARIANT_ENUM_CAST_LINE"
+echo "STOREKIT2_PATCHED_HEADER_BEGIN"
+nl -ba "$PLUGIN_HEADER" | sed -n '1,55p'
+echo "STOREKIT2_PATCHED_HEADER_END"
 echo "STOREKIT2_GODOT_COMPAT_PATCH_OK godot=$GODOT_VERSION include=core/variant/type_info.h count=$TYPE_INFO_INCLUDE_COUNT"
 
 PLUGIN_PROJECT="$PLUGIN_SOURCE/godot-storekit2.xcodeproj/project.pbxproj"

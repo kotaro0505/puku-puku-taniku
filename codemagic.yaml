@@ -14,7 +14,7 @@ workflows:
         GODOT_TEMPLATE_VERSION: "4.7.2.stable"
         STOREKIT2_VERSION: "v0.2"
         IOS_MIN_VERSION: "15.6"
-        STOREKIT2_COMPAT_REVISION: "compat1"
+        STOREKIT2_COMPAT_REVISION: "compat2"
         APP_VERSION: "1.0.0"
         APPLE_TEAM_ID: "UK8FRB9XKH"
         BUNDLE_ID: "com.ohanayanouen.pukupukutaniku"
@@ -24,9 +24,17 @@ workflows:
     cache:
       cache_paths:
         - $HOME/.cache/puku-puku-taniku/godot-4.7.2
-        - $HOME/.cache/puku-puku-taniku/storekit2-v0.2-godot-4.7.2-ios15.6-compat1
+        - $HOME/.cache/puku-puku-taniku/storekit2-v0.2-godot-4.7.2-ios15.6-compat2
         - $HOME/Library/Application Support/Godot/export_templates/4.7.2.stable
     scripts:
+      - name: Report checked-out source revision
+        script: |
+          #!/bin/bash
+          set -euo pipefail
+          echo "CODEMAGIC_SOURCE_HEAD=$(git rev-parse HEAD)"
+          git status --short --branch
+          git log -1 --oneline
+
       - name: Validate iOS release configuration
         script: |
           #!/bin/bash
@@ -35,7 +43,7 @@ workflows:
           test "$APPLE_TEAM_ID" = "UK8FRB9XKH"
           test "$APP_VERSION" = "1.0.0"
           test "$IOS_MIN_VERSION" = "15.6"
-          test "$STOREKIT2_COMPAT_REVISION" = "compat1"
+          test "$STOREKIT2_COMPAT_REVISION" = "compat2"
           grep -Fq 'application/bundle_identifier="com.ohanayanouen.pukupukutaniku"' export_presets.cfg
           grep -Fq 'application/app_store_team_id="UK8FRB9XKH"' export_presets.cfg
           grep -Fq 'application/targeted_device_family=0' export_presets.cfg
