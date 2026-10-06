@@ -14,6 +14,7 @@ workflows:
         GODOT_TEMPLATE_VERSION: "4.7.2.stable"
         STOREKIT2_VERSION: "v0.2"
         IOS_MIN_VERSION: "15.6"
+        STOREKIT2_COMPAT_REVISION: "compat1"
         APP_VERSION: "1.0.0"
         APPLE_TEAM_ID: "UK8FRB9XKH"
         BUNDLE_ID: "com.ohanayanouen.pukupukutaniku"
@@ -23,7 +24,7 @@ workflows:
     cache:
       cache_paths:
         - $HOME/.cache/puku-puku-taniku/godot-4.7.2
-        - $HOME/.cache/puku-puku-taniku/storekit2-v0.2-godot-4.7.2-ios15.6
+        - $HOME/.cache/puku-puku-taniku/storekit2-v0.2-godot-4.7.2-ios15.6-compat1
         - $HOME/Library/Application Support/Godot/export_templates/4.7.2.stable
     scripts:
       - name: Validate iOS release configuration
@@ -34,6 +35,7 @@ workflows:
           test "$APPLE_TEAM_ID" = "UK8FRB9XKH"
           test "$APP_VERSION" = "1.0.0"
           test "$IOS_MIN_VERSION" = "15.6"
+          test "$STOREKIT2_COMPAT_REVISION" = "compat1"
           grep -Fq 'application/bundle_identifier="com.ohanayanouen.pukupukutaniku"' export_presets.cfg
           grep -Fq 'application/app_store_team_id="UK8FRB9XKH"' export_presets.cfg
           grep -Fq 'application/targeted_device_family=0' export_presets.cfg
@@ -48,6 +50,8 @@ workflows:
           test -f ios/plugins/SharePlugin.release.xcframework/ios-arm64/SharePlugin.a
           test -f ios/plugins/NotificationSchedulerPlugin.release.xcframework/ios-arm64/NotificationSchedulerPlugin.a
           test -f scripts/ci/build_storekit2_plugin.sh
+          grep -Fq 'core/variant/type_info.h' scripts/ci/build_storekit2_plugin.sh
+          grep -Fq 'VARIANT_ENUM_CAST' scripts/ci/build_storekit2_plugin.sh
           test -f ios/plugins/GodotStoreKit2-LICENSE.txt
           grep -Fq 'textures/vram_compression/import_etc2_astc=true' project.godot
           python3 - <<'PY'
@@ -117,7 +121,7 @@ workflows:
           test -d ios/plugins/godot-storekit2/godot-storekit2.debug.xcframework
           test -d ios/plugins/godot-storekit2/godot-storekit2.release.xcframework
           grep -Fq 'StoreKit.framework' ios/plugins/godot-storekit2/godot-storekit2.gdip
-          echo "STOREKIT2_PLUGIN_OK version=$STOREKIT2_VERSION godot=$GODOT_VERSION ios=$IOS_MIN_VERSION"
+          echo "STOREKIT2_PLUGIN_OK version=$STOREKIT2_VERSION godot=$GODOT_VERSION ios=$IOS_MIN_VERSION compat=$STOREKIT2_COMPAT_REVISION"
 
       - name: Import project and run regression smoke tests
         script: |
