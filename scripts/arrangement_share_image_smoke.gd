@@ -26,13 +26,14 @@ func _ready() -> void:
 			{"species_id": "laui", "x": 356.0, "y": 310.0, "scale": 0.78, "rotation": 27.0, "z_index": 2},
 		],
 	}
-	game.saved_arrangements = [arrangement.duplicate(true)]
+	game.saved_arrangements = [game._normalize_arrangement(arrangement)]
 	game._sync_arrangement_ui()
 	var ui = game.arrangement_ui
 	ui.set_world_backdrop_mode(true, Vector2(288.0, 716.0))
 	ui.visible = true
 	ui._open_viewer(arrangement, "saved")
 	await get_tree().process_frame
+	assert(ui.viewer_artwork_root.position.is_zero_approx() and is_equal_approx(ui.viewer_artwork_root.scale.x, 1.0))
 	var state_before := JSON.stringify(arrangement)
 	var inventory_before: Dictionary = game.owned_pots.duplicate(true)
 	var output_directory := "res://tmp/arrangement-share-qa"
@@ -104,7 +105,7 @@ func _ready() -> void:
 	assert(ui.viewer_share_status.visible and ui.viewer_share_status.text == Localizer.text(game.language_code, "share_creating"))
 	var captured_transform: Dictionary = captured_requests[0].viewer_transform
 	assert(is_equal_approx(float(captured_transform.x), 21.0) and is_equal_approx(float(captured_transform.y), 13.0) and is_equal_approx(float(captured_transform.scale), 1.1))
-	assert((game.saved_arrangements[0].viewer_transform as Dictionary) == captured_transform)
+	assert(not game.saved_arrangements[0].has("viewer_transform"))
 	ui.set_share_state(Localizer.text(game.language_code, "share_opening"), false)
 	assert(not ui.viewer_share_in_progress and not ui.viewer_share_button.disabled and not ui.viewer_share_background_button.disabled)
 	print("ARRANGEMENT_SHARE_IMAGE_SMOKE_OK backgrounds=4 output=1080x1920")

@@ -2064,7 +2064,6 @@ func _build_arrangement_ui(hud:Control)->void:
 	arrangement_ui=ArrangementUIClass.new();hud.add_child(arrangement_ui)
 	arrangement_ui.close_requested.connect(_on_arrangement_close_requested)
 	arrangement_ui.save_requested.connect(_on_arrangement_save_requested)
-	arrangement_ui.viewer_transform_save_requested.connect(_on_arrangement_viewer_transform_save_requested)
 	arrangement_ui.share_background_save_requested.connect(_on_arrangement_share_background_save_requested)
 	arrangement_ui.share_requested.connect(_on_arrangement_share_requested)
 	arrangement_ui.dismantle_requested.connect(_on_arrangement_dismantle_requested)
@@ -2190,20 +2189,6 @@ func _on_arrangement_dismantle_requested(arrangement_id:String)->void:
 			_save();arrangement_ui.sync_state(owned_pots,saved_arrangements,arrangement_save_capacity);arrangement_ui.set_dismantle_request_result(true)
 			return
 
-func _on_arrangement_viewer_transform_save_requested(arrangement_id:String,viewer_transform:Dictionary)->void:
-	if arrangement_id.is_empty():return
-	var normalized_transform:=ArrangementUIClass.normalize_viewer_transform(viewer_transform)
-	for index in range(saved_arrangements.size()):
-		var arrangement_value=saved_arrangements[index]
-		if not arrangement_value is Dictionary or str(arrangement_value.get("arrangement_id",""))!=arrangement_id:continue
-		var updated:Dictionary=arrangement_value.duplicate(true)
-		updated["viewer_transform"]=normalized_transform.duplicate(true)
-		saved_arrangements[index]=updated
-		# Viewer framing is display metadata only. Do not pass through the new-work
-		# save path, which owns pot availability and completion accounting.
-		_save();arrangement_ui.sync_state(owned_pots,saved_arrangements,arrangement_save_capacity)
-		return
-
 func _share_background_unlock_states()->Dictionary:
 	var restoration:=_restoration_state()
 	var story_cleared:=finale_complete or bool(restoration.get("ending_seen",false)) or HabitatRestorationClass.ending_phase(restoration)=="complete"
@@ -2219,7 +2204,7 @@ func _on_arrangement_share_background_save_requested(arrangement_id:String,share
 		var updated:Dictionary=arrangement_value.duplicate(true)
 		updated["share_background_id"]=normalized_id
 		saved_arrangements[index]=updated
-		# Share framing metadata must not re-run new-work, pot inventory, or
+		# Share-background metadata must not re-run new-work, pot inventory, or
 		# arrangement-capacity validation.
 		_save();arrangement_ui.sync_state(owned_pots,saved_arrangements,arrangement_save_capacity)
 		return
@@ -2450,9 +2435,10 @@ func _normalize_arrangement(source:Dictionary)->Dictionary:
 	if arrangement_id.is_empty():arrangement_id="arrangement_%d_%d"%[Time.get_unix_time_from_system(),Time.get_ticks_msec()%100000]
 	var arrangement_name:=str(source.get("name","")).strip_edges()
 	if arrangement_name.is_empty():arrangement_name=Localizer.text(language_code,"arrangement_default_name",[saved_arrangements.size()+1])
-	var viewer_transform:=ArrangementUIClass.normalize_viewer_transform(source.get("viewer_transform",{}))
 	var share_background_id:=ArrangementShareBackgroundsClass.normalize_id(source.get("share_background_id",ArrangementShareBackgroundsClass.DEFAULT_ID))
-	return {"arrangement_id":arrangement_id,"name":arrangement_name,"pot_id":pot_id,"created_at":str(source.get("created_at",Time.get_datetime_string_from_system(false,true))),"completed":true,"plants":plants_data,"viewer_transform":viewer_transform,"share_background_id":share_background_id}
+	# Legacy viewer_transform metadata is intentionally discarded. Finished-work
+	# pan/zoom is transient and always starts from the standard framing.
+	return {"arrangement_id":arrangement_id,"name":arrangement_name,"pot_id":pot_id,"created_at":str(source.get("created_at",Time.get_datetime_string_from_system(false,true))),"completed":true,"plants":plants_data,"share_background_id":share_background_id}
 
 func _on_shop_panda_tapped()->void:
 	if shop_chatter_bubble.visible:_dismiss_or_advance_shop_chatter();return
