@@ -43,7 +43,7 @@ func _ready() -> void:
 
 
 func _test_catalog_and_runtime_retirement(game: Node) -> void:
-	assert(game.catalog_species.size() == 232)
+	assert(game.catalog_species.size() == 242)
 	for species_id in RETIRED_IDS:
 		assert(game._catalog_entry(species_id).is_empty())
 		assert(species_id not in game._collection_complete_species_ids())

@@ -3,7 +3,7 @@ extends Node
 const Localizer = preload("res://scripts/game_localizer.gd")
 const StoryDevPresetsClass = preload("res://scripts/story_dev_presets.gd")
 
-const TARGET_COUNT := 229
+const TARGET_COUNT := 239
 const FINAL_SPECIES_ID := "hyb_jelly_jelly"
 const FUSION_PARENT_ID := "jelly_grape"
 const ROUTE_SAMPLES := [
@@ -26,7 +26,7 @@ func _ready() -> void:
 	await _test_unseen_presentation_recovery(game)
 	# Leave the shared smoke-test save small and neutral for the following scene.
 	game._reset_progression_state()
-	print("COLLECTION_COMPLETE_SMOKE_OK target=229 unique=true get_card_first=true hidden_prep=true silhouette=true complete_overlay=true localized=true save_history=true unseen_resume=true fusion_return=true")
+	print("COLLECTION_COMPLETE_SMOKE_OK target=239 unique=true get_card_first=true hidden_prep=true silhouette=true complete_overlay=true localized=true save_history=true unseen_resume=true fusion_return=true")
 	get_tree().quit()
 
 
@@ -37,7 +37,7 @@ func _test_target_definition(game) -> void:
 	for species_id in target_ids:
 		assert(not unique_ids.has(species_id))
 		unique_ids[species_id] = true
-	for required_id in ["colorata", "pinwheel", "jelly_grape", "jurejure_pure_gold", "hyb_jelly_jelly", "fus1_jelly_bomb", "fus1_fruit_terrine", "fus2_moonbow"]:
+	for required_id in ["colorata", "pinwheel", "jelly_grape", "jurejure_pure_gold", "hyb_jelly_jelly", "fus1_jelly_bomb", "fus1_fruit_terrine", "fus2_moonbow", "fus2_whip_blue_cherry", "fus2_warm_cacao"]:
 		assert(unique_ids.has(required_id))
 	# Active hidden species remain outside the page denominator. Retired special
 	# species must likewise never leak back into a completion target.

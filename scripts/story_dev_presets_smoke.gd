@@ -117,7 +117,7 @@ func _test_collection_one_remaining_preset() -> void:
 	await get_tree().process_frame
 	var last_species_id := str(result.get("collection_last_species_id", ""))
 	assert(last_species_id == StoryDevPresetsClass.COLLECTION_DEV_LAST_SPECIES_ID)
-	assert(game._collection_complete_target_count() == 229)
+	assert(game._collection_complete_target_count() == 239)
 	assert(game._collection_complete_get_count() == game._collection_complete_target_count() - 1)
 	assert(game._species_get_count(last_species_id) == 0)
 	assert(not bool(game.discovered.get(last_species_id, false)))

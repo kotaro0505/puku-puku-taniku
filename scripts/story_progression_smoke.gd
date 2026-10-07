@@ -24,7 +24,7 @@ func _test_catalog_contract(game: Node) -> void:
 	assert(game.INITIAL_SERIES_ID == "base")
 	assert(game._series_entry("common").is_empty())
 	assert(bool(game.unlocked_series.get("base", false)))
-	assert(game.catalog_species.size() == 232)
+	assert(game.catalog_species.size() == 242)
 	var jurejure_entries: Array[Dictionary] = game._series_species_entries("jurejure")
 	assert(jurejure_entries.size() == 10)
 	for entry in jurejure_entries:

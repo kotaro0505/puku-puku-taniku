@@ -50,6 +50,18 @@ const TIER2_EXACT_RECIPES := [
 	["fus1_pukupuku_planet", "fus1_dream_specimen", "fus2_planet_specimen"],
 	["fus1_jelly_bomb", "fus1_bonus_time", "fus2_toro_pork_jelly"],
 ]
+const TERMINAL_TIER2_EXACT_RECIPES := [
+	["sweets_blueberry_galaxy", "hyb_sweets_jure", "fus2_whip_blue_cherry", "sweets"],
+	["fus1_fruit_terrine", "sweets_strawberry_shortcake", "fus2_fruit_sweets", "sweets"],
+	["fus1_sunset_jelly", "sweets_fairy_sugar", "fus2_jelly_lilac", "yumekawa"],
+	["fus1_firefly_dome", "hyb_sweets_yumekawa", "fus2_yumefuwa_firefly", "glow"],
+	["hyb_sweets_glow", "hyb_glow_stone", "fus2_mochi_moonstone", "stone"],
+	["sweets_chocolate_gold", "hyb_sweets_forest_amber", "fus2_happy_cacao", "sweets"],
+	["sweets_strawberry_shortcake", "sweets_raspberry_jewel", "fus2_love_topping", "jewel"],
+	["hyb_glow_sea", "hyb_sweets_stone", "fus2_soda_sugar", "sea"],
+	["hyb_sweets_yumekawa", "hyb_sweets_forest_amber", "fus2_cosmos_montblanc", "yumekawa"],
+	["hyb_metal_sweets", "hyb_sweets_sea", "fus2_warm_cacao", "sweets"],
+]
 const TIER2_SERIES_RECIPES := [
 	["fus1_diving_sphere", "glow", "glow_emerald_rosette", "fus2_deep_sea_light"],
 	["fus1_sunset_jelly", "stone", "stone_black_lava_rosette", "fus2_sunset_stone"],
@@ -70,20 +82,30 @@ func _ready() -> void:
 	add_child(game)
 	await get_tree().process_frame
 	await get_tree().process_frame
+	game._reset_progression_state()
+	print("FUSION_SYSTEM_STAGE presentation")
 	_test_hybrid_lab_presentation(game)
+	print("FUSION_SYSTEM_STAGE catalog")
 	_test_catalog_and_recipes(game)
+	print("FUSION_SYSTEM_STAGE precedence")
 	_test_special_recipe_precedence(game)
 	_test_original_fallbacks(game)
 	_test_tier1_recipes(game)
 	_test_tier2_recipes(game)
 	_test_tier3_recipes(game)
+	print("FUSION_SYSTEM_STAGE base_flow")
 	await _test_game_flow(game)
+	print("FUSION_SYSTEM_STAGE tier1_flow")
 	await _test_tier1_game_flow(game)
+	print("FUSION_SYSTEM_STAGE tier2_flow")
 	await _test_tier2_game_flow(game)
+	print("FUSION_SYSTEM_STAGE terminal_tier2_flow")
+	await _test_terminal_tier2_discovery_flow(game)
+	print("FUSION_SYSTEM_STAGE tier3_flow")
 	await _test_tier3_game_flow(game)
 	game._reset_progression_state()
 	game.queue_free()
-	print("FUSION_SYSTEM_SMOKE_OK hybrid_lab_name=true attached_background=720x1280 result_heading_removed=true instruction_cards_separated=true symmetric_margins=true top_close_removed=true main_back=close picker_back=main processing_exit_guard=true energy_speed_unchanged=true energy_emission_3x=true fusion_series=11 basic_species=66 basic_recipes=66 tier1_species=22 tier1_special=22 tier2_species=11 tier2_exact=6 tier2_series=5 tier3_species=5 tier3_exact=5 transparent_images=104 jelly_catalog=24 picker_touch_contract=true unordered=true originals=fallback exact_then_series_special=priority parents=GET_only cost=atomic silhouette=species_specific double_submit=blocked known_result=disabled return_after_GET=lab seeds=after_GET languages=3")
+	print("FUSION_SYSTEM_SMOKE_OK hybrid_lab_name=true attached_background=720x1280 result_heading_removed=true instruction_cards_separated=true symmetric_margins=true top_close_removed=true main_back=close picker_back=main processing_exit_guard=true energy_speed_unchanged=true energy_emission_3x=true fusion_series=11 basic_species=66 basic_recipes=66 tier1_species=22 tier1_special=22 tier2_species=21 tier2_exact=16 tier2_terminal=10 tier2_series=5 tier3_species=5 tier3_exact=5 transparent_images=114 jelly_catalog=24 picker_touch_contract=true unordered=true originals=fallback exact_then_series_special=priority parents=GET_only terminal_results=true cost=atomic silhouette=species_specific double_submit=blocked known_result=disabled return_after_GET=lab seeds=after_GET languages=3")
 	get_tree().quit()
 
 func _test_hybrid_lab_presentation(game) -> void:
@@ -172,7 +194,7 @@ func _test_catalog_and_recipes(game) -> void:
 	assert(hybrid_entries.size() == 66 and ids.size() == 66)
 	assert(result_series_counts == {"gummy":6,"metal":5,"sweets":5,"glow":5,"jewel":5,"jure":6,"stone":6,"sea":6,"yumekawa":5,"forest_amber":6,"jelly":11})
 	assert(game.fusion_system.basic_recipes_by_pair.size() == 66)
-	assert(game.fusion_system.special_recipes_by_pair.size() == 33)
+	assert(game.fusion_system.special_recipes_by_pair.size() == 43)
 	assert(game.fusion_system.series_special_recipes_by_species.size() == 5)
 	var parent_for_series: Dictionary = {}
 	for entry_value in game.catalog_species:
@@ -314,6 +336,8 @@ func _test_tier1_recipes(game) -> void:
 
 func _test_tier2_recipes(game) -> void:
 	var tier2_ids: Dictionary = {}
+	var terminal_tier2_ids: Dictionary = {}
+	var terminal_display_series: Dictionary = {}
 	for recipe in TIER2_EXACT_RECIPES:
 		var parent_a_id := str(recipe[0])
 		var parent_b_id := str(recipe[1])
@@ -324,6 +348,24 @@ func _test_tier2_recipes(game) -> void:
 		assert(str(forward.get("result_species_id", "")) == result_id)
 		assert(str(reverse.get("result_species_id", "")) == result_id)
 		assert(int(forward.get("fusion_cost_puku", 0)) == 3)
+		tier2_ids[result_id] = true
+	for recipe in TERMINAL_TIER2_EXACT_RECIPES:
+		var parent_a_id := str(recipe[0])
+		var parent_b_id := str(recipe[1])
+		var result_id := str(recipe[2])
+		var display_series := str(recipe[3])
+		var forward: Dictionary = game.fusion_system.resolve(parent_a_id, parent_b_id)
+		var reverse: Dictionary = game.fusion_system.resolve(parent_b_id, parent_a_id)
+		assert(str(forward.get("source", "")) == "special")
+		assert(str(forward.get("result_species_id", "")) == result_id)
+		assert(str(reverse.get("source", "")) == "special")
+		assert(str(reverse.get("result_species_id", "")) == result_id)
+		assert(int(forward.get("fusion_cost_puku", 0)) == 3)
+		var result_entry: Dictionary = game._catalog_entry(result_id)
+		assert(str(result_entry.get("fusion_display_series", "")) == display_series)
+		assert((result_entry.get("fusion_parent_species_ids", []) as Array) == [parent_a_id, parent_b_id])
+		terminal_tier2_ids[result_id] = true
+		terminal_display_series[result_id] = display_series
 		tier2_ids[result_id] = true
 	for recipe in TIER2_SERIES_RECIPES:
 		var fixed_id := str(recipe[0])
@@ -350,12 +392,13 @@ func _test_tier2_recipes(game) -> void:
 			assert(str(game.fusion_system.resolve(candidate_id, fixed_id).get("result_species_id", "")) == result_id)
 		assert(matching_parent_count > 0)
 		tier2_ids[result_id] = true
-	assert(tier2_ids.size() == 11)
+	assert(tier2_ids.size() == 21)
+	assert(terminal_tier2_ids.size() == 10)
 	for result_id_value in tier2_ids:
 		var result_id := str(result_id_value)
 		var entry: Dictionary = game._catalog_entry(result_id)
 		assert(not entry.is_empty() and int(entry.get("fusion_tier", 0)) == 2)
-		assert(bool(entry.get("fusion_parent_enabled", false)))
+		assert(bool(entry.get("fusion_parent_enabled", false)) != terminal_tier2_ids.has(result_id))
 		assert(str(entry.get("fusion_series", "")).is_empty())
 		assert(str(entry.get("fusion_display_series", "")) in SERIES)
 		assert(game.fusion_system.fusion_series_for_entry(entry).is_empty())
@@ -367,6 +410,11 @@ func _test_tier2_recipes(game) -> void:
 		assert(Localizer.species_name("ja", entry) == str(entry.get("name_ja", "")))
 		assert(Localizer.species_name("hiragana", entry) == str(entry.get("name_hiragana", "")))
 		assert(Localizer.species_name("en", entry) == str(entry.get("name_en", "")))
+		if terminal_tier2_ids.has(result_id):
+			var display_series := str(terminal_display_series.get(result_id, ""))
+			assert(str(entry.get("fusion_display_series", "")) == display_series)
+			assert(game._catalog_display_entries_for_series(display_series).any(func(candidate: Dictionary) -> bool: return str(candidate.get("species_id", "")) == result_id))
+			assert(game._seed_new_species_blocked(result_id))
 		var image_path := str(entry.get("image_path", ""))
 		assert(image_path == "res://assets/catalog/fusion_tier2/%s.png" % result_id)
 		assert(FileAccess.file_exists(image_path) and ResourceLoader.exists(image_path))
@@ -376,11 +424,11 @@ func _test_tier2_recipes(game) -> void:
 		_assert_transparent_catalog_image(image_path, expected_size)
 	var tier2_series: Dictionary = game._series_entry("fusion_tier2")
 	assert(not tier2_series.is_empty())
-	assert((tier2_series.get("species_ids", []) as Array).size() == 11)
+	assert((tier2_series.get("species_ids", []) as Array).size() == 21)
 	assert(str(tier2_series.get("cover_image_path", "")) == "res://assets/catalog/fusion_tier2/fus2_moonbow.png")
 	var image_loader = CatalogImageLoaderClass.new()
 	assert(image_loader._versioned_relative_path("assets/catalog/hybrid/hyb_gummy_gummy.png") == "assets/catalog/hybrid/hyb_gummy_gummy.png?v=hybrid-20261002-2")
-	assert(image_loader._versioned_relative_path("assets/catalog/fusion_tier2/fus2_moonbow.png") == "assets/catalog/fusion_tier2/fus2_moonbow.png?v=fusion-tier2-20261002-2")
+	assert(image_loader._versioned_relative_path("assets/catalog/fusion_tier2/fus2_moonbow.png") == "assets/catalog/fusion_tier2/fus2_moonbow.png?v=fusion-tier2-20261007-3")
 	assert(image_loader._versioned_relative_path("assets/catalog/fusion_tier1/fus1_rainbow_bubble.png") == "assets/catalog/fusion_tier1/fus1_rainbow_bubble.png?v=fusion-tier1-20261002-2")
 	assert(image_loader._versioned_relative_path("assets/catalog/fusion_tier3/fus3_black_hole.png") == "assets/catalog/fusion_tier3/fus3_black_hole.png?v=fusion-tier3-20261006-1")
 	image_loader.free()
@@ -392,11 +440,12 @@ func _test_tier2_recipes(game) -> void:
 	assert(game.fusion_system.resolve("fus1_diving_sphere", "fus2_deep_sea_light").is_empty())
 	# GET makes tier-2 species selectable as future exact-recipe parents, but it
 	# still cannot enter the 66 basic recipe matrix.
-	var ownership := {"fus2_moonbow": 1, "fus2_abyss_glass": 1}
+	var ownership := {"fus2_moonbow": 1, "fus2_abyss_glass": 1, "fus2_whip_blue_cherry": 1, "fus2_warm_cacao": 1}
 	var eligible_ids: Array[String] = []
 	for entry in game.fusion_system.eligible_parents(ownership):
 		eligible_ids.append(str(entry.get("species_id", "")))
 	assert("fus2_moonbow" in eligible_ids and "fus2_abyss_glass" in eligible_ids)
+	assert("fus2_whip_blue_cherry" not in eligible_ids and "fus2_warm_cacao" not in eligible_ids)
 	assert(game.fusion_system.resolve("fus2_moonbow", "metal_silver_rosette").is_empty())
 
 func _test_tier3_recipes(game) -> void:
@@ -847,6 +896,54 @@ func _test_tier2_game_flow(game) -> void:
 	assert(game.puku_points == 0)
 	assert(game._species_get_count(result_id) == 1)
 	assert(bool(game.discovered.get(result_id, false)) and bool(game.greenhouse_available.get(result_id, false)))
+	assert(bool(game.unlocked_series.get("fusion_tier2", false)))
+
+func _test_terminal_tier2_discovery_flow(game) -> void:
+	game._reset_progression_state()
+	game.opening_story_complete = true
+	game.intro_story_complete = true
+	game.habitat_awakened = true
+	game.habitat_tutorial_complete = true
+	game.seed_shop_open = true
+	game.puku_gauge_intro_complete = true
+	game.mystery_items_acquired = true
+	game.mystery_catalog_tutorial_complete = true
+	game.encyclopedia_unlocked = true
+	game.current_mode = "greenhouse"
+	var result_ids: Array[String] = []
+	for recipe in TERMINAL_TIER2_EXACT_RECIPES:
+		var result_id := str(recipe[2])
+		result_ids.append(result_id)
+		assert(game._seed_new_species_blocked(result_id))
+		assert(game._register_species_discovery(result_id, true))
+		assert(game._species_get_count(result_id) == 1)
+		assert(bool(game.discovered.get(result_id, false)))
+		assert(bool(game.greenhouse_available.get(result_id, false)))
+		assert(not game._seed_new_species_blocked(result_id))
+	assert(bool(game.unlocked_series.get("fusion_tier2", false)))
+	var normal_pool_ids: Array[String] = []
+	for entry in game._normal_seed_selection_pools().get("all_known", []):
+		normal_pool_ids.append(str(entry.get("species_id", "")))
+	var eligible_parent_ids: Array[String] = []
+	for entry in game.fusion_system.eligible_parents(game.species_get_counts):
+		eligible_parent_ids.append(str(entry.get("species_id", "")))
+	for result_id in result_ids:
+		assert(result_id in normal_pool_ids)
+		assert(result_id not in eligible_parent_ids)
+	game._save()
+	for result_id in result_ids:
+		game.discovered.erase(result_id)
+		game.greenhouse_available.erase(result_id)
+		game.unlocked_species.erase(result_id)
+		game.species_get_counts.erase(result_id)
+	game.unlocked_series.erase("fusion_tier2")
+	game._load_save()
+	await get_tree().process_frame
+	for result_id in result_ids:
+		assert(game._species_get_count(result_id) == 1)
+		assert(bool(game.discovered.get(result_id, false)))
+		assert(bool(game.greenhouse_available.get(result_id, false)))
+		assert(not game._seed_new_species_blocked(result_id))
 	assert(bool(game.unlocked_series.get("fusion_tier2", false)))
 
 func _test_tier3_game_flow(game) -> void:

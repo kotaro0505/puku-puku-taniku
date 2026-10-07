@@ -11,10 +11,10 @@ func _ready()->void:
 		assert(str(series_entry.get("series_id",""))==expected_ids[index])
 		for required_key in ["series_id","display_name","subtitle","description","cover_image_path","species_ids","field_id","unlock_type","unlock_condition","iap_product_id","sort_order"]:assert(series_entry.has(required_key))
 	assert(game._series_entry("common").is_empty() and game._series_species_entries("common").is_empty())
-	var base:Dictionary=game._series_entry("base");assert(game._is_series_unlocked(base));assert(str(base.get("display_name",""))=="原種" and game._series_species_entries("base").size()==12 and game.catalog_species.size()==238)
+	var base:Dictionary=game._series_entry("base");assert(game._is_series_unlocked(base));assert(str(base.get("display_name",""))=="原種" and game._series_species_entries("base").size()==12 and game.catalog_species.size()==242)
 	var hybrid:Dictionary=game._series_entry("hybrid");assert(hybrid.species_ids.size()==66 and not game._is_series_unlocked(hybrid) and not game._can_browse_series(hybrid))
 	var fusion_tier1:Dictionary=game._series_entry("fusion_tier1");assert(fusion_tier1.species_ids.size()==22 and not game._is_series_unlocked(fusion_tier1) and not game._can_browse_series(fusion_tier1))
-	var fusion_tier2:Dictionary=game._series_entry("fusion_tier2");assert(fusion_tier2.species_ids.size()==11 and not game._is_series_unlocked(fusion_tier2) and not game._can_browse_series(fusion_tier2) and str(fusion_tier2.get("display_name",""))=="上位特殊配合")
+	var fusion_tier2:Dictionary=game._series_entry("fusion_tier2");assert(fusion_tier2.species_ids.size()==21 and not game._is_series_unlocked(fusion_tier2) and not game._can_browse_series(fusion_tier2) and str(fusion_tier2.get("display_name",""))=="上位特殊配合")
 	var fusion_tier3:Dictionary=game._series_entry("fusion_tier3");assert(fusion_tier3.species_ids.size()==5 and not game._is_series_unlocked(fusion_tier3) and not game._can_browse_series(fusion_tier3) and str(fusion_tier3.get("display_name",""))=="最上位特殊配合")
 	for source_page in [hybrid,fusion_tier1,fusion_tier2,fusion_tier3]:assert(game._catalog_series_hidden_from_navigation(source_page))
 	game.unlocked_series["hybrid"]=true;game.unlocked_series["fusion_tier1"]=true;game.unlocked_series["fusion_tier2"]=true;game.unlocked_series["fusion_tier3"]=true
@@ -37,7 +37,7 @@ func _ready()->void:
 			assert(rank>=previous_rank);previous_rank=rank
 	assert(game._catalog_display_entries_for_series("hybrid").is_empty() and game._catalog_display_entries_for_series("fusion_tier1").is_empty() and game._catalog_display_entries_for_series("fusion_tier2").is_empty() and game._catalog_display_entries_for_series("fusion_tier3").is_empty())
 	var sea_fusion_ids:Array=game._catalog_display_entries_for_series("sea").slice(game._series_species_entries("sea").size()).map(func(entry):return str(entry.get("species_id","")))
-	assert(sea_fusion_ids==["hyb_gummy_sea","hyb_glow_sea","hyb_jewel_sea","hyb_stone_sea","hyb_sea_sea","hyb_sea_yumekawa","fus1_deep_sea_aquarium","fus1_tide_pool","fus2_abyss_glass","fus3_lagoon_lutea"])
+	assert(sea_fusion_ids==["hyb_gummy_sea","hyb_glow_sea","hyb_jewel_sea","hyb_stone_sea","hyb_sea_sea","hyb_sea_yumekawa","fus1_deep_sea_aquarium","fus1_tide_pool","fus2_abyss_glass","fus2_soda_sugar","fus3_lagoon_lutea"])
 	assert(game._catalog_display_series_id_for_entry(game._catalog_entry("hyb_sweets_jure"))=="jurejure" and game._catalog_display_series_id_for_entry(game._catalog_entry("fus1_bonus_time"))=="jurejure" and game._catalog_display_series_id_for_entry(game._catalog_entry("fus2_moon_resort"))=="jurejure" and game._catalog_display_series_id_for_entry(game._catalog_entry("fus3_black_hole"))=="jurejure")
 	assert(game._series_species_entries("sea").size()==10 and game._series_seed_draw_candidates("sea").all(func(entry):return not game._catalog_entry_is_fusion(entry)))
 	var unique_base_ids:Dictionary={}
@@ -135,7 +135,7 @@ func _ready()->void:
 	found_hybrid_card.pressed.emit();assert(game.encyclopedia_detail_page.find_child("SpeciesName",true,false).text=="ダブルグミ")
 	game._close_encyclopedia();game.discovered.erase("gummy_peach_milk");game.species_get_counts.erase("gummy_peach_milk");game.discovered.erase("hyb_gummy_gummy");game.species_get_counts.erase("hyb_gummy_gummy");game.selected_series_index=0
 	game.selected_series_index=1;game._open_encyclopedia();assert(game.series_cover_image.texture==null and game.series_cover_placeholder.visible);await get_tree().process_frame
-	assert(game.encyclopedia_list_page.visible and game.encyclopedia_list_title.text=="スイーツ多肉" and game.encyclopedia_grid.get_child_count()==18 and not game.encyclopedia_list_progress.visible and not game.encyclopedia_list_get.visible)
+	assert(game.encyclopedia_list_page.visible and game.encyclopedia_list_title.text=="スイーツ多肉" and game.encyclopedia_grid.get_child_count()==22 and not game.encyclopedia_list_progress.visible and not game.encyclopedia_list_get.visible)
 	game._register_species_discovery("sweets_strawberry_shortcake",true);game._refresh_series_selection();await get_tree().process_frame;game._update_encyclopedia_visible_textures()
 	var first_sweets_card:Button=game.encyclopedia_grid.get_child(0);assert(not first_sweets_card.disabled);first_sweets_card.pressed.emit();assert(game.encyclopedia_detail_page.find_child("SpeciesName",true,false).text=="いちごショート多肉" and game.encyclopedia_detail_page.find_child("SpeciesImage",true,false).texture.resource_path=="res://assets/catalog/sweets/sweets-strawberry-shortcake.png")
 	game._close_encyclopedia();game.discovered.erase("sweets_strawberry_shortcake");game.species_get_counts.erase("sweets_strawberry_shortcake");game.selected_series_index=0
@@ -158,7 +158,7 @@ func _ready()->void:
 	assert(game.series_carousel_offset==-140.0 and game.series_carousel_track.position.x<game.SERIES_CAROUSEL_TRACK_ORIGIN.x and next_card.title.self_modulate.a>0.0)
 	var swipe_end:=InputEventScreenTouch.new();swipe_end.pressed=false;swipe_end.position=Vector2(210,202);game._on_series_swipe_input(swipe_end);assert(game.series_carousel_animating)
 	await get_tree().create_timer(.36).timeout
-	assert(game._current_series_entry().series_id=="sweets" and not game.series_lock_label.visible and game.current_encyclopedia_series_id=="sweets" and game.encyclopedia_grid.get_child_count()==18 and game.encyclopedia_scroll.scroll_vertical==0)
+	assert(game._current_series_entry().series_id=="sweets" and not game.series_lock_label.visible and game.current_encyclopedia_series_id=="sweets" and game.encyclopedia_grid.get_child_count()==22 and game.encyclopedia_scroll.scroll_vertical==0)
 	assert(is_zero_approx(game.series_carousel_offset) and str(previous_card.container.get_meta("series_id"))=="base" and str(next_card.container.get_meta("series_id"))=="gummy")
 	var short_start:=InputEventScreenTouch.new();short_start.pressed=true;short_start.position=Vector2(300,200);game._on_series_swipe_input(short_start)
 	var short_drag:=InputEventScreenDrag.new();short_drag.position=Vector2(270,200);game._on_series_swipe_input(short_drag)
