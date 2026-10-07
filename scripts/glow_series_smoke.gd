@@ -53,7 +53,7 @@ func _ready()->void:
 	assert(seen.size()==12 and entries.all(func(entry:Dictionary)->bool:return not bool(entry.get("series_seed_eligible",true))))
 	game.unlocked_series["glow"]=true;game._open_encyclopedia();assert(game._owned_series_entries().size()==2)
 	game.current_encyclopedia_series_id="glow";game.encyclopedia_series_page.visible=false;game.encyclopedia_list_page.visible=true;game._refresh_encyclopedia_header();game._refresh_encyclopedia_cards();await get_tree().process_frame;game._update_encyclopedia_visible_textures()
-	assert(game.encyclopedia_list_title.text=="蓄光多肉" and not game.encyclopedia_list_progress.visible and not game.encyclopedia_list_get.visible and game.encyclopedia_grid.get_child_count()==20)
+	assert(game.encyclopedia_list_title.text=="蓄光多肉" and not game.encyclopedia_list_progress.visible and not game.encyclopedia_list_get.visible and game.encyclopedia_grid.get_child_count()==21)
 	assert(not game.encyclopedia_unlock_panel.visible)
 	for card in game.encyclopedia_grid.get_children():
 		assert(card.disabled)
@@ -71,7 +71,7 @@ func _ready()->void:
 	for species_id in EXPECTED.keys():
 		game.discovered[species_id]=true;game.species_get_counts[species_id]=1
 	game._refresh_encyclopedia_cards();await get_tree().process_frame;game._update_encyclopedia_visible_textures();await get_tree().process_frame
-	assert(game.encyclopedia_card_images.size()==20)
+	assert(game.encyclopedia_card_images.size()==21)
 	for i in range(EXPECTED.size()):
 		game._request_species_texture(game.encyclopedia_card_entries[i],game.encyclopedia_card_images[i],true)
 	for frame in range(20):await get_tree().process_frame

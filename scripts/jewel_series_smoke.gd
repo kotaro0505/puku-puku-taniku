@@ -67,7 +67,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	assert(game._current_series_entry().get("series_id", "") == "jewel")
 	assert(game.encyclopedia_list_title.text == "宝石多肉")
-	assert(game.encyclopedia_grid.get_child_count() == 18)
+	assert(game.encyclopedia_grid.get_child_count() == 19)
 	assert(game.series_cover_image.texture == null and game.series_cover_placeholder.visible)
 	var first_card: Button = game.encyclopedia_grid.get_child(0)
 	assert(first_card.disabled)

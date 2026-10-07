@@ -60,8 +60,8 @@ func _ready() -> void:
 	await get_tree().process_frame
 	assert(game._current_series_entry().get("series_id", "") == "stone")
 	assert(game.encyclopedia_list_title.text == "ストーン")
-	# 10 stone originals plus 10 integrated hybrid/fusion entries.
-	assert(game.encyclopedia_grid.get_child_count() == 20)
+	# 10 stone originals plus 11 integrated hybrid/fusion entries.
+	assert(game.encyclopedia_grid.get_child_count() == 21)
 	assert(game.series_cover_image.texture == null and game.series_cover_placeholder.visible)
 	var first_card: Button = game.encyclopedia_grid.get_child(0)
 	assert(first_card.disabled)

@@ -530,7 +530,8 @@ func _test_integrated_final_chapter() -> void:
 	assert(game.habitat_restoration_ui.ending_final_image.stretch_mode == TextureRect.STRETCH_KEEP_ASPECT_COVERED)
 	assert(game.habitat_restoration_ui.ending_final_text_group.visible)
 	assert(game.habitat_restoration_ui.ending_return_button.visible and not game.habitat_restoration_ui.ending_return_button.disabled)
-	assert(game.habitat_restoration_ui.ending_thank_you_label.text.contains("ありがとう"))
+	assert(game.habitat_restoration_ui.ending_thank_you_label.text == Localizer.text(game.language_code, "restoration_thank_you"))
+	assert(game.habitat_restoration_ui.ending_product_label.text == Localizer.text(game.language_code, "restoration_product_by"))
 	game.habitat_restoration_ui.ending_return_button.pressed.emit()
 	await get_tree().create_timer(game.ENDING_BGM_FADE_OUT_SECONDS + 0.15).timeout
 	assert(HabitatRestorationClass.ending_phase(game._restoration_state())=="complete")

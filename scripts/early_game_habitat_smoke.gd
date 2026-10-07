@@ -65,7 +65,7 @@ func _ready() -> void:
 	assert(Localizer.text("ja", "awakening_overharvest") == "乱獲や密猟も、絶滅の大きな原因だったみたいだ……。")
 	assert(Localizer.text("ja", "awakening_empty_2") == "何もないね……。")
 	assert(Localizer.text("ja", "awakening_promise_2") == "これから新しく見つけた品種は、\nここにお返していきます。")
-	assert(Localizer.text("ja", "awakening_promise_3") == "だから、また沢山の可愛い多肉植物を\n私たちにも見せてください！")
+	assert(Localizer.text("ja", "awakening_promise_3") == "だから、また沢山の可愛い多肉植物を私たちにも見せてください！")
 	for expected_page in range(1, 3):
 		assert(game.habitat_awakening_overlay.page_index == expected_page)
 		assert(game.habitat_awakening_overlay.speaker_portrait.visible)

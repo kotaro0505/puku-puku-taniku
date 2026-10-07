@@ -71,8 +71,8 @@ func _ready() -> void:
 	await get_tree().process_frame
 	assert(game._current_series_entry().get("series_id", "") == "yumekawa")
 	assert(game.encyclopedia_list_title.text == "ゆめふわ")
-	# 10 yumekawa originals plus 9 integrated hybrid/fusion entries.
-	assert(game.encyclopedia_grid.get_child_count() == 19)
+	# 10 yumekawa originals plus 11 integrated hybrid/fusion entries.
+	assert(game.encyclopedia_grid.get_child_count() == 21)
 	assert(game.series_cover_image.texture == null and game.series_cover_placeholder.visible)
 	var first_card: Button = game.encyclopedia_grid.get_child(0)
 	assert(first_card.disabled)

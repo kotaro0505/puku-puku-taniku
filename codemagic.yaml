@@ -171,6 +171,7 @@ workflows:
           run_scene_smoke res://scripts/puku_points_smoke.tscn PUKU_POINTS_SMOKE_OK
           run_scene_smoke res://scripts/normal_round_smoke.tscn NORMAL_ROUND_SMOKE_OK
           run_scene_smoke res://scripts/story_guidance_smoke.tscn STORY_GUIDANCE_SMOKE_OK
+          run_script_smoke res://scripts/release_polish_b_smoke.gd RELEASE_POLISH_B_SMOKE_OK
           run_scene_smoke res://scripts/habitat_restoration_smoke.tscn HABITAT_RESTORATION_SMOKE_OK
           run_scene_smoke res://scripts/integrated_features_smoke.tscn INTEGRATED_FEATURES_SMOKE_OK
           run_scene_smoke res://scripts/fusion_system_smoke.tscn FUSION_SYSTEM_SMOKE_OK
