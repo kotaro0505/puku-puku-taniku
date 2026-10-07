@@ -219,7 +219,7 @@ func start(requested_language := "ja") -> void:
 			sprout_part.scale = Vector2(0.08, 0.08)
 	for seed in seed_layer.get_children():
 		seed.queue_free()
-	instruction_label.text = Localizer.text(language_code, "opening_story_tap")
+	instruction_label.text = Localizer.text(language_code, "continue")
 	_set_dialogue_visible(true)
 	visible = true
 	move_to_front()

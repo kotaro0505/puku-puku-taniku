@@ -120,7 +120,7 @@ func start(requested_language := "ja") -> void:
 	page_index = 0
 	_stop_light_animation()
 	color_tint.color.a = 0.30
-	instruction_label.text = Localizer.text(language_code, "opening_story_tap")
+	instruction_label.text = Localizer.text(language_code, "continue")
 	visible = true
 	move_to_front()
 	_show_page()

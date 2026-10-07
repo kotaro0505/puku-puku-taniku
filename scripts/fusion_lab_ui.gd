@@ -43,7 +43,6 @@ var current_result_is_new := false
 var picker_slot := 0
 
 var title_label: Label
-var close_button: Button
 var main_page: Control
 var instruction_label: Label
 var parent_a_button: Button
@@ -103,21 +102,16 @@ func _build_ui() -> void:
 	title_label.add_theme_constant_override("outline_size", 3)
 	add_child(title_label)
 
-	close_button = Button.new()
-	close_button.position = Vector2(447, 181)
-	close_button.size = Vector2(72, 44)
-	_skin_button(close_button, Color("#ead8b1"), 16)
-	close_button.pressed.connect(func(): close_requested.emit())
-	add_child(close_button)
-
 	main_page = Control.new()
+	main_page.name = "FusionMainPage"
 	main_page.position = Vector2(46, 230)
-	main_page.size = Vector2(484, 520)
+	main_page.size = Vector2(484, 532)
 	main_page.mouse_filter = Control.MOUSE_FILTER_PASS
 	add_child(main_page)
 	_build_main_page()
 
 	picker_page = Control.new()
+	picker_page.name = "FusionParentPickerPage"
 	picker_page.position = Vector2(46, 230)
 	picker_page.size = Vector2(484, 532)
 	picker_page.mouse_filter = Control.MOUSE_FILTER_PASS
@@ -127,8 +121,9 @@ func _build_ui() -> void:
 
 func _build_main_page() -> void:
 	instruction_label = Label.new()
+	instruction_label.name = "FusionInstruction"
 	instruction_label.position = Vector2(8, 0)
-	instruction_label.size = Vector2(468, 56)
+	instruction_label.size = Vector2(468, 60)
 	instruction_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	instruction_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	instruction_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -137,7 +132,8 @@ func _build_main_page() -> void:
 	main_page.add_child(instruction_label)
 
 	parent_a_button = Button.new()
-	parent_a_button.position = Vector2(2, 54)
+	parent_a_button.name = "FusionParentA"
+	parent_a_button.position = Vector2(4, 68)
 	parent_a_button.size = Vector2(140, 210)
 	_skin_button(parent_a_button, Color("#d8ece5"), 16)
 	parent_a_button.pressed.connect(_open_picker.bind(0))
@@ -172,7 +168,8 @@ func _build_main_page() -> void:
 	parent_a_button.add_child(parent_a_name_label)
 
 	parent_b_button = Button.new()
-	parent_b_button.position = Vector2(342, 54)
+	parent_b_button.name = "FusionParentB"
+	parent_b_button.position = Vector2(340, 68)
 	parent_b_button.size = Vector2(140, 210)
 	_skin_button(parent_b_button, Color("#f0dbe5"), 16)
 	parent_b_button.pressed.connect(_open_picker.bind(1))
@@ -209,7 +206,7 @@ func _build_main_page() -> void:
 	for marker_data in [{"x": 137.0, "text": "→"}, {"x": 327.0, "text": "←"}]:
 		var inward_marker := Label.new()
 		inward_marker.text = str(marker_data["text"])
-		inward_marker.position = Vector2(float(marker_data["x"]), 142)
+		inward_marker.position = Vector2(float(marker_data["x"]), 156)
 		inward_marker.size = Vector2(20, 40)
 		inward_marker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		inward_marker.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -218,8 +215,9 @@ func _build_main_page() -> void:
 		main_page.add_child(inward_marker)
 
 	var result_frame := PanelContainer.new()
-	result_frame.position = Vector2(154, 44)
-	result_frame.size = Vector2(176, 238)
+	result_frame.name = "FusionResultFrame"
+	result_frame.position = Vector2(154, 68)
+	result_frame.size = Vector2(176, 230)
 	var result_style := _box(Color("#241c27"), Color("#e0bc72"), 25, 3)
 	result_style.shadow_color = Color(0.4, 0.2, 0.5, 0.3)
 	result_style.shadow_size = 8
@@ -230,7 +228,7 @@ func _build_main_page() -> void:
 	result_frame.add_child(result_content)
 	result_image = TextureRect.new()
 	result_image.position = Vector2(9, 12)
-	result_image.size = Vector2(158, 166)
+	result_image.size = Vector2(158, 158)
 	result_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	result_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	result_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -239,7 +237,7 @@ func _build_main_page() -> void:
 	silhouette_material = create_silhouette_material()
 
 	result_name_label = Label.new()
-	result_name_label.position = Vector2(8, 178)
+	result_name_label.position = Vector2(8, 170)
 	result_name_label.size = Vector2(160, 50)
 	result_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	result_name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -261,7 +259,7 @@ func _build_main_page() -> void:
 	result_content.add_child(result_new_label)
 
 	result_status_label = Label.new()
-	result_status_label.position = Vector2(18, 290)
+	result_status_label.position = Vector2(18, 306)
 	result_status_label.size = Vector2(448, 54)
 	result_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	result_status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -271,7 +269,7 @@ func _build_main_page() -> void:
 	main_page.add_child(result_status_label)
 
 	fusion_cost_label = Label.new()
-	fusion_cost_label.position = Vector2(92, 348)
+	fusion_cost_label.position = Vector2(92, 362)
 	fusion_cost_label.size = Vector2(300, 44)
 	fusion_cost_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	fusion_cost_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -280,21 +278,23 @@ func _build_main_page() -> void:
 	main_page.add_child(fusion_cost_label)
 
 	fuse_button = Button.new()
-	fuse_button.position = Vector2(62, 398)
+	fuse_button.position = Vector2(62, 412)
 	fuse_button.size = Vector2(360, 64)
 	_skin_button(fuse_button, Color("#d69a45"), 22)
 	fuse_button.pressed.connect(_request_fusion)
 	main_page.add_child(fuse_button)
 
 	back_button = Button.new()
-	back_button.position = Vector2(132, 470)
+	back_button.name = "FusionLabBack"
+	back_button.position = Vector2(132, 484)
 	back_button.size = Vector2(220, 48)
 	_skin_button(back_button, Color("#ead8b1"), 18)
-	back_button.pressed.connect(_back_to_parent_selection)
+	back_button.pressed.connect(_request_close)
 	main_page.add_child(back_button)
 
 func _build_picker_page() -> void:
 	picker_back_button = Button.new()
+	picker_back_button.name = "FusionPickerBack"
 	picker_back_button.position = Vector2(4, 0)
 	picker_back_button.size = Vector2(98, 48)
 	_skin_button(picker_back_button, Color("#ead8b1"), 16)
@@ -362,7 +362,6 @@ func set_language(value: String) -> void:
 	if title_label == null:
 		return
 	title_label.text = Localizer.text(language, "fusion_title")
-	close_button.text = Localizer.text(language, "close")
 	instruction_label.text = Localizer.text(language, "fusion_owned_hint")
 	fuse_button.text = Localizer.text(language, "fusion_fuse")
 	back_button.text = Localizer.text(language, "back")
@@ -415,8 +414,6 @@ func show_error(message: String) -> void:
 
 func set_processing_state(value: bool) -> void:
 	fusion_processing = value
-	if close_button:
-		close_button.disabled = value
 	if parent_a_button:
 		parent_a_button.disabled = value
 	if parent_b_button:
@@ -621,10 +618,10 @@ func _show_main_page() -> void:
 	main_page.visible = true
 	picker_page.visible = false
 
-func _back_to_parent_selection() -> void:
+func _request_close() -> void:
 	if fusion_processing:
 		return
-	_open_picker(1 if not selected_b_id.is_empty() else 0)
+	close_requested.emit()
 
 func _request_fusion() -> void:
 	if selected_a_id.is_empty() or selected_b_id.is_empty() or current_result.is_empty():

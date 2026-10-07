@@ -121,7 +121,7 @@ func start(requested_language := "ja") -> void:
 	language_code = Localizer.normalize_language(requested_language)
 	page_index = 0
 	transitioning = true
-	tap_hint.text = Localizer.text(language_code, "opening_story_tap")
+	tap_hint.text = Localizer.text(language_code, "continue")
 	modulate.a = 0.0
 	visible = true
 	move_to_front()

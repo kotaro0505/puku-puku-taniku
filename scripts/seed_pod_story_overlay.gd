@@ -152,7 +152,7 @@ func start(requested_language := "ja") -> void:
 	transitioning = true
 	exit_fade.color.a = 0.0
 	story_image.modulate.a = 0.0
-	tap_hint.text = Localizer.text(language_code, "opening_story_tap")
+	tap_hint.text = Localizer.text(language_code, "continue")
 	modulate.a = 0.0
 	visible = true
 	move_to_front()

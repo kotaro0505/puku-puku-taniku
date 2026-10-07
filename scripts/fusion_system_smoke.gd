@@ -83,7 +83,7 @@ func _ready() -> void:
 	await _test_tier3_game_flow(game)
 	game._reset_progression_state()
 	game.queue_free()
-	print("FUSION_SYSTEM_SMOKE_OK hybrid_lab_name=true attached_background=720x1280 result_heading_removed=true energy_speed_unchanged=true energy_emission_3x=true fusion_series=11 basic_species=66 basic_recipes=66 tier1_species=22 tier1_special=22 tier2_species=11 tier2_exact=6 tier2_series=5 tier3_species=5 tier3_exact=5 transparent_images=104 jelly_catalog=24 picker_touch_contract=true unordered=true originals=fallback exact_then_series_special=priority parents=GET_only cost=atomic silhouette=species_specific double_submit=blocked known_result=disabled return_after_GET=lab seeds=after_GET languages=3")
+	print("FUSION_SYSTEM_SMOKE_OK hybrid_lab_name=true attached_background=720x1280 result_heading_removed=true instruction_cards_separated=true symmetric_margins=true top_close_removed=true main_back=close picker_back=main processing_exit_guard=true energy_speed_unchanged=true energy_emission_3x=true fusion_series=11 basic_species=66 basic_recipes=66 tier1_species=22 tier1_special=22 tier2_species=11 tier2_exact=6 tier2_series=5 tier3_species=5 tier3_exact=5 transparent_images=104 jelly_catalog=24 picker_touch_contract=true unordered=true originals=fallback exact_then_series_special=priority parents=GET_only cost=atomic silhouette=species_specific double_submit=blocked known_result=disabled return_after_GET=lab seeds=after_GET languages=3")
 	get_tree().quit()
 
 func _test_hybrid_lab_presentation(game) -> void:
@@ -95,6 +95,33 @@ func _test_hybrid_lab_presentation(game) -> void:
 	assert(game.fusion_lab_ui.background_image.texture.get_height() == 1280)
 	assert(game.fusion_lab_ui.background_image.stretch_mode == TextureRect.STRETCH_KEEP_ASPECT_COVERED)
 	assert(game.fusion_lab_ui.find_child("ResultHeading", true, false) == null)
+	var result_frame := game.fusion_lab_ui.find_child("FusionResultFrame", true, false) as Control
+	assert(result_frame != null)
+	var instruction_bottom: float = game.fusion_lab_ui.instruction_label.position.y + game.fusion_lab_ui.instruction_label.size.y
+	assert(instruction_bottom <= game.fusion_lab_ui.parent_a_button.position.y)
+	assert(instruction_bottom <= game.fusion_lab_ui.parent_b_button.position.y)
+	assert(instruction_bottom <= result_frame.position.y)
+	var left_margin: float = game.fusion_lab_ui.parent_a_button.position.x
+	var right_margin: float = game.fusion_lab_ui.main_page.size.x - (game.fusion_lab_ui.parent_b_button.position.x + game.fusion_lab_ui.parent_b_button.size.x)
+	assert(is_equal_approx(left_margin, right_margin))
+	var left_gap: float = result_frame.position.x - (game.fusion_lab_ui.parent_a_button.position.x + game.fusion_lab_ui.parent_a_button.size.x)
+	var right_gap: float = game.fusion_lab_ui.parent_b_button.position.x - (result_frame.position.x + result_frame.size.x)
+	assert(is_equal_approx(left_gap, right_gap) and left_gap >= 8.0)
+	assert(game.fusion_lab_ui.main_page.position.y + game.fusion_lab_ui.back_button.position.y + game.fusion_lab_ui.back_button.size.y <= 1024.0)
+	var top_level_buttons: Array = game.fusion_lab_ui.get_children().filter(func(child: Node) -> bool: return child is Button)
+	assert(top_level_buttons.is_empty())
+	var no_candidates: Array[Dictionary] = []
+	game.fusion_lab_ui.open_lab(no_candidates, {})
+	game.fusion_lab_ui._open_picker(0)
+	game.fusion_lab_ui.picker_back_button.pressed.emit()
+	assert(game.fusion_lab_ui.visible and game.fusion_lab_ui.main_page.visible and not game.fusion_lab_ui.picker_page.visible)
+	game.fusion_lab_ui.set_processing_state(true)
+	assert(game.fusion_lab_ui.back_button.disabled)
+	game.fusion_lab_ui._request_close()
+	assert(game.fusion_lab_ui.visible)
+	game.fusion_lab_ui.set_processing_state(false)
+	game.fusion_lab_ui.back_button.pressed.emit()
+	assert(not game.fusion_lab_ui.visible)
 	assert(Localizer.text("ja", "fusion_title") == "ハイブリッドラボ")
 	assert(Localizer.text("hiragana", "fusion_title") == "はいぶりっどらぼ")
 	assert(Localizer.text("en", "fusion_title") == "Hybrid Lab")

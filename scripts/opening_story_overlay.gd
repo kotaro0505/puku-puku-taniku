@@ -117,7 +117,7 @@ func start(as_replay := false, start_page := 0, requested_language := "ja") -> v
 		page_tween.kill()
 	replay_mode = as_replay
 	language_code = Localizer.normalize_language(requested_language)
-	tap_hint.text = Localizer.text(language_code, "opening_story_tap")
+	tap_hint.text = Localizer.text(language_code, "continue")
 	transitioning = false
 	modulate = Color.WHITE
 	tap_area.disabled = false
