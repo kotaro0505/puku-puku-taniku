@@ -14,7 +14,7 @@ const SPRITES := {
 	"hyalina_san_luis": "res://assets/plants/sprite-hyalina-san-luis.png",
 	"purpusorum": "res://assets/plants/sprite-purpusorum.png",
 	"lutea": "res://assets/plants/sprite-lutea.png",
-	"juliana": "res://assets/plants/sprite-lutea.png",
+	"juliana": "res://assets/plants/sprite-carnicolor-glau-grey.png",
 	"kannte": "res://assets/plants/sprite-kante.png",
 	"shaviana": "res://assets/plants/sprite-shaviana.png",
 	"pinwheel": "res://assets/plants/sprite-pinwheel.png",
