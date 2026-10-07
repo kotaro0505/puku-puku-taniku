@@ -4,6 +4,7 @@ extends Control
 signal close_requested(context:String)
 signal save_requested(arrangement:Dictionary)
 signal viewer_transform_save_requested(arrangement_id:String,viewer_transform:Dictionary)
+signal share_background_save_requested(arrangement_id:String,share_background_id:String)
 signal dismantle_requested(arrangement_id:String)
 signal pot_purchase_requested(pot_id:String)
 signal pot_unlock_requested(product_id:String)
@@ -14,6 +15,7 @@ signal world_scroll_input(event:InputEvent)
 signal completion_confetti_requested(layer:Control)
 
 const PotPlaceholderClass = preload("res://scripts/arrangement_pot_placeholder.gd")
+const ShareBackgroundsClass = preload("res://scripts/arrangement_share_backgrounds.gd")
 const MAX_PLANTS_PER_ARRANGEMENT := 24
 const PLANT_CONTROL_SIZE := Vector2(150,150)
 const PLANT_SCALE_MIN := 0.45
@@ -55,6 +57,8 @@ var pot_design_unlocks:Dictionary={}
 var pot_iap_products:Dictionary={}
 var pot_restore_available:=false
 var pot_restore_in_progress:=false
+var share_background_catalog:Array=[]
+var share_background_unlocks:Dictionary={}
 var texture_resolver:Callable
 var texture_requester:Callable
 var return_context:="greenhouse"
@@ -90,6 +94,10 @@ var viewer_artwork_root:Control
 var viewer_pot_layer:Control
 var viewer_plant_layer:Control
 var viewer_dismantle_button:Button
+var viewer_share_background_button:Button
+var share_background_panel:Panel
+var share_background_scroll:ScrollContainer
+var share_background_cards:HBoxContainer
 var viewer_return_context:="home"
 var dismantle_confirmation_overlay:Control
 var dismantle_confirmation_label:Label
@@ -179,7 +187,7 @@ void fragment() {
 func _exit_tree()->void:
 	_remove_web_multitouch_fallback()
 
-func configure(species_data:Array,series_data:Array,pots_data:Array,discovery:Dictionary,purchased_pots:Dictionary,arrangements:Array,capacity:int,puku_points:int,resolver:Callable,requester:Callable=Callable(),best_records:Dictionary={},locale:String="ja",sales_stage:int=0,design_unlocks:Dictionary={},iap_products:Dictionary={},restore_available:bool=false,restore_in_progress:bool=false)->void:
+func configure(species_data:Array,series_data:Array,pots_data:Array,discovery:Dictionary,purchased_pots:Dictionary,arrangements:Array,capacity:int,puku_points:int,resolver:Callable,requester:Callable=Callable(),best_records:Dictionary={},locale:String="ja",sales_stage:int=0,design_unlocks:Dictionary={},iap_products:Dictionary={},restore_available:bool=false,restore_in_progress:bool=false,share_backgrounds:Array=[],background_unlocks:Dictionary={})->void:
 	catalog_species=species_data
 	series_catalog=series_data
 	pot_catalog=pots_data
@@ -197,6 +205,9 @@ func configure(species_data:Array,series_data:Array,pots_data:Array,discovery:Di
 	pot_iap_products=iap_products
 	pot_restore_available=restore_available
 	pot_restore_in_progress=restore_in_progress
+	share_background_catalog=share_backgrounds.duplicate(true)
+	share_background_unlocks=background_unlocks.duplicate(true)
+	if visible and viewer_page!=null and viewer_page.visible and _share_background_panel_is_open():_refresh_share_background_panel()
 
 func set_language(locale:String)->void:
 	language_code=GameLocalizer.normalize_language(locale)
@@ -206,7 +217,8 @@ func set_language(locale:String)->void:
 	elif saved_arrangements_page.visible:_refresh_saved_arrangements()
 	elif editor_page.visible:_rebuild_editor_scene()
 	elif picker_page.visible:_refresh_picker_filters();_refresh_species_picker()
-	elif viewer_page.visible and not current_arrangement.is_empty():_render_readonly_arrangement(current_arrangement)
+	elif viewer_page.visible and not current_arrangement.is_empty():
+		if _share_background_panel_is_open():_refresh_share_background_panel()
 	elif shop_page.visible:_refresh_pot_shop()
 	elif catalog_shop_page.visible:_refresh_catalog_shop()
 	elif seed_shop_page.visible:_refresh_seed_shop()
@@ -239,6 +251,10 @@ func sync_pot_iap_state(design_unlocks:Dictionary,iap_products:Dictionary,restor
 	if visible and shop_page.visible:_refresh_pot_shop()
 	if visible and home_page.visible:_refresh_home()
 
+func sync_share_background_state(backgrounds:Array,background_unlocks:Dictionary)->void:
+	share_background_catalog=backgrounds.duplicate(true);share_background_unlocks=background_unlocks.duplicate(true)
+	if visible and viewer_page.visible and _share_background_panel_is_open():_refresh_share_background_panel()
+
 func sync_seed_shop_state(products:Array,puku_points:int)->void:
 	seed_shop_products=products;wallet_puku_points=maxi(0,puku_points)
 	if visible and seed_shop_page.visible:_refresh_seed_shop()
@@ -256,7 +272,7 @@ func open_seed_shop()->void:
 	set_world_backdrop_mode(false,world_pot_anchor_screen);return_context="shop";visible=true;_show_page(seed_shop_page);_refresh_seed_shop()
 
 func close()->void:
-	_cancel_editor_gesture();_commit_viewer_transform_if_dirty();_cancel_viewer_gesture(false);_clear_completion_overlay();_hide_dismantle_confirmation();visible=false;close_requested.emit(return_context)
+	_cancel_editor_gesture();_commit_viewer_transform_if_dirty();_cancel_viewer_gesture(false);_close_share_background_panel();_clear_completion_overlay();_hide_dismantle_confirmation();visible=false;close_requested.emit(return_context)
 
 func show_pot_shop_message(message:String)->void:
 	shop_message.text=message;_refresh_pot_shop_cards()
@@ -313,7 +329,7 @@ func _build_dismantle_confirmation()->void:
 
 func _show_dismantle_confirmation()->void:
 	if current_arrangement.is_empty() or not bool(current_arrangement.get("completed",false)):return
-	dismantle_request_accepted=false;dismantle_confirmation_overlay.visible=true;dismantle_confirmation_overlay.move_to_front()
+	_close_share_background_panel();dismantle_request_accepted=false;dismantle_confirmation_overlay.visible=true;dismantle_confirmation_overlay.move_to_front()
 
 func _hide_dismantle_confirmation()->void:
 	if dismantle_confirmation_overlay:dismantle_confirmation_overlay.visible=false
@@ -323,7 +339,7 @@ func _confirm_dismantle()->void:
 	dismantle_request_accepted=false
 	dismantle_requested.emit(str(current_arrangement.get("arrangement_id","")))
 	if not dismantle_request_accepted:return
-	viewer_transform_dirty=false;_hide_dismantle_confirmation();current_arrangement={}
+	viewer_transform_dirty=false;_close_share_background_panel();_hide_dismantle_confirmation();current_arrangement={}
 	if viewer_return_context=="saved":_show_page(saved_arrangements_page);_refresh_saved_arrangements()
 	else:_show_page(home_page);_refresh_home()
 
@@ -340,7 +356,7 @@ func _page()->Control:
 func _show_page(page:Control)->void:
 	if editor_page and editor_page.visible and page!=editor_page:_cancel_editor_gesture()
 	if viewer_page and viewer_page.visible and page!=viewer_page:_cancel_viewer_gesture(false)
-	if page!=viewer_page:_hide_dismantle_confirmation()
+	if page!=viewer_page:_hide_dismantle_confirmation();_close_share_background_panel()
 	for candidate in [home_page,saved_arrangements_page,editor_page,picker_page,viewer_page,shop_page,catalog_shop_page,seed_shop_page]:
 		if candidate:candidate.visible=candidate==page
 
@@ -362,6 +378,9 @@ func _input(event:InputEvent)->void:
 	# fingers use the same path. Mouse input remains owned by each canvas.
 	if is_viewer_active() and viewer_canvas!=null:
 		if event is InputEventScreenTouch or event is InputEventScreenDrag:
+			if _share_background_panel_is_open():
+				_cancel_viewer_gesture(true)
+				return
 			if viewer_web_multitouch_suppress_native:
 				# The capture-phase DOM bridge already applied this exact Web gesture.
 				get_viewport().set_input_as_handled()
@@ -395,7 +414,7 @@ func _route_editor_touch_event(event:InputEvent,position_is_editor_local:bool)->
 	return false
 
 func _route_viewer_touch_event(event:InputEvent,position_is_viewer_local:bool)->bool:
-	if not is_viewer_active() or viewer_canvas==null:return false
+	if not is_viewer_active() or viewer_canvas==null or _share_background_panel_is_open():return false
 	if event is InputEventScreenTouch:
 		var touch:=event as InputEventScreenTouch
 		var local_position:=touch.position if position_is_viewer_local else _viewer_local_touch_position(touch.position)
@@ -495,7 +514,7 @@ func _select_editor_pot(pot_id:String)->void:
 		current_arrangement={};editor_plants.clear();selected_plant_index=-1;_show_page(home_page);_refresh_home();return
 	var pot:=_pot_entry(pot_id)
 	if pot.is_empty() or not _pot_sales_stage_unlocked(pot) or not _pot_design_unlocked(pot) or _pot_available_count(pot_id)<=0:return
-	current_arrangement={"arrangement_id":_new_arrangement_id(),"name":_default_arrangement_name(),"pot_id":pot_id,"created_at":Time.get_datetime_string_from_system(false,true),"completed":false,"plants":[]}
+	current_arrangement={"arrangement_id":_new_arrangement_id(),"name":_default_arrangement_name(),"pot_id":pot_id,"created_at":Time.get_datetime_string_from_system(false,true),"completed":false,"plants":[],"share_background_id":ShareBackgroundsClass.DEFAULT_ID}
 	_show_page(editor_page);_load_editor_from_current()
 
 func _build_editor_page()->void:
@@ -557,6 +576,7 @@ func _on_editor_canvas_gui_input(event:InputEvent)->void:
 		if _route_editor_touch_event(event,true):accept_event()
 
 func _on_viewer_canvas_gui_input(event:InputEvent)->void:
+	if _share_background_panel_is_open():return
 	if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT:
 		if event.pressed:_begin_viewer_drag(-1,event.position)
 		else:_finish_viewer_pointer(-1)
@@ -597,6 +617,9 @@ func _on_web_touch_event(arguments:Array)->void:
 	var event_type:=str(event.type)
 	if is_viewer_active():
 		if web_multitouch_active or web_multitouch_suppress_native:_reset_web_multitouch_state()
+		if _share_background_panel_is_open():
+			if viewer_web_multitouch_active or viewer_web_multitouch_suppress_native:_reset_viewer_web_multitouch_state(true)
+			return
 		if touch_count<2 and not viewer_web_multitouch_active:
 			if viewer_web_multitouch_suppress_native and event_type=="touchstart":
 				# Keep suppression through the trailing Godot touchend mirror, then
@@ -1037,7 +1060,7 @@ func _save_current_arrangement()->void:
 	var name:=editor_name.text.strip_edges()
 	if name.is_empty():name=_default_arrangement_name();editor_name.text=name
 	_cancel_editor_gesture();selected_plant_index=-1;_update_editor_selection()
-	var saved:={"arrangement_id":str(current_arrangement.get("arrangement_id",_new_arrangement_id())),"name":name,"pot_id":str(current_arrangement.get("pot_id",DEFAULT_POT_ID)),"created_at":str(current_arrangement.get("created_at",Time.get_datetime_string_from_system(false,true))),"completed":true,"plants":editor_plants.duplicate(true)}
+	var saved:={"arrangement_id":str(current_arrangement.get("arrangement_id",_new_arrangement_id())),"name":name,"pot_id":str(current_arrangement.get("pot_id",DEFAULT_POT_ID)),"created_at":str(current_arrangement.get("created_at",Time.get_datetime_string_from_system(false,true))),"completed":true,"plants":editor_plants.duplicate(true),"share_background_id":ShareBackgroundsClass.normalize_id(current_arrangement.get("share_background_id",ShareBackgroundsClass.DEFAULT_ID))}
 	save_request_accepted=false;save_requested.emit(saved.duplicate(true))
 	if not save_request_accepted:return
 	current_arrangement=saved.duplicate(true)
@@ -1055,11 +1078,75 @@ func _build_viewer_page()->void:
 	viewer_artwork_root=Control.new();viewer_artwork_root.name="ViewerArtworkRoot";viewer_artwork_root.size=viewer_canvas.size;viewer_artwork_root.mouse_filter=Control.MOUSE_FILTER_IGNORE;viewer_canvas.add_child(viewer_artwork_root)
 	viewer_pot_layer=Control.new();viewer_pot_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);viewer_pot_layer.mouse_filter=Control.MOUSE_FILTER_IGNORE;viewer_artwork_root.add_child(viewer_pot_layer)
 	viewer_plant_layer=Control.new();viewer_plant_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);viewer_plant_layer.z_index=PLANT_LAYER_Z;viewer_plant_layer.mouse_filter=Control.MOUSE_FILTER_IGNORE;viewer_artwork_root.add_child(viewer_plant_layer)
+	viewer_share_background_button=_button(GameLocalizer.text(language_code,"share_background"),Vector2(154,790),Vector2(268,60),Color("#d7aa64"),18);viewer_share_background_button.z_index=500;_mark_localized(viewer_share_background_button,"share_background");viewer_share_background_button.pressed.connect(_toggle_share_background_panel);viewer_page.add_child(viewer_share_background_button)
 	viewer_dismantle_button=_button(GameLocalizer.text(language_code,"arrangement_dismantle"),Vector2(154,868),Vector2(268,60),Color("#b87962"),18);viewer_dismantle_button.z_index=500;_mark_localized(viewer_dismantle_button,"arrangement_dismantle");viewer_dismantle_button.pressed.connect(_show_dismantle_confirmation);viewer_page.add_child(viewer_dismantle_button)
+	_build_share_background_panel()
+
+func _build_share_background_panel()->void:
+	share_background_panel=Panel.new();share_background_panel.position=Vector2(12,430);share_background_panel.size=Vector2(552,552);share_background_panel.z_index=700;share_background_panel.clip_contents=true;share_background_panel.mouse_filter=Control.MOUSE_FILTER_STOP;share_background_panel.visible=false;share_background_panel.add_theme_stylebox_override("panel",_box(Color("#f6e6c7"),Color("#b77c48"),26,4));viewer_page.add_child(share_background_panel)
+	var title:=Label.new();_mark_localized(title,"share_background");title.position=Vector2(24,16);title.size=Vector2(394,52);title.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;title.add_theme_font_size_override("font_size",24);title.add_theme_color_override("font_color",UI_BROWN);title.mouse_filter=Control.MOUSE_FILTER_IGNORE;share_background_panel.add_child(title)
+	var close_button:=_button(GameLocalizer.text(language_code,"close"),Vector2(444,14),Vector2(88,52),Color("#ead4a5"),15);_mark_localized(close_button,"close");close_button.pressed.connect(_close_share_background_panel);share_background_panel.add_child(close_button)
+	share_background_scroll=ScrollContainer.new();share_background_scroll.position=Vector2(18,80);share_background_scroll.size=Vector2(516,446);share_background_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_AUTO;share_background_scroll.vertical_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;share_background_scroll.scroll_deadzone=12;share_background_scroll.mouse_filter=Control.MOUSE_FILTER_STOP;share_background_panel.add_child(share_background_scroll)
+	share_background_cards=HBoxContainer.new();share_background_cards.custom_minimum_size=Vector2(0,426);share_background_cards.mouse_filter=Control.MOUSE_FILTER_PASS;share_background_cards.add_theme_constant_override("separation",12);share_background_scroll.add_child(share_background_cards)
+
+func _share_background_panel_is_open()->bool:
+	return share_background_panel!=null and share_background_panel.visible
+
+func _toggle_share_background_panel()->void:
+	if _share_background_panel_is_open():_close_share_background_panel()
+	else:_open_share_background_panel()
+
+func _open_share_background_panel()->void:
+	if not is_viewer_active() or current_arrangement.is_empty():return
+	_cancel_viewer_gesture(true);_hide_dismantle_confirmation();_refresh_share_background_panel();share_background_panel.visible=true;share_background_panel.move_to_front()
+
+func _close_share_background_panel()->void:
+	if share_background_panel:share_background_panel.visible=false
+
+func _current_share_background_id()->String:
+	return ShareBackgroundsClass.normalize_id(current_arrangement.get("share_background_id",ShareBackgroundsClass.DEFAULT_ID))
+
+func _share_background_unlocked(background_id:String)->bool:
+	return bool(share_background_unlocks.get(background_id,false))
+
+func _refresh_share_background_panel()->void:
+	if share_background_cards==null:return
+	_clear_children(share_background_cards)
+	var selected_id:=_current_share_background_id()
+	for value in share_background_catalog:
+		if not value is Dictionary:continue
+		var entry:Dictionary=value
+		var background_id:=str(entry.get("id",""));var texture_path:=str(entry.get("texture_path",""))
+		if background_id.is_empty() or texture_path.is_empty() or not ResourceLoader.exists(texture_path):continue
+		var unlocked:=_share_background_unlocked(background_id);var selected:=background_id==selected_id
+		var card:=Button.new();card.custom_minimum_size=Vector2(184,426);card.action_mode=BaseButton.ACTION_MODE_BUTTON_RELEASE;card.focus_mode=Control.FOCUS_NONE;card.mouse_filter=Control.MOUSE_FILTER_PASS;card.mouse_force_pass_scroll_events=true
+		_skin_button(card,Color("#e9cf9e") if selected else Color("#f4e1bc") if unlocked else Color("#a99d90"),14);share_background_cards.add_child(card)
+		var thumbnail:=TextureRect.new();thumbnail.position=Vector2(10,10);thumbnail.size=Vector2(164,292);thumbnail.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;thumbnail.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_COVERED;thumbnail.clip_contents=true;thumbnail.mouse_filter=Control.MOUSE_FILTER_IGNORE
+		var texture_value=load(texture_path)
+		if texture_value is Texture2D:thumbnail.texture=texture_value
+		if not unlocked:thumbnail.modulate=Color(.42,.39,.36,.82)
+		card.add_child(thumbnail)
+		if not unlocked:
+			var lock_label:=Label.new();lock_label.text="🔒";lock_label.position=Vector2(10,112);lock_label.size=Vector2(164,74);lock_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;lock_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;lock_label.add_theme_font_size_override("font_size",38);lock_label.add_theme_color_override("font_color",Color.WHITE);lock_label.add_theme_color_override("font_outline_color",Color(0.12,.06,.03,.9));lock_label.add_theme_constant_override("outline_size",7);lock_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(lock_label)
+		var name_label:=Label.new();name_label.text=GameLocalizer.text(language_code,str(entry.get("name_key","")));name_label.position=Vector2(8,306);name_label.size=Vector2(168,42);name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;name_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;name_label.add_theme_font_size_override("font_size",17);name_label.add_theme_color_override("font_color",UI_BROWN);name_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(name_label)
+		var status_key:=str(entry.get("unlock_text_key","share_background_available_now"))
+		if selected:status_key="share_background_selected"
+		elif unlocked and str(entry.get("unlock_condition",""))!="always":status_key="share_background_available_now"
+		var status_label:=Label.new();status_label.text=GameLocalizer.text(language_code,status_key);status_label.position=Vector2(8,350);status_label.size=Vector2(168,66);status_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;status_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;status_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;status_label.add_theme_font_size_override("font_size",13);status_label.add_theme_color_override("font_color",Color("#6f4027") if unlocked else Color("#f7ead4"));status_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(status_label)
+		card.pressed.connect(_select_share_background.bind(background_id))
+
+func _select_share_background(background_id:String)->void:
+	var normalized_id:=ShareBackgroundsClass.normalize_id(background_id)
+	if normalized_id!=background_id or not _share_background_unlocked(normalized_id):return
+	if normalized_id!=_current_share_background_id():
+		current_arrangement["share_background_id"]=normalized_id
+		var arrangement_id:=str(current_arrangement.get("arrangement_id",""))
+		if not arrangement_id.is_empty():share_background_save_requested.emit(arrangement_id,normalized_id)
+	_refresh_share_background_panel()
 
 func _open_viewer(arrangement:Dictionary,return_target:String="home")->void:
 	viewer_return_context="saved" if return_target=="saved" else "home"
-	_cancel_viewer_gesture(false);_hide_dismantle_confirmation();current_arrangement=arrangement.duplicate(true);current_arrangement["completed"]=true;viewer_name.text=str(arrangement.get("name",GameLocalizer.text(language_code,"arrangement_title")));_show_page(viewer_page);_render_readonly_arrangement(current_arrangement)
+	_cancel_viewer_gesture(false);_close_share_background_panel();_hide_dismantle_confirmation();current_arrangement=arrangement.duplicate(true);current_arrangement["completed"]=true;current_arrangement["share_background_id"]=ShareBackgroundsClass.normalize_id(current_arrangement.get("share_background_id",ShareBackgroundsClass.DEFAULT_ID));viewer_name.text=str(arrangement.get("name",GameLocalizer.text(language_code,"arrangement_title")));_show_page(viewer_page);_render_readonly_arrangement(current_arrangement)
 
 func _render_readonly_arrangement(arrangement:Dictionary)->void:
 	_clear_children(viewer_pot_layer);_clear_children(viewer_plant_layer)
@@ -1077,7 +1164,7 @@ func _pot_holder_position(canvas:Control,holder_size:Vector2)->Vector2:
 	return Vector2(world_pot_anchor_screen.x-canvas.position.x-holder_size.x*.5,world_pot_anchor_screen.y+POT_VERTICAL_OFFSET-canvas.position.y-holder_size.y*.94)
 
 func _return_from_viewer()->void:
-	_commit_viewer_transform_if_dirty()
+	_commit_viewer_transform_if_dirty();_close_share_background_panel()
 	if viewer_return_context=="saved":_show_page(saved_arrangements_page);_refresh_saved_arrangements()
 	else:_show_page(home_page);_refresh_home()
 

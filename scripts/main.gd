@@ -6,6 +6,7 @@ const SucculentClass = preload("res://scripts/succulent.gd")
 const AudioManagerClass = preload("res://scripts/audio_manager.gd")
 const JellyBalanceClass = preload("res://scripts/jelly_balance.gd")
 const ArrangementUIClass = preload("res://scripts/arrangement_ui.gd")
+const ArrangementShareBackgroundsClass = preload("res://scripts/arrangement_share_backgrounds.gd")
 const ArrangementNavigationHintClass = preload("res://scripts/arrangement_navigation_hint.gd")
 const PotUnlockIAPServiceClass = preload("res://scripts/pot_unlock_iap_service.gd")
 const CatalogPreviewDevClass = preload("res://scripts/catalog_preview_dev.gd")
@@ -2062,6 +2063,7 @@ func _build_arrangement_ui(hud:Control)->void:
 	arrangement_ui.close_requested.connect(_on_arrangement_close_requested)
 	arrangement_ui.save_requested.connect(_on_arrangement_save_requested)
 	arrangement_ui.viewer_transform_save_requested.connect(_on_arrangement_viewer_transform_save_requested)
+	arrangement_ui.share_background_save_requested.connect(_on_arrangement_share_background_save_requested)
 	arrangement_ui.dismantle_requested.connect(_on_arrangement_dismantle_requested)
 	arrangement_ui.pot_purchase_requested.connect(_on_pot_purchase_requested)
 	arrangement_ui.pot_unlock_requested.connect(_on_pot_unlock_requested)
@@ -2082,7 +2084,7 @@ func _sync_arrangement_ui()->void:
 	var iap_states:Dictionary=pot_unlock_iap_service.product_states_snapshot() if pot_unlock_iap_service!=null else {}
 	var restore_available:bool=pot_unlock_iap_service.restore_available() if pot_unlock_iap_service!=null else false
 	var restore_in_progress:bool=pot_unlock_iap_service.restore_in_progress() if pot_unlock_iap_service!=null else false
-	arrangement_ui.configure(catalog_species,[],pot_catalog,discovered,owned_pots,saved_arrangements,arrangement_save_capacity,puku_points,_species_texture,_request_species_texture,bests,language_code,_current_pot_sales_stage(),pot_design_unlocks,iap_states,restore_available,restore_in_progress)
+	arrangement_ui.configure(catalog_species,[],pot_catalog,discovered,owned_pots,saved_arrangements,arrangement_save_capacity,puku_points,_species_texture,_request_species_texture,bests,language_code,_current_pot_sales_stage(),pot_design_unlocks,iap_states,restore_available,restore_in_progress,ArrangementShareBackgroundsClass.catalog(),_share_background_unlock_states())
 	arrangement_ui.sync_catalog_state(unlocked_series,puku_points)
 	arrangement_ui.sync_seed_shop_state(_seed_shop_products(),puku_points)
 
@@ -2196,6 +2198,26 @@ func _on_arrangement_viewer_transform_save_requested(arrangement_id:String,viewe
 		saved_arrangements[index]=updated
 		# Viewer framing is display metadata only. Do not pass through the new-work
 		# save path, which owns pot availability and completion accounting.
+		_save();arrangement_ui.sync_state(owned_pots,saved_arrangements,arrangement_save_capacity)
+		return
+
+func _share_background_unlock_states()->Dictionary:
+	var restoration:=_restoration_state()
+	var story_cleared:=finale_complete or bool(restoration.get("ending_seen",false)) or HabitatRestorationClass.ending_phase(restoration)=="complete"
+	return ArrangementShareBackgroundsClass.unlock_states(StoryProgressionClass.exploitation_is_started(story_progression_state),story_cleared)
+
+func _on_arrangement_share_background_save_requested(arrangement_id:String,share_background_id:String)->void:
+	if arrangement_id.is_empty():return
+	var normalized_id:=ArrangementShareBackgroundsClass.normalize_id(share_background_id)
+	if normalized_id!=share_background_id or not bool(_share_background_unlock_states().get(normalized_id,false)):return
+	for index in range(saved_arrangements.size()):
+		var arrangement_value=saved_arrangements[index]
+		if not arrangement_value is Dictionary or str(arrangement_value.get("arrangement_id",""))!=arrangement_id:continue
+		var updated:Dictionary=arrangement_value.duplicate(true)
+		updated["share_background_id"]=normalized_id
+		saved_arrangements[index]=updated
+		# Share framing metadata must not re-run new-work, pot inventory, or
+		# arrangement-capacity validation.
 		_save();arrangement_ui.sync_state(owned_pots,saved_arrangements,arrangement_save_capacity)
 		return
 
@@ -2379,7 +2401,8 @@ func _normalize_arrangement(source:Dictionary)->Dictionary:
 	var arrangement_name:=str(source.get("name","")).strip_edges()
 	if arrangement_name.is_empty():arrangement_name=Localizer.text(language_code,"arrangement_default_name",[saved_arrangements.size()+1])
 	var viewer_transform:=ArrangementUIClass.normalize_viewer_transform(source.get("viewer_transform",{}))
-	return {"arrangement_id":arrangement_id,"name":arrangement_name,"pot_id":pot_id,"created_at":str(source.get("created_at",Time.get_datetime_string_from_system(false,true))),"completed":true,"plants":plants_data,"viewer_transform":viewer_transform}
+	var share_background_id:=ArrangementShareBackgroundsClass.normalize_id(source.get("share_background_id",ArrangementShareBackgroundsClass.DEFAULT_ID))
+	return {"arrangement_id":arrangement_id,"name":arrangement_name,"pot_id":pot_id,"created_at":str(source.get("created_at",Time.get_datetime_string_from_system(false,true))),"completed":true,"plants":plants_data,"viewer_transform":viewer_transform,"share_background_id":share_background_id}
 
 func _on_shop_panda_tapped()->void:
 	if shop_chatter_bubble.visible:_dismiss_or_advance_shop_chatter();return

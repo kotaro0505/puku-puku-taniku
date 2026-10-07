@@ -8,7 +8,16 @@ func _ready()->void:
 	var ui=game.arrangement_ui
 	var localizer=load("res://scripts/game_localizer.gd")
 	for locale in ["ja","hiragana","en"]:
-		for key in ["pot_available_count","pot_all_in_use","pot_save_unavailable","pot_owned_total","pot_bought_count","arrangement_dismantle","arrangement_dismantle_confirm","arrangement_dismantle_confirm_button","arrangement_dismantle_cancel","arrangement_choose_pot_hint","arrangement_view_saved","arrangement_saved_title","arrangement_save_limit_help"]:assert(localizer.text(locale,key)!=key)
+		for key in ["pot_available_count","pot_all_in_use","pot_save_unavailable","pot_owned_total","pot_bought_count","arrangement_dismantle","arrangement_dismantle_confirm","arrangement_dismantle_confirm_button","arrangement_dismantle_cancel","arrangement_choose_pot_hint","arrangement_view_saved","arrangement_saved_title","arrangement_save_limit_help","share_background","share_background_greenhouse","share_background_puku_members","share_background_jurejure_gang","share_background_all_characters","share_background_selected","share_background_available_from_start","share_background_unlock_exploitation","share_background_unlock_story_clear","share_background_unlock_collection_complete"]:assert(localizer.text(locale,key)!=key)
+	var share_backgrounds=load("res://scripts/arrangement_share_backgrounds.gd");var share_catalog:Array=share_backgrounds.catalog();assert(share_catalog.size()==4)
+	var share_ids:Array=[]
+	for background_value in share_catalog:
+		var background:Dictionary=background_value;share_ids.append(str(background.id));assert(ResourceLoader.exists(str(background.texture_path)) and background.has("name_key") and background.has("unlock_condition") and background.has("crop_mode") and background.get("focus") is Vector2)
+	assert(share_ids==["greenhouse","puku_members","jurejure_gang","all_characters"] and not share_ids.has("collection_complete"))
+	assert(str(share_catalog[0].texture_path)=="res://assets/greenhouse-master-horizontal.png" and str(share_catalog[0].crop_mode)=="cover")
+	for background in share_catalog.slice(1):
+		var background_image:Image=(load(str(background.texture_path)) as Texture2D).get_image();assert(background_image.get_size()==Vector2i(720,1280) and str(background.crop_mode)=="native_9_16")
+	var initial_share_unlocks:Dictionary=game._share_background_unlock_states();assert(bool(initial_share_unlocks.greenhouse) and bool(initial_share_unlocks.puku_members) and not bool(initial_share_unlocks.jurejure_gang) and not bool(initial_share_unlocks.all_characters))
 	assert(game.pot_catalog.size()==44 and int(game.owned_pots.get("shallow_terracotta",0))==1 and typeof(game.owned_pots.get("shallow_terracotta"))==TYPE_INT)
 	for pot_value in game.pot_catalog:
 		for required_key in ["pot_id","display_name","image_path","price_puku","sales_group","sales_stage","unlock_type","unlock_condition","iap_product_id","placement_area","sort_order"]:assert(pot_value.has(required_key))
@@ -24,6 +33,7 @@ func _ready()->void:
 	ui.open_home();assert(ui.home_page.visible and ui.pot_select_grid.get_child_count()==8 and not (ui.pot_select_grid.get_child(0) as Button).disabled and _has_label_text_containing(ui.pot_select_grid.get_child(0),"使用可能 ×1"))
 	assert(_has_label_text_containing(ui.home_page,"好きな鉢を選んで作ってみよう") and _has_button_text(ui.home_page,"作った作品を見る") and not _has_button_text(ui.home_page,"＋ 新しく作る"))
 	ui._select_editor_pot("shallow_terracotta");assert(ui.editor_page.visible and str(ui.current_arrangement.pot_id)=="shallow_terracotta" and ui.editor_message.text.is_empty())
+	assert(not _has_button_text(ui.editor_page,"共有背景") and not ui.share_background_panel.visible)
 	assert(not _has_label_text_containing(ui.editor_page,"タップで選択・ドラッグで移動"))
 	assert(game._pot_available_count("shallow_terracotta")==1 and ui._pot_available_count("shallow_terracotta")==1)
 	assert(not _has_button_text(ui.editor_page,"鉢を変更") and not ui.has_method("_change_editor_pot"))
@@ -92,6 +102,17 @@ func _ready()->void:
 	await get_tree().create_timer(ui.COMPLETION_DISPLAY_SECONDS+.08).timeout
 	assert(ui.viewer_page.visible and ui.viewer_plant_layer.get_child_count()==2 and ui.viewer_plant_layer.find_child("SelectionBorder",true,false)==null and not ui.completion_overlay.visible)
 	assert(ui.is_viewer_active() and ui.viewer_pot_layer.get_parent()==ui.viewer_artwork_root and ui.viewer_plant_layer.get_parent()==ui.viewer_artwork_root and ui.viewer_artwork_root.position.is_zero_approx() and ui.viewer_artwork_root.scale.is_equal_approx(Vector2.ONE))
+	assert(_has_button_text(ui.viewer_page,"共有背景") and str(game.saved_arrangements[0].share_background_id)=="greenhouse")
+	var share_pot_usage_before:int=int(game._pot_usage_count("shallow_terracotta"));var share_available_before:int=int(game._pot_available_count("shallow_terracotta"));var share_plants_before:=JSON.stringify(game.saved_arrangements[0].plants);var share_created_at_before:=str(game.saved_arrangements[0].created_at);var share_transform_before:Dictionary=(game.saved_arrangements[0].viewer_transform as Dictionary).duplicate(true)
+	ui._open_share_background_panel();assert(ui.share_background_panel.visible and ui.share_background_cards.get_child_count()==4 and ui.share_background_scroll.horizontal_scroll_mode==ScrollContainer.SCROLL_MODE_AUTO and _has_label_text_containing(ui.share_background_panel,"✓ 選択中"))
+	var artwork_position_before_panel:Vector2=ui.viewer_artwork_root.position;ui._on_viewer_canvas_gui_input(_mouse_button(Vector2(220,280),true));ui._on_viewer_canvas_gui_input(_mouse_motion(Vector2(300,340)));ui._on_viewer_canvas_gui_input(_mouse_button(Vector2(300,340),false));assert(ui.viewer_artwork_root.position.is_equal_approx(artwork_position_before_panel))
+	ui._select_share_background("puku_members");assert(str(ui.current_arrangement.share_background_id)=="puku_members" and str(game.saved_arrangements[0].share_background_id)=="puku_members" and _has_label_text_containing(ui.share_background_panel,"✓ 選択中"))
+	ui._select_share_background("jurejure_gang");assert(str(ui.current_arrangement.share_background_id)=="puku_members" and str(game.saved_arrangements[0].share_background_id)=="puku_members")
+	assert(game._pot_usage_count("shallow_terracotta")==share_pot_usage_before and game._pot_available_count("shallow_terracotta")==share_available_before and JSON.stringify(game.saved_arrangements[0].plants)==share_plants_before and str(game.saved_arrangements[0].created_at)==share_created_at_before and (game.saved_arrangements[0].viewer_transform as Dictionary)==share_transform_before)
+	game.story_progression_state["exploitation_started"]=true;game._sync_arrangement_ui();assert(ui._share_background_unlocked("jurejure_gang") and not ui._share_background_unlocked("all_characters"));ui._select_share_background("jurejure_gang");assert(str(game.saved_arrangements[0].share_background_id)=="jurejure_gang")
+	var legacy_restoration:Dictionary=game._restoration_state();legacy_restoration["ending_seen"]=true;assert(bool(game._share_background_unlock_states().all_characters));legacy_restoration["ending_seen"]=false
+	game.finale_complete=true;game._sync_arrangement_ui();assert(ui._share_background_unlocked("all_characters"));ui._select_share_background("all_characters");assert(str(game.saved_arrangements[0].share_background_id)=="all_characters" and (game.saved_arrangements[0].viewer_transform as Dictionary)==share_transform_before)
+	ui._close_share_background_panel();assert(not ui.share_background_panel.visible)
 	var viewed_pot:Control=ui.viewer_pot_layer.get_child(0);assert(viewed_pot.position.is_equal_approx(edit_pot_position) and viewed_pot.size.is_equal_approx(editor_pot.size))
 	for index in range(ui.viewer_plant_layer.get_child_count()):
 		var viewed_plant:Control=ui.viewer_plant_layer.get_child(index);var edit_snapshot:Dictionary=edit_snapshots[index]
@@ -117,7 +138,7 @@ func _ready()->void:
 	var saved:Dictionary=game.saved_arrangements[0];assert(saved.has("arrangement_id") and saved.has("name") and saved.has("pot_id") and saved.has("created_at") and saved.has("plants") and saved.has("viewer_transform") and bool(saved.completed));assert(saved.plants.size()==2 and int(saved.plants[0].z_index)>int(saved.plants[1].z_index) and is_equal_approx(float(saved.plants[0].scale),2.35))
 	for plant_key in ["species_id","x","y","scale","rotation","z_index"]:assert(saved.plants[0].has(plant_key))
 	var saved_id:=str(saved.arrangement_id);var saved_position:=Vector2(float(saved.plants[0].x),float(saved.plants[0].y));var saved_scale:=float(saved.plants[0].scale)
-	game._save();game.saved_arrangements.clear();game._load_save();assert(game.saved_arrangements.size()==1 and str(game.saved_arrangements[0].arrangement_id)==saved_id)
+	game._save();game.saved_arrangements.clear();game._load_save();assert(game.saved_arrangements.size()==1 and str(game.saved_arrangements[0].arrangement_id)==saved_id and str(game.saved_arrangements[0].share_background_id)=="all_characters")
 	assert(Vector2(float(game.saved_arrangements[0].plants[0].x),float(game.saved_arrangements[0].plants[0].y)).is_equal_approx(saved_position) and is_equal_approx(float(game.saved_arrangements[0].plants[0].scale),saved_scale) and (game.saved_arrangements[0].viewer_transform as Dictionary)==saved_viewer_transform)
 	game._on_arrangement_save_requested({"arrangement_id":"blocked_no_pot","name":"保存不可","pot_id":"shallow_terracotta","created_at":"test","completed":true,"plants":[]});assert(game.saved_arrangements.size()==1 and not ui.save_request_accepted)
 	game._sync_arrangement_ui();ui.selected_plant_index=0;var locked_scale:=float(ui.editor_plants[0].scale);ui._adjust_selected_scale(.1);assert(is_equal_approx(float(ui.editor_plants[0].scale),locked_scale))
@@ -151,7 +172,7 @@ func _ready()->void:
 	game._save();game.owned_pots.erase("classic_terracotta");game._load_save();assert(int(game.owned_pots.get("classic_terracotta",0))==2 and typeof(game.owned_pots.get("classic_terracotta"))==TYPE_INT)
 	game._sync_arrangement_ui();ui.open_home();assert(ui.pot_select_grid.get_child_count()==8);ui._select_editor_pot("classic_terracotta");assert(ui.editor_page.visible and str(ui.current_arrangement.pot_id)=="classic_terracotta")
 	assert(game.species_get_counts==get_before and game.bests==best_before and game.discovered==discovered_before)
-	var migrated:Dictionary=game._normalize_arrangement({"arrangement_id":"legacy","name":"旧作品","pot_id":"starter_terracotta","plants":[]});assert(str(migrated.pot_id)=="shallow_terracotta" and (migrated.viewer_transform as Dictionary)=={"x":0.0,"y":0.0,"scale":1.0})
+	var migrated:Dictionary=game._normalize_arrangement({"arrangement_id":"legacy","name":"旧作品","pot_id":"starter_terracotta","plants":[]});assert(str(migrated.pot_id)=="shallow_terracotta" and (migrated.viewer_transform as Dictionary)=={"x":0.0,"y":0.0,"scale":1.0} and str(migrated.share_background_id)=="greenhouse")
 	ui._open_viewer(migrated);assert(ui.viewer_plant_layer.get_child_count()==0 and ui.viewer_artwork_root.position.is_zero_approx() and ui.viewer_artwork_root.scale.is_equal_approx(Vector2.ONE));ui._return_from_viewer();ui._select_editor_pot("classic_terracotta")
 	var free_scale:Dictionary=game._normalize_arrangement({"arrangement_id":"free_scale","name":"自由拡大","pot_id":"shallow_terracotta","plants":[{"species_id":"colorata","x":211.0,"y":287.0,"scale":2.75,"rotation":73.0,"z_index":4}]})
 	assert(is_equal_approx(float(free_scale.plants[0].scale),2.75) and is_equal_approx(float(free_scale.plants[0].rotation),73.0) and int(free_scale.plants[0].z_index)==4)
