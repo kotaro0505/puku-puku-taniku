@@ -130,7 +130,11 @@ func _test_spin_capsule_and_reveal(game)->void:
 		var candidate:Dictionary=game.forest_gacha_system.draw(game.unlocked_series,game.discovered,game.forest_gacha_encountered,probe,true,game.jurejure_species_unlocked)
 		if str(candidate.get("source",""))=="locked":locked_seed=seed_value;break
 	assert(locked_seed>0);game.forest_gacha_rng.seed=locked_seed;game._open_forest_gacha()
-	game._spin_forest_gacha();assert(game.forest_gacha_ui.hint_label.text.is_empty())
+	var dial_rotation_before:float=game.forest_gacha_ui.dial_texture.rotation
+	game.forest_gacha_ui._request_spin()
+	assert(game.forest_gacha_ui._spin_feedback_active and game.forest_gacha_ui.hint_label.text.is_empty())
+	assert(game.forest_gacha_ui.dial_texture.rotation>dial_rotation_before)
+	await get_tree().process_frame
 	for test_language in ["ja","hiragana","en"]:assert(Localizer.text(test_language,"gacha_selecting") not in game.forest_gacha_ui.hint_label.text)
 	await get_tree().create_timer(.45).timeout
 	assert(game.puku_points==4 and game.forest_gacha_draw_count==1 and game.forest_gacha_ui.capsule_ready and game.forest_gacha_ui.capsule.visible and absf(game.forest_gacha_ui.dial_texture.rotation)>1.0)

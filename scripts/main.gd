@@ -64,6 +64,7 @@ const SEED_POD_GAUGE_TARGET_CM := 750.0
 const SEED_POD_GAUGE_REWARD_BAGS := 3
 const PUKU_UNITS_PER_PUKU := 1000
 const NORMAL_ROUND_COST_UNITS := 1000
+const PUKU_GAUGE_FINISH_SPEED_SCALE := 0.5
 const FIRST_GET_MIN_REWARD_UNITS := 200
 const INITIAL_PUKU_CAPITAL_UNITS := 5000
 const LEGACY_PUKU_GAUGE_TARGET_CM := 500.0
@@ -110,6 +111,8 @@ const ARRANGEMENT_POT_ANCHOR := Vector2(0.50,760.0/1086.0)
 const ARRANGEMENT_SHARE_TEXTURE_TIMEOUT_MSEC := 8000
 const HABITAT_DRAG_SCALE := 0.055
 const HABITAT_LOOKAROUND_DURATION_SECONDS := 8.0
+const HABITAT_ARRIVAL_LOOKAROUND_DURATION_SECONDS := 4.0
+const HABITAT_ARRIVAL_LOOKAROUND_DEGREES := 180.0
 const HABITAT_ITEM_RADIUS := 9.0
 const NORMAL_SEED_UNLOCKED_NEW_RATE := 0.03
 const NORMAL_SEED_LOCKED_NEW_RATE := 0.01
@@ -705,6 +708,7 @@ var habitat_target_pitch := -3.0
 var habitat_lookaround_active := false
 var habitat_lookaround_elapsed := 0.0
 var habitat_lookaround_start_yaw := 0.0
+var habitat_lookaround_end_yaw := 0.0
 var habitat_lookaround_start_pitch := -3.0
 var habitat_lookaround_context := ""
 var habitat_texture_mode := "full"
@@ -1743,9 +1747,9 @@ func _build_ui() -> void:
 	var game_theme:=Theme.new();game_theme.default_font=load("res://assets/fonts/ZenMaruGothic-Bold.ttf") as Font;game_theme.default_font_size=16
 	labels_layer.theme=game_theme;hud.theme=game_theme;main_status_hud.theme=game_theme;effects_layer.theme=game_theme
 	# logo
-	var logo:=Label.new(); logo.name="MainLogo";logo.text=Localizer.text(language_code,"game_title"); logo.position=Vector2(26,34); logo.size=Vector2(190,105); logo.add_theme_font_size_override("font_size",31); logo.add_theme_color_override("font_color",Color("#fff2d3")); logo.add_theme_color_override("font_outline_color",UI_BROWN); logo.add_theme_constant_override("outline_size",8); logo.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;logo.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; main_status_hud.add_child(logo)
-	var ribbon:=Label.new(); ribbon.text=" PUKU PUKU TANIKU "; ribbon.position=Vector2(56,126); ribbon.add_theme_font_size_override("font_size",11); ribbon.add_theme_color_override("font_color",Color.WHITE); ribbon.add_theme_stylebox_override("normal",_box(Color("#d99a3c"),Color("#7b4a25"),12,2)); main_status_hud.add_child(ribbon)
-	best_panel=PanelContainer.new(); best_panel.position=Vector2(204,54); best_panel.size=Vector2(168,66); best_panel.add_theme_stylebox_override("panel",_box(Color("#47261b"),Color("#f5c985"),16,2)); main_status_hud.add_child(best_panel)
+	var logo:=Label.new(); logo.name="MainLogo";logo.text=Localizer.text(language_code,"game_title"); logo.position=Vector2(16,34); logo.size=Vector2(180,105); logo.add_theme_font_size_override("font_size",31); logo.add_theme_color_override("font_color",Color("#fff2d3")); logo.add_theme_color_override("font_outline_color",UI_BROWN); logo.add_theme_constant_override("outline_size",8); logo.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;logo.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; main_status_hud.add_child(logo)
+	var ribbon:=Label.new(); ribbon.text=" PUKU PUKU TANIKU "; ribbon.position=Vector2(45,126); ribbon.add_theme_font_size_override("font_size",11); ribbon.add_theme_color_override("font_color",Color.WHITE); ribbon.add_theme_stylebox_override("normal",_box(Color("#d99a3c"),Color("#7b4a25"),12,2)); main_status_hud.add_child(ribbon)
+	best_panel=PanelContainer.new(); best_panel.position=Vector2(204,122); best_panel.size=Vector2(168,65); best_panel.add_theme_stylebox_override("panel",_box(Color("#47261b"),Color("#f5c985"),16,2)); main_status_hud.add_child(best_panel)
 	best_label=Label.new();best_label.name="BestLabel";best_label.text="最高記録\n0.0 cm"; best_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; best_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; best_label.add_theme_font_size_override("font_size",17); best_label.add_theme_color_override("font_color",Color.WHITE); best_panel.add_child(best_label)
 	seed_pod_gauge_area=Control.new();seed_pod_gauge_area.name="SeedPodGaugeArea";seed_pod_gauge_area.position=Vector2(42,145);seed_pod_gauge_area.size=Vector2(158,47);seed_pod_gauge_area.mouse_filter=Control.MOUSE_FILTER_IGNORE;main_status_hud.add_child(seed_pod_gauge_area)
 	var pod_content:=VBoxContainer.new();pod_content.position=Vector2(13,0);pod_content.size=Vector2(132,47);pod_content.alignment=BoxContainer.ALIGNMENT_CENTER;pod_content.mouse_filter=Control.MOUSE_FILTER_IGNORE;pod_content.add_theme_constant_override("separation",2);seed_pod_gauge_area.add_child(pod_content)
@@ -1782,7 +1786,7 @@ func _build_ui() -> void:
 	fusion_lab_button=Button.new();fusion_lab_button.name="FusionLabButton";fusion_lab_button.text="ハイブリッドラボ";fusion_lab_button.position=Vector2(398,400);fusion_lab_button.size=Vector2(153,58);_skin_button(fusion_lab_button,Color("#cda4d7"),16);fusion_lab_button.mouse_filter=Control.MOUSE_FILTER_STOP;fusion_lab_button.pressed.connect(_open_fusion_lab);hud.add_child(fusion_lab_button)
 	external_navigation_controls.append(fusion_lab_button)
 	habitat_status_label=Label.new();habitat_status_label.position=Vector2(163,42);habitat_status_label.size=Vector2(250,56);habitat_status_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;habitat_status_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;habitat_status_label.add_theme_font_size_override("font_size",18);habitat_status_label.add_theme_color_override("font_color",UI_CREAM);habitat_status_label.add_theme_stylebox_override("normal",_box(Color("#4b2d20"),Color("#d8ad68"),18,2));habitat_status_label.visible=false;hud.add_child(habitat_status_label)
-	seed_bag_panel=PanelContainer.new();seed_bag_panel.position=Vector2(210,125);seed_bag_panel.size=Vector2(156,92);seed_bag_panel.add_theme_stylebox_override("panel",_box(Color("#cda66a"),Color("#6f4325"),28,3));seed_bag_panel.visible=false;hud.add_child(seed_bag_panel)
+	seed_bag_panel=PanelContainer.new();seed_bag_panel.position=Vector2(210,198);seed_bag_panel.size=Vector2(156,92);seed_bag_panel.add_theme_stylebox_override("panel",_box(Color("#cda66a"),Color("#6f4325"),28,3));seed_bag_panel.visible=false;hud.add_child(seed_bag_panel)
 	play_timer_label=Label.new();play_timer_label.text="たね\n残り 12粒";play_timer_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;play_timer_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;play_timer_label.add_theme_font_size_override("font_size",20);play_timer_label.add_theme_color_override("font_color",Color("#4f2e1d"));play_timer_label.add_theme_color_override("font_outline_color",Color("#f4dbac"));play_timer_label.add_theme_constant_override("outline_size",2);seed_bag_panel.add_child(play_timer_label)
 	play_open_button=Button.new();play_open_button.text="たねをまく";play_open_button.position=Vector2(198,499);play_open_button.size=Vector2(180,58);play_open_button.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS;play_open_button.clip_text=true;_skin_button(play_open_button,Color("#8b5a35"),21);play_open_button.mouse_filter=Control.MOUSE_FILTER_STOP;play_open_button.pressed.connect(_open_play_modal);hud.add_child(play_open_button)
 	record_card=PanelContainer.new(); record_card.position=Vector2(394,816); record_card.size=Vector2(164,134); record_card.add_theme_stylebox_override("panel",_box(Color("#674135"),Color("#f4d36e"),18,3)); record_card.visible=false; hud.add_child(record_card)
@@ -2583,13 +2587,13 @@ func _build_intro_story(hud:Control)->void:
 	intro_dialog_panel=PanelContainer.new();intro_dialog_panel.position=Vector2(40,690);intro_dialog_panel.size=Vector2(496,255);intro_dialog_panel.add_theme_stylebox_override("panel",_box(Color(0.97,0.90,0.75,.96),Color("#a86f36"),24,4));intro_overlay.add_child(intro_dialog_panel)
 	var dialog_row:=HBoxContainer.new();dialog_row.alignment=BoxContainer.ALIGNMENT_CENTER;dialog_row.add_theme_constant_override("separation",12);intro_dialog_panel.add_child(dialog_row)
 	intro_portrait_slot=Control.new();intro_portrait_slot.custom_minimum_size=Vector2(132,205);intro_portrait_slot.mouse_filter=Control.MOUSE_FILTER_IGNORE;dialog_row.add_child(intro_portrait_slot)
-	intro_panda_portrait=TextureRect.new();intro_panda_portrait.texture=_panda_portrait_texture();intro_panda_portrait.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);intro_panda_portrait.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;intro_panda_portrait.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;intro_panda_portrait.mouse_filter=Control.MOUSE_FILTER_IGNORE;intro_panda_portrait.visible=false;intro_portrait_slot.add_child(intro_panda_portrait)
+	intro_panda_portrait=TextureRect.new();intro_panda_portrait.texture=_panda_portrait_texture();intro_panda_portrait.position=Vector2(0,32);intro_panda_portrait.size=Vector2(132,173);intro_panda_portrait.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;intro_panda_portrait.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;intro_panda_portrait.mouse_filter=Control.MOUSE_FILTER_IGNORE;intro_panda_portrait.visible=false;intro_portrait_slot.add_child(intro_panda_portrait)
 	intro_trio_portraits=Control.new();intro_trio_portraits.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);intro_trio_portraits.mouse_filter=Control.MOUSE_FILTER_IGNORE;intro_trio_portraits.visible=false;intro_portrait_slot.add_child(intro_trio_portraits)
-	var trio_layout:=[{"speaker":"panda","position":Vector2(0,70)},{"speaker":"armadillo","position":Vector2(76,70)},{"speaker":"girl","position":Vector2(38,4)}]
+	var trio_layout:=[{"speaker":"panda","position":Vector2(0,88)},{"speaker":"armadillo","position":Vector2(76,88)},{"speaker":"girl","position":Vector2(38,32)}]
 	for trio_entry in trio_layout:
-		var trio_position:Vector2=trio_entry.get("position",Vector2.ZERO);var trio_portrait:=TextureRect.new();trio_portrait.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;trio_portrait.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;trio_portrait.texture=_speaker_portrait_texture(str(trio_entry.speaker));trio_portrait.position=trio_position;trio_portrait.size=Vector2(86,126);trio_portrait.mouse_filter=Control.MOUSE_FILTER_IGNORE;intro_trio_portraits.add_child(trio_portrait)
+		var trio_position:Vector2=trio_entry.get("position",Vector2.ZERO);var trio_portrait:=TextureRect.new();trio_portrait.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;trio_portrait.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;trio_portrait.texture=_speaker_portrait_texture(str(trio_entry.speaker));trio_portrait.position=trio_position;trio_portrait.size=Vector2(86,112);trio_portrait.mouse_filter=Control.MOUSE_FILTER_IGNORE;intro_trio_portraits.add_child(trio_portrait)
+	intro_speaker_label=Label.new();intro_speaker_label.text=Localizer.text(language_code,"story_speaker_panda");intro_speaker_label.position=Vector2.ZERO;intro_speaker_label.size=Vector2(132,30);intro_speaker_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;intro_speaker_label.add_theme_font_size_override("font_size",17);intro_speaker_label.add_theme_color_override("font_color",Color("#8b5528"));intro_speaker_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;intro_speaker_label.z_index=2;intro_portrait_slot.add_child(intro_speaker_label)
 	var content:=VBoxContainer.new();content.alignment=BoxContainer.ALIGNMENT_CENTER;content.add_theme_constant_override("separation",12);content.size_flags_horizontal=Control.SIZE_EXPAND_FILL;dialog_row.add_child(content)
-	intro_speaker_label=Label.new();intro_speaker_label.text=Localizer.text(language_code,"story_speaker_panda");intro_speaker_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;intro_speaker_label.add_theme_font_size_override("font_size",20);intro_speaker_label.add_theme_color_override("font_color",Color("#8b5528"));content.add_child(intro_speaker_label)
 	intro_dialogue_label=Label.new();intro_dialogue_label.custom_minimum_size=Vector2(300,90);intro_dialogue_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;intro_dialogue_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;intro_dialogue_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;intro_dialogue_label.add_theme_font_size_override("font_size",20);intro_dialogue_label.add_theme_color_override("font_color",UI_BROWN);intro_dialogue_label.size_flags_horizontal=Control.SIZE_EXPAND_FILL;content.add_child(intro_dialogue_label)
 	intro_continue_button=Button.new();intro_continue_button.text=Localizer.text(language_code,"next");intro_continue_button.custom_minimum_size=Vector2(250,55);_skin_button(intro_continue_button,Color("#d8b56b"),19);intro_continue_button.pressed.connect(_advance_intro_story);content.add_child(intro_continue_button)
 	intro_fullscreen_continue_button=Button.new();intro_fullscreen_continue_button.name="OldSeedGetContinueArea";intro_fullscreen_continue_button.flat=true;intro_fullscreen_continue_button.focus_mode=Control.FOCUS_NONE;intro_fullscreen_continue_button.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);intro_fullscreen_continue_button.visible=false;intro_fullscreen_continue_button.pressed.connect(_advance_intro_story);intro_overlay.add_child(intro_fullscreen_continue_button)
@@ -2819,7 +2823,10 @@ func _finish_scripted_dialog()->void:
 		if start_restoration_join_after_return:
 			call_deferred("_focus_jurejure_group","restoration_join")
 		elif next_restoration_return_stage>0:
-			call_deferred("_start_restoration_return_event",next_restoration_return_stage)
+			if next_restoration_return_stage>=HabitatRestorationClass.REQUIRED_RETURNED_PLANTS:
+				call_deferred("_transition_to_restoration_habitat","final_return",0)
+			else:
+				call_deferred("_transition_between_restoration_returns",next_restoration_return_stage)
 		elif restoration_return_stage>=HabitatRestorationClass.REQUIRED_RETURNED_PLANTS:
 			call_deferred("_begin_restoration_recovery_slides")
 		else:call_deferred("_try_start_pending_story_event")
@@ -3279,7 +3286,9 @@ func _complete_tutorial_guide()->void:
 			encyclopedia_scroll.scroll_vertical=560
 			call_deferred("_start_mystery_catalog_tutorial_dialog")
 	elif target=="habitat":_toggle_mode()
-	elif target=="play_open":_open_play_modal();call_deferred("_show_tutorial_guide","old_seed")
+	elif target=="play_open":
+		_open_play_modal()
+		if not play_active:call_deferred("_show_tutorial_guide","old_seed")
 	elif target=="play_open_normal":
 		_start_greenhouse_play("normal")
 	elif target=="old_seed":_start_greenhouse_play("old")
@@ -3312,7 +3321,10 @@ func _update_first_play_tutorial(delta:float)->bool:
 		if first_play_tutorial_observe_remaining<=0.0:
 			first_play_tutorial_phase="new_species_panda"
 			_show_first_play_tutorial_custom_dialog("tutorial_normal_new_panda","panda")
-		return true
+			return true
+		# This is observation time, not a pause: keep normal growth simulation and
+		# visual updates running while the player watches the NEW plant.
+		return false
 	if first_play_tutorial_phase=="forcing_jelly":return true
 	if first_play_tutorial_sequence_complete:
 		_maybe_activate_first_play_harvest_guide()
@@ -4100,21 +4112,21 @@ func _close_forest_gacha()->void:
 func _spin_forest_gacha()->void:
 	if forest_gacha_ui==null or not forest_gacha_ui.visible or forest_gacha_ui.is_busy():return
 	if forest_gacha_preview_mode:
-		if not _trial_dev_controls_enabled():return
-		if forest_gacha_preview_puku_points<FOREST_GACHA_SPIN_COST:return
+		if not _trial_dev_controls_enabled():forest_gacha_ui.cancel_spin_feedback();return
+		if forest_gacha_preview_puku_points<FOREST_GACHA_SPIN_COST:forest_gacha_ui.cancel_spin_feedback();return
 		var preview_next:=forest_gacha_preview_draw_count+1
 		var preview_result:Dictionary=forest_gacha_system.draw({INITIAL_SERIES_ID:true},forest_gacha_preview_discovered,forest_gacha_preview_encountered,forest_gacha_rng)
-		if preview_result.is_empty():return
+		if preview_result.is_empty():forest_gacha_ui.cancel_spin_feedback();return
 		forest_gacha_preview_puku_points-=FOREST_GACHA_SPIN_COST;forest_gacha_preview_draw_count=preview_next
 		var preview_species_id:=str(preview_result.get("species_id",""))
 		if str(preview_result.get("source",""))=="locked":preview_result["source"]="unlocked"
 		forest_gacha_preview_discovered[preview_species_id]=true
 		forest_gacha_ui.set_wallet(forest_gacha_preview_puku_points,forest_gacha_preview_draw_count);var preview_entry:Dictionary=preview_result.get("species_entry",{});var preview_texture:=_species_texture(preview_entry);forest_gacha_ui.play_spin(preview_result,preview_texture if preview_texture!=null else CatalogImageLoader.placeholder_texture);return
 	if forest_gacha_trial_dev_mode:
-		if not _trial_dev_controls_enabled():return
+		if not _trial_dev_controls_enabled():forest_gacha_ui.cancel_spin_feedback();return
 		var trial_next:=forest_gacha_draw_count+1
 		var trial_result:Dictionary=forest_gacha_system.draw(unlocked_series,discovered,forest_gacha_encountered,forest_gacha_rng,StoryProgressionClass.fantasy_is_unlocked(story_progression_state),jurejure_species_unlocked)
-		if trial_result.is_empty():return
+		if trial_result.is_empty():forest_gacha_ui.cancel_spin_feedback();return
 		forest_gacha_draw_count=trial_next
 		var trial_species_id:=str(trial_result.get("species_id",""))
 		var trial_unlocked_series_id:=""
@@ -4126,10 +4138,10 @@ func _spin_forest_gacha()->void:
 		var trial_entry:Dictionary=trial_result.get("species_entry",{});var trial_texture:=_species_texture(trial_entry);forest_gacha_ui.play_spin(trial_result,trial_texture if trial_texture!=null else CatalogImageLoader.placeholder_texture);return
 	var forest_cost_units:=_puku_cost_units(FOREST_GACHA_SPIN_COST)
 	if not _can_afford_puku_units(forest_cost_units):
-		forest_gacha_ui.set_wallet(puku_points,forest_gacha_draw_count);return
+		forest_gacha_ui.cancel_spin_feedback();forest_gacha_ui.set_wallet(puku_points,forest_gacha_draw_count);return
 	var next_draw:=forest_gacha_draw_count+1
 	var result:Dictionary=forest_gacha_system.draw(unlocked_series,discovered,forest_gacha_encountered,forest_gacha_rng,StoryProgressionClass.fantasy_is_unlocked(story_progression_state),jurejure_species_unlocked)
-	if result.is_empty():return
+	if result.is_empty():forest_gacha_ui.cancel_spin_feedback();return
 	_change_puku_balance(-forest_cost_units,"forest_gacha",false,true);forest_gacha_draw_count=next_draw
 	var species_id:=str(result.get("species_id",""))
 	var unlocked_series_id:=""
@@ -4353,6 +4365,10 @@ func _start_result_record_pulse()->void:
 
 func _open_play_modal()->void:
 	if play_active or current_mode!="greenhouse":return
+	if _first_old_seed_play_pending():
+		play_modal_open=false
+		_start_greenhouse_play("old")
+		return
 	if _endless_normal_flow_owns_play_controls():
 		play_modal_open=false
 		if play_overlay:play_overlay.visible=false
@@ -4362,6 +4378,9 @@ func _open_play_modal()->void:
 		_start_greenhouse_play("normal")
 		return
 	play_modal_open=true;_update_play_ui()
+
+func _first_old_seed_play_pending()->bool:
+	return intro_story_complete and total_play_count==0 and old_seed_bags>0 and not _has_any_playable_seed_stock()
 
 func _close_play_modal()->void:
 	play_modal_open=false;_update_play_ui()
@@ -4577,7 +4596,7 @@ func _update_mission_ui()->void:
 	var mission_text:=_current_mission_text()
 	mission_title_label.text=Localizer.text(language_code,"mission_title")
 	mission_text_label.text=mission_text
-	mission_panel.visible=not mission_text.is_empty() and _mission_foreground_safe() and not arrangement_scene_active and not arrangement_transitioning
+	mission_panel.visible=not play_active and not mission_text.is_empty() and _mission_foreground_safe() and not arrangement_scene_active and not arrangement_transitioning
 
 func _update_play_ui()->void:
 	if not play_overlay:return
@@ -4605,7 +4624,7 @@ func _update_play_ui()->void:
 		play_open_button.add_theme_font_size_override("font_size",14 if rescue_needed else 17)
 		play_open_button.disabled=false
 	else:
-		play_open_button.text=Localizer.text(language_code,"main_play")
+		play_open_button.text=Localizer.text(language_code,"play_first_old_seed" if _first_old_seed_play_pending() else "main_play")
 		play_open_button.add_theme_font_size_override("font_size",21)
 		play_open_button.disabled=false
 	seed_bag_panel.visible=current_mode=="greenhouse" and play_active and active_seed_type!="old" and not _is_endless_normal_play()
@@ -4971,14 +4990,14 @@ func _run_puku_gauge_animation_queue()->void:
 	while generation==puku_gauge_animation_generation:
 		while not puku_gauge_animation_queue.is_empty() and generation==puku_gauge_animation_generation:
 			var item:Dictionary=puku_gauge_animation_queue.pop_front()
-			await get_tree().create_timer(maxf(.001,.26*puku_gauge_animation_speed_scale)).timeout
+			await get_tree().create_timer(maxf(.001,.26*_puku_gauge_effective_speed_scale())).timeout
 			if generation!=puku_gauge_animation_generation:return
 			await _animate_puku_balance_delta(int(item.get("delta_units",0)),generation)
 		if generation!=puku_gauge_animation_generation:return
 		if puku_gauge_combo_count>=2 and puku_combo_label and puku_combo_label.visible:
-			await get_tree().create_timer(maxf(.001,.14*puku_gauge_animation_speed_scale)).timeout
+			await get_tree().create_timer(maxf(.001,.14*_puku_gauge_effective_speed_scale())).timeout
 			if generation!=puku_gauge_animation_generation:return
-			puku_combo_tween=create_tween();puku_combo_tween.tween_property(puku_combo_label,"modulate:a",0.0,maxf(.001,.12*puku_gauge_animation_speed_scale))
+			puku_combo_tween=create_tween();puku_combo_tween.tween_property(puku_combo_label,"modulate:a",0.0,maxf(.001,.12*_puku_gauge_effective_speed_scale()))
 			await puku_combo_tween.finished
 			if generation!=puku_gauge_animation_generation:return
 		if puku_gauge_animation_queue.is_empty():break
@@ -4990,7 +5009,7 @@ func _animate_puku_balance_delta(delta_units:int,generation:int)->void:
 	var remaining:int=absi(delta_units)
 	if remaining<=0:return
 	var original_amount:int=remaining
-	var total_duration:=clampf(.34+minf(1.0,float(remaining)/2400.0)*.50,.34,.84)*puku_gauge_animation_speed_scale
+	var total_duration:=clampf(.34+minf(1.0,float(remaining)/2400.0)*.50,.34,.84)*_puku_gauge_effective_speed_scale()
 	var direction:=1 if delta_units>0 else -1
 	while remaining>0 and generation==puku_gauge_animation_generation:
 		if direction>0:
@@ -5026,7 +5045,7 @@ func _play_puku_balance_boundary(direction:int,generation:int)->void:
 	else:
 		puku_points_display=maxi(0,puku_points_display-1);_set_puku_gauge_display_units(float(PUKU_UNITS_PER_PUKU))
 	if puku_point_label:puku_point_label.text=Localizer.text(language_code,"puku_count",[puku_points_display])
-	puku_gauge_meter.pivot_offset=puku_gauge_meter.size*.5;puku_gauge_active_tween=create_tween();puku_gauge_active_tween.tween_property(puku_gauge_meter,"scale",Vector2(1.06,1.22),maxf(.001,.025*puku_gauge_animation_speed_scale)).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT);puku_gauge_active_tween.tween_property(puku_gauge_meter,"scale",Vector2.ONE,maxf(.001,.04*puku_gauge_animation_speed_scale)).set_trans(Tween.TRANS_QUAD)
+	puku_gauge_meter.pivot_offset=puku_gauge_meter.size*.5;puku_gauge_active_tween=create_tween();puku_gauge_active_tween.tween_property(puku_gauge_meter,"scale",Vector2(1.06,1.22),maxf(.001,.025*_puku_gauge_effective_speed_scale())).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT);puku_gauge_active_tween.tween_property(puku_gauge_meter,"scale",Vector2.ONE,maxf(.001,.04*_puku_gauge_effective_speed_scale())).set_trans(Tween.TRANS_QUAD)
 	await puku_gauge_active_tween.finished
 	if generation==puku_gauge_animation_generation and direction>0 and puku_gauge_combo_count>=2:
 		await _pulse_puku_combo_display(generation)
@@ -5036,8 +5055,15 @@ func _pulse_puku_combo_display(generation:int)->void:
 	if generation!=puku_gauge_animation_generation or puku_combo_label==null:return
 	puku_combo_label.text="×%d"%puku_gauge_combo_count;puku_combo_label.visible=true;puku_combo_label.modulate.a=1.0;puku_combo_label.scale=Vector2.ONE
 	if puku_combo_tween and puku_combo_tween.is_valid():puku_combo_tween.kill()
-	puku_combo_tween=create_tween();puku_combo_tween.tween_property(puku_combo_label,"scale",Vector2(1.28,1.28),maxf(.001,.085*puku_gauge_animation_speed_scale)).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT);puku_combo_tween.tween_property(puku_combo_label,"scale",Vector2.ONE,maxf(.001,.10*puku_gauge_animation_speed_scale)).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	puku_combo_tween=create_tween();puku_combo_tween.tween_property(puku_combo_label,"scale",Vector2(1.28,1.28),maxf(.001,.085*_puku_gauge_effective_speed_scale())).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT);puku_combo_tween.tween_property(puku_combo_label,"scale",Vector2.ONE,maxf(.001,.10*_puku_gauge_effective_speed_scale())).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
 	await puku_combo_tween.finished
+
+func _puku_gauge_is_only_finish_blocker()->bool:
+	return play_active and _is_endless_normal_play() and play_seeds_remaining<=0 and play_spawn_queue<=0 and play_seed_animations_pending<=0 and plants.is_empty()
+
+func _puku_gauge_effective_speed_scale()->float:
+	var finish_scale:=PUKU_GAUGE_FINISH_SPEED_SCALE if _puku_gauge_is_only_finish_blocker() else 1.0
+	return puku_gauge_animation_speed_scale*finish_scale
 
 func _reset_puku_combo_display()->void:
 	puku_gauge_combo_count=0
@@ -6320,6 +6346,22 @@ func _start_restoration_return_event(stage:int)->void:
 	_focus_restoration_returned_plant(stage)
 	_start_scripted_dialog("restoration_return_%d"%stage,_restoration_return_pages(stage),false)
 
+func _transition_between_restoration_returns(stage:int)->void:
+	if current_mode!="habitat" or stage<1 or stage>=HabitatRestorationClass.REQUIRED_RETURNED_PLANTS:
+		_start_restoration_return_event(stage)
+		return
+	if scene_transition_fade==null or scene_transition_fade.visible:
+		_start_restoration_return_event(stage)
+		return
+	scene_transition_fade.color=Color.BLACK;scene_transition_fade.color.a=0.0;scene_transition_fade.visible=true;scene_transition_fade.move_to_front()
+	var fade_out:=create_tween();fade_out.tween_property(scene_transition_fade,"color:a",1.0,.30).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	await fade_out.finished
+	_build_habitat_items(true);_focus_restoration_returned_plant(stage,true)
+	var fade_in:=create_tween();fade_in.tween_property(scene_transition_fade,"color:a",0.0,.80).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	await fade_in.finished
+	scene_transition_fade.visible=false;scene_transition_fade.color=Color.BLACK
+	_start_scripted_dialog("restoration_return_%d"%stage,_restoration_return_pages(stage),false)
+
 func _commit_and_start_next_restoration_return()->void:
 	if current_mode!="habitat":return
 	var restoration:=_restoration_state()
@@ -7229,6 +7271,7 @@ func _set_intro_speaker(speaker_id:String)->void:
 	if intro_portrait_slot:
 		intro_portrait_slot.visible=not speaker_id.is_empty()
 		intro_portrait_slot.custom_minimum_size=Vector2(162,205) if speaker_id=="trio" else Vector2(132,205)
+	if intro_speaker_label:intro_speaker_label.size.x=162.0 if speaker_id=="trio" else 132.0
 	intro_panda_portrait.texture=_speaker_portrait_texture(speaker_id)
 	intro_panda_portrait.visible=intro_panda_portrait.texture!=null and speaker_id!="trio"
 	if intro_trio_portraits:intro_trio_portraits.visible=speaker_id=="trio"
@@ -8060,14 +8103,15 @@ func _update_habitat_view_follow(delta:float)->void:
 				_play_current_area_bgm(true);call_deferred("_show_jurejure_first_encounter_still")
 		return
 	if habitat_lookaround_active:
-		habitat_lookaround_elapsed=minf(HABITAT_LOOKAROUND_DURATION_SECONDS,habitat_lookaround_elapsed+delta)
-		var progress:=clampf(habitat_lookaround_elapsed/HABITAT_LOOKAROUND_DURATION_SECONDS,0.0,1.0)
+		var lookaround_duration:=HABITAT_ARRIVAL_LOOKAROUND_DURATION_SECONDS if habitat_lookaround_context=="arrival" else HABITAT_LOOKAROUND_DURATION_SECONDS
+		habitat_lookaround_elapsed=minf(lookaround_duration,habitat_lookaround_elapsed+delta)
+		var progress:=clampf(habitat_lookaround_elapsed/lookaround_duration,0.0,1.0)
 		var eased:=0.5-0.5*cos(PI*progress)
-		view_yaw=habitat_lookaround_start_yaw+360.0*eased
+		view_yaw=lerpf(habitat_lookaround_start_yaw,habitat_lookaround_end_yaw,eased)
 		view_pitch=habitat_lookaround_start_pitch;habitat_target_yaw=view_yaw;habitat_target_pitch=view_pitch;_apply_view_rotation()
 		if progress>=1.0:
 			var finished_context:=habitat_lookaround_context
-			view_yaw=habitat_lookaround_start_yaw;view_pitch=habitat_lookaround_start_pitch;habitat_target_yaw=view_yaw;habitat_target_pitch=view_pitch
+			view_yaw=habitat_lookaround_end_yaw if finished_context=="arrival" else habitat_lookaround_start_yaw;view_pitch=habitat_lookaround_start_pitch;habitat_target_yaw=view_yaw;habitat_target_pitch=view_pitch
 			habitat_lookaround_active=false;habitat_lookaround_elapsed=0.0;habitat_lookaround_context="";_apply_view_rotation()
 			call_deferred("_finish_habitat_lookaround",finished_context)
 		return
@@ -8089,8 +8133,11 @@ func _start_habitat_lookaround(context:String)->void:
 	if current_mode!="habitat" or habitat_lookaround_active:return
 	pointer_down=false;greenhouse_drag_accumulator=0.0;greenhouse_drag_started=false
 	habitat_lookaround_active=true;habitat_lookaround_elapsed=0.0;habitat_lookaround_context=context
-	habitat_lookaround_start_yaw=view_yaw;habitat_lookaround_start_pitch=view_pitch
-	habitat_target_yaw=view_yaw;habitat_target_pitch=view_pitch
+	habitat_lookaround_end_yaw=view_yaw
+	habitat_lookaround_start_yaw=view_yaw-HABITAT_ARRIVAL_LOOKAROUND_DEGREES if context=="arrival" else view_yaw
+	if context!="arrival":habitat_lookaround_end_yaw=view_yaw+360.0
+	habitat_lookaround_start_pitch=view_pitch;view_yaw=habitat_lookaround_start_yaw
+	habitat_target_yaw=view_yaw;habitat_target_pitch=view_pitch;_apply_view_rotation()
 
 func _finish_habitat_lookaround(context:String)->void:
 	if context=="arrival" and habitat_awakening_overlay and habitat_awakening_overlay.visible:

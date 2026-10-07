@@ -17,7 +17,7 @@ func _ready()->void:
 	game._open_play_modal();assert(not game.play_active and game.puku_balance_units==999 and game.shop_overlay.visible)
 	game._close_shop()
 	game.puku_balance_units=5000;game._update_play_ui()
-	assert(game.play_open_button.visible and game.play_open_button.text=="たねをまく　1ぷく")
+	assert(game.play_open_button.visible and game.play_open_button.text=="たねをまく　1ぷくコイン")
 	game._open_play_modal()
 	assert(game.play_active and game.puku_balance_units==4000 and game.endless_economy_seed_cost_units==1000)
 	assert(game.play_concurrent_target>=7 and game.play_concurrent_target<=10)

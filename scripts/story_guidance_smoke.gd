@@ -103,10 +103,16 @@ func _test_mission_copy_and_progress(game: Node) -> void:
 		game.species_get_counts[fantasy_ids[index]] = 1
 	assert(game._unique_fantasy_species_get_count() == 10)
 	assert(game._unique_act2_species_get_count() == 15)
-	assert(game._current_mission_text() == "新しい品種を24種類見つけよう！　15/24")
+	assert(game._current_mission_text() == "最高記録を目指しながら、新しい品種を24種類見つけよう！　15/24")
 	game._update_mission_ui()
 	assert(game.mission_panel.visible)
 	assert(game.mission_title_label.text == "ミッション")
+	game.play_active = true
+	game._update_mission_ui()
+	assert(not game.mission_panel.visible)
+	game.play_active = false
+	game._update_mission_ui()
+	assert(game.mission_panel.visible)
 
 	game.species_get_counts.clear()
 	for species_id in original_ids:
@@ -118,7 +124,7 @@ func _test_mission_copy_and_progress(game: Node) -> void:
 	game.act3_intro_seen = false
 	assert(game._unique_fantasy_species_get_count() == 11)
 	assert(game._unique_act2_species_get_count() == 23)
-	assert(game._current_mission_text() == "新しい品種を24種類見つけよう！　23/24")
+	assert(game._current_mission_text() == "最高記録を目指しながら、新しい品種を24種類見つけよう！　23/24")
 	game._refresh_narrative_species_progress()
 	assert(not game.act3_unlocked)
 	game.species_get_counts[fantasy_ids[11]] = 1
@@ -138,7 +144,7 @@ func _test_mission_copy_and_progress(game: Node) -> void:
 	game.act3_intro_pending = false
 	assert(game._unique_fantasy_species_get_count() == 10)
 	assert(game._unique_act2_species_get_count() == 22)
-	assert(game._current_mission_text() == "新しい品種を24種類見つけよう！　22/24")
+	assert(game._current_mission_text() == "最高記録を目指しながら、新しい品種を24種類見つけよう！　22/24")
 
 	game.species_get_counts.clear()
 	game.act3_intro_seen = true
@@ -207,7 +213,7 @@ func _test_round_navigation_lock(game: Node) -> void:
 	assert(not game._greenhouse_area_navigation_available())
 	game._open_arrangements()
 	assert(not game.arrangement_scene_active and not game.arrangement_transitioning)
-	assert(game.mission_panel.visible)
+	assert(not game.mission_panel.visible)
 	game.play_active = false
 	game._update_play_ui()
 	assert(game._greenhouse_area_navigation_available())

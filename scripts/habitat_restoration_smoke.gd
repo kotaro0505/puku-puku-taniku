@@ -264,6 +264,15 @@ func _test_integrated_final_chapter() -> void:
 	for stage in range(1, 6):
 		var pages: Array[Dictionary] = game._restoration_return_pages(stage)
 		assert(pages.size() == [3, 5, 7, 7, 2][stage - 1])
+	assert(Localizer.text("ja", "restoration_return_1_girl") == "さぁ、もっとここへ多肉を持ってこよう！")
+	assert(Localizer.text("ja", "restoration_return_2_armadillo") == "届いてくれるといいな…")
+	assert(Localizer.text("ja", "restoration_return_4_armadillo") == "少し明るくなってきた")
+	assert(Localizer.text("ja", "restoration_return_4_mouse") == "頼むから早く元気になれチュー！")
+	assert(Localizer.text("ja", "restoration_return_4_panda") == "…")
+	assert(Localizer.text("hiragana", "restoration_return_2_armadillo") == "とどいてくれると いいな…")
+	assert(Localizer.text("hiragana", "restoration_return_4_mouse") == "たのむから はやく げんきになれチュー！")
+	assert(Localizer.text("en", "restoration_return_1_girl") == "Come on, let's bring more succulents here!")
+	assert(Localizer.text("en", "restoration_return_4_panda") == "...")
 	assert(str(game._restoration_return_pages(5)[0].get("text", "")) == "これで5株目だよ。")
 	assert(str(game._restoration_return_pages(5)[1].get("text", "")) == "5株の多肉を原生地に還した！")
 
@@ -367,6 +376,8 @@ func _test_integrated_final_chapter() -> void:
 	await get_tree().process_frame
 	assert(game.scripted_dialog_kind=="restoration_return_3")
 	_finish_dialog(game);await get_tree().process_frame
+	assert(game.scene_transition_fade.visible and game.scene_transition_fade.color.r<.01)
+	await get_tree().create_timer(1.16).timeout
 	assert(game.scripted_dialog_kind=="restoration_return_4")
 	_finish_dialog(game);await get_tree().process_frame
 	assert(HabitatRestorationClass.pending_return_stages(restoration).is_empty())

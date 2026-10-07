@@ -14,6 +14,7 @@ func _ready() -> void:
 	_prepare_safe_greenhouse(game)
 	_test_localized_copy()
 	_test_language_ui_geometry(game)
+	_test_top_hud_and_speaker_geometry(game)
 	_test_shop_chatter_contract(game)
 	_test_habitat_attention_glow(game)
 	_test_arrangement_gate_and_direction(game)
@@ -96,6 +97,20 @@ func _test_language_ui_geometry(game: Node) -> void:
 		assert(bgm_toggle.custom_minimum_size.x == 145.0 and se_toggle.custom_minimum_size.x == 145.0)
 		assert(bgm_toggle.text == "BGM" and se_toggle.text == "SE")
 	game._set_language("ja")
+
+
+func _test_top_hud_and_speaker_geometry(game: Node) -> void:
+	var logo := game.main_status_hud.find_child("MainLogo", true, false) as Label
+	assert(logo != null and logo.position == Vector2(16, 34) and logo.position.x + logo.size.x <= game.best_panel.position.x)
+	assert(game.best_panel.position == Vector2(204, 122) and game.best_panel.size == Vector2(168, 65))
+	assert(game.seed_bag_panel.position == Vector2(210, 198))
+	assert(not Rect2(logo.position, logo.size).intersects(Rect2(game.best_panel.position, game.best_panel.size)))
+	assert(not Rect2(game.best_panel.position, game.best_panel.size).intersects(Rect2(game.seed_bag_panel.position, game.seed_bag_panel.size)))
+	assert(game.intro_speaker_label.get_parent() == game.intro_portrait_slot)
+	assert(game.intro_speaker_label.position.y + game.intro_speaker_label.size.y <= game.intro_panda_portrait.position.y + 2.0)
+	for overlay in [game.habitat_awakening_overlay, game.seed_pod_story_overlay, game.habitat_second_awakening_overlay, game.jurejure_first_encounter_overlay]:
+		assert(overlay.speaker_label.position.x == overlay.speaker_portrait.position.x)
+		assert(overlay.speaker_label.position.y + overlay.speaker_label.size.y <= overlay.speaker_portrait.position.y)
 
 
 func _test_shop_chatter_contract(game: Node) -> void:

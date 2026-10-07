@@ -119,22 +119,22 @@ func _ready() -> void:
 
 func _verify_score_label_layout_and_content(battle: Control) -> void:
 	var expected_x: float = BattleClass.BATTLE_VIEW_WIDTH - BattleClass.SCORE_LABEL_RIGHT_MARGIN - BattleClass.SCORE_LABEL_SIZE.x
-	var expected_opponent_position := Vector2(expected_x, BattleClass.OPPONENT_FIELD_RECT.position.y - BattleClass.SCORE_LABEL_FIELD_TOP_GAP)
+	var expected_opponent_position := Vector2(expected_x, BattleClass.OPPONENT_FIELD_RECT.position.y - BattleClass.SCORE_LABEL_FIELD_TOP_GAP - BattleClass.OPPONENT_SCORE_RAISE)
 	var expected_player_position := Vector2(expected_x, BattleClass.PLAYER_FIELD_RECT.position.y - BattleClass.SCORE_LABEL_FIELD_TOP_GAP)
 	assert(battle.opponent_score_label.size == BattleClass.SCORE_LABEL_SIZE)
 	assert(battle.player_score_label.size == BattleClass.SCORE_LABEL_SIZE)
 	assert(battle.opponent_score_label.position == expected_opponent_position)
 	assert(battle.player_score_label.position == expected_player_position)
-	assert(is_equal_approx(
-		BattleClass.OPPONENT_FIELD_RECT.position.y - battle.opponent_score_label.position.y,
-		BattleClass.PLAYER_FIELD_RECT.position.y - battle.player_score_label.position.y
-	))
+	assert(is_equal_approx(BattleClass.OPPONENT_FIELD_RECT.position.y - battle.opponent_score_label.position.y, BattleClass.SCORE_LABEL_FIELD_TOP_GAP + BattleClass.OPPONENT_SCORE_RAISE))
+	assert(is_equal_approx(BattleClass.PLAYER_FIELD_RECT.position.y - battle.player_score_label.position.y, BattleClass.SCORE_LABEL_FIELD_TOP_GAP))
 	assert(is_equal_approx(battle.opponent_score_label.position.x + battle.opponent_score_label.size.x, BattleClass.BATTLE_VIEW_WIDTH - BattleClass.SCORE_LABEL_RIGHT_MARGIN))
 	assert(is_equal_approx(battle.player_score_label.position.x + battle.player_score_label.size.x, BattleClass.BATTLE_VIEW_WIDTH - BattleClass.SCORE_LABEL_RIGHT_MARGIN))
 	assert(not Rect2(battle.opponent_score_label.position, battle.opponent_score_label.size).intersects(OPPONENT_RIGHT_CHARACTER_MAJOR_RECT))
 	assert(not Rect2(battle.player_score_label.position, battle.player_score_label.size).intersects(PLAYER_RIGHT_CHARACTER_MAJOR_RECT))
 	assert(Rect2(Vector2.ZERO, Vector2(576, 1024)).encloses(Rect2(battle.opponent_score_label.position, battle.opponent_score_label.size)))
 	assert(Rect2(Vector2.ZERO, Vector2(576, 1024)).encloses(Rect2(battle.player_score_label.position, battle.player_score_label.size)))
+	assert(battle.result_panel.position == BattleClass.RESULT_PANEL_POSITION)
+	assert(battle.result_panel.position.y + battle.result_panel.size.y <= battle.player_score_label.position.y - 12.0)
 	var original_language: String = battle.language_code
 	var original_opponent_score: float = battle.opponent_score
 	var original_player_score: float = battle.player_score

@@ -48,6 +48,8 @@ var current_puku_points:=0
 var current_draw_count:=0
 var _dial_dragging:=false
 var _dial_drag_origin:=Vector2.ZERO
+var _spin_feedback_active:=false
+var _spin_feedback_tween:Tween
 var language:="ja"
 
 func _ready()->void:
@@ -95,7 +97,7 @@ func _build_result_overlay()->void:
 	result_close_button=Button.new();result_close_button.name="ResultCloseButton";result_close_button.text="ガチャへ戻る";result_close_button.custom_minimum_size=Vector2(260,62);_skin_button(result_close_button,Color("#d5aa58"),18);result_close_button.pressed.connect(_close_result);content.add_child(result_close_button)
 
 func open_gacha(puku_points:int,draw_count:int)->void:
-	visible=true;pending_result.clear();busy=false;capsule_ready=false;capsule.visible=false;capsule_hit_area.visible=false;result_overlay.visible=false;set_wallet(puku_points,draw_count);hint_label.text="ダイヤルをタップして回そう";close_button.disabled=false
+	cancel_spin_feedback();visible=true;pending_result.clear();busy=false;capsule_ready=false;capsule.visible=false;capsule_hit_area.visible=false;result_overlay.visible=false;set_wallet(puku_points,draw_count);hint_label.text="ダイヤルをタップして回そう";close_button.disabled=false
 	set_language(language)
 
 func set_language(value:String)->void:
@@ -105,18 +107,20 @@ func set_language(value:String)->void:
 	wallet_label.text=Localizer.text(language,"wallet",[current_puku_points]);result_close_button.text=Localizer.text(language,"gacha_return");unlock_button.text=Localizer.text(language,"unlock_action");later_button.text=Localizer.text(language,"later")
 
 func close_gacha()->void:
-	visible=false;pending_result.clear();busy=false;capsule_ready=false
+	cancel_spin_feedback();visible=false;pending_result.clear();busy=false;capsule_ready=false
 
 func set_wallet(puku_points:int,draw_count:int)->void:
 	current_puku_points=puku_points;current_draw_count=draw_count
-	wallet_label.text=Localizer.text(language,"wallet",[puku_points]);spin_button.disabled=busy or capsule_ready or result_overlay.visible or puku_points<SPIN_COST_PUKU;dial_hit_area.disabled=spin_button.disabled
+	wallet_label.text=Localizer.text(language,"wallet",[puku_points]);spin_button.disabled=busy or _spin_feedback_active or capsule_ready or result_overlay.visible or puku_points<SPIN_COST_PUKU;dial_hit_area.disabled=spin_button.disabled
 
 func play_spin(result:Dictionary,texture:Texture2D)->void:
 	if busy:return
+	if _spin_feedback_tween and _spin_feedback_tween.is_valid():_spin_feedback_tween.kill()
+	_spin_feedback_tween=null;_spin_feedback_active=false
 	pending_result=result.duplicate(true);busy=true;capsule_ready=false;close_button.disabled=true;spin_button.disabled=true;dial_hit_area.disabled=true;hint_label.text="";result_image.texture=texture
-	dial_texture.rotation=0.0;background_stage.position=Vector2.ZERO
+	background_stage.position=Vector2.ZERO
 	var turn:=create_tween().set_parallel(true)
-	turn.tween_property(dial_texture,"rotation",TAU*3.4,.92*animation_time_scale).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	turn.tween_property(dial_texture,"rotation",dial_texture.rotation+TAU*3.4,.92*animation_time_scale).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	var shake:=create_tween();shake.tween_property(background_stage,"position:x",-5.0,.10*animation_time_scale);shake.tween_property(background_stage,"position:x",6.0,.12*animation_time_scale);shake.tween_property(background_stage,"position:x",-3.0,.12*animation_time_scale);shake.tween_property(background_stage,"position:x",0.0,.18*animation_time_scale)
 	await turn.finished
 	capsule.set_seed(str(result.get("species_id","")).hash());capsule.position=Vector2(244,726);capsule.scale=Vector2(.35,.35);capsule.rotation=-.35;capsule.modulate=Color(1,1,1,0);capsule.visible=true
@@ -146,8 +150,22 @@ func _on_dial_input(event:InputEvent)->void:
 		dial_texture.rotation+=event.relative.x*.025
 
 func _request_spin()->void:
-	if busy or capsule_ready or result_overlay.visible or spin_button.disabled:return
+	if busy or _spin_feedback_active or capsule_ready or result_overlay.visible or spin_button.disabled:return
+	_spin_feedback_active=true;close_button.disabled=true;spin_button.disabled=true;dial_hit_area.disabled=true;hint_label.text=""
+	dial_texture.rotation=fmod(dial_texture.rotation,TAU)
+	dial_texture.rotation+=0.08
+	_spin_feedback_tween=create_tween();_spin_feedback_tween.tween_property(dial_texture,"rotation",dial_texture.rotation+0.55,.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	# Let the first dial movement reach the renderer before draw/save work starts.
+	await get_tree().process_frame
+	if not _spin_feedback_active or not visible:return
 	spin_requested.emit()
+
+func cancel_spin_feedback()->void:
+	if _spin_feedback_tween and _spin_feedback_tween.is_valid():_spin_feedback_tween.kill()
+	_spin_feedback_tween=null;_spin_feedback_active=false
+	if not is_node_ready():return
+	close_button.disabled=false;hint_label.text=Localizer.text(language,"gacha_dial_hint")
+	set_wallet(current_puku_points,current_draw_count)
 
 func _reveal_result()->void:
 	if not capsule_ready or pending_result.is_empty():return
@@ -177,7 +195,7 @@ func _close_result()->void:
 	result_overlay.visible=false;pending_result.clear();result_image.texture=null;result_image.get_parent().visible=true;close_button.disabled=false;hint_label.text=Localizer.text(language,"gacha_dial_hint");capsule_ready=false;busy=false;set_wallet(current_puku_points,current_draw_count)
 
 func _request_close()->void:
-	if busy or capsule_ready or result_overlay.visible:return
+	if busy or _spin_feedback_active or capsule_ready or result_overlay.visible:return
 	close_requested.emit()
 
 func is_open()->bool:return visible

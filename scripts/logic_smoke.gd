@@ -37,7 +37,7 @@ func _ready()->void:
 	game._show_opening();game._show_opening();var opening_stream:AudioStream=game.audio_manager._stream_for("bgm","opening");var opening_players:=0
 	for player in game.audio_manager.bgm_players:opening_players+=1 if player.playing and player.stream==opening_stream else 0
 	assert(game.opening_overlay.visible and game.audio_manager.current_bgm_key=="opening" and opening_players<=1 and opening_stream is AudioStreamOggVorbis and opening_stream.loop and game.audio_manager._bgm_target_db("opening")<game.audio_manager._bgm_target_db("greenhouse"));game.opening_story_complete=true;game._finish_opening();assert(not game.opening_overlay.visible)
-	assert(game.best_label.get_parent().position==Vector2(204,54))
+	assert(game.best_label.get_parent().position==Vector2(204,122) and game.best_label.get_parent().size==Vector2(168,65))
 	var habitat_sky:Sky=game.habitat_environment.sky;var habitat_panorama:PanoramaSkyMaterial=habitat_sky.sky_material;assert(habitat_sky.radiance_size==Sky.RADIANCE_SIZE_512 and habitat_panorama.panorama.resource_path=="res://assets/highland-panorama.jpg" and habitat_panorama.panorama.get_width()==1280 and habitat_panorama.panorama.get_height()==640)
 	assert(game.mode_button.position==Vector2(398,198) and game.mode_button.size==Vector2(153,55));assert(game.shop_button.position==Vector2(398,262) and game.shop_button.size==Vector2(153,55));assert(game.result_confetti_layer.get_parent()==game.result_overlay)
 	game._toggle_mode()

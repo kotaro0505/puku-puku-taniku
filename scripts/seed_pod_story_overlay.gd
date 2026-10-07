@@ -24,7 +24,6 @@ var story_text: Label
 var story_image: TextureRect
 var speaker_label: Label
 var speaker_portrait: TextureRect
-var page_count_label: Label
 var tap_hint: Label
 var text_tween: Tween
 var fade_tween: Tween
@@ -89,8 +88,9 @@ func _build_ui() -> void:
 
 	speaker_label = Label.new()
 	speaker_label.name = "StorySpeaker"
-	speaker_label.position = Vector2(170, 757)
-	speaker_label.size = Vector2(370, 32)
+	speaker_label.position = Vector2(40, 752)
+	speaker_label.size = Vector2(116, 32)
+	speaker_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	speaker_label.add_theme_font_size_override("font_size", 16)
 	speaker_label.add_theme_color_override("font_color", Color("#f2cf92"))
 	speaker_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -112,18 +112,6 @@ func _build_ui() -> void:
 	story_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	story_text.z_index = 2
 	add_child(story_text)
-
-	page_count_label = Label.new()
-	page_count_label.name = "StoryPageCount"
-	page_count_label.position = Vector2(454, 24)
-	page_count_label.size = Vector2(90, 38)
-	page_count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	page_count_label.add_theme_font_size_override("font_size", 15)
-	page_count_label.add_theme_color_override("font_color", Color("#fff4da"))
-	page_count_label.add_theme_color_override("font_outline_color", Color(0.12, 0.06, 0.03, 0.82))
-	page_count_label.add_theme_constant_override("outline_size", 5)
-	page_count_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(page_count_label)
 
 	tap_hint = Label.new()
 	tap_hint.name = "StoryTapHint"
@@ -211,4 +199,3 @@ func _show_page() -> void:
 	speaker_portrait.visible = speaker_portrait.texture != null
 	story_text.text = Localizer.text(language_code, DIALOG_KEYS[page_index])
 	story_text.modulate = Color.WHITE
-	page_count_label.text = "%d / %d" % [page_index + 1, DIALOG_KEYS.size()]

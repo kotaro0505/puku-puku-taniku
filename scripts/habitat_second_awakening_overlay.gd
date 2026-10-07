@@ -80,8 +80,9 @@ func _build_ui() -> void:
 	speaker_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(speaker_portrait)
 	speaker_label = Label.new()
-	speaker_label.position = Vector2(170, 757)
-	speaker_label.size = Vector2(354, 30)
+	speaker_label.position = Vector2(40, 752)
+	speaker_label.size = Vector2(116, 30)
+	speaker_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	speaker_label.add_theme_font_size_override("font_size", 14)
 	speaker_label.add_theme_color_override("font_color", Color("#ffd4ff"))
 	speaker_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -141,6 +142,7 @@ func advance() -> void:
 func _show_page() -> void:
 	var speaker_key := str(SPEAKER_KEYS[page_index])
 	speaker_label.text = "" if speaker_key.is_empty() else Localizer.text(language_code, speaker_key)
+	speaker_label.visible = not speaker_key.is_empty()
 	speaker_portrait.texture = DialoguePortraits.texture(DialoguePortraits.speaker_id_from_key(speaker_key))
 	speaker_portrait.visible = speaker_portrait.texture != null
 	dialogue_label.text = Localizer.text(language_code, DIALOG_KEYS[page_index])

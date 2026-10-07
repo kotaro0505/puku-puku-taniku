@@ -11,14 +11,13 @@ const DIALOG_KEYS := [
 	"awakening_empty_1", "awakening_empty_2", "awakening_overharvest", "awakening_sow",
 	"_pause_before_memory", "awakening_surprise", "awakening_memory", "awakening_thanks",
 	"awakening_apology", "awakening_promise_1", "awakening_promise_2", "awakening_promise_3",
-	"awakening_rain_stopping", "_pause_before_sprout", "awakening_sprout_look",
-	"awakening_sprout_panda"
+	"awakening_rain_stopping", "awakening_sprout_look", "awakening_sprout_panda"
 ]
 const SPEAKER_KEYS := [
 	"story_speaker_armadillo", "story_speaker_panda", "story_speaker_armadillo",
 	"story_speaker_panda", "", "story_speaker_panda", "story_speaker_armadillo",
 	"story_speaker_girl", "story_speaker_girl", "story_speaker_armadillo",
-	"story_speaker_girl", "story_speaker_girl", "story_speaker_panda", "", "story_speaker_girl",
+	"story_speaker_girl", "story_speaker_girl", "story_speaker_panda", "story_speaker_girl",
 	"story_speaker_panda"
 ]
 const GHOST_TEXTURES: Array[Texture2D] = [
@@ -113,22 +112,6 @@ func _build_ui() -> void:
 		sprout_group.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		sprout_group.set_meta("story_sprout_group", true)
 		sprout_layer.add_child(sprout_group)
-		var glow := Panel.new()
-		glow.name = "GreenGlow"
-		glow.position = Vector2(39, 96)
-		glow.size = Vector2(54, 26)
-		glow.scale = Vector2(0.1, 0.1)
-		glow.modulate.a = 0.0
-		glow.pivot_offset = glow.size * 0.5
-		glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		glow.set_meta("story_sprout_glow", true)
-		var style := StyleBoxFlat.new()
-		style.bg_color = Color(0.62, 1.0, 0.58, 0.8)
-		style.set_corner_radius_all(18)
-		style.shadow_color = Color(0.42, 1.0, 0.5, 0.65)
-		style.shadow_size = 14
-		glow.add_theme_stylebox_override("panel", style)
-		sprout_group.add_child(glow)
 		var plant := TextureRect.new()
 		plant.name = "Plant"
 		plant.texture = SPROUT_TEXTURES[index]
@@ -171,9 +154,9 @@ func _build_ui() -> void:
 	add_child(speaker_portrait)
 
 	speaker_label = Label.new()
-	speaker_label.position = Vector2(170, 757)
-	speaker_label.size = Vector2(354, 30)
-	speaker_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	speaker_label.position = Vector2(40, 752)
+	speaker_label.size = Vector2(116, 30)
+	speaker_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	speaker_label.add_theme_font_size_override("font_size", 14)
 	speaker_label.add_theme_color_override("font_color", Color("#f4ca7b"))
 	speaker_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -248,6 +231,9 @@ func advance() -> void:
 		return
 	if page_index == 0 and waiting_for_arrival_lookaround:
 		return
+	if page_index == 3 and not sow_animation_played:
+		_begin_sow_animation()
+		return
 	if page_index >= DIALOG_KEYS.size() - 1:
 		visible = false
 		rain_active = false
@@ -277,8 +263,6 @@ func _layout_ghosts() -> void:
 func _show_page() -> void:
 	if page_index == 3:
 		_show_current_dialogue()
-		if not sow_animation_played:
-			_begin_sow_animation()
 		return
 	if page_index == 4:
 		_begin_memory_reveal()
@@ -289,7 +273,7 @@ func _show_page() -> void:
 	if page_index == 12:
 		_begin_sprout_reveal()
 		return
-	if page_index == 14:
+	if page_index == 13:
 		_begin_three_species_reveal()
 		return
 	_show_current_dialogue()
@@ -323,19 +307,23 @@ func _begin_sow_animation() -> void:
 		flight.tween_callback(seed.queue_free)
 	await get_tree().create_timer(1.28).timeout
 	if visible and page_index == 3:
+		page_index += 1
 		transitioning = false
+		_show_page()
 
 func _show_current_dialogue() -> void:
 	_set_dialogue_visible(true)
 	var speaker_key := str(SPEAKER_KEYS[page_index])
 	speaker_label.text = "" if speaker_key.is_empty() else Localizer.text(language_code, speaker_key)
+	speaker_label.visible = not speaker_key.is_empty()
 	speaker_portrait.texture = DialoguePortraits.texture(DialoguePortraits.speaker_id_from_key(speaker_key))
 	speaker_portrait.visible = speaker_portrait.texture != null
 	dialogue_label.text = Localizer.text(language_code, DIALOG_KEYS[page_index])
 
 func _set_dialogue_visible(show: bool) -> void:
 	text_back.visible = show
-	speaker_label.visible = show
+	var speaker_key := str(SPEAKER_KEYS[page_index]) if page_index >= 0 and page_index < SPEAKER_KEYS.size() else ""
+	speaker_label.visible = show and not speaker_key.is_empty()
 	speaker_portrait.visible = show and speaker_portrait.texture != null
 	dialogue_label.visible = show
 	instruction_label.visible = show
@@ -401,12 +389,9 @@ func _begin_three_species_reveal() -> void:
 	var sequence := create_tween()
 	for index in sprout_layer.get_child_count():
 		var sprout_group: Control = sprout_layer.get_child(index)
-		var glow: Control = sprout_group.get_node("GreenGlow")
 		var plant: Control = sprout_group.get_node("Plant")
-		sequence.tween_property(glow, "modulate:a", 1.0, 0.20)
-		sequence.parallel().tween_property(glow, "scale", Vector2.ONE, 0.30).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-		sequence.tween_property(plant, "modulate:a", 1.0, 0.24)
-		sequence.parallel().tween_property(plant, "scale", Vector2(0.54, 0.54), 0.42).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		sequence.tween_property(plant, "modulate:a", 1.0, 0.28)
+		sequence.parallel().tween_property(plant, "scale", Vector2(0.54, 0.54), 0.46).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		sequence.tween_interval(0.08)
 	sequence.tween_interval(0.18)
 	sequence.tween_callback(func():

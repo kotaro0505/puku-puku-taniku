@@ -89,6 +89,8 @@ func _test_round_entry_and_harvest(game)->void:
 	var preexisting_count:int=int(game._species_get_count("colorata"));game.species_get_counts["colorata"]=maxi(1,preexisting_count)
 	harvested.harvest();await get_tree().process_frame
 	assert(game.puku_balance_units==3750 and game.play_puku_reward_units_total==3750 and game.endless_economy_harvest_reward_units==3750)
+	assert(game._puku_gauge_is_only_finish_blocker())
+	assert(is_equal_approx(game._puku_gauge_effective_speed_scale(),game.puku_gauge_animation_speed_scale*game.PUKU_GAUGE_FINISH_SPEED_SCALE))
 	var panel:=game.effects_layer.find_child("HarvestResult",true,false) as PanelContainer
 	assert(panel and (panel.find_child("PukuRewardGain",true,false) as Label).text=="+3.75ぷく")
 	assert(game.effects_layer.find_child("PukuBalanceFly",true,false)==null)
@@ -135,7 +137,7 @@ func _test_panda_rescue(game)->void:
 	game._request_rescue_reward_ad();await get_tree().create_timer(.8).timeout
 	assert(game.puku_balance_units==1100 and game.normal_round_free_plays==0 and not game.rescue_reward_in_progress and not game.play_active)
 	game._close_shop();game._update_play_ui()
-	assert(game.play_open_button.text=="たねをまく　1ぷく")
+	assert(game.play_open_button.text=="たねをまく　1ぷくコイン")
 	game._start_greenhouse_play("normal");assert(game.play_active and game.normal_round_free_plays==0 and game.puku_balance_units==100 and game.endless_economy_seed_cost_units==1000)
 	assert(game.FOREST_GACHA_SPIN_COST==1)
 	game.play_active=false

@@ -73,8 +73,9 @@ func _build_ui() -> void:
 	add_child(speaker_portrait)
 
 	speaker_label = Label.new()
-	speaker_label.position = Vector2(170, 774)
-	speaker_label.size = Vector2(354, 30)
+	speaker_label.position = Vector2(40, 762)
+	speaker_label.size = Vector2(116, 30)
+	speaker_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	speaker_label.add_theme_font_size_override("font_size", 15)
 	speaker_label.add_theme_color_override("font_color", Color("#f4ca7b"))
 	speaker_label.mouse_filter = Control.MOUSE_FILTER_IGNORE

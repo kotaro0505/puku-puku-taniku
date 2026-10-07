@@ -43,6 +43,8 @@ const BATTLE_VIEW_WIDTH := 576.0
 const SCORE_LABEL_SIZE := Vector2(136, 50)
 const SCORE_LABEL_RIGHT_MARGIN := 20.0
 const SCORE_LABEL_FIELD_TOP_GAP := 170.0
+const OPPONENT_SCORE_RAISE := 16.0
+const RESULT_PANEL_POSITION := Vector2(78, 268)
 
 var language_code := "ja"
 var choice_layer: Control
@@ -152,7 +154,7 @@ func _build_ui() -> void:
 	logic_root = Node.new()
 	logic_root.name = "BattlePlantLogic"
 	add_child(logic_root)
-	opponent_score_label = _score_label(_score_label_position(OPPONENT_FIELD_RECT), Color("#ffd6b1"))
+	opponent_score_label = _score_label(_score_label_position(OPPONENT_FIELD_RECT, true), Color("#ffd6b1"))
 	battle_layer.add_child(opponent_score_label)
 	player_score_label = _score_label(_score_label_position(PLAYER_FIELD_RECT), Color("#e0ffd2"))
 	battle_layer.add_child(player_score_label)
@@ -166,7 +168,7 @@ func _build_ui() -> void:
 	battle_layer.add_child(sow_button)
 
 	result_panel = PanelContainer.new()
-	result_panel.position = Vector2(78, 394)
+	result_panel.position = RESULT_PANEL_POSITION
 	result_panel.size = Vector2(420, 236)
 	result_panel.add_theme_stylebox_override("panel", _box(Color(0.12, 0.065, 0.035, 0.96), Color("#f2c966"), 28, 4))
 	battle_layer.add_child(result_panel)
@@ -722,10 +724,10 @@ func _score_label(position_value: Vector2, color: Color) -> Label:
 	return label
 
 
-func _score_label_position(field_rect: Rect2) -> Vector2:
+func _score_label_position(field_rect: Rect2, is_opponent := false) -> Vector2:
 	return Vector2(
 		BATTLE_VIEW_WIDTH - SCORE_LABEL_RIGHT_MARGIN - SCORE_LABEL_SIZE.x,
-		field_rect.position.y - SCORE_LABEL_FIELD_TOP_GAP
+		field_rect.position.y - SCORE_LABEL_FIELD_TOP_GAP - (OPPONENT_SCORE_RAISE if is_opponent else 0.0)
 	)
 
 

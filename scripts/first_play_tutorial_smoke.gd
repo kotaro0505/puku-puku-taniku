@@ -23,7 +23,11 @@ func _ready() -> void:
 	# "leftover seed" story.
 	game._start_intro_story()
 	assert(game.intro_dialogue_label.text == Localizer.text("ja", "intro_old_seed"))
-	assert(game.intro_dialogue_label.text == "はい、これ。きみの分の1粒だよ。古いから、芽が出るかは分からないけど…")
+	assert(game.intro_dialogue_label.text == "はい、これ。きみの分の1粒。古いから、芽が出るかは分からないけど…")
+	assert(Localizer.text("hiragana", "intro_old_seed") == "はい、これ。きみの ぶんの 1つぶ。ふるいから、めが でるかは わからないけど…")
+	assert(Localizer.text("en", "intro_old_seed") == "Here, one seed for you. It's old, so I don't know if it will sprout...")
+	assert("ぼくが まいた たね" in Localizer.text("hiragana", "story_trio_1"))
+	assert("The seed I planted" in Localizer.text("en", "story_trio_1"))
 	assert(not "売れ残った" in game.intro_dialogue_label.text)
 	game._advance_intro_story()
 	assert(game.intro_dialogue_label.text == Localizer.text("ja", "intro_old_seed_get"))
@@ -33,9 +37,15 @@ func _ready() -> void:
 	game._advance_intro_story()
 	assert(game.intro_story_complete and game.old_seed_bags == 1)
 	assert(game.OLD_SEED_GERMINATION_COUNT == 1)
-
-	game._hide_first_play_tutorial_overlay()
-	game._start_greenhouse_play("old")
+	assert(game.tutorial_guide_overlay.visible and str(game.tutorial_guide_button.get_meta("target", "")) == "play_open")
+	assert(game._first_old_seed_play_pending())
+	game.normal_seed_bags = 1
+	assert(not game._first_old_seed_play_pending())
+	game.normal_seed_bags = 0
+	game._update_play_ui()
+	assert(game.play_open_button.text == Localizer.text("ja", "play_first_old_seed"))
+	game._complete_tutorial_guide()
+	assert(game.play_active and not game.play_overlay.visible)
 	await get_tree().create_timer(0.45).timeout
 	game.set_process(false)
 	assert(game.play_active and not game.first_play_tutorial_active)
@@ -67,7 +77,7 @@ func _ready() -> void:
 	assert(game.intro_dialogue_label.text == Localizer.text("ja", "old_seed_reaction_trio") and game.intro_trio_portraits.visible)
 	assert(game.intro_trio_portraits.get_child_count() == 3)
 	for trio_portrait in game.intro_trio_portraits.get_children():
-		assert((trio_portrait as TextureRect).size.is_equal_approx(Vector2(86, 126)))
+		assert((trio_portrait as TextureRect).size.is_equal_approx(Vector2(86, 112)))
 	game._advance_scripted_dialog()
 	assert(game.intro_dialogue_label.text == Localizer.text("ja", "old_seed_reaction_girl"))
 	game._advance_scripted_dialog()
@@ -315,8 +325,10 @@ func _ready() -> void:
 	assert(str(tutorial_new_entry.get("rarity", "")) == "通常")
 	assert(game._species_get_count(tutorial_harvest_species_id) == 0)
 	assert(not game.first_play_tutorial_reserved_plant.jelly_checks_enabled)
+	var reserved_observe_start_cm: float = game.first_play_tutorial_reserved_plant.diameter_cm
 	game._process(game.FIRST_PLAY_TUTORIAL_NEW_OBSERVE_SECONDS - .01)
 	assert(not game.first_play_tutorial_dialog_visible)
+	assert(game.first_play_tutorial_reserved_plant.diameter_cm > reserved_observe_start_cm)
 	game._process(.02)
 	assert(game.first_play_tutorial_dialog_visible)
 	assert(game.tutorial_guide_message.text == "見て！はじめて見る品種が出てる！")

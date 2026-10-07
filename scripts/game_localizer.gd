@@ -17,7 +17,7 @@ const TEXT := {
 		"mission_return_tutorial": "原生地の多肉を温室へ還そう！",
 		"mission_meet_jurejure": "原生地でジュレジュレ団に会おう！",
 		"mission_battle_jurejure": "ジュレジュレ団とぷくぷくバトルをしよう！",
-		"mission_fantasy_species": "新しい品種を24種類見つけよう！　%d/24",
+		"mission_fantasy_species": "最高記録を目指しながら、新しい品種を24種類見つけよう！　%d/24",
 		"mission_jurejure_species": "ジュレジュレ団品種を8種類集めよう！　%d/8",
 		"mission_check_habitat": "原生地の様子を確かめよう！",
 		"mission_return_greenhouse": "温室へ戻って、原生地を元に戻す方法を考えよう！",
@@ -26,10 +26,10 @@ const TEXT := {
 		"mission_watch_restoration": "原生地の復興を見届けよう！",
 		"opening_tap": "タップしてはじめる",
 		"opening_story_tap": "タップしてつぎへ",
-		"opening_story_1": "ある日、女の子は古い倉庫のすみで、ほこりをかぶった一冊の本を見つけました。\n\n「なんだろう、これ……」",
+		"opening_story_1": "ある日、ガーデニングが大好きな女の子が、古い倉庫のすみで、ほこりをかぶった一冊の本を見つけました。\n\n「なんだろう、これ……」",
 		"opening_story_2": "ほこりを払い、みんなで本を見てみると——\n\nそれは、古い植物の本のようでした。",
 		"opening_story_3": "ページを開くと、そこには見たことのない植物がたくさん描かれていました。\n\nぷっくりした葉。変わったかたち。不思議な色。\n\nそこには、「多肉植物」という言葉が。\n\n「こんな植物、本当にあったのかな……」",
-		"opening_story_4": "そのころパンダも、別の場所で古いタネ袋を見つけていました。\n\n「これ、なんのタネだろう？」\n\n本に描かれた植物を見ながら、3人は顔を見合わせました。\n\n「もしかして……この植物のタネかもしれない」\n\nそこで3人は、タネを分けて蒔いてみることにしました。",
+		"opening_story_4": "翌日、お花屋さんのパンダが、古いタネ袋を見つけました。\n\n「これ、なんのタネだろう？」\n\n3人は顔を見合わせました。\n\n「もしかして……多肉植物のタネ！？」\n\n3人は、そのタネを蒔いてみることにしました。",
 		"panda_shop_name": "パンダのお店",
 		"armadillo_name": "アルマジロ",
 		"story_speaker_girl": "女の子",
@@ -41,7 +41,7 @@ const TEXT := {
 		"jurejure_peccary_name": "ペッカリー",
 		"next": "つぎへ",
 		"daily_seed_gift": "今日も来てくれてありがとう。\nたね（12粒）×1セット GET！",
-		"intro_old_seed": "はい、これ。きみの分の1粒だよ。古いから、芽が出るかは分からないけど…",
+		"intro_old_seed": "はい、これ。きみの分の1粒。古いから、芽が出るかは分からないけど…",
 		"intro_old_seed_get": "古い種 ×1 GET",
 		"old_seed_reaction_sprout": "見て！芽が出たよ！",
 		"old_seed_reaction_trio": "多肉植物だ！！",
@@ -50,7 +50,7 @@ const TEXT := {
 		"story_colorata_1": "本当に多肉植物のタネだったなんて！",
 		"story_colorata_2": "この本によると、これは『%s』っていう種類らしいよ！",
 		"story_colorata_3": "すごい。世界に多肉植物が帰って来てくれたんだ……！",
-		"story_trio_1": "聞いて！ ぼくのタネも育ったんだ！\nこの本によると『%s』っていうみたい。",
+		"story_trio_1": "聞いて！ ぼくが蒔いたタネも育ったんだ！\nこの本によると『%s』っていうみたい。",
 		"story_trio_2": "僕もだよ！『%s』っていう種類らしい。",
 		"story_trio_3": "信じられない。長い間失われていた植物を\nこうして見られるなんて……。",
 		"story_trio_4": "とってもきれい。そして、ぷくぷくしてて可愛いね！",
@@ -60,7 +60,7 @@ const TEXT := {
 		"awakening_empty_1": "記録では、ここで間違いないはずなんだけど……。",
 		"awakening_empty_2": "何もないね……。",
 		"awakening_overharvest": "乱獲や密猟も、絶滅の大きな原因だったみたいだ……。",
-		"awakening_sow": "最初に見つけた古いたねが、まだ少し残ってる。ここに蒔いてみよう。",
+		"awakening_sow": "たねがまだ少し残ってる。ここに蒔いてみよう。",
 		"awakening_surprise": "なんだ！？",
 		"awakening_memory": "……この場所、\n昔ここにあった多肉たちを\n思い出しているように見える……。",
 		"awakening_thanks": "素敵な思い出を見せてくれて、ありがとう。",
@@ -232,12 +232,12 @@ const TEXT := {
 		"restoration_returned_system": "%d株目の多肉を原生地に還した！",
 		"restoration_return_1_armadillo": "見て！ちゃんと根付いてる！",
 		"restoration_return_1_panda": "ほんとだ！",
-		"restoration_return_1_girl": "この株から、原生地を元に戻せるかもしれないね！",
+		"restoration_return_1_girl": "さぁ、もっとここへ多肉を持ってこよう！",
 		"restoration_return_1_mouse": "……なかなかやるチュー。",
 		"restoration_return_1_peccary": "でっかいッペ……。",
 		"restoration_return_1_skunk": "この調子でどんどんいきまスカ！",
 		"restoration_return_2_girl": "2つ目も根付いたよ！",
-		"restoration_return_2_armadillo": "原生地の様子も、少し変わってきた気がする。",
+		"restoration_return_2_armadillo": "届いてくれるといいな…",
 		"restoration_return_2_mouse": "…なかなかの株だチュー。",
 		"restoration_return_2_peccary": "オレが運んだッペ。",
 		"restoration_return_2_skunk": "もういっちょ、運びまスカ！",
@@ -249,12 +249,12 @@ const TEXT := {
 		"restoration_return_3_peccary": "戻ってきてるッペ！",
 		"restoration_return_3_skunk": "まだまだ持ってきまスカ！",
 		"restoration_return_4_girl": "これで4つめだね！",
-		"restoration_return_4_armadillo": "もう少しだ。",
+		"restoration_return_4_armadillo": "少し明るくなってきた",
 		"restoration_return_4_girl_2": "最初に来た頃みたいになってきたね。",
-		"restoration_return_4_mouse": "あと一株チュー！",
+		"restoration_return_4_mouse": "頼むから早く元気になれチュー！",
 		"restoration_return_4_peccary": "次のやつ早く育てるッペ！",
 		"restoration_return_4_skunk": "ここまで来てダンボールには戻れないッスカ！",
-		"restoration_return_4_panda": "そこなの？",
+		"restoration_return_4_panda": "…",
 		"restoration_return_5_system": "5株の多肉を原生地に還した！",
 		"restoration_return_5_girl": "これで5株目だよ。",
 		"restoration_slide_title": "原生地へ、少しずつ",
@@ -413,9 +413,10 @@ const TEXT := {
 		,"seed_remaining": "たね\n残り %d粒"
 		,"series_seed_remaining": "シリーズ種\n残り %d粒"
 		,"play_old_seed": "古いたねをまく　1粒　残り%d袋"
+		,"play_first_old_seed": "古いたねをまく"
 		,"play_normal_seed": "たねをまく　12粒　残り%dセット"
 		,"play_normal_seed_endless": "たねをまく"
-		,"play_normal_seed_round": "たねをまく　1ぷく"
+		,"play_normal_seed_round": "たねをまく　1ぷくコイン"
 		,"play_normal_seed_round_free": "たねをまく　無料"
 		,"play_normal_seed_round_help": "パンダのお手伝いをする\n＋1ぷくコイン"
 		,"normal_sets_endless": "通常のたね：∞"
@@ -728,7 +729,7 @@ const TEXT := {
 		"mission_return_tutorial": "げんせいちの たにくを おんしつへ かえそう！",
 		"mission_meet_jurejure": "げんせいちで じゅれじゅれだんに あおう！",
 		"mission_battle_jurejure": "じゅれじゅれだんと ぷくぷくばとるを しよう！",
-		"mission_fantasy_species": "あたらしい ひんしゅを 24しゅるい みつけよう！　%d/24",
+		"mission_fantasy_species": "さいこうきろくを めざしながら、あたらしい ひんしゅを 24しゅるい みつけよう！　%d/24",
 		"mission_jurejure_species": "じゅれじゅれだんひんしゅを 8しゅるい あつめよう！　%d/8",
 		"mission_check_habitat": "げんせいちの ようすを たしかめよう！",
 		"mission_return_greenhouse": "おんしつへ もどって、げんせいちを もとに もどす ほうほうを かんがえよう！",
@@ -737,10 +738,10 @@ const TEXT := {
 		"mission_watch_restoration": "げんせいちの ふっこうを みとどけよう！",
 		"opening_tap": "タップして はじめる",
 		"opening_story_tap": "タップして つぎへ",
-		"opening_story_1": "あるひ、おんなのこは ふるい そうこの すみで、ほこりを かぶった いっさつの ほんを みつけました。\n\n「なんだろう、これ……」",
+		"opening_story_1": "あるひ、がーでにんぐが だいすきな おんなのこが、ふるい そうこの すみで、ほこりを かぶった いっさつの ほんを みつけました。\n\n「なんだろう、これ……」",
 		"opening_story_2": "ほこりを はらい、みんなで ほんを みてみると——\n\nそれは、ふるい しょくぶつの ほんのようでした。",
 		"opening_story_3": "ぺーじを ひらくと、そこには みたことのない しょくぶつが たくさん えがかれていました。\n\nぷっくりした は。かわった かたち。ふしぎな いろ。\n\nそこには、「たにくしょくぶつ」という ことばが。\n\n「こんな しょくぶつ、ほんとうに あったのかな……」",
-		"opening_story_4": "そのころ ぱんだも、べつの ばしょで ふるい たねぶくろを みつけていました。\n\n「これ、なんの たねだろう？」\n\nほんに えがかれた しょくぶつを みながら、3にんは かおを みあわせました。\n\n「もしかして……この しょくぶつの たねかもしれない」\n\nそこで3にんは、たねを わけて まいてみることに しました。",
+		"opening_story_4": "よくじつ、おはなやさんの ぱんだが、ふるい たねぶくろを みつけました。\n\n「これ、なんの たねだろう？」\n\n3にんは かおを みあわせました。\n\n「もしかして……たにくしょくぶつの たね！？」\n\n3にんは、その たねを まいてみることに しました。",
 		"panda_shop_name": "ぱんだの おみせ",
 		"armadillo_name": "あるまじろ",
 		"story_speaker_girl": "おんなのこ",
@@ -752,7 +753,7 @@ const TEXT := {
 		"jurejure_peccary_name": "ぺっかりー",
 		"next": "つぎへ",
 		"daily_seed_gift": "きょうも きてくれて ありがとう。\nたね（12つぶ）×1せっと げっと！",
-		"intro_old_seed": "はい、これ。きみの ぶんの 1つぶだよ。ふるいから、めが でるかは わからないけど…",
+		"intro_old_seed": "はい、これ。きみの ぶんの 1つぶ。ふるいから、めが でるかは わからないけど…",
 		"intro_old_seed_get": "ふるい たね ×1 げっと",
 		"old_seed_reaction_sprout": "みて！めが でたよ！",
 		"old_seed_reaction_trio": "たにくしょくぶつだ！！",
@@ -761,7 +762,7 @@ const TEXT := {
 		"story_colorata_1": "ほんとうに たにくしょくぶつの たねだったなんて！",
 		"story_colorata_2": "この ほんによると、これは『%s』っていう しゅるいらしいよ！",
 		"story_colorata_3": "すごい。せかいに たにくしょくぶつが かえってきてくれたんだ……！",
-		"story_trio_1": "きいて！ ぼくの たねも そだったんだ！\nこの ほんによると『%s』っていうみたい。",
+		"story_trio_1": "きいて！ ぼくが まいた たねも そだったんだ！\nこの ほんによると『%s』っていうみたい。",
 		"story_trio_2": "ぼくもだよ！『%s』っていう しゅるいらしい。",
 		"story_trio_3": "しんじられない。ながいあいだ うしなわれていた しょくぶつを\nこうして みられるなんて……。",
 		"story_trio_4": "とっても きれい。そして、ぷくぷくしてて かわいいね！",
@@ -771,7 +772,7 @@ const TEXT := {
 		"awakening_empty_1": "きろくでは、ここで まちがいないはずなんだけど……。",
 		"awakening_empty_2": "なにも ないね……。",
 		"awakening_overharvest": "らんかくや みつりょうも、ぜつめつの おおきな げんいんだったみたいだ……。",
-		"awakening_sow": "さいしょに みつけた ふるい たねが、まだ すこし のこってる。ここに まいてみよう。",
+		"awakening_sow": "たねが まだ すこし のこってる。ここに まいてみよう。",
 		"awakening_surprise": "なんだ！？",
 		"awakening_memory": "……この ばしょ、\nむかし ここに あった たにくたちを\nおもいだしているように みえる……。",
 		"awakening_thanks": "すてきな おもいでを みせてくれて、ありがとう。",
@@ -943,12 +944,12 @@ const TEXT := {
 		"restoration_returned_system": "%dかぶめの たにくを げんせいちに かえした！",
 		"restoration_return_1_armadillo": "みて！ちゃんと ねづいてる！",
 		"restoration_return_1_panda": "ほんとだ！",
-		"restoration_return_1_girl": "この かぶから、げんせいちを もとに もどせるかもしれないね！",
+		"restoration_return_1_girl": "さぁ、もっと ここへ たにくを もってこよう！",
 		"restoration_return_1_mouse": "……なかなか やるチュー。",
 		"restoration_return_1_peccary": "でっかいッペ……。",
 		"restoration_return_1_skunk": "この ちょうしで どんどん いきまスカ！",
 		"restoration_return_2_girl": "2つめも ねづいたよ！",
-		"restoration_return_2_armadillo": "げんせいちの ようすも、すこし かわってきた きがする。",
+		"restoration_return_2_armadillo": "とどいてくれると いいな…",
 		"restoration_return_2_mouse": "…なかなかの かぶだチュー。",
 		"restoration_return_2_peccary": "おれが はこんだッペ。",
 		"restoration_return_2_skunk": "もういっちょ、はこびまスカ！",
@@ -960,12 +961,12 @@ const TEXT := {
 		"restoration_return_3_peccary": "もどってきてるッペ！",
 		"restoration_return_3_skunk": "まだまだ もってきまスカ！",
 		"restoration_return_4_girl": "これで 4つめだね！",
-		"restoration_return_4_armadillo": "もう すこしだ。",
+		"restoration_return_4_armadillo": "すこし あかるくなってきた",
 		"restoration_return_4_girl_2": "さいしょに きたころ みたいに なってきたね。",
-		"restoration_return_4_mouse": "あと ひとかぶチュー！",
+		"restoration_return_4_mouse": "たのむから はやく げんきになれチュー！",
 		"restoration_return_4_peccary": "つぎのやつ はやく そだてるッペ！",
 		"restoration_return_4_skunk": "ここまで きて だんぼーるには もどれないッスカ！",
-		"restoration_return_4_panda": "そこなの？",
+		"restoration_return_4_panda": "…",
 		"restoration_return_5_system": "5かぶの たにくを げんせいちに かえした！",
 		"restoration_return_5_girl": "これで 5かぶめだよ。",
 		"restoration_slide_title": "げんせいちへ、すこしずつ",
@@ -1124,9 +1125,10 @@ const TEXT := {
 		,"seed_remaining": "たね\nのこり %dつぶ"
 		,"series_seed_remaining": "しりーずの たね\nのこり %dつぶ"
 		,"play_old_seed": "ふるい たねを まく　1つぶ　のこり%dふくろ"
+		,"play_first_old_seed": "ふるい たねを まく"
 		,"play_normal_seed": "たねを まく　12つぶ　のこり%dせっと"
 		,"play_normal_seed_endless": "たねを まく"
-		,"play_normal_seed_round": "たねを まく　1ぷく"
+		,"play_normal_seed_round": "たねを まく　1ぷくこいん"
 		,"play_normal_seed_round_free": "たねを まく　むりょう"
 		,"play_normal_seed_round_help": "ぱんだの おてつだいをする\n＋1ぷくこいん"
 		,"normal_sets_endless": "ふつうの たね：むげん"
@@ -1439,7 +1441,7 @@ const TEXT := {
 		"mission_return_tutorial": "Return the habitat succulent to the greenhouse!",
 		"mission_meet_jurejure": "Meet the JureJure Gang at the habitat!",
 		"mission_battle_jurejure": "Challenge the JureJure Gang to a Puku Puku Battle!",
-		"mission_fantasy_species": "Discover 24 new varieties!  %d/24",
+		"mission_fantasy_species": "Aim for a new personal best while discovering 24 new varieties!  %d/24",
 		"mission_jurejure_species": "Collect 8 JureJure Gang varieties!  %d/8",
 		"mission_check_habitat": "Check what is happening at the habitat!",
 		"mission_return_greenhouse": "Return to the greenhouse and find a way to restore the habitat!",
@@ -1448,10 +1450,10 @@ const TEXT := {
 		"mission_watch_restoration": "See the habitat restoration through!",
 		"opening_tap": "Tap to Start",
 		"opening_story_tap": "Tap to continue",
-		"opening_story_1": "One day, the girl found a dusty old book in the corner of an old storeroom.\n\n\"What could this be...?\"",
+		"opening_story_1": "One day, a girl who loved gardening found a dusty old book in the corner of an old storeroom.\n\n\"What could this be...?\"",
 		"opening_story_2": "They brushed off the dust and looked through it together.\n\nIt seemed to be an old book about plants.",
 		"opening_story_3": "Inside were drawings of plants none of them had ever seen.\n\nPlump leaves. Strange shapes. Mysterious colors.\n\nThe pages called them \"succulents.\"\n\n\"Did plants like these really exist...?\"",
-		"opening_story_4": "Meanwhile, Panda had found an old bag of seeds somewhere else.\n\n\"What kind of seeds are these?\"\n\nLooking at the plants drawn in the book, the three glanced at one another.\n\n\"Maybe... these are seeds from those plants.\"\n\nSo they divided the seeds and decided to plant them.",
+		"opening_story_4": "The next day, Panda from the flower shop found an old bag of seeds.\n\n\"What kind of seeds are these?\"\n\nThe three looked at one another.\n\n\"Could these be... succulent seeds!?\"\n\nThey decided to plant the seeds and find out.",
 		"panda_shop_name": "Panda's Shop",
 		"armadillo_name": "Armadillo",
 		"story_speaker_girl": "Girl",
@@ -1463,7 +1465,7 @@ const TEXT := {
 		"jurejure_peccary_name": "Peccary",
 		"next": "Next",
 		"daily_seed_gift": "Thanks for coming back today!\nSeeds (12) × 1 set — GET!",
-		"intro_old_seed": "Here, this one's for you. It's old, so I don't know if it will sprout...",
+		"intro_old_seed": "Here, one seed for you. It's old, so I don't know if it will sprout...",
 		"intro_old_seed_get": "You got 1 old seed!",
 		"old_seed_reaction_sprout": "Look! It sprouted!",
 		"old_seed_reaction_trio": "It's a succulent!!",
@@ -1472,7 +1474,7 @@ const TEXT := {
 		"story_colorata_1": "Those really were succulent seeds!",
 		"story_colorata_2": "According to this book, this species is called '%s'!",
 		"story_colorata_3": "Amazing. Succulents have returned to the world...!",
-		"story_trio_1": "Listen! My seed grew too!\nAccording to this book, it's called '%s'.",
+		"story_trio_1": "Listen! The seed I planted grew too!\nAccording to this book, it's called '%s'.",
 		"story_trio_2": "Mine did too! It seems this species is called '%s'.",
 		"story_trio_3": "I can't believe it. We're really seeing plants\nthat were lost for so long...",
 		"story_trio_4": "They're so beautiful. And their plump leaves are adorable!",
@@ -1482,7 +1484,7 @@ const TEXT := {
 		"awakening_empty_1": "The records say this must be the place...",
 		"awakening_empty_2": "There's nothing here...",
 		"awakening_overharvest": "It seems overharvesting and poaching were also major causes of their extinction...",
-		"awakening_sow": "A few of the old seeds we first found are still left. Let's plant them here.",
+		"awakening_sow": "There are still a few seeds left. Let's plant them here.",
 		"awakening_surprise": "What is that?!",
 		"awakening_memory": "...It looks as though this place\nis remembering the succulents\nthat once grew here...",
 		"awakening_thanks": "Thank you for showing us these beautiful memories.",
@@ -1654,12 +1656,12 @@ const TEXT := {
 		"restoration_returned_system": "Returned large plant %d to the habitat!",
 		"restoration_return_1_armadillo": "Look! It has taken root!",
 		"restoration_return_1_panda": "It really has!",
-		"restoration_return_1_girl": "Maybe this plant can be the start of restoring the habitat!",
+		"restoration_return_1_girl": "Come on, let's bring more succulents here!",
 		"restoration_return_1_mouse": "...Not bad, chuu.",
 		"restoration_return_1_peccary": "It's huge, ppe...",
 		"restoration_return_1_skunk": "Let's keep this going, sska!",
 		"restoration_return_2_girl": "The second one took root too!",
-		"restoration_return_2_armadillo": "I think the habitat is starting to change a little.",
+		"restoration_return_2_armadillo": "I hope they make it...",
 		"restoration_return_2_mouse": "...That's quite a plant, chuu.",
 		"restoration_return_2_peccary": "I carried that one, ppe.",
 		"restoration_return_2_skunk": "Let's carry another, sska!",
@@ -1671,12 +1673,12 @@ const TEXT := {
 		"restoration_return_3_peccary": "They're coming back, ppe!",
 		"restoration_return_3_skunk": "Let's bring even more, sska!",
 		"restoration_return_4_girl": "That's number four!",
-		"restoration_return_4_armadillo": "Just a little more.",
+		"restoration_return_4_armadillo": "It's getting a little brighter.",
 		"restoration_return_4_girl_2": "It's starting to look like it did when we first came here.",
-		"restoration_return_4_mouse": "One more plant, chuu!",
+		"restoration_return_4_mouse": "Please, hurry up and get well, chuu!",
 		"restoration_return_4_peccary": "Grow the next one quickly, ppe!",
 		"restoration_return_4_skunk": "We didn't come this far just to go back to cardboard boxes, sska!",
-		"restoration_return_4_panda": "That's what you're worried about?",
+		"restoration_return_4_panda": "...",
 		"restoration_return_5_system": "Returned five large succulents to the habitat!",
 		"restoration_return_5_girl": "That's the fifth one.",
 		"restoration_slide_title": "Little by Little, Back to the Habitat",
@@ -1835,9 +1837,10 @@ const TEXT := {
 		,"seed_remaining": "Seeds\n%d left"
 		,"series_seed_remaining": "Series Seed\n%d seeds left"
 		,"play_old_seed": "Plant the old seed · 1 seed · %d bags"
+		,"play_first_old_seed": "Plant the old seed"
 		,"play_normal_seed": "Plant seeds · 12 seeds · %d sets"
 		,"play_normal_seed_endless": "Plant seeds"
-		,"play_normal_seed_round": "Plant 12 seeds · 1 Puku"
+		,"play_normal_seed_round": "Plant 12 seeds · 1 Puku Coin"
 		,"play_normal_seed_round_free": "Plant 12 seeds · Free"
 		,"play_normal_seed_round_help": "Help Panda\n+1 Puku Coin"
 		,"normal_sets_endless": "Normal seeds: unlimited"
