@@ -56,6 +56,8 @@ func _ready() -> void:
 	assert(main_source.contains('Engine.has_singleton("SharePlugin")'))
 	assert(main_source.contains('has_method("share_image")'))
 	assert(main_source.contains('"share_image",'))
+	assert(main_source.contains('_open_native_share_or_fallback(image_path,image_path.get_file(),"arrangement")'))
+	assert(main_source.contains("_create_arrangement_share_image"))
 	assert(not main_source.contains('has_method("share")'))
 	assert(main_source.contains("navigator.share"))
 	var notification_source:=FileAccess.get_file_as_string("res://scripts/habitat_notification_service.gd")

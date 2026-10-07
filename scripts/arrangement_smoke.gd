@@ -8,11 +8,11 @@ func _ready()->void:
 	var ui=game.arrangement_ui
 	var localizer=load("res://scripts/game_localizer.gd")
 	for locale in ["ja","hiragana","en"]:
-		for key in ["pot_available_count","pot_all_in_use","pot_save_unavailable","pot_owned_total","pot_bought_count","arrangement_dismantle","arrangement_dismantle_confirm","arrangement_dismantle_confirm_button","arrangement_dismantle_cancel","arrangement_choose_pot_hint","arrangement_view_saved","arrangement_saved_title","arrangement_save_limit_help","share_background","share_background_greenhouse","share_background_puku_members","share_background_jurejure_gang","share_background_all_characters","share_background_selected","share_background_available_from_start","share_background_unlock_exploitation","share_background_unlock_story_clear","share_background_unlock_collection_complete"]:assert(localizer.text(locale,key)!=key)
+		for key in ["pot_available_count","pot_all_in_use","pot_save_unavailable","pot_owned_total","pot_bought_count","arrangement_dismantle","arrangement_dismantle_confirm","arrangement_dismantle_confirm_button","arrangement_dismantle_cancel","arrangement_choose_pot_hint","arrangement_view_saved","arrangement_saved_title","arrangement_save_limit_help","share_action","share_creating","share_failed","share_opening","share_background","share_background_greenhouse","share_background_puku_members","share_background_jurejure_gang","share_background_all_characters","share_background_selected","share_background_available_from_start","share_background_unlock_exploitation","share_background_unlock_story_clear","share_background_unlock_collection_complete"]:assert(localizer.text(locale,key)!=key)
 	var share_backgrounds=load("res://scripts/arrangement_share_backgrounds.gd");var share_catalog:Array=share_backgrounds.catalog();assert(share_catalog.size()==4)
 	var share_ids:Array=[]
 	for background_value in share_catalog:
-		var background:Dictionary=background_value;share_ids.append(str(background.id));assert(ResourceLoader.exists(str(background.texture_path)) and background.has("name_key") and background.has("unlock_condition") and background.has("crop_mode") and background.get("focus") is Vector2)
+		var background:Dictionary=background_value;share_ids.append(str(background.id));assert(ResourceLoader.exists(str(background.texture_path)) and background.has("name_key") and background.has("unlock_condition") and background.has("crop_mode") and background.get("focus") is Vector2 and background.get("artwork_rect") is Rect2)
 	assert(share_ids==["greenhouse","puku_members","jurejure_gang","all_characters"] and not share_ids.has("collection_complete"))
 	assert(str(share_catalog[0].texture_path)=="res://assets/greenhouse-master-horizontal.png" and str(share_catalog[0].crop_mode)=="cover")
 	for background in share_catalog.slice(1):
@@ -33,7 +33,7 @@ func _ready()->void:
 	ui.open_home();assert(ui.home_page.visible and ui.pot_select_grid.get_child_count()==8 and not (ui.pot_select_grid.get_child(0) as Button).disabled and _has_label_text_containing(ui.pot_select_grid.get_child(0),"使用可能 ×1"))
 	assert(_has_label_text_containing(ui.home_page,"好きな鉢を選んで作ってみよう") and _has_button_text(ui.home_page,"作った作品を見る") and not _has_button_text(ui.home_page,"＋ 新しく作る"))
 	ui._select_editor_pot("shallow_terracotta");assert(ui.editor_page.visible and str(ui.current_arrangement.pot_id)=="shallow_terracotta" and ui.editor_message.text.is_empty())
-	assert(not _has_button_text(ui.editor_page,"共有背景") and not ui.share_background_panel.visible)
+	assert(not _has_button_text(ui.editor_page,"共有背景") and not _has_button_text(ui.editor_page,"共有") and not ui.share_background_panel.visible)
 	assert(not _has_label_text_containing(ui.editor_page,"タップで選択・ドラッグで移動"))
 	assert(game._pot_available_count("shallow_terracotta")==1 and ui._pot_available_count("shallow_terracotta")==1)
 	assert(not _has_button_text(ui.editor_page,"鉢を変更") and not ui.has_method("_change_editor_pot"))
@@ -102,7 +102,8 @@ func _ready()->void:
 	await get_tree().create_timer(ui.COMPLETION_DISPLAY_SECONDS+.08).timeout
 	assert(ui.viewer_page.visible and ui.viewer_plant_layer.get_child_count()==2 and ui.viewer_plant_layer.find_child("SelectionBorder",true,false)==null and not ui.completion_overlay.visible)
 	assert(ui.is_viewer_active() and ui.viewer_pot_layer.get_parent()==ui.viewer_artwork_root and ui.viewer_plant_layer.get_parent()==ui.viewer_artwork_root and ui.viewer_artwork_root.position.is_zero_approx() and ui.viewer_artwork_root.scale.is_equal_approx(Vector2.ONE))
-	assert(_has_button_text(ui.viewer_page,"共有背景") and str(game.saved_arrangements[0].share_background_id)=="greenhouse")
+	assert(_has_button_text(ui.viewer_page,"共有") and _has_button_text(ui.viewer_page,"共有背景") and str(game.saved_arrangements[0].share_background_id)=="greenhouse")
+	assert(ui.viewer_share_button.position.y==ui.viewer_share_background_button.position.y and ui.viewer_share_button.position.x<ui.viewer_share_background_button.position.x and ui.viewer_dismantle_button.position.y>ui.viewer_share_button.position.y)
 	var share_pot_usage_before:int=int(game._pot_usage_count("shallow_terracotta"));var share_available_before:int=int(game._pot_available_count("shallow_terracotta"));var share_plants_before:=JSON.stringify(game.saved_arrangements[0].plants);var share_created_at_before:=str(game.saved_arrangements[0].created_at);var share_transform_before:Dictionary=(game.saved_arrangements[0].viewer_transform as Dictionary).duplicate(true)
 	ui._open_share_background_panel();assert(ui.share_background_panel.visible and ui.share_background_cards.get_child_count()==4 and ui.share_background_scroll.horizontal_scroll_mode==ScrollContainer.SCROLL_MODE_AUTO and _has_label_text_containing(ui.share_background_panel,"✓ 選択中"))
 	var artwork_position_before_panel:Vector2=ui.viewer_artwork_root.position;ui._on_viewer_canvas_gui_input(_mouse_button(Vector2(220,280),true));ui._on_viewer_canvas_gui_input(_mouse_motion(Vector2(300,340)));ui._on_viewer_canvas_gui_input(_mouse_button(Vector2(300,340),false));assert(ui.viewer_artwork_root.position.is_equal_approx(artwork_position_before_panel))

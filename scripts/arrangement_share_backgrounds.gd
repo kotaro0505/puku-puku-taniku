@@ -15,6 +15,7 @@ const CATALOG := [
 		"unlock_text_key": "share_background_available_from_start",
 		"crop_mode": "cover",
 		"focus": Vector2(0.47, 0.70),
+		"artwork_rect": Rect2(0.05, 0.38, 0.90, 0.60),
 	},
 	{
 		"id": "puku_members",
@@ -24,6 +25,7 @@ const CATALOG := [
 		"unlock_text_key": "share_background_available_from_start",
 		"crop_mode": "native_9_16",
 		"focus": Vector2(0.50, 0.50),
+		"artwork_rect": Rect2(0.05, 0.38, 0.90, 0.60),
 	},
 	{
 		"id": "jurejure_gang",
@@ -33,6 +35,7 @@ const CATALOG := [
 		"unlock_text_key": "share_background_unlock_exploitation",
 		"crop_mode": "native_9_16",
 		"focus": Vector2(0.50, 0.50),
+		"artwork_rect": Rect2(0.05, 0.38, 0.90, 0.60),
 	},
 	{
 		"id": "all_characters",
@@ -42,6 +45,7 @@ const CATALOG := [
 		"unlock_text_key": "share_background_unlock_story_clear",
 		"crop_mode": "native_9_16",
 		"focus": Vector2(0.50, 0.50),
+		"artwork_rect": Rect2(0.05, 0.38, 0.90, 0.60),
 	},
 ]
 

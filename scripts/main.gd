@@ -107,6 +107,7 @@ const GREENHOUSE_AREA_FLICK_THRESHOLD := 650.0
 const ARRANGEMENT_TABLE_SOURCE_CENTER := Vector2(340.0,760.0)
 const ARRANGEMENT_TABLE_SCREEN_TARGET_RATIO := Vector2(0.50,760.0/1086.0)
 const ARRANGEMENT_POT_ANCHOR := Vector2(0.50,760.0/1086.0)
+const ARRANGEMENT_SHARE_TEXTURE_TIMEOUT_MSEC := 8000
 const HABITAT_DRAG_SCALE := 0.055
 const HABITAT_LOOKAROUND_DURATION_SECONDS := 8.0
 const HABITAT_ITEM_RADIUS := 9.0
@@ -661,6 +662,7 @@ var play_max_size := 0.0
 var play_previous_global_best := 0.0
 var play_updated_global_best := false
 var play_share_record:Dictionary={}
+var native_share_context:=""
 var play_notable_species: Dictionary = {}
 var play_hidden_species_unlocked := ""
 var current_target_count := NORMAL_GERMINATION_COUNT
@@ -2064,6 +2066,7 @@ func _build_arrangement_ui(hud:Control)->void:
 	arrangement_ui.save_requested.connect(_on_arrangement_save_requested)
 	arrangement_ui.viewer_transform_save_requested.connect(_on_arrangement_viewer_transform_save_requested)
 	arrangement_ui.share_background_save_requested.connect(_on_arrangement_share_background_save_requested)
+	arrangement_ui.share_requested.connect(_on_arrangement_share_requested)
 	arrangement_ui.dismantle_requested.connect(_on_arrangement_dismantle_requested)
 	arrangement_ui.pot_purchase_requested.connect(_on_pot_purchase_requested)
 	arrangement_ui.pot_unlock_requested.connect(_on_pot_unlock_requested)
@@ -2220,6 +2223,53 @@ func _on_arrangement_share_background_save_requested(arrangement_id:String,share
 		# arrangement-capacity validation.
 		_save();arrangement_ui.sync_state(owned_pots,saved_arrangements,arrangement_save_capacity)
 		return
+
+func _on_arrangement_share_requested(arrangement:Dictionary)->void:
+	if arrangement_ui==null or arrangement.is_empty():return
+	var image_path:String=await _create_arrangement_share_image(arrangement)
+	if image_path.is_empty():arrangement_ui.set_share_state(Localizer.text(language_code,"share_failed"),false);return
+	var shared:=_open_native_share_or_fallback(image_path,image_path.get_file(),"arrangement")
+	arrangement_ui.set_share_state(shared,false)
+
+func _create_arrangement_share_image(arrangement:Dictionary,output_path_override:String="")->String:
+	if arrangement_ui==null or arrangement.is_empty():return ""
+	var background_id:=ArrangementShareBackgroundsClass.normalize_id(arrangement.get("share_background_id",ArrangementShareBackgroundsClass.DEFAULT_ID))
+	var background_entry:=ArrangementShareBackgroundsClass.entry(background_id)
+	if background_entry.is_empty():return ""
+	if not await _prepare_arrangement_share_textures(arrangement):return ""
+	var output_path:=output_path_override
+	if output_path.is_empty():output_path="user://puku-arrangement-%d-%03d.png"%[int(Time.get_unix_time_from_system()),Time.get_ticks_msec()%1000]
+	return await arrangement_ui.create_share_image(arrangement,background_entry,output_path)
+
+func _prepare_arrangement_share_textures(arrangement:Dictionary)->bool:
+	var pending:Dictionary={}
+	var plants_value=arrangement.get("plants",[])
+	if not plants_value is Array:return false
+	for plant_value in plants_value:
+		if not plant_value is Dictionary:continue
+		var entry:=_catalog_entry(str(plant_value.get("species_id","")))
+		if entry.is_empty():return false
+		var path:=_species_image_path(entry)
+		if path.is_empty():return false
+		if CatalogImageLoader.is_external_path(path):
+			if CatalogImageLoader.is_cached(path):continue
+			if not pending.has(path):
+				pending[path]=0
+				CatalogImageLoader.request_texture(path,_on_arrangement_share_texture_ready.bind(path,pending),true)
+		elif not ResourceLoader.exists(path):return false
+	if pending.is_empty():return true
+	var deadline:=Time.get_ticks_msec()+ARRANGEMENT_SHARE_TEXTURE_TIMEOUT_MSEC
+	while Time.get_ticks_msec()<deadline:
+		var all_ready:=true
+		for state_value in pending.values():
+			if int(state_value)<0:return false
+			if int(state_value)==0:all_ready=false
+		if all_ready:return true
+		await get_tree().process_frame
+	return false
+
+func _on_arrangement_share_texture_ready(texture:Texture2D,path:String,pending:Dictionary)->void:
+	pending[path]=1 if texture!=null and CatalogImageLoader.is_cached(path) else -1
 
 func _on_pot_purchase_requested(pot_id:String)->void:
 	var pot:=_pot_entry(pot_id)
@@ -5198,17 +5248,22 @@ func _create_personal_best_share_image(record:Dictionary)->String:
 	viewport.queue_free()
 	return output_path if error==OK else ""
 
-func _open_native_share_or_fallback(image_path:String)->String:
+func _open_native_share_or_fallback(image_path:String,download_filename:String="",share_context:String="personal_best")->String:
 	var absolute_path:=ProjectSettings.globalize_path(image_path)
+	var safe_filename:=download_filename.strip_edges()
+	if safe_filename.is_empty():safe_filename=image_path.get_file()
+	if safe_filename.is_empty():safe_filename="puku-share.png"
+	var share_subject:=Localizer.text(language_code,"viewer_title") if share_context=="arrangement" else Localizer.text(language_code,"share_record")
 	if Engine.has_singleton("SharePlugin"):
 		var share_plugin=Engine.get_singleton("SharePlugin")
 		_connect_native_share_bridge(share_plugin)
+		native_share_context=share_context
 		if share_plugin and share_plugin.has_method("share_image"):
 			share_plugin.call(
 				"share_image",
 				absolute_path,
 				Localizer.text(language_code,"game_title"),
-				Localizer.text(language_code,"share_record"),
+				share_subject,
 				Localizer.text(language_code,"share_prompt")
 			)
 			return Localizer.text(language_code,"share_opening")
@@ -5218,7 +5273,7 @@ func _open_native_share_or_fallback(image_path:String)->String:
 				absolute_path,
 				"image/png",
 				Localizer.text(language_code,"game_title"),
-				Localizer.text(language_code,"share_record"),
+				share_subject,
 				Localizer.text(language_code,"share_prompt")
 			)
 			return Localizer.text(language_code,"share_opening")
@@ -5229,12 +5284,14 @@ func _open_native_share_or_fallback(image_path:String)->String:
 			native_share.call("share_file",absolute_path,"image/png",Localizer.text(language_code,"game_title"))
 			return Localizer.text(language_code,"share_opening")
 	if OS.has_feature("web"):
-		var bytes:=FileAccess.get_file_as_bytes(image_path);var encoded:=Marshalls.raw_to_base64(bytes);var quoted:=JSON.stringify(encoded);var share_title:=JSON.stringify(Localizer.text(language_code,"game_title"))
-		var script:="""(()=>{const b=atob(%s),a=new Uint8Array(b.length);for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i);const f=new File([a],'puku-personal-best.png',{type:'image/png'});const save=()=>{const u=URL.createObjectURL(f),x=document.createElement('a');x.href=u;x.download=f.name;x.click();setTimeout(()=>URL.revokeObjectURL(u),1000)};if(navigator.share&&navigator.canShare&&navigator.canShare({files:[f]})){navigator.share({title:%s,files:[f]}).catch(save)}else save();return true})()"""%[quoted,share_title]
-		JavaScriptBridge.eval(script,true)
+		var bytes:=FileAccess.get_file_as_bytes(image_path);var encoded:=Marshalls.raw_to_base64(bytes)
+		JavaScriptBridge.eval(_web_share_file_script(encoded,safe_filename,Localizer.text(language_code,"game_title")),true)
 		return Localizer.text(language_code,"share_web_opened")
 	OS.shell_open(absolute_path)
 	return "%s: %s"%[Localizer.text(language_code,"share_fallback"),absolute_path]
+
+func _web_share_file_script(encoded:String,filename:String,title:String)->String:
+	return """(()=>{const b=atob(%s),a=new Uint8Array(b.length);for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i);const f=new File([a],%s,{type:'image/png'});const save=()=>{const u=URL.createObjectURL(f),x=document.createElement('a');x.href=u;x.download=f.name;x.click();setTimeout(()=>URL.revokeObjectURL(u),1000)};if(navigator.share&&navigator.canShare&&navigator.canShare({files:[f]})){navigator.share({title:%s,files:[f]}).catch(save)}else save();return true})()"""%[JSON.stringify(encoded),JSON.stringify(filename),JSON.stringify(title)]
 
 func _connect_native_share_bridge(share_plugin:Object)->void:
 	if share_plugin==null:return
@@ -5247,13 +5304,19 @@ func _connect_native_share_bridge(share_plugin:Object)->void:
 		if share_plugin.has_signal(signal_name) and not share_plugin.is_connected(signal_name,handlers[signal_name]):share_plugin.connect(signal_name,handlers[signal_name])
 
 func _on_native_share_completed(_activity_type:="")->void:
-	if result_share_status:result_share_status.visible=true;result_share_status.text=Localizer.text(language_code,"share_complete")
+	_update_native_share_feedback("share_complete")
 
 func _on_native_share_canceled()->void:
-	if result_share_status:result_share_status.visible=true;result_share_status.text=Localizer.text(language_code,"share_canceled")
+	_update_native_share_feedback("share_canceled")
 
 func _on_native_share_failed(_message:="")->void:
-	if result_share_status:result_share_status.visible=true;result_share_status.text=Localizer.text(language_code,"share_native_failed")
+	_update_native_share_feedback("share_native_failed")
+
+func _update_native_share_feedback(key:String)->void:
+	var message:=Localizer.text(language_code,key)
+	if native_share_context=="arrangement" and arrangement_ui:arrangement_ui.set_share_state(message,false)
+	elif result_share_status:result_share_status.visible=true;result_share_status.text=message
+	native_share_context=""
 
 func _play_shop_new_species_animations(species_ids:Array)->void:
 	for species_id_value in species_ids:

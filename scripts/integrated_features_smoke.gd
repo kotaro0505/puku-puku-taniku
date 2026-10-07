@@ -75,7 +75,7 @@ func _test_one_time_gift_arrangement_and_share(game)->void:
 	game.play_share_record.clear();game._show_play_result();assert(not game.result_share_button.visible)
 	game.play_share_record={"species_id":"colorata","size":32.1};game._show_play_result();assert(game.result_share_button.visible)
 	var main_source:=FileAccess.get_file_as_string("res://scripts/main.gd")
-	assert(main_source.contains('Engine.has_singleton("SharePlugin")') and main_source.contains('has_method("share_image")') and main_source.contains("navigator.share") and main_source.contains("_queue_species_get"))
+	assert(main_source.contains('Engine.has_singleton("SharePlugin")') and main_source.contains('has_method("share_image")') and main_source.contains("navigator.share") and main_source.contains("_create_arrangement_share_image") and main_source.contains("_queue_species_get"))
 	assert(not main_source.contains("原種として図鑑に登録したよ"))
 
 func _test_removed_mystery_pod()->void:
