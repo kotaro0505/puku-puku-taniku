@@ -125,10 +125,12 @@ func _test_hybrid_lab_presentation(game) -> void:
 	assert(instruction_bottom <= result_frame.position.y)
 	var left_margin: float = game.fusion_lab_ui.parent_a_button.position.x
 	var right_margin: float = game.fusion_lab_ui.main_page.size.x - (game.fusion_lab_ui.parent_b_button.position.x + game.fusion_lab_ui.parent_b_button.size.x)
-	assert(is_equal_approx(left_margin, right_margin))
+	assert(is_equal_approx(left_margin, right_margin) and left_margin >= 12.0)
 	var left_gap: float = result_frame.position.x - (game.fusion_lab_ui.parent_a_button.position.x + game.fusion_lab_ui.parent_a_button.size.x)
 	var right_gap: float = game.fusion_lab_ui.parent_b_button.position.x - (result_frame.position.x + result_frame.size.x)
 	assert(is_equal_approx(left_gap, right_gap) and left_gap >= 8.0)
+	assert(game.fusion_lab_ui.parent_a_button.position.y >= instruction_bottom + 12.0)
+	assert(game.fusion_lab_ui.parent_b_button.position.y >= instruction_bottom + 12.0)
 	assert(game.fusion_lab_ui.main_page.position.y + game.fusion_lab_ui.back_button.position.y + game.fusion_lab_ui.back_button.size.y <= 1024.0)
 	var top_level_buttons: Array = game.fusion_lab_ui.get_children().filter(func(child: Node) -> bool: return child is Button)
 	assert(top_level_buttons.is_empty())

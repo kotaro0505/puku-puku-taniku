@@ -133,15 +133,15 @@ func _build_main_page() -> void:
 
 	parent_a_button = Button.new()
 	parent_a_button.name = "FusionParentA"
-	parent_a_button.position = Vector2(4, 68)
-	parent_a_button.size = Vector2(140, 210)
+	parent_a_button.position = Vector2(12, 72)
+	parent_a_button.size = Vector2(132, 206)
 	_skin_button(parent_a_button, Color("#d8ece5"), 16)
 	parent_a_button.pressed.connect(_open_picker.bind(0))
 	main_page.add_child(parent_a_button)
 	var parent_a_heading := Label.new()
 	parent_a_heading.name = "ParentAHeading"
-	parent_a_heading.position = Vector2(8, 7)
-	parent_a_heading.size = Vector2(124, 27)
+	parent_a_heading.position = Vector2(6, 7)
+	parent_a_heading.size = Vector2(120, 27)
 	parent_a_heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	parent_a_heading.add_theme_font_size_override("font_size", 15)
 	parent_a_heading.add_theme_color_override("font_color", UI_BROWN)
@@ -149,15 +149,15 @@ func _build_main_page() -> void:
 	parent_a_button.add_child(parent_a_heading)
 	parent_a_image = TextureRect.new()
 	parent_a_image.name = "ParentAImage"
-	parent_a_image.position = Vector2(8, 34)
-	parent_a_image.size = Vector2(124, 120)
+	parent_a_image.position = Vector2(6, 34)
+	parent_a_image.size = Vector2(120, 120)
 	parent_a_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	parent_a_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	parent_a_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent_a_button.add_child(parent_a_image)
 	parent_a_name_label = Label.new()
-	parent_a_name_label.position = Vector2(8, 156)
-	parent_a_name_label.size = Vector2(124, 46)
+	parent_a_name_label.position = Vector2(6, 156)
+	parent_a_name_label.size = Vector2(120, 46)
 	parent_a_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	parent_a_name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	parent_a_name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -169,15 +169,15 @@ func _build_main_page() -> void:
 
 	parent_b_button = Button.new()
 	parent_b_button.name = "FusionParentB"
-	parent_b_button.position = Vector2(340, 68)
-	parent_b_button.size = Vector2(140, 210)
+	parent_b_button.position = Vector2(340, 72)
+	parent_b_button.size = Vector2(132, 206)
 	_skin_button(parent_b_button, Color("#f0dbe5"), 16)
 	parent_b_button.pressed.connect(_open_picker.bind(1))
 	main_page.add_child(parent_b_button)
 	var parent_b_heading := Label.new()
 	parent_b_heading.name = "ParentBHeading"
-	parent_b_heading.position = Vector2(8, 7)
-	parent_b_heading.size = Vector2(124, 27)
+	parent_b_heading.position = Vector2(6, 7)
+	parent_b_heading.size = Vector2(120, 27)
 	parent_b_heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	parent_b_heading.add_theme_font_size_override("font_size", 15)
 	parent_b_heading.add_theme_color_override("font_color", UI_BROWN)
@@ -185,15 +185,15 @@ func _build_main_page() -> void:
 	parent_b_button.add_child(parent_b_heading)
 	parent_b_image = TextureRect.new()
 	parent_b_image.name = "ParentBImage"
-	parent_b_image.position = Vector2(8, 34)
-	parent_b_image.size = Vector2(124, 120)
+	parent_b_image.position = Vector2(6, 34)
+	parent_b_image.size = Vector2(120, 120)
 	parent_b_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	parent_b_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	parent_b_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent_b_button.add_child(parent_b_image)
 	parent_b_name_label = Label.new()
-	parent_b_name_label.position = Vector2(8, 156)
-	parent_b_name_label.size = Vector2(124, 46)
+	parent_b_name_label.position = Vector2(6, 156)
+	parent_b_name_label.size = Vector2(120, 46)
 	parent_b_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	parent_b_name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	parent_b_name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
