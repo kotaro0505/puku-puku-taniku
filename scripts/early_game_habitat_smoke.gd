@@ -182,7 +182,7 @@ func _ready() -> void:
 	await get_tree().create_timer(.82).timeout
 	assert(not game.seed_pod_story_overlay.visible and bool(game.tutorial_steps.get("seed_pod_story_seen", false)))
 	assert(game.mystery_items_acquired and game.seed_shop_open and game.normal_seed_bags == 0 and game.puku_balance_units == game.INITIAL_PUKU_CAPITAL_UNITS and game.puku_points == 5)
-	assert(game.current_mode == "greenhouse" and not game.seed_pod_gauge_area.visible and game.puku_gauge_area.visible and game.encyclopedia_icon_button.visible)
+	assert(game.current_mode == "greenhouse" and not game.seed_pod_gauge_area.visible and game.puku_gauge_area.visible and not game.encyclopedia_icon_button.visible)
 	assert(not game.scene_transition_fade.visible and game.scripted_dialog_kind == "habitat_return")
 	assert(game.scripted_dialog_pages.size() == 5)
 	var return_keys := ["habitat_return_panda", "habitat_return_girl_1", "habitat_return_armadillo_1", "habitat_return_girl_2", "habitat_return_armadillo_2"]

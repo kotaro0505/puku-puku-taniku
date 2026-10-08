@@ -2586,8 +2586,8 @@ func _build_intro_story(hud:Control)->void:
 	var shade:=ColorRect.new();shade.color=Color(0.08,0.05,0.025,.18);shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);shade.mouse_filter=Control.MOUSE_FILTER_STOP;intro_overlay.add_child(shade)
 	intro_dialog_panel=PanelContainer.new();intro_dialog_panel.position=Vector2(40,690);intro_dialog_panel.size=Vector2(496,255);intro_dialog_panel.add_theme_stylebox_override("panel",_box(Color(0.97,0.90,0.75,.96),Color("#a86f36"),24,4));intro_overlay.add_child(intro_dialog_panel)
 	var dialog_row:=HBoxContainer.new();dialog_row.alignment=BoxContainer.ALIGNMENT_CENTER;dialog_row.add_theme_constant_override("separation",12);intro_dialog_panel.add_child(dialog_row)
-	intro_portrait_slot=Control.new();intro_portrait_slot.custom_minimum_size=Vector2(132,205);intro_portrait_slot.mouse_filter=Control.MOUSE_FILTER_IGNORE;dialog_row.add_child(intro_portrait_slot)
-	intro_panda_portrait=TextureRect.new();intro_panda_portrait.texture=_panda_portrait_texture();intro_panda_portrait.position=Vector2(0,32);intro_panda_portrait.size=Vector2(132,173);intro_panda_portrait.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;intro_panda_portrait.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;intro_panda_portrait.mouse_filter=Control.MOUSE_FILTER_IGNORE;intro_panda_portrait.visible=false;intro_portrait_slot.add_child(intro_panda_portrait)
+	intro_portrait_slot=Control.new();intro_portrait_slot.custom_minimum_size=Vector2(132,205);intro_portrait_slot.clip_contents=true;intro_portrait_slot.mouse_filter=Control.MOUSE_FILTER_IGNORE;dialog_row.add_child(intro_portrait_slot)
+	intro_panda_portrait=TextureRect.new();intro_panda_portrait.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;intro_panda_portrait.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;intro_panda_portrait.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);intro_panda_portrait.offset_top=32.0;intro_panda_portrait.texture=_panda_portrait_texture();intro_panda_portrait.mouse_filter=Control.MOUSE_FILTER_IGNORE;intro_panda_portrait.visible=false;intro_portrait_slot.add_child(intro_panda_portrait)
 	intro_trio_portraits=Control.new();intro_trio_portraits.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);intro_trio_portraits.mouse_filter=Control.MOUSE_FILTER_IGNORE;intro_trio_portraits.visible=false;intro_portrait_slot.add_child(intro_trio_portraits)
 	var trio_layout:=[{"speaker":"panda","position":Vector2(0,88)},{"speaker":"armadillo","position":Vector2(76,88)},{"speaker":"girl","position":Vector2(38,32)}]
 	for trio_entry in trio_layout:
@@ -2618,7 +2618,7 @@ func _position_tutorial_dialog(avoid:Rect2)->void:
 	tutorial_dialog_panel.position=center if Rect2(bottom,tutorial_dialog_panel.size).intersects(avoid) else bottom
 
 func _start_intro_story()->void:
-	intro_is_daily_gift=false;tutorial_dialog_kind="";intro_story_step=0;current_mode="greenhouse";_apply_mode();_set_shop_purchase_visible(false);shop_overlay.visible=false;intro_overlay.visible=true;intro_continue_button.visible=true;intro_fullscreen_continue_button.visible=false;_set_intro_speaker("panda");_position_intro_dialog();intro_speaker_label.visible=true;play_overlay.visible=false;play_open_button.visible=false;audio_manager.play_bgm("greenhouse");_advance_intro_story()
+	intro_is_daily_gift=false;tutorial_dialog_kind="";intro_story_step=0;current_mode="greenhouse";_apply_mode();_set_shop_purchase_visible(false);shop_overlay.visible=false;intro_overlay.visible=true;intro_continue_button.visible=true;intro_fullscreen_continue_button.visible=false;_set_intro_speaker("panda");_position_intro_dialog();intro_speaker_label.visible=true;play_overlay.visible=false;play_open_button.visible=false;audio_manager.play_bgm("greenhouse");_advance_intro_story();_update_play_ui()
 
 func _start_daily_seed_gift()->void:
 	intro_is_daily_gift=true;current_mode="greenhouse";_apply_mode();_set_shop_purchase_visible(false);shop_overlay.visible=true;intro_overlay.visible=true;_set_intro_speaker("panda");_position_intro_dialog();intro_speaker_label.visible=true;play_overlay.visible=false;play_open_button.visible=false;audio_manager.play_bgm("shop")
@@ -2657,7 +2657,7 @@ func _start_scripted_dialog(kind:String,pages:Array,shop_context:=false)->void:
 	scripted_dialog_kind=kind;scripted_dialog_pages.clear();scripted_dialog_index=-1;scripted_dialog_shop_context=shop_context
 	for page_value in pages:
 		if page_value is Dictionary:scripted_dialog_pages.append(page_value.duplicate(true))
-	intro_overlay.visible=true;intro_overlay.move_to_front();shop_overlay.visible=shop_context;play_overlay.visible=false;play_open_button.visible=false;_position_intro_dialog()
+	intro_overlay.visible=true;intro_overlay.move_to_front();shop_overlay.visible=shop_context;play_overlay.visible=false;play_open_button.visible=false;_position_intro_dialog();_update_play_ui()
 	if shop_context:
 		armadillo_present=scripted_dialog_pages.any(func(page:Dictionary)->bool:return str(page.get("speaker",""))=="armadillo")
 		shop_background.texture=load("res://assets/shop-background-armadillo.jpg" if armadillo_present else "res://assets/shop-background-final.jpg")
@@ -2864,7 +2864,7 @@ func _finish_scripted_dialog()->void:
 		call_deferred("_start_habitat_second_awakening")
 
 func _start_post_play_dialog(kind:String)->void:
-	tutorial_dialog_kind=kind;_set_shop_purchase_visible(false);shop_overlay.visible=true;intro_overlay.visible=true;_set_intro_speaker("panda");_position_intro_dialog();intro_speaker_label.visible=true;play_overlay.visible=false;play_open_button.visible=false;audio_manager.play_bgm("shop")
+	tutorial_dialog_kind=kind;_set_shop_purchase_visible(false);shop_overlay.visible=true;intro_overlay.visible=true;_set_intro_speaker("panda");_position_intro_dialog();intro_speaker_label.visible=true;play_overlay.visible=false;play_open_button.visible=false;_update_play_ui();audio_manager.play_bgm("shop")
 	if kind=="play1":
 		var tutorial_entry:=_catalog_entry(first_tutorial_species_id)
 		_set_intro_speaker("");intro_speaker_label.visible=false;intro_dialogue_label.text=Localizer.text(language_code,"new")+"\n"+Localizer.species_name(language_code,tutorial_entry);intro_continue_button.text=Localizer.text(language_code,"continue")
@@ -4604,7 +4604,8 @@ func _update_play_ui()->void:
 	var gacha_open:bool=(forest_gacha_ui!=null and forest_gacha_ui.visible) or (species_get_overlay!=null and species_get_overlay.visible) or (catalog_series_unlock_overlay!=null and catalog_series_unlock_overlay.visible) or (fusion_lab_ui!=null and fusion_lab_ui.visible)
 	var battle_open:bool=puku_puku_battle!=null and puku_puku_battle.visible
 	var habitat_modal_open:bool=battle_open or (habitat_plant_panel!=null and habitat_plant_panel.visible) or (habitat_dev_panel!=null and habitat_dev_panel.visible) or (story_dev_panel!=null and story_dev_panel.visible) or (habitat_awakening_overlay!=null and habitat_awakening_overlay.visible) or (seed_pod_story_overlay!=null and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay!=null and habitat_second_awakening_overlay.visible)
-	var arrangement_navigation_suspended:bool=arrangement_scene_active or arrangement_transitioning or catalog_preview_mode_active or preview_overlay_open or gacha_open or habitat_modal_open or jurejure_intro_camera_active or habitat_lookaround_active
+	var conversation_navigation_suspended:bool=(intro_overlay!=null and intro_overlay.visible) or not scripted_dialog_kind.is_empty() or not tutorial_dialog_kind.is_empty()
+	var arrangement_navigation_suspended:bool=arrangement_scene_active or arrangement_transitioning or catalog_preview_mode_active or preview_overlay_open or gacha_open or habitat_modal_open or conversation_navigation_suspended or jurejure_intro_camera_active or habitat_lookaround_active
 	var arrangement_hud_hidden:bool=arrangement_scene_active or arrangement_transitioning
 	var endless_owns_normal_flow:=_endless_normal_flow_owns_play_controls()
 	var normal_round_start_visible:=not endless_owns_normal_flow or _endless_greenhouse_auto_start_unlocked()
