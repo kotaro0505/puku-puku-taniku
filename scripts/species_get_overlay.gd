@@ -23,6 +23,7 @@ var last_close_first_visual_msec:=-1
 var last_close_first_visual_latency_msec:=-1
 var last_close_hidden_msec:=-1
 var last_close_presented_msec:=-1
+var last_close_emitted_msec:=-1
 
 func _ready()->void:
 	name="SpeciesGetOverlay";set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);mouse_filter=Control.MOUSE_FILTER_STOP;visible=false;z_index=900
@@ -85,11 +86,7 @@ func close_overlay()->void:
 		await get_tree().process_frame
 	else:
 		await RenderingServer.frame_post_draw
-		# Web's frame_post_draw signal precedes browser composition. Keep the
-		# hidden canvas state alive through a browser-driven frame before closed
-		# handlers can start synchronous save or queue work.
-		if OS.has_feature("web"):
-			await get_tree().create_timer(0.12).timeout
-	last_close_presented_msec=Time.get_ticks_msec();busy=false;closed.emit(context)
+	last_close_presented_msec=Time.get_ticks_msec();busy=false
+	last_close_emitted_msec=Time.get_ticks_msec();closed.emit(context)
 
 func is_open()->bool:return visible

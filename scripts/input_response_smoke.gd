@@ -10,6 +10,12 @@ func _ready() -> void:
 	game._reset_progression_state()
 	_prepare_quiet_progress(game)
 	var get_metrics: Dictionary = await _test_get_card_response(game)
+	if OS.has_feature("web") and bool(JavaScriptBridge.eval("new URL(window.location.href).searchParams.has('get_close_profile')")):
+		print("INPUT_RESPONSE_SMOKE_OK get_close_profile_total_ms=",get_metrics.profile_total)
+		game.queue_free()
+		await get_tree().process_frame
+		get_tree().quit()
+		return
 	var gacha_latency: int = await _test_gacha_response(game)
 	var harvest_latency: int = await _test_old_seed_harvest_response(game)
 	var loader_source := FileAccess.get_file_as_string("res://scripts/catalog_image_loader.gd")
@@ -72,6 +78,27 @@ func _test_get_card_response(game: Node) -> Dictionary:
 	overlay.closed.disconnect(capture)
 	overlay.closed.connect(main_handler)
 
+	# The final NEW card must run through the production handler, finish the
+	# round-result queue, persist the formal registration, and restore input.
+	var single_id := "kannte"
+	for state in [game.discovered,game.species_get_counts,game.greenhouse_available,game.unlocked_species]:state.erase(single_id)
+	game.species_get_queue.clear()
+	game.pending_round_new_species_ids.assign([single_id])
+	game.round_result_species_finalize_queue.clear()
+	game.round_result_species_finalize_queue.append({"species_id":single_id,"formalize":true,"is_new":true})
+	game.round_result_species_finalize_active=true;game.round_result_species_save_pending=false
+	game.get_close_profile_enabled=true;game.get_close_profile_total_msec=-1
+	game._show_next_round_result_species()
+	assert(await _wait_until(func()->bool:return overlay.visible and game.species_get_active_species_id==single_id,800))
+	assert(game.round_result_species_save_pending and game._species_get_count(single_id)==1)
+	assert(await _wait_until(func()->bool:return not overlay.busy,900))
+	_tap_get_overlay(overlay)
+	assert(await _wait_until(func()->bool:return not game.round_result_species_finalize_active,900))
+	assert(await _wait_until(func()->bool:return game.get_close_profile_total_msec>=0,900))
+	assert(game.get_close_profile_save_count==1 and not game.round_result_species_save_pending)
+	var saved_payload=JSON.parse_string(FileAccess.get_file_as_string(game._active_save_path()))
+	assert(saved_payload is Dictionary and int(saved_payload.get("species_get_counts",{}).get(single_id,0))==1)
+
 	# Two NEW cards formalize in sequence while the durable write remains batched
 	# until the queue is empty. Each card still owns the correct species/context.
 	var ids: Array[String] = ["lutea", "laui"]
@@ -87,23 +114,27 @@ func _test_get_card_response(game: Node) -> Dictionary:
 	game.round_result_species_finalize_queue.append({"species_id": ids[1], "formalize": true, "is_new": true})
 	game.round_result_species_finalize_active = true
 	game.round_result_species_save_pending = false
+	game.get_close_profile_total_msec = -1
 	game._show_next_round_result_species()
 	assert(await _wait_until(func() -> bool: return overlay.visible and game.species_get_active_species_id == ids[0], 800))
 	assert(game.round_result_species_save_pending and game._species_get_count(ids[0]) == 1)
 	assert(await _wait_until(func() -> bool: return not overlay.busy, 900))
-	await overlay.close_overlay()
+	_tap_get_overlay(overlay)
 	assert(await _wait_until(func() -> bool: return overlay.visible and game.species_get_active_species_id == ids[1], 900))
 	assert(game.round_result_species_save_pending and game._species_get_count(ids[1]) == 1)
 	assert(await _wait_until(func() -> bool: return not overlay.busy, 900))
-	await overlay.close_overlay()
+	_tap_get_overlay(overlay)
 	assert(await _wait_until(func() -> bool: return not game.round_result_species_finalize_active, 900))
+	assert(await _wait_until(func() -> bool: return game.get_close_profile_total_msec >= 0, 900))
 	assert(not game.round_result_species_save_pending and game.round_result_species_finalize_queue.is_empty())
 	assert(game.pending_round_new_species_ids.is_empty() and not overlay.visible)
-	var main_source:=FileAccess.get_file_as_string("res://scripts/main.gd")
-	var queue_start:=main_source.find("func _show_next_round_result_species")
-	var queue_end:=main_source.find("func _start_result_new_species_pulse",queue_start)
-	assert(main_source.substr(queue_start,queue_end-queue_start).count("_save()") == 1)
-	return {"feedback": feedback_latency, "visual": overlay.last_close_first_visual_latency_msec, "hidden": hidden_latency}
+	assert(game.get_close_profile_save_count == 1)
+	if not OS.has_feature("web"):
+		var main_source:=FileAccess.get_file_as_string("res://scripts/main.gd")
+		var queue_start:=main_source.find("func _show_next_round_result_species")
+		var queue_end:=main_source.find("func _start_result_new_species_pulse",queue_start)
+		assert(main_source.substr(queue_start,queue_end-queue_start).count("_save()") == 1)
+	return {"feedback": feedback_latency, "visual": overlay.last_close_first_visual_latency_msec, "hidden": hidden_latency, "profile_total": game.get_close_profile_total_msec}
 
 func _test_gacha_response(game: Node) -> int:
 	game.forest_gacha_preview_mode = false
@@ -205,6 +236,11 @@ func _wait_until(predicate: Callable, timeout_msec: int) -> bool:
 			return true
 		await get_tree().process_frame
 	return bool(predicate.call())
+
+func _tap_get_overlay(overlay:Control)->void:
+	var event:=InputEventMouseButton.new()
+	event.button_index=MOUSE_BUTTON_LEFT;event.pressed=true
+	overlay._input(event)
 
 func _await_presented_frame() -> void:
 	if DisplayServer.get_name()=="headless":

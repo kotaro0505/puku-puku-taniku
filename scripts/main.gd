@@ -649,6 +649,14 @@ var pending_round_new_species_ids: Array[String] = []
 var round_result_species_finalize_queue: Array[Dictionary] = []
 var round_result_species_finalize_active := false
 var round_result_species_save_pending := false
+var get_close_profile_enabled := OS.is_debug_build()
+var get_close_profile_active := false
+var get_close_profile_events: Dictionary = {}
+var get_close_profile_event_order: Array[String] = []
+var get_close_profile_total_msec := -1
+var get_close_profile_slow_sections: Array[String] = []
+var get_close_profile_save_count := 0
+var get_close_profile_run_id := 0
 var catalog_series_unlock_notice_queue: Array[String] = []
 var catalog_series_unlock_notice_ready: Dictionary = {}
 var shop_chatter_acquired_species: Array[String] = []
@@ -1222,9 +1230,15 @@ func _load_save() -> void:
 			if migrating_legacy_puku_balance and _ensure_initial_puku_capital(false):puku_balance_migration_dirty=true
 
 func _save() -> void:
+	var profile_save_name := ""
+	if get_close_profile_enabled and get_close_profile_active:
+		get_close_profile_save_count += 1
+		profile_save_name = "save" if get_close_profile_save_count == 1 else "save_%d" % get_close_profile_save_count
+		_get_close_profile_mark(profile_save_name + "_start")
 	var f := FileAccess.open(_active_save_path(),FileAccess.WRITE)
 	if f==null:
 		push_error("Unable to open active save path: %s"%_active_save_path())
+		if not profile_save_name.is_empty():_get_close_profile_mark(profile_save_name + "_end")
 		return
 	if audio_manager:audio_settings=audio_manager.settings_dictionary()
 	var payload:={
@@ -1272,6 +1286,7 @@ func _save() -> void:
 	if _is_endless_greenhouse_enabled():payload["endless_discovery_state"]=endless_greenhouse.discovery_state_for_save()
 	f.store_string(JSON.stringify(payload))
 	f.close()
+	if not profile_save_name.is_empty():_get_close_profile_mark(profile_save_name + "_end")
 
 func _active_save_path()->String:
 	return endless_greenhouse.active_save_path()
@@ -4221,8 +4236,47 @@ func _show_next_species_get()->void:
 	_request_species_texture(entry,species_get_overlay.result_image,true)
 	if audio_manager:audio_manager.play_se("new_species",.9)
 
+func _get_close_profile_record_at(event_name:String,event_msec:int)->void:
+	if not get_close_profile_enabled or not get_close_profile_active or event_msec<0:return
+	if not get_close_profile_events.has(event_name):get_close_profile_event_order.append(event_name)
+	get_close_profile_events[event_name]=event_msec
+
+func _get_close_profile_mark(event_name:String)->void:
+	_get_close_profile_record_at(event_name,Time.get_ticks_msec())
+
+func _get_close_profile_begin_from_overlay(context:String)->void:
+	if not get_close_profile_enabled or context!="round_result_new" or species_get_overlay==null:return
+	get_close_profile_run_id+=1
+	get_close_profile_active=true
+	get_close_profile_events.clear();get_close_profile_event_order.clear();get_close_profile_slow_sections.clear()
+	get_close_profile_total_msec=-1;get_close_profile_save_count=0
+	_get_close_profile_record_at("close_tap",species_get_overlay.last_close_input_msec)
+	_get_close_profile_record_at("overlay_visible_false",species_get_overlay.last_close_hidden_msec)
+	_get_close_profile_record_at("closed_emit",species_get_overlay.last_close_emitted_msec)
+	_get_close_profile_mark("handler_entry")
+
+func _finish_get_close_profile_after_rendered_frame(profile_run_id:int)->void:
+	if not get_close_profile_enabled or profile_run_id!=get_close_profile_run_id or get_close_profile_events.is_empty():return
+	if DisplayServer.get_name()=="headless":await get_tree().process_frame
+	else:await RenderingServer.frame_post_draw
+	if profile_run_id!=get_close_profile_run_id:return
+	_get_close_profile_mark("input_ready")
+	get_close_profile_total_msec=int(get_close_profile_events["input_ready"])-int(get_close_profile_events["close_tap"])
+	var segment_text:Array[String]=[]
+	for index in range(1,get_close_profile_event_order.size()):
+		var previous_name:=get_close_profile_event_order[index-1]
+		var current_name:=get_close_profile_event_order[index]
+		var elapsed:=int(get_close_profile_events[current_name])-int(get_close_profile_events[previous_name])
+		var description:="%s->%s=%dms"%[previous_name,current_name,elapsed]
+		segment_text.append(description)
+		if elapsed>=50:get_close_profile_slow_sections.append(description)
+	print("GET_CLOSE_PROFILE total_ms=",get_close_profile_total_msec," segments=",", ".join(segment_text)," slow_50ms=",("none" if get_close_profile_slow_sections.is_empty() else ", ".join(get_close_profile_slow_sections)))
+	get_close_profile_active=false
+
 func _on_species_get_overlay_closed(context:String)->void:
+	_get_close_profile_begin_from_overlay(context)
 	_mark_collection_complete_get_card_seen(species_get_active_species_id)
+	_get_close_profile_mark("collection_seen_end")
 	species_get_active_context=""
 	species_get_active_species_id=""
 	var closed_series_id:=species_get_active_series_id
@@ -5228,6 +5282,7 @@ func _play_result_new_species_animations()->void:
 	_show_next_round_result_species()
 
 func _show_next_round_result_species()->void:
+	_get_close_profile_mark("show_next_entry")
 	if not species_get_queue.is_empty() or species_get_overlay and species_get_overlay.visible or catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible:return
 	if round_result_species_finalize_queue.is_empty():
 		round_result_species_finalize_active=false
@@ -5239,6 +5294,8 @@ func _show_next_round_result_species()->void:
 			round_result_species_save_pending=false;_save()
 		if total_play_count==1 and not first_colorata_confirmed:call_deferred("_start_first_colorata_discovery_event")
 		else:call_deferred("_try_start_pending_story_event")
+		_get_close_profile_mark("show_next_exit")
+		if get_close_profile_active:call_deferred("_finish_get_close_profile_after_rendered_frame",get_close_profile_run_id)
 		return
 	var queued:Dictionary=round_result_species_finalize_queue.pop_front()
 	var species_id:=str(queued.get("species_id",""))
@@ -5638,9 +5695,12 @@ func _collection_complete_get_card_seen()->bool:
 	return bool(_collection_complete_current_record().get("last_get_card_seen",false))
 
 func _mark_collection_complete_get_card_seen(species_id:String)->void:
-	if species_id.is_empty() or species_id!=_collection_completion_last_species_id():return
+	if species_id.is_empty():return
 	var record:=_collection_complete_current_record()
 	if not bool(record.get("completed",false)) or bool(record.get("last_get_card_seen",false)):return
+	var last_species_id:=str(record.get("last_species_id",""))
+	if last_species_id.is_empty():last_species_id=_collection_completion_last_species_id()
+	if species_id!=last_species_id:return
 	record["last_get_card_seen"]=true
 	collection_complete_versions[_game_version_key()]=record
 	_save()
