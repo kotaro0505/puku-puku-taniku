@@ -311,8 +311,8 @@ func _build_picker_page() -> void:
 	picker_page.add_child(picker_title_label)
 
 	picker_scroll = ScrollContainer.new()
-	picker_scroll.position = Vector2(3, 62)
-	picker_scroll.size = Vector2(475, 466)
+	picker_scroll.position = Vector2(16, 62)
+	picker_scroll.size = Vector2(468, 466)
 	picker_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	picker_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	picker_scroll.scroll_deadzone = 12
