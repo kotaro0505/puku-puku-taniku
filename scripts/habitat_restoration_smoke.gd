@@ -4,6 +4,7 @@ const HabitatRestorationClass = preload("res://scripts/habitat_restoration.gd")
 const HabitatRestorationUIClass = preload("res://scripts/habitat_restoration_ui.gd")
 const StoryProgressionClass = preload("res://scripts/story_progression.gd")
 const JureJureSystemClass = preload("res://scripts/jurejure_system.gd")
+const HabitatWildSystemClass = preload("res://scripts/habitat_wild_system.gd")
 const Localizer = preload("res://scripts/game_localizer.gd")
 
 
@@ -422,6 +423,7 @@ func _test_integrated_final_chapter() -> void:
 			medals.append(child)
 	assert(medals.size() == 5)
 	assert(medals[4].scale.x > medals[0].scale.x)
+	await _test_restoration_plant_pickups(game)
 	game.habitat_crisis_atmosphere.activate()
 	game.habitat_crisis_atmosphere.set_habitat_visible(true)
 	game.habitat_crisis_atmosphere.set_restoration_stage(3)
@@ -566,6 +568,140 @@ func _test_integrated_final_chapter() -> void:
 	assert(game.habitat_items_root.find_children("RestorationMedalPlant*","Sprite3D",true,false).size()==5)
 	game.free()
 	await get_tree().process_frame
+
+
+func _test_restoration_plant_pickups(game: Node) -> void:
+	var returned: Array = HabitatRestorationClass.returned_plants(game._restoration_state())
+	var restoration_pickups: Array = game.habitat_pickups.filter(func(item: Dictionary) -> bool: return str(item.get("kind", "")) == "restoration_plant")
+	assert(restoration_pickups.size() == 5)
+	for index in 5:
+		var pickup: Dictionary = restoration_pickups[index]
+		var pickup_snapshot := pickup.get("snapshot", {}) as Dictionary
+		var expected_snapshot := returned[index] as Dictionary
+		assert(int(pickup.get("stage", 0)) == index + 1)
+		assert(str(pickup_snapshot.get("species_id", "")) == str(expected_snapshot.get("species_id", "")))
+		assert(is_equal_approx(float(pickup_snapshot.get("diameter_cm", 0.0)), float(expected_snapshot.get("diameter_cm", 0.0))))
+
+	var first_pickup := restoration_pickups[0] as Dictionary
+	var first_sprite := first_pickup.get("node") as Sprite3D
+	assert(is_instance_valid(first_sprite))
+	game.camera.look_at(first_sprite.global_position, Vector3.UP)
+	var first_probe: Dictionary = game._habitat_sprite_screen_hit_test(first_sprite, Vector2(-10000.0, -10000.0))
+	var first_rect := first_probe.get("rect", Rect2()) as Rect2
+	assert(first_rect.size.x > 78.0 and first_rect.size.y > 78.0)
+	var restoration_tap := first_rect.get_center()
+	assert(bool(game._habitat_sprite_screen_hit_test(first_sprite, restoration_tap).get("hit", false)))
+
+	# Reproduce the problematic layout: a different normal species is rooted at
+	# the safe point immediately beside restoration stage one.
+	var original_wild_plants: Array = game.habitat_wild_plants.duplicate(true)
+	var original_initialized: bool = game.habitat_wild_initialized
+	var original_next_spawn: float = game.habitat_wild_next_spawn_unix
+	var now := Time.get_unix_time_from_system()
+	var nearby_wild := _habitat_test_plant("restoration_overlap_wild", "affinis", 38.0, now)
+	nearby_wild["panorama_x"] = 155.0
+	nearby_wild["panorama_y"] = 410.0
+	game.habitat_wild_plants.append(nearby_wild)
+	game.habitat_wild_initialized = true
+	game.habitat_wild_next_spawn_unix = now + 999999.0
+	game._add_habitat_wild_plant(nearby_wild)
+	var nearby_item: Dictionary = game._habitat_wild_item_by_id("restoration_overlap_wild")
+	var nearby_sprite := nearby_item.get("node") as Sprite3D
+	assert(is_instance_valid(nearby_sprite))
+	var nearby_center: Vector2 = game.camera.unproject_position(nearby_sprite.global_position)
+	var overlap_tap := nearby_center
+	var overlap_found := bool(game._habitat_sprite_screen_hit_test(first_sprite, overlap_tap).get("hit", false))
+	if not overlap_found:
+		for step in range(1, 21):
+			var candidate: Vector2 = nearby_center.lerp(restoration_tap, float(step) / 20.0)
+			if candidate.distance_to(nearby_center) < 78.0 and bool(game._habitat_sprite_screen_hit_test(first_sprite, candidate).get("hit", false)):
+				overlap_tap = candidate
+				overlap_found = true
+				break
+	assert(overlap_found)
+
+	# The restoration artwork is tested first and owns taps over its visible quad,
+	# even while the normal plant's old center-radius also overlaps that point.
+	var selected_overlap: Dictionary = game._habitat_pickup_at(overlap_tap)
+	assert(str(selected_overlap.get("kind", "")) == "restoration_plant")
+	game._try_habitat_pick(overlap_tap)
+	assert(game.habitat_plant_panel.visible)
+	assert(game.habitat_plant_panel.title_label.text == game._habitat_species_name("colorata"))
+	assert(Localizer.text(game.language_code, "habitat_observe_size", [120.0]) in game.habitat_plant_panel.detail_label.text)
+	game.habitat_plant_panel.close()
+
+	# Move the nearby normal sprite just far enough for its artwork/root to be
+	# visibly separate. It must remain independently selectable as the normal
+	# species rather than being captured by any restoration quad.
+	var normal_tap := Vector2.ZERO
+	var normal_tap_found := false
+	var restoration_origin := first_sprite.global_position
+	var screen_right: Vector3 = game.camera.global_transform.basis.x.normalized()
+	for direction in [1.0, -1.0]:
+		for step in range(2, 17):
+			nearby_sprite.global_position = restoration_origin + screen_right * direction * float(step) * .28
+			var candidate: Vector2 = game.camera.unproject_position(nearby_sprite.global_position)
+			if candidate.x < 20.0 or candidate.x > 556.0 or candidate.y < 20.0 or candidate.y > 1004.0:continue
+			var candidate_item: Dictionary = game._habitat_pickup_at(candidate)
+			if str(candidate_item.get("kind", "")) == "wild_plant" and str(candidate_item.get("individual_id", "")) == "restoration_overlap_wild":
+				normal_tap = candidate
+				normal_tap_found = true
+				break
+		if normal_tap_found:break
+	assert(normal_tap_found)
+	game._try_habitat_pick(normal_tap)
+	assert(game.habitat_plant_panel.visible)
+	assert(game.habitat_plant_panel.title_label.text == game._habitat_species_name("affinis"))
+	assert(Localizer.text(game.language_code, "habitat_observe_size", [38.0]) in game.habitat_plant_panel.detail_label.text)
+	game.habitat_plant_panel.close()
+
+	# The priority pass must not change center-hit selection for the other habitat
+	# pickup kinds; their established dispatch paths are exercised by their own
+	# smoke suites.
+	var saved_pickups: Array = game.habitat_pickups.duplicate()
+	for legacy_kind in ["seed", "old_catalog_page", "jurejure_group"]:
+		var anchor := Node3D.new()
+		game.habitat_items_root.add_child(anchor)
+		anchor.global_position = game.camera.global_position - game.camera.global_transform.basis.z * 4.0
+		game.habitat_pickups.assign([{"node": anchor, "kind": legacy_kind}])
+		var legacy_selected: Dictionary = game._habitat_pickup_at(game.camera.unproject_position(anchor.global_position))
+		assert(str(legacy_selected.get("kind", "")) == legacy_kind)
+		game.habitat_pickups.clear()
+		anchor.free()
+	game.habitat_pickups.assign(saved_pickups)
+
+	game.habitat_wild_plants.assign(original_wild_plants)
+	game.habitat_wild_initialized = original_initialized
+	game.habitat_wild_next_spawn_unix = original_next_spawn
+	game.habitat_plant_panel.close()
+	game._build_habitat_items(true)
+	game._apply_view_rotation()
+
+
+func _habitat_test_plant(individual_id: String, species_id: String, diameter: float, now: float) -> Dictionary:
+	return {
+		"individual_id": individual_id,
+		"species_id": species_id,
+		"diameter_cm": diameter,
+		"growth_state": "growing",
+		"jellied": false,
+		"jellied_unix": 0.0,
+		"jelly_immune": false,
+		"jelly_elapsed_seconds": 0.0,
+		"jelly_hazard_accumulated": 0.0,
+		"jelly_threshold": 999999.0,
+		"jelly_risk_curve": 1.0,
+		"mature_diameter_cm": 30.8,
+		"jelly_eligible_since_unix": 0.0,
+		"tutorial": false,
+		"base_growth_rate": 1.0,
+		"spawned_unix": now,
+		"last_updated_unix": now,
+		"habitat_timing_version": HabitatWildSystemClass.TIMING_VERSION,
+		"panorama_x": 155.0,
+		"panorama_y": 410.0,
+		"position_validated": true,
+	}
 
 
 func _finish_dialog(game: Node) -> void:

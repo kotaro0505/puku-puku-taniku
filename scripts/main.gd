@@ -7105,6 +7105,7 @@ func _add_restoration_habitat_plants()->void:
 		var compressed_scale:=clampf(2.15+(represented_diameter-100.0)*.012,2.15,3.65);sprite.scale=Vector3.ONE*compressed_scale
 		sprite.set_meta("restoration_stage",index+1);sprite.set_meta("restoration_snapshot",snapshot.duplicate(true))
 		sprite.modulate=Color(1.08,1.08,1.02,1.0);habitat_items_root.add_child(sprite)
+		habitat_pickups.append({"node":sprite,"kind":"restoration_plant","stage":index+1,"snapshot":snapshot.duplicate(true)})
 
 func _add_restoration_recovery_sprouts()->void:
 	var stage:=_restoration_stage()
@@ -8047,6 +8048,20 @@ func _open_habitat_plant_panel(plant:Dictionary)->void:
 	habitat_plant_panel.open_for(plant,_habitat_species_name(str(plant.get("species_id",""))),size_text,observation_text,Localizer.text(language_code,"close"))
 	_update_play_ui()
 
+func _open_restoration_plant_panel(item:Dictionary)->void:
+	if habitat_plant_panel==null:return
+	var snapshot_value:Variant=item.get("snapshot",{})
+	if not snapshot_value is Dictionary:return
+	var snapshot:Dictionary=(snapshot_value as Dictionary).duplicate(true)
+	if snapshot.is_empty():return
+	var species_id:=str(snapshot.get("species_id",""));var entry:=_catalog_entry(species_id);var species_name:=""
+	if not entry.is_empty():species_name=Localizer.species_name(language_code,entry)
+	if species_name.is_empty():species_name=str(snapshot.get("display_name",species_id))
+	var size_text:=Localizer.text(language_code,"habitat_observe_size",[float(snapshot.get("diameter_cm",0.0))])
+	var observation_text:=Localizer.text(language_code,"habitat_observe_note")
+	habitat_plant_panel.open_for(snapshot,species_name,size_text,observation_text,Localizer.text(language_code,"close"))
+	_update_play_ui()
+
 func _refresh_habitat_wild_badges()->void:
 	for item in habitat_pickups:
 		if str(item.get("kind",""))!="wild_plant":continue
@@ -8457,19 +8472,72 @@ func _try_harvest(screen_pos:Vector2)->void:
 		selected_plant.set_meta("harvest_input_msec",Time.get_ticks_msec())
 		selected_plant.harvest()
 
-func _try_habitat_pick(screen_pos:Vector2)->void:
+func _habitat_sprite_screen_hit_used_rect(sprite:Sprite3D)->Rect2:
+	if sprite==null or sprite.texture==null:return Rect2()
+	if sprite.has_meta("habitat_screen_hit_used_rect"):
+		var cached:Variant=sprite.get_meta("habitat_screen_hit_used_rect")
+		if cached is Rect2:return cached
+	var texture_size:=sprite.texture.get_size();var result:=Rect2(Vector2.ZERO,texture_size);var image:=sprite.texture.get_image()
+	if image!=null and not image.is_empty():
+		var used:=image.get_used_rect()
+		if used.size.x>0 and used.size.y>0:result=Rect2(used)
+	sprite.set_meta("habitat_screen_hit_used_rect",result)
+	return result
+
+func _habitat_sprite_screen_hit_test(sprite:Sprite3D,screen_point:Vector2)->Dictionary:
+	# Restoration plants are much larger than their root position. Reconstruct the
+	# rendered billboard quad so visible leaves, rather than a small center radius,
+	# own the tap even when a normal habitat plant is rooted immediately beside it.
+	if camera==null or sprite==null or sprite.texture==null:return {"hit":false}
+	if camera.is_position_behind(sprite.global_position):return {"hit":false}
+	var texture_size:=sprite.texture.get_size()
+	if texture_size.x<=0.0 or texture_size.y<=0.0:return {"hit":false}
+	var used:=_habitat_sprite_screen_hit_used_rect(sprite)
+	if used.size.x<=0.0 or used.size.y<=0.0:used=Rect2(Vector2.ZERO,texture_size)
+	var basis:=camera.global_transform.basis;var angle:=sprite.rotation.z
+	var plane_right:Vector3=basis.x*cos(angle)+basis.y*sin(angle);var plane_up:Vector3=-basis.x*sin(angle)+basis.y*cos(angle)
+	var global_scale:=sprite.global_transform.basis.get_scale();var origin:=sprite.global_position;var points:=PackedVector2Array()
+	for pixel_point in [used.position,Vector2(used.end.x,used.position.y),used.end,Vector2(used.position.x,used.end.y)]:
+		var local_pixels:=Vector2(pixel_point.x-texture_size.x*.5+sprite.offset.x,-(pixel_point.y-texture_size.y*.5+sprite.offset.y))
+		var world_point:=origin+plane_right*local_pixels.x*sprite.pixel_size*global_scale.x+plane_up*local_pixels.y*sprite.pixel_size*global_scale.y
+		points.append(camera.unproject_position(world_point))
+	var visible_rect:=Rect2(points[0],Vector2.ZERO)
+	for point in points:visible_rect=visible_rect.expand(point)
+	var padding:=clampf(minf(visible_rect.size.x,visible_rect.size.y)*.08,14.0,36.0);var inside_artwork_bounds:=Geometry2D.is_point_in_polygon(screen_point,points)
+	if not inside_artwork_bounds and not visible_rect.grow(padding).has_point(screen_point):return {"hit":false,"rect":visible_rect,"polygon":points}
+	var half_size:=Vector2(maxf(visible_rect.size.x*.5,1.0),maxf(visible_rect.size.y*.5,1.0));var normalized_delta:=(screen_point-visible_rect.get_center())/half_size
+	return {"hit":true,"score":normalized_delta.length()+(0.0 if inside_artwork_bounds else .85),"rect":visible_rect,"polygon":points,"center":visible_rect.get_center(),"inside_artwork_bounds":inside_artwork_bounds}
+
+func _habitat_pickup_at(screen_pos:Vector2)->Dictionary:
+	var restoration_candidates:Array=[]
+	for item in habitat_pickups:
+		if str(item.get("kind",""))!="restoration_plant":continue
+		var sprite:=item.get("node") as Sprite3D
+		if not is_instance_valid(sprite):continue
+		var hit:=_habitat_sprite_screen_hit_test(sprite,screen_pos)
+		if bool(hit.get("hit",false)):restoration_candidates.append({"item":item,"score":float(hit.get("score",INF))})
+	if not restoration_candidates.is_empty():
+		restoration_candidates.sort_custom(func(a,b):return a.score<b.score)
+		return restoration_candidates[0].item
 	var candidates:Array=[]
 	for item in habitat_pickups:
+		if str(item.get("kind",""))=="restoration_plant":continue
 		var node=item.get("node")
 		if not is_instance_valid(node) or camera.is_position_behind(node.global_position):continue
 		var projected:=camera.unproject_position(node.global_position);var distance:=projected.distance_to(screen_pos)
 		var kind:=str(item.get("kind",""));var hit_radius:=142.0 if kind=="jurejure_group" else (78.0 if kind=="wild_plant" else 42.0)
 		if distance<hit_radius:candidates.append({"item":item,"distance":distance})
-	if candidates.is_empty():return
-	candidates.sort_custom(func(a,b):return a.distance<b.distance);var selected:Dictionary=candidates[0].item
+	if candidates.is_empty():return {}
+	candidates.sort_custom(func(a,b):return a.distance<b.distance)
+	return candidates[0].item
+
+func _try_habitat_pick(screen_pos:Vector2)->void:
+	var selected:=_habitat_pickup_at(screen_pos)
+	if selected.is_empty():return
 	if str(selected.kind)=="seed":_collect_habitat_seed(selected)
 	elif str(selected.kind)=="old_catalog_page":_collect_habitat_old_catalog_page(selected)
 	elif str(selected.kind)=="wild_plant":_collect_habitat_wild_plant(selected)
+	elif str(selected.kind)=="restoration_plant":_open_restoration_plant_panel(selected)
 	elif str(selected.kind)=="jurejure_group":_on_jurejure_group_pressed()
 
 func _collect_habitat_wild_plant(item:Dictionary)->void:
