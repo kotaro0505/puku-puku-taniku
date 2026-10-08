@@ -19,10 +19,16 @@ var request_count_by_path: Dictionary = {}
 var _texture_cache: Dictionary = {}
 var _last_used: Dictionary = {}
 var _pending_callbacks: Dictionary = {}
+var _request_high_priority: Dictionary = {}
 var _high_priority_queue: Array[String] = []
 var _prefetch_queue: Array[String] = []
+var _decode_queue: Array[Dictionary] = []
+var _decode_pump_running := false
 var _active_requests := 0
 var _access_serial := 0
+var decode_count := 0
+var last_decode_duration_msec := 0
+var max_decode_duration_msec := 0
 
 func _ready() -> void:
 	placeholder_texture = _build_placeholder_texture()
@@ -58,11 +64,13 @@ func request_texture(path: String, callback: Callable, high_priority := true) ->
 	if _pending_callbacks.has(path):
 		(_pending_callbacks[path] as Array).append(callback)
 		if high_priority:
+			_request_high_priority[path] = true
 			_prefetch_queue.erase(path)
 			if path not in _high_priority_queue:
 				_high_priority_queue.push_front(path)
 		return
 	_pending_callbacks[path] = [callback]
+	_request_high_priority[path] = high_priority
 	if high_priority:
 		_high_priority_queue.append(path)
 	else:
@@ -105,6 +113,35 @@ func _finish_request(path: String, request: HTTPRequest, body: PackedByteArray, 
 	if is_instance_valid(request):
 		request.queue_free()
 	_active_requests = maxi(0, _active_requests - 1)
+	_decode_queue.append({"path": path, "body": body, "response_code": response_code, "high_priority": bool(_request_high_priority.get(path, false))})
+	# Network concurrency stays at four, but image decoding and GPU texture
+	# creation are serialized. Four 2-3 MB responses finishing together used to
+	# decode in one main-thread frame and could stall a foreground card gesture.
+	_pump_queue()
+	if not _decode_pump_running:
+		_decode_pump_running = true
+		call_deferred("_drain_decode_queue")
+
+func _drain_decode_queue() -> void:
+	while not _decode_queue.is_empty():
+		var selected_index := 0
+		for index in range(_decode_queue.size()):
+			if bool(_decode_queue[index].get("high_priority", false)):
+				selected_index = index
+				break
+		var response: Dictionary = _decode_queue.pop_at(selected_index)
+		_decode_response(str(response.get("path", "")), response.get("body", PackedByteArray()), int(response.get("response_code", 0)))
+		if not _decode_queue.is_empty():
+			# Preserve full-resolution images while preventing several expensive PNG
+			# decodes from landing in the same rendered frame.
+			if DisplayServer.get_name()=="headless":
+				await get_tree().process_frame
+			else:
+				await RenderingServer.frame_post_draw
+	_decode_pump_running = false
+
+func _decode_response(path: String, body: PackedByteArray, response_code: int) -> void:
+	var decode_started_msec := Time.get_ticks_msec()
 	var texture: Texture2D = placeholder_texture
 	if response_code >= 200 and response_code < 300 and not body.is_empty():
 		var image := Image.new()
@@ -118,11 +155,14 @@ func _finish_request(path: String, request: HTTPRequest, body: PackedByteArray, 
 			_evict_old_textures()
 	var callbacks: Array = _pending_callbacks.get(path, [])
 	_pending_callbacks.erase(path)
+	_request_high_priority.erase(path)
 	for callback_value in callbacks:
 		var callback: Callable = callback_value
 		if callback.is_valid():
 			callback.call_deferred(texture)
-	_pump_queue()
+	last_decode_duration_msec = Time.get_ticks_msec() - decode_started_msec
+	max_decode_duration_msec = maxi(max_decode_duration_msec, last_decode_duration_msec)
+	decode_count += 1
 
 func _external_url(path: String) -> String:
 	var relative_path := _versioned_relative_path(path.trim_prefix("res://"))

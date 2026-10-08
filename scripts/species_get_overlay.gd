@@ -17,6 +17,12 @@ var flash:ColorRect
 var current_context:=""
 var current_language:="ja"
 var busy:=false
+var last_close_input_msec:=-1
+var last_close_feedback_msec:=-1
+var last_close_first_visual_msec:=-1
+var last_close_first_visual_latency_msec:=-1
+var last_close_hidden_msec:=-1
+var last_close_presented_msec:=-1
 
 func _ready()->void:
 	name="SpeciesGetOverlay";set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);mouse_filter=Control.MOUSE_FILTER_STOP;visible=false;z_index=900
@@ -36,6 +42,9 @@ func _ready()->void:
 func show_species(entry:Dictionary,texture:Texture2D,is_new:bool,context:String,language:String="ja")->void:
 	current_context=context;current_language=Localizer.normalize_language(language);visible=true;busy=true
 	var story_catalog_card:=context=="first_colorata_catalog" or context.begins_with("scripted_dialog_card:")
+	# A late Web image callback from the previous card must never repopulate this
+	# reusable TextureRect. main.gd assigns the new request identity afterwards.
+	result_image.set_meta("catalog_loaded_path","");result_image.set_meta("catalog_request_path","")
 	result_image.texture=texture;badge_label.text=Localizer.text(current_language,"original_catalog_new" if story_catalog_card else ("new" if is_new else "get"));name_label.text=Localizer.species_name(current_language,entry)
 	var stars:=clampi(int(entry.get("gold_star_count",0)),0,2);star_rating.star_count=stars;rarity_label.text=Localizer.text(current_language,"super_rare") if stars>0 else "";star_rating.visible=stars>0;hint_label.text=Localizer.text(current_language,"tap_to_close")
 	card.scale=Vector2(.56,.56);card.rotation=-.035;flash.color.a=.94
@@ -57,9 +66,30 @@ func _input(event:InputEvent)->void:
 func close_overlay()->void:
 	if not visible or busy:return
 	busy=true
+	last_close_input_msec=Time.get_ticks_msec();last_close_feedback_msec=last_close_input_msec
 	var context:=current_context
 	var hide:=create_tween().set_parallel(true);hide.tween_property(card,"scale",Vector2(.86,.86),.16).set_trans(Tween.TRANS_QUAD);hide.tween_property(self,"modulate:a",0.0,.16)
-	await hide.finished
-	visible=false;modulate.a=1.0;card.scale=Vector2.ONE;result_image.texture=null;current_context="";busy=false;closed.emit(context)
+	if DisplayServer.get_name()=="headless":
+		await get_tree().process_frame
+	else:
+		await RenderingServer.frame_post_draw
+	last_close_first_visual_msec=Time.get_ticks_msec();last_close_first_visual_latency_msec=maxi(0,last_close_first_visual_msec-last_close_input_msec)
+	if hide.is_running():await hide.finished
+	visible=false;modulate.a=1.0;card.scale=Vector2.ONE;result_image.texture=null
+	result_image.set_meta("catalog_loaded_path","");result_image.set_meta("catalog_request_path","")
+	current_context="";last_close_hidden_msec=Time.get_ticks_msec()
+	# The hidden/cleared state must reach the renderer before closed handlers can
+	# serialize the save or prepare another result card. Without this barrier the
+	# previous canvas frame remains visible during synchronous follow-up work.
+	if DisplayServer.get_name()=="headless":
+		await get_tree().process_frame
+	else:
+		await RenderingServer.frame_post_draw
+		# Web's frame_post_draw signal precedes browser composition. Keep the
+		# hidden canvas state alive through a browser-driven frame before closed
+		# handlers can start synchronous save or queue work.
+		if OS.has_feature("web"):
+			await get_tree().create_timer(0.12).timeout
+	last_close_presented_msec=Time.get_ticks_msec();busy=false;closed.emit(context)
 
 func is_open()->bool:return visible

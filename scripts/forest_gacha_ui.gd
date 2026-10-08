@@ -3,6 +3,7 @@ extends Control
 
 signal close_requested
 signal spin_requested
+signal spin_animation_completed
 signal unlock_requested(series_id:String,species_id:String)
 signal later_requested(series_id:String,species_id:String)
 signal species_reveal_requested(result:Dictionary)
@@ -49,7 +50,12 @@ var current_draw_count:=0
 var _dial_dragging:=false
 var _dial_drag_origin:=Vector2.ZERO
 var _spin_feedback_active:=false
-var _spin_feedback_tween:Tween
+var _spin_turn_tween:Tween
+var spin_request_started_msec:=-1
+var spin_started_msec:=-1
+var last_spin_start_latency_msec:=-1
+var spin_first_visual_msec:=-1
+var last_spin_visual_latency_msec:=-1
 var language:="ja"
 
 func _ready()->void:
@@ -97,7 +103,7 @@ func _build_result_overlay()->void:
 	result_close_button=Button.new();result_close_button.name="ResultCloseButton";result_close_button.text="ガチャへ戻る";result_close_button.custom_minimum_size=Vector2(260,62);_skin_button(result_close_button,Color("#d5aa58"),18);result_close_button.pressed.connect(_close_result);content.add_child(result_close_button)
 
 func open_gacha(puku_points:int,draw_count:int)->void:
-	cancel_spin_feedback();visible=true;pending_result.clear();busy=false;capsule_ready=false;capsule.visible=false;capsule_hit_area.visible=false;result_overlay.visible=false;set_wallet(puku_points,draw_count);hint_label.text="ダイヤルをタップして回そう";close_button.disabled=false
+	cancel_spin_feedback();visible=true;pending_result.clear();busy=false;capsule_ready=false;capsule.visible=false;capsule_hit_area.visible=false;result_overlay.visible=false;spin_request_started_msec=-1;spin_started_msec=-1;last_spin_start_latency_msec=-1;spin_first_visual_msec=-1;last_spin_visual_latency_msec=-1;set_wallet(puku_points,draw_count);hint_label.text="ダイヤルをタップして回そう";close_button.disabled=false
 	set_language(language)
 
 func set_language(value:String)->void:
@@ -115,18 +121,20 @@ func set_wallet(puku_points:int,draw_count:int)->void:
 
 func play_spin(result:Dictionary,texture:Texture2D)->void:
 	if busy:return
-	if _spin_feedback_tween and _spin_feedback_tween.is_valid():_spin_feedback_tween.kill()
-	_spin_feedback_tween=null;_spin_feedback_active=false
+	_spin_feedback_active=false
 	pending_result=result.duplicate(true);busy=true;capsule_ready=false;close_button.disabled=true;spin_button.disabled=true;dial_hit_area.disabled=true;hint_label.text="";result_image.texture=texture
-	background_stage.position=Vector2.ZERO
-	var turn:=create_tween().set_parallel(true)
-	turn.tween_property(dial_texture,"rotation",dial_texture.rotation+TAU*3.4,.92*animation_time_scale).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	var shake:=create_tween();shake.tween_property(background_stage,"position:x",-5.0,.10*animation_time_scale);shake.tween_property(background_stage,"position:x",6.0,.12*animation_time_scale);shake.tween_property(background_stage,"position:x",-3.0,.12*animation_time_scale);shake.tween_property(background_stage,"position:x",0.0,.18*animation_time_scale)
-	await turn.finished
+	# Normal input already started the real turn before the draw signal. Keep a
+	# direct-call fallback for smoke/dev callers that invoke play_spin themselves.
+	if _spin_turn_tween==null or not _spin_turn_tween.is_valid():
+		if spin_request_started_msec<0:spin_request_started_msec=Time.get_ticks_msec()
+		_start_actual_spin_turn()
+		await _mark_first_spin_frame()
+	if _spin_turn_tween.is_running():await _spin_turn_tween.finished
 	capsule.set_seed(str(result.get("species_id","")).hash());capsule.position=Vector2(244,726);capsule.scale=Vector2(.35,.35);capsule.rotation=-.35;capsule.modulate=Color(1,1,1,0);capsule.visible=true
 	var drop:=create_tween().set_parallel(true);drop.tween_property(capsule,"position",Vector2(244,784),.46*animation_time_scale).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT);drop.tween_property(capsule,"scale",Vector2.ONE,.34*animation_time_scale).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT);drop.tween_property(capsule,"rotation",.14,.46*animation_time_scale).set_trans(Tween.TRANS_CUBIC);drop.tween_property(capsule,"modulate:a",1.0,.16*animation_time_scale)
 	await drop.finished
 	busy=false;capsule_ready=true;capsule_hit_area.visible=true;hint_label.text=Localizer.text(language,"gacha_capsule_hint");close_button.disabled=true
+	spin_animation_completed.emit()
 
 func show_unlock_complete(message:String,puku_points:int,draw_count:int)->void:
 	offer_panel.visible=false;result_message.text=message;result_badge.text=Localizer.text(language,"new");result_close_button.visible=true;set_wallet(puku_points,draw_count)
@@ -151,19 +159,38 @@ func _on_dial_input(event:InputEvent)->void:
 
 func _request_spin()->void:
 	if busy or _spin_feedback_active or capsule_ready or result_overlay.visible or spin_button.disabled:return
-	_spin_feedback_active=true;close_button.disabled=true;spin_button.disabled=true;dial_hit_area.disabled=true;hint_label.text=""
+	spin_request_started_msec=Time.get_ticks_msec();_spin_feedback_active=true;close_button.disabled=true;spin_button.disabled=true;dial_hit_area.disabled=true;hint_label.text=""
 	dial_texture.rotation=fmod(dial_texture.rotation,TAU)
-	dial_texture.rotation+=0.08
-	_spin_feedback_tween=create_tween();_spin_feedback_tween.tween_property(dial_texture,"rotation",dial_texture.rotation+0.55,.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	# Let the first dial movement reach the renderer before draw/save work starts.
-	await get_tree().process_frame
-	if not _spin_feedback_active or not visible:return
+	# Start the real 3.4-turn animation at input time. Result selection follows
+	# only after its first frame, so catalog/save work can never sit in front of
+	# the user's visual response. This is the actual spin, not a feedback nudge.
+	_start_actual_spin_turn()
+	await _mark_first_spin_frame()
+	if not _spin_feedback_active:return
 	spin_requested.emit()
 
+func _start_actual_spin_turn()->void:
+	background_stage.position=Vector2.ZERO
+	spin_started_msec=Time.get_ticks_msec();last_spin_start_latency_msec=maxi(0,spin_started_msec-spin_request_started_msec)
+	_spin_turn_tween=create_tween().set_parallel(true)
+	_spin_turn_tween.tween_property(dial_texture,"rotation",dial_texture.rotation+TAU*3.4,.92*animation_time_scale).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	var shake:=create_tween();shake.tween_property(background_stage,"position:x",-5.0,.10*animation_time_scale);shake.tween_property(background_stage,"position:x",6.0,.12*animation_time_scale);shake.tween_property(background_stage,"position:x",-3.0,.12*animation_time_scale);shake.tween_property(background_stage,"position:x",0.0,.18*animation_time_scale)
+
+func _mark_first_spin_frame()->void:
+	if DisplayServer.get_name()=="headless":
+		await get_tree().process_frame
+	else:
+		await RenderingServer.frame_post_draw
+		if OS.has_feature("web"):
+			await get_tree().create_timer(0.04).timeout
+	spin_first_visual_msec=Time.get_ticks_msec();last_spin_visual_latency_msec=maxi(0,spin_first_visual_msec-spin_request_started_msec)
+
 func cancel_spin_feedback()->void:
-	if _spin_feedback_tween and _spin_feedback_tween.is_valid():_spin_feedback_tween.kill()
-	_spin_feedback_tween=null;_spin_feedback_active=false
+	_spin_feedback_active=false
+	if _spin_turn_tween and _spin_turn_tween.is_valid():_spin_turn_tween.kill()
+	_spin_turn_tween=null
 	if not is_node_ready():return
+	background_stage.position=Vector2.ZERO
 	close_button.disabled=false;hint_label.text=Localizer.text(language,"gacha_dial_hint")
 	set_wallet(current_puku_points,current_draw_count)
 

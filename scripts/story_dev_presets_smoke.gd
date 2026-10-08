@@ -265,8 +265,13 @@ func _test_restoration_and_101cm_presets() -> void:
 	assert(not plant.jelly_checks_enabled)
 	game.puku_gauge_animation_speed_scale = .02
 	plant.harvest()
+	# Harvest feedback is immediate; restoration/save work intentionally resumes
+	# only after that state has reached a rendered frame.
+	assert(plant.state == "harvested")
+	assert(bool(plant.get_meta("harvest_feedback_started", false)))
 	assert(not game.habitat_restoration_ui.prompt_layer.visible)
 	assert(HabitatRestorationClass.returned_count(restoration) == 4)
+	await get_tree().process_frame
 	assert(HabitatRestorationClass.pending_return_count(restoration) == 1)
 	assert(str(HabitatRestorationClass.pending_return_snapshots(restoration)[0].get("species_id", "")) == "colorata")
 	assert(float(HabitatRestorationClass.pending_return_snapshots(restoration)[0].get("diameter_cm", 0.0)) >= 100.0)

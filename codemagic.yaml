@@ -172,6 +172,7 @@ workflows:
           run_scene_smoke res://scripts/normal_round_smoke.tscn NORMAL_ROUND_SMOKE_OK
           run_scene_smoke res://scripts/story_guidance_smoke.tscn STORY_GUIDANCE_SMOKE_OK
           run_script_smoke res://scripts/dialog_portrait_layout_smoke.gd DIALOG_PORTRAIT_LAYOUT_SMOKE_OK
+          run_script_smoke res://scripts/input_response_smoke.gd INPUT_RESPONSE_SMOKE_OK
           run_script_smoke res://scripts/release_polish_b_smoke.gd RELEASE_POLISH_B_SMOKE_OK
           run_scene_smoke res://scripts/habitat_restoration_smoke.tscn HABITAT_RESTORATION_SMOKE_OK
           run_scene_smoke res://scripts/integrated_features_smoke.tscn INTEGRATED_FEATURES_SMOKE_OK

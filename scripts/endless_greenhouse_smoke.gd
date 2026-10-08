@@ -82,7 +82,7 @@ func _ready() -> void:
 	await _test_formal_endless_main_features(game)
 	await _test_debug_controls_and_gacha(game)
 	await _test_fusion_lab_flow(game)
-	_test_gauges(game)
+	await _test_gauges(game)
 	await _test_restoration_pending_until_habitat(game)
 	_test_large_plant_screen_hits(game)
 
@@ -683,13 +683,14 @@ func _test_formal_endless_main_features(game: Node) -> void:
 	assert(game.forest_gacha_ui.visible and not game.forest_gacha_trial_dev_mode and not game.forest_gacha_preview_mode)
 	game._spin_forest_gacha()
 	assert(not game.forest_gacha_ui.pending_result.is_empty())
-	assert(game.puku_balance_units==puku_before_units-game.FOREST_GACHA_SPIN_COST*game.PUKU_UNITS_PER_PUKU)
-	assert(game.forest_gacha_draw_count==draw_before+1)
+	assert(game.puku_balance_units==puku_before_units and game.forest_gacha_draw_count==draw_before)
 	for _frame in range(120):
 		if game.forest_gacha_ui.capsule_ready:
 			break
 		await get_tree().process_frame
 	assert(game.forest_gacha_ui.capsule_ready)
+	assert(game.puku_balance_units==puku_before_units-game.FOREST_GACHA_SPIN_COST*game.PUKU_UNITS_PER_PUKU)
+	assert(game.forest_gacha_draw_count==draw_before+1)
 	game.forest_gacha_ui._reveal_result()
 	await get_tree().process_frame
 	await get_tree().process_frame
@@ -782,7 +783,13 @@ func _test_debug_controls_and_gacha(game: Node) -> void:
 	game._spin_forest_gacha()
 	var result:Dictionary=game.forest_gacha_ui.pending_result
 	var species_id:=str(result.get("species_id",""))
-	assert(not species_id.is_empty() and bool(game.discovered.get(species_id,false)))
+	assert(not species_id.is_empty() and not game.forest_gacha_pending_commit.is_empty())
+	for _frame in range(120):
+		if game.forest_gacha_ui.capsule_ready:
+			break
+		await get_tree().process_frame
+	assert(game.forest_gacha_ui.capsule_ready)
+	assert(bool(game.discovered.get(species_id,false)))
 	assert(bool(game.greenhouse_available.get(species_id,false)))
 	assert(bool(game.arrangement_ui.discovered.get(species_id,false)))
 	assert(game.species.any(func(entry:Dictionary)->bool:return str(entry.get("species_id",""))==species_id))
@@ -790,11 +797,6 @@ func _test_debug_controls_and_gacha(game: Node) -> void:
 	var saved_payload=JSON.parse_string(FileAccess.get_file_as_string(EXPERIMENT_PATH))
 	assert(saved_payload is Dictionary)
 	assert(bool((saved_payload.get("discovered",{}) as Dictionary).get(species_id,false)))
-	for _frame in range(120):
-		if game.forest_gacha_ui.capsule_ready:
-			break
-		await get_tree().process_frame
-	assert(game.forest_gacha_ui.capsule_ready)
 	game.forest_gacha_ui._reveal_result()
 	await get_tree().process_frame
 	await get_tree().process_frame
@@ -939,7 +941,12 @@ func _test_gauges(game: Node) -> void:
 	var gauge_probe = game.plants.back()
 	gauge_probe.jelly_checks_enabled = false
 	gauge_probe.diameter_cm = 100.0
+	var gauge_commit_before:int=game.harvest_commit_count
 	gauge_probe.harvest()
+	for _frame in range(30):
+		if game.harvest_commit_count>gauge_commit_before:break
+		await get_tree().process_frame
+	assert(game.harvest_commit_count==gauge_commit_before+1)
 	assert(is_equal_approx(game.puku_gauge_cm, 123.0))
 	assert(game.puku_balance_units==12571 and game.puku_points==12 and game._puku_fraction_units()==571)
 	var harvest_panel:=game.effects_layer.find_child("HarvestResult",true,false) as PanelContainer
@@ -977,13 +984,17 @@ func _test_restoration_pending_until_habitat(game: Node) -> void:
 	game.scripted_dialog_pages.clear()
 	game.intro_overlay.visible = false
 	game._apply_mode()
+	var restoration_commit_before:int=game.harvest_commit_count
 	for diameter in [101.0, 108.0]:
 		game._spawn_specific_plant("colorata")
 		var plant = game.plants.back()
 		plant.jelly_checks_enabled = false
 		plant.diameter_cm = diameter
 		plant.harvest()
-	await get_tree().process_frame
+	for _frame in range(30):
+		if game.harvest_commit_count>=restoration_commit_before+2:break
+		await get_tree().process_frame
+	assert(game.harvest_commit_count==restoration_commit_before+2)
 	var saved_restoration: Dictionary = game._restoration_state()
 	assert(HabitatRestorationClass.returned_count(saved_restoration) == 0)
 	assert(HabitatRestorationClass.pending_return_count(saved_restoration) == 2)

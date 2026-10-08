@@ -648,6 +648,7 @@ var result_deferred_species_queue: Array[String] = []
 var pending_round_new_species_ids: Array[String] = []
 var round_result_species_finalize_queue: Array[Dictionary] = []
 var round_result_species_finalize_active := false
+var round_result_species_save_pending := false
 var catalog_series_unlock_notice_queue: Array[String] = []
 var catalog_series_unlock_notice_ready: Dictionary = {}
 var shop_chatter_acquired_species: Array[String] = []
@@ -664,6 +665,14 @@ var play_harvest_count := 0
 var play_max_size := 0.0
 var play_previous_global_best := 0.0
 var play_updated_global_best := false
+var last_forest_gacha_persist_started_msec := -1
+var forest_gacha_pending_commit: Dictionary = {}
+var last_harvest_input_msec := -1
+var last_harvest_feedback_msec := -1
+var last_harvest_feedback_latency_msec := -1
+var last_harvest_presented_msec := -1
+var last_harvest_presented_latency_msec := -1
+var harvest_commit_count := 0
 var play_share_record:Dictionary={}
 var native_share_context:=""
 var play_notable_species: Dictionary = {}
@@ -1028,6 +1037,7 @@ func _load_save() -> void:
 	pending_round_new_species_ids.clear()
 	round_result_species_finalize_queue.clear()
 	round_result_species_finalize_active=false
+	round_result_species_save_pending=false
 	save_file_present_on_boot=false
 	language_selected=false
 	pot_design_unlocks={}
@@ -3929,6 +3939,7 @@ func _build_forest_gacha_ui(hud:Control)->void:
 	forest_gacha_ui=ForestGachaUIClass.new();hud.add_child(forest_gacha_ui)
 	forest_gacha_ui.close_requested.connect(_close_forest_gacha)
 	forest_gacha_ui.spin_requested.connect(_spin_forest_gacha)
+	forest_gacha_ui.spin_animation_completed.connect(_on_forest_gacha_spin_animation_completed)
 	forest_gacha_ui.unlock_requested.connect(_unlock_forest_gacha_series)
 	forest_gacha_ui.later_requested.connect(_defer_forest_gacha_series)
 	forest_gacha_ui.species_reveal_requested.connect(_on_forest_gacha_species_reveal)
@@ -4117,40 +4128,56 @@ func _spin_forest_gacha()->void:
 		var preview_next:=forest_gacha_preview_draw_count+1
 		var preview_result:Dictionary=forest_gacha_system.draw({INITIAL_SERIES_ID:true},forest_gacha_preview_discovered,forest_gacha_preview_encountered,forest_gacha_rng)
 		if preview_result.is_empty():forest_gacha_ui.cancel_spin_feedback();return
-		forest_gacha_preview_puku_points-=FOREST_GACHA_SPIN_COST;forest_gacha_preview_draw_count=preview_next
-		var preview_species_id:=str(preview_result.get("species_id",""))
 		if str(preview_result.get("source",""))=="locked":preview_result["source"]="unlocked"
-		forest_gacha_preview_discovered[preview_species_id]=true
-		forest_gacha_ui.set_wallet(forest_gacha_preview_puku_points,forest_gacha_preview_draw_count);var preview_entry:Dictionary=preview_result.get("species_entry",{});var preview_texture:=_species_texture(preview_entry);forest_gacha_ui.play_spin(preview_result,preview_texture if preview_texture!=null else CatalogImageLoader.placeholder_texture);return
+		forest_gacha_pending_commit={"mode":"preview","result":preview_result.duplicate(true),"unlocked_series_id":"","next_draw":preview_next};last_forest_gacha_persist_started_msec=-1
+		forest_gacha_ui.play_spin(preview_result,CatalogImageLoader.placeholder_texture);return
 	if forest_gacha_trial_dev_mode:
 		if not _trial_dev_controls_enabled():forest_gacha_ui.cancel_spin_feedback();return
 		var trial_next:=forest_gacha_draw_count+1
 		var trial_result:Dictionary=forest_gacha_system.draw(unlocked_series,discovered,forest_gacha_encountered,forest_gacha_rng,StoryProgressionClass.fantasy_is_unlocked(story_progression_state),jurejure_species_unlocked)
 		if trial_result.is_empty():forest_gacha_ui.cancel_spin_feedback();return
-		forest_gacha_draw_count=trial_next
-		var trial_species_id:=str(trial_result.get("species_id",""))
 		var trial_unlocked_series_id:=""
 		if str(trial_result.get("source",""))=="locked":
-			trial_unlocked_series_id=str(trial_result.get("series_id",""));unlocked_series[trial_unlocked_series_id]=true;trial_result["source"]="unlocked"
-		_register_species_discovery(trial_species_id,true)
-		if not trial_unlocked_series_id.is_empty():_queue_catalog_series_unlock_notice(trial_unlocked_series_id)
-		_save();_update_currency_ui();_sync_arrangement_ui();forest_gacha_ui.set_wallet(TRIAL_DEV_GACHA_WALLET,forest_gacha_draw_count)
-		var trial_entry:Dictionary=trial_result.get("species_entry",{});var trial_texture:=_species_texture(trial_entry);forest_gacha_ui.play_spin(trial_result,trial_texture if trial_texture!=null else CatalogImageLoader.placeholder_texture);return
+			trial_unlocked_series_id=str(trial_result.get("series_id",""));trial_result["source"]="unlocked"
+		forest_gacha_pending_commit={"mode":"trial","result":trial_result.duplicate(true),"unlocked_series_id":trial_unlocked_series_id,"next_draw":trial_next};last_forest_gacha_persist_started_msec=-1
+		forest_gacha_ui.play_spin(trial_result,CatalogImageLoader.placeholder_texture);return
 	var forest_cost_units:=_puku_cost_units(FOREST_GACHA_SPIN_COST)
 	if not _can_afford_puku_units(forest_cost_units):
 		forest_gacha_ui.cancel_spin_feedback();forest_gacha_ui.set_wallet(puku_points,forest_gacha_draw_count);return
 	var next_draw:=forest_gacha_draw_count+1
 	var result:Dictionary=forest_gacha_system.draw(unlocked_series,discovered,forest_gacha_encountered,forest_gacha_rng,StoryProgressionClass.fantasy_is_unlocked(story_progression_state),jurejure_species_unlocked)
 	if result.is_empty():forest_gacha_ui.cancel_spin_feedback();return
-	_change_puku_balance(-forest_cost_units,"forest_gacha",false,true);forest_gacha_draw_count=next_draw
-	var species_id:=str(result.get("species_id",""))
 	var unlocked_series_id:=""
 	if str(result.get("source",""))=="locked":
-		unlocked_series_id=str(result.get("series_id",""));unlocked_series[unlocked_series_id]=true;result["source"]="unlocked"
+		unlocked_series_id=str(result.get("series_id",""));result["source"]="unlocked"
+	# Store the finalized draw in memory and start the real 3.4-turn animation in
+	# this input call. Persistence and catalog/UI maintenance wait until every dial
+	# and capsule tween has completed, so they cannot stall the visible motion.
+	forest_gacha_pending_commit={"mode":"live","result":result.duplicate(true),"unlocked_series_id":unlocked_series_id,"next_draw":next_draw};last_forest_gacha_persist_started_msec=-1
+	forest_gacha_ui.play_spin(result,CatalogImageLoader.placeholder_texture)
+
+func _on_forest_gacha_spin_animation_completed()->void:
+	if forest_gacha_pending_commit.is_empty():return
+	var transaction:=forest_gacha_pending_commit.duplicate(true);forest_gacha_pending_commit.clear()
+	last_forest_gacha_persist_started_msec=Time.get_ticks_msec()
+	if forest_gacha_ui==null:return
+	var mode:=str(transaction.get("mode",""));var result:Dictionary=transaction.get("result",{})
+	var unlocked_series_id:=str(transaction.get("unlocked_series_id",""));var next_draw:=int(transaction.get("next_draw",0))
+	var entry:Dictionary=result.get("species_entry",{})
+	_request_species_texture(entry,forest_gacha_ui.result_image,true)
+	var species_id:=str(result.get("species_id",""))
+	if mode=="preview":
+		forest_gacha_preview_puku_points-=FOREST_GACHA_SPIN_COST;forest_gacha_preview_draw_count=next_draw
+		forest_gacha_preview_discovered[species_id]=true
+		forest_gacha_ui.set_wallet(forest_gacha_preview_puku_points,forest_gacha_preview_draw_count)
+		return
+	forest_gacha_draw_count=next_draw
+	if mode=="live":_change_puku_balance(-_puku_cost_units(FOREST_GACHA_SPIN_COST),"forest_gacha",false,true)
+	if not unlocked_series_id.is_empty():unlocked_series[unlocked_series_id]=true
 	_register_species_discovery(species_id,true)
 	if not unlocked_series_id.is_empty():_queue_catalog_series_unlock_notice(unlocked_series_id)
-	_save();_update_currency_ui();_sync_arrangement_ui();forest_gacha_ui.set_wallet(puku_points,forest_gacha_draw_count)
-	var entry:Dictionary=result.get("species_entry",{});var result_texture:=_species_texture(entry);forest_gacha_ui.play_spin(result,result_texture if result_texture!=null else CatalogImageLoader.placeholder_texture)
+	_save();_update_currency_ui();_sync_arrangement_ui()
+	forest_gacha_ui.set_wallet(TRIAL_DEV_GACHA_WALLET if mode=="trial" else puku_points,forest_gacha_draw_count)
 
 func _unlock_forest_gacha_series(series_id:String,_species_id:String)->void:
 	if forest_gacha_ui==null or not forest_gacha_ui.visible:return
@@ -4307,7 +4334,7 @@ func _reset_progression_state()->void:
 	original_catalog_complete_event_seen=false;habitat_tutorial_returned_to_greenhouse=false;jurejure_intro_complete=false;jurejure_enabled=false;jurejure_growth_stage=JureJureSystemClass.GROWTH_EARLY;jurejure_growth_event_mask=0;active_jurejure_event={};jurejure_next_check_unix=0.0;jurejure_cooldown_until_unix=0.0;jurejure_return_event_complete=false;jurejure_waiting_for_seed_pod_reward=false;jurejure_battle_count=0;jurejure_battle_win_count=0;jurejure_habitat_visit_point=Vector2(-1.0,-1.0);jurejure_pending_reward_species_id="";jurejure_pending_reward_is_new=false;jurejure_last_battle_result.clear();habitat_second_awakened=false;habitat_second_awakening_complete=false;jurejure_update_accumulator=0.0
 	first_seed_pod_reward_event_active=false;habitat_visit_id=0;jurejure_focused_habitat_visit_id=-1;act3_intro_eligible_visit_id=0;habitat_crisis_eligible_visit_id=0
 	if habitat_crisis_atmosphere:habitat_crisis_atmosphere.deactivate()
-	_cancel_puku_gauge_animations();puku_gauge_cm=0.0;puku_balance_units=0;bests.clear();discovered.clear();species_get_counts.clear();catalog_cover_species.clear();unlocked_series={INITIAL_SERIES_ID:true};series_seed_inventory.clear();forest_gacha_draw_count=0;forest_gacha_encountered.clear();active_series_seed_id="";owned_pots={DEFAULT_POT_ID:1};saved_arrangements.clear();arrangement_save_capacity=20;greenhouse_available=_initial_greenhouse_state();unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;opening_story_complete=false;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;puku_gauge_intro_complete=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;mystery_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;mystery_seed_pack_unlocked=false;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;habitat_mystery_seeds_pending=0;mystery_seed_count=0;armadillo_research_total=0;armadillo_research_rewards.clear();armadillo_research_intro_seen=false;armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();result_deferred_species_queue.clear();pending_round_new_species_ids.clear();round_result_species_finalize_queue.clear();round_result_species_finalize_active=false;shop_chatter_acquired_species.clear();species_get_queue.clear();play_share_record.clear();play_active=false;play_time_remaining=0.0;play_harvest_cm_total=0.0;play_puku_reward_units_total=0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;_reset_endless_economy_stats();rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_time_multiplier=1;habitat_simulation_unix=Time.get_unix_time_from_system();habitat_debug_log.clear();habitat_scroll_tutorial_active=false;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_clear_habitat_items();_save();_update_currency_ui();_update_play_ui()
+	_cancel_puku_gauge_animations();puku_gauge_cm=0.0;puku_balance_units=0;bests.clear();discovered.clear();species_get_counts.clear();catalog_cover_species.clear();unlocked_series={INITIAL_SERIES_ID:true};series_seed_inventory.clear();forest_gacha_draw_count=0;forest_gacha_encountered.clear();active_series_seed_id="";owned_pots={DEFAULT_POT_ID:1};saved_arrangements.clear();arrangement_save_capacity=20;greenhouse_available=_initial_greenhouse_state();unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;opening_story_complete=false;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;puku_gauge_intro_complete=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;mystery_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;mystery_seed_pack_unlocked=false;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;habitat_mystery_seeds_pending=0;mystery_seed_count=0;armadillo_research_total=0;armadillo_research_rewards.clear();armadillo_research_intro_seen=false;armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();result_deferred_species_queue.clear();pending_round_new_species_ids.clear();round_result_species_finalize_queue.clear();round_result_species_finalize_active=false;round_result_species_save_pending=false;shop_chatter_acquired_species.clear();species_get_queue.clear();play_share_record.clear();play_active=false;play_time_remaining=0.0;play_harvest_cm_total=0.0;play_puku_reward_units_total=0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;_reset_endless_economy_stats();rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_time_multiplier=1;habitat_simulation_unix=Time.get_unix_time_from_system();habitat_debug_log.clear();habitat_scroll_tutorial_active=false;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_clear_habitat_items();_save();_update_currency_ui();_update_play_ui()
 	normal_round_free_plays=0
 	normal_play_count=0;shop_visit_count=0;hidden_species_acquired.clear();tovar_next_play=TOVAR_FIRST_PLAY;tovar_attempt_count=0;tovar_event_active=false;tovar_harvested_this_play=false;armadillo_present=false;_save()
 
@@ -4419,7 +4446,7 @@ func _start_greenhouse_play(seed_type:String)->void:
 		if not _is_endless_greenhouse_enabled():normal_seed_bags-=1
 		current_target_count=NORMAL_GERMINATION_COUNT
 	if seed_type=="old" and total_play_count==0:_ensure_first_tutorial_species()
-	active_seed_type=seed_type;old_seed_reaction_stage=0;old_seed_harvest_guide_active=false;tutorial_harvest_plant=null;play_time_remaining=0.0;play_active=true;play_modal_open=false;play_harvest_cm_total=0.0;play_puku_reward_units_total=0;play_harvest_count=0;play_max_size=0.0;play_previous_global_best=_global_best_size();play_updated_global_best=false;play_share_record.clear();play_notable_species.clear();play_hidden_species_unlocked="";result_new_species_queue.clear();result_deferred_species_queue.clear();round_result_species_finalize_queue.clear();round_result_species_finalize_active=false;opening_species.clear();play_seeds_remaining=current_target_count;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=_initial_greenhouse_concurrent_target(seed_type);greenhouse_finish_attempt_count=0;greenhouse_finish_completed_count=0;greenhouse_finish_last_block_reason="";greenhouse_finish_last_snapshot.clear();_clear_greenhouse_plants();_reset_endless_economy_stats()
+	active_seed_type=seed_type;old_seed_reaction_stage=0;old_seed_harvest_guide_active=false;tutorial_harvest_plant=null;play_time_remaining=0.0;play_active=true;play_modal_open=false;play_harvest_cm_total=0.0;play_puku_reward_units_total=0;play_harvest_count=0;play_max_size=0.0;play_previous_global_best=_global_best_size();play_updated_global_best=false;play_share_record.clear();play_notable_species.clear();play_hidden_species_unlocked="";result_new_species_queue.clear();result_deferred_species_queue.clear();round_result_species_finalize_queue.clear();round_result_species_finalize_active=false;round_result_species_save_pending=false;opening_species.clear();play_seeds_remaining=current_target_count;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=_initial_greenhouse_concurrent_target(seed_type);greenhouse_finish_attempt_count=0;greenhouse_finish_completed_count=0;greenhouse_finish_last_block_reason="";greenhouse_finish_last_snapshot.clear();_clear_greenhouse_plants();_reset_endless_economy_stats()
 	if seed_type=="normal" and _is_endless_greenhouse_enabled():
 		endless_greenhouse.begin_play()
 		if puku_gauge_intro_complete:
@@ -5176,7 +5203,7 @@ func _show_play_result()->void:
 
 func _play_result_new_species_animations()->void:
 	if round_result_species_finalize_active:return
-	round_result_species_finalize_active=true
+	round_result_species_finalize_active=true;round_result_species_save_pending=false
 	await get_tree().create_timer(.48).timeout
 	# Finite/old-seed flows already registered their discoveries before the
 	# result. Keep their established card contexts and follow-ups unchanged.
@@ -5204,7 +5231,12 @@ func _show_next_round_result_species()->void:
 	if not species_get_queue.is_empty() or species_get_overlay and species_get_overlay.visible or catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible:return
 	if round_result_species_finalize_queue.is_empty():
 		round_result_species_finalize_active=false
-		_save()
+		# Formal registrations from every card in this result are persisted as one
+		# transaction. The pending IDs were already saved at harvest time, so an
+		# interruption before this point remains recoverable without rewriting the
+		# complete save between consecutive cards.
+		if round_result_species_save_pending:
+			round_result_species_save_pending=false;_save()
 		if total_play_count==1 and not first_colorata_confirmed:call_deferred("_start_first_colorata_discovery_event")
 		else:call_deferred("_try_start_pending_story_event")
 		return
@@ -5218,8 +5250,8 @@ func _show_next_round_result_species()->void:
 	if formalize:
 		is_new=_species_get_count(species_id)<=0
 		if is_new:_register_species_discovery(species_id,true)
-		pending_round_new_species_ids.erase(species_id)
-		_save()
+		if species_id in pending_round_new_species_ids:
+			pending_round_new_species_ids.erase(species_id);round_result_species_save_pending=true
 		if not is_new:
 			call_deferred("_show_next_round_result_species")
 			return
@@ -8420,7 +8452,10 @@ func _try_harvest(screen_pos:Vector2)->void:
 		var hit:Dictionary=p.screen_hit_test(camera,screen_pos)
 		if bool(hit.get("hit",false)):candidates.append({"p":p,"score":float(hit.get("score",INF))})
 	if candidates.size()>0:
-		candidates.sort_custom(func(a,b):return a.score<b.score);candidates[0].p.harvest()
+		candidates.sort_custom(func(a,b):return a.score<b.score)
+		var selected_plant=candidates[0].p
+		selected_plant.set_meta("harvest_input_msec",Time.get_ticks_msec())
+		selected_plant.harvest()
 
 func _try_habitat_pick(screen_pos:Vector2)->void:
 	var candidates:Array=[]
@@ -8465,41 +8500,65 @@ func _on_harvested(p)->void:
 	if bool(p.get_meta("catalog_preview",false)):_on_catalog_preview_harvested(p);return
 	if dev_jelly_test_active:
 		plants.erase(p);var tween:=create_tween().bind_node(p);tween.tween_property(p,"scale",Vector3.ONE*.01,.2);_cleanup_later(p,.25);return
+	last_harvest_input_msec=int(p.get_meta("harvest_input_msec",Time.get_ticks_msec()))
+	var harvested_data:Dictionary=p.data.duplicate(true)
+	var harvested_species_id:=str(harvested_data.get("species_id",""))
+	var harvested_diameter_cm:=float(p.diameter_cm)
+	var harvested_visual_scale:=float(p.visual_scale)
+	var harvested_screen_position:=camera.unproject_position(p.global_position)
+	var story_dev_101:=bool(p.get_meta("story_dev_101",false))
 	var terminal_first_tutorial_harvest:=_is_terminal_first_tutorial_plant(p)
 	if first_play_tutorial_active:first_play_has_harvested=true
+	var completed_first_harvest_guide:=first_play_harvest_guide_active
 	if old_seed_harvest_guide_active:
 		old_seed_harvest_guide_active=false;tutorial_harvest_plant=null;_hide_first_play_tutorial_overlay()
-	if first_play_harvest_guide_active:
+	if completed_first_harvest_guide:
 		if bool(p.get_meta("first_tutorial_reserved_new",false)):tutorial_steps["first_normal_tutorial_species_id"]=str(p.data.get("species_id",""))
 		first_play_harvest_guide_active=false;tutorial_steps["first_harvest_guide"]=true;normal_play_tutorial_complete=true;tutorial_harvest_plant=null;_hide_first_play_tutorial_overlay()
 		for remaining_plant in plants:
 			if is_instance_valid(remaining_plant) and remaining_plant!=p and remaining_plant.state=="growing":remaining_plant.jelly_checks_enabled=true
 		if _is_endless_normal_play():_end_first_play_tutorial_context()
-		_save()
-	else:_maybe_activate_first_play_harvest_guide()
 	var story_old_seed:=_old_seed_story_active()
-	var deferred_tovar:=tovar_event_active and str(p.data.species_id)==HIDDEN_TOVAR_ID
+	var deferred_tovar:=tovar_event_active and harvested_species_id==HIDDEN_TOVAR_ID
 	var endless_forced_new:=bool(p.get_meta("endless_forced_new",false))
-	if deferred_tovar:tovar_harvested_this_play=true
-	var harvested_species_id:=str(p.data.species_id)
-	var old:=float(bests.get(p.data.species_id,0.0));var is_record:bool=not deferred_tovar and not story_old_seed and p.diameter_cm>old
+	var old:=float(bests.get(harvested_species_id,0.0));var is_record:bool=not deferred_tovar and not story_old_seed and harvested_diameter_cm>old
 	var already_pending_round_new:=harvested_species_id in pending_round_new_species_ids
 	var is_first_get_for_puku:=_species_get_count(harvested_species_id)<=0 and not already_pending_round_new
 	var first_discovery:=not deferred_tovar and is_first_get_for_puku
+	var defer_round_new:=not deferred_tovar and _is_endless_normal_play() and first_discovery
+	# Reserve the NEW immediately so a second input can never duplicate it. Full
+	# discovery/story work still waits until the first feedback frame is visible.
+	if defer_round_new:pending_round_new_species_ids.append(harvested_species_id)
+	audio_manager.play_se("harvest",.55)
+	var harvest_tween:=create_tween().bind_node(p).set_parallel();harvest_tween.tween_property(p,"position:y",p.position.y+2.0,.42).set_trans(Tween.TRANS_BACK);harvest_tween.tween_property(p,"scale",p.scale*1.2,.22);harvest_tween.chain().tween_property(p,"scale",Vector3.ONE*0.01,.24)
+	p.set_meta("harvest_feedback_started",true)
+	last_harvest_feedback_msec=Time.get_ticks_msec();last_harvest_feedback_latency_msec=maxi(0,last_harvest_feedback_msec-last_harvest_input_msec)
+	# Let the spotlight removal, sound trigger and first animation frame render
+	# before save serialization and story/unlock evaluation run on the main thread.
+	if DisplayServer.get_name()=="headless":
+		await get_tree().process_frame
+	else:
+		await RenderingServer.frame_post_draw
+		# Web's frame_post_draw signal precedes browser composition. Give the
+		# immediate sound/spotlight/Tween response a browser-driven frame before
+		# synchronous progression and persistence can block the main thread.
+		if OS.has_feature("web"):
+			await get_tree().create_timer(0.12).timeout
+	last_harvest_presented_msec=Time.get_ticks_msec();last_harvest_presented_latency_msec=maxi(0,last_harvest_presented_msec-last_harvest_input_msec)
+	if not completed_first_harvest_guide:_maybe_activate_first_play_harvest_guide()
+	if deferred_tovar:tovar_harvested_this_play=true
 	var restoration_snapshot:Dictionary={}
-	if not deferred_tovar and HabitatRestorationClass.can_offer_return(_restoration_state(),float(p.diameter_cm)):
+	if not deferred_tovar and HabitatRestorationClass.can_offer_return(_restoration_state(),harvested_diameter_cm):
 		restoration_snapshot={
-			"species_id":str(p.data.get("species_id","")),
-			"display_name":Localizer.species_name(language_code,p.data),
-			"diameter_cm":float(p.diameter_cm),
-			"visual_scale":float(p.visual_scale),
-			"rarity":str(p.data.get("rarity","")),
-			"gold_star_count":int(p.data.get("gold_star_count",0)),
+			"species_id":harvested_species_id,
+			"display_name":Localizer.species_name(language_code,harvested_data),
+			"diameter_cm":harvested_diameter_cm,
+			"visual_scale":harvested_visual_scale,
+			"rarity":str(harvested_data.get("rarity","")),
+			"gold_star_count":int(harvested_data.get("gold_star_count",0)),
 		}
 	if not deferred_tovar:
-		var defer_round_new:=_is_endless_normal_play() and first_discovery
-		if defer_round_new:pending_round_new_species_ids.append(harvested_species_id)
-		_record_endless_discovery_settlement(true,float(p.diameter_cm))
+		_record_endless_discovery_settlement(true,harvested_diameter_cm)
 		if defer_round_new:
 			# Formal GET, catalog progress, and story thresholds intentionally wait
 			# until the round result is closed. Only the active forced slot is cleared;
@@ -8513,32 +8572,32 @@ func _on_harvested(p)->void:
 		elif endless_forced_new:
 			endless_greenhouse.fail_forced_new(harvested_species_id)
 	if is_record:
-		bests[p.data.species_id]=p.diameter_cm
-		if play_active and (play_share_record.is_empty() or p.diameter_cm>float(play_share_record.get("size",0.0))):play_share_record={"species_id":str(p.data.species_id),"size":p.diameter_cm}
+		bests[harvested_species_id]=harvested_diameter_cm
+		if play_active and (play_share_record.is_empty() or harvested_diameter_cm>float(play_share_record.get("size",0.0))):play_share_record={"species_id":harvested_species_id,"size":harvested_diameter_cm}
 		_evaluate_best_spawn_unlocks()
-	var harvest_reward_units:=0;var harvest_screen_position:=camera.unproject_position(p.global_position)
+	var harvest_reward_units:=0
 	if play_active and active_seed_type!="old":
-		if not _is_endless_greenhouse_enabled():add_seed_pod_gauge_cm(p.diameter_cm,false,true)
-		elif _is_endless_normal_play() and puku_gauge_intro_complete and not bool(p.get_meta("story_dev_101",false)):
-			harvest_reward_units=_harvest_puku_reward_units(float(p.diameter_cm),is_first_get_for_puku)
-			_change_puku_balance(harvest_reward_units,"endless_harvest",false,true,harvest_screen_position)
-			endless_economy_harvest_count+=1;endless_economy_max_harvest_cm=maxf(endless_economy_max_harvest_cm,float(p.diameter_cm))
-	if play_active:StoryProgressionClass.record_greenhouse_harvest(story_progression_state,float(p.diameter_cm))
-	_evaluate_unlock_rules("harvest_size",p.diameter_cm);_update_main_story_progress(false);_save();_update_best_ui();_update_currency_ui();audio_manager.play_se("harvest",.55)
+		if not _is_endless_greenhouse_enabled():add_seed_pod_gauge_cm(harvested_diameter_cm,false,true)
+		elif _is_endless_normal_play() and puku_gauge_intro_complete and not story_dev_101:
+			harvest_reward_units=_harvest_puku_reward_units(harvested_diameter_cm,is_first_get_for_puku)
+			_change_puku_balance(harvest_reward_units,"endless_harvest",false,true,harvested_screen_position)
+			endless_economy_harvest_count+=1;endless_economy_max_harvest_cm=maxf(endless_economy_max_harvest_cm,harvested_diameter_cm)
+	if play_active:StoryProgressionClass.record_greenhouse_harvest(story_progression_state,harvested_diameter_cm)
+	_evaluate_unlock_rules("harvest_size",harvested_diameter_cm);_update_main_story_progress(false)
 	if play_active:
-		play_harvest_cm_total+=p.diameter_cm;play_puku_reward_units_total+=harvest_reward_units;play_harvest_count+=1;play_max_size=maxf(play_max_size,p.diameter_cm)
-		if not story_old_seed and p.diameter_cm>play_previous_global_best:play_updated_global_best=true
-		var species_id:=str(p.data.species_id);var notable=play_notable_species.get(species_id,{})
-		if notable.is_empty() or p.diameter_cm>float(notable.get("size",0.0)):play_notable_species[species_id]={"name":Localizer.species_name(language_code,_catalog_entry(species_id)),"size":p.diameter_cm}
-	if active_seed_type!="old" and not terminal_first_tutorial_harvest:_show_harvest_result(p,harvest_reward_units)
-	if is_record:_show_record(p)
+		play_harvest_cm_total+=harvested_diameter_cm;play_puku_reward_units_total+=harvest_reward_units;play_harvest_count+=1;play_max_size=maxf(play_max_size,harvested_diameter_cm)
+		if not story_old_seed and harvested_diameter_cm>play_previous_global_best:play_updated_global_best=true
+		var notable=play_notable_species.get(harvested_species_id,{})
+		if notable.is_empty() or harvested_diameter_cm>float(notable.get("size",0.0)):play_notable_species[harvested_species_id]={"name":Localizer.species_name(language_code,_catalog_entry(harvested_species_id)),"size":harvested_diameter_cm}
+	if is_instance_valid(p) and active_seed_type!="old" and not terminal_first_tutorial_harvest:_show_harvest_result(p,harvest_reward_units)
+	if is_instance_valid(p) and is_record:_show_record(p)
 	if play_active and active_seed_type=="normal" and normal_play_tutorial_complete and not terminal_first_tutorial_harvest and not puku_buyback_tutorial_complete and not puku_buyback_tutorial_active:call_deferred("_start_puku_buyback_tutorial")
 	if not restoration_snapshot.is_empty():
 		var restoration:=_restoration_state()
 		if HabitatRestorationClass.queue_pending_return_snapshot(restoration,restoration_snapshot):
-			story_progression_state["restoration"]=restoration;_save();_update_play_ui()
-	var tween:=create_tween().bind_node(p).set_parallel();tween.tween_property(p,"position:y",p.position.y+2.0,.42).set_trans(Tween.TRANS_BACK);tween.tween_property(p,"scale",p.scale*1.2,.22);tween.chain().tween_property(p,"scale",Vector3.ONE*0.01,.24)
-	_cleanup_later(p,.68)
+			story_progression_state["restoration"]=restoration;_update_play_ui()
+	_save();_update_best_ui();_update_currency_ui();harvest_commit_count+=1
+	if is_instance_valid(p):p.set_meta("harvest_state_committed",true);_cleanup_later(p,.68)
 
 func _is_terminal_first_tutorial_plant(plant)->bool:
 	if _is_endless_normal_play():return false

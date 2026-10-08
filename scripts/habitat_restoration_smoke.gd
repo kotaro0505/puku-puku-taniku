@@ -311,7 +311,9 @@ func _test_integrated_final_chapter() -> void:
 		game._spawn_specific_plant("colorata")
 		var harvested_plant = game.plants.back()
 		harvested_plant.fast_forward_to_diameter(diameter)
-		game._on_harvested(harvested_plant)
+		harvested_plant.harvest()
+	# State accounting follows the guaranteed first visual feedback frame.
+	await get_tree().process_frame
 	assert(StoryProgressionClass.lifetime_harvest_count(game.story_progression_state) == 2)
 	assert(is_equal_approx(StoryProgressionClass.lifetime_harvest_cm_total(game.story_progression_state), 250.0))
 	restoration = game._restoration_state()
