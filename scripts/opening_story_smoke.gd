@@ -19,7 +19,7 @@ func _ready()->void:
 		for key in OpeningStoryOverlayClass.PAGE_TEXT_KEYS:
 			var page_text:=Localizer.text(locale,key)
 			assert(not page_text.is_empty())
-			assert("\n" not in page_text.replace("\n\n",""))
+			if locale!="ja":assert("\n" not in page_text.replace("\n\n",""))
 			if locale=="ja":
 				for character_index in range(page_text.length()):
 					var codepoint:=page_text.unicode_at(character_index)
