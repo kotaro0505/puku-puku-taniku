@@ -357,7 +357,6 @@ const TEXT := {
 		"get": "GET!",
 		"new": "NEW!",
 		"original_catalog_new": "NEW！",
-		"super_rare": "スーパーレア",
 		"tap_to_close": "タップしてとじる",
 		"habitat_intro_1": "芽が出た！",
 		"habitat_observe_size": "現在 %.1fcm",
@@ -590,9 +589,9 @@ const TEXT := {
 		,"seed_series_price_tbd": "タネは不思議なさやから受け取れます"
 		,"seed_price_tbd": "タネは不思議なさやから受け取れます"
 		,"seed_normal_bought": "たね（12粒）を%dセット購入しました"
-		,"seed_normal_detail": "たね（12粒）×3セット\n不思議なさやにできる基本のたね。いろんな多肉が育ちます。\n金星1つ10%　金星2つ5%　新品種4%"
-		,"seed_volume_detail": "ボリュームパックたね　36粒 / 袋\n原生地のたねをたっぷり袋詰め。じっくり大物を狙えます。\nレア10%　スーパーレア5%　新種 約3%"
-		,"seed_premium_detail": "プレミアムたね　24粒 / 袋\n原生地のたねから、パンダが珍しそうな粒を選びました。\nレア30%　スーパーレア10%　新種 約3%"
+		,"seed_normal_detail": "たね（12粒）×3セット\n不思議なさやにできる基本のたね。いろんな多肉が育ちます。\n新品種4%"
+		,"seed_volume_detail": "ボリュームパックたね　36粒 / 袋\n原生地のたねをたっぷり袋詰め。じっくり大物を狙えます。\n新種 約3%"
+		,"seed_premium_detail": "プレミアムたね　24粒 / 袋\n原生地のたねから、パンダが珍しそうな粒を選びました。\n新種 約3%"
 		,"seed_mystery_detail": "謎種パック　5粒 / 袋\n何が育つかわからない、不思議なたね。\n発見済みのパック対象・謎品種100%"
 		,"pot_missing": "この鉢は見つかりませんでした"
 		,"pot_owned": "この鉢は購入済みです"
@@ -1067,7 +1066,6 @@ const TEXT := {
 		"get": "げっと！",
 		"new": "にゅー！",
 		"original_catalog_new": "にゅー！",
-		"super_rare": "すーぱーれあ",
 		"tap_to_close": "おして とじる",
 		"habitat_intro_1": "めが でた！",
 		"habitat_observe_size": "いまの おおきさ %.1fcm",
@@ -1300,9 +1298,9 @@ const TEXT := {
 		,"seed_series_price_tbd": "たねは ふしぎな さやから もらえます"
 		,"seed_price_tbd": "たねは ふしぎな さやから もらえます"
 		,"seed_normal_bought": "たね（12つぶ）を%dせっと かったよ"
-		,"seed_normal_detail": "たね（12つぶ）×3せっと\nふしぎな さやに できる きほんの たねです。\nきんぼし1つ10%　きんぼし2つ5%　しんひんしゅ4%"
-		,"seed_volume_detail": "ぼりゅーむぱっく　36つぶ / ふくろ\nげんせいちの たねを たっぷり ふくろづめ しました。\nれあ10%　すーぱーれあ5%　しんしゅ やく3%"
-		,"seed_premium_detail": "ぷれみあむたね　24つぶ / ふくろ\nぱんだが めずらしそうな つぶを えらびました。\nれあ30%　すーぱーれあ10%　しんしゅ やく3%"
+		,"seed_normal_detail": "たね（12つぶ）×3せっと\nふしぎな さやに できる きほんの たねです。\nしんひんしゅ4%"
+		,"seed_volume_detail": "ぼりゅーむぱっく　36つぶ / ふくろ\nげんせいちの たねを たっぷり ふくろづめ しました。\nしんしゅ やく3%"
+		,"seed_premium_detail": "ぷれみあむたね　24つぶ / ふくろ\nぱんだが めずらしそうな つぶを えらびました。\nしんしゅ やく3%"
 		,"seed_mystery_detail": "なぞたねぱっく　5つぶ / ふくろ\nなにが そだつか わからない ふしぎな たねです。\nみつけた なぞの ひんしゅが でます"
 		,"pot_missing": "この はちは みつかりませんでした"
 		,"pot_owned": "この はちは もう もっています"
@@ -1777,7 +1775,6 @@ const TEXT := {
 		"get": "GET!",
 		"new": "NEW!",
 		"original_catalog_new": "NEW!",
-		"super_rare": "SUPER RARE",
 		"tap_to_close": "Tap to close",
 		"habitat_intro_1": "A sprout!",
 		"habitat_observe_size": "Current size: %.1f cm",
@@ -2010,9 +2007,9 @@ const TEXT := {
 		,"seed_series_price_tbd": "Seeds are received from the mysterious pod"
 		,"seed_price_tbd": "Seeds are received from the mysterious pod"
 		,"seed_normal_bought": "Bought %d sets of Seeds (12)"
-		,"seed_normal_detail": "Seeds (12) × 3 sets\nBasic seeds formed in the mysterious pod; many succulents may grow.\n1 Gold Star 10% · 2 Gold Stars 5% · New species 4%"
-		,"seed_volume_detail": "Volume Pack · 36 seeds per bag\nA generous bag of habitat seeds for growing big succulents.\nRare 10% · Super Rare 5% · New species about 3%"
-		,"seed_premium_detail": "Premium Seeds · 24 seeds per bag\nHabitat seeds Panda selected because they looked unusual.\nRare 30% · Super Rare 10% · New species about 3%"
+		,"seed_normal_detail": "Seeds (12) × 3 sets\nBasic seeds formed in the mysterious pod; many succulents may grow.\nNew species 4%"
+		,"seed_volume_detail": "Volume Pack · 36 seeds per bag\nA generous bag of habitat seeds for growing big succulents.\nNew species about 3%"
+		,"seed_premium_detail": "Premium Seeds · 24 seeds per bag\nHabitat seeds Panda selected because they looked unusual.\nNew species about 3%"
 		,"seed_mystery_detail": "Mystery Pack · 5 seeds per bag\nMysterious seeds with unknown results.\nDiscovered eligible mystery species only"
 		,"pot_missing": "That pot could not be found"
 		,"pot_owned": "You already own that pot"

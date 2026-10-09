@@ -11,7 +11,7 @@ func _ready()->void:
 	_test_one_time_gift_arrangement_and_share(game)
 	_test_removed_mystery_pod()
 	game._reset_progression_state();game.queue_free();await get_tree().process_frame
-	print("INTEGRATED_FEATURES_SMOKE_OK rarity=1x2+2x1 localization=3 gift=once arrangement=free-scale share=record-only mystery_pod=removed")
+	print("INTEGRATED_FEATURES_SMOKE_OK selection_metadata=1x2+2x1 player_rarity_ui=removed localization=3 gift=once arrangement=free-scale share=record-only mystery_pod=removed")
 	get_tree().quit()
 
 func _test_catalog_and_collection_rarity(game)->void:
@@ -53,6 +53,10 @@ func _test_language_and_symbol_safety(game)->void:
 			var args:Array=[5] if str(key) in numeric_format_keys else (["TEST"] if str(key) in string_format_keys else [])
 			assert(not Localizer.text(language,str(key),args).is_empty())
 		for key in game.SHOP_CHATTER_KEYS:assert(not Localizer.text(language,str(key)).is_empty())
+		var forbidden_rarity_terms:Dictionary={"ja":["レア","金星"],"hiragana":["れあ","きんぼし"],"en":["rare","gold star"]}
+		for key in ["seed_normal_detail","seed_volume_detail","seed_premium_detail"]:
+			var seed_detail:=Localizer.text(language,key).to_lower()
+			for term in forbidden_rarity_terms[language]:assert(str(term).to_lower() not in seed_detail)
 	game._set_language("en");assert(game.language_code=="en" and game.settings_button.text=="Settings" and game.forest_gacha_ui.language=="en" and game.opening_prompt_localized.visible and not game.opening_prompt.visible and game.opening_prompt_localized_label.text=="Tap to Start")
 	assert(game.find_child("SeToggle",true,false).text==Localizer.text("en","audio_se_on"))
 	game._set_language("hiragana");assert(game.language_code=="hiragana" and game.opening_prompt_localized.visible and game.opening_prompt_localized_label.text=="タップして はじめる")
@@ -61,7 +65,11 @@ func _test_language_and_symbol_safety(game)->void:
 	for path in ["res://scripts/main.gd","res://scripts/arrangement_ui.gd","res://scripts/forest_gacha_ui.gd","res://scripts/species_get_overlay.gd"]:
 		var source:=FileAccess.get_file_as_string(path)
 		for forbidden in [String.chr(0x2B50),String.chr(0x2605),String.chr(0x2606),String.chr(0x2665),String.chr(0x2764)]:assert(not source.contains(forbidden))
-	assert(FileAccess.file_exists("res://scripts/ui_symbol_icon.gd") and FileAccess.file_exists("res://scripts/star_rating.gd"))
+	assert(FileAccess.file_exists("res://scripts/ui_symbol_icon.gd") and not FileAccess.file_exists("res://scripts/star_rating.gd"))
+	var main_source:=FileAccess.get_file_as_string("res://scripts/main.gd")
+	var get_overlay_source:=FileAccess.get_file_as_string("res://scripts/species_get_overlay.gd")
+	assert(not main_source.contains("StarRating") and not main_source.contains("GoldStars") and not main_source.contains('Localizer.text(language_code,"super_rare")'))
+	assert(not get_overlay_source.contains("StarRating") and not get_overlay_source.contains("rarity_label") and not get_overlay_source.contains("star_rating"))
 
 func _test_one_time_gift_arrangement_and_share(game)->void:
 	var points_before:int=game.puku_points;var bags_before:int=game.normal_seed_bags

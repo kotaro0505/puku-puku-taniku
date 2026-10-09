@@ -3,14 +3,11 @@ extends Control
 
 signal closed(context:String)
 
-const StarRatingClass=preload("res://scripts/star_rating.gd")
 const Localizer=preload("res://scripts/game_localizer.gd")
 
 var result_image:TextureRect
 var badge_label:Label
 var name_label:Label
-var rarity_label:Label
-var star_rating:Control
 var hint_label:Label
 var card:PanelContainer
 var flash:ColorRect
@@ -35,9 +32,6 @@ func _ready()->void:
 	var glow:=PanelContainer.new();glow.custom_minimum_size=Vector2(420,430);var glow_style:=StyleBoxFlat.new();glow_style.bg_color=Color(1,.91,.63,.06);glow_style.border_color=Color(1,.86,.42,.68);glow_style.set_border_width_all(3);glow_style.set_corner_radius_all(34);glow_style.shadow_color=Color(1,.55,.26,.35);glow_style.shadow_size=22;glow.add_theme_stylebox_override("panel",glow_style);content.add_child(glow)
 	result_image=TextureRect.new();result_image.name="SpeciesImage";result_image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;result_image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;result_image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);result_image.offset_left=18;result_image.offset_top=18;result_image.offset_right=-18;result_image.offset_bottom=-18;result_image.mouse_filter=Control.MOUSE_FILTER_IGNORE;glow.add_child(result_image)
 	name_label=Label.new();name_label.custom_minimum_size=Vector2(430,64);name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;name_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;name_label.add_theme_font_size_override("font_size",30);name_label.add_theme_color_override("font_color",Color("#fff4dc"));name_label.add_theme_color_override("font_outline_color",Color("#3a1724"));name_label.add_theme_constant_override("outline_size",6);content.add_child(name_label)
-	var rating_row:=HBoxContainer.new();rating_row.alignment=BoxContainer.ALIGNMENT_CENTER;rating_row.custom_minimum_size=Vector2(430,44);rating_row.add_theme_constant_override("separation",10);content.add_child(rating_row)
-	rarity_label=Label.new();rarity_label.add_theme_font_size_override("font_size",18);rarity_label.add_theme_color_override("font_color",Color("#ffd76e"));rating_row.add_child(rarity_label)
-	star_rating=StarRatingClass.new();rating_row.add_child(star_rating)
 	hint_label=Label.new();hint_label.custom_minimum_size=Vector2(430,44);hint_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;hint_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;hint_label.add_theme_font_size_override("font_size",17);hint_label.add_theme_color_override("font_color",Color("#ead8c0"));content.add_child(hint_label)
 
 func show_species(entry:Dictionary,texture:Texture2D,is_new:bool,context:String,language:String="ja")->void:
@@ -47,7 +41,7 @@ func show_species(entry:Dictionary,texture:Texture2D,is_new:bool,context:String,
 	# reusable TextureRect. main.gd assigns the new request identity afterwards.
 	result_image.set_meta("catalog_loaded_path","");result_image.set_meta("catalog_request_path","")
 	result_image.texture=texture;badge_label.text=Localizer.text(current_language,"original_catalog_new" if story_catalog_card else ("new" if is_new else "get"));name_label.text=Localizer.species_name(current_language,entry)
-	var stars:=clampi(int(entry.get("gold_star_count",0)),0,2);star_rating.star_count=stars;rarity_label.text=Localizer.text(current_language,"super_rare") if stars>0 else "";star_rating.visible=stars>0;hint_label.text=Localizer.text(current_language,"tap_to_close")
+	hint_label.text=Localizer.text(current_language,"tap_to_close")
 	card.scale=Vector2(.56,.56);card.rotation=-.035;flash.color.a=.94
 	var reveal:=create_tween().set_parallel(true);reveal.tween_property(card,"scale",Vector2.ONE,.44).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT);reveal.tween_property(card,"rotation",0.0,.34).set_trans(Tween.TRANS_QUAD);reveal.tween_property(flash,"color:a",0.0,.52)
 	await reveal.finished
