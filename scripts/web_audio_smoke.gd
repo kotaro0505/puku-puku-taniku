@@ -16,6 +16,23 @@ func _ready() -> void:
 		assert(player.playback_type == AudioServer.PLAYBACK_TYPE_DEFAULT)
 
 	audio.apply_settings({"bgm_enabled":true,"se_enabled":true,"bgm_volume":0.65,"se_volume":0.62})
+	var existing_harvest:=audio._stream_for("se","harvest")
+	assert(existing_harvest is AudioStreamWAV and is_equal_approx(existing_harvest.get_length(),.18))
+	audio.set_harvest_test_variant(1,true)
+	var firefly_1:=audio._stream_for("se","harvest") as AudioStreamWAV
+	assert(firefly_1!=null and is_equal_approx(firefly_1.get_length(),3551.0/48000.0))
+	audio.play_se("harvest",.55)
+	assert(audio.last_se_key=="harvest" and audio.se_players[0].stream==firefly_1)
+	audio.set_harvest_test_variant(2,true)
+	var firefly_2:=audio._stream_for("se","harvest") as AudioStreamWAV
+	assert(firefly_2!=null and is_equal_approx(firefly_2.get_length(),2086.0/48000.0) and firefly_2!=firefly_1)
+	for i in range(audio.SE_POOL_SIZE+2):audio.play_se("harvest",.55)
+	assert(audio.se_players.all(func(player:AudioStreamPlayer)->bool:return player.stream==firefly_2))
+	audio.apply_settings({"bgm_enabled":true,"se_enabled":false,"bgm_volume":0.65,"se_volume":0.62})
+	audio.last_se_key="";audio.play_se("harvest",.55);assert(audio.last_se_key.is_empty())
+	audio.set_harvest_test_variant(2,false)
+	assert(audio.harvest_test_variant==0 and audio._stream_for("se","harvest")==existing_harvest)
+	audio.apply_settings({"bgm_enabled":true,"se_enabled":true,"bgm_volume":0.65,"se_volume":0.62})
 	audio.play_bgm("opening")
 	assert(audio.current_bgm_key == "opening")
 	assert(_playing_count(audio) == 0)
@@ -90,7 +107,7 @@ func _ready() -> void:
 
 	audio.queue_free()
 	await get_tree().process_frame
-	print("WEB_AUDIO_SMOKE_OK locked_start=silent playback=stream crossfade=single jurejure_sequence=true crisis_sequence=true ending=true custom_fade=true mp3_loop=true visibility=pause_resume")
+	print("WEB_AUDIO_SMOKE_OK locked_start=silent playback=stream crossfade=single harvest_variants=3 se_off=true harvest_pool=true jurejure_sequence=true crisis_sequence=true ending=true custom_fade=true mp3_loop=true visibility=pause_resume")
 	get_tree().quit()
 
 func _playing_count(audio:Node) -> int:

@@ -507,6 +507,9 @@ var settings_language_heading:Label
 var settings_close_button:Button
 var settings_language_status:Label
 var language_buttons:Dictionary={}
+var harvest_sound_test_variant:=0
+var harvest_sound_test_buttons:Array[Button]=[]
+var harvest_sound_test_status:Label
 var progression_dev_labels:Dictionary={}
 var endless_economy_debug_label:Label
 var jelly_dev_overlay: Control
@@ -3609,6 +3612,7 @@ func _build_settings(hud:Control)->void:
 	_add_audio_setting_controls(content,Localizer.text(language_code,"audio_se"),false)
 	var note:=Label.new();note.name="AudioSettingsNote";note.text=Localizer.text(language_code,"audio_note");note.custom_minimum_size=Vector2(420,40);note.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;note.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;note.add_theme_font_size_override("font_size",14);note.add_theme_color_override("font_color",Color("#76513b"));content.add_child(note)
 	if _trial_dev_controls_enabled():
+		_add_harvest_sound_test_controls(content)
 		var habitat_test:=Button.new();habitat_test.name="HabitatDevOpen";habitat_test.text="開発用：通常原生地テスト";habitat_test.custom_minimum_size=Vector2(370,58);_skin_button(habitat_test,Color("#adcbb8"),16);habitat_test.pressed.connect(_open_habitat_dev);content.add_child(habitat_test)
 		var opening_story_replay:=Button.new();opening_story_replay.name="OpeningStoryReplay";opening_story_replay.text="開発用：オープニングストーリー再表示";opening_story_replay.custom_minimum_size=Vector2(370,58);_skin_button(opening_story_replay,Color("#d8c29e"),15);opening_story_replay.pressed.connect(_replay_opening_story_for_development);content.add_child(opening_story_replay)
 	if _trial_dev_controls_enabled():
@@ -3878,6 +3882,27 @@ func _add_audio_setting_controls(parent:VBoxContainer,label_text:String,is_bgm:b
 	var toggle:=CheckButton.new();toggle.name="BgmToggle" if is_bgm else "SeToggle";toggle.text=Localizer.text(language_code,"audio_bgm_on" if is_bgm else "audio_se_on");toggle.button_pressed=bool(audio_settings.get("bgm_enabled" if is_bgm else "se_enabled",true));toggle.custom_minimum_size=Vector2(145,48);toggle.clip_text=true;toggle.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS;row.add_child(toggle)
 	var slider:=HSlider.new();slider.min_value=0;slider.max_value=100;slider.step=1;slider.value=float(audio_settings.get("bgm_volume" if is_bgm else "se_volume",.65)) * 100.0;slider.custom_minimum_size=Vector2(210,48);row.add_child(slider)
 	toggle.toggled.connect(_change_audio_enabled.bind(is_bgm));slider.value_changed.connect(_change_audio_volume.bind(is_bgm))
+
+func _add_harvest_sound_test_controls(parent:VBoxContainer)->void:
+	var heading:=Label.new();heading.name="HarvestSoundTestHeading";heading.text="収穫音（テスト用）";heading.custom_minimum_size=Vector2(420,30);heading.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;heading.add_theme_font_size_override("font_size",19);heading.add_theme_color_override("font_color",UI_BROWN);parent.add_child(heading)
+	var row:=HBoxContainer.new();row.name="HarvestSoundTestRow";row.alignment=BoxContainer.ALIGNMENT_CENTER;row.add_theme_constant_override("separation",7);parent.add_child(row)
+	var specs:=[{"name":"HarvestSoundExisting","label":"既存"},{"name":"HarvestSoundFirefly1","label":"Firefly ①"},{"name":"HarvestSoundFirefly2","label":"Firefly ②"}]
+	for index in range(specs.size()):
+		var spec:Dictionary=specs[index];var button:=Button.new();button.name=str(spec.name);button.text=str(spec.label);button.custom_minimum_size=Vector2(134,48);button.clip_text=true;button.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS;_skin_button(button,Color("#d9c49d"),15);button.pressed.connect(_select_harvest_sound_test_variant.bind(index));row.add_child(button);harvest_sound_test_buttons.append(button)
+	harvest_sound_test_status=Label.new();harvest_sound_test_status.name="HarvestSoundTestStatus";harvest_sound_test_status.custom_minimum_size=Vector2(420,32);harvest_sound_test_status.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;harvest_sound_test_status.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;harvest_sound_test_status.add_theme_font_size_override("font_size",14);harvest_sound_test_status.add_theme_color_override("font_color",Color("#76513b"));parent.add_child(harvest_sound_test_status)
+	_refresh_harvest_sound_test_controls()
+
+func _select_harvest_sound_test_variant(variant_index:int)->void:
+	if not _trial_dev_controls_enabled():return
+	harvest_sound_test_variant=clampi(variant_index,0,2)
+	audio_manager.set_harvest_test_variant(harvest_sound_test_variant,true)
+	_refresh_harvest_sound_test_controls()
+
+func _refresh_harvest_sound_test_controls()->void:
+	var labels:=["既存","Firefly ①","Firefly ②"]
+	for index in range(harvest_sound_test_buttons.size()):
+		var selected:=index==harvest_sound_test_variant;harvest_sound_test_buttons[index].disabled=selected;harvest_sound_test_buttons[index].text=("✓ " if selected else "")+labels[index]
+	if harvest_sound_test_status:harvest_sound_test_status.text="選択中：%s"%labels[harvest_sound_test_variant]
 
 func _open_settings()->void:
 	if play_active:return

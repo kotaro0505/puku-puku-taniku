@@ -4,6 +4,10 @@ const CONFIG_PATH := "res://data/audio-config.json"
 const BGM_FADE_SECONDS := 0.45
 const SE_POOL_SIZE := 8
 const FALLBACK_MIX_RATE := 22050
+const HARVEST_TEST_STREAM_PATHS: Array[String] = [
+	"res://assets/audio/harvest_firefly_1.wav",
+	"res://assets/audio/harvest_firefly_2.wav"
+]
 
 var bgm_enabled := true
 var se_enabled := true
@@ -24,6 +28,8 @@ var last_bgm_fade_seconds := BGM_FADE_SECONDS
 var application_audio_paused := false
 var bgm_changed_while_paused := false
 var web_visibility_callback
+var harvest_test_variant := 0
+var harvest_test_stream:AudioStream
 
 func _ready() -> void:
 	_load_config()
@@ -71,6 +77,10 @@ func apply_settings(saved: Dictionary) -> void:
 
 func settings_dictionary() -> Dictionary:
 	return {"bgm_enabled":bgm_enabled,"se_enabled":se_enabled,"bgm_volume":bgm_volume,"se_volume":se_volume}
+
+func set_harvest_test_variant(variant_index:int,dev_controls_enabled:bool)->void:
+	harvest_test_variant=clampi(variant_index,0,HARVEST_TEST_STREAM_PATHS.size()) if dev_controls_enabled else 0
+	harvest_test_stream=load(HARVEST_TEST_STREAM_PATHS[harvest_test_variant-1]) as AudioStream if harvest_test_variant>0 else null
 
 func play_bgm(key: String, restart := false, fade_seconds := BGM_FADE_SECONDS) -> void:
 	var previous_key := current_bgm_key
@@ -200,6 +210,8 @@ func play_se(key: String, gain := 1.0) -> void:
 	player.play()
 
 func _stream_for(section: String, key: String) -> AudioStream:
+	if section=="se" and key=="harvest" and harvest_test_variant>0:
+		return harvest_test_stream
 	var paths = config.get(section, {})
 	if paths is Dictionary:
 		var path := str(paths.get(key, ""))
