@@ -688,6 +688,15 @@ var gacha_capsule_profile_total_msec := -1
 var gacha_capsule_profile_run_id := 0
 var gacha_capsule_profile_decode_count_start := 0
 var gacha_capsule_profile_started_with_placeholder := false
+var old_colorata_profile_enabled := OS.is_debug_build()
+var old_colorata_profile_active := false
+var old_colorata_profile_events: Dictionary = {}
+var old_colorata_profile_event_order: Array[String] = []
+var old_colorata_profile_slow_sections: Array[String] = []
+var old_colorata_profile_run_id := 0
+var old_colorata_profile_save_count := 0
+var old_colorata_profile_tap_to_first_visual_msec := -1
+var old_colorata_profile_tap_to_get_start_msec := -1
 var last_harvest_input_msec := -1
 var last_harvest_feedback_msec := -1
 var last_harvest_feedback_latency_msec := -1
@@ -1248,10 +1257,16 @@ func _save() -> void:
 		get_close_profile_save_count += 1
 		profile_save_name = "save" if get_close_profile_save_count == 1 else "save_%d" % get_close_profile_save_count
 		_get_close_profile_mark(profile_save_name + "_start")
+	var old_colorata_save_name := ""
+	if old_colorata_profile_active:
+		old_colorata_profile_save_count+=1
+		old_colorata_save_name="save" if old_colorata_profile_save_count==1 else "save_%d"%old_colorata_profile_save_count
+		_old_colorata_profile_mark(old_colorata_save_name+"_start")
 	var f := FileAccess.open(_active_save_path(),FileAccess.WRITE)
 	if f==null:
 		push_error("Unable to open active save path: %s"%_active_save_path())
 		if not profile_save_name.is_empty():_get_close_profile_mark(profile_save_name + "_end")
+		if not old_colorata_save_name.is_empty():_old_colorata_profile_mark(old_colorata_save_name+"_end")
 		return
 	if audio_manager:audio_settings=audio_manager.settings_dictionary()
 	var payload:={
@@ -1300,6 +1315,7 @@ func _save() -> void:
 	f.store_string(JSON.stringify(payload))
 	f.close()
 	if not profile_save_name.is_empty():_get_close_profile_mark(profile_save_name + "_end")
+	if not old_colorata_save_name.is_empty():_old_colorata_profile_mark(old_colorata_save_name+"_end")
 
 func _active_save_path()->String:
 	return endless_greenhouse.active_save_path()
@@ -4272,14 +4288,18 @@ func _show_next_species_get()->void:
 	species_get_active_series_id=_series_id_for_species(str(entry.get("species_id","")))
 	if species_get_active_series_id in catalog_series_unlock_notice_queue:catalog_series_unlock_notice_ready[species_get_active_series_id]=true
 	var forest_gacha_reveal:=species_get_active_context=="forest_gacha"
+	var first_colorata_reveal:=species_get_active_context=="first_colorata" and species_get_active_species_id==FIRST_STORY_SPECIES_ID and old_colorata_profile_active
 	var texture:=CatalogImageLoader.placeholder_texture if forest_gacha_reveal else _species_texture(entry)
 	if forest_gacha_reveal:_gacha_capsule_profile_mark("get_card_show_start")
+	if first_colorata_reveal:_old_colorata_profile_mark("get_card_show_start")
 	species_get_overlay.show_species(entry,texture if texture!=null else CatalogImageLoader.placeholder_texture,bool(queued.get("is_new",true)),species_get_active_context,language_code)
 	if forest_gacha_reveal:
 		gacha_capsule_profile_started_with_placeholder=species_get_overlay.result_image.texture==CatalogImageLoader.placeholder_texture
 		if forest_gacha_ui:forest_gacha_ui.complete_capsule_reveal_transition()
 		call_deferred("_finish_gacha_capsule_first_display",gacha_capsule_profile_run_id,entry.duplicate(true),species_get_active_species_id)
-	else:_request_species_texture(entry,species_get_overlay.result_image,true)
+	else:
+		_request_species_texture(entry,species_get_overlay.result_image,true)
+		if first_colorata_reveal:call_deferred("_finish_old_colorata_profile_after_rendered_frame",old_colorata_profile_run_id)
 	if audio_manager:audio_manager.play_se("new_species",.9)
 
 func _gacha_capsule_profile_requested()->bool:
@@ -4325,6 +4345,45 @@ func _finish_gacha_capsule_first_display(profile_run_id:int,entry:Dictionary,spe
 	# frame. Cached images replace it immediately; Web requests/decode remain async.
 	if species_get_overlay and species_get_overlay.visible and species_get_active_context=="forest_gacha" and species_get_active_species_id==species_id:
 		_request_species_texture(entry,species_get_overlay.result_image,true)
+
+func _old_colorata_profile_requested()->bool:
+	if old_colorata_profile_enabled:return true
+	if not OS.has_feature("web"):return false
+	return bool(JavaScriptBridge.eval("new URL(window.location.href).searchParams.has('old_colorata_profile')",true))
+
+func _old_colorata_profile_record_at(event_name:String,event_msec:int)->void:
+	if not old_colorata_profile_active or event_msec<0:return
+	if not old_colorata_profile_events.has(event_name):old_colorata_profile_event_order.append(event_name)
+	old_colorata_profile_events[event_name]=event_msec
+
+func _old_colorata_profile_mark(event_name:String)->void:
+	_old_colorata_profile_record_at(event_name,Time.get_ticks_msec())
+
+func _begin_old_colorata_profile(tap_msec:int)->void:
+	if not _old_colorata_profile_requested():return
+	old_colorata_profile_enabled=true;old_colorata_profile_active=true;old_colorata_profile_run_id+=1
+	old_colorata_profile_events.clear();old_colorata_profile_event_order.clear();old_colorata_profile_slow_sections.clear()
+	old_colorata_profile_save_count=0;old_colorata_profile_tap_to_first_visual_msec=-1;old_colorata_profile_tap_to_get_start_msec=-1
+	_old_colorata_profile_record_at("tap_start",tap_msec)
+
+func _finish_old_colorata_profile_after_rendered_frame(profile_run_id:int)->void:
+	if DisplayServer.get_name()=="headless":await get_tree().process_frame
+	else:await RenderingServer.frame_post_draw
+	if not old_colorata_profile_active or profile_run_id!=old_colorata_profile_run_id:return
+	_old_colorata_profile_mark("get_card_first_frame")
+	var tap_msec:=int(old_colorata_profile_events.get("tap_start",-1))
+	var first_visual_msec:=int(old_colorata_profile_events.get("first_visual_response",-1))
+	var get_start_msec:=int(old_colorata_profile_events.get("get_card_show_start",-1))
+	old_colorata_profile_tap_to_first_visual_msec=maxi(-1,first_visual_msec-tap_msec)
+	old_colorata_profile_tap_to_get_start_msec=maxi(-1,get_start_msec-tap_msec)
+	var segment_text:Array[String]=[]
+	for index in range(1,old_colorata_profile_event_order.size()):
+		var previous_name:=old_colorata_profile_event_order[index-1];var current_name:=old_colorata_profile_event_order[index]
+		var elapsed:=int(old_colorata_profile_events[current_name])-int(old_colorata_profile_events[previous_name])
+		var description:="%s->%s=%dms"%[previous_name,current_name,elapsed];segment_text.append(description)
+		if elapsed>=50:old_colorata_profile_slow_sections.append(description)
+	print("OLD_COLORATA_PROFILE tap_to_first_visual_ms=",old_colorata_profile_tap_to_first_visual_msec," tap_to_get_start_ms=",old_colorata_profile_tap_to_get_start_msec," segments=",", ".join(segment_text)," slow_50ms=",("none" if old_colorata_profile_slow_sections.is_empty() else ", ".join(old_colorata_profile_slow_sections))," save_count=",old_colorata_profile_save_count)
+	old_colorata_profile_active=false
 
 func _get_close_profile_record_at(event_name:String,event_msec:int)->void:
 	if not get_close_profile_enabled or not get_close_profile_active or event_msec<0:return
@@ -4624,6 +4683,7 @@ func _finish_greenhouse_play()->void:
 	greenhouse_finish_last_snapshot={"play_active":play_active,"plants_size":plants.size(),"play_seeds_remaining":play_seeds_remaining,"play_spawn_queue":play_spawn_queue,"play_seed_animations_pending":play_seed_animations_pending,"first_play_tutorial_active":first_play_tutorial_active,"first_play_tutorial_sequence_complete":first_play_tutorial_sequence_complete,"result_overlay_visible":result_overlay.visible if result_overlay else false}
 	greenhouse_finish_last_block_reason=_greenhouse_finish_block_reason()
 	if not greenhouse_finish_last_block_reason.is_empty():return
+	if old_colorata_profile_active:_old_colorata_profile_mark("round_finish_start")
 	greenhouse_finish_completed_count+=1
 	var completed_endless_round:=_is_endless_normal_play()
 	play_active=false;play_time_remaining=0.0;play_spawn_timer=0.0;_end_first_play_tutorial_context()
@@ -4641,6 +4701,7 @@ func _finish_greenhouse_play()->void:
 	_evaluate_unlock_rules("play_count",float(total_play_count))
 	if completed_endless_round:_log_endless_economy("round_complete")
 	_clear_greenhouse_plants();_save();_update_play_ui();_show_play_result();audio_manager.play_se("result",.7)
+	if old_colorata_profile_active:_old_colorata_profile_mark("round_finish_end")
 
 func _greenhouse_finish_block_reason()->String:
 	if habitat_restoration_ui and habitat_restoration_ui.is_modal_visible():return "habitat_restoration_event"
@@ -5348,7 +5409,8 @@ func _show_play_result()->void:
 func _play_result_new_species_animations()->void:
 	if round_result_species_finalize_active:return
 	round_result_species_finalize_active=true;round_result_species_save_pending=false
-	await get_tree().create_timer(.48).timeout
+	var immediate_first_colorata:=active_seed_type=="old" and total_play_count==1 and not first_colorata_confirmed and FIRST_STORY_SPECIES_ID in result_new_species_queue
+	if not immediate_first_colorata:await get_tree().create_timer(.48).timeout
 	# Finite/old-seed flows already registered their discoveries before the
 	# result. Keep their established card contexts and follow-ups unchanged.
 	if pending_round_new_species_ids.is_empty():
@@ -6283,7 +6345,9 @@ func _species_available_in_current_era(entry:Dictionary)->bool:
 	# pre-awakening acquisition route.
 	return bool(discovered.get(str(entry.get("species_id","")),false))
 
-func _register_species_discovery(species_id:String,count_get:=true)->bool:
+func _register_species_discovery(species_id:String,count_get:=true,check_collection_complete:=true)->bool:
+	var profile_first_colorata:=old_colorata_profile_active and species_id==FIRST_STORY_SPECIES_ID and count_get
+	if profile_first_colorata:_old_colorata_profile_mark("registration_lookup_start")
 	var entry:=_catalog_entry(species_id)
 	if entry.is_empty():return false
 	if _is_jurejure_species(entry) and not _is_jurejure_species_unlocked(species_id):return false
@@ -6293,19 +6357,24 @@ func _register_species_discovery(species_id:String,count_get:=true)->bool:
 	var first_discovery:=not bool(discovered.get(species_id,false));var first_get:=count_get and _species_get_count(species_id)==0
 	discovered[species_id]=true
 	greenhouse_available[species_id]=true;unlocked_species[species_id]=true
+	if profile_first_colorata:_old_colorata_profile_mark("registration_record_get_start")
 	if count_get:_record_species_get(species_id)
+	if profile_first_colorata:_old_colorata_profile_mark("registration_record_get_end")
 	var already_present:=false
 	for active_entry in species:
 		if str(active_entry.get("species_id",""))==species_id:already_present=true;break
 	if not already_present:species.append(entry)
 	if habitat_awakened and not _is_jurejure_species(entry):habitat_returned_species[species_id]=true
+	if profile_first_colorata:_old_colorata_profile_mark("registration_inventory_end")
 	if first_discovery:
 		if not series_id.is_empty():unlocked_series[series_id]=true
 		if count_get and not series_page_was_unlocked and not series_id.is_empty():
 			_queue_catalog_series_unlock_notice(series_id)
 		encyclopedia_unlocked=mystery_items_acquired;_refresh_seed_pack_unlocks()
 		_update_main_story_progress(false)
-	if first_get:_mark_collection_complete_if_earned(species_id)
+	if profile_first_colorata:_old_colorata_profile_mark("registration_unlocks_end")
+	if first_get and check_collection_complete:_mark_collection_complete_if_earned(species_id)
+	if profile_first_colorata:_old_colorata_profile_mark("registration_collection_end")
 	return first_discovery or first_get
 
 func _register_story_catalog_species(species_id:String)->void:
@@ -8564,6 +8633,8 @@ func _input(event:InputEvent)->void:
 		_drag_pointer(event.position, event.relative)
 
 func _begin_pointer(screen_pos:Vector2)->void:
+	if _old_seed_story_active() and old_seed_harvest_guide_active and is_instance_valid(tutorial_harvest_plant) and str(tutorial_harvest_plant.data.get("species_id",""))==FIRST_STORY_SPECIES_ID:
+		_begin_old_colorata_profile(Time.get_ticks_msec())
 	pointer_down=true;pointer_start=screen_pos;pointer_last=screen_pos;pointer_travel=0.0
 	greenhouse_drag_accumulator=0.0;greenhouse_drag_started=false;greenhouse_pan_target_x=greenhouse_pan_x
 	habitat_target_yaw=view_yaw;habitat_target_pitch=view_pitch
@@ -8593,6 +8664,7 @@ func _drag_pointer(screen_pos:Vector2,relative:Vector2)->void:
 func _end_pointer(screen_pos:Vector2)->void:
 	if not pointer_down:return
 	pointer_down=false
+	if old_colorata_profile_active:_old_colorata_profile_mark("tap_end")
 	if pointer_travel<13.0 and pointer_start.distance_to(screen_pos)<16.0:
 		if current_mode=="greenhouse":_try_harvest(screen_pos)
 		elif current_mode=="habitat":_try_habitat_pick(screen_pos)
@@ -8615,6 +8687,8 @@ func _try_harvest(screen_pos:Vector2)->void:
 	if candidates.size()>0:
 		candidates.sort_custom(func(a,b):return a.score<b.score)
 		var selected_plant=candidates[0].p
+		if old_colorata_profile_active and selected_plant==tutorial_harvest_plant:
+			_old_colorata_profile_mark("harvest_target_decided");selected_plant.set_meta("old_colorata_profile",true)
 		selected_plant.set_meta("harvest_input_msec",Time.get_ticks_msec())
 		selected_plant.harvest()
 
@@ -8717,6 +8791,7 @@ func _on_harvested(p)->void:
 	last_harvest_input_msec=int(p.get_meta("harvest_input_msec",Time.get_ticks_msec()))
 	var harvested_data:Dictionary=p.data.duplicate(true)
 	var harvested_species_id:=str(harvested_data.get("species_id",""))
+	var profiled_old_colorata:=bool(p.get_meta("old_colorata_profile",false)) and harvested_species_id==FIRST_STORY_SPECIES_ID
 	var harvested_diameter_cm:=float(p.diameter_cm)
 	var harvested_visual_scale:=float(p.visual_scale)
 	var harvested_screen_position:=camera.unproject_position(p.global_position)
@@ -8743,6 +8818,7 @@ func _on_harvested(p)->void:
 	# Reserve the NEW immediately so a second input can never duplicate it. Full
 	# discovery/story work still waits until the first feedback frame is visible.
 	if defer_round_new:pending_round_new_species_ids.append(harvested_species_id)
+	if profiled_old_colorata:_old_colorata_profile_mark("harvest_animation_start")
 	audio_manager.play_se("harvest",.55)
 	var harvest_tween:=create_tween().bind_node(p).set_parallel();harvest_tween.tween_property(p,"position:y",p.position.y+2.0,.42).set_trans(Tween.TRANS_BACK);harvest_tween.tween_property(p,"scale",p.scale*1.2,.22);harvest_tween.chain().tween_property(p,"scale",Vector3.ONE*0.01,.24)
 	p.set_meta("harvest_feedback_started",true)
@@ -8756,9 +8832,10 @@ func _on_harvested(p)->void:
 		# Web's frame_post_draw signal precedes browser composition. Give the
 		# immediate sound/spotlight/Tween response a browser-driven frame before
 		# synchronous progression and persistence can block the main thread.
-		if OS.has_feature("web"):
+		if OS.has_feature("web") and not story_old_seed:
 			await get_tree().create_timer(0.12).timeout
 	last_harvest_presented_msec=Time.get_ticks_msec();last_harvest_presented_latency_msec=maxi(0,last_harvest_presented_msec-last_harvest_input_msec)
+	if profiled_old_colorata:_old_colorata_profile_mark("first_visual_response")
 	if not completed_first_harvest_guide:_maybe_activate_first_play_harvest_guide()
 	if deferred_tovar:tovar_harvested_this_play=true
 	var restoration_snapshot:Dictionary={}
@@ -8779,8 +8856,10 @@ func _on_harvested(p)->void:
 			# a newly rolled reservation (including on the twelfth plant) survives.
 			if endless_forced_new:endless_greenhouse.complete_forced_new()
 		elif first_discovery:
-			_register_species_discovery(harvested_species_id,true)
+			if profiled_old_colorata:_old_colorata_profile_mark("registration_start")
+			_register_species_discovery(harvested_species_id,true,not story_old_seed)
 			result_new_species_queue.append(harvested_species_id)
+			if profiled_old_colorata:_old_colorata_profile_mark("registration_end")
 		elif not already_pending_round_new:
 			_register_species_discovery(harvested_species_id,true)
 		elif endless_forced_new:
@@ -8810,7 +8889,8 @@ func _on_harvested(p)->void:
 		var restoration:=_restoration_state()
 		if HabitatRestorationClass.queue_pending_return_snapshot(restoration,restoration_snapshot):
 			story_progression_state["restoration"]=restoration;_update_play_ui()
-	_save();_update_best_ui();_update_currency_ui();harvest_commit_count+=1
+	if not story_old_seed:_save()
+	_update_best_ui();_update_currency_ui();harvest_commit_count+=1
 	if is_instance_valid(p):p.set_meta("harvest_state_committed",true);_cleanup_later(p,.68)
 
 func _is_terminal_first_tutorial_plant(plant)->bool:

@@ -9,6 +9,9 @@ func _ready() -> void:
 	await get_tree().process_frame
 	game._reset_progression_state()
 	_prepare_quiet_progress(game)
+	var harvest_metrics: Dictionary = await _test_old_seed_harvest_response(game)
+	game._reset_progression_state()
+	_prepare_quiet_progress(game)
 	var get_metrics: Dictionary = await _test_get_card_response(game)
 	if OS.has_feature("web") and bool(JavaScriptBridge.eval("new URL(window.location.href).searchParams.has('get_close_profile')")):
 		print("INPUT_RESPONSE_SMOKE_OK get_close_profile_total_ms=",get_metrics.profile_total)
@@ -17,10 +20,9 @@ func _ready() -> void:
 		get_tree().quit()
 		return
 	var gacha_latency: int = await _test_gacha_response(game)
-	var harvest_latency: int = await _test_old_seed_harvest_response(game)
 	var loader_source := FileAccess.get_file_as_string("res://scripts/catalog_image_loader.gd")
 	assert(loader_source.contains("_decode_queue") and loader_source.contains("await RenderingServer.frame_post_draw"))
-	print("INPUT_RESPONSE_SMOKE_OK get_first_visual_ms=", get_metrics.visual, " get_hidden_ms=", get_metrics.hidden, " gacha_first_visual_ms=", gacha_latency, " harvest_first_visual_ms=", harvest_latency, " multi_new=batch_save catalog_decode=one_per_frame")
+	print("INPUT_RESPONSE_SMOKE_OK get_first_visual_ms=", get_metrics.visual, " get_hidden_ms=", get_metrics.hidden, " gacha_first_visual_ms=", gacha_latency, " harvest_first_visual_ms=", harvest_metrics.visual, " old_colorata_get_start_ms=", harvest_metrics.get_start, " old_colorata_save_count=", harvest_metrics.save_count, " multi_new=batch_save catalog_decode=one_per_frame")
 	game.queue_free()
 	await get_tree().process_frame
 	get_tree().quit()
@@ -176,7 +178,7 @@ func _test_gacha_response(game: Node) -> int:
 	ui.close_gacha()
 	return ui.last_spin_visual_latency_msec
 
-func _test_old_seed_harvest_response(game: Node) -> int:
+func _test_old_seed_harvest_response(game: Node) -> Dictionary:
 	game.species_get_overlay.visible = false
 	game.species_get_queue.clear()
 	game.catalog_series_unlock_notice_queue.clear()
@@ -198,7 +200,7 @@ func _test_old_seed_harvest_response(game: Node) -> int:
 	game.old_seed_reaction_stage = 2
 	game.play_active = true
 	game.active_seed_type = "old"
-	game.total_play_count = 1
+	game.total_play_count = 0
 	game.play_seeds_remaining = 0
 	game.play_spawn_queue = 0
 	game.play_seed_animations_pending = 0
@@ -215,8 +217,8 @@ func _test_old_seed_harvest_response(game: Node) -> int:
 	var harvest_commit_before:int=game.harvest_commit_count
 	var start_position: Vector3 = plant.position
 	var tap_position: Vector2 = game.camera.unproject_position(plant.global_position + Vector3(0, plant.visual_scale * .48, 0))
-	game._try_harvest(tap_position)
-	game._try_harvest(tap_position)
+	game.old_colorata_profile_enabled = true
+	_send_game_tap(game,tap_position)
 	assert(plant.state == "harvested" and bool(plant.get_meta("harvest_feedback_started", false)))
 	assert(not game.old_seed_harvest_guide_active and not game.tutorial_guide_overlay.visible)
 	assert(game.last_harvest_feedback_latency_msec >= 0 and game.last_harvest_feedback_latency_msec < MAX_FIRST_FEEDBACK_MSEC)
@@ -225,9 +227,27 @@ func _test_old_seed_harvest_response(game: Node) -> int:
 	assert(not plant.position.is_equal_approx(start_position))
 	assert(game.last_harvest_presented_latency_msec >= 0 and game.last_harvest_presented_latency_msec < MAX_FIRST_FEEDBACK_MSEC)
 	assert(game.harvest_commit_count == harvest_commit_before + 1)
-	assert(bool(game.discovered.get("colorata", false)) and "colorata" in game.result_new_species_queue)
-	assert(game.old_seed_reaction_stage >= 2 and game.first_colorata_confirmed == false)
-	return game.last_harvest_presented_latency_msec
+	assert(bool(game.discovered.get("colorata", false)))
+	assert(await _wait_until(func()->bool:return game.species_get_overlay.visible and game.species_get_active_context=="first_colorata",1800))
+	assert(await _wait_until(func()->bool:return game.old_colorata_profile_tap_to_get_start_msec>=0,900))
+	assert(game.old_colorata_profile_tap_to_first_visual_msec>=0 and game.old_colorata_profile_tap_to_first_visual_msec<MAX_FIRST_FEEDBACK_MSEC)
+	assert(game.old_colorata_profile_tap_to_get_start_msec<250 and game.old_colorata_profile_save_count==1)
+	assert(game.old_seed_reaction_stage >= 2 and game.first_colorata_confirmed == false and game.total_play_count==1)
+	assert(await _wait_until(func()->bool:return not game.species_get_overlay.busy,900))
+	_tap_get_overlay(game.species_get_overlay)
+	assert(await _wait_until(func()->bool:return game.scripted_dialog_kind=="first_colorata_discovery",900))
+	assert(game.scripted_dialog_pages.size()==3)
+	var saved_payload=JSON.parse_string(FileAccess.get_file_as_string(game._active_save_path()))
+	assert(saved_payload is Dictionary and int(saved_payload.get("species_get_counts",{}).get("colorata",0))==1 and int(saved_payload.get("total_play_count",0))==1)
+	return {"visual":game.old_colorata_profile_tap_to_first_visual_msec,"get_start":game.old_colorata_profile_tap_to_get_start_msec,"save_count":game.old_colorata_profile_save_count}
+
+func _send_game_tap(game:Node,position:Vector2)->void:
+	var press:=InputEventMouseButton.new()
+	press.button_index=MOUSE_BUTTON_LEFT;press.position=position;press.pressed=true
+	game._input(press)
+	var release:=InputEventMouseButton.new()
+	release.button_index=MOUSE_BUTTON_LEFT;release.position=position;release.pressed=false
+	game._input(release)
 
 func _wait_until(predicate: Callable, timeout_msec: int) -> bool:
 	var deadline := Time.get_ticks_msec() + timeout_msec
