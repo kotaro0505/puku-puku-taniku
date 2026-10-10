@@ -552,7 +552,7 @@ func _test_integrated_final_chapter() -> void:
 		"この先もずっと、多肉植物がある世界だといいね",
 		"よーし",
 		"これからも、いっぱいたね蒔こ！",
-		"まだまだ、僕たちの多肉植物の世界は始まったばかりだ！",
+		"まだまだ、僕たちの多肉植物の物語は始まったばかりだ！",
 	]
 	assert(game.scripted_dialog_pages.size() == expected_post_ending_greenhouse_lines.size())
 	for index in expected_post_ending_greenhouse_lines.size():
