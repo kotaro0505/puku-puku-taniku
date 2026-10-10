@@ -4,13 +4,13 @@ extends Control
 signal intro_finished
 
 const Localizer = preload("res://scripts/game_localizer.gd")
-const UISymbolIconClass = preload("res://scripts/ui_symbol_icon.gd")
+const INTRO_POINTER_TEXTURE_PATH := "res://assets/ui/arrangement-swipe-finger.png"
 
 var persistent_panel: PanelContainer
 var persistent_label: Label
 var intro_panel: PanelContainer
 var intro_label: Label
-var intro_pointer: Control
+var intro_pointer: TextureRect
 var intro_tween: Tween
 var intro_playing := false
 
@@ -56,11 +56,14 @@ func _build_ui() -> void:
 	intro_label.add_theme_constant_override("outline_size", 4)
 	intro_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	intro_panel.add_child(intro_label)
-	intro_pointer = UISymbolIconClass.new()
-	intro_pointer.symbol = "pointer"
-	intro_pointer.icon_color = Color("#ffe48d")
-	intro_pointer.position = Vector2(95, 55)
-	intro_pointer.size = Vector2(42, 42)
+	intro_pointer = TextureRect.new()
+	intro_pointer.name = "SwipeFinger"
+	intro_pointer.texture = _load_intro_pointer_texture()
+	intro_pointer.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	intro_pointer.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	intro_pointer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	intro_pointer.position = Vector2(95, 52)
+	intro_pointer.size = Vector2(54, 56)
 	intro_panel.add_child(intro_pointer)
 
 
@@ -101,7 +104,7 @@ func play_intro(locale: String, transition_direction: float) -> void:
 		direction = 1.0
 	var start_x := 92.0 if direction > 0.0 else 326.0
 	var end_x := 326.0 if direction > 0.0 else 92.0
-	intro_pointer.position = Vector2(start_x, 55)
+	intro_pointer.position = Vector2(start_x, 52)
 	intro_pointer.modulate.a = 0.0
 	intro_tween = create_tween()
 	for cycle in 2:
@@ -121,6 +124,17 @@ func _finish_intro() -> void:
 	intro_panel.visible = false
 	intro_panel.modulate.a = 1.0
 	intro_finished.emit()
+
+
+func _load_intro_pointer_texture() -> Texture2D:
+	if ResourceLoader.exists(INTRO_POINTER_TEXTURE_PATH):
+		var resource := load(INTRO_POINTER_TEXTURE_PATH)
+		if resource is Texture2D:
+			return resource
+	var image := Image.load_from_file(INTRO_POINTER_TEXTURE_PATH)
+	if image.is_empty():
+		return null
+	return ImageTexture.create_from_image(image)
 
 
 func _panel_style(color: Color) -> StyleBoxFlat:
