@@ -267,7 +267,7 @@ func _test_integrated_final_chapter() -> void:
 		assert(pages.size() == [3, 5, 7, 7, 2][stage - 1])
 	assert(Localizer.text("ja", "restoration_return_1_girl") == "さぁ、もっとここへ多肉を持ってこよう！")
 	assert(Localizer.text("ja", "restoration_return_2_armadillo") == "届いてくれるといいな…")
-	assert(Localizer.text("ja", "restoration_return_4_armadillo") == "少し明るくなってきた")
+	assert(Localizer.text("ja", "restoration_return_4_armadillo") == "少し明るくなってきた。")
 	assert(Localizer.text("ja", "restoration_return_4_mouse") == "頼むから早く元気になれチュー！")
 	assert(Localizer.text("ja", "restoration_return_4_panda") == "…")
 	assert(Localizer.text("hiragana", "restoration_return_2_armadillo") == "とどいてくれると いいな…")

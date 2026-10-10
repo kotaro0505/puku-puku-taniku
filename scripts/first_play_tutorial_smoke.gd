@@ -114,11 +114,11 @@ func _ready() -> void:
 	assert(game.scripted_dialog_kind == "first_colorata_discovery")
 	assert(game.scripted_dialog_pages.size() == 3)
 	assert([game.scripted_dialog_pages[0].speaker, game.scripted_dialog_pages[1].speaker, game.scripted_dialog_pages[2].speaker] == ["panda", "armadillo", "panda"])
-	assert([game.scripted_dialog_pages[0].text, game.scripted_dialog_pages[1].text, game.scripted_dialog_pages[2].text] == ["本当に多肉植物のタネだったなんて！", "この本によると、これは『コロラータ』っていう種類らしいよ！", "すごい。世界に多肉植物が帰って来てくれたんだ……！"])
+	assert([game.scripted_dialog_pages[0].text, game.scripted_dialog_pages[1].text, game.scripted_dialog_pages[2].text] == ["本当に多肉植物の種だったなんて！", "この本によると、これは『コロラータ』っていう種類らしいよ！", "すごい。世界に多肉植物が帰って来てくれたんだ……！"])
 	var discovery_text := ""
 	for page in game.scripted_dialog_pages:
 		discovery_text += str(page.get("text", ""))
-	assert("本当に多肉植物のタネだったなんて" in discovery_text)
+	assert("本当に多肉植物の種だったなんて" in discovery_text)
 	assert("世界に多肉植物が帰って来てくれたんだ" in discovery_text)
 	assert("本当に育った" not in discovery_text and "図鑑に描いてある植物" not in discovery_text)
 	assert(Localizer.species_name("ja", game._catalog_entry(FIRST_SPECIES_ID)) in discovery_text)
@@ -331,7 +331,7 @@ func _ready() -> void:
 	assert(game.first_play_tutorial_reserved_plant.diameter_cm > reserved_observe_start_cm)
 	game._process(.02)
 	assert(game.first_play_tutorial_dialog_visible)
-	assert(game.tutorial_guide_message.text == "見て！はじめて見る品種が出てる！")
+	assert(game.tutorial_guide_message.text == "見て！\nはじめて見る品種が出てる！")
 	game._dismiss_first_play_tutorial_dialog()
 	assert(game.first_play_tutorial_phase == "new_species_girl")
 	assert(game.tutorial_guide_message.text == "ジュレる前に収穫しよう！")
@@ -357,10 +357,10 @@ func _ready() -> void:
 	assert(not game.species_get_overlay.visible)
 	await get_tree().process_frame
 	assert(game.puku_buyback_tutorial_active)
-	assert(game.tutorial_guide_message.text=="そうだ！育てた多肉はうちのお店で買い取るよ！")
+	assert(game.tutorial_guide_message.text=="そうだ！育てた多肉は\nうちのお店で買い取るよ！")
 	assert(game.tutorial_panda_portrait.visible)
 	game._advance_puku_buyback_tutorial()
-	assert(game.tutorial_guide_message.text=="大きい株ほど高く買い取るからね！")
+	assert(game.tutorial_guide_message.text=="大きい株ほど\n高く買い取るからね！")
 	assert(game.tutorial_panda_portrait.visible)
 	game._advance_puku_buyback_tutorial()
 	assert(bool(game.first_play_harvest_spotlight_material.get_shader_parameter("focus_ellipse")))
@@ -406,8 +406,8 @@ func _ready() -> void:
 	assert(not bool(game.story_progression_state.get("original_new_guarantee_pending", false)))
 	assert(not bool(game.story_progression_state.get("original_new_guarantee_consumed", false)))
 
-	assert(Localizer.text("ja","puku_buyback_1") == "そうだ！育てた多肉はうちのお店で買い取るよ！")
-	assert(Localizer.text("ja","puku_buyback_2") == "大きい株ほど高く買い取るからね！")
+	assert(Localizer.text("ja","puku_buyback_1") == "そうだ！育てた多肉は\nうちのお店で買い取るよ！")
+	assert(Localizer.text("ja","puku_buyback_2") == "大きい株ほど\n高く買い取るからね！")
 	print("FIRST_PLAY_TUTORIAL_SMOKE_OK old_colorata_growth=1.3 normal_growth=unchanged cost_note=once trio_cards=catalog_only pre_sow=true start_guide=play_open_normal forced_jelly=true reserved_original_new=true observed_3s=true post_result_GET=true act2_guarantee_untouched=true total=12 result=1_harvest+11_jelly")
 	get_tree().quit()
 

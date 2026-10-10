@@ -51,12 +51,12 @@ func _prepare_safe_greenhouse(game: Node) -> void:
 
 
 func _test_localized_copy() -> void:
-	assert(Localizer.text("ja", "puku_buyback_1") == "そうだ！育てた多肉はうちのお店で買い取るよ！")
-	assert(Localizer.text("ja", "puku_buyback_2") == "大きい株ほど高く買い取るからね！")
+	assert(Localizer.text("ja", "puku_buyback_1") == "そうだ！育てた多肉は\nうちのお店で買い取るよ！")
+	assert(Localizer.text("ja", "puku_buyback_2") == "大きい株ほど\n高く買い取るからね！")
 	assert(Localizer.text("ja", "puku_buyback_2_endless") == "大きい株を収穫するほど\nぷくゲージが溜まります。\n満タンになると +1ぷくコインGET！")
 	assert(Localizer.text("ja", "jurejure_first_peccary") == "いっぱい生えてるッペー！\nぜーんぶ頂きだッペー！")
 	assert(Localizer.text("ja", "fantasy_first_armadillo") == "こんな多肉、あの本には載ってないよ…。")
-	assert(Localizer.text("ja", "habitat_crisis_no_battle") == "……今はバトルする気にならないチュー……。")
+	assert(Localizer.text("ja", "habitat_crisis_no_battle") == "…今は、バトルする気にならない\nチュー")
 	assert(Localizer.text("ja", "puku_gauge") == "ぷくゲージ")
 	assert(Localizer.text("hiragana", "puku_gauge") == "ぷくげーじ")
 	assert(Localizer.text("en", "puku_gauge") == "Puku Gauge")
