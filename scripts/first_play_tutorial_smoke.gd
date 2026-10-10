@@ -318,6 +318,21 @@ func _ready() -> void:
 	assert(game.play_seeds_remaining == remaining_before_forced_jelly - 1)
 	assert(game.first_play_tutorial_phase == "reserved_seed_observe")
 	assert(is_instance_valid(game.first_play_tutorial_reserved_plant))
+	var reserved_spawn_position:Vector3=game.first_play_tutorial_reserved_plant.original_pos
+	assert(reserved_spawn_position.z>=game.FIRST_PLAY_TUTORIAL_FRONT_SPAWN_MIN_Z)
+	assert(game._spawn_center_inside_soil(reserved_spawn_position))
+	var front_position_rng:=RandomNumberGenerator.new();front_position_rng.seed=12012026
+	var sampled_front_positions:Array[Vector3]=[]
+	for sample_index in range(6):
+		var sampled_position:Vector3=game._find_spawn_position(front_position_rng,true)
+		assert(sampled_position.z>=game.FIRST_PLAY_TUTORIAL_FRONT_SPAWN_MIN_Z)
+		assert(game._spawn_center_inside_soil(sampled_position))
+		sampled_front_positions.append(sampled_position)
+	var found_distinct_front_position:=false
+	for sample_index in range(1,sampled_front_positions.size()):
+		if sampled_front_positions[sample_index].distance_to(sampled_front_positions[0])>.05:
+			found_distinct_front_position=true;break
+	assert(found_distinct_front_position)
 	var tutorial_harvest_species_id := str(game.first_play_tutorial_reserved_plant.data.get("species_id", ""))
 	var tutorial_new_entry: Dictionary = game._catalog_entry(tutorial_harvest_species_id)
 	assert(tutorial_harvest_species_id == game.first_play_tutorial_reserved_species_id)
@@ -408,7 +423,7 @@ func _ready() -> void:
 
 	assert(Localizer.text("ja","puku_buyback_1") == "そうだ！育てた多肉は\nうちのお店で買い取るよ！")
 	assert(Localizer.text("ja","puku_buyback_2") == "大きい株ほど\n高く買い取るからね！")
-	print("FIRST_PLAY_TUTORIAL_SMOKE_OK old_colorata_growth=1.3 normal_growth=unchanged cost_note=once trio_cards=catalog_only pre_sow=true start_guide=play_open_normal forced_jelly=true reserved_original_new=true observed_3s=true post_result_GET=true act2_guarantee_untouched=true total=12 result=1_harvest+11_jelly")
+	print("FIRST_PLAY_TUTORIAL_SMOKE_OK old_colorata_growth=1.3 normal_growth=unchanged cost_note=once trio_cards=catalog_only pre_sow=true start_guide=play_open_normal forced_jelly=true reserved_original_new=true reserved_front_random=true observed_3s=true post_result_GET=true act2_guarantee_untouched=true total=12 result=1_harvest+11_jelly")
 	get_tree().quit()
 
 

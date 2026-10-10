@@ -162,6 +162,7 @@ const FIRST_PLAY_TUTORIAL_GROWTH_DIALOG_CM := 9.0
 const FIRST_PLAY_TUTORIAL_JELLY_DIALOG_CM := 18.0
 const FIRST_PLAY_TUTORIAL_JELLY_OBSERVE_SECONDS := 0.55
 const FIRST_PLAY_TUTORIAL_NEW_OBSERVE_SECONDS := 3.0
+const FIRST_PLAY_TUTORIAL_FRONT_SPAWN_MIN_Z := 0.75
 const SERIES_CAROUSEL_TRACK_ORIGIN := Vector2(48,0)
 const SERIES_CAROUSEL_CARD_SIZE := Vector2(480,590)
 const SERIES_CAROUSEL_SPACING := 420.0
@@ -3462,7 +3463,8 @@ func _sow_first_play_tutorial_reserved_seed()->void:
 		first_play_tutorial_reserved_seed_pending=false;_complete_first_play_tutorial_dialog_sequence();return
 	opening_species.push_front(entry)
 	first_play_tutorial_phase="reserved_seed_sowing"
-	if _spawn_greenhouse_seed(true):
+	var spawn_position:=_find_spawn_position(null,true)
+	if _spawn_greenhouse_seed(true,spawn_position):
 		first_play_tutorial_reserved_seed_pending=false
 	else:
 		opening_species.pop_front();first_play_tutorial_reserved_seed_pending=false;_complete_first_play_tutorial_dialog_sequence()
@@ -7689,9 +7691,9 @@ func spawn_plant(force_golden := false,spawn_position:Variant=null) -> void:
 	if endless_forced_new or endless_carryover_advanced or (_is_endless_normal_play() and new_species_candidate):_save()
 	if audio_manager:audio_manager.play_se("sprout",.28)
 
-func _spawn_greenhouse_seed(suppress_puku_effect:=false)->bool:
+func _spawn_greenhouse_seed(suppress_puku_effect:=false,requested_spawn_position:Variant=null)->bool:
 	if not play_active or play_seeds_remaining<=0:return false
-	var spawn_position:=_find_spawn_position();pending_seed_positions.append(spawn_position)
+	var spawn_position:Vector3=_find_spawn_position() if requested_spawn_position==null else requested_spawn_position;pending_seed_positions.append(spawn_position)
 	play_seeds_remaining-=1
 	play_seed_animations_pending+=1;_update_play_ui();_animate_and_spawn_greenhouse_seed(spawn_position)
 	return true
@@ -8006,7 +8008,7 @@ func _seed_new_species_blocked(species_id:String)->bool:
 	if bool(entry.get("fusion_only_until_discovered",false)) and _species_get_count(species_id)<=0:return true
 	return species_id in [MYSTERY_RESEARCH_TRANSPARENT_ID,"golden_laui","golden_kannte"]
 
-func _find_spawn_position(position_rng:RandomNumberGenerator=null)->Vector3:
+func _find_spawn_position(position_rng:RandomNumberGenerator=null,front_only:=false)->Vector3:
 	# Sample world positions, but accept them only after projecting into the
 	# scrolling background image's source-pixel coordinates.
 	var spawn_rng:=position_rng if position_rng!=null else rng
@@ -8016,6 +8018,7 @@ func _find_spawn_position(position_rng:RandomNumberGenerator=null)->Vector3:
 		var angle := spawn_rng.randf_range(0.0, TAU)
 		var radius := sqrt(spawn_rng.randf())
 		var candidate := Vector3(cos(angle)*3.55*radius,.12,sin(angle)*3.15*radius)
+		if front_only and candidate.z<FIRST_PLAY_TUTORIAL_FRONT_SPAWN_MIN_Z:continue
 		if not _spawn_center_inside_soil(candidate):continue
 		var clearance := 99.0
 		for plant in plants:
@@ -8027,7 +8030,10 @@ func _find_spawn_position(position_rng:RandomNumberGenerator=null)->Vector3:
 		if clearance > best_clearance:
 			best = candidate
 			best_clearance = clearance
-		if clearance >= .82: return candidate
+		# Normal seeds retain their existing first-safe-position behavior. The
+		# scripted NEW seed evaluates every front-side candidate so the clearest
+		# visible spot wins while its sampled position remains random.
+		if not front_only and clearance >= .82:return candidate
 	return best
 
 func _spawn_center_inside_soil(candidate:Vector3)->bool:
