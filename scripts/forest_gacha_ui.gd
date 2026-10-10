@@ -29,6 +29,7 @@ var dial_texture:TextureRect
 var dial_hit_area:Button
 var capsule:Control
 var capsule_hit_area:Button
+var capsule_open_burst:Panel
 var result_overlay:Control
 var result_flash:ColorRect
 var result_panel:PanelContainer
@@ -51,11 +52,15 @@ var _dial_dragging:=false
 var _dial_drag_origin:=Vector2.ZERO
 var _spin_feedback_active:=false
 var _spin_turn_tween:Tween
+var _capsule_open_tween:Tween
 var spin_request_started_msec:=-1
 var spin_started_msec:=-1
 var last_spin_start_latency_msec:=-1
 var spin_first_visual_msec:=-1
 var last_spin_visual_latency_msec:=-1
+var last_capsule_tap_msec:=-1
+var last_capsule_first_visual_msec:=-1
+var last_capsule_first_visual_latency_msec:=-1
 var language:="ja"
 
 func _ready()->void:
@@ -80,6 +85,8 @@ func _build_dial()->void:
 	spin_button=Button.new();spin_button.name="SpinButton";spin_button.text="1ぷくコインで回す";spin_button.position=Vector2(148,910);spin_button.size=Vector2(280,72);_skin_button(spin_button,Color("#c7923d"),21);spin_button.pressed.connect(_request_spin);add_child(spin_button)
 
 func _build_capsule()->void:
+	capsule_open_burst=Panel.new();capsule_open_burst.name="CapsuleOpenBurst";capsule_open_burst.position=Vector2(232,772);capsule_open_burst.size=Vector2(112,112);capsule_open_burst.pivot_offset=capsule_open_burst.size*.5;capsule_open_burst.mouse_filter=Control.MOUSE_FILTER_IGNORE;capsule_open_burst.visible=false
+	var burst_style:=StyleBoxFlat.new();burst_style.bg_color=Color(1.0,.91,.50,.20);burst_style.border_color=Color(1.0,.96,.73,.94);burst_style.set_border_width_all(5);burst_style.set_corner_radius_all(56);burst_style.shadow_color=Color(1.0,.70,.25,.62);burst_style.shadow_size=18;capsule_open_burst.add_theme_stylebox_override("panel",burst_style);add_child(capsule_open_burst)
 	capsule=CapsuleClass.new();capsule.name="Capsule";capsule.position=Vector2(244,742);capsule.size=Vector2(88,88);capsule.pivot_offset=capsule.size*.5;capsule.mouse_filter=Control.MOUSE_FILTER_IGNORE;capsule.visible=false;add_child(capsule)
 	capsule_hit_area=Button.new();capsule_hit_area.name="CapsuleHitArea";capsule_hit_area.flat=true;capsule_hit_area.position=Vector2(226,728);capsule_hit_area.size=Vector2(124,132);capsule_hit_area.focus_mode=Control.FOCUS_NONE;capsule_hit_area.visible=false;capsule_hit_area.pressed.connect(_reveal_result);add_child(capsule_hit_area)
 
@@ -103,7 +110,7 @@ func _build_result_overlay()->void:
 	result_close_button=Button.new();result_close_button.name="ResultCloseButton";result_close_button.text="ガチャへ戻る";result_close_button.custom_minimum_size=Vector2(260,62);_skin_button(result_close_button,Color("#d5aa58"),18);result_close_button.pressed.connect(_close_result);content.add_child(result_close_button)
 
 func open_gacha(puku_points:int,draw_count:int)->void:
-	cancel_spin_feedback();visible=true;pending_result.clear();busy=false;capsule_ready=false;capsule.visible=false;capsule_hit_area.visible=false;result_overlay.visible=false;spin_request_started_msec=-1;spin_started_msec=-1;last_spin_start_latency_msec=-1;spin_first_visual_msec=-1;last_spin_visual_latency_msec=-1;set_wallet(puku_points,draw_count);hint_label.text="ダイヤルをタップして回そう";close_button.disabled=false
+	cancel_spin_feedback();cancel_capsule_opening();visible=true;pending_result.clear();busy=false;capsule_ready=false;capsule.visible=false;capsule_hit_area.visible=false;result_overlay.visible=false;spin_request_started_msec=-1;spin_started_msec=-1;last_spin_start_latency_msec=-1;spin_first_visual_msec=-1;last_spin_visual_latency_msec=-1;last_capsule_tap_msec=-1;last_capsule_first_visual_msec=-1;last_capsule_first_visual_latency_msec=-1;set_wallet(puku_points,draw_count);hint_label.text="ダイヤルをタップして回そう";close_button.disabled=false
 	set_language(language)
 
 func set_language(value:String)->void:
@@ -113,7 +120,7 @@ func set_language(value:String)->void:
 	wallet_label.text=Localizer.text(language,"wallet",[current_puku_points]);result_close_button.text=Localizer.text(language,"gacha_return");unlock_button.text=Localizer.text(language,"unlock_action");later_button.text=Localizer.text(language,"later")
 
 func close_gacha()->void:
-	cancel_spin_feedback();visible=false;pending_result.clear();busy=false;capsule_ready=false
+	cancel_spin_feedback();cancel_capsule_opening();visible=false;pending_result.clear();busy=false;capsule_ready=false
 
 func set_wallet(puku_points:int,draw_count:int)->void:
 	current_puku_points=puku_points;current_draw_count=draw_count
@@ -196,10 +203,39 @@ func cancel_spin_feedback()->void:
 
 func _reveal_result()->void:
 	if not capsule_ready or pending_result.is_empty():return
-	capsule_ready=false;capsule.visible=false;capsule_hit_area.visible=false;busy=true;species_reveal_requested.emit(pending_result.duplicate(true))
+	last_capsule_tap_msec=Time.get_ticks_msec();last_capsule_first_visual_msec=-1;last_capsule_first_visual_latency_msec=-1
+	capsule_ready=false;capsule_hit_area.visible=false;busy=true;_start_capsule_opening_feedback()
+	# Keep the capsule on screen for one rendered opening frame. The GET card is
+	# shown immediately after that frame, so there is never a blank frame between
+	# the two surfaces and the tap always has visible feedback.
+	if DisplayServer.get_name()=="headless":await get_tree().process_frame
+	else:await RenderingServer.frame_post_draw
+	last_capsule_first_visual_msec=Time.get_ticks_msec();last_capsule_first_visual_latency_msec=maxi(0,last_capsule_first_visual_msec-last_capsule_tap_msec)
+	species_reveal_requested.emit(pending_result.duplicate(true))
+
+func _start_capsule_opening_feedback()->void:
+	if _capsule_open_tween and _capsule_open_tween.is_valid():_capsule_open_tween.kill()
+	capsule_open_burst.position=capsule.position+capsule.size*.5-capsule_open_burst.size*.5;capsule_open_burst.scale=Vector2(.56,.56);capsule_open_burst.modulate.a=1.0;capsule_open_burst.visible=true
+	# The squashed capsule and bright ring are applied synchronously on the tap;
+	# the tween only carries that opening reaction through its first frame.
+	capsule.scale=Vector2(1.14,.84);capsule.modulate=Color(1.18,1.10,.88,1.0);capsule.rotation+=.08
+	_capsule_open_tween=create_tween().set_parallel(true)
+	_capsule_open_tween.tween_property(capsule_open_burst,"scale",Vector2(1.24,1.24),.14).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_capsule_open_tween.tween_property(capsule_open_burst,"modulate:a",0.0,.14).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_capsule_open_tween.tween_property(capsule,"scale",Vector2(1.28,.72),.09).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+func complete_capsule_reveal_transition()->void:
+	if _capsule_open_tween and _capsule_open_tween.is_valid():_capsule_open_tween.kill()
+	_capsule_open_tween=null;capsule.visible=false;capsule_open_burst.visible=false;capsule.modulate=Color.WHITE
+
+func cancel_capsule_opening()->void:
+	if _capsule_open_tween and _capsule_open_tween.is_valid():_capsule_open_tween.kill()
+	_capsule_open_tween=null
+	if not is_node_ready():return
+	capsule_open_burst.visible=false;capsule_open_burst.modulate.a=1.0;capsule.modulate=Color.WHITE
 
 func resume_after_species_reveal()->void:
-	busy=false
+	complete_capsule_reveal_transition();busy=false
 	if pending_result.is_empty():return
 	var is_locked:=str(pending_result.get("source",""))=="locked"
 	if not is_locked:_close_result();return
@@ -219,7 +255,7 @@ func _request_later()->void:
 	unlock_button.disabled=true;later_button.disabled=true;later_requested.emit(str(pending_result.get("series_id","")),str(pending_result.get("species_id","")))
 
 func _close_result()->void:
-	result_overlay.visible=false;pending_result.clear();result_image.texture=null;result_image.get_parent().visible=true;close_button.disabled=false;hint_label.text=Localizer.text(language,"gacha_dial_hint");capsule_ready=false;busy=false;set_wallet(current_puku_points,current_draw_count)
+	cancel_capsule_opening();result_overlay.visible=false;pending_result.clear();result_image.texture=null;result_image.get_parent().visible=true;close_button.disabled=false;hint_label.text=Localizer.text(language,"gacha_dial_hint");capsule_ready=false;busy=false;set_wallet(current_puku_points,current_draw_count)
 
 func _request_close()->void:
 	if busy or _spin_feedback_active or capsule_ready or result_overlay.visible:return

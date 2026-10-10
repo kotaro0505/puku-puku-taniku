@@ -676,7 +676,18 @@ var play_max_size := 0.0
 var play_previous_global_best := 0.0
 var play_updated_global_best := false
 var last_forest_gacha_persist_started_msec := -1
+var last_forest_gacha_persist_ended_msec := -1
+var last_forest_gacha_persist_duration_msec := -1
 var forest_gacha_pending_commit: Dictionary = {}
+var gacha_capsule_profile_enabled := OS.is_debug_build()
+var gacha_capsule_profile_active := false
+var gacha_capsule_profile_events: Dictionary = {}
+var gacha_capsule_profile_event_order: Array[String] = []
+var gacha_capsule_profile_slow_sections: Array[String] = []
+var gacha_capsule_profile_total_msec := -1
+var gacha_capsule_profile_run_id := 0
+var gacha_capsule_profile_decode_count_start := 0
+var gacha_capsule_profile_started_with_placeholder := false
 var last_harvest_input_msec := -1
 var last_harvest_feedback_msec := -1
 var last_harvest_feedback_latency_msec := -1
@@ -4198,7 +4209,7 @@ func _spin_forest_gacha()->void:
 func _on_forest_gacha_spin_animation_completed()->void:
 	if forest_gacha_pending_commit.is_empty():return
 	var transaction:=forest_gacha_pending_commit.duplicate(true);forest_gacha_pending_commit.clear()
-	last_forest_gacha_persist_started_msec=Time.get_ticks_msec()
+	last_forest_gacha_persist_started_msec=Time.get_ticks_msec();last_forest_gacha_persist_ended_msec=-1;last_forest_gacha_persist_duration_msec=-1
 	if forest_gacha_ui==null:return
 	var mode:=str(transaction.get("mode",""));var result:Dictionary=transaction.get("result",{})
 	var unlocked_series_id:=str(transaction.get("unlocked_series_id",""));var next_draw:=int(transaction.get("next_draw",0))
@@ -4209,13 +4220,14 @@ func _on_forest_gacha_spin_animation_completed()->void:
 		forest_gacha_preview_puku_points-=FOREST_GACHA_SPIN_COST;forest_gacha_preview_draw_count=next_draw
 		forest_gacha_preview_discovered[species_id]=true
 		forest_gacha_ui.set_wallet(forest_gacha_preview_puku_points,forest_gacha_preview_draw_count)
+		last_forest_gacha_persist_ended_msec=Time.get_ticks_msec();last_forest_gacha_persist_duration_msec=maxi(0,last_forest_gacha_persist_ended_msec-last_forest_gacha_persist_started_msec)
 		return
 	forest_gacha_draw_count=next_draw
 	if mode=="live":_change_puku_balance(-_puku_cost_units(FOREST_GACHA_SPIN_COST),"forest_gacha",false,true)
 	if not unlocked_series_id.is_empty():unlocked_series[unlocked_series_id]=true
 	_register_species_discovery(species_id,true)
 	if not unlocked_series_id.is_empty():_queue_catalog_series_unlock_notice(unlocked_series_id)
-	_save();_update_currency_ui();_sync_arrangement_ui()
+	_save();_update_currency_ui();_sync_arrangement_ui();last_forest_gacha_persist_ended_msec=Time.get_ticks_msec();last_forest_gacha_persist_duration_msec=maxi(0,last_forest_gacha_persist_ended_msec-last_forest_gacha_persist_started_msec)
 	forest_gacha_ui.set_wallet(TRIAL_DEV_GACHA_WALLET if mode=="trial" else puku_points,forest_gacha_draw_count)
 
 func _unlock_forest_gacha_series(series_id:String,_species_id:String)->void:
@@ -4236,15 +4248,19 @@ func _defer_forest_gacha_series(_series_id:String,_species_id:String)->void:
 	forest_gacha_ui.show_later_message(Localizer.text(language_code,"forest_deferred"),puku_points,forest_gacha_draw_count)
 
 func _on_forest_gacha_species_reveal(result:Dictionary)->void:
+	_begin_gacha_capsule_profile()
+	_gacha_capsule_profile_mark("handler_entry")
 	var entry:Dictionary=result.get("species_entry",{})
-	_queue_species_get(entry,not bool(result.get("was_discovered",false)),"forest_gacha")
+	_queue_species_get(entry,not bool(result.get("was_discovered",false)),"forest_gacha",true)
 
-func _queue_species_get(entry:Dictionary,is_new:bool,context:String)->void:
+func _queue_species_get(entry:Dictionary,is_new:bool,context:String,show_immediately:=false)->void:
 	if entry.is_empty():
 		_on_species_get_overlay_closed(context)
 		return
 	species_get_queue.append({"entry":entry.duplicate(true),"is_new":is_new,"context":context})
-	if species_get_overlay and not species_get_overlay.visible and (catalog_series_unlock_overlay==null or not catalog_series_unlock_overlay.visible):call_deferred("_show_next_species_get")
+	if species_get_overlay and not species_get_overlay.visible and (catalog_series_unlock_overlay==null or not catalog_series_unlock_overlay.visible):
+		if show_immediately:_show_next_species_get()
+		else:call_deferred("_show_next_species_get")
 
 func _queue_species_get_by_id(species_id:String,is_new:bool,context:String)->void:
 	_queue_species_get(_catalog_entry(species_id),is_new,context)
@@ -4255,10 +4271,60 @@ func _show_next_species_get()->void:
 	species_get_active_species_id=str(entry.get("species_id",""))
 	species_get_active_series_id=_series_id_for_species(str(entry.get("species_id","")))
 	if species_get_active_series_id in catalog_series_unlock_notice_queue:catalog_series_unlock_notice_ready[species_get_active_series_id]=true
-	var texture:=_species_texture(entry)
+	var forest_gacha_reveal:=species_get_active_context=="forest_gacha"
+	var texture:=CatalogImageLoader.placeholder_texture if forest_gacha_reveal else _species_texture(entry)
+	if forest_gacha_reveal:_gacha_capsule_profile_mark("get_card_show_start")
 	species_get_overlay.show_species(entry,texture if texture!=null else CatalogImageLoader.placeholder_texture,bool(queued.get("is_new",true)),species_get_active_context,language_code)
-	_request_species_texture(entry,species_get_overlay.result_image,true)
+	if forest_gacha_reveal:
+		gacha_capsule_profile_started_with_placeholder=species_get_overlay.result_image.texture==CatalogImageLoader.placeholder_texture
+		if forest_gacha_ui:forest_gacha_ui.complete_capsule_reveal_transition()
+		call_deferred("_finish_gacha_capsule_first_display",gacha_capsule_profile_run_id,entry.duplicate(true),species_get_active_species_id)
+	else:_request_species_texture(entry,species_get_overlay.result_image,true)
 	if audio_manager:audio_manager.play_se("new_species",.9)
+
+func _gacha_capsule_profile_requested()->bool:
+	if gacha_capsule_profile_enabled:return true
+	if not OS.has_feature("web"):return false
+	return bool(JavaScriptBridge.eval("new URL(window.location.href).searchParams.has('gacha_capsule_profile')",true))
+
+func _gacha_capsule_profile_record_at(event_name:String,event_msec:int)->void:
+	if not gacha_capsule_profile_active or event_msec<0:return
+	if not gacha_capsule_profile_events.has(event_name):gacha_capsule_profile_event_order.append(event_name)
+	gacha_capsule_profile_events[event_name]=event_msec
+
+func _gacha_capsule_profile_mark(event_name:String)->void:
+	_gacha_capsule_profile_record_at(event_name,Time.get_ticks_msec())
+
+func _begin_gacha_capsule_profile()->void:
+	if not _gacha_capsule_profile_requested() or forest_gacha_ui==null:return
+	gacha_capsule_profile_enabled=true;gacha_capsule_profile_active=true;gacha_capsule_profile_run_id+=1
+	gacha_capsule_profile_events.clear();gacha_capsule_profile_event_order.clear();gacha_capsule_profile_slow_sections.clear();gacha_capsule_profile_total_msec=-1;gacha_capsule_profile_started_with_placeholder=false
+	gacha_capsule_profile_decode_count_start=CatalogImageLoader.decode_count
+	_gacha_capsule_profile_record_at("capsule_tap",forest_gacha_ui.last_capsule_tap_msec)
+	_gacha_capsule_profile_record_at("first_visual_response",forest_gacha_ui.last_capsule_first_visual_msec)
+
+func _finish_gacha_capsule_first_display(profile_run_id:int,entry:Dictionary,species_id:String)->void:
+	if DisplayServer.get_name()=="headless":await get_tree().process_frame
+	else:await RenderingServer.frame_post_draw
+	if gacha_capsule_profile_active and profile_run_id==gacha_capsule_profile_run_id:
+		_gacha_capsule_profile_mark("first_display_frame")
+		gacha_capsule_profile_total_msec=int(gacha_capsule_profile_events.get("first_display_frame",0))-int(gacha_capsule_profile_events.get("capsule_tap",0))
+		var segment_text:Array[String]=[]
+		for index in range(1,gacha_capsule_profile_event_order.size()):
+			var previous_name:=gacha_capsule_profile_event_order[index-1];var current_name:=gacha_capsule_profile_event_order[index]
+			var elapsed:=int(gacha_capsule_profile_events[current_name])-int(gacha_capsule_profile_events[previous_name])
+			var description:="%s->%s=%dms"%[previous_name,current_name,elapsed];segment_text.append(description)
+			if elapsed>=50:gacha_capsule_profile_slow_sections.append(description)
+		var tap_msec:=int(gacha_capsule_profile_events.get("capsule_tap",-1))
+		var save_overlapped:=last_forest_gacha_persist_started_msec>=0 and last_forest_gacha_persist_ended_msec>=tap_msec and last_forest_gacha_persist_started_msec<=tap_msec
+		var decode_count_delta:=maxi(0,CatalogImageLoader.decode_count-gacha_capsule_profile_decode_count_start)
+		if decode_count_delta>0 and CatalogImageLoader.last_decode_duration_msec>=50:gacha_capsule_profile_slow_sections.append("png_decode=%dms"%CatalogImageLoader.last_decode_duration_msec)
+		print("GACHA_CAPSULE_PROFILE total_ms=",gacha_capsule_profile_total_msec," segments=",", ".join(segment_text)," slow_50ms=",("none" if gacha_capsule_profile_slow_sections.is_empty() else ", ".join(gacha_capsule_profile_slow_sections))," placeholder_first=",gacha_capsule_profile_started_with_placeholder," save_overlap=",save_overlapped," prior_save_ms=",last_forest_gacha_persist_duration_msec," decode_count=",decode_count_delta," decode_last_ms=",CatalogImageLoader.last_decode_duration_msec if decode_count_delta>0 else 0)
+		gacha_capsule_profile_active=false
+	# Start texture work only after the placeholder card has reached a rendered
+	# frame. Cached images replace it immediately; Web requests/decode remain async.
+	if species_get_overlay and species_get_overlay.visible and species_get_active_context=="forest_gacha" and species_get_active_species_id==species_id:
+		_request_species_texture(entry,species_get_overlay.result_image,true)
 
 func _get_close_profile_record_at(event_name:String,event_msec:int)->void:
 	if not get_close_profile_enabled or not get_close_profile_active or event_msec<0:return

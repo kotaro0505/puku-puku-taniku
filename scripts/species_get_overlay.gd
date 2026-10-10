@@ -43,7 +43,12 @@ func show_species(entry:Dictionary,texture:Texture2D,is_new:bool,context:String,
 	result_image.texture=texture;badge_label.text=Localizer.text(current_language,"original_catalog_new" if story_catalog_card else ("new" if is_new else "get"));name_label.text=Localizer.species_name(current_language,entry)
 	hint_label.text=Localizer.text(current_language,"tap_to_close")
 	card.scale=Vector2(.56,.56);card.rotation=-.035;flash.color.a=.94
-	var reveal:=create_tween().set_parallel(true);reveal.tween_property(card,"scale",Vector2.ONE,.44).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT);reveal.tween_property(card,"rotation",0.0,.34).set_trans(Tween.TRANS_QUAD);reveal.tween_property(flash,"color:a",0.0,.52)
+	# Forest Gacha already has a dial and capsule lead-in. Its result card settles
+	# sooner so the opening reaction feels continuous without changing other GETs.
+	var scale_seconds:=.28 if context=="forest_gacha" else .44
+	var rotation_seconds:=.22 if context=="forest_gacha" else .34
+	var flash_seconds:=.32 if context=="forest_gacha" else .52
+	var reveal:=create_tween().set_parallel(true);reveal.tween_property(card,"scale",Vector2.ONE,scale_seconds).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT);reveal.tween_property(card,"rotation",0.0,rotation_seconds).set_trans(Tween.TRANS_QUAD);reveal.tween_property(flash,"color:a",0.0,flash_seconds)
 	await reveal.finished
 	busy=false
 
