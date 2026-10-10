@@ -6,6 +6,7 @@ signal spin_requested
 signal spin_animation_completed
 signal unlock_requested(series_id:String,species_id:String)
 signal later_requested(series_id:String,species_id:String)
+signal capsule_reveal_started
 signal species_reveal_requested(result:Dictionary)
 
 const CapsuleClass=preload("res://scripts/forest_gacha_capsule.gd")
@@ -205,12 +206,12 @@ func _reveal_result()->void:
 	if not capsule_ready or pending_result.is_empty():return
 	last_capsule_tap_msec=Time.get_ticks_msec();last_capsule_first_visual_msec=-1;last_capsule_first_visual_latency_msec=-1
 	capsule_ready=false;capsule_hit_area.visible=false;busy=true;_start_capsule_opening_feedback()
-	# Keep the capsule on screen for one rendered opening frame. The GET card is
-	# shown immediately after that frame, so there is never a blank frame between
-	# the two surfaces and the tap always has visible feedback.
-	if DisplayServer.get_name()=="headless":await get_tree().process_frame
-	else:await RenderingServer.frame_post_draw
 	last_capsule_first_visual_msec=Time.get_ticks_msec();last_capsule_first_visual_latency_msec=maxi(0,last_capsule_first_visual_msec-last_capsule_tap_msec)
+	capsule_reveal_started.emit()
+	# Let the synchronous opening state reach one normal process frame, but do not
+	# gate the GET card on frame_post_draw. A pending full-size catalog PNG decode
+	# could otherwise delay this continuation for multiple frames.
+	await get_tree().process_frame
 	species_reveal_requested.emit(pending_result.duplicate(true))
 
 func _start_capsule_opening_feedback()->void:

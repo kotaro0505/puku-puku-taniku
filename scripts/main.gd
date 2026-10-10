@@ -371,6 +371,9 @@ var encyclopedia_unlock_status: Label
 var encyclopedia_unlock_puku_button: Button
 var encyclopedia_complete_badge_label: Label
 var collection_complete_versions: Dictionary = {}
+var collection_complete_species_ids_cache: Array[String] = []
+var collection_complete_species_membership_cache: Dictionary = {}
+var collection_complete_species_ids_cache_ready := false
 var collection_complete_pending_species_id := ""
 var collection_complete_resume_context := ""
 var collection_complete_resume_shop_visible := false
@@ -678,6 +681,9 @@ var play_updated_global_best := false
 var last_forest_gacha_persist_started_msec := -1
 var last_forest_gacha_persist_ended_msec := -1
 var last_forest_gacha_persist_duration_msec := -1
+var last_forest_gacha_registration_duration_msec := -1
+var last_forest_gacha_save_duration_msec := -1
+var last_forest_gacha_ui_update_duration_msec := -1
 var forest_gacha_pending_commit: Dictionary = {}
 var gacha_capsule_profile_enabled := OS.is_debug_build()
 var gacha_capsule_profile_active := false
@@ -687,6 +693,7 @@ var gacha_capsule_profile_slow_sections: Array[String] = []
 var gacha_capsule_profile_total_msec := -1
 var gacha_capsule_profile_run_id := 0
 var gacha_capsule_profile_decode_count_start := 0
+var gacha_capsule_profile_decode_total_start := 0
 var gacha_capsule_profile_started_with_placeholder := false
 var old_colorata_profile_enabled := OS.is_debug_build()
 var old_colorata_profile_active := false
@@ -813,6 +820,9 @@ func _ready() -> void:
 	_load_species()
 	_load_series_data()
 	_load_collection_rarity()
+	# This catalog-derived set is immutable during play. Build it while the game
+	# is loading so the first gacha NEW registration cannot block capsule input.
+	_ensure_collection_complete_species_cache()
 	fusion_system=FusionSystemClass.new();fusion_system.configure(catalog_species)
 	forest_gacha_system=ForestGachaSystemClass.new();forest_gacha_system.configure(series_catalog,catalog_species,catalog_progression)
 	_load_pot_data()
@@ -966,7 +976,7 @@ func _load_species() -> void:
 		if str(entry.get("fusion_series","")).is_empty():
 			var fusion_series:=FusionSystemClass.default_fusion_series_for_catalog_series(str(entry.get("series_id","")))
 			if not fusion_series.is_empty():entry["fusion_series"]=fusion_series
-	catalog_species=all_species.duplicate(true)
+	catalog_species=all_species.duplicate(true);collection_complete_species_ids_cache.clear();collection_complete_species_membership_cache.clear();collection_complete_species_ids_cache_ready=false
 	unlock_rules=JSON.parse_string(FileAccess.get_file_as_string("res://data/unlock-rules.json"))
 	greenhouse_available=_initial_greenhouse_state()
 	unlocked_species=greenhouse_available.duplicate(true)
@@ -4008,6 +4018,7 @@ func _build_forest_gacha_ui(hud:Control)->void:
 	forest_gacha_ui.spin_animation_completed.connect(_on_forest_gacha_spin_animation_completed)
 	forest_gacha_ui.unlock_requested.connect(_unlock_forest_gacha_series)
 	forest_gacha_ui.later_requested.connect(_defer_forest_gacha_series)
+	forest_gacha_ui.capsule_reveal_started.connect(_on_forest_gacha_capsule_reveal_started)
 	forest_gacha_ui.species_reveal_requested.connect(_on_forest_gacha_species_reveal)
 	forest_gacha_ui.set_language(language_code)
 
@@ -4225,26 +4236,27 @@ func _spin_forest_gacha()->void:
 func _on_forest_gacha_spin_animation_completed()->void:
 	if forest_gacha_pending_commit.is_empty():return
 	var transaction:=forest_gacha_pending_commit.duplicate(true);forest_gacha_pending_commit.clear()
-	last_forest_gacha_persist_started_msec=Time.get_ticks_msec();last_forest_gacha_persist_ended_msec=-1;last_forest_gacha_persist_duration_msec=-1
+	last_forest_gacha_persist_started_msec=Time.get_ticks_msec();last_forest_gacha_persist_ended_msec=-1;last_forest_gacha_persist_duration_msec=-1;last_forest_gacha_registration_duration_msec=-1;last_forest_gacha_save_duration_msec=-1;last_forest_gacha_ui_update_duration_msec=-1
 	if forest_gacha_ui==null:return
 	var mode:=str(transaction.get("mode",""));var result:Dictionary=transaction.get("result",{})
 	var unlocked_series_id:=str(transaction.get("unlocked_series_id",""));var next_draw:=int(transaction.get("next_draw",0))
-	var entry:Dictionary=result.get("species_entry",{})
-	_request_species_texture(entry,forest_gacha_ui.result_image,true)
 	var species_id:=str(result.get("species_id",""))
 	if mode=="preview":
 		forest_gacha_preview_puku_points-=FOREST_GACHA_SPIN_COST;forest_gacha_preview_draw_count=next_draw
 		forest_gacha_preview_discovered[species_id]=true
+		var preview_ui_started_msec:=Time.get_ticks_msec()
 		forest_gacha_ui.set_wallet(forest_gacha_preview_puku_points,forest_gacha_preview_draw_count)
+		last_forest_gacha_registration_duration_msec=0;last_forest_gacha_save_duration_msec=0;last_forest_gacha_ui_update_duration_msec=maxi(0,Time.get_ticks_msec()-preview_ui_started_msec)
 		last_forest_gacha_persist_ended_msec=Time.get_ticks_msec();last_forest_gacha_persist_duration_msec=maxi(0,last_forest_gacha_persist_ended_msec-last_forest_gacha_persist_started_msec)
 		return
 	forest_gacha_draw_count=next_draw
 	if mode=="live":_change_puku_balance(-_puku_cost_units(FOREST_GACHA_SPIN_COST),"forest_gacha",false,true)
 	if not unlocked_series_id.is_empty():unlocked_series[unlocked_series_id]=true
-	_register_species_discovery(species_id,true)
+	var registration_started_msec:=Time.get_ticks_msec();_register_species_discovery(species_id,true);last_forest_gacha_registration_duration_msec=maxi(0,Time.get_ticks_msec()-registration_started_msec)
 	if not unlocked_series_id.is_empty():_queue_catalog_series_unlock_notice(unlocked_series_id)
-	_save();_update_currency_ui();_sync_arrangement_ui();last_forest_gacha_persist_ended_msec=Time.get_ticks_msec();last_forest_gacha_persist_duration_msec=maxi(0,last_forest_gacha_persist_ended_msec-last_forest_gacha_persist_started_msec)
-	forest_gacha_ui.set_wallet(TRIAL_DEV_GACHA_WALLET if mode=="trial" else puku_points,forest_gacha_draw_count)
+	var save_started_msec:=Time.get_ticks_msec();_save();last_forest_gacha_save_duration_msec=maxi(0,Time.get_ticks_msec()-save_started_msec)
+	var ui_started_msec:=Time.get_ticks_msec();_update_currency_ui();_sync_arrangement_ui();forest_gacha_ui.set_wallet(TRIAL_DEV_GACHA_WALLET if mode=="trial" else puku_points,forest_gacha_draw_count);last_forest_gacha_ui_update_duration_msec=maxi(0,Time.get_ticks_msec()-ui_started_msec)
+	last_forest_gacha_persist_ended_msec=Time.get_ticks_msec();last_forest_gacha_persist_duration_msec=maxi(0,last_forest_gacha_persist_ended_msec-last_forest_gacha_persist_started_msec)
 
 func _unlock_forest_gacha_series(series_id:String,_species_id:String)->void:
 	if forest_gacha_ui==null or not forest_gacha_ui.visible:return
@@ -4263,8 +4275,11 @@ func _defer_forest_gacha_series(_series_id:String,_species_id:String)->void:
 	if forest_gacha_ui==null:return
 	forest_gacha_ui.show_later_message(Localizer.text(language_code,"forest_deferred"),puku_points,forest_gacha_draw_count)
 
-func _on_forest_gacha_species_reveal(result:Dictionary)->void:
+func _on_forest_gacha_capsule_reveal_started()->void:
 	_begin_gacha_capsule_profile()
+
+func _on_forest_gacha_species_reveal(result:Dictionary)->void:
+	if not gacha_capsule_profile_active:_begin_gacha_capsule_profile()
 	_gacha_capsule_profile_mark("handler_entry")
 	var entry:Dictionary=result.get("species_entry",{})
 	_queue_species_get(entry,not bool(result.get("was_discovered",false)),"forest_gacha",true)
@@ -4320,6 +4335,7 @@ func _begin_gacha_capsule_profile()->void:
 	gacha_capsule_profile_enabled=true;gacha_capsule_profile_active=true;gacha_capsule_profile_run_id+=1
 	gacha_capsule_profile_events.clear();gacha_capsule_profile_event_order.clear();gacha_capsule_profile_slow_sections.clear();gacha_capsule_profile_total_msec=-1;gacha_capsule_profile_started_with_placeholder=false
 	gacha_capsule_profile_decode_count_start=CatalogImageLoader.decode_count
+	gacha_capsule_profile_decode_total_start=CatalogImageLoader.total_decode_duration_msec
 	_gacha_capsule_profile_record_at("capsule_tap",forest_gacha_ui.last_capsule_tap_msec)
 	_gacha_capsule_profile_record_at("first_visual_response",forest_gacha_ui.last_capsule_first_visual_msec)
 
@@ -4336,10 +4352,14 @@ func _finish_gacha_capsule_first_display(profile_run_id:int,entry:Dictionary,spe
 			var description:="%s->%s=%dms"%[previous_name,current_name,elapsed];segment_text.append(description)
 			if elapsed>=50:gacha_capsule_profile_slow_sections.append(description)
 		var tap_msec:=int(gacha_capsule_profile_events.get("capsule_tap",-1))
-		var save_overlapped:=last_forest_gacha_persist_started_msec>=0 and last_forest_gacha_persist_ended_msec>=tap_msec and last_forest_gacha_persist_started_msec<=tap_msec
+		var save_overlapped:=last_forest_gacha_persist_started_msec>=0 and last_forest_gacha_persist_ended_msec>tap_msec and last_forest_gacha_persist_started_msec<tap_msec
 		var decode_count_delta:=maxi(0,CatalogImageLoader.decode_count-gacha_capsule_profile_decode_count_start)
-		if decode_count_delta>0 and CatalogImageLoader.last_decode_duration_msec>=50:gacha_capsule_profile_slow_sections.append("png_decode=%dms"%CatalogImageLoader.last_decode_duration_msec)
-		print("GACHA_CAPSULE_PROFILE total_ms=",gacha_capsule_profile_total_msec," segments=",", ".join(segment_text)," slow_50ms=",("none" if gacha_capsule_profile_slow_sections.is_empty() else ", ".join(gacha_capsule_profile_slow_sections))," placeholder_first=",gacha_capsule_profile_started_with_placeholder," save_overlap=",save_overlapped," prior_save_ms=",last_forest_gacha_persist_duration_msec," decode_count=",decode_count_delta," decode_last_ms=",CatalogImageLoader.last_decode_duration_msec if decode_count_delta>0 else 0)
+		var decode_duration_delta:=maxi(0,CatalogImageLoader.total_decode_duration_msec-gacha_capsule_profile_decode_total_start)
+		if decode_duration_delta>=50:gacha_capsule_profile_slow_sections.append("png_decode=%dms"%decode_duration_delta)
+		if last_forest_gacha_registration_duration_msec>=50:gacha_capsule_profile_slow_sections.append("registration=%dms"%last_forest_gacha_registration_duration_msec)
+		if last_forest_gacha_save_duration_msec>=50:gacha_capsule_profile_slow_sections.append("save=%dms"%last_forest_gacha_save_duration_msec)
+		if last_forest_gacha_ui_update_duration_msec>=50:gacha_capsule_profile_slow_sections.append("ui_update=%dms"%last_forest_gacha_ui_update_duration_msec)
+		print("GACHA_CAPSULE_PROFILE run=",gacha_capsule_profile_run_id," total_ms=",gacha_capsule_profile_total_msec," segments=",", ".join(segment_text)," slow_50ms=",("none" if gacha_capsule_profile_slow_sections.is_empty() else ", ".join(gacha_capsule_profile_slow_sections))," placeholder_first=",gacha_capsule_profile_started_with_placeholder," save_overlap=",save_overlapped," registration_ms=",last_forest_gacha_registration_duration_msec," save_ms=",last_forest_gacha_save_duration_msec," ui_ms=",last_forest_gacha_ui_update_duration_msec," persist_ms=",last_forest_gacha_persist_duration_msec," decode_count=",decode_count_delta," decode_ms=",decode_duration_delta)
 		gacha_capsule_profile_active=false
 	# Start texture work only after the placeholder card has reached a rendered
 	# frame. Cached images replace it immediately; Web requests/decode remain async.
@@ -5735,7 +5755,7 @@ func _game_version_key()->String:
 	var version:=str(ProjectSettings.get_setting("application/config/version","1.0.0")).strip_edges()
 	return "1.0.0" if version.is_empty() else version.trim_prefix("v").trim_prefix("V")
 
-func _is_collection_complete_species(entry:Dictionary)->bool:
+func _collection_complete_entry_is_eligible(entry:Dictionary)->bool:
 	if entry.is_empty():return false
 	var species_id:=str(entry.get("species_id","")).strip_edges()
 	if species_id.is_empty():return false
@@ -5745,24 +5765,42 @@ func _is_collection_complete_species(entry:Dictionary)->bool:
 	if entry.has("collection_complete_required") and not bool(entry.get("collection_complete_required",true)):return false
 	var lifecycle:=str(entry.get("status","")).to_lower()
 	if lifecycle in ["development","preview","test","retired","removed","placeholder","future"]:return false
-	var display_series_id:=_catalog_display_series_id_for_entry(entry)
-	var display_series:=_series_entry(display_series_id)
-	if display_series_id.is_empty() or display_series.is_empty() or _catalog_series_hidden_from_navigation(display_series):return false
-	# A species only contributes when it owns a real card on its current display
-	# page. This includes integrated fusion tiers and excludes route-only species
-	# intentionally removed from every catalog page.
-	return _catalog_entry_is_listed_for_series(entry,display_series_id)
+	return true
 
-func _collection_complete_species_ids()->Array[String]:
-	var ids:Array[String]=[];var included:Dictionary={}
+func _ensure_collection_complete_species_cache()->void:
+	if collection_complete_species_ids_cache_ready:return
+	var eligible_species:Dictionary={}
+	for entry_value in catalog_species:
+		if entry_value is Dictionary and _collection_complete_entry_is_eligible(entry_value):eligible_species[str(entry_value.get("species_id",""))]=true
+	var visible_series:Dictionary={}
+	for series_value in series_catalog:
+		if not series_value is Dictionary:continue
+		var series_entry:Dictionary=series_value;var series_id:=str(series_entry.get("series_id",""))
+		if not series_id.is_empty() and not _catalog_series_hidden_from_navigation(series_entry):visible_series[series_id]=true
+	# Build each visible page once. The previous per-species lookup rebuilt the
+	# same page hundreds of times during every NEW registration.
+	var listed_species:Dictionary={}
+	for series_id_value in visible_series:
+		for listed_entry in _catalog_display_entries_for_series(str(series_id_value)):
+			listed_species[str(listed_entry.get("species_id",""))]=true
+	var ids:Array[String]=[];var membership:Dictionary={}
 	for entry_value in catalog_species:
 		if not entry_value is Dictionary:continue
-		var entry:Dictionary=entry_value
-		if not _is_collection_complete_species(entry):continue
-		var species_id:=str(entry.get("species_id",""))
-		if included.has(species_id):continue
-		included[species_id]=true;ids.append(species_id)
-	return ids
+		var entry:Dictionary=entry_value;var species_id:=str(entry.get("species_id",""))
+		if membership.has(species_id) or not eligible_species.has(species_id):continue
+		var display_series_id:=_catalog_display_series_id_for_entry(entry)
+		if not visible_series.has(display_series_id) or not listed_species.has(species_id):continue
+		membership[species_id]=true;ids.append(species_id)
+	collection_complete_species_ids_cache=ids;collection_complete_species_membership_cache=membership;collection_complete_species_ids_cache_ready=true
+
+func _is_collection_complete_species(entry:Dictionary)->bool:
+	if not _collection_complete_entry_is_eligible(entry):return false
+	_ensure_collection_complete_species_cache()
+	return bool(collection_complete_species_membership_cache.get(str(entry.get("species_id","")),false))
+
+func _collection_complete_species_ids()->Array[String]:
+	_ensure_collection_complete_species_cache()
+	return collection_complete_species_ids_cache.duplicate()
 
 func _collection_complete_target_count()->int:
 	return _collection_complete_species_ids().size()
@@ -7120,16 +7158,18 @@ func _request_species_texture(entry:Dictionary,target:TextureRect,high_priority:
 	var immediate:=CatalogImageLoader.get_texture(path)
 	if immediate!=null:target.texture=immediate
 	if not CatalogImageLoader.is_external_path(path):
-		target.set_meta("catalog_loaded_path",path);target.set_meta("catalog_request_path","");return
+		target.set_meta("catalog_loaded_path",path);target.set_meta("catalog_request_path","");target.set_meta("catalog_request_callback",Callable());return
 	if CatalogImageLoader.is_cached(path):
-		target.set_meta("catalog_loaded_path",path);target.set_meta("catalog_request_path","");return
-	CatalogImageLoader.request_texture(path,_apply_requested_species_texture.bind(target,path),high_priority)
+		target.set_meta("catalog_loaded_path",path);target.set_meta("catalog_request_path","");target.set_meta("catalog_request_callback",Callable());return
+	var callback:=_apply_requested_species_texture.bind(target,path)
+	target.set_meta("catalog_request_callback",callback)
+	CatalogImageLoader.request_texture(path,callback,high_priority)
 
 func _apply_requested_species_texture(texture:Texture2D,target:TextureRect,path:String)->void:
 	if not is_instance_valid(target) or str(target.get_meta("catalog_request_path",""))!=path:return
 	target.texture=texture if texture!=null else CatalogImageLoader.placeholder_texture
 	target.set_meta("catalog_loaded_path",path if CatalogImageLoader.is_cached(path) else "")
-	target.set_meta("catalog_request_path","")
+	target.set_meta("catalog_request_path","");target.set_meta("catalog_request_callback",Callable())
 
 func _species_texture(entry:Dictionary)->Texture2D:
 	return CatalogImageLoader.get_texture(_species_image_path(entry))

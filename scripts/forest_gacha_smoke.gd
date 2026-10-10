@@ -123,7 +123,7 @@ func _test_jurejure_species_gate(game)->void:
 	assert(seen_jurejure.size()>1)
 
 func _test_spin_capsule_and_reveal(game)->void:
-	game.puku_points=5;game.forest_gacha_draw_count=0;game.forest_gacha_encountered.clear();game.discovered={"colorata":true};game.greenhouse_available={"colorata":true};game.unlocked_species=game.greenhouse_available.duplicate(true);game.unlocked_series={"base":true};game.story_progression_state["fantasy_unlocked"]=true;game.story_progression_state["pending_story_events"]=[];game.fantasy_first_discovery_seen=true;game.fantasy_realization_seen=true;game._apply_saved_unlocks();game.forest_gacha_ui.animation_time_scale=.02
+	game.puku_points=5;game.forest_gacha_draw_count=0;game.forest_gacha_encountered.clear();game.discovered={"colorata":true};game.greenhouse_available={"colorata":true};game.unlocked_species=game.greenhouse_available.duplicate(true);game.unlocked_series={"base":true};game.story_progression_state["fantasy_unlocked"]=true;game.story_progression_state["pending_story_events"]=[];game.fantasy_first_discovery_seen=true;game.fantasy_realization_seen=true;game._apply_saved_unlocks();game.forest_gacha_ui.animation_time_scale=1.0
 	var locked_seed:=-1
 	for seed_value in range(1,100):
 		var probe:=RandomNumberGenerator.new();probe.seed=seed_value
@@ -139,7 +139,7 @@ func _test_spin_capsule_and_reveal(game)->void:
 	assert(game.forest_gacha_ui.last_spin_start_latency_msec>=0 and game.forest_gacha_ui.last_spin_start_latency_msec<100)
 	assert(game.forest_gacha_ui.last_spin_visual_latency_msec>=0 and game.forest_gacha_ui.last_spin_visual_latency_msec<100)
 	for test_language in ["ja","hiragana","en"]:assert(Localizer.text(test_language,"gacha_selecting") not in game.forest_gacha_ui.hint_label.text)
-	await get_tree().create_timer(.45).timeout
+	assert(await _wait_until(func()->bool:return game.forest_gacha_ui.capsule_ready,2500))
 	assert(game.puku_points==4 and game.forest_gacha_draw_count==1 and game.forest_gacha_ui.capsule_ready and game.forest_gacha_ui.capsule.visible and absf(game.forest_gacha_ui.dial_texture.rotation)>1.0)
 	var species_id:=str(game.forest_gacha_ui.pending_result.get("species_id",""));var series_id:=str(game.forest_gacha_ui.pending_result.get("series_id",""));assert(not species_id.is_empty() and series_id!="base" and bool(game.discovered.get(species_id,false)) and bool(game.greenhouse_available.get(species_id,false)))
 	assert(series_id in game.catalog_series_unlock_notice_queue and not game.catalog_series_unlock_overlay.visible)
@@ -151,6 +151,7 @@ func _test_spin_capsule_and_reveal(game)->void:
 	assert(game.forest_gacha_ui.last_capsule_first_visual_latency_msec>=0 and game.forest_gacha_ui.last_capsule_first_visual_latency_msec<100 and game.gacha_capsule_profile_total_msec<200)
 	assert(game.gacha_capsule_profile_started_with_placeholder and not game.forest_gacha_ui.capsule.visible and not game.forest_gacha_ui.capsule_open_burst.visible)
 	for event_name in ["capsule_tap","first_visual_response","handler_entry","get_card_show_start","first_display_frame"]:assert(game.gacha_capsule_profile_events.has(event_name))
+	var profile_totals:Array[int]=[];profile_totals.append(game.gacha_capsule_profile_total_msec)
 	assert(await _wait_until(func()->bool:return not game.species_get_overlay.busy,900));await game.species_get_overlay.close_overlay();await get_tree().process_frame
 	assert(not game.species_get_overlay.visible and game.catalog_series_unlock_overlay.visible and game.scripted_dialog_kind.is_empty())
 	assert(game.catalog_series_unlock_overlay.title_label.text=="図鑑ページ解放！" and game.catalog_series_unlock_overlay.message_label.text.contains(game._catalog_series_notice_name(game._series_entry(series_id))))
@@ -158,17 +159,28 @@ func _test_spin_capsule_and_reveal(game)->void:
 	assert(game.catalog_series_unlock_overlay.cover_image.texture!=null and game.catalog_series_unlock_overlay.cover_image.texture.resource_path==str(game._catalog_entry(species_id).get("image_path","")))
 	game.catalog_series_unlock_overlay.busy=false;await game.catalog_series_unlock_overlay.close_overlay();await get_tree().process_frame
 	assert(not game.catalog_series_unlock_overlay.visible and not game.forest_gacha_ui.busy)
-	# A second live draw can start immediately after returning from the first NEW
-	# card flow; cost, registration and the duplicate-input guard stay intact.
-	game.forest_gacha_ui._request_spin();game.forest_gacha_ui._request_spin()
-	assert(await _wait_until(func()->bool:return game.forest_gacha_ui.capsule_ready,900))
-	assert(game.puku_points==3 and game.forest_gacha_draw_count==2)
-	game.forest_gacha_ui._reveal_result();game.forest_gacha_ui._reveal_result()
-	assert(await _wait_until(func()->bool:return game.species_get_overlay.visible,900))
-	assert(await _wait_until(func()->bool:return not game.species_get_overlay.busy,900));await game.species_get_overlay.close_overlay();await get_tree().process_frame
-	if game.catalog_series_unlock_overlay.visible:
-		game.catalog_series_unlock_overlay.busy=false;await game.catalog_series_unlock_overlay.close_overlay();await get_tree().process_frame
-	assert(not game.species_get_overlay.visible and not game.forest_gacha_ui.busy);game._close_forest_gacha()
+	# Measure all three consecutive openings at production animation speed. Each
+	# second call verifies that duplicate spin/reveal input still cannot charge or
+	# open twice.
+	for run_index in range(1,3):
+		game.forest_gacha_ui._request_spin();game.forest_gacha_ui._request_spin()
+		assert(await _wait_until(func()->bool:return game.forest_gacha_ui.capsule_ready,2500))
+		assert(game.puku_points==4-run_index and game.forest_gacha_draw_count==run_index+1)
+		game.gacha_capsule_profile_total_msec=-1
+		game.forest_gacha_ui._reveal_result();game.forest_gacha_ui._reveal_result()
+		assert(await _wait_until(func()->bool:return game.species_get_overlay.visible,900))
+		assert(await _wait_until(func()->bool:return game.gacha_capsule_profile_total_msec>=0,900))
+		assert(game.forest_gacha_ui.last_capsule_first_visual_latency_msec>=0 and game.forest_gacha_ui.last_capsule_first_visual_latency_msec<100 and game.gacha_capsule_profile_total_msec<200)
+		assert(game.gacha_capsule_profile_started_with_placeholder)
+		for event_name in ["capsule_tap","first_visual_response","handler_entry","get_card_show_start","first_display_frame"]:assert(game.gacha_capsule_profile_events.has(event_name))
+		profile_totals.append(game.gacha_capsule_profile_total_msec)
+		assert(await _wait_until(func()->bool:return not game.species_get_overlay.busy,900));await game.species_get_overlay.close_overlay();await get_tree().process_frame
+		if game.catalog_series_unlock_overlay.visible:
+			game.catalog_series_unlock_overlay.busy=false;await game.catalog_series_unlock_overlay.close_overlay();await get_tree().process_frame
+		assert(not game.species_get_overlay.visible and not game.forest_gacha_ui.busy)
+	assert(profile_totals.size()==3)
+	print("GACHA_CAPSULE_SMOKE normal_speed run1_ms=",profile_totals[0]," run2_ms=",profile_totals[1]," run3_ms=",profile_totals[2])
+	game._close_forest_gacha()
 	game.puku_balance_units=999;var previous_count:int=game.forest_gacha_draw_count;game._open_forest_gacha();game._spin_forest_gacha();assert(game.forest_gacha_draw_count==previous_count and game.puku_balance_units==999);game._close_forest_gacha()
 
 func _test_encounter_save_and_unlock(game)->void:

@@ -20,6 +20,7 @@ var _texture_cache: Dictionary = {}
 var _last_used: Dictionary = {}
 var _pending_callbacks: Dictionary = {}
 var _request_high_priority: Dictionary = {}
+var _active_request_paths: Dictionary = {}
 var _high_priority_queue: Array[String] = []
 var _prefetch_queue: Array[String] = []
 var _decode_queue: Array[Dictionary] = []
@@ -29,6 +30,7 @@ var _access_serial := 0
 var decode_count := 0
 var last_decode_duration_msec := 0
 var max_decode_duration_msec := 0
+var total_decode_duration_msec := 0
 
 func _ready() -> void:
 	placeholder_texture = _build_placeholder_texture()
@@ -66,7 +68,7 @@ func request_texture(path: String, callback: Callable, high_priority := true) ->
 		if high_priority:
 			_request_high_priority[path] = true
 			_prefetch_queue.erase(path)
-			if path not in _high_priority_queue:
+			if not _active_request_paths.has(path) and path not in _high_priority_queue:
 				_high_priority_queue.push_front(path)
 		return
 	_pending_callbacks[path] = [callback]
@@ -76,6 +78,25 @@ func request_texture(path: String, callback: Callable, high_priority := true) ->
 	else:
 		_prefetch_queue.append(path)
 	_pump_queue()
+
+func cancel_texture_request(path: String, callback: Callable) -> void:
+	if path.is_empty() or not _pending_callbacks.has(path):
+		return
+	var callbacks: Array = _pending_callbacks[path]
+	callbacks.erase(callback)
+	if not callbacks.is_empty():
+		_pending_callbacks[path] = callbacks
+		return
+	_request_high_priority.erase(path)
+	_high_priority_queue.erase(path)
+	_prefetch_queue.erase(path)
+	for index in range(_decode_queue.size()-1,-1,-1):
+		if str(_decode_queue[index].get("path",""))==path:_decode_queue.remove_at(index)
+	if _active_request_paths.has(path):
+		# Keep an empty slot so a new consumer can join the in-flight request.
+		_pending_callbacks[path] = []
+	else:
+		_pending_callbacks.erase(path)
 
 func clear_texture_cache() -> void:
 	_texture_cache.clear()
@@ -90,7 +111,7 @@ func _pump_queue() -> void:
 			path = _prefetch_queue.pop_front()
 		else:
 			return
-		if not _pending_callbacks.has(path):
+		if not _pending_callbacks.has(path) or _active_request_paths.has(path):
 			continue
 		_start_request(path)
 
@@ -100,6 +121,7 @@ func _start_request(path: String) -> void:
 	add_child(request)
 	request.request_completed.connect(_on_request_completed.bind(path, request), CONNECT_ONE_SHOT)
 	_active_requests += 1
+	_active_request_paths[path] = true
 	network_request_count += 1
 	request_count_by_path[path] = int(request_count_by_path.get(path, 0)) + 1
 	var error := request.request(_external_url(path))
@@ -113,6 +135,13 @@ func _finish_request(path: String, request: HTTPRequest, body: PackedByteArray, 
 	if is_instance_valid(request):
 		request.queue_free()
 	_active_requests = maxi(0, _active_requests - 1)
+	_active_request_paths.erase(path)
+	var callbacks: Array = _pending_callbacks.get(path, [])
+	if callbacks.is_empty():
+		_pending_callbacks.erase(path)
+		_request_high_priority.erase(path)
+		_pump_queue()
+		return
 	_decode_queue.append({"path": path, "body": body, "response_code": response_code, "high_priority": bool(_request_high_priority.get(path, false))})
 	# Network concurrency stays at four, but image decoding and GPU texture
 	# creation are serialized. Four 2-3 MB responses finishing together used to
@@ -141,6 +170,11 @@ func _drain_decode_queue() -> void:
 	_decode_pump_running = false
 
 func _decode_response(path: String, body: PackedByteArray, response_code: int) -> void:
+	var callbacks: Array = _pending_callbacks.get(path, [])
+	if callbacks.is_empty():
+		_pending_callbacks.erase(path)
+		_request_high_priority.erase(path)
+		return
 	var decode_started_msec := Time.get_ticks_msec()
 	var texture: Texture2D = placeholder_texture
 	if response_code >= 200 and response_code < 300 and not body.is_empty():
@@ -153,7 +187,6 @@ func _decode_response(path: String, body: PackedByteArray, response_code: int) -
 			_texture_cache[path] = texture
 			_touch(path)
 			_evict_old_textures()
-	var callbacks: Array = _pending_callbacks.get(path, [])
 	_pending_callbacks.erase(path)
 	_request_high_priority.erase(path)
 	for callback_value in callbacks:
@@ -162,6 +195,7 @@ func _decode_response(path: String, body: PackedByteArray, response_code: int) -
 			callback.call_deferred(texture)
 	last_decode_duration_msec = Time.get_ticks_msec() - decode_started_msec
 	max_decode_duration_msec = maxi(max_decode_duration_msec, last_decode_duration_msec)
+	total_decode_duration_msec += last_decode_duration_msec
 	decode_count += 1
 
 func _external_url(path: String) -> String:

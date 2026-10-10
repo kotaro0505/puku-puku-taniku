@@ -39,6 +39,7 @@ func show_species(entry:Dictionary,texture:Texture2D,is_new:bool,context:String,
 	var story_catalog_card:=context=="first_colorata_catalog" or context.begins_with("scripted_dialog_card:")
 	# A late Web image callback from the previous card must never repopulate this
 	# reusable TextureRect. main.gd assigns the new request identity afterwards.
+	_cancel_result_image_request()
 	result_image.set_meta("catalog_loaded_path","");result_image.set_meta("catalog_request_path","")
 	result_image.texture=texture;badge_label.text=Localizer.text(current_language,"original_catalog_new" if story_catalog_card else ("new" if is_new else "get"));name_label.text=Localizer.species_name(current_language,entry)
 	hint_label.text=Localizer.text(current_language,"tap_to_close")
@@ -75,7 +76,7 @@ func close_overlay()->void:
 		await RenderingServer.frame_post_draw
 	last_close_first_visual_msec=Time.get_ticks_msec();last_close_first_visual_latency_msec=maxi(0,last_close_first_visual_msec-last_close_input_msec)
 	if hide.is_running():await hide.finished
-	visible=false;modulate.a=1.0;card.scale=Vector2.ONE;result_image.texture=null
+	visible=false;modulate.a=1.0;card.scale=Vector2.ONE;_cancel_result_image_request();result_image.texture=null
 	result_image.set_meta("catalog_loaded_path","");result_image.set_meta("catalog_request_path","")
 	current_context="";last_close_hidden_msec=Time.get_ticks_msec()
 	# The hidden/cleared state must reach the renderer before closed handlers can
@@ -89,3 +90,12 @@ func close_overlay()->void:
 	last_close_emitted_msec=Time.get_ticks_msec();closed.emit(context)
 
 func is_open()->bool:return visible
+
+func _cancel_result_image_request()->void:
+	if result_image==null:return
+	var path:=str(result_image.get_meta("catalog_request_path",""))
+	var callback_value:Variant=result_image.get_meta("catalog_request_callback",Callable())
+	if not path.is_empty() and typeof(callback_value)==TYPE_CALLABLE:
+		var callback:Callable=callback_value
+		if callback.is_valid():CatalogImageLoader.cancel_texture_request(path,callback)
+	result_image.set_meta("catalog_request_callback",Callable())
