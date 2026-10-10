@@ -87,6 +87,7 @@ func _ready() -> void:
 	_test_hybrid_lab_presentation(game)
 	print("FUSION_SYSTEM_STAGE catalog")
 	_test_catalog_and_recipes(game)
+	_test_fusion_cost_schedule(game)
 	print("FUSION_SYSTEM_STAGE precedence")
 	_test_special_recipe_precedence(game)
 	_test_original_fallbacks(game)
@@ -105,7 +106,7 @@ func _ready() -> void:
 	await _test_tier3_game_flow(game)
 	game._reset_progression_state()
 	game.queue_free()
-	print("FUSION_SYSTEM_SMOKE_OK hybrid_lab_name=true attached_background=720x1280 result_heading_removed=true instruction_cards_separated=true symmetric_margins=true top_close_removed=true main_back=close picker_back=main processing_exit_guard=true energy_speed_unchanged=true energy_emission_3x=true fusion_series=11 basic_species=66 basic_recipes=66 tier1_species=22 tier1_special=22 tier2_species=21 tier2_exact=16 tier2_terminal=10 tier2_series=5 tier3_species=5 tier3_exact=5 transparent_images=114 jelly_catalog=24 picker_touch_contract=true unordered=true originals=fallback exact_then_series_special=priority parents=GET_only terminal_results=true cost=atomic silhouette=species_specific double_submit=blocked known_result=disabled return_after_GET=lab seeds=after_GET languages=3")
+	print("FUSION_SYSTEM_SMOKE_OK hybrid_lab_name=true attached_background=720x1280 result_heading_removed=true instruction_cards_separated=true symmetric_margins=true top_close_removed=true main_back=close picker_back=main processing_exit_guard=true energy_speed_unchanged=true energy_emission_3x=true fusion_series=11 basic_species=66 basic_recipes=66 tier1_species=22 tier1_special=22 tier2_species=21 tier2_exact=16 tier2_terminal=10 tier2_series=5 tier3_species=5 tier3_exact=5 cost_schedule=1/3/7/12 total_cost=339 transparent_images=114 jelly_catalog=24 picker_touch_contract=true unordered=true originals=fallback exact_then_series_special=priority parents=GET_only terminal_results=true cost=atomic silhouette=species_specific double_submit=blocked known_result=disabled return_after_GET=lab seeds=after_GET languages=3")
 	get_tree().quit()
 
 func _test_hybrid_lab_presentation(game) -> void:
@@ -234,6 +235,30 @@ func _test_catalog_and_recipes(game) -> void:
 		assert(str(recipe[2]) in jelly_catalog_ids)
 	assert("fus1_jelly_bomb" in jelly_catalog_ids and "fus1_fruit_terrine" in jelly_catalog_ids and "fus2_toro_pork_jelly" in jelly_catalog_ids)
 
+func _test_fusion_cost_schedule(game) -> void:
+	var expected := {
+		"hybrid": {"count": 66, "cost": 1},
+		"fusion_tier1": {"count": 22, "cost": 3},
+		"fusion_tier2": {"count": 21, "cost": 7},
+		"fusion_tier3": {"count": 5, "cost": 12},
+	}
+	var counts := {"hybrid": 0, "fusion_tier1": 0, "fusion_tier2": 0, "fusion_tier3": 0}
+	var total_cost := 0
+	for entry_value in game.catalog_species:
+		if not entry_value is Dictionary:
+			continue
+		var entry: Dictionary = entry_value
+		var series_id := str(entry.get("series_id", ""))
+		if not expected.has(series_id):
+			continue
+		var cost := maxi(1, int(entry.get("fusion_cost_puku", 1)))
+		assert(cost == int((expected[series_id] as Dictionary)["cost"]))
+		counts[series_id] = int(counts[series_id]) + 1
+		total_cost += cost
+	for series_id in expected:
+		assert(int(counts[series_id]) == int((expected[series_id] as Dictionary)["count"]))
+	assert(total_cost == 339)
+
 func _test_special_recipe_precedence(game) -> void:
 	var gummy_id := "gummy_peach_milk"
 	var metal_id := "metal_silver_rosette"
@@ -307,7 +332,7 @@ func _test_tier1_recipes(game) -> void:
 		assert(str(forward.get("source", "")) == "special")
 		assert(str(forward.get("result_species_id", "")) == result_id)
 		assert(str(reverse.get("result_species_id", "")) == result_id)
-		assert(int(forward.get("fusion_cost_puku", 0)) == 2)
+		assert(int(forward.get("fusion_cost_puku", 0)) == 3)
 		var entry: Dictionary = game._catalog_entry(result_id)
 		assert(not entry.is_empty() and int(entry.get("fusion_tier", 0)) == 1)
 		assert(bool(entry.get("fusion_parent_enabled", false)))
@@ -349,7 +374,7 @@ func _test_tier2_recipes(game) -> void:
 		assert(str(forward.get("source", "")) == "special")
 		assert(str(forward.get("result_species_id", "")) == result_id)
 		assert(str(reverse.get("result_species_id", "")) == result_id)
-		assert(int(forward.get("fusion_cost_puku", 0)) == 3)
+		assert(int(forward.get("fusion_cost_puku", 0)) == 7)
 		tier2_ids[result_id] = true
 	for recipe in TERMINAL_TIER2_EXACT_RECIPES:
 		var parent_a_id := str(recipe[0])
@@ -362,7 +387,7 @@ func _test_tier2_recipes(game) -> void:
 		assert(str(forward.get("result_species_id", "")) == result_id)
 		assert(str(reverse.get("source", "")) == "special")
 		assert(str(reverse.get("result_species_id", "")) == result_id)
-		assert(int(forward.get("fusion_cost_puku", 0)) == 3)
+		assert(int(forward.get("fusion_cost_puku", 0)) == 7)
 		var result_entry: Dictionary = game._catalog_entry(result_id)
 		assert(str(result_entry.get("fusion_display_series", "")) == display_series)
 		assert((result_entry.get("fusion_parent_species_ids", []) as Array) == [parent_a_id, parent_b_id])
@@ -380,7 +405,7 @@ func _test_tier2_recipes(game) -> void:
 		assert(str(forward.get("source", "")) == "series_special")
 		assert(str(forward.get("result_species_id", "")) == result_id)
 		assert(str(reverse.get("result_species_id", "")) == result_id)
-		assert(int(forward.get("fusion_cost_puku", 0)) == 3)
+		assert(int(forward.get("fusion_cost_puku", 0)) == 7)
 		var matching_parent_count := 0
 		for candidate_value in game.catalog_species:
 			if not candidate_value is Dictionary:
@@ -405,7 +430,7 @@ func _test_tier2_recipes(game) -> void:
 		assert(str(entry.get("fusion_display_series", "")) in SERIES)
 		assert(game.fusion_system.fusion_series_for_entry(entry).is_empty())
 		assert(str(entry.get("series_id", "")) == "fusion_tier2")
-		assert(int(entry.get("fusion_cost_puku", 0)) == 3)
+		assert(int(entry.get("fusion_cost_puku", 0)) == 7)
 		assert(str(entry.get("name_ja", "")) != "")
 		assert(str(entry.get("name_hiragana", "")) != "")
 		assert(str(entry.get("name_en", "")) != "")
@@ -464,7 +489,7 @@ func _test_tier3_recipes(game) -> void:
 		assert(str(reverse.get("source", "")) == "special")
 		assert(str(forward.get("result_species_id", "")) == result_id)
 		assert(str(reverse.get("result_species_id", "")) == result_id)
-		assert(int(forward.get("fusion_cost_puku", 0)) == 3)
+		assert(int(forward.get("fusion_cost_puku", 0)) == 12)
 		var entry: Dictionary = game._catalog_entry(result_id)
 		assert(not entry.is_empty() and str(entry.get("series_id", "")) == "fusion_tier3")
 		assert(int(entry.get("fusion_tier", 0)) == 3 and bool(entry.get("fusion_parent_enabled", false)))
@@ -750,18 +775,18 @@ func _test_tier1_game_flow(game) -> void:
 	await get_tree().process_frame
 	assert(str(game.fusion_lab_ui.current_result.get("result_species_id", "")) == result_id)
 	assert(game.fusion_lab_ui.result_name_label.text == "レインボーバブル")
-	assert(game.fusion_lab_ui.fusion_cost_label.text == "2ぷくコイン")
+	assert(game.fusion_lab_ui.fusion_cost_label.text == "3ぷくコイン")
 	assert(game.fusion_lab_ui.result_image.texture != null)
 	assert(game.fusion_lab_ui.result_image.material == game.fusion_lab_ui.silhouette_material)
 	var parent_a_before: int = game._species_get_count(parent_a_id)
 	var parent_b_before: int = game._species_get_count(parent_b_id)
-	game.puku_points = 1
+	game.puku_points = 2
 	game._perform_fusion(parent_a_id, parent_b_id)
-	assert(game.puku_points == 1)
+	assert(game.puku_points == 2)
 	assert(game._species_get_count(result_id) == 0)
 	assert(game.fusion_lab_ui.result_status_label.text == Localizer.text("ja", "not_enough_puku"))
 
-	game.puku_points = 2
+	game.puku_points = 3
 	game._perform_fusion(parent_a_id, parent_b_id)
 	game._perform_fusion(parent_a_id, parent_b_id)
 	assert(game.fusion_in_progress)
@@ -840,17 +865,17 @@ func _test_tier2_game_flow(game) -> void:
 	await get_tree().process_frame
 	assert(str(game.fusion_lab_ui.current_result.get("result_species_id", "")) == result_id)
 	assert(game.fusion_lab_ui.result_name_label.text == "ムーンボウ")
-	assert(game.fusion_lab_ui.fusion_cost_label.text == "3ぷくコイン")
+	assert(game.fusion_lab_ui.fusion_cost_label.text == "7ぷくコイン")
 	assert(game.fusion_lab_ui.result_image.texture != null)
 	assert(game.fusion_lab_ui.result_image.material == game.fusion_lab_ui.silhouette_material)
 	var parent_a_before: int = game._species_get_count(parent_a_id)
 	var parent_b_before: int = game._species_get_count(parent_b_id)
-	game.puku_points = 2
+	game.puku_points = 6
 	game._perform_fusion(parent_a_id, parent_b_id)
-	assert(game.puku_points == 2)
+	assert(game.puku_points == 6)
 	assert(game._species_get_count(result_id) == 0)
 	assert(game.fusion_lab_ui.result_status_label.text == Localizer.text("ja", "not_enough_puku"))
-	game.puku_points = 3
+	game.puku_points = 7
 	game._perform_fusion(parent_a_id, parent_b_id)
 	game._perform_fusion(parent_a_id, parent_b_id)
 	assert(game.fusion_in_progress)
@@ -969,7 +994,7 @@ func _test_tier3_game_flow(game) -> void:
 		game.unlocked_species[parent_id] = true
 		game.species_get_counts[parent_id] = 1
 	game._apply_saved_unlocks()
-	game.puku_points = 3
+	game.puku_points = 11
 	game._open_fusion_lab()
 	game._on_fusion_parent_selected(0, parent_a_id)
 	game._on_fusion_parent_selected(1, parent_b_id)
@@ -977,8 +1002,13 @@ func _test_tier3_game_flow(game) -> void:
 	await get_tree().process_frame
 	assert(str(game.fusion_lab_ui.current_result.get("result_species_id", "")) == result_id)
 	assert(game.fusion_lab_ui.result_name_label.text == "ハート・オブ・マグマ")
-	assert(game.fusion_lab_ui.fusion_cost_label.text == "3ぷくコイン")
+	assert(game.fusion_lab_ui.fusion_cost_label.text == "12ぷくコイン")
 	assert(not game.fusion_lab_ui.fuse_button.disabled)
+	game._perform_fusion(parent_a_id, parent_b_id)
+	assert(not game.fusion_in_progress and game.puku_points == 11)
+	assert(game._species_get_count(result_id) == 0)
+	assert(game.fusion_lab_ui.result_status_label.text == Localizer.text("ja", "not_enough_puku"))
+	game.puku_points = 12
 	game._perform_fusion(parent_a_id, parent_b_id)
 	assert(game.fusion_in_progress and game.puku_points == 0)
 	assert(game._species_get_count(result_id) == 1)
