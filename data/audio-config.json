@@ -16,7 +16,7 @@
     "ui_tap": "",
     "watering": "",
     "sprout": "",
-    "harvest": "",
+    "harvest": "res://assets/audio/harvest_firefly_1.wav",
     "jelly": "",
     "squish": "",
     "level_up": "",
