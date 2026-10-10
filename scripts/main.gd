@@ -341,6 +341,7 @@ var encyclopedia_card_images: Array[TextureRect] = []
 var encyclopedia_card_entries: Array[Dictionary] = []
 var encyclopedia_silhouette_material: ShaderMaterial
 var series_catalog: Array = []
+var species_picker_series_catalog: Array = []
 var catalog_progression: Dictionary = {}
 var selected_series_index := 0
 var current_encyclopedia_series_id := INITIAL_SERIES_ID
@@ -989,6 +990,7 @@ func _initial_greenhouse_state()->Dictionary:
 
 func _load_series_data() -> void:
 	series_catalog.clear()
+	species_picker_series_catalog.clear()
 	catalog_progression={}
 	var parsed_progression=JSON.parse_string(FileAccess.get_file_as_string("res://data/catalog-progression.json"))
 	if parsed_progression is Dictionary:catalog_progression=parsed_progression.duplicate(true)
@@ -1001,6 +1003,7 @@ func _load_series_data() -> void:
 		var fallback_ids:Array[String]=[]
 		for entry in catalog_species:fallback_ids.append(str(entry.get("species_id","")))
 		series_catalog.append({"series_id":INITIAL_SERIES_ID,"display_name":"原種","subtitle":"この世界に帰ってきた多肉たち","description":"新しく見つけた原種を不思議な図鑑へ記録します。","cover_image_path":"","species_ids":fallback_ids,"field_id":"base_field","unlock_type":"default","unlock_condition":{},"iap_product_id":"","sort_order":0})
+	species_picker_series_catalog=_build_species_picker_series_catalog()
 
 func _load_collection_rarity()->void:
 	var by_id:Dictionary={}
@@ -2155,7 +2158,7 @@ func _sync_arrangement_ui()->void:
 	var iap_states:Dictionary=pot_unlock_iap_service.product_states_snapshot() if pot_unlock_iap_service!=null else {}
 	var restore_available:bool=pot_unlock_iap_service.restore_available() if pot_unlock_iap_service!=null else false
 	var restore_in_progress:bool=pot_unlock_iap_service.restore_in_progress() if pot_unlock_iap_service!=null else false
-	arrangement_ui.configure(catalog_species,[],pot_catalog,discovered,owned_pots,saved_arrangements,arrangement_save_capacity,puku_points,_species_texture,_request_species_texture,bests,language_code,_current_pot_sales_stage(),pot_design_unlocks,iap_states,restore_available,restore_in_progress,ArrangementShareBackgroundsClass.catalog(),_share_background_unlock_states())
+	arrangement_ui.configure(catalog_species,[],pot_catalog,discovered,owned_pots,saved_arrangements,arrangement_save_capacity,puku_points,_species_texture,_request_species_texture,bests,language_code,_current_pot_sales_stage(),pot_design_unlocks,iap_states,restore_available,restore_in_progress,ArrangementShareBackgroundsClass.catalog(),_share_background_unlock_states(),species_picker_series_catalog)
 	arrangement_ui.sync_catalog_state(unlocked_series,puku_points)
 	arrangement_ui.sync_seed_shop_state(_seed_shop_products(),puku_points)
 
@@ -4056,7 +4059,7 @@ func _open_fusion_lab()->void:
 	fusion_return_pending=false
 	fusion_parent_a_id="";fusion_parent_b_id=""
 	fusion_lab_ui.set_language(language_code)
-	fusion_lab_ui.open_lab(fusion_system.eligible_parents(species_get_counts),species_get_counts)
+	fusion_lab_ui.open_lab(fusion_system.eligible_parents(species_get_counts),species_get_counts,"","",species_picker_series_catalog)
 	_update_play_ui()
 
 func _close_fusion_lab()->void:
@@ -4123,7 +4126,7 @@ func _resume_fusion_lab_after_get()->void:
 	if not species_get_queue.is_empty() or species_get_overlay and species_get_overlay.visible or catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible:return
 	fusion_return_pending=false
 	fusion_lab_ui.set_language(language_code)
-	fusion_lab_ui.open_lab(fusion_system.eligible_parents(species_get_counts),species_get_counts,fusion_parent_a_id,fusion_parent_b_id)
+	fusion_lab_ui.open_lab(fusion_system.eligible_parents(species_get_counts),species_get_counts,fusion_parent_a_id,fusion_parent_b_id,species_picker_series_catalog)
 	_refresh_fusion_lab_result()
 	fusion_lab_ui.move_to_front()
 	_update_play_ui()
@@ -4876,11 +4879,15 @@ func _update_play_ui()->void:
 		var round_is_free:=normal_round_free_plays>0 or not puku_gauge_intro_complete
 		var rescue_needed:=not round_is_free and not _can_afford_puku_units(NORMAL_ROUND_COST_UNITS)
 		play_open_button.text=Localizer.text(language_code,"play_normal_seed_round_help" if rescue_needed else ("play_normal_seed_round_free" if round_is_free else "play_normal_seed_round"))
-		play_open_button.add_theme_font_size_override("font_size",14 if rescue_needed else 17)
+		play_open_button.add_theme_font_size_override("font_size",14 if rescue_needed or not round_is_free else 17)
+		play_open_button.text_overrun_behavior=TextServer.OVERRUN_NO_TRIMMING if not rescue_needed and not round_is_free else TextServer.OVERRUN_TRIM_ELLIPSIS
+		play_open_button.clip_text=not (not rescue_needed and not round_is_free)
 		play_open_button.disabled=false
 	else:
 		play_open_button.text=Localizer.text(language_code,"play_first_old_seed" if _first_old_seed_play_pending() else "main_play")
 		play_open_button.add_theme_font_size_override("font_size",21)
+		play_open_button.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
+		play_open_button.clip_text=true
 		play_open_button.disabled=false
 	seed_bag_panel.visible=current_mode=="greenhouse" and play_active and active_seed_type!="old" and not _is_endless_normal_play()
 	play_timer_label.visible=seed_bag_panel.visible
@@ -5738,6 +5745,20 @@ func _catalog_display_entries_for_series(series_id:String)->Array[Dictionary]:
 			if _catalog_display_series_id_for_entry(entry)==series_id and not included.has(species_id):
 				entries.append(entry);included[species_id]=true
 	return entries
+
+func _build_species_picker_series_catalog()->Array:
+	var picker_series:Array=[]
+	for raw_series in series_catalog:
+		if not raw_series is Dictionary:continue
+		var series:Dictionary=raw_series
+		if _catalog_series_hidden_from_navigation(series):continue
+		var picker_entry:Dictionary=series.duplicate(true)
+		var display_species_ids:Array[String]=[]
+		for entry in _catalog_display_entries_for_series(str(series.get("series_id",""))):
+			display_species_ids.append(str(entry.get("species_id","")))
+		picker_entry["species_ids"]=display_species_ids
+		picker_series.append(picker_entry)
+	return picker_series
 
 func _catalog_cover_entry_for_series(series_id:String)->Dictionary:
 	var species_id:=str(catalog_cover_species.get(series_id,""))

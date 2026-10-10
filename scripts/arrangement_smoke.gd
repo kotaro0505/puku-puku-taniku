@@ -30,6 +30,18 @@ func _ready()->void:
 		var pot_image:Image=(load(str(added_pot.image_path)) as Texture2D).get_image();assert(pot_image.get_pixel(0,0).a<.05 and pot_image.get_pixel(pot_image.get_width()-1,pot_image.get_height()-1).a<.05)
 	assert(game.arrangement_button == null)
 	var available:Array=ui._available_species_entries("all");assert(available.size()==1 and str(available[0].species_id)=="colorata")
+	game.discovered["gummy_peach_milk"]=true;game.discovered["hyb_gummy_metal"]=true;game._sync_arrangement_ui()
+	ui._refresh_picker_filters(true)
+	var gummy_filter_index:=-1
+	for item_index in range(ui.picker_filter.item_count):
+		if str(ui.picker_filter.get_item_metadata(item_index))=="gummy":gummy_filter_index=item_index
+	assert(ui.picker_filter.item_count==3 and gummy_filter_index>0)
+	ui.picker_filter.select(gummy_filter_index);ui._on_picker_filter_changed(gummy_filter_index)
+	var gummy_entries:Array=ui._available_species_entries("gummy");assert(gummy_entries.size()==2 and gummy_entries.all(func(entry:Dictionary)->bool:return str(entry.get("species_id","")) in ["gummy_peach_milk","hyb_gummy_metal"]))
+	assert(ui.picker_grid.get_child_count()==2)
+	for card_value in ui.picker_grid.get_children():
+		var card:=card_value as Button;assert(card!=null and card.find_child("SpeciesImage",true,false)!=null and card.find_child("SpeciesName",true,false)!=null and card.find_child("SpeciesName",true,false).text.count("\n")==0 and not _has_label_text_containing(card,"記録"))
+	game.discovered.erase("gummy_peach_milk");game.discovered.erase("hyb_gummy_metal");game._sync_arrangement_ui()
 	ui.open_home();assert(ui.home_page.visible and ui.pot_select_grid.get_child_count()==8 and not (ui.pot_select_grid.get_child(0) as Button).disabled and _has_label_text_containing(ui.pot_select_grid.get_child(0),"使用可能 ×1"))
 	assert(_has_label_text_containing(ui.home_page,"好きな鉢を選んで作ってみよう") and _has_button_text(ui.home_page,"作った作品を見る") and not _has_button_text(ui.home_page,"＋ 新しく作る"))
 	ui._select_editor_pot("shallow_terracotta");assert(ui.editor_page.visible and str(ui.current_arrangement.pot_id)=="shallow_terracotta" and ui.editor_message.text.is_empty())

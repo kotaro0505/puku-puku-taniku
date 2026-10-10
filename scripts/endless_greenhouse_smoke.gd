@@ -618,7 +618,12 @@ func _test_navigation_pause_resume(game: Node) -> void:
 	game._apply_mode()
 	game._process(.01)
 	assert(not game.play_active and game.play_open_button.visible and not game.play_overlay.visible)
-	game.puku_balance_units=maxi(game.puku_balance_units,game.NORMAL_ROUND_COST_UNITS)
+	game.puku_gauge_intro_complete=true;game.normal_round_free_plays=0;game.puku_balance_units=maxi(game.puku_balance_units,game.NORMAL_ROUND_COST_UNITS);game._update_play_ui()
+	assert(game.play_open_button.text=="たねをまく\n1ぷくコイン消費" and game.play_open_button.text_overrun_behavior==TextServer.OVERRUN_NO_TRIMMING and not game.play_open_button.clip_text)
+	assert(Localizer.text("hiragana","play_normal_seed_round")=="たねを まく\n1ぷくこいん しょうひ" and Localizer.text("en","play_normal_seed_round")=="Plant seeds\nUse 1 Puku Coin")
+	game.normal_round_free_plays=1;game._update_play_ui();assert(game.play_open_button.text=="たねをまく　無料")
+	game.normal_round_free_plays=0;game.puku_balance_units=0;game._update_play_ui();assert(game.play_open_button.text=="パンダのお手伝いをする\n＋1ぷくコイン")
+	game.puku_balance_units=game.NORMAL_ROUND_COST_UNITS;game._update_play_ui()
 	game._open_play_modal()
 	await get_tree().create_timer(.72).timeout
 	assert(game.play_active and game.active_seed_type == "normal")
@@ -856,6 +861,7 @@ func _test_fusion_lab_flow(game: Node) -> void:
 	game.fusion_lab_ui.parent_a_button.pressed.emit()
 	assert(game.fusion_lab_ui.picker_page.visible and game.fusion_lab_ui.picker_slot == 0)
 	assert(game.fusion_lab_ui.picker_scroll.vertical_scroll_mode == ScrollContainer.SCROLL_MODE_AUTO)
+	assert(str(game.fusion_lab_ui.picker_filter.get_item_metadata(game.fusion_lab_ui.picker_filter.selected))=="all")
 	assert(game.fusion_lab_ui.candidate_cards_by_id.has(gummy_id))
 	assert(game.fusion_lab_ui.candidate_images_by_id.has(gummy_id))
 	assert(game.fusion_lab_ui.candidate_name_labels_by_id[gummy_id].text == Localizer.species_name("ja", game._catalog_entry(gummy_id)))
@@ -866,11 +872,24 @@ func _test_fusion_lab_flow(game: Node) -> void:
 	var hybrid_image: TextureRect = game.fusion_lab_ui.candidate_images_by_id[owned_hybrid_id]
 	assert(hybrid_image.texture != null)
 	assert(str(hybrid_image.get_meta("catalog_loaded_path", "")) == "res://assets/catalog/hybrid/%s.png" % owned_hybrid_id)
+	var gummy_filter_index:=-1;var metal_filter_index:=-1
+	for item_index in range(game.fusion_lab_ui.picker_filter.item_count):
+		var filter_id:=str(game.fusion_lab_ui.picker_filter.get_item_metadata(item_index))
+		if filter_id=="gummy":gummy_filter_index=item_index
+		elif filter_id=="metal":metal_filter_index=item_index
+	assert(gummy_filter_index>0 and metal_filter_index>0)
+	game.fusion_lab_ui.picker_filter.select(gummy_filter_index);game.fusion_lab_ui._on_picker_filter_changed(gummy_filter_index)
+	assert(game.fusion_lab_ui.candidate_cards_by_id[gummy_id].visible and game.fusion_lab_ui.candidate_cards_by_id[owned_hybrid_id].visible and not game.fusion_lab_ui.candidate_cards_by_id[metal_id].visible)
+	assert(game.fusion_lab_ui.candidate_cards_by_id[gummy_id].find_child("GetCount",true,false)==null)
+	var cached_gummy_card:Button=game.fusion_lab_ui.candidate_cards_by_id[gummy_id]
 	game.fusion_lab_ui._choose_candidate(gummy_id)
 	assert(game.fusion_parent_a_id == gummy_id)
 	game.fusion_lab_ui.parent_a_button.pressed.emit()
+	assert(game.fusion_lab_ui.candidate_cards_by_id[gummy_id]==cached_gummy_card)
 	assert(game.fusion_lab_ui.candidate_cards_by_id[gummy_id].button_pressed)
 	assert(game.fusion_lab_ui.candidate_selected_badges_by_id[gummy_id].visible)
+	game.fusion_lab_ui.picker_filter.select(metal_filter_index);game.fusion_lab_ui._on_picker_filter_changed(metal_filter_index)
+	assert(game.fusion_parent_a_id==gummy_id and not game.fusion_lab_ui.candidate_cards_by_id[gummy_id].visible and game.fusion_lab_ui.candidate_cards_by_id[metal_id].visible)
 	game.fusion_lab_ui._choose_candidate(gummy_id)
 	game.fusion_lab_ui.parent_b_button.pressed.emit()
 	assert(game.fusion_lab_ui.picker_page.visible and game.fusion_lab_ui.picker_slot == 1)

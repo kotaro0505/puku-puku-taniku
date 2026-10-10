@@ -19,14 +19,17 @@ const ENERGY_PARTICLE_FADE_SECONDS := 0.18
 const ENERGY_PARTICLE_STAGGER_SECONDS := 0.035
 const SERIES_LABELS := {
 	"ja": {
+		"base": "原種", "neon": "ネオン", "jurejure": "ジュレジュレ団",
 		"gummy": "グミ", "metal": "金属", "sweets": "スイーツ", "glow": "蓄光", "jewel": "宝石",
 		"jure": "ジュレジュレ団", "stone": "ストーン", "sea": "海", "yumekawa": "ゆめふわ", "forest_amber": "森と琥珀", "jelly": "ゼリー",
 	},
 	"hiragana": {
+		"base": "げんしゅ", "neon": "ねおん", "jurejure": "じゅれじゅれだん",
 		"gummy": "ぐみ", "metal": "きんぞく", "sweets": "すいーつ", "glow": "ちっこう", "jewel": "ほうせき",
 		"jure": "じゅれじゅれだん", "stone": "すとーん", "sea": "うみ", "yumekawa": "ゆめふわ", "forest_amber": "もりと こはく", "jelly": "ぜりー",
 	},
 	"en": {
+		"base": "Original Species", "neon": "Neon", "jurejure": "JureJure Gang",
 		"gummy": "Gummy", "metal": "Metal", "sweets": "Sweets", "glow": "Glow", "jewel": "Jewel",
 		"jure": "JureJure Gang", "stone": "Stone", "sea": "Sea", "yumekawa": "Dreamy", "forest_amber": "Forest & Amber", "jelly": "Jelly",
 	},
@@ -35,6 +38,7 @@ const SERIES_LABELS := {
 var language := "ja"
 var candidates: Array[Dictionary] = []
 var candidate_by_id: Dictionary = {}
+var picker_series_catalog: Array = []
 var get_counts: Dictionary = {}
 var selected_a_id := ""
 var selected_b_id := ""
@@ -61,8 +65,12 @@ var back_button: Button
 var picker_page: Control
 var picker_title_label: Label
 var picker_back_button: Button
+var picker_filter: OptionButton
 var picker_scroll: ScrollContainer
 var picker_grid: GridContainer
+var picker_empty_label: Label
+var picker_filter_series_id := "all"
+var candidate_cache_signature := ""
 var candidate_cards_by_id: Dictionary = {}
 var candidate_images_by_id: Dictionary = {}
 var candidate_name_labels_by_id: Dictionary = {}
@@ -310,9 +318,17 @@ func _build_picker_page() -> void:
 	picker_title_label.add_theme_color_override("font_color", UI_BROWN)
 	picker_page.add_child(picker_title_label)
 
+	picker_filter = OptionButton.new()
+	picker_filter.name = "FusionSeriesFilter"
+	picker_filter.position = Vector2(99, 56)
+	picker_filter.size = Vector2(286, 52)
+	picker_filter.add_theme_font_size_override("font_size", 17)
+	picker_filter.item_selected.connect(_on_picker_filter_changed)
+	picker_page.add_child(picker_filter)
+
 	picker_scroll = ScrollContainer.new()
-	picker_scroll.position = Vector2(16, 62)
-	picker_scroll.size = Vector2(468, 466)
+	picker_scroll.position = Vector2(16, 116)
+	picker_scroll.size = Vector2(468, 412)
 	picker_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	picker_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	picker_scroll.scroll_deadzone = 12
@@ -327,8 +343,13 @@ func _build_picker_page() -> void:
 	picker_grid.add_theme_constant_override("v_separation", 8)
 	picker_scroll.add_child(picker_grid)
 
-func open_lab(parent_candidates: Array[Dictionary], counts: Dictionary, parent_a_id := "", parent_b_id := "") -> void:
+func open_lab(parent_candidates: Array[Dictionary], counts: Dictionary, parent_a_id := "", parent_b_id := "", series_data: Array = []) -> void:
+	var next_signature := _candidate_signature(parent_candidates)
+	if next_signature != candidate_cache_signature:
+		_clear_picker_card_cache()
+		candidate_cache_signature = next_signature
 	candidates = parent_candidates.duplicate(true)
+	picker_series_catalog = series_data.duplicate(true)
 	get_counts = counts.duplicate(true)
 	candidate_by_id.clear()
 	for entry in candidates:
@@ -343,6 +364,8 @@ func open_lab(parent_candidates: Array[Dictionary], counts: Dictionary, parent_a
 	result_image.material = null
 	result_new_label.visible = false
 	set_processing_state(false)
+	picker_filter_series_id = "all"
+	_refresh_picker_filters(true)
 	visible = true
 	_show_main_page()
 	refresh_selection(selected_a_id, selected_b_id, {}, false)
@@ -374,6 +397,8 @@ func set_language(value: String) -> void:
 		parent_b_heading.text = Localizer.text(language, "fusion_parent_b")
 	result_new_label.text = Localizer.text(language, "fusion_new")
 	refresh_selection(selected_a_id, selected_b_id, current_result, current_result_is_new)
+	_refresh_picker_filters(false)
+	_refresh_cached_candidate_language()
 	if picker_page.visible:
 		_rebuild_picker()
 
@@ -511,30 +536,117 @@ func _open_picker(slot: int) -> void:
 	picker_slot = slot
 	main_page.visible = false
 	picker_page.visible = true
+	picker_filter_series_id = "all"
+	_refresh_picker_filters(true)
+	picker_scroll.scroll_vertical = 0
 	_rebuild_picker()
 
 func _rebuild_picker() -> void:
 	if picker_grid == null:
 		return
-	for child in picker_grid.get_children():
-		child.free()
+	picker_title_label.text = Localizer.text(language, "fusion_select_parent", ["A" if picker_slot == 0 else "B"])
+	_ensure_picker_cards()
+	_apply_picker_filter()
+	_refresh_picker_selection()
+
+func _candidate_signature(entries: Array) -> String:
+	var ids := PackedStringArray()
+	for entry_value in entries:
+		if entry_value is Dictionary:
+			ids.append(str((entry_value as Dictionary).get("species_id", "")))
+	return "|".join(ids)
+
+func _clear_picker_card_cache() -> void:
+	if picker_grid != null:
+		for child in picker_grid.get_children():
+			child.free()
+	picker_empty_label = null
 	candidate_cards_by_id.clear()
 	candidate_images_by_id.clear()
 	candidate_name_labels_by_id.clear()
 	candidate_selected_badges_by_id.clear()
-	picker_title_label.text = Localizer.text(language, "fusion_select_parent", ["A" if picker_slot == 0 else "B"])
+
+func _candidate_display_series_id(entry: Dictionary) -> String:
+	var series_id := str(entry.get("series_id", ""))
+	var display_series_id := str(entry.get("fusion_display_series", ""))
+	if display_series_id.is_empty() and series_id == "hybrid":
+		display_series_id = str(entry.get("fusion_series", ""))
+	if display_series_id.is_empty():
+		display_series_id = series_id
+	return "jurejure" if display_series_id == "jure" else display_series_id
+
+func _series_has_candidates(series_id: String) -> bool:
+	for entry in candidates:
+		if _candidate_display_series_id(entry) == series_id:
+			return true
+	return false
+
+func _series_label_for_id(series_id: String) -> String:
+	var series_names: Dictionary = SERIES_LABELS.get(language, SERIES_LABELS["ja"])
+	return str(series_names.get(series_id, series_id.replace("_", " ").capitalize()))
+
+func _refresh_picker_filters(reset_selection: bool = false) -> void:
+	if picker_filter == null:
+		return
+	var requested_id := "all" if reset_selection else picker_filter_series_id
+	picker_filter.clear()
+	picker_filter.add_item(Localizer.text(language, "all"))
+	picker_filter.set_item_metadata(0, "all")
+	var seen: Dictionary = {}
+	var selected_index := 0
+	for series_value in picker_series_catalog:
+		if not series_value is Dictionary:
+			continue
+		var series: Dictionary = series_value
+		var series_id := str(series.get("series_id", ""))
+		if series_id.is_empty() or seen.has(series_id) or not _series_has_candidates(series_id):
+			continue
+		seen[series_id] = true
+		picker_filter.add_item(Localizer.series_name(language, series))
+		var item_index := picker_filter.item_count - 1
+		picker_filter.set_item_metadata(item_index, series_id)
+		if series_id == requested_id:
+			selected_index = item_index
+	for entry in candidates:
+		var series_id := _candidate_display_series_id(entry)
+		if series_id.is_empty() or seen.has(series_id):
+			continue
+		seen[series_id] = true
+		picker_filter.add_item(_series_label_for_id(series_id))
+		var item_index := picker_filter.item_count - 1
+		picker_filter.set_item_metadata(item_index, series_id)
+		if series_id == requested_id:
+			selected_index = item_index
+	picker_filter.select(selected_index)
+	picker_filter_series_id = str(picker_filter.get_item_metadata(selected_index))
+
+func _on_picker_filter_changed(index: int) -> void:
+	if index < 0 or index >= picker_filter.item_count:
+		return
+	picker_filter_series_id = str(picker_filter.get_item_metadata(index))
+	picker_scroll.scroll_vertical = 0
+	_apply_picker_filter()
+
+func _ensure_picker_empty_label() -> void:
+	if picker_empty_label == null:
+		picker_empty_label = Label.new()
+		picker_empty_label.name = "FusionPickerEmpty"
+		picker_empty_label.text = Localizer.text(language, "fusion_no_parents")
+		picker_empty_label.custom_minimum_size = Vector2(450, 100)
+		picker_empty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		picker_empty_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		picker_empty_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		picker_empty_label.add_theme_color_override("font_color", UI_BROWN)
+		picker_grid.add_child(picker_empty_label)
+
+func _ensure_picker_cards() -> void:
+	if not candidate_cards_by_id.is_empty():
+		return
 	if candidates.is_empty():
-		var empty_label := Label.new()
-		empty_label.text = Localizer.text(language, "fusion_no_parents")
-		empty_label.custom_minimum_size = Vector2(450, 100)
-		empty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		empty_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		empty_label.add_theme_color_override("font_color", UI_BROWN)
-		picker_grid.add_child(empty_label)
+		_ensure_picker_empty_label()
 		return
 	var selected_id := selected_a_id if picker_slot == 0 else selected_b_id
-	for candidate_index in range(candidates.size()):
-		var entry: Dictionary = candidates[candidate_index]
+	for entry in candidates:
 		var species_id := str(entry.get("species_id", ""))
 		var species_name := Localizer.species_name(language, entry)
 		var is_selected := species_id == selected_id
@@ -550,6 +662,8 @@ func _rebuild_picker() -> void:
 		button.mouse_force_pass_scroll_events = true
 		button.tooltip_text = species_name
 		button.set_meta("species_id", species_id)
+		button.set_meta("display_series_id", _candidate_display_series_id(entry))
+		button.set_meta("image_requested", false)
 		button.set_meta("selected_for_slot", is_selected)
 		_skin_candidate_card(button)
 		button.pressed.connect(_choose_candidate.bind(species_id))
@@ -558,7 +672,7 @@ func _rebuild_picker() -> void:
 		var image := TextureRect.new()
 		image.name = "SpeciesImage"
 		image.position = Vector2(12, 10)
-		image.size = Vector2(198, 144)
+		image.size = Vector2(198, 166)
 		image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		image.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -567,8 +681,8 @@ func _rebuild_picker() -> void:
 		var name_label := Label.new()
 		name_label.name = "SpeciesName"
 		name_label.text = species_name
-		name_label.position = Vector2(10, 155)
-		name_label.size = Vector2(202, 38)
+		name_label.position = Vector2(10, 178)
+		name_label.size = Vector2(202, 36)
 		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -577,18 +691,6 @@ func _rebuild_picker() -> void:
 		name_label.add_theme_color_override("font_color", UI_BROWN)
 		name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		button.add_child(name_label)
-
-		var count_label := Label.new()
-		count_label.name = "GetCount"
-		count_label.text = Localizer.text(language, "fusion_get_count", [int(get_counts.get(species_id, 0))])
-		count_label.position = Vector2(10, 193)
-		count_label.size = Vector2(202, 23)
-		count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		count_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		count_label.add_theme_font_size_override("font_size", 12)
-		count_label.add_theme_color_override("font_color", Color("#805f47"))
-		count_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		button.add_child(count_label)
 
 		var selected_badge := Label.new()
 		selected_badge.name = "SelectedBadge"
@@ -608,7 +710,46 @@ func _rebuild_picker() -> void:
 		candidate_images_by_id[species_id] = image
 		candidate_name_labels_by_id[species_id] = name_label
 		candidate_selected_badges_by_id[species_id] = selected_badge
-		candidate_image_requested.emit(entry, image, candidate_index < 6)
+	_ensure_picker_empty_label()
+
+func _apply_picker_filter() -> void:
+	var visible_index := 0
+	for entry in candidates:
+		var species_id := str(entry.get("species_id", ""))
+		if not candidate_cards_by_id.has(species_id):
+			continue
+		var card := candidate_cards_by_id[species_id] as Button
+		var matches := picker_filter_series_id == "all" or _candidate_display_series_id(entry) == picker_filter_series_id
+		card.visible = matches
+		if matches:
+			if not bool(card.get_meta("image_requested", false)):
+				card.set_meta("image_requested", true)
+				candidate_image_requested.emit(entry, candidate_images_by_id[species_id], visible_index < 6)
+			visible_index += 1
+	if picker_empty_label != null:
+		picker_empty_label.text = Localizer.text(language, "fusion_no_parents")
+		picker_empty_label.visible = visible_index == 0
+
+func _refresh_picker_selection() -> void:
+	var selected_id := selected_a_id if picker_slot == 0 else selected_b_id
+	for species_id_value in candidate_cards_by_id:
+		var species_id := str(species_id_value)
+		var is_selected := species_id == selected_id
+		var button := candidate_cards_by_id[species_id] as Button
+		button.button_pressed = is_selected
+		button.set_meta("selected_for_slot", is_selected)
+		(candidate_selected_badges_by_id[species_id] as Label).visible = is_selected
+
+func _refresh_cached_candidate_language() -> void:
+	for entry in candidates:
+		var species_id := str(entry.get("species_id", ""))
+		if not candidate_name_labels_by_id.has(species_id):
+			continue
+		var species_name := Localizer.species_name(language, entry)
+		(candidate_name_labels_by_id[species_id] as Label).text = species_name
+		(candidate_cards_by_id[species_id] as Button).tooltip_text = species_name
+	if picker_empty_label != null:
+		picker_empty_label.text = Localizer.text(language, "fusion_no_parents")
 
 func _choose_candidate(species_id: String) -> void:
 	parent_selected.emit(picker_slot, species_id)

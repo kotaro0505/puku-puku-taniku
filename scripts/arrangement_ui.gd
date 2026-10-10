@@ -43,6 +43,7 @@ const UI_BROWN := Color("#4a2618")
 
 var catalog_species:Array=[]
 var series_catalog:Array=[]
+var picker_series_catalog:Array=[]
 var pot_catalog:Array=[]
 var discovered:Dictionary={}
 var species_bests:Dictionary={}
@@ -198,9 +199,10 @@ void fragment() {
 func _exit_tree()->void:
 	_remove_web_multitouch_fallback()
 
-func configure(species_data:Array,series_data:Array,pots_data:Array,discovery:Dictionary,purchased_pots:Dictionary,arrangements:Array,capacity:int,puku_points:int,resolver:Callable,requester:Callable=Callable(),best_records:Dictionary={},locale:String="ja",sales_stage:int=0,design_unlocks:Dictionary={},iap_products:Dictionary={},restore_available:bool=false,restore_in_progress:bool=false,share_backgrounds:Array=[],background_unlocks:Dictionary={})->void:
+func configure(species_data:Array,series_data:Array,pots_data:Array,discovery:Dictionary,purchased_pots:Dictionary,arrangements:Array,capacity:int,puku_points:int,resolver:Callable,requester:Callable=Callable(),best_records:Dictionary={},locale:String="ja",sales_stage:int=0,design_unlocks:Dictionary={},iap_products:Dictionary={},restore_available:bool=false,restore_in_progress:bool=false,share_backgrounds:Array=[],background_unlocks:Dictionary={},picker_series_data:Array=[])->void:
 	catalog_species=species_data
 	series_catalog=series_data
+	picker_series_catalog=picker_series_data
 	pot_catalog=pots_data
 	discovered=discovery
 	owned_pots=purchased_pots
@@ -1048,19 +1050,23 @@ func _build_picker_page()->void:
 func _open_species_picker()->void:
 	if bool(current_arrangement.get("completed",false)):return
 	if editor_plants.size()>=MAX_PLANTS_PER_ARRANGEMENT:editor_message.text=GameLocalizer.text(language_code,"arrangement_max_plants",[MAX_PLANTS_PER_ARRANGEMENT]);return
-	_show_page(picker_page);_refresh_picker_filters();_refresh_species_picker();picker_scroll.scroll_vertical=0
+	_show_page(picker_page);_refresh_picker_filters(true);_refresh_species_picker();picker_scroll.scroll_vertical=0
 
-func _refresh_picker_filters()->void:
+func _refresh_picker_filters(reset_selection:bool=false)->void:
+	var selected_filter_id:="all"
+	if not reset_selection and picker_filter.item_count>0:selected_filter_id=str(picker_filter.get_item_metadata(picker_filter.selected))
 	picker_filter.clear();picker_filter.add_item(GameLocalizer.text(language_code,"all"));picker_filter.set_item_metadata(0,"all")
-	for series_value in series_catalog:
+	var selected_index:=0
+	for series_value in picker_series_catalog:
 		if not series_value is Dictionary:continue
 		var series:Dictionary=series_value;var series_id:=str(series.get("series_id",""))
 		if _available_species_entries(series_id).is_empty():continue
-		picker_filter.add_item(GameLocalizer.series_name(language_code,series));picker_filter.set_item_metadata(picker_filter.item_count-1,series_id)
-	picker_filter.select(0)
+		picker_filter.add_item(GameLocalizer.series_name(language_code,series));var item_index:=picker_filter.item_count-1;picker_filter.set_item_metadata(item_index,series_id)
+		if series_id==selected_filter_id:selected_index=item_index
+	picker_filter.select(selected_index)
 
 func _on_picker_filter_changed(_index:int)->void:
-	_refresh_species_picker()
+	picker_scroll.scroll_vertical=0;_refresh_species_picker()
 
 func _refresh_species_picker()->void:
 	_clear_children(picker_grid)
@@ -1071,17 +1077,16 @@ func _refresh_species_picker()->void:
 		var empty:=Label.new();empty.text=GameLocalizer.text(language_code,"picker_empty");empty.custom_minimum_size=Vector2(500,100);empty.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;empty.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;empty.add_theme_color_override("font_color",UI_CREAM);picker_grid.add_child(empty);return
 	for entry in available:
 		var species_id:=str(entry.get("species_id",""));var texture:=_resolve_texture(entry)
-		var card:=Button.new();card.custom_minimum_size=Vector2(248,150);_skin_button(card,Color("#f4e1bc"),15);_prepare_scroll_button(card);card.disabled=texture==null;picker_grid.add_child(card)
-		var image_frame:=Control.new();image_frame.position=Vector2(8,12);image_frame.size=Vector2(112,112);image_frame.clip_contents=true;image_frame.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(image_frame)
-		var image:=TextureRect.new();image.texture=texture;image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.mouse_filter=Control.MOUSE_FILTER_IGNORE;image_frame.add_child(image);_request_texture(entry,image,false)
-		var max_cm:=float(species_bests.get(species_id,0.0));var size_line:=GameLocalizer.text(language_code,"no_record_min") if max_cm<=0.0 else GameLocalizer.text(language_code,"max_cm",[max_cm])
-		var label:=Label.new();label.text=GameLocalizer.species_name(language_code,entry)+("\n"+GameLocalizer.text(language_code,"image_preparing") if texture==null else "\n"+size_line);label.position=Vector2(121,12);label.size=Vector2(117,126);label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;label.add_theme_font_size_override("font_size",13);label.add_theme_color_override("font_color",UI_BROWN);label.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(label)
+		var card:=Button.new();card.name="ArrangementSpecies_%s"%species_id;card.custom_minimum_size=Vector2(248,190);card.set_meta("species_id",species_id);_skin_button(card,Color("#f4e1bc"),15);_prepare_scroll_button(card);card.disabled=texture==null;picker_grid.add_child(card)
+		var image_frame:=Control.new();image_frame.position=Vector2(12,8);image_frame.size=Vector2(224,142);image_frame.clip_contents=true;image_frame.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(image_frame)
+		var image:=TextureRect.new();image.name="SpeciesImage";image.texture=texture;image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.mouse_filter=Control.MOUSE_FILTER_IGNORE;image_frame.add_child(image);_request_texture(entry,image,false)
+		var label:=Label.new();label.name="SpeciesName";label.text=GameLocalizer.species_name(language_code,entry);label.position=Vector2(10,151);label.size=Vector2(228,32);label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;label.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS;label.add_theme_font_size_override("font_size",15);label.add_theme_color_override("font_color",UI_BROWN);label.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(label)
 		if texture!=null:card.pressed.connect(_add_species_to_editor.bind(species_id))
 
 func _available_species_entries(series_id:String="all")->Array[Dictionary]:
 	var allowed_ids:Dictionary={}
 	if series_id!="all":
-		for series_value in series_catalog:
+		for series_value in picker_series_catalog:
 			if series_value is Dictionary and str(series_value.get("series_id",""))==series_id:
 				for species_id_value in series_value.get("species_ids",[]):allowed_ids[str(species_id_value)]=true
 				break
