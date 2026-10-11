@@ -7,7 +7,9 @@ const FONT_COLOR := Color("#4a2618")
 const FONT_SIZE := 19
 const CORNER_RADIUS := 20
 const BORDER_WIDTH := 3
-const PANEL_BOTTOM_MARGIN := 0.0
+const PANEL_BOTTOM_MARGIN := 24.0
+const TEXT_BUTTON_GAP := 12.0
+const PANEL_TEXT_TOP_MARGIN := 12.0
 
 
 static func apply(button: Button) -> void:
@@ -27,6 +29,19 @@ static func place_at_panel_bottom(button: Button, panel: Control, bottom_margin 
 		panel.position.y + panel.size.y - BUTTON_SIZE.y - bottom_margin
 	)
 	button.size = BUTTON_SIZE
+
+
+static func balance_text_above_button(text: Control, button: Button, panel: Control, gap := TEXT_BUTTON_GAP) -> void:
+	var overflow := text.position.y + text.size.y - (button.position.y - gap)
+	if overflow <= 0.0:
+		return
+	var minimum_text_y := panel.position.y + PANEL_TEXT_TOP_MARGIN
+	var upward_room := maxf(0.0, text.position.y - minimum_text_y)
+	var upward_shift := minf(overflow, upward_room)
+	text.position.y -= upward_shift
+	overflow -= upward_shift
+	if overflow > 0.0:
+		text.size.y = maxf(0.0, text.size.y - overflow)
 
 
 static func _style(background: Color, border: Color) -> StyleBoxFlat:

@@ -46,11 +46,11 @@ func _test_localized_continuation_copy() -> void:
 
 func _test_story_overlay_continuation_buttons() -> void:
 	var overlay_specs := [
-		{"overlay": OpeningStoryOverlayClass.new(), "button": "tap_hint", "panel_property": "text_panel", "text_property": "story_text", "panel_rect": Rect2(14, 586, 548, 414), "panel_bg": Color(0.105, 0.055, 0.035, 0.92)},
-		{"overlay": HabitatAwakeningOverlayClass.new(), "button": "instruction_label", "panel_property": "text_back", "text_property": "dialogue_label", "panel_rect": Rect2(24, 744, 528, 226), "panel_bg": Color(0.08, 0.06, 0.05, 0.90), "dialog_keys": HabitatAwakeningOverlayClass.DIALOG_KEYS},
-		{"overlay": SeedPodStoryOverlayClass.new(), "button": "tap_hint", "text_property": "story_text", "panel_rect": Rect2(14, 730, 548, 240), "panel_bg": Color(0.105, 0.055, 0.035, 0.92), "dialog_keys": SeedPodStoryOverlayClass.DIALOG_KEYS},
-		{"overlay": HabitatSecondAwakeningOverlayClass.new(), "button": "instruction_label", "text_property": "dialogue_label", "panel_rect": Rect2(24, 744, 528, 226), "panel_bg": Color(0.07, 0.045, 0.09, 0.92), "dialog_keys": HabitatSecondAwakeningOverlayClass.DIALOG_KEYS},
-		{"overlay": JureJureFirstEncounterOverlayClass.new(), "button": "tap_hint", "text_property": "dialogue_label", "panel_rect": Rect2(24, 758, 528, 220), "panel_bg": Color(0.08, 0.045, 0.025, 0.92), "dialog_keys": JureJureFirstEncounterOverlayClass.DIALOG_KEYS},
+		{"overlay": OpeningStoryOverlayClass.new(), "button": "tap_hint", "panel_property": "text_panel", "text_property": "story_text", "panel_rect": Rect2(14, 586, 548, 414), "panel_bg": Color(0.105, 0.055, 0.035, 0.92), "text_color": Color("#fff6df")},
+		{"overlay": HabitatAwakeningOverlayClass.new(), "button": "instruction_label", "panel_property": "text_back", "text_property": "dialogue_label", "panel_rect": Rect2(24, 744, 528, 226), "panel_bg": Color(0.08, 0.06, 0.05, 0.90), "text_color": Color("#fff6df"), "dialog_keys": HabitatAwakeningOverlayClass.DIALOG_KEYS},
+		{"overlay": SeedPodStoryOverlayClass.new(), "button": "tap_hint", "text_property": "story_text", "panel_rect": Rect2(14, 730, 548, 240), "panel_bg": Color(0.105, 0.055, 0.035, 0.92), "text_color": Color("#fff6df"), "dialog_keys": SeedPodStoryOverlayClass.DIALOG_KEYS},
+		{"overlay": HabitatSecondAwakeningOverlayClass.new(), "button": "instruction_label", "text_property": "dialogue_label", "panel_rect": Rect2(24, 744, 528, 226), "panel_bg": Color(0.07, 0.045, 0.09, 0.92), "text_color": Color("#fff7ff"), "dialog_keys": HabitatSecondAwakeningOverlayClass.DIALOG_KEYS},
+		{"overlay": JureJureFirstEncounterOverlayClass.new(), "button": "tap_hint", "text_property": "dialogue_label", "panel_rect": Rect2(24, 758, 528, 220), "panel_bg": Color(0.08, 0.045, 0.025, 0.92), "text_color": Color("#fff6df"), "dialog_keys": JureJureFirstEncounterOverlayClass.DIALOG_KEYS},
 	]
 	for spec_value in overlay_specs:
 		var spec: Dictionary = spec_value
@@ -69,12 +69,18 @@ func _test_story_overlay_continuation_buttons() -> void:
 				panel = overlay.find_child("StoryTextPanel", true, false) as Control
 			var dialogue_text := overlay.get(str(spec["text_property"])) as Control
 			_assert_standard_continue_button(button, panel, dialogue_text, locale, true)
+			if overlay is HabitatAwakeningOverlay and locale == "ja":
+				assert((dialogue_text as Label).text == "記録では、ここで間違いないはずなんだけど……。")
+				assert(button.position.is_equal_approx(Vector2(163, 898)))
+			assert(dialogue_text.get_theme_font_size("font_size") == 20)
+			assert(dialogue_text.get_theme_color("font_color").is_equal_approx(spec["text_color"]))
 			var expected_panel_rect: Rect2 = spec["panel_rect"]
 			assert(panel.position.is_equal_approx(expected_panel_rect.position))
 			assert(panel.size.is_equal_approx(expected_panel_rect.size))
 			var panel_style := panel.get_theme_stylebox("panel") as StyleBoxFlat
 			var expected_panel_bg: Color = spec["panel_bg"]
 			assert(panel_style != null and panel_style.bg_color.is_equal_approx(expected_panel_bg))
+			assert(panel_style.border_width_left == 2 and panel_style.corner_radius_top_left == 24)
 			var tap_area := overlay.find_child("StoryTapArea", true, false) as Button
 			assert(tap_area != null and tap_area.pressed.get_connections().size() == 1)
 			assert(button.get_parent() == tap_area.get_parent() and button.get_index() > tap_area.get_index())
@@ -133,8 +139,10 @@ func _assert_standard_continue_button(button: Button, panel: Control, dialogue_t
 	if panel_bottom_aligned:
 		var panel_rect := panel.get_global_rect()
 		var dialogue_rect := dialogue_text.get_global_rect()
-		assert(is_equal_approx(button_rect.end.y, panel_rect.end.y))
-		assert(button_rect.position.y - dialogue_rect.end.y >= 5.5, "continue button is too close to dialogue: button=%s dialogue=%s" % [button_rect, dialogue_rect])
+		assert(is_equal_approx(panel_rect.end.y - button_rect.end.y, StoryContinueButtonStyleClass.PANEL_BOTTOM_MARGIN))
+		assert(button_rect.position.y - dialogue_rect.end.y >= StoryContinueButtonStyleClass.TEXT_BUTTON_GAP - 0.5, "continue button is too close to dialogue: button=%s dialogue=%s" % [button_rect, dialogue_rect])
+		var text_label := dialogue_text as Label
+		assert(text_label.get_line_count() * text_label.get_line_height() <= text_label.size.y + 0.5, "dialogue text is clipped: lines=%d line_height=%d size=%s" % [text_label.get_line_count(), text_label.get_line_height(), text_label.size])
 	var visible_text_rect := _visible_label_text_rect(dialogue_text as Label)
 	assert(not button_rect.intersects(visible_text_rect), "continue button overlaps visible text: button=%s text=%s" % [button_rect, visible_text_rect])
 	assert(button.pressed.get_connections().size() >= 1)
@@ -154,6 +162,9 @@ func _test_scripted_dialog_continuation(game: Node) -> void:
 	game._start_scripted_dialog("release_polish_b", [{"speaker": "panda", "text": "test"}])
 	await get_tree().process_frame
 	assert(game.intro_overlay.visible)
+	assert(game.intro_dialog_panel.size.is_equal_approx(Vector2(496, 255)))
+	var greenhouse_panel_style := game.intro_dialog_panel.get_theme_stylebox("panel") as StyleBoxFlat
+	assert(greenhouse_panel_style != null and greenhouse_panel_style.bg_color.is_equal_approx(Color(0.97, 0.90, 0.75, 0.96)))
 	assert(game.intro_continue_button.text == Localizer.text(game.language_code, "continue"))
 	_assert_standard_continue_button(game.intro_continue_button, game.intro_dialog_panel, game.intro_dialogue_label, game.language_code)
 	game.collection_complete_overlay.visible = true

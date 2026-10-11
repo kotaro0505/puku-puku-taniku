@@ -200,6 +200,7 @@ func _build_ui() -> void:
 	instruction_label.name = "StoryContinueButton"
 	StoryContinueButtonStyleClass.apply(instruction_label)
 	StoryContinueButtonStyleClass.place_at_panel_bottom(instruction_label, text_back)
+	StoryContinueButtonStyleClass.balance_text_above_button(dialogue_label, instruction_label, text_back)
 	instruction_label.pressed.connect(advance)
 	add_child(instruction_label)
 

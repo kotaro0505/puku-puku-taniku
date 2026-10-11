@@ -97,6 +97,7 @@ func _build_ui() -> void:
 	tap_hint.name = "StoryContinueButton"
 	StoryContinueButtonStyleClass.apply(tap_hint)
 	StoryContinueButtonStyleClass.place_at_panel_bottom(tap_hint, text_panel)
+	StoryContinueButtonStyleClass.balance_text_above_button(story_text, tap_hint, text_panel)
 	tap_hint.pressed.connect(advance_page)
 	add_child(tap_hint)
 
@@ -175,5 +176,6 @@ func _show_page(index: int) -> void:
 	StoryContinueButtonStyleClass.place_at_panel_bottom(tap_hint, text_panel)
 	story_text.text = Localizer.text(language_code, PAGE_TEXT_KEYS[index])
 	story_text.add_theme_font_size_override("font_size", int(PAGE_FONT_SIZES[index]))
+	StoryContinueButtonStyleClass.balance_text_above_button(story_text, tap_hint, text_panel)
 	story_text.modulate = Color.WHITE
 	page_count_label.text = "%d / %d" % [index + 1, PAGE_TEXTURES.size()]

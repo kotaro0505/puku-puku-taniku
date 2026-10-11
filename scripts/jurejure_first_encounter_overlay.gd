@@ -99,6 +99,7 @@ func _build_ui() -> void:
 	tap_hint.name = "StoryContinueButton"
 	StoryContinueButtonStyleClass.apply(tap_hint)
 	StoryContinueButtonStyleClass.place_at_panel_bottom(tap_hint, text_panel)
+	StoryContinueButtonStyleClass.balance_text_above_button(dialogue_label, tap_hint, text_panel)
 	tap_hint.pressed.connect(advance)
 	add_child(tap_hint)
 
