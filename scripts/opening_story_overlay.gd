@@ -4,6 +4,7 @@ extends Control
 signal story_finished(replay_mode: bool)
 
 const Localizer = preload("res://scripts/game_localizer.gd")
+const StoryContinueButtonStyleClass = preload("res://scripts/story_continue_button_style.gd")
 
 const PAGE_TEXTURES: Array[Texture2D] = [
 	preload("res://assets/opening_story/page-1.jpg"),
@@ -23,7 +24,7 @@ var story_text: Label
 var page_count_label: Label
 var tap_area: Button
 var page_tween: Tween
-var tap_hint: Label
+var tap_hint: Button
 var language_code := "ja"
 
 func _ready() -> void:
@@ -92,15 +93,11 @@ func _build_ui() -> void:
 	page_count_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(page_count_label)
 
-	tap_hint = Label.new()
-	tap_hint.name = "StoryTapHint"
-	tap_hint.position = Vector2(148, 954)
-	tap_hint.size = Vector2(280, 36)
-	tap_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	tap_hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	tap_hint.add_theme_font_size_override("font_size", 14)
-	tap_hint.add_theme_color_override("font_color", Color("#d9c8aa"))
-	tap_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tap_hint = Button.new()
+	tap_hint.name = "StoryContinueButton"
+	StoryContinueButtonStyleClass.apply(tap_hint)
+	StoryContinueButtonStyleClass.place_at_panel_bottom(tap_hint, text_panel)
+	tap_hint.pressed.connect(advance_page)
 	add_child(tap_hint)
 
 	tap_area = Button.new()
@@ -111,6 +108,7 @@ func _build_ui() -> void:
 	tap_area.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	tap_area.pressed.connect(advance_page)
 	add_child(tap_area)
+	tap_hint.move_to_front()
 
 func start(as_replay := false, start_page := 0, requested_language := "ja") -> void:
 	if page_tween and page_tween.is_valid():
@@ -174,6 +172,7 @@ func _show_page(index: int) -> void:
 		text_panel.size.y=414
 		story_text.position.y=600
 		story_text.size.y=346
+	StoryContinueButtonStyleClass.place_at_panel_bottom(tap_hint, text_panel)
 	story_text.text = Localizer.text(language_code, PAGE_TEXT_KEYS[index])
 	story_text.add_theme_font_size_override("font_size", int(PAGE_FONT_SIZES[index]))
 	story_text.modulate = Color.WHITE

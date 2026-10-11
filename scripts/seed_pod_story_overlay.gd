@@ -5,6 +5,7 @@ signal story_finished
 
 const Localizer = preload("res://scripts/game_localizer.gd")
 const DialoguePortraits = preload("res://scripts/dialogue_portraits.gd")
+const StoryContinueButtonStyleClass = preload("res://scripts/story_continue_button_style.gd")
 const STORY_TEXTURE: Texture2D = preload("res://assets/story/first-awakening-seed-pod.jpg")
 const IMAGE_AREA_SIZE := Vector2(576, 744)
 const DIALOG_KEYS := [
@@ -24,7 +25,7 @@ var story_text: Label
 var story_image: TextureRect
 var speaker_label: Label
 var speaker_portrait: TextureRect
-var tap_hint: Label
+var tap_hint: Button
 var text_tween: Tween
 var fade_tween: Tween
 var transitioning := false
@@ -113,15 +114,11 @@ func _build_ui() -> void:
 	story_text.z_index = 2
 	add_child(story_text)
 
-	tap_hint = Label.new()
-	tap_hint.name = "StoryTapHint"
-	tap_hint.position = Vector2(148, 970)
-	tap_hint.size = Vector2(280, 36)
-	tap_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	tap_hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	tap_hint.add_theme_font_size_override("font_size", 14)
-	tap_hint.add_theme_color_override("font_color", Color("#d9c8aa"))
-	tap_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tap_hint = Button.new()
+	tap_hint.name = "StoryContinueButton"
+	StoryContinueButtonStyleClass.apply(tap_hint)
+	StoryContinueButtonStyleClass.place_at_panel_bottom(tap_hint, text_panel)
+	tap_hint.pressed.connect(advance)
 	add_child(tap_hint)
 
 	var tap_area := Button.new()
@@ -132,6 +129,7 @@ func _build_ui() -> void:
 	tap_area.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	tap_area.pressed.connect(advance)
 	add_child(tap_area)
+	tap_hint.move_to_front()
 
 	exit_fade = ColorRect.new()
 	exit_fade.name = "ExitFade"

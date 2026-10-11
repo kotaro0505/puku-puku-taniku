@@ -5,6 +5,7 @@ signal awakening_finished
 
 const Localizer = preload("res://scripts/game_localizer.gd")
 const DialoguePortraits = preload("res://scripts/dialogue_portraits.gd")
+const StoryContinueButtonStyleClass = preload("res://scripts/story_continue_button_style.gd")
 const DIALOG_KEYS := [
 	"second_awakening_light",
 	"second_awakening_panda",
@@ -20,7 +21,7 @@ var page_index := 0
 var dialogue_label: Label
 var speaker_label: Label
 var speaker_portrait: TextureRect
-var instruction_label: Label
+var instruction_label: Button
 var color_tint: ColorRect
 var light_layer: Control
 var light_tweens: Array[Tween] = []
@@ -61,6 +62,7 @@ func _build_ui() -> void:
 		light_layer.add_child(light)
 
 	var text_back := Panel.new()
+	text_back.name = "StoryTextPanel"
 	text_back.position = Vector2(24, 744)
 	text_back.size = Vector2(528, 226)
 	text_back.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -99,20 +101,20 @@ func _build_ui() -> void:
 	dialogue_label.add_theme_constant_override("outline_size", 4)
 	dialogue_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(dialogue_label)
-	instruction_label = Label.new()
-	instruction_label.position = Vector2(138, 924)
-	instruction_label.size = Vector2(300, 30)
-	instruction_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	instruction_label.add_theme_font_size_override("font_size", 13)
-	instruction_label.add_theme_color_override("font_color", Color("#ead7ef"))
-	instruction_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	instruction_label = Button.new()
+	instruction_label.name = "StoryContinueButton"
+	StoryContinueButtonStyleClass.apply(instruction_label)
+	StoryContinueButtonStyleClass.place_at_panel_bottom(instruction_label, text_back)
+	instruction_label.pressed.connect(advance)
 	add_child(instruction_label)
 	var tap_area := Button.new()
+	tap_area.name = "StoryTapArea"
 	tap_area.flat = true
 	tap_area.focus_mode = Control.FOCUS_NONE
 	tap_area.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	tap_area.pressed.connect(advance)
 	add_child(tap_area)
+	instruction_label.move_to_front()
 
 
 func start(requested_language := "ja") -> void:

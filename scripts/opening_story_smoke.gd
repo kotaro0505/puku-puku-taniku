@@ -69,6 +69,9 @@ func _ready()->void:
 			story.start(true,page_index,locale)
 			await get_tree().process_frame
 			assert(story.story_text.get_line_count()*story.story_text.get_line_height()<=story.story_text.size.y)
+			assert(story.tap_hint is Button and story.tap_hint.text==Localizer.text(locale,"continue"))
+			assert(story.text_panel.get_global_rect().grow(.5).encloses(story.tap_hint.get_global_rect()))
+			assert(not _visible_label_text_rect(story.story_text).intersects(story.tap_hint.get_global_rect()))
 	story.start(false,0,"ja")
 	for expected_page in range(4):
 		assert(story.current_page_index==expected_page)
@@ -103,3 +106,11 @@ func _ready()->void:
 		assert(DirAccess.remove_absolute(ProjectSettings.globalize_path(LEGACY_FINITE_SAVE_PATH))==OK)
 	print("OPENING_STORY_SMOKE_OK cold_start=true language_first=true restart=true pages=4 layout=20_centered_full_border fade=true greenhouse=true locales=3")
 	get_tree().quit()
+
+
+func _visible_label_text_rect(label:Label)->Rect2:
+	var content_height:=minf(label.size.y,float(label.get_line_count()*label.get_line_height()))
+	var top:=label.global_position.y
+	if label.vertical_alignment==VERTICAL_ALIGNMENT_CENTER:top+=(label.size.y-content_height)*.5
+	elif label.vertical_alignment==VERTICAL_ALIGNMENT_BOTTOM:top+=label.size.y-content_height
+	return Rect2(Vector2(label.global_position.x,top),Vector2(label.size.x,content_height))

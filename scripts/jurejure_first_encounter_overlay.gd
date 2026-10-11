@@ -4,6 +4,7 @@ extends Control
 signal story_finished
 
 const Localizer = preload("res://scripts/game_localizer.gd")
+const StoryContinueButtonStyleClass = preload("res://scripts/story_continue_button_style.gd")
 const STORY_TEXTURE: Texture2D = preload("res://assets/story/jurejure-first-encounter.jpg")
 const DIALOG_KEYS := [
 	"jurejure_first_peccary",
@@ -18,7 +19,7 @@ var transitioning := false
 var speaker_label: Label
 var speaker_portrait: TextureRect
 var dialogue_label: Label
-var tap_hint: Label
+var tap_hint: Button
 var fade_tween: Tween
 var text_tween: Tween
 
@@ -94,13 +95,11 @@ func _build_ui() -> void:
 	dialogue_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(dialogue_label)
 
-	tap_hint = Label.new()
-	tap_hint.position = Vector2(168, 936)
-	tap_hint.size = Vector2(240, 30)
-	tap_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	tap_hint.add_theme_font_size_override("font_size", 13)
-	tap_hint.add_theme_color_override("font_color", Color("#d9c8aa"))
-	tap_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tap_hint = Button.new()
+	tap_hint.name = "StoryContinueButton"
+	StoryContinueButtonStyleClass.apply(tap_hint)
+	StoryContinueButtonStyleClass.place_at_panel_bottom(tap_hint, text_panel)
+	tap_hint.pressed.connect(advance)
 	add_child(tap_hint)
 
 	var tap_area := Button.new()
@@ -111,6 +110,7 @@ func _build_ui() -> void:
 	tap_area.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	tap_area.pressed.connect(advance)
 	add_child(tap_area)
+	tap_hint.move_to_front()
 
 
 func start(requested_language := "ja") -> void:

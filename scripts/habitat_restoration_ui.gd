@@ -9,6 +9,7 @@ signal ending_slide_started(kind: String, index: int, payload: Dictionary)
 
 const Localizer = preload("res://scripts/game_localizer.gd")
 const DialoguePortraitsClass = preload("res://scripts/dialogue_portraits.gd")
+const StoryContinueButtonStyleClass = preload("res://scripts/story_continue_button_style.gd")
 const REQUIRED_PLANTS := 5
 const LAMP_PANEL_POSITION := Vector2(93, 772)
 const FINAL_IMAGE_PATH := "res://assets/ending/restoration-finale.jpg"
@@ -192,6 +193,7 @@ func _build_ending() -> void:
 	wash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ending_layer.add_child(wash)
 	var card := PanelContainer.new()
+	card.name = "StoryTextPanel"
 	card.position = Vector2(38, 78)
 	card.size = Vector2(500, 818)
 	card.add_theme_stylebox_override("panel", _panel_style(Color(0.12, 0.18, 0.13, 0.84), Color("#f3df9d"), 30, 3))
@@ -220,7 +222,8 @@ func _build_ending() -> void:
 	character_row.add_theme_constant_override("separation", -12)
 	content.add_child(character_row)
 	ending_continue = Button.new()
-	ending_continue.custom_minimum_size = Vector2(300, 68)
+	ending_continue.name = "StoryContinueButton"
+	StoryContinueButtonStyleClass.apply(ending_continue)
 	ending_continue.pressed.connect(_advance_ending)
 	content.add_child(ending_continue)
 	ending_layer.visible = false
