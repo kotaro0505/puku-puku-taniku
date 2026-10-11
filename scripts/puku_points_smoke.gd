@@ -140,7 +140,7 @@ func _test_panda_rescue(game)->void:
 	game._request_rescue_reward_ad();await get_tree().create_timer(.8).timeout
 	assert(game.puku_balance_units==1100 and game.normal_round_free_plays==0 and not game.rescue_reward_in_progress and not game.play_active)
 	game._close_shop();game._update_play_ui()
-	assert(game.play_open_button.text=="たねをまく\n1ぷくコイン消費")
+	assert(game.play_open_button.text=="たねを蒔く\n1ぷくコイン消費")
 	game._start_greenhouse_play("normal");assert(game.play_active and game.normal_round_free_plays==0 and game.puku_balance_units==100 and game.endless_economy_seed_cost_units==1000)
 	assert(game.FOREST_GACHA_SPIN_COST==1)
 	game.play_active=false

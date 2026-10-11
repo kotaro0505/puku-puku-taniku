@@ -35,6 +35,21 @@ func _test_catalog_and_collection_rarity(game)->void:
 	assert(int(game._catalog_entry("golden_laui").get("gold_star_count",0))==2)
 
 func _test_language_and_symbol_safety(game)->void:
+	var japanese_texts:Dictionary=Localizer.TEXT.get("ja",{})
+	for key_value in japanese_texts:
+		var key:=str(key_value);var displayed_text:=str(japanese_texts[key_value])
+		assert("タネ" not in displayed_text)
+		assert("まいて" not in displayed_text and "まいた" not in displayed_text and "まこう" not in displayed_text)
+		if "まく" in displayed_text:assert(key=="restoration_join_peccary_carry")
+	assert(Localizer.text("ja","opening_story_4").contains("古いたね袋") and Localizer.text("ja","opening_story_4").contains("多肉植物のたね"))
+	assert(Localizer.text("ja","awakening_sow")=="たねがまだ少し残ってる。\nここに蒔いてみよう。")
+	assert(Localizer.text("ja","play_normal_seed_round")=="たねを蒔く\n1ぷくコイン消費")
+	assert(Localizer.text("ja","series_seed_remaining")=="シリーズのたね\n残り %d粒")
+	assert(Localizer.text("ja","seed_mystery_detail").begins_with("謎のたねパック"))
+	assert(Localizer.text("ja","post_ending_greenhouse_girl_4")=="これからも、いっぱいたね蒔こ！")
+	assert(Localizer.text("hiragana","awakening_sow").contains("まいて"))
+	assert(Localizer.text("hiragana","play_normal_seed_round")=="たねを まく\n1ぷくこいん しょうひ")
+	assert(Localizer.text("en","play_normal_seed_round")=="Plant seeds\nUse 1 Puku Coin")
 	var major_runtime_keys:=[
 		"habitat_intro_1","research_reward_title","shop_rescue_offer","shop_chatter_touch",
 		"shop_season_new_year","old_page_intro_1","volume_intro_1","bustamante_gift","pinwheel_intro_1",
@@ -68,6 +83,7 @@ func _test_language_and_symbol_safety(game)->void:
 	assert(FileAccess.file_exists("res://scripts/ui_symbol_icon.gd") and not FileAccess.file_exists("res://scripts/star_rating.gd"))
 	var main_source:=FileAccess.get_file_as_string("res://scripts/main.gd")
 	var get_overlay_source:=FileAccess.get_file_as_string("res://scripts/species_get_overlay.gd")
+	assert(main_source.contains("たねを蒔く") and main_source.contains("使用たね"))
 	assert(not main_source.contains("StarRating") and not main_source.contains("GoldStars") and not main_source.contains('Localizer.text(language_code,"super_rare")'))
 	assert(not get_overlay_source.contains("StarRating") and not get_overlay_source.contains("rarity_label") and not get_overlay_source.contains("star_rating"))
 

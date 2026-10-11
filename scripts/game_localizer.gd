@@ -28,7 +28,7 @@ const TEXT := {
 		"opening_story_1": "ある日、\n\nガーデニングが大好きな女の子が、\n\n古い倉庫のすみで、ほこりをかぶった\n\n一冊の本を見つけました。\n\n「なんだろう、これ……」",
 		"opening_story_2": "ほこりを払い、みんなで本を見てみると——\n\nそれは、古い植物の本のようでした。",
 		"opening_story_3": "ページを開くと、そこには見たことのない植物がたくさん描かれていました。\n\nぷっくりした葉。変わったかたち。不思議な色。\n\nそこには、「多肉植物」という言葉が。\n\n「こんな植物、本当にあったのかな……」",
-		"opening_story_4": "翌日、お花屋さんのパンダが、\n\n古いタネ袋を見つけました。\n\n「これ、なんのタネだろう？」\n\n3人は顔を見合わせました。\n\n「もしかして……多肉植物のタネ！？」\n\n3人は、そのタネを蒔いてみることにしました。",
+		"opening_story_4": "翌日、お花屋さんのパンダが、\n\n古いたね袋を見つけました。\n\n「これ、なんのたねだろう？」\n\n3人は顔を見合わせました。\n\n「もしかして……多肉植物のたね！？」\n\n3人は、そのたねを蒔いてみることにしました。",
 		"panda_shop_name": "パンダのお店",
 		"armadillo_name": "アルマジロ",
 		"story_speaker_girl": "女の子",
@@ -40,15 +40,15 @@ const TEXT := {
 		"jurejure_peccary_name": "ペッカリー",
 		"daily_seed_gift": "今日も来てくれてありがとう。\nたね（12粒）×1セット GET！",
 		"intro_old_seed": "はい、これ。きみの分の1粒。古いから、芽が出るかは分からないけど…",
-		"intro_old_seed_get": "古い種 ×1 GET",
+		"intro_old_seed_get": "古いたね ×1 GET",
 		"old_seed_reaction_sprout": "見て！芽が出たよ！",
 		"old_seed_reaction_trio": "多肉植物だ！！",
 		"old_seed_reaction_girl": "信じられない！",
 		"old_seed_reaction_growth": "どんどん大きくなるよ！",
-		"story_colorata_1": "本当に多肉植物の種だったなんて！",
+		"story_colorata_1": "本当に多肉植物のたねだったなんて！",
 		"story_colorata_2": "この本によると、これは『%s』っていう種類らしいよ！",
 		"story_colorata_3": "すごい。世界に多肉植物が帰って来てくれたんだ……！",
-		"story_trio_1": "聞いて！ ぼくが蒔いたタネも育ったんだ！\nこの本によると『%s』っていうみたい。",
+		"story_trio_1": "聞いて！ ぼくが蒔いたたねも育ったんだ！\nこの本によると『%s』っていうみたい。",
 		"story_trio_2": "僕もだよ！『%s』っていう種類らしい。",
 		"story_trio_3": "信じられない。\n長い間失われていた植物を\nこうして見られるなんて…。",
 		"story_trio_4": "とってもきれい。そして、\nぷくぷくしてて可愛いね！",
@@ -58,7 +58,7 @@ const TEXT := {
 		"awakening_empty_1": "記録では、ここで間違いないはずなんだけど……。",
 		"awakening_empty_2": "何もないね……。",
 		"awakening_overharvest": "乱獲や密猟も、絶滅の大きな\n原因だったみたいだ…。",
-		"awakening_sow": "種がまだ少し残ってる。\nここにまいてみよう。",
+		"awakening_sow": "たねがまだ少し残ってる。\nここに蒔いてみよう。",
 		"awakening_surprise": "なんだ！？",
 		"awakening_memory": "……この場所、\n昔ここにあった多肉たちを\n思い出しているように見える……。",
 		"awakening_thanks": "素敵な想い出を見せてくれて、\nありがとう。",
@@ -70,7 +70,7 @@ const TEXT := {
 		"awakening_sprout_look": "見て！",
 		"awakening_sprout_panda": "あ、芽が出てる！",
 		"seed_pod_story_1": "見て！ 空から何か降りて来たよ！",
-		"seed_pod_story_2": "タネのさや……かな？",
+		"seed_pod_story_2": "たねのさや……かな？",
 		"seed_pod_story_3": "こっちは……図鑑？",
 		"mystery_catalog_prompt": "図鑑、見てみようよ！",
 		"mystery_catalog_tutorial_1": "見て。この図鑑、さっき育てた多肉が載ってる。",
@@ -200,7 +200,7 @@ const TEXT := {
 		"post_crisis_greenhouse_girl": "じゃあ、とにかく大きな株を作って持っていってみない？",
 		"post_crisis_greenhouse_armadillo_2": "育った多肉は、今までどおり原生地にぼくが持って行くよ。",
 		"post_crisis_greenhouse_panda_2": "ぼくも一緒に行くよ！",
-		"post_crisis_greenhouse_girl_2": "私はどんどん種を蒔くね！",
+		"post_crisis_greenhouse_girl_2": "私はどんどんたねを蒔くね！",
 		"post_crisis_greenhouse_panda_3": "うん。やってみよう！",
 		"restoration_join_home_armadillo": "そうだ！ジュレジュレ団にも手伝ってもらおうよ。",
 		"restoration_join_home_panda": "そうしよう！ジュレジュレ団、いつも原生地にいるもんね！",
@@ -294,7 +294,7 @@ const TEXT := {
 		"jurejure_battle_choice_title": "ぷくぷくバトルで勝負する？",
 		"jurejure_battle_yes": "バトルする",
 		"jurejure_battle_no": "バトルしない",
-		"jurejure_battle_sow": "たねをまく",
+		"jurejure_battle_sow": "たねを蒔く",
 		"jurejure_battle_enemy_score": "%.1f cm",
 		"jurejure_battle_player_score": "%.1f cm",
 		"jurejure_battle_win": "勝利！",
@@ -337,7 +337,7 @@ const TEXT := {
 		"tutorial_normal_new_panda": "見て！\nはじめて見る品種が出てる！",
 		"tutorial_normal_new_girl": "ジュレる前に収穫しよう！",
 		"tutorial_harvest_tap": "育った株をタップで収穫！",
-		"main_play": "たねをまく",
+		"main_play": "たねを蒔く",
 		"main_shop": "パンダのお店",
 		"main_arrangement": "寄せ植え",
 		"main_forest_gacha": "森のガチャ",
@@ -363,16 +363,16 @@ const TEXT := {
 		"habitat_observe_note": "自然の中で、ゆっくり育っています。",
 		"puku_intro_1": "そうだ！育てた多肉は\nうちのお店で買い取るよ！",
 		"puku_intro_2": "大きい株ほど\n高く買い取るからね！",
-		"initial_seed_stock_girl": "……あれ？ さやの中に種ができてる。",
+		"initial_seed_stock_girl": "……あれ？ さやの中にたねができてる。",
 		"initial_seed_stock_armadillo": "12粒あるみたいだね。まずは育ててみよう。",
 		"initial_seed_stock_received": "たね（12粒）×1セット　GET！",
-		"initial_seed_stock_endless_girl": "原生地がくれたさやから種が\nどんどん出てくるよ！",
-		"initial_seed_stock_endless_armadillo": "すごい！さっそくまいてみようよ！",
-		"tutorial_normal_pre_sow_endless": "じゃあ、まいてみるね！",
+		"initial_seed_stock_endless_girl": "原生地がくれたさやからたねが\nどんどん出てくるよ！",
+		"initial_seed_stock_endless_armadillo": "すごい！さっそく蒔いてみようよ！",
+		"tutorial_normal_pre_sow_endless": "じゃあ、蒔いてみるね！",
 		"first_normal_cost_notice": "1ぷくコインを消費します",
 		"seed_pod_tutorial_girl": "さやが光ってる！",
 		"seed_pod_tutorial_armadillo": "育てると少しずつ光が溜まっていくみたいだね。",
-		"seed_pod_tutorial_panda": "見て！ 種がたくさん出てきたよ！",
+		"seed_pod_tutorial_panda": "見て！ たねがたくさん出てきたよ！",
 		"seed_pod_tutorial_received": "たね（12粒）×3セット　GET！",
 		"puku_buyback_1": "そうだ！育てた多肉は\nうちのお店で買い取るよ！",
 		"puku_buyback_2": "大きい株ほど\n高く買い取るからね！",
@@ -390,7 +390,7 @@ const TEXT := {
 		,"tutorial_play2": "育てるの、上手だね！\nアルマジロが昔の原生地について調べてくれているよ。"
 		,"tutorial_play3": "準備できたよ！多肉の原生地へ行けるようになったよ。\n原生地を見に行ってみよう。"
 		,"armadillo_intro_panda_1": "アルマジロから、古い資料の研究報告があるみたいだよ。"
-		,"armadillo_intro_panda_2": "昔の植物や古いタネをずっと調べてくれているんだ。"
+		,"armadillo_intro_panda_2": "昔の植物や古いたねをずっと調べてくれているんだ。"
 		,"armadillo_intro_self": "古い記録を調べていたら、気になる原種の手がかりを見つけたんだ。"
 		,"armadillo_pinwheel_gift": "記録をたどって復活できたピンウィールだ。\nきみに育ててほしい。"
 		,"armadillo_mystery_1": "いま原生地に落ちている『謎のたね』を研究しているんだ。"
@@ -406,21 +406,21 @@ const TEXT := {
 		,"puku_gain": "ぷくコイン +%d"
 		,"puku_gauge_reward": "ぷくコイン +%d"
 		,"seed_pod_gauge_reward": "たね（12粒）×%dセット GET！"
-		,"play_choose_seed": "どのたねをまく？"
+		,"play_choose_seed": "どのたねを蒔く？"
 		,"seed_remaining": "たね\n残り %d粒"
-		,"series_seed_remaining": "シリーズ種\n残り %d粒"
-		,"play_old_seed": "古いたねをまく　1粒　残り%d袋"
-		,"play_first_old_seed": "古いたねをまく"
-		,"play_normal_seed": "たねをまく　12粒　残り%dセット"
-		,"play_normal_seed_endless": "たねをまく"
-		,"play_normal_seed_round": "たねをまく\n1ぷくコイン消費"
-		,"play_normal_seed_round_free": "たねをまく　無料"
+		,"series_seed_remaining": "シリーズのたね\n残り %d粒"
+		,"play_old_seed": "古いたねを蒔く　1粒　残り%d袋"
+		,"play_first_old_seed": "古いたねを蒔く"
+		,"play_normal_seed": "たねを蒔く　12粒　残り%dセット"
+		,"play_normal_seed_endless": "たねを蒔く"
+		,"play_normal_seed_round": "たねを蒔く\n1ぷくコイン消費"
+		,"play_normal_seed_round_free": "たねを蒔く　無料"
 		,"play_normal_seed_round_help": "パンダのお手伝いをする\n＋1ぷくコイン"
 		,"normal_sets_endless": "通常のたね：∞"
 		,"normal_sets_held": "たね（12粒）×%dセット"
-		,"play_volume_seed": "ボリュームパックをまく　36粒　残り%d袋"
-		,"play_premium_seed": "プレミアムたねをまく　24粒　残り%d袋"
-		,"play_mystery_seed": "謎種パックをまく　5粒　残り%d袋"
+		,"play_volume_seed": "ボリュームパックのたねを蒔く　36粒　残り%d袋"
+		,"play_premium_seed": "プレミアムのたねを蒔く　24粒　残り%d袋"
+		,"play_mystery_seed": "謎のたねパックを蒔く　5粒　残り%d袋"
 		,"old_seed_name": "古いたね"
 		,"bags_held": "%s %d袋"
 		,"shop_choose_category": "なにを見ますか？"
@@ -428,8 +428,8 @@ const TEXT := {
 		,"shop_category_catalog": "図鑑\n新シリーズ"
 		,"shop_category_gacha": "森の\nガチャ"
 		,"shop_category_back": "カテゴリへもどる"
-		,"shop_seed_info": "通常のタネは、さやゲージが満ちるとできます"
-		,"normal_seed_price": "通常のタネは販売していません"
+		,"shop_seed_info": "通常のたねは、さやゲージが満ちるとできます"
+		,"normal_seed_price": "通常のたねは販売していません"
 		,"price_tbd": "ぷく価格は準備中"
 		,"locked": "未解禁"
 		,"buy_bundle": "買う\n3セット  1ぷくコイン"
@@ -570,29 +570,29 @@ const TEXT := {
 		,"shop_tab_normal": "普通"
 		,"shop_tab_volume": "ボリューム"
 		,"shop_tab_premium": "プレミアム"
-		,"shop_tab_mystery": "謎種"
+		,"shop_tab_mystery": "謎のたね"
 		,"shop_category_short": "カテゴリ"
 		,"shop_catalog_preparing": "図鑑は初GETで\n自動記録されます"
 		,"yes": "はい"
 		,"no": "いいえ"
 		,"restore": "復元する"
-		,"ad_seed": "広告を見て種をもらう"
+		,"ad_seed": "広告を見てたねをもらう"
 		,"ad_preparing": "広告を準備中…"
 		,"seed_normal_card": "たね（12粒）・所持 %dセット\n不思議なさやにできる基本のたね"
 		,"seed_volume_card": "36粒入り・所持 %d袋\n%s"
 		,"seed_premium_card": "24粒入り・所持 %d袋\n%s"
 		,"seed_mystery_card": "5粒入り・所持 %d袋\n%s"
-		,"seed_series_name": "%sの種"
+		,"seed_series_name": "%sのたね"
 		,"seed_series_card": "1粒・所持 %d粒\n不思議なさやから入手"
 		,"unlock_mystery_species": "謎品種を1種発見で解禁"
 		,"not_enough_puku": "ぷくコインが足りません"
-		,"seed_series_price_tbd": "タネは不思議なさやから受け取れます"
-		,"seed_price_tbd": "タネは不思議なさやから受け取れます"
+		,"seed_series_price_tbd": "たねは不思議なさやから受け取れます"
+		,"seed_price_tbd": "たねは不思議なさやから受け取れます"
 		,"seed_normal_bought": "たね（12粒）を%dセット購入しました"
 		,"seed_normal_detail": "たね（12粒）×3セット\n不思議なさやにできる基本のたね。いろんな多肉が育ちます。\n新品種4%"
-		,"seed_volume_detail": "ボリュームパックたね　36粒 / 袋\n原生地のたねをたっぷり袋詰め。じっくり大物を狙えます。\n新種 約3%"
-		,"seed_premium_detail": "プレミアムたね　24粒 / 袋\n原生地のたねから、パンダが珍しそうな粒を選びました。\n新種 約3%"
-		,"seed_mystery_detail": "謎種パック　5粒 / 袋\n何が育つかわからない、不思議なたね。\n発見済みのパック対象・謎品種100%"
+		,"seed_volume_detail": "ボリュームパックのたね　36粒 / 袋\n原生地のたねをたっぷり袋詰め。じっくり大物を狙えます。\n新種 約3%"
+		,"seed_premium_detail": "プレミアムのたね　24粒 / 袋\n原生地のたねから、パンダが珍しそうな粒を選びました。\n新種 約3%"
+		,"seed_mystery_detail": "謎のたねパック　5粒 / 袋\n何が育つかわからない、不思議なたね。\n発見済みのパック対象・謎品種100%"
 		,"pot_missing": "この鉢は見つかりませんでした"
 		,"pot_owned": "この鉢は購入済みです"
 		,"pot_locked": "この鉢はまだ購入できません"
@@ -628,8 +628,8 @@ const TEXT := {
 		,"research_reward_claimed": "%sをどうぞ。\n未発見の品種は、図鑑のシルエットを手がかりに探してみてね。"
 		,"result_hidden_registered": "%sを図鑑登録！"
 		,"arrangement_default_name": "寄せ植え %d"
-		,"shop_rescue_offer": "タネなくなっちゃった？\n少し分けてあげるよ！"
-		,"shop_rescue_success": "はい、どうぞ！大事にまいてみてね。"
+		,"shop_rescue_offer": "たねなくなっちゃった？\n少し分けてあげるよ！"
+		,"shop_rescue_success": "はい、どうぞ！大事に蒔いてみてね。"
 		,"shop_puku_rescue_offer": "ぷくが足りないの？\nお店を手伝ってくれたら、1ぷくコイン渡すよ！"
 		,"shop_puku_rescue_success": "お手伝いありがとう！\n1ぷくコインを受け取ってね。"
 		,"shop_help_action": "お手伝いする"
@@ -656,17 +656,17 @@ const TEXT := {
 		,"shop_season_spring": "だんだんと暖かい日が増えてきたね。多肉もどんどん育つね！"
 		,"old_page_intro_1": "これ、原生地で拾ったんだ。\n古くて汚れているけど、図鑑のページみたいじゃない？"
 		,"old_page_intro_2": "アルマジロ君なら、きっと元の図鑑に復元できると思うよ。"
-		,"volume_intro_1": "不思議なさやに、たくさんのタネができたよ！"
+		,"volume_intro_1": "不思議なさやに、たくさんのたねができたよ！"
 		,"volume_intro_2": "36粒入ってるから、普通のたねよりたっぷり楽しめるよ。\nこれなら、じっくりどデカい多肉を育てられるね！"
 		,"bustamante_gift": "いつも来てくれてありがとう。\nストリクチフローラ ブスタマンテを1株、君にあげるよ。"
 		,"pinwheel_intro_1": "古い資料を調べていたら、育て方の手がかりを見つけたんだ。"
-		,"pinwheel_intro_2": "ぼくたちのタネで試してみたら、また一株育てられたよ。"
+		,"pinwheel_intro_2": "ぼくたちのたねで試してみたら、また一株育てられたよ。"
 		,"pinwheel_intro_3": "図鑑で照合すると、ピンウィールという原種らしい。\nきみに託すよ。"
 		,"armadillo_idle_1": "また会えたね。ゆっくりしていって！"
 		,"armadillo_idle_2": "今日の多肉も元気そうだね。"
 		,"armadillo_idle_3": "土の匂いって落ち着くよね。"
 		,"research_intro_1": "おや？ そのたね……。\nもしかして、原生地で拾ったのかい？"
-		,"research_intro_2": "じつはぼく、この『謎のたね』を研究してるんだ。\nまだ、何の種なのかはわからないんだけどね。"
+		,"research_intro_2": "じつはぼく、この『謎のたね』を研究してるんだ。\nまだ、何のたねなのかはわからないんだけどね。"
 		,"research_intro_3": "よかったら、そのたねを研究させてもらえないかな？"
 		,"research_return_offer": "謎のたねを持ってきてくれたんだね。\n研究のために、まとめて預かってもいいかい？"
 		,"restore_offer": "この記録は、不思議な図鑑へ自動で反映されるよ。"
@@ -1130,9 +1130,9 @@ const TEXT := {
 		,"play_normal_seed_round_help": "ぱんだの おてつだいをする\n＋1ぷくこいん"
 		,"normal_sets_endless": "ふつうの たね：むげん"
 		,"normal_sets_held": "たね（12つぶ）×%dせっと"
-		,"play_volume_seed": "ぼりゅーむぱっくを まく　36つぶ　のこり%dふくろ"
-		,"play_premium_seed": "ぷれみあむたねを まく　24つぶ　のこり%dふくろ"
-		,"play_mystery_seed": "なぞたねぱっくを まく　5つぶ　のこり%dふくろ"
+		,"play_volume_seed": "ぼりゅーむぱっくの たねを まく　36つぶ　のこり%dふくろ"
+		,"play_premium_seed": "ぷれみあむの たねを まく　24つぶ　のこり%dふくろ"
+		,"play_mystery_seed": "なぞの たねぱっくを まく　5つぶ　のこり%dふくろ"
 		,"old_seed_name": "ふるい たね"
 		,"bags_held": "%s %dふくろ"
 		,"shop_choose_category": "なにを みますか？"
@@ -1282,7 +1282,7 @@ const TEXT := {
 		,"shop_tab_normal": "ふつう"
 		,"shop_tab_volume": "ぼりゅーむ"
 		,"shop_tab_premium": "ぷれみあむ"
-		,"shop_tab_mystery": "なぞたね"
+		,"shop_tab_mystery": "なぞの たね"
 		,"shop_category_short": "しゅるい"
 		,"shop_catalog_preparing": "ずかんは はじめての げっとで\nじどうきろくされます"
 		,"yes": "はい"
@@ -1302,9 +1302,9 @@ const TEXT := {
 		,"seed_price_tbd": "たねは ふしぎな さやから もらえます"
 		,"seed_normal_bought": "たね（12つぶ）を%dせっと かったよ"
 		,"seed_normal_detail": "たね（12つぶ）×3せっと\nふしぎな さやに できる きほんの たねです。\nしんひんしゅ4%"
-		,"seed_volume_detail": "ぼりゅーむぱっく　36つぶ / ふくろ\nげんせいちの たねを たっぷり ふくろづめ しました。\nしんしゅ やく3%"
-		,"seed_premium_detail": "ぷれみあむたね　24つぶ / ふくろ\nぱんだが めずらしそうな つぶを えらびました。\nしんしゅ やく3%"
-		,"seed_mystery_detail": "なぞたねぱっく　5つぶ / ふくろ\nなにが そだつか わからない ふしぎな たねです。\nみつけた なぞの ひんしゅが でます"
+		,"seed_volume_detail": "ぼりゅーむぱっくの たね　36つぶ / ふくろ\nげんせいちの たねを たっぷり ふくろづめ しました。\nしんしゅ やく3%"
+		,"seed_premium_detail": "ぷれみあむの たね　24つぶ / ふくろ\nぱんだが めずらしそうな つぶを えらびました。\nしんしゅ やく3%"
+		,"seed_mystery_detail": "なぞの たねぱっく　5つぶ / ふくろ\nなにが そだつか わからない ふしぎな たねです。\nみつけた なぞの ひんしゅが でます"
 		,"pot_missing": "この はちは みつかりませんでした"
 		,"pot_owned": "この はちは もう もっています"
 		,"pot_locked": "この はちは まだ かえません"
@@ -2260,9 +2260,9 @@ static func pot_name(language:String,entry:Dictionary)->String:
 static func seed_name(language:String,seed_type:String,japanese_name:String)->String:
 	var names:={
 		"normal":{"hiragana":"ふつうの たね","en":"Normal Seeds"},
-		"volume":{"hiragana":"ぼりゅーむぱっく","en":"Volume Pack"},
-		"premium":{"hiragana":"ぷれみあむたね","en":"Premium Seeds"},
-		"mystery":{"hiragana":"なぞたねぱっく","en":"Mystery Pack"}
+		"volume":{"hiragana":"ぼりゅーむぱっくの たね","en":"Volume Pack"},
+		"premium":{"hiragana":"ぷれみあむの たね","en":"Premium Seeds"},
+		"mystery":{"hiragana":"なぞの たねぱっく","en":"Mystery Pack"}
 	}
 	if not names.has(seed_type):return japanese_name
 	return str(names[seed_type].get(normalize_language(language),japanese_name))

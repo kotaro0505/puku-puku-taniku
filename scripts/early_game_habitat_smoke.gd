@@ -226,7 +226,7 @@ func _ready() -> void:
 	assert(game.scripted_dialog_kind == "initial_seed_stock")
 	assert(game.normal_seed_bags == 0 and game.scripted_dialog_pages.size() == 2)
 	assert(game.intro_dialogue_label.text == Localizer.text("ja", "initial_seed_stock_endless_girl"))
-	assert(game.intro_dialogue_label.text == "原生地がくれたさやから種が\nどんどん出てくるよ！")
+	assert(game.intro_dialogue_label.text == "原生地がくれたさやからたねが\nどんどん出てくるよ！")
 	game._advance_scripted_dialog()
 	assert(game.intro_dialogue_label.text == Localizer.text("ja", "initial_seed_stock_endless_armadillo"))
 	game._advance_scripted_dialog()
