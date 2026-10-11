@@ -41,8 +41,11 @@ const GHOST_CENTER_RATIOS := [
 	Vector2(0.40, 0.58), Vector2(0.70, 0.61)
 ]
 const GHOST_SIZE_SCALES := [0.62, 0.76, 0.58, 0.70, 0.66, 0.96, 1.24, 0.90, 1.08, 0.82, 1.28]
-const GHOST_PEAK_ALPHAS := [0.33, 0.38, 0.30, 0.36, 0.34, 0.54, 0.62, 0.50, 0.58, 0.47, 0.66]
 const GHOST_SETTLE_ALPHAS := [0.18, 0.22, 0.16, 0.20, 0.19, 0.32, 0.40, 0.29, 0.35, 0.26, 0.42]
+const GHOST_REVEAL_INITIAL_SCALE := 0.90
+const GHOST_REVEAL_DURATION := 2.40
+const GHOST_REVEAL_STAGGER_SECONDS := 0.10
+const GHOST_BASE_COLOR := Color(0.72, 0.92, 1.0, 0.0)
 const SPROUT_TEXTURES: Array[Texture2D] = [
 	preload("res://assets/plants/habitat/sprite-colorata.png"),
 	preload("res://assets/plants/habitat/sprite-affinis.png"),
@@ -73,6 +76,7 @@ var ghosts: Array[TextureRect] = []
 var rain_drops: Array[Dictionary] = []
 var rng := RandomNumberGenerator.new()
 var sow_animation_played := false
+var ghost_reveal_tweens: Array[Tween] = []
 
 func _ready() -> void:
 	name = "HabitatAwakeningOverlay"
@@ -109,7 +113,7 @@ func _build_ui() -> void:
 		ghost.size = Vector2(132, 132)
 		ghost.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		ghost.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		ghost.modulate = Color(0.72, 0.92, 1.0, 0.0)
+		ghost.modulate = GHOST_BASE_COLOR
 		ghost.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		ghost_layer.add_child(ghost)
 		ghosts.append(ghost)
@@ -217,6 +221,7 @@ func _build_ui() -> void:
 		})
 
 func start(requested_language := "ja") -> void:
+	_stop_ghost_reveal_animation()
 	language_code = Localizer.normalize_language(requested_language)
 	page_index = 0
 	rain_active = false
@@ -226,9 +231,10 @@ func start(requested_language := "ja") -> void:
 	waiting_for_arrival_lookaround = true
 	darkness.color.a = 0.12
 	rain_tint.color.a = 0.0
+	_layout_ghosts()
 	for ghost in ghosts:
-		ghost.modulate.a = 0.0
-		ghost.scale = Vector2.ONE
+		ghost.modulate = GHOST_BASE_COLOR
+		ghost.scale = Vector2.ONE * GHOST_REVEAL_INITIAL_SCALE
 	for sprout_group in sprout_layer.get_children():
 		sprout_group.modulate = Color.WHITE
 		for sprout_part in sprout_group.get_children():
@@ -276,6 +282,7 @@ func _layout_ghosts() -> void:
 		var ghost := ghosts[index]
 		var ghost_side := side * float(GHOST_SIZE_SCALES[index])
 		ghost.size = Vector2(ghost_side, ghost_side)
+		ghost.pivot_offset = ghost.size * 0.5
 		ghost.position = Vector2(area.x * GHOST_CENTER_RATIOS[index].x, area.y * GHOST_CENTER_RATIOS[index].y) - ghost.size * 0.5
 
 func _layout_sprouts() -> void:
@@ -385,13 +392,22 @@ func _begin_memory_reveal() -> void:
 	)
 
 func _show_ghosts() -> void:
-	var stagger_seconds := 0.40 / maxf(1.0, float(ghosts.size() - 1))
+	_stop_ghost_reveal_animation()
 	for index in ghosts.size():
 		var ghost := ghosts[index]
+		ghost.modulate = GHOST_BASE_COLOR
+		ghost.scale = Vector2.ONE * GHOST_REVEAL_INITIAL_SCALE
 		var tween := create_tween()
-		tween.tween_interval(float(index) * stagger_seconds)
-		tween.tween_property(ghost, "modulate:a", float(GHOST_PEAK_ALPHAS[index]), 0.42)
-		tween.tween_property(ghost, "modulate:a", float(GHOST_SETTLE_ALPHAS[index]), 0.36)
+		ghost_reveal_tweens.append(tween)
+		tween.tween_interval(float(index) * GHOST_REVEAL_STAGGER_SECONDS)
+		tween.tween_property(ghost, "modulate:a", float(GHOST_SETTLE_ALPHAS[index]), GHOST_REVEAL_DURATION).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tween.parallel().tween_property(ghost, "scale", Vector2.ONE, GHOST_REVEAL_DURATION).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+func _stop_ghost_reveal_animation() -> void:
+	for tween in ghost_reveal_tweens:
+		if tween != null and tween.is_valid():
+			tween.kill()
+	ghost_reveal_tweens.clear()
 
 func _begin_rain_softening() -> void:
 	transitioning = true
@@ -408,6 +424,7 @@ func _begin_rain_softening() -> void:
 func _begin_sprout_reveal() -> void:
 	transitioning = true
 	_set_dialogue_visible(false)
+	_stop_ghost_reveal_animation()
 	var reveal := create_tween().set_parallel()
 	for ghost in ghosts:
 		reveal.tween_property(ghost, "position:y", ghost.position.y + 110.0, 0.75)

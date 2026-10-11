@@ -1,8 +1,10 @@
 extends Node
 
 const Localizer = preload("res://scripts/game_localizer.gd")
+const HabitatAwakeningOverlayClass = preload("res://scripts/habitat_awakening_overlay.gd")
 
 func _ready() -> void:
+	await _assert_memory_ghost_reveal()
 	var game = load("res://main.tscn").instantiate()
 	add_child(game)
 	await get_tree().process_frame
@@ -272,6 +274,33 @@ func _ready() -> void:
 
 	print("EARLY_GAME_HABITAT_SMOKE_OK empty=true dormant=true awakening=rain+ghosts+three_sprouts_no_glow promise=two_pages observation=true items=pod+catalog image_fade=true return_dialog=5 stock=round12 catalog_tutorial=4 player_start=true shop=true beacon=retired settlement=true")
 	get_tree().quit()
+
+func _assert_memory_ghost_reveal() -> void:
+	var overlay := HabitatAwakeningOverlayClass.new()
+	add_child(overlay)
+	await get_tree().process_frame
+	overlay.start("ja")
+	assert(is_equal_approx(overlay.GHOST_REVEAL_DURATION, 2.40))
+	assert(is_equal_approx(overlay.GHOST_REVEAL_STAGGER_SECONDS, 0.10))
+	for ghost in overlay.ghosts:
+		assert(is_zero_approx(ghost.modulate.a))
+		assert(ghost.scale.is_equal_approx(Vector2.ONE * overlay.GHOST_REVEAL_INITIAL_SCALE))
+	overlay._show_ghosts()
+	await get_tree().create_timer(0.32).timeout
+	assert(overlay.ghosts[0].modulate.a > overlay.ghosts[-1].modulate.a)
+	assert(overlay.ghosts[0].scale.x > overlay.ghosts[-1].scale.x)
+	var total_duration: float = overlay.GHOST_REVEAL_DURATION + overlay.GHOST_REVEAL_STAGGER_SECONDS * float(overlay.ghosts.size() - 1)
+	assert(total_duration >= 3.0 and total_duration <= 3.5)
+	await get_tree().create_timer(total_duration).timeout
+	for index in overlay.ghosts.size():
+		assert(is_equal_approx(overlay.ghosts[index].modulate.a, float(overlay.GHOST_SETTLE_ALPHAS[index])))
+		assert(overlay.ghosts[index].scale.is_equal_approx(Vector2.ONE))
+	overlay.start("ja")
+	for ghost in overlay.ghosts:
+		assert(is_zero_approx(ghost.modulate.a))
+		assert(ghost.scale.is_equal_approx(Vector2.ONE * overlay.GHOST_REVEAL_INITIAL_SCALE))
+	overlay.queue_free()
+	await get_tree().process_frame
 
 func _prepare_trio_complete(game: Node) -> void:
 	game.opening_finished = true
