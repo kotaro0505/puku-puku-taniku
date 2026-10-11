@@ -17,7 +17,7 @@ func _binomial_probability(n:int,k:int,p:float)->float:
 	return _combination(n,k)*pow(p,k)*pow(1.0-p,n-k)
 
 func _ready()->void:
-	var balance:Dictionary=JellyBalanceClass.endless_normal_trial_balance()
+	var balance:Dictionary=JellyBalanceClass.FORMAL.duplicate(true)
 	var economy=MainScript.new()
 	var survival_sums:Dictionary={}
 	for target in TARGETS:survival_sums[target]=0.0
@@ -26,7 +26,7 @@ func _ready()->void:
 		plant.setup({"species_id":"economy_probe"},170000+sample_index,null,null,true,balance)
 		for target in TARGETS:
 			plant.fast_forward_to_diameter(float(target))
-			var jelly_probability:float=SucculentClass.jelly_probability_for_interval(0.0,plant.age,plant.jelly_safe_end_seconds,plant.jelly_ramp_end_seconds,plant.jelly_final_chance)
+			var jelly_probability:float=SucculentClass.jelly_probability_for_interval(0.0,plant.age,plant.jelly_rates_per_second)
 			survival_sums[target]=float(survival_sums[target])+(1.0-jelly_probability)
 		plant.free()
 	var rows:Array=[]
@@ -62,7 +62,7 @@ func _ready()->void:
 		})
 		net_by_target[target]=average_net
 	assert(float(net_by_target[20.0])<0.0 and float(net_by_target[30.0])<float(net_by_target[50.0]))
-	print("PUKU_ECONOMY_BALANCE_REPORT settings=35/35/22/8 safe=3.8-6.2 final=6% round_seeds=12 entry_cost=1.00 samples=",SAMPLE_SEEDS," rows=",JSON.stringify(rows))
+	print("PUKU_ECONOMY_BALANCE_REPORT jelly_rates=1/2/3/4% boundaries=5/10/15 round_seeds=12 entry_cost=1.00 samples=",SAMPLE_SEEDS," rows=",JSON.stringify(rows))
 	print("PUKU_ECONOMY_BALANCE_SMOKE_OK targets=20-120 round_model=true")
 	economy.free()
 	get_tree().quit()

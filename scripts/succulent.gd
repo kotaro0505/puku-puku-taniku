@@ -122,25 +122,19 @@ var target_offset := Vector3.ZERO
 var rng := RandomNumberGenerator.new()
 var label: Label
 const GROWTH_CM_PER_SECOND := 1.365625
-const JELLY_CHANCE_FINAL := 0.06
 const GROWTH_RHYTHM_AMPLITUDE := 0.10
+const JELLY_STAGE_ENDS := [5.0,10.0,15.0]
 
 var visual_scale := 0.18
 var plant_sprite: Sprite3D
 var contact_shadow: MeshInstance3D
 var is_special := false
-var jelly_safe_end_seconds := 4.5
-var jelly_ramp_end_seconds := 13.0
 var growth_rhythm_period := 22.0
 var growth_rhythm_phase := 0.0
 var growth_rhythm_amplitude := GROWTH_RHYTHM_AMPLITUDE
 var growth_speed_multiplier := 1.0
-var individual_growth_multiplier := 1.0
-var jelly_final_chance := JELLY_CHANCE_FINAL
-var resistance_type := "normal"
-var base_resistance_type := "normal"
-var is_slow_sticky := false
-var is_resilient := false
+var jelly_rates_per_second:Array[float]=[0.01,0.02,0.03,0.04]
+var jelly_rng:=RandomNumberGenerator.new()
 var jelly_permission:Callable
 var jelly_checks_enabled := true
 var sway_phase := 0.0
@@ -148,31 +142,12 @@ var sway_phase := 0.0
 func setup(species: Dictionary, seed_value: int, screen_label: Label, _danger: Label, logic_only := false, balance_override:Dictionary = {}) -> void:
 	data = species
 	rng.seed = seed_value
+	jelly_rng.seed = int(seed_value) ^ 0x5A17B3C9
 	sway_phase = rng.randf_range(0.0, TAU)
 	is_special = rng.randf() < 0.10
-	# Every plant gets a short guaranteed establishment period. Its later
-	# vulnerability is individual: both the safe period and the time needed to
-	# reach the common 6%/second mature risk vary continuously.
 	var balance:=balance_override if not balance_override.is_empty() else JellyBalanceClass.effective()
-	jelly_final_chance=float(balance.final_chance);growth_speed_multiplier=float(balance.growth_speed);growth_rhythm_amplitude=float(balance.rhythm_amplitude)
-	individual_growth_multiplier=1.0;is_slow_sticky=false;is_resilient=false
-	jelly_safe_end_seconds = rng.randf_range(float(balance.safe_min), float(balance.safe_max))
-	var ramp_roll := rng.randf()
-	base_resistance_type=JellyBalanceClass.resistance_for_roll(ramp_roll,balance);resistance_type=base_resistance_type
-	var ramp_min:=float(balance[base_resistance_type+"_min"]);var ramp_max:=float(balance[base_resistance_type+"_max"])
-	# Conversion is a second, one-time roll only after the base short type wins.
-	# At 0%, no extra RNG is consumed, preserving the exact legacy profile.
-	if base_resistance_type=="short" and float(balance.slow_short_rate)>0.0:
-		var slow_roll:=rng.randf()
-		if JellyBalanceClass.slow_sticky_for_roll(base_resistance_type,slow_roll,balance):
-			is_slow_sticky=true;resistance_type="slow_sticky"
-			if float(balance.slow_resilient_rate)>0.0:is_resilient=JellyBalanceClass.resilient_for_roll(base_resistance_type,true,rng.randf(),balance)
-			individual_growth_multiplier=rng.randf_range(float(balance.slow_growth_min),float(balance.slow_growth_max))
-			ramp_min=float(balance.slow_ramp_min);ramp_max=float(balance.slow_ramp_max)
-	if base_resistance_type=="short" and not is_slow_sticky and float(balance.regular_short_resilient_rate)>0.0:
-		is_resilient=JellyBalanceClass.resilient_for_roll(base_resistance_type,false,rng.randf(),balance)
-	if is_resilient:jelly_final_chance=float(balance.resilient_final_chance)
-	jelly_ramp_end_seconds=jelly_safe_end_seconds+rng.randf_range(ramp_min,ramp_max)
+	jelly_rates_per_second=JellyBalanceClass.rate_values(balance)
+	growth_speed_multiplier=float(balance.get("growth_speed",1.0));growth_rhythm_amplitude=float(balance.get("rhythm_amplitude",GROWTH_RHYTHM_AMPLITUDE))
 	growth_rhythm_period = rng.randf_range(16.0, 28.0)
 	growth_rhythm_phase = rng.randf_range(0.0, TAU)
 	label = screen_label
@@ -303,8 +278,8 @@ func simulate(delta: float) -> void:
 	visual_scale = .18 + (diameter_cm - 1.6) * .058
 	_update_visual(delta)
 	if jelly_checks_enabled:
-		var jelly_probability := jelly_probability_for_interval(age - delta, delta, jelly_safe_end_seconds, jelly_ramp_end_seconds,jelly_final_chance)
-		if rng.randf() < jelly_probability and (not jelly_permission.is_valid() or bool(jelly_permission.call())): jelly()
+		var jelly_probability := jelly_probability_for_interval(age-delta,delta,jelly_rates_per_second)
+		if jelly_rng.randf()<jelly_probability and (not jelly_permission.is_valid() or bool(jelly_permission.call())):jelly()
 
 func _integrated_growth_multiplier(start_time: float, end_time: float) -> float:
 	# Integrate 1 + amplitude*sin(omega*t+phase) exactly. The multiplier stays
@@ -316,30 +291,38 @@ func _integrated_growth_multiplier(start_time: float, end_time: float) -> float:
 	)
 
 func effective_growth_speed_multiplier()->float:
-	return growth_speed_multiplier*individual_growth_multiplier
+	return growth_speed_multiplier
 
-func development_trait_text()->String:
-	var type_name:=str({"short":"短命","normal":"普通","long":"長命","ultra":"超長命"}.get(base_resistance_type,base_resistance_type))
-	return "%s\n%s / %s\n成長×%.2f\n最終%.1f%%"%[type_name,"遅育" if is_slow_sticky else "通常育","強健" if is_resilient else "標準",individual_growth_multiplier,jelly_final_chance*100.0]
+static func jelly_stage_index(at_age:float)->int:
+	if at_age<5.0:return 0
+	if at_age<10.0:return 1
+	if at_age<15.0:return 2
+	return 3
 
-static func jelly_probability_for_interval(start_age: float, delta: float, safe_end_seconds := 4.5, ramp_end_seconds := 13.0, final_chance:=JELLY_CHANCE_FINAL) -> float:
-	# This is the single source of truth for jelly probability. Integrating the
-	# smoothly varying hazard over the whole frame makes the result FPS independent.
-	if delta <= 0.0: return 0.0
-	var end_age := start_age + delta
-	var integrated_hazard := _integrate_hazard_segment(start_age,end_age,safe_end_seconds,ramp_end_seconds,0.0,final_chance)
-	var constant_start := maxf(start_age, ramp_end_seconds)
-	if end_age > constant_start:
-		integrated_hazard += -log(1.0 - final_chance) * (end_age - constant_start)
-	return 1.0 - exp(-integrated_hazard)
+static func jelly_probability_for_interval(start_age:float,delta:float,rates_per_second:Array=[]) -> float:
+	# Each stage stores a probability per full second. Multiplying the survival
+	# factors for every crossed segment makes the result independent of frame rate.
+	if delta<=0.0:return 0.0
+	var rates:Array=JellyBalanceClass.rate_values(JellyBalanceClass.FORMAL) if rates_per_second.is_empty() else rates_per_second
+	if rates.size()<4:return 0.0
+	var cursor:=maxf(0.0,start_age)
+	var end_age:=maxf(cursor,start_age+delta)
+	var survival:=1.0
+	while cursor<end_age:
+		var stage:=jelly_stage_index(cursor)
+		var stage_end:=float(JELLY_STAGE_ENDS[stage]) if stage<3 else end_age
+		var segment_end:=minf(end_age,stage_end)
+		var segment_seconds:=segment_end-cursor
+		var chance_per_second:=clampf(float(rates[stage]),0.0,1.0)
+		if chance_per_second>=1.0:return 1.0
+		if chance_per_second>0.0:survival*=pow(1.0-chance_per_second,segment_seconds)
+		cursor=segment_end
+	return clampf(1.0-survival,0.0,1.0)
 
-static func jelly_chance_per_second(at_age: float, safe_end_seconds := 4.5, ramp_end_seconds := 13.0, final_chance:=JELLY_CHANCE_FINAL) -> float:
-	var hazard := 0.0
-	if at_age > safe_end_seconds and at_age < ramp_end_seconds:
-		hazard = _smooth_hazard(at_age,safe_end_seconds,ramp_end_seconds,0.0,final_chance)
-	elif at_age >= ramp_end_seconds:
-		hazard = -log(1.0-final_chance)
-	return 1.0 - exp(-hazard)
+static func jelly_chance_per_second(at_age:float,rates_per_second:Array=[]) -> float:
+	var rates:Array=JellyBalanceClass.rate_values(JellyBalanceClass.FORMAL) if rates_per_second.is_empty() else rates_per_second
+	if rates.size()<4:return 0.0
+	return clampf(float(rates[jelly_stage_index(maxf(0.0,at_age))]),0.0,1.0)
 
 func fast_forward_to_diameter(target_cm:float)->void:
 	var clamped_target_cm:=maxf(1.6,target_cm)
@@ -355,22 +338,6 @@ func fast_forward_to_diameter(target_cm:float)->void:
 	# integral at the approximate age can round microscopically below a story
 	# threshold and make otherwise deterministic smoke tests intermittent.
 	age=(low+high)*.5;growth_time=target_growth;diameter_cm=clamped_target_cm;visual_scale=.18+(diameter_cm-1.6)*.058;_update_visual(0.0)
-
-static func _smooth_hazard(at_age: float, segment_start: float, segment_end: float, start_chance: float, end_chance: float) -> float:
-	var t := clampf((at_age - segment_start) / (segment_end - segment_start), 0.0, 1.0)
-	return lerpf(-log(1.0 - start_chance), -log(1.0 - end_chance), smoothstep(0.0, 1.0, t))
-
-static func _integrate_hazard_segment(start_age: float, end_age: float, segment_start: float, segment_end: float, start_chance: float, end_chance: float) -> float:
-	var clipped_start := maxf(start_age, segment_start)
-	var clipped_end := minf(end_age, segment_end)
-	if clipped_end <= clipped_start: return 0.0
-	var length := segment_end - segment_start
-	var t0 := (clipped_start - segment_start) / length
-	var t1 := (clipped_end - segment_start) / length
-	var smooth_integral := (pow(t1, 3.0) - 0.5 * pow(t1, 4.0)) - (pow(t0, 3.0) - 0.5 * pow(t0, 4.0))
-	var start_hazard := -log(1.0 - start_chance)
-	var end_hazard := -log(1.0 - end_chance)
-	return start_hazard * (clipped_end - clipped_start) + (end_hazard - start_hazard) * length * smooth_integral
 
 func _update_visual(delta: float) -> void:
 	if plant_sprite == null: return

@@ -3,235 +3,142 @@ extends Node
 const JellyBalanceClass = preload("res://scripts/jelly_balance.gd")
 const SucculentClass = preload("res://scripts/succulent.gd")
 
+const SAMPLE_COUNT := 20000
+const FORMAL_RATES:Array[float] = [0.01, 0.02, 0.03, 0.04]
+
 var sample_species := {
-	"species_id":"colorata","name_ja":"コロラータ","rarity":"通常",
-	"visual_variant":"colorata","colors":["7f9f91","d35f6f"]
+	"species_id":"colorata", "name_ja":"コロラータ",
+	"visual_variant":"colorata", "colors":["7f9f91", "d35f6f"]
 }
 
-func _force_base_type(balance:Dictionary,type:String)->void:
-	for key in ["short","normal","long","ultra"]:
-		balance[key+"_weight"]=100.0 if key==type else 0.0
+func _approx(actual:float, expected:float, tolerance:=0.000001)->void:
+	assert(absf(actual-expected)<=tolerance, "actual=%s expected=%s tolerance=%s"%[actual,expected,tolerance])
 
-func _make_plant(balance:Dictionary,seed_value:int)->Succulent:
-	JellyBalanceClass.values=balance.duplicate(true)
-	JellyBalanceClass.override_enabled=true
+func _make_plant(seed_value:int, balance:Dictionary={})->Succulent:
 	var plant:=SucculentClass.new()
-	plant.setup(sample_species,seed_value,null,null)
+	plant.setup(sample_species,seed_value,null,null,true,balance)
 	return plant
 
-func _verify_endless_normal_trial_balance()->void:
+func _theoretical_survival(seconds:float)->float:
+	return 1.0-SucculentClass.jelly_probability_for_interval(0.0,seconds,FORMAL_RATES)
+
+func _survival_accumulated_at_fps(seconds:float,fps:int)->float:
+	var survival:=1.0
+	var age:=0.0
+	var step:=1.0/float(fps)
+	for _frame in range(int(round(seconds*fps))):
+		var probability:=SucculentClass.jelly_probability_for_interval(age,step,FORMAL_RATES)
+		survival*=1.0-probability
+		age+=step
+	return survival
+
+func _verify_formal_rates_and_boundaries()->void:
 	JellyBalanceClass.reset_formal()
-	var formal:=JellyBalanceClass.FORMAL
-	var trial:=JellyBalanceClass.endless_normal_trial_balance()
-	assert(is_equal_approx(float(trial.short_weight),35.0))
-	assert(is_equal_approx(float(trial.normal_weight),35.0))
-	assert(is_equal_approx(float(trial.long_weight),22.0))
-	assert(is_equal_approx(float(trial.ultra_weight),8.0))
-	assert(is_equal_approx(JellyBalanceClass.weight_total(trial),100.0))
-	for key in formal:
-		if not str(key).ends_with("_weight"):
-			assert(trial[key]==formal[key])
-	assert(JellyBalanceClass.resistance_for_roll(.34,trial)=="short")
-	assert(JellyBalanceClass.resistance_for_roll(.40,trial)=="normal")
-	assert(JellyBalanceClass.resistance_for_roll(.80,trial)=="long")
-	assert(JellyBalanceClass.resistance_for_roll(.95,trial)=="ultra")
-	assert(JellyBalanceClass.resistance_for_roll(.40,formal)=="short")
+	assert(JellyBalanceClass.rate_values(JellyBalanceClass.FORMAL)==FORMAL_RATES)
+	assert(SucculentClass.jelly_stage_index(0.0)==0)
+	assert(SucculentClass.jelly_stage_index(4.999999)==0)
+	assert(SucculentClass.jelly_stage_index(5.0)==1)
+	assert(SucculentClass.jelly_stage_index(9.999999)==1)
+	assert(SucculentClass.jelly_stage_index(10.0)==2)
+	assert(SucculentClass.jelly_stage_index(14.999999)==2)
+	assert(SucculentClass.jelly_stage_index(15.0)==3)
+	_approx(SucculentClass.jelly_chance_per_second(2.0,FORMAL_RATES),0.01)
+	_approx(SucculentClass.jelly_chance_per_second(7.0,FORMAL_RATES),0.02)
+	_approx(SucculentClass.jelly_chance_per_second(12.0,FORMAL_RATES),0.03)
+	_approx(SucculentClass.jelly_chance_per_second(20.0,FORMAL_RATES),0.04)
+	_approx(SucculentClass.jelly_probability_for_interval(0.0,5.0,FORMAL_RATES),1.0-pow(.99,5.0))
+	_approx(SucculentClass.jelly_probability_for_interval(4.0,2.0,FORMAL_RATES),1.0-.99*.98)
+	_approx(SucculentClass.jelly_probability_for_interval(9.0,7.0,FORMAL_RATES),1.0-.98*pow(.97,5.0)*.96)
+	_approx(SucculentClass.jelly_probability_for_interval(0.0,20.0,FORMAL_RATES),1.0-pow(.99,5.0)*pow(.98,5.0)*pow(.97,5.0)*pow(.96,5.0))
 
-	var profile_rng:=RandomNumberGenerator.new();profile_rng.seed=20260930
-	var counts:={"short":0,"normal":0,"long":0,"ultra":0}
-	for index in range(50000):
-		var resistance:=JellyBalanceClass.resistance_for_roll(profile_rng.randf(),trial)
-		counts[resistance]=int(counts[resistance])+1
-	assert(absf(float(counts.short)/50000.0-.35)<.01)
-	assert(absf(float(counts.normal)/50000.0-.35)<.01)
-	assert(absf(float(counts.long)/50000.0-.22)<.01)
-	assert(absf(float(counts.ultra)/50000.0-.08)<.01)
+func _verify_fps_independence()->void:
+	var expected:=_theoretical_survival(20.0)
+	for fps in [30,60,120]:
+		_approx(_survival_accumulated_at_fps(20.0,fps),expected,0.00001)
 
-	# Supplying the mode-specific balance affects only this plant. The same RNG
-	# seed still uses the formal 45/35/16/4 split without the override.
-	var selected_seed:=-1
-	for seed_value in range(1000):
-		var probe:=RandomNumberGenerator.new();probe.seed=seed_value
-		probe.randf_range(0.0,TAU);probe.randf();probe.randf_range(float(formal.safe_min),float(formal.safe_max))
-		var roll:=probe.randf()
-		if roll>.35 and roll<.45:selected_seed=seed_value;break
-	assert(selected_seed>=0)
-	var trial_plant:=SucculentClass.new();trial_plant.setup(sample_species,selected_seed,null,null,true,trial)
-	var formal_plant:=SucculentClass.new();formal_plant.setup(sample_species,selected_seed,null,null,true,formal)
-	assert(trial_plant.base_resistance_type=="normal")
-	assert(formal_plant.base_resistance_type=="short")
-	trial_plant.free();formal_plant.free()
-	JellyBalanceClass.values=JellyBalanceClass.FORMAL.duplicate(true)
-	JellyBalanceClass.override_enabled=false
-	JellyBalanceClass.initialized=false
-
-func _verify_prediction_statistics()->void:
-	var balance:=JellyBalanceClass.FORMAL.duplicate(true)
-	balance.slow_short_rate=70.0;balance.slow_resilient_rate=30.0;balance.regular_short_resilient_rate=5.0
-	var profile_rng:=RandomNumberGenerator.new();profile_rng.seed=20260904
-	var short_count:=0;var slow_count:=0;var slow_resilient_count:=0;var regular_short_count:=0;var regular_resilient_count:=0
-	for i in range(50000):
-		var base_type:=JellyBalanceClass.resistance_for_roll(profile_rng.randf(),balance)
-		if base_type=="short":
-			short_count+=1
-			var slow:=JellyBalanceClass.slow_sticky_for_roll(base_type,profile_rng.randf(),balance)
-			if slow:
-				slow_count+=1
-				if JellyBalanceClass.resilient_for_roll(base_type,true,profile_rng.randf(),balance):slow_resilient_count+=1
-			else:
-				regular_short_count+=1
-				if JellyBalanceClass.resilient_for_roll(base_type,false,profile_rng.randf(),balance):regular_resilient_count+=1
-	var rate:=float(slow_count)/float(short_count)
-	assert(short_count>21500 and short_count<23500)
-	assert(rate>0.68 and rate<0.72)
-	assert(float(slow_resilient_count)/float(slow_count)>0.28 and float(slow_resilient_count)/float(slow_count)<0.32)
-	assert(float(regular_resilient_count)/float(regular_short_count)>0.04 and float(regular_resilient_count)/float(regular_short_count)<0.06)
-
-func _verify_disabled_is_legacy()->void:
-	var balance:=JellyBalanceClass.FORMAL.duplicate(true)
-	_force_base_type(balance,"short");balance.slow_short_rate=0.0
-	var selected_seed:=-1
-	for seed_value in range(100):
-		var probe:=RandomNumberGenerator.new();probe.seed=seed_value
-		probe.randf_range(0.0,TAU);probe.randf();probe.randf_range(float(balance.safe_min),float(balance.safe_max))
-		if JellyBalanceClass.resistance_for_roll(probe.randf(),balance)=="short":selected_seed=seed_value;break
-	assert(selected_seed>=0)
-	var expected:=RandomNumberGenerator.new();expected.seed=selected_seed
-	expected.randf_range(0.0,TAU);expected.randf()
-	var expected_safe:=expected.randf_range(float(balance.safe_min),float(balance.safe_max));expected.randf()
-	var expected_ramp:=expected_safe+expected.randf_range(float(balance.short_min),float(balance.short_max))
-	var expected_period:=expected.randf_range(16.0,28.0);var expected_phase:=expected.randf_range(0.0,TAU)
-	var plant:=_make_plant(balance,selected_seed)
-	assert(plant.base_resistance_type=="short" and plant.resistance_type=="short")
-	assert(not plant.is_slow_sticky and not plant.is_resilient and is_equal_approx(plant.individual_growth_multiplier,1.0))
-	assert(is_equal_approx(plant.jelly_safe_end_seconds,expected_safe))
-	assert(is_equal_approx(plant.jelly_ramp_end_seconds,expected_ramp))
-	assert(is_equal_approx(plant.growth_rhythm_period,expected_period) and is_equal_approx(plant.growth_rhythm_phase,expected_phase))
-	plant.free()
-
-func _verify_prediction_boundaries_and_snapshot()->void:
-	var balance:=JellyBalanceClass.FORMAL.duplicate(true);_force_base_type(balance,"short")
-	balance.slow_short_rate=0.0;balance.regular_short_resilient_rate=0.0
-	var legacy_short:=_make_plant(balance,3100)
-	assert(not legacy_short.is_slow_sticky and not legacy_short.is_resilient and is_equal_approx(legacy_short.jelly_final_chance,0.06))
-	legacy_short.free()
-
-	balance.regular_short_resilient_rate=100.0
-	var resilient_regular:=_make_plant(balance,3101)
-	assert(not resilient_regular.is_slow_sticky and resilient_regular.is_resilient and is_equal_approx(resilient_regular.jelly_final_chance,0.03))
-	resilient_regular.free()
-
-	balance.slow_short_rate=100.0;balance.regular_short_resilient_rate=0.0;balance.slow_resilient_rate=0.0
-	var slow_standard:=_make_plant(balance,3102)
-	assert(slow_standard.is_slow_sticky and not slow_standard.is_resilient and is_equal_approx(slow_standard.jelly_final_chance,0.06))
-	assert(slow_standard.individual_growth_multiplier>=0.65 and slow_standard.individual_growth_multiplier<=0.80)
-	slow_standard.free()
-
-	balance.slow_resilient_rate=100.0
-	var slow_resilient:=_make_plant(balance,3103)
-	assert(slow_resilient.is_slow_sticky and slow_resilient.is_resilient and is_equal_approx(slow_resilient.jelly_final_chance,0.03))
-	var snapshot:=[slow_resilient.base_resistance_type,slow_resilient.is_slow_sticky,slow_resilient.is_resilient,slow_resilient.individual_growth_multiplier,slow_resilient.jelly_final_chance,slow_resilient.jelly_ramp_end_seconds]
-	JellyBalanceClass.values.slow_short_rate=0.0;JellyBalanceClass.values.slow_resilient_rate=0.0;JellyBalanceClass.values.regular_short_resilient_rate=0.0;JellyBalanceClass.values.resilient_final_chance=0.40
-	assert(snapshot==[slow_resilient.base_resistance_type,slow_resilient.is_slow_sticky,slow_resilient.is_resilient,slow_resilient.individual_growth_multiplier,slow_resilient.jelly_final_chance,slow_resilient.jelly_ramp_end_seconds])
-	slow_resilient.free()
-
-	for type in ["normal","long","ultra"]:
-		var non_short_balance:=balance.duplicate(true);_force_base_type(non_short_balance,type);non_short_balance.slow_short_rate=100.0;non_short_balance.slow_resilient_rate=100.0;non_short_balance.regular_short_resilient_rate=100.0
-		var non_short:=_make_plant(non_short_balance,3200+type.length())
-		assert(non_short.base_resistance_type==type and not non_short.is_slow_sticky and not non_short.is_resilient and is_equal_approx(non_short.individual_growth_multiplier,1.0) and is_equal_approx(non_short.jelly_final_chance,0.06))
-		non_short.free()
-
-	assert(not JellyBalanceClass.slow_sticky_for_roll("short",0.0,{"slow_short_rate":0.0}))
-	assert(JellyBalanceClass.slow_sticky_for_roll("short",0.999,{"slow_short_rate":100.0}))
-	assert(not JellyBalanceClass.resilient_for_roll("short",true,0.0,{"slow_resilient_rate":0.0,"regular_short_resilient_rate":0.0}))
-	assert(JellyBalanceClass.resilient_for_roll("short",true,0.999,{"slow_resilient_rate":100.0,"regular_short_resilient_rate":0.0}))
-	assert(not JellyBalanceClass.resilient_for_roll("short",false,0.0,{"slow_resilient_rate":0.0,"regular_short_resilient_rate":0.0}))
-	assert(JellyBalanceClass.resilient_for_roll("short",false,0.999,{"slow_resilient_rate":0.0,"regular_short_resilient_rate":100.0}))
-
-func _verify_profile_bounds_and_common_hazard()->void:
-	var slow_balance:=JellyBalanceClass.FORMAL.duplicate(true)
-	_force_base_type(slow_balance,"short");slow_balance.slow_short_rate=100.0
-	slow_balance.slow_growth_min=0.65;slow_balance.slow_growth_max=0.80;slow_balance.slow_ramp_min=12.0;slow_balance.slow_ramp_max=22.0
-	var observed_min:=10.0;var observed_max:=0.0
-	for seed_value in range(64):
-		var plant:=_make_plant(slow_balance,seed_value+500)
-		assert(plant.base_resistance_type=="short" and plant.resistance_type=="slow_sticky" and plant.is_slow_sticky)
-		assert(plant.individual_growth_multiplier>=0.65 and plant.individual_growth_multiplier<=0.80)
-		var ramp_duration:=plant.jelly_ramp_end_seconds-plant.jelly_safe_end_seconds
-		assert(ramp_duration>=12.0 and ramp_duration<=22.0)
-		assert(is_zero_approx(SucculentClass.jelly_chance_per_second(plant.jelly_safe_end_seconds,plant.jelly_safe_end_seconds,plant.jelly_ramp_end_seconds,plant.jelly_final_chance)))
-		var midpoint:=(plant.jelly_safe_end_seconds+plant.jelly_ramp_end_seconds)*0.5
-		var midpoint_chance:=SucculentClass.jelly_chance_per_second(midpoint,plant.jelly_safe_end_seconds,plant.jelly_ramp_end_seconds,plant.jelly_final_chance)
-		assert(midpoint_chance>0.0 and midpoint_chance<plant.jelly_final_chance)
-		assert(is_equal_approx(SucculentClass.jelly_chance_per_second(plant.jelly_ramp_end_seconds+10.0,plant.jelly_safe_end_seconds,plant.jelly_ramp_end_seconds,plant.jelly_final_chance),plant.jelly_final_chance))
-		observed_min=minf(observed_min,plant.individual_growth_multiplier);observed_max=maxf(observed_max,plant.individual_growth_multiplier)
+func _verify_independent_random_and_statistics()->void:
+	var observed_jellied:=0
+	var first_draws:Dictionary={}
+	for sample in range(SAMPLE_COUNT):
+		var plant:=_make_plant(700000+sample,JellyBalanceClass.FORMAL)
+		if sample<64:first_draws[plant.jelly_rng.randf()]=true
+		plant.simulate(20.0)
+		if plant.state=="jelly":observed_jellied+=1
 		plant.free()
-	assert(observed_min<0.68 and observed_max>0.77)
+	assert(first_draws.size()==64)
+	var expected_jellied:=1.0-_theoretical_survival(20.0)
+	var observed_rate:=float(observed_jellied)/float(SAMPLE_COUNT)
+	assert(absf(observed_rate-expected_jellied)<0.012,"observed=%s expected=%s"%[observed_rate,expected_jellied])
+	print("JELLY_STAT_PROFILE samples=",SAMPLE_COUNT," expected_jellied=",expected_jellied," observed_jellied=",observed_rate)
 
-	for type in ["normal","long","ultra"]:
-		var regular_balance:=slow_balance.duplicate(true);_force_base_type(regular_balance,type)
-		var regular:=_make_plant(regular_balance,900+type.length())
-		assert(regular.base_resistance_type==type and regular.resistance_type==type)
-		assert(not regular.is_slow_sticky and not regular.is_resilient and is_equal_approx(regular.individual_growth_multiplier,1.0))
-		assert(regular.jelly_ramp_end_seconds-regular.jelly_safe_end_seconds>=float(regular_balance[type+"_min"]))
-		assert(regular.jelly_ramp_end_seconds-regular.jelly_safe_end_seconds<=float(regular_balance[type+"_max"]))
-		regular.free()
+func _verify_simultaneous_results_are_not_limited()->void:
+	var forced_balance:=JellyBalanceClass.FORMAL.duplicate(true)
+	for key in JellyBalanceClass.RATE_KEYS:forced_balance[key]=1.0
+	var plants:Array=[]
+	for index in range(12):
+		var plant:=_make_plant(900000+index,forced_balance)
+		plant.simulate(0.01)
+		assert(plant.state=="jelly")
+		plants.append(plant)
+	for plant in plants:plant.free()
 
-func _ready()->void:
-	_verify_endless_normal_trial_balance()
-	var game=load("res://main.tscn").instantiate();add_child(game)
-	await get_tree().process_frame;await get_tree().process_frame
+func _verify_new_plant_snapshot()->void:
+	var first_balance:=JellyBalanceClass.FORMAL.duplicate(true)
+	first_balance.rate_0_5=0.25
+	var first:=_make_plant(101,first_balance)
+	first_balance.rate_0_5=0.75
+	var second:=_make_plant(102,first_balance)
+	_approx(first.jelly_rates_per_second[0],0.25)
+	_approx(second.jelly_rates_per_second[0],0.75)
+	first.free();second.free()
+
+func _verify_development_ui(game)->void:
 	game._open_jelly_dev()
 	assert(game.jelly_dev_overlay.visible and JellyBalanceClass.override_enabled)
-	assert(is_equal_approx(float(JellyBalanceClass.values.final_chance),.06))
-	assert(is_equal_approx(float(JellyBalanceClass.values.cooldown),1.0))
-	assert(is_equal_approx(float(JellyBalanceClass.values.safe_min),3.8) and is_equal_approx(float(JellyBalanceClass.values.safe_max),6.2))
-	assert(is_equal_approx(float(JellyBalanceClass.values.slow_short_rate),70.0))
-	assert(is_equal_approx(float(JellyBalanceClass.values.slow_resilient_rate),30.0))
-	assert(is_equal_approx(float(JellyBalanceClass.values.regular_short_resilient_rate),5.0))
-	assert(is_equal_approx(float(JellyBalanceClass.values.resilient_final_chance),0.03))
-	assert(is_equal_approx(float(JellyBalanceClass.values.slow_growth_min),0.65) and is_equal_approx(float(JellyBalanceClass.values.slow_growth_max),0.80))
-	assert(is_equal_approx(float(JellyBalanceClass.values.slow_ramp_min),12.0) and is_equal_approx(float(JellyBalanceClass.values.slow_ramp_max),22.0))
-	for key in ["slow_short_rate","slow_resilient_rate","regular_short_resilient_rate","resilient_final_chance","slow_growth_min","slow_growth_max","slow_ramp_min","slow_ramp_max"]:assert(key in game.jelly_dev_labels)
-	assert(not game.jelly_trait_display_enabled and "OFF" in game.jelly_trait_toggle_button.text)
-	assert(is_equal_approx(JellyBalanceClass.weight_total(),100.0) and "100%" in game.jelly_dev_total_label.text)
-	game.last_jelly_claim_msec=-1000000000;assert(game._try_claim_jelly() and not game._try_claim_jelly())
-	game._change_jelly_dev_value("slow_short_rate",50.0);assert(is_equal_approx(float(JellyBalanceClass.values.slow_short_rate),100.0))
-	game._change_jelly_dev_value("slow_short_rate",-200.0);assert(is_equal_approx(float(JellyBalanceClass.values.slow_short_rate),0.0))
-	game._change_jelly_dev_value("slow_resilient_rate",100.0);game._change_jelly_dev_value("slow_resilient_rate",1.0);assert(is_equal_approx(float(JellyBalanceClass.values.slow_resilient_rate),100.0))
-	game._change_jelly_dev_value("regular_short_resilient_rate",-100.0);game._change_jelly_dev_value("regular_short_resilient_rate",-1.0);assert(is_zero_approx(float(JellyBalanceClass.values.regular_short_resilient_rate)))
-	game._change_jelly_dev_value("slow_growth_min",1.0);game._change_jelly_dev_value("slow_growth_max",-1.0)
-	assert(is_equal_approx(float(JellyBalanceClass.values.slow_growth_min),0.80) and is_equal_approx(float(JellyBalanceClass.values.slow_growth_max),0.80))
-	game._change_jelly_dev_value("slow_ramp_min",20.0);game._change_jelly_dev_value("slow_ramp_max",-20.0)
-	assert(is_equal_approx(float(JellyBalanceClass.values.slow_ramp_min),22.0) and is_equal_approx(float(JellyBalanceClass.values.slow_ramp_max),22.0))
-	game._dev_apply_prediction_v1();assert(is_equal_approx(float(JellyBalanceClass.values.slow_short_rate),70.0) and is_equal_approx(float(JellyBalanceClass.values.slow_resilient_rate),30.0) and is_equal_approx(float(JellyBalanceClass.values.regular_short_resilient_rate),5.0) and is_equal_approx(float(JellyBalanceClass.values.resilient_final_chance),0.03))
-	_verify_disabled_is_legacy()
-	_verify_prediction_statistics()
-	_verify_prediction_boundaries_and_snapshot()
-	_verify_profile_bounds_and_common_hazard()
+	assert(game.jelly_dev_labels.size()==5)
+	for key in JellyBalanceClass.RATE_KEYS:
+		assert(key in game.jelly_dev_labels)
+	assert("growth_speed" in game.jelly_dev_labels)
+	assert(game.jelly_dev_labels.rate_0_5.text=="0〜5秒 ジュレ率：1.0%")
+	assert(game.jelly_dev_labels.rate_5_10.text=="5〜10秒 ジュレ率：2.0%")
+	assert(game.jelly_dev_labels.rate_10_15.text=="10〜15秒 ジュレ率：3.0%")
+	assert(game.jelly_dev_labels.rate_15_plus.text=="15秒以降 ジュレ率：4.0%")
+	assert(game.jelly_dev_overlay.find_child("JellyDevRow_short_weight",true,false)==null)
+	assert(game.jelly_dev_overlay.find_child("JellyDevRow_safe_min",true,false)==null)
+	for key in JellyBalanceClass.RATE_KEYS:
+		var before:=float(JellyBalanceClass.values[key])
+		game._change_jelly_dev_value(str(key),.005)
+		_approx(float(JellyBalanceClass.values[key]),before+.005)
+	game._change_jelly_dev_value("rate_0_5",-2.0)
+	_approx(float(JellyBalanceClass.values.rate_0_5),0.0)
+	game._change_jelly_dev_value("rate_0_5",2.0)
+	_approx(float(JellyBalanceClass.values.rate_0_5),1.0)
+	game._change_jelly_dev_value("growth_speed",.2)
+	_approx(float(JellyBalanceClass.values.growth_speed),1.2)
 
-	var test_balance:=JellyBalanceClass.FORMAL.duplicate(true)
-	_force_base_type(test_balance,"short");test_balance.slow_short_rate=100.0;test_balance.slow_growth_min=0.70;test_balance.slow_growth_max=0.70;test_balance.slow_ramp_min=12.0;test_balance.slow_ramp_max=22.0;test_balance.growth_speed=1.2
-	JellyBalanceClass.values=test_balance;JellyBalanceClass.override_enabled=true
-	game._dev_spawn_50cm();assert(game.dev_jelly_test_active and game.plants.size()==4 and not game.play_active)
-	var profiles:Dictionary={}
+	JellyBalanceClass.set_value("rate_5_10",.125)
+	game._dev_spawn_50cm()
+	assert(game.dev_jelly_test_active and game.plants.size()==4 and not game.play_active)
 	for plant in game.plants:
-		assert(plant.is_slow_sticky and is_equal_approx(plant.individual_growth_multiplier,0.70))
-		assert(is_equal_approx(plant.effective_growth_speed_multiplier(),0.84))
-		assert(absf(plant.diameter_cm-50.0)<.01 and plant.age>38.0 and plant.growth_time>0.0)
-		assert(is_equal_approx(plant.growth_time,plant._integrated_growth_multiplier(0.0,plant.age)))
-		assert(plant.jelly_safe_end_seconds>=3.8 and plant.jelly_safe_end_seconds<=6.2)
-		assert(plant.jelly_ramp_end_seconds-plant.jelly_safe_end_seconds>=12.0 and plant.jelly_ramp_end_seconds-plant.jelly_safe_end_seconds<=22.0)
-		profiles["%.3f/%.3f"%[plant.jelly_safe_end_seconds,plant.jelly_ramp_end_seconds]]=true
-	assert(profiles.size()>1)
-	game._toggle_jelly_trait_display();game._update_labels();assert(game.jelly_trait_display_enabled and "ON" in game.jelly_trait_toggle_button.text)
-	for plant in game.plants:assert("短命" in plant.label.text and "遅育" in plant.label.text and "成長×0.70" in plant.label.text and "最終" in plant.label.text)
-	game._toggle_jelly_trait_display();game._update_labels();assert(not game.jelly_trait_display_enabled)
-	for plant in game.plants:assert("遅育" not in plant.label.text and "最終" not in plant.label.text)
-	game.last_jelly_claim_msec=-1000000000;assert(game._try_claim_jelly() and game._try_claim_jelly())
+		_approx(plant.jelly_rates_per_second[1],.125)
+		_approx(plant.effective_growth_speed_multiplier(),1.2)
+		assert(absf(plant.diameter_cm-50.0)<.01)
+
 	game._dev_reset_jelly()
-	assert(not JellyBalanceClass.override_enabled and not game.jelly_trait_display_enabled and is_equal_approx(float(JellyBalanceClass.values.slow_short_rate),0.0))
-	assert(is_zero_approx(float(JellyBalanceClass.values.slow_resilient_rate)) and is_zero_approx(float(JellyBalanceClass.values.regular_short_resilient_rate)) and is_equal_approx(float(JellyBalanceClass.values.resilient_final_chance),0.03))
-	assert(is_equal_approx(float(JellyBalanceClass.effective().cooldown),0.0) and is_equal_approx(float(JellyBalanceClass.values.rhythm_amplitude),.10))
-	print("JELLY_DEV_SMOKE_OK endless_trial=35/35/22/8 prediction_v1 slow=70% slow_resilient=30% regular_resilient=5% resilient_final=3% formal_rng=legacy trait_default=OFF")
+	assert(not JellyBalanceClass.override_enabled and not game.dev_jelly_test_active)
+	assert(JellyBalanceClass.rate_values(JellyBalanceClass.values)==FORMAL_RATES)
+	_approx(float(JellyBalanceClass.values.growth_speed),1.0)
+
+func _ready()->void:
+	_verify_formal_rates_and_boundaries()
+	_verify_fps_independence()
+	_verify_independent_random_and_statistics()
+	_verify_simultaneous_results_are_not_limited()
+	_verify_new_plant_snapshot()
+	var game=load("res://main.tscn").instantiate()
+	add_child(game)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	_verify_development_ui(game)
+	print("JELLY_DEV_SMOKE_OK rates=1/2/3/4 boundaries=5/10/15 fps=30/60/120 independent=true cooldown=none reset=true")
 	get_tree().quit()

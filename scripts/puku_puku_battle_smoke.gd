@@ -296,10 +296,8 @@ func _verify_jelly_precedes_ai_harvest(battle: Control) -> void:
 	logic.jelly_checks_enabled = true
 	logic.age = 1.0
 	logic.growth_time = 1.0
-	logic.jelly_safe_end_seconds = 0.0
-	logic.jelly_ramp_end_seconds = 0.01
-	logic.jelly_final_chance = 0.999999999
-	logic.rng.seed = 818181
+	logic.jelly_rates_per_second.assign([1.0, 1.0, 1.0, 1.0])
+	logic.jelly_rng.seed = 818181
 	unit["done"] = false
 	unit["jellied"] = false
 	unit["ai_harvest_age"] = 0.0
@@ -322,12 +320,7 @@ func _simulate_ai_population(seed_offset: int) -> Dictionary:
 		plant.setup(SAMPLE_SPECIES, plant_seed, null, null, true)
 		var plan_rng := RandomNumberGenerator.new()
 		plan_rng.seed = plant_seed + 900000
-		var plan := BattleClass.ai_harvest_plan(
-			plant.jelly_safe_end_seconds,
-			plant.jelly_ramp_end_seconds,
-			plan_rng.randf(),
-			plan_rng.randf()
-		)
+		var plan := BattleClass.ai_harvest_plan(plan_rng.randf(),plan_rng.randf())
 		while plant.state == "growing" and plant.age < 90.0:
 			# This ordering is identical to the live battle: shared jelly simulation
 			# first, then (only if still alive) the AI harvest decision.

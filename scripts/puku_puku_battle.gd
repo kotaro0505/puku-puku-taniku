@@ -373,12 +373,7 @@ func _create_unit(opponent: bool, point_index: int, entries: Array[Dictionary], 
 	logic.name = ("Opponent" if opponent else "Player") + "Logic%02d" % point_index
 	logic_root.add_child(logic)
 	logic.setup(entry, logic_seed, null, null, true)
-	var harvest_plan := ai_harvest_plan(
-		float(logic.jelly_safe_end_seconds),
-		float(logic.jelly_ramp_end_seconds),
-		rng.randf(),
-		rng.randf()
-	) if opponent else {"style": "player", "age": -1.0}
+	var harvest_plan := ai_harvest_plan(rng.randf(), rng.randf()) if opponent else {"style": "player", "age": -1.0}
 	var unit := {
 		"node": button,
 		"size_label": size_label,
@@ -422,17 +417,17 @@ static func texture_alpha_click_mask(texture: Texture2D, threshold := 0.08) -> B
 	return mask
 
 
-static func ai_harvest_plan(safe_end: float, ramp_end: float, style_roll: float, timing_roll: float) -> Dictionary:
-	var safe := maxf(0.1, safe_end)
-	var ramp_span := maxf(0.1, ramp_end - safe)
+static func ai_harvest_plan(style_roll: float, timing_roll: float) -> Dictionary:
+	# Preserve the four established AI risk styles against the new fixed
+	# 5/10/15-second probability stages instead of removed individual traits.
 	var timing := clampf(timing_roll, 0.0, 1.0)
 	if style_roll < 0.24:
-		return {"style": "cautious", "age": lerpf(safe * 0.72, safe * 0.98, timing)}
+		return {"style": "cautious", "age": lerpf(3.6, 4.9, timing)}
 	if style_roll < 0.62:
-		return {"style": "steady", "age": safe + ramp_span * lerpf(0.22, 0.58, timing)}
+		return {"style": "steady", "age": lerpf(6.1, 7.9, timing)}
 	if style_roll < 0.88:
-		return {"style": "greedy", "age": safe + ramp_span * lerpf(0.64, 0.98, timing)}
-	return {"style": "reckless", "age": ramp_end + lerpf(1.5, 7.0, timing)}
+		return {"style": "greedy", "age": lerpf(11.5, 14.5, timing)}
+	return {"style": "reckless", "age": lerpf(16.5, 22.0, timing)}
 
 
 func _process(delta: float) -> void:
@@ -446,8 +441,8 @@ func _process(delta: float) -> void:
 		if not is_instance_valid(logic):
 			continue
 		# Succulent.simulate() is also the greenhouse source of truth. It applies
-		# the shared growth rhythm, individual traits and FPS-independent jelly
-		# hazard before the gang gets a chance to make its harvest decision.
+		# the shared growth rhythm and FPS-independent jelly probability before
+		# the gang gets a chance to make its harvest decision.
 		logic.simulate(delta)
 		unit["size_cm"] = float(logic.diameter_cm)
 		units[unit_index] = unit

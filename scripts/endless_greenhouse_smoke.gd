@@ -101,7 +101,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	_remove_test_file(NORMAL_PATH)
 	_remove_test_file(EXPERIMENT_PATH)
-	print("ENDLESS_GREENHOUSE_SMOKE_OK default_without_flags=true player_start=true round_seeds=12 round_cost=1 concurrent=7-10 refill_free=true harvest_direct=true wallet=fixed_point jelly_extra_penalty=false result=true longevity=35/35/22/8 new_roll=max_carryover_x0.4 jelly_new_roll=false discovery_curve=unchanged forced_new=true candidate_pool=uniform deferred_formal_get=true pending_duplicate=false first_get_floor=once virtual_batch=12 pause=true navigation=habitat+catalog+shop+gacha production_gacha=1puku+species_get fusion=1-2-3puku restoration_pending=true finite=true save_isolated=true")
+	print("ENDLESS_GREENHOUSE_SMOKE_OK default_without_flags=true player_start=true round_seeds=12 round_cost=1 concurrent=7-10 refill_free=true harvest_direct=true wallet=fixed_point jelly_extra_penalty=false result=true jelly_rates=1/2/3/4 boundaries=5/10/15 new_roll=max_carryover_x0.4 jelly_new_roll=false discovery_curve=unchanged forced_new=true candidate_pool=uniform deferred_formal_get=true pending_duplicate=false first_get_floor=once virtual_batch=12 pause=true navigation=habitat+catalog+shop+gacha production_gacha=1puku+species_get fusion=1-2-3puku restoration_pending=true finite=true save_isolated=true")
 	get_tree().quit()
 
 
@@ -338,6 +338,9 @@ func _test_localized_trial_tutorial(game: Node) -> void:
 
 func _test_endless_first_play_tutorial(game: Node) -> void:
 	game._clear_greenhouse_plants()
+	game.pending_round_new_species_ids.clear()
+	game.result_new_species_queue.clear()
+	game.species_get_queue.clear()
 	game.play_active = false
 	game.play_modal_open = false
 	game.normal_play_tutorial_complete = false
@@ -634,14 +637,8 @@ func _test_formal_endless_main_features(game: Node) -> void:
 	game.habitat_debug_enabled = false
 	assert(game._trial_dev_controls_enabled())
 	var trial_balance:Dictionary=game._greenhouse_jelly_balance_for_spawn()
-	assert(is_equal_approx(float(trial_balance.short_weight),35.0))
-	assert(is_equal_approx(float(trial_balance.normal_weight),35.0))
-	assert(is_equal_approx(float(trial_balance.long_weight),22.0))
-	assert(is_equal_approx(float(trial_balance.ultra_weight),8.0))
-	assert(is_equal_approx(float(JellyBalanceClass.FORMAL.short_weight),45.0))
-	assert(is_equal_approx(float(JellyBalanceClass.FORMAL.normal_weight),35.0))
-	assert(is_equal_approx(float(JellyBalanceClass.FORMAL.long_weight),16.0))
-	assert(is_equal_approx(float(JellyBalanceClass.FORMAL.ultra_weight),4.0))
+	assert(JellyBalanceClass.rate_values(trial_balance)==[0.01,0.02,0.03,0.04])
+	assert(JellyBalanceClass.rate_values(JellyBalanceClass.FORMAL)==[0.01,0.02,0.03,0.04])
 	game.puku_gauge_intro_complete=false
 	game._start_puku_gauge_intro_dialog()
 	assert(game.scripted_dialog_kind=="puku_gauge_first_gift" and game.scripted_dialog_pages.size()==3)
@@ -752,18 +749,14 @@ func _test_debug_controls_and_gacha(game: Node) -> void:
 	game._open_jelly_dev()
 	assert(game.jelly_dev_overlay.visible)
 	var debug_balance:Dictionary=game._greenhouse_jelly_balance_for_spawn()
-	assert(is_equal_approx(float(debug_balance.short_weight),45.0))
-	assert(is_equal_approx(float(debug_balance.normal_weight),35.0))
-	assert(is_equal_approx(float(debug_balance.long_weight),16.0))
-	assert(is_equal_approx(float(debug_balance.ultra_weight),4.0))
-	assert(is_equal_approx(float(debug_balance.cooldown),1.0))
-	game._change_jelly_dev_value("final_chance",.005)
+	assert(JellyBalanceClass.rate_values(debug_balance)==[0.01,0.02,0.03,0.04])
+	game._change_jelly_dev_value("rate_0_5",.005)
 	debug_balance=game._greenhouse_jelly_balance_for_spawn()
-	assert(is_equal_approx(float(debug_balance.final_chance),.065))
+	assert(is_equal_approx(float(debug_balance.rate_0_5),.015))
 	game._dev_reset_jelly()
 	assert(not JellyBalanceClass.override_enabled)
 	var production_balance:Dictionary=game._greenhouse_jelly_balance_for_spawn()
-	assert(production_balance.is_empty())
+	assert(JellyBalanceClass.rate_values(production_balance)==[0.01,0.02,0.03,0.04])
 	game._close_jelly_dev()
 	assert(game._should_simulate_endless_greenhouse())
 
@@ -1120,11 +1113,8 @@ func _test_finite_mode_unchanged(game: Node) -> void:
 	game.endless_greenhouse.configure(false)
 	game.habitat_debug_enabled=false
 	assert(game._trial_dev_controls_enabled())
-	assert(game._greenhouse_jelly_balance_for_spawn().is_empty())
-	assert(is_equal_approx(float(JellyBalanceClass.FORMAL.short_weight),45.0))
-	assert(is_equal_approx(float(JellyBalanceClass.FORMAL.normal_weight),35.0))
-	assert(is_equal_approx(float(JellyBalanceClass.FORMAL.long_weight),16.0))
-	assert(is_equal_approx(float(JellyBalanceClass.FORMAL.ultra_weight),4.0))
+	assert(JellyBalanceClass.rate_values(game._greenhouse_jelly_balance_for_spawn())==[0.01,0.02,0.03,0.04])
+	assert(JellyBalanceClass.rate_values(JellyBalanceClass.FORMAL)==[0.01,0.02,0.03,0.04])
 	game.normal_seed_bags = 1
 	game.volume_seed_unlocked = true
 	game.volume_seed_bags = 1

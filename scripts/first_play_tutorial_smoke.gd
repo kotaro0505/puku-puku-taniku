@@ -59,9 +59,7 @@ func _ready() -> void:
 	game._update_labels()
 	assert(not game.best_panel.visible and not first_plant.label.visible)
 	first_plant.jelly_checks_enabled = true
-	first_plant.jelly_safe_end_seconds = 0.0
-	first_plant.jelly_ramp_end_seconds = 0.0
-	first_plant.jelly_final_chance = 1.0
+	first_plant.jelly_rates_per_second.assign([1.0, 1.0, 1.0, 1.0])
 	var state_before := str(first_plant.state)
 	first_plant.simulate(1.0)
 	assert(str(first_plant.state) == state_before)

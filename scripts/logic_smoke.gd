@@ -166,15 +166,14 @@ func _drain_species_get(game:Node)->void:
 
 func _verify_jelly_probability()->void:
 	var succulent_script = load("res://scripts/succulent.gd")
-	for profile in [[3.8,8.3],[4.7,15.0],[5.4,24.0],[6.2,42.0]]:
-		var safe_end:float=profile[0];var ramp_end:float=profile[1];var midpoint:float=(safe_end+ramp_end)*.5
-		assert(is_zero_approx(succulent_script.jelly_chance_per_second(0.0,safe_end,ramp_end)))
-		assert(is_zero_approx(succulent_script.jelly_chance_per_second(safe_end,safe_end,ramp_end)))
-		assert(succulent_script.jelly_chance_per_second(midpoint,safe_end,ramp_end)>0.0 and succulent_script.jelly_chance_per_second(midpoint,safe_end,ramp_end)<0.06)
-		assert(absf(succulent_script.jelly_chance_per_second(ramp_end,safe_end,ramp_end)-0.06)<0.000001)
-		assert(is_zero_approx(succulent_script.jelly_probability_for_interval(0.0,safe_end,safe_end,ramp_end)))
-		var reference_probability = succulent_script.jelly_probability_for_interval(0.0,50.0,safe_end,ramp_end)
-		for fps in [30,60,120]:
-			var delta := 1.0/float(fps);var survival:=1.0
-			for frame in range(50*fps):survival*=1.0-succulent_script.jelly_probability_for_interval(frame*delta,delta,safe_end,ramp_end)
-			assert(is_equal_approx(1.0-survival,reference_probability))
+	var rates:Array[float]=[.01,.02,.03,.04]
+	assert(is_equal_approx(succulent_script.jelly_chance_per_second(0.0,rates),.01))
+	assert(is_equal_approx(succulent_script.jelly_chance_per_second(5.0,rates),.02))
+	assert(is_equal_approx(succulent_script.jelly_chance_per_second(10.0,rates),.03))
+	assert(is_equal_approx(succulent_script.jelly_chance_per_second(15.0,rates),.04))
+	assert(is_equal_approx(succulent_script.jelly_probability_for_interval(4.0,2.0,rates),1.0-.99*.98))
+	var reference_probability = succulent_script.jelly_probability_for_interval(0.0,50.0,rates)
+	for fps in [30,60,120]:
+		var delta := 1.0/float(fps);var survival:=1.0
+		for frame in range(50*fps):survival*=1.0-succulent_script.jelly_probability_for_interval(frame*delta,delta,rates)
+		assert(absf((1.0-survival)-reference_probability)<.00001)

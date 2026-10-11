@@ -515,9 +515,6 @@ var progression_dev_labels:Dictionary={}
 var endless_economy_debug_label:Label
 var jelly_dev_overlay: Control
 var jelly_dev_labels:Dictionary={}
-var jelly_dev_total_label:Label
-var jelly_trait_toggle_button:Button
-var jelly_trait_display_enabled:=false
 var dev_jelly_test_active:=false
 var catalog_preview_ui
 var catalog_preview_settings_button:Button
@@ -560,7 +557,6 @@ var habitat_old_catalog_page_pending:=false
 var habitat_old_catalog_page_series_id:=""
 var habitat_old_catalog_page_point:=Vector2(905,452)
 var old_catalog_page_roll_play_count:=-1
-var last_jelly_claim_msec:=-1000000000
 var audio_manager: Node
 var audio_settings: Dictionary = {"bgm_enabled":true,"se_enabled":true,"bgm_volume":0.65,"se_volume":0.62}
 var habitat_glow_tween: Tween
@@ -1349,13 +1345,10 @@ func _endless_puku_economy_active()->bool:
 	return _is_endless_normal_play() and puku_gauge_intro_complete
 
 func _greenhouse_jelly_balance_for_spawn()->Dictionary:
-	# An explicit developer override must win while the unified development gate
-	# is enabled so device builds can exercise the same tuning controls as Web.
-	if _trial_dev_controls_enabled() and JellyBalanceClass.override_enabled:
-		return JellyBalanceClass.effective().duplicate(true)
-	# Production ENDLESS plants keep their formal resistance mix. Every other
-	# Succulent setup path keeps its existing balance.
-	return JellyBalanceClass.endless_normal_trial_balance() if _is_endless_normal_play() else {}
+	# Every new greenhouse plant snapshots the currently active four-stage rates.
+	# Developer overrides are runtime-only and never enter the save payload.
+	var balance:=JellyBalanceClass.effective() if _trial_dev_controls_enabled() and JellyBalanceClass.override_enabled else JellyBalanceClass.FORMAL
+	return balance.duplicate(true)
 
 func _normal_seed_play_available()->bool:
 	# Unlimited supply begins only after the story actually grants the mysterious
@@ -3527,9 +3520,10 @@ func _advance_puku_buyback_tutorial()->void:
 	if not puku_buyback_tutorial_active:return
 	puku_buyback_tutorial_index+=1;_show_puku_buyback_tutorial_page()
 
-func _allow_plant_jelly(plant)->bool:
-	if active_seed_type=="old" and not first_colorata_confirmed:return false
-	return _try_claim_jelly()
+func _allow_plant_jelly(_plant)->bool:
+	# Story protection is plant-local. Normal plants never consult global jelly
+	# counts or timing, so simultaneous and consecutive outcomes remain possible.
+	return not (active_seed_type=="old" and not first_colorata_confirmed)
 
 func _first_play_growing_plants()->Array:
 	var growing:Array=[]
@@ -3814,34 +3808,25 @@ func _build_jelly_dev_overlay(hud:Control)->void:
 	if not _trial_dev_controls_enabled():return
 	jelly_dev_overlay=Control.new();jelly_dev_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);jelly_dev_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;jelly_dev_overlay.visible=false;hud.add_child(jelly_dev_overlay)
 	var shade:=ColorRect.new();shade.color=Color(0.08,0.04,0.03,.78);shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);shade.mouse_filter=Control.MOUSE_FILTER_STOP;jelly_dev_overlay.add_child(shade)
-	var panel:=PanelContainer.new();panel.position=Vector2(18,28);panel.size=Vector2(540,968);panel.add_theme_stylebox_override("panel",_box(Color("#f7e8c7"),Color("#8f633b"),24,4));jelly_dev_overlay.add_child(panel)
+	var panel:=PanelContainer.new();panel.position=Vector2(18,118);panel.size=Vector2(540,788);panel.add_theme_stylebox_override("panel",_box(Color("#f7e8c7"),Color("#8f633b"),24,4));jelly_dev_overlay.add_child(panel)
 	var outer:=VBoxContainer.new();outer.add_theme_constant_override("separation",8);panel.add_child(outer)
 	var title:=Label.new();title.text="開発用：ジュレテスト";title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;title.add_theme_font_size_override("font_size",24);title.add_theme_color_override("font_color",UI_BROWN);outer.add_child(title)
-	var note:=Label.new();note.text="正式ロジックは保持したまま、テスト中だけ上書きします";note.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;note.add_theme_font_size_override("font_size",13);note.add_theme_color_override("font_color",Color("#76513b"));outer.add_child(note)
-	var scroll:=ScrollContainer.new();scroll.custom_minimum_size=Vector2(500,735);scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;outer.add_child(scroll)
+	var note:=Label.new();note.text="変更は新しく発芽した株から適用され、保存されません";note.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;note.add_theme_font_size_override("font_size",13);note.add_theme_color_override("font_color",Color("#76513b"));outer.add_child(note)
+	var scroll:=ScrollContainer.new();scroll.custom_minimum_size=Vector2(500,535);scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;outer.add_child(scroll)
 	var content:=VBoxContainer.new();content.size_flags_horizontal=Control.SIZE_EXPAND_FILL;content.add_theme_constant_override("separation",5);scroll.add_child(content)
-	_add_jelly_dev_row(content,"final_chance",.005);_add_jelly_dev_row(content,"cooldown",.1);_add_jelly_dev_row(content,"safe_min",.1);_add_jelly_dev_row(content,"safe_max",.1)
-	for kind in ["short","normal","long","ultra"]:
-		var heading:=Label.new();heading.text={"short":"短命タイプ","normal":"普通タイプ","long":"長命タイプ","ultra":"超長命タイプ"}[kind];heading.add_theme_font_size_override("font_size",18);heading.add_theme_color_override("font_color",Color("#754326"));content.add_child(heading)
-		_add_jelly_dev_row(content,kind+"_weight",1.0);_add_jelly_dev_row(content,kind+"_min",.1);_add_jelly_dev_row(content,kind+"_max",.1)
-	var slow_heading:=Label.new();slow_heading.text="生育予測 v1（短命から派生）";slow_heading.add_theme_font_size_override("font_size",18);slow_heading.add_theme_color_override("font_color",Color("#754326"));content.add_child(slow_heading)
-	_add_jelly_dev_row(content,"slow_short_rate",1.0);_add_jelly_dev_row(content,"slow_resilient_rate",1.0);_add_jelly_dev_row(content,"regular_short_resilient_rate",1.0);_add_jelly_dev_row(content,"resilient_final_chance",.005)
-	_add_jelly_dev_row(content,"slow_growth_min",.01);_add_jelly_dev_row(content,"slow_growth_max",.01);_add_jelly_dev_row(content,"slow_ramp_min",.1);_add_jelly_dev_row(content,"slow_ramp_max",.1)
-	var prediction_actions:=HBoxContainer.new();prediction_actions.alignment=BoxContainer.ALIGNMENT_CENTER;prediction_actions.add_theme_constant_override("separation",8);content.add_child(prediction_actions)
-	var apply_prediction:=Button.new();apply_prediction.text="生育予測 v1\nテスト値を適用";apply_prediction.custom_minimum_size=Vector2(238,54);_skin_button(apply_prediction,Color("#c7b4d9"),14);apply_prediction.pressed.connect(_dev_apply_prediction_v1);prediction_actions.add_child(apply_prediction)
-	jelly_trait_toggle_button=Button.new();jelly_trait_toggle_button.custom_minimum_size=Vector2(220,54);_skin_button(jelly_trait_toggle_button,Color("#d9c49d"),14);jelly_trait_toggle_button.pressed.connect(_toggle_jelly_trait_display);prediction_actions.add_child(jelly_trait_toggle_button)
-	_add_jelly_dev_row(content,"growth_speed",.1);_add_jelly_dev_row(content,"rhythm_amplitude",.01)
-	jelly_dev_total_label=Label.new();jelly_dev_total_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;jelly_dev_total_label.add_theme_font_size_override("font_size",17);content.add_child(jelly_dev_total_label)
+	for key in JellyBalanceClass.RATE_KEYS:_add_jelly_dev_row(content,str(key),.005)
+	var growth_heading:=Label.new();growth_heading.text="成長速度（正式値は変更しません）";growth_heading.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;growth_heading.add_theme_font_size_override("font_size",18);growth_heading.add_theme_color_override("font_color",Color("#754326"));content.add_child(growth_heading)
+	_add_jelly_dev_row(content,"growth_speed",.1)
 	var actions:=HBoxContainer.new();actions.alignment=BoxContainer.ALIGNMENT_CENTER;actions.add_theme_constant_override("separation",7);outer.add_child(actions)
 	for spec in [["たね（12粒）+1セット",Callable(self,"_dev_add_seed_bag")],["50cm株 ×4 テスト",Callable(self,"_dev_spawn_50cm")],["正式値に戻す",Callable(self,"_dev_reset_jelly")]]:
 		var button:=Button.new();button.text=spec[0];button.custom_minimum_size=Vector2(158,52);_skin_button(button,Color("#d8b56b"),14);button.pressed.connect(spec[1]);actions.add_child(button)
 	var close:=Button.new();close.text="閉じる";close.custom_minimum_size=Vector2(280,45);_skin_button(close,Color("#ead8b1"),16);close.pressed.connect(_close_jelly_dev);outer.add_child(close)
 
 func _add_jelly_dev_row(parent:VBoxContainer,key:String,step:float)->void:
-	var row:=HBoxContainer.new();row.alignment=BoxContainer.ALIGNMENT_CENTER;row.add_theme_constant_override("separation",6);parent.add_child(row)
+	var row:=HBoxContainer.new();row.name="JellyDevRow_"+key;row.alignment=BoxContainer.ALIGNMENT_CENTER;row.add_theme_constant_override("separation",6);parent.add_child(row)
 	var label:=Label.new();label.custom_minimum_size=Vector2(330,38);label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.add_theme_font_size_override("font_size",15);label.add_theme_color_override("font_color",UI_BROWN);row.add_child(label);jelly_dev_labels[key]=label
 	for delta in [-step,step]:
-		var button:=Button.new();button.text="−" if delta<0 else "+";button.custom_minimum_size=Vector2(64,38);_skin_button(button,Color("#d9c49d"),18);button.pressed.connect(_change_jelly_dev_value.bind(key,delta));row.add_child(button)
+		var button:=Button.new();button.name=("JellyDevMinus_" if delta<0 else "JellyDevPlus_")+key;button.text="−" if delta<0 else "+";button.custom_minimum_size=Vector2(64,38);_skin_button(button,Color("#d9c49d"),18);button.pressed.connect(_change_jelly_dev_value.bind(key,delta));row.add_child(button)
 
 func _open_jelly_dev()->void:
 	if not _trial_dev_controls_enabled():return
@@ -3853,33 +3838,21 @@ func _close_jelly_dev()->void:
 
 func _change_jelly_dev_value(key:String,delta:float)->void:
 	if not _trial_dev_controls_enabled():return
+	if not JellyBalanceClass.FORMAL.has(key):return
 	var value:=float(JellyBalanceClass.values[key])+delta
-	if key.ends_with("_weight") or key in ["slow_short_rate","slow_resilient_rate","regular_short_resilient_rate"]:value=clampf(value,0.0,100.0)
-	elif key in ["final_chance","resilient_final_chance"]:value=clampf(value,.0,.50)
+	if key in JellyBalanceClass.RATE_KEYS:value=clampf(value,0.0,1.0)
 	elif key=="growth_speed":value=clampf(value,.1,10.0)
-	elif key=="slow_growth_min" or key=="slow_growth_max":value=clampf(value,.05,2.0)
-	elif key=="rhythm_amplitude":value=clampf(value,.0,.50)
-	else:value=clampf(value,.0,120.0)
-	if key.ends_with("_min"):
-		var max_key:=key.trim_suffix("_min")+"_max";value=minf(value,float(JellyBalanceClass.values[max_key]))
-	elif key.ends_with("_max"):
-		var min_key:=key.trim_suffix("_max")+"_min";value=maxf(value,float(JellyBalanceClass.values[min_key]))
+	else:return
 	JellyBalanceClass.set_value(key,value);_refresh_jelly_dev_ui()
 
 func _jelly_dev_text(key:String)->String:
-	var names={"final_chance":"最終ジュレ率","cooldown":"連続ジュレ回避","safe_min":"初期安全 MIN","safe_max":"初期安全 MAX","short_weight":"短命 割合","short_min":"短命 時間 MIN","short_max":"短命 時間 MAX","normal_weight":"普通 割合","normal_min":"普通 時間 MIN","normal_max":"普通 時間 MAX","long_weight":"長命 割合","long_min":"長命 時間 MIN","long_max":"長命 時間 MAX","ultra_weight":"超長命 割合","ultra_min":"超長命 時間 MIN","ultra_max":"超長命 時間 MAX","slow_short_rate":"短命から遅育率","slow_resilient_rate":"遅育から強健率","regular_short_resilient_rate":"通常短命から強健率","resilient_final_chance":"強健個体 最終ジュレ率","slow_growth_min":"遅育 成長 MIN","slow_growth_max":"遅育 成長 MAX","slow_ramp_min":"遅育 危険上昇 MIN","slow_ramp_max":"遅育 危険上昇 MAX","growth_speed":"成長速度倍率","rhythm_amplitude":"成長リズム幅"}
+	var names={"rate_0_5":"0〜5秒 ジュレ率：","rate_5_10":"5〜10秒 ジュレ率：","rate_10_15":"10〜15秒 ジュレ率：","rate_15_plus":"15秒以降 ジュレ率："}
 	var value:=float(JellyBalanceClass.values[key])
-	if key in ["final_chance","resilient_final_chance","rhythm_amplitude"]:return "%s　%.1f%%"%[names[key],value*100.0]
-	if key.ends_with("_weight") or key in ["slow_short_rate","slow_resilient_rate","regular_short_resilient_rate"]:return "%s　%.0f%%"%[names[key],value]
-	if key=="slow_growth_min" or key=="slow_growth_max":return "%s　×%.2f"%[names[key],value]
-	if key=="growth_speed":return "%s　×%.1f"%[names[key],value]
-	return "%s　%.1f秒"%[names[key],value]
+	if key in JellyBalanceClass.RATE_KEYS:return "%s%.1f%%"%[names[key],value*100.0]
+	return "成長速度倍率：×%.1f"%value
 
 func _refresh_jelly_dev_ui()->void:
 	for key in jelly_dev_labels:jelly_dev_labels[key].text=_jelly_dev_text(str(key))
-	if jelly_trait_toggle_button:jelly_trait_toggle_button.text="体質表示　%s"%("ON" if jelly_trait_display_enabled else "OFF")
-	var total:=JellyBalanceClass.weight_total();jelly_dev_total_label.text="タイプ割合 合計 %.0f%%　%s"%[total,"OK" if is_equal_approx(total,100.0) else "注意: 100%にしてください"]
-	jelly_dev_total_label.add_theme_color_override("font_color",Color("#47713b") if is_equal_approx(total,100.0) else Color("#b33b31"))
 
 func _dev_add_seed_bag()->void:
 	if not _trial_dev_controls_enabled():return
@@ -3887,32 +3860,18 @@ func _dev_add_seed_bag()->void:
 
 func _dev_reset_jelly()->void:
 	if not _trial_dev_controls_enabled():return
-	JellyBalanceClass.reset_formal();jelly_trait_display_enabled=false
+	JellyBalanceClass.reset_formal()
 	if dev_jelly_test_active:
 		dev_jelly_test_active=false;_clear_greenhouse_plants();active_seed_type="normal"
 	_refresh_jelly_dev_ui();_update_play_ui()
 
-func _dev_apply_prediction_v1()->void:
-	if not _trial_dev_controls_enabled():return
-	JellyBalanceClass.apply_prediction_v1_test_values();_refresh_jelly_dev_ui()
-
-func _toggle_jelly_trait_display()->void:
-	if not _trial_dev_controls_enabled():return
-	jelly_trait_display_enabled=not jelly_trait_display_enabled;_refresh_jelly_dev_ui();_update_labels()
-
 func _dev_spawn_50cm()->void:
 	if not _trial_dev_controls_enabled():return
-	JellyBalanceClass.override_enabled=true;dev_jelly_test_active=true;last_jelly_claim_msec=-1000000000
+	JellyBalanceClass.override_enabled=true;dev_jelly_test_active=true
 	jelly_dev_overlay.visible=false;settings_overlay.visible=false;current_mode="greenhouse";_apply_mode();_clear_greenhouse_plants();play_active=false;active_seed_type="dev_jelly";play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0
 	for i in range(4):
 		_spawn_specific_plant("colorata");var plant=plants.back();plant.fast_forward_to_diameter(50.0)
 	_update_play_ui()
-
-func _try_claim_jelly()->bool:
-	var cooldown:=float(JellyBalanceClass.effective().cooldown)
-	var now:=Time.get_ticks_msec()
-	if cooldown>0.0 and now-last_jelly_claim_msec<int(cooldown*1000.0):return false
-	last_jelly_claim_msec=now;return true
 
 func _add_audio_setting_controls(parent:VBoxContainer,label_text:String,is_bgm:bool)->void:
 	var row:=HBoxContainer.new();row.alignment=BoxContainer.ALIGNMENT_CENTER;row.add_theme_constant_override("separation",12);parent.add_child(row)
@@ -4529,7 +4488,7 @@ func _reset_progression_state()->void:
 	old_seed_reaction_stage=0;old_seed_harvest_guide_active=false;habitat_lookaround_active=false;habitat_lookaround_elapsed=0.0;habitat_lookaround_context="";jurejure_first_encounter_active=false;jurejure_intro_camera_active=false;jurejure_intro_camera_elapsed=0.0;jurejure_camera_focus_context=""
 	_cancel_all_habitat_notifications()
 	old_catalog_pages=0;old_catalog_page_inventory.clear();old_catalog_intro_seen=false;old_catalog_intro_pending=false;habitat_old_catalog_page_pending=false;habitat_old_catalog_page_series_id="";old_catalog_page_roll_play_count=-1;research_catalog_reward_pending=false
-	JellyBalanceClass.reset_formal();jelly_trait_display_enabled=false;dev_jelly_test_active=false;last_jelly_claim_msec=-1000000000
+	JellyBalanceClass.reset_formal();dev_jelly_test_active=false
 	rain_completion_count=0;best_100_achieved=false;shop_selected_seed_type="normal"
 	first_tutorial_species_id="";habitat_wild_plants.clear();habitat_wild_initialized=false;habitat_wild_next_spawn_unix=0.0;habitat_tutorial_started=false;habitat_tutorial_complete=false;habitat_tutorial_species_id="";original_catalog_gifted=false;panda_beacon_unlocked=false;panda_beacon_count=0;panda_beacon_unread_log.clear();first_habitat_gift_claimed=false;armadillo_intro_event_3_completed=false;armadillo_series_event_7_completed=false;pending_armadillo_story_event="";armadillo_gift_series_id="";armadillo_gift_species_id="";scripted_dialog_kind="";scripted_dialog_pages.clear();scripted_dialog_index=-1
 	first_colorata_confirmed=false;trio_originals_confirmed=false;habitat_arrival_started=false;habitat_awakened=false;habitat_awakening_event_complete=false;seed_shop_open=false;mystery_items_acquired=false;mystery_catalog_tutorial_complete=false;normal_play_tutorial_complete=false;seed_pod_gauge_discovery_complete=false;seed_pod_first_reward_seen=false;initial_seed_stock_notice_complete=false;puku_buyback_tutorial_complete=false;puku_buyback_tutorial_active=false;puku_buyback_tutorial_index=0;habitat_returned_species.clear();special_series_explanation_seen=false;pending_special_series_explanation=false;main_story_stage=StoryProgressionClass.ACT_1;main_story_complete=false;main_story_completion_seen=false;catalog_series_unlock_notice_queue.clear();catalog_series_unlock_notice_ready.clear()
@@ -8556,14 +8515,13 @@ func _update_labels()->void:
 			p.label.visible=false
 			continue
 		var screen:=camera.unproject_position(p.global_position+Vector3(0,p.visual_scale*.7,0))
-		var show_traits:=jelly_trait_display_enabled and JellyBalanceClass.override_enabled
-		var label_size:=Vector2(154,100) if show_traits else Vector2(92,34)
+		var label_size:=Vector2(92,34)
 		var r:=Rect2(screen-Vector2(label_size.x*.5,label_size.y+28),label_size)
 		for other in occupied:
 			if r.intersects(other):r.position.y=other.position.y-label_size.y-3
 		occupied.append(r)
 		var new_prefix:="NEW！\n" if bool(p.get_meta("new_species_candidate",false)) and _species_get_count(str(p.data.get("species_id","")))<=0 else ""
-		p.label.position=r.position;p.label.size=label_size+Vector2(0,26 if not new_prefix.is_empty() else 0);p.label.add_theme_font_size_override("font_size",12 if show_traits else 17);p.label.text=new_prefix+(("%.1f cm\n%s"%[p.diameter_cm,p.development_trait_text()]) if show_traits else "%.1f cm"%p.diameter_cm);p.label.add_theme_color_override("font_color",Color("#ffe56f") if not new_prefix.is_empty() else Color.WHITE);p.label.visible=p.state=="growing" and Rect2(Vector2.ZERO,get_viewport().get_visible_rect().size).grow(80).has_point(screen)
+		p.label.position=r.position;p.label.size=label_size+Vector2(0,26 if not new_prefix.is_empty() else 0);p.label.add_theme_font_size_override("font_size",17);p.label.text=new_prefix+"%.1f cm"%p.diameter_cm;p.label.add_theme_color_override("font_color",Color("#ffe56f") if not new_prefix.is_empty() else Color.WHITE);p.label.visible=p.state=="growing" and Rect2(Vector2.ZERO,get_viewport().get_visible_rect().size).grow(80).has_point(screen)
 
 func _greenhouse_area_navigation_available()->bool:
 	if not StoryProgressionClass.arrangement_is_unlocked(story_progression_state) or not _tutorial_fully_complete() or current_mode!="greenhouse" or play_active or catalog_preview_mode_active or arrangement_transitioning:return false
