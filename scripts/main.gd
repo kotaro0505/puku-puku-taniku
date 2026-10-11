@@ -2129,7 +2129,7 @@ func _build_arrangement_ui(hud:Control)->void:
 	arrangement_ui.share_background_save_requested.connect(_on_arrangement_share_background_save_requested)
 	arrangement_ui.share_requested.connect(_on_arrangement_share_requested)
 	arrangement_ui.dismantle_requested.connect(_on_arrangement_dismantle_requested)
-	arrangement_ui.pot_purchase_requested.connect(_on_pot_purchase_requested)
+	arrangement_ui.pot_purchase_requested.connect(_on_pot_purchase_requested,CONNECT_DEFERRED)
 	arrangement_ui.pot_unlock_requested.connect(_on_pot_unlock_requested)
 	arrangement_ui.pot_restore_requested.connect(_on_pot_restore_requested)
 	arrangement_ui.catalog_purchase_requested.connect(_on_catalog_purchase_requested)
@@ -2326,7 +2326,8 @@ func _on_pot_purchase_requested(pot_id:String)->void:
 	var price:=maxi(0,int(pot.get("price_puku",POT_PRICE_PUKU)))
 	var price_units:=_puku_cost_units(price)
 	if not _can_afford_puku_units(price_units):arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"not_enough_puku"));return
-	_change_puku_balance(-price_units,"pot_purchase",false,true);owned_pots[pot_id]=_owned_pot_total(pot_id)+1;_save();_update_currency_ui();arrangement_ui.sync_state(owned_pots,saved_arrangements,arrangement_save_capacity);arrangement_ui.sync_catalog_state(unlocked_series,puku_points);arrangement_ui.sync_seed_shop_state(_seed_shop_products(),puku_points);arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"pot_bought_count",[Localizer.pot_name(language_code,pot),_owned_pot_total(pot_id)]))
+	var before_count:=_owned_pot_total(pot_id)
+	_change_puku_balance(-price_units,"pot_purchase",false,true);owned_pots[pot_id]=before_count+1;_save();_update_currency_ui();arrangement_ui.sync_state(owned_pots,saved_arrangements,arrangement_save_capacity);arrangement_ui.sync_catalog_state(unlocked_series,puku_points);arrangement_ui.sync_seed_shop_state(_seed_shop_products(),puku_points);arrangement_ui.show_pot_purchase_success(pot_id,before_count,_owned_pot_total(pot_id))
 	audio_manager.notify_user_gesture();audio_manager.play_se("purchase",1.0)
 
 func _on_pot_unlock_requested(product_id:String)->void:
