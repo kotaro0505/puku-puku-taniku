@@ -48,7 +48,10 @@ const SPROUT_TEXTURES: Array[Texture2D] = [
 	preload("res://assets/plants/habitat/sprite-affinis.png"),
 	preload("res://assets/plants/habitat/sprite-shaviana.png")
 ]
-const SPROUT_CENTERS := [Vector2(105, 635), Vector2(288, 570), Vector2(470, 642)]
+const SPROUT_GROUP_SIZE := Vector2(132, 132)
+const SPROUT_CENTER_YS := [635.0, 570.0, 642.0]
+const SPROUT_HORIZONTAL_HALF_SPAN := 150.0
+const SPROUT_SIDE_PADDING := 24.0
 
 var language_code := "ja"
 var page_index := 0
@@ -79,6 +82,7 @@ func _ready() -> void:
 	rng.seed = 20260917
 	_build_ui()
 	resized.connect(_layout_ghosts)
+	resized.connect(_layout_sprouts)
 	set_process(true)
 	visible = false
 
@@ -118,8 +122,7 @@ func _build_ui() -> void:
 	for index in SPROUT_TEXTURES.size():
 		var sprout_group := Control.new()
 		sprout_group.name = "StorySprout%d" % index
-		sprout_group.position = SPROUT_CENTERS[index] - Vector2(66, 66)
-		sprout_group.size = Vector2(132, 132)
+		sprout_group.size = SPROUT_GROUP_SIZE
 		sprout_group.pivot_offset = sprout_group.size * 0.5
 		sprout_group.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		sprout_group.set_meta("story_sprout_group", true)
@@ -128,7 +131,7 @@ func _build_ui() -> void:
 		plant.name = "Plant"
 		plant.texture = SPROUT_TEXTURES[index]
 		plant.position = Vector2.ZERO
-		plant.size = Vector2(132, 132)
+		plant.size = SPROUT_GROUP_SIZE
 		plant.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		plant.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		plant.pivot_offset = plant.size * 0.5
@@ -137,6 +140,7 @@ func _build_ui() -> void:
 		plant.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		plant.set_meta("story_sprout_plant", true)
 		sprout_group.add_child(plant)
+	_layout_sprouts()
 
 	seed_layer = Control.new()
 	seed_layer.name = "StorySeedLayer"
@@ -273,6 +277,24 @@ func _layout_ghosts() -> void:
 		var ghost_side := side * float(GHOST_SIZE_SCALES[index])
 		ghost.size = Vector2(ghost_side, ghost_side)
 		ghost.position = Vector2(area.x * GHOST_CENTER_RATIOS[index].x, area.y * GHOST_CENTER_RATIOS[index].y) - ghost.size * 0.5
+
+func _layout_sprouts() -> void:
+	if sprout_layer == null:
+		return
+	var area := sprout_layer.size
+	if area.x <= 0.0:
+		area = size
+	if area.x <= 0.0:
+		area = get_viewport_rect().size
+	if area.x <= 0.0:
+		area.x = 576.0
+	var half_size := SPROUT_GROUP_SIZE * 0.5
+	var center_x := area.x * 0.5
+	var half_span := minf(SPROUT_HORIZONTAL_HALF_SPAN, maxf(0.0, center_x - half_size.x - SPROUT_SIDE_PADDING))
+	var center_xs := [center_x - half_span, center_x, center_x + half_span]
+	for index in mini(mini(sprout_layer.get_child_count(), center_xs.size()), SPROUT_CENTER_YS.size()):
+		var sprout_group := sprout_layer.get_child(index) as Control
+		sprout_group.position = Vector2(float(center_xs[index]), float(SPROUT_CENTER_YS[index])) - half_size
 
 func _show_page() -> void:
 	if page_index == 3:
