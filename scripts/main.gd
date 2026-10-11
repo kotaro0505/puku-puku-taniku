@@ -2129,7 +2129,7 @@ func _build_arrangement_ui(hud:Control)->void:
 	arrangement_ui.share_background_save_requested.connect(_on_arrangement_share_background_save_requested)
 	arrangement_ui.share_requested.connect(_on_arrangement_share_requested)
 	arrangement_ui.dismantle_requested.connect(_on_arrangement_dismantle_requested)
-	arrangement_ui.pot_purchase_requested.connect(_on_pot_purchase_requested,CONNECT_DEFERRED)
+	arrangement_ui.pot_purchase_requested.connect(_on_pot_purchase_requested)
 	arrangement_ui.pot_unlock_requested.connect(_on_pot_unlock_requested)
 	arrangement_ui.pot_restore_requested.connect(_on_pot_restore_requested)
 	arrangement_ui.catalog_purchase_requested.connect(_on_catalog_purchase_requested)
@@ -2177,7 +2177,7 @@ func _on_arrangement_swipe_intro_finished()->void:
 
 func _open_pot_shop()->void:
 	if not _tutorial_fully_complete():return
-	_hide_shop_chatter(true);_sync_arrangement_ui();arrangement_ui.open_pot_shop()
+	audio_manager.prepare_se("purchase");_hide_shop_chatter(true);_sync_arrangement_ui();arrangement_ui.open_pot_shop()
 
 func _on_arrangement_close_requested(context:String)->void:
 	if context=="greenhouse" and arrangement_scene_active:
@@ -2327,8 +2327,20 @@ func _on_pot_purchase_requested(pot_id:String)->void:
 	var price_units:=_puku_cost_units(price)
 	if not _can_afford_puku_units(price_units):arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"not_enough_puku"));return
 	var before_count:=_owned_pot_total(pot_id)
-	_change_puku_balance(-price_units,"pot_purchase",false,true);owned_pots[pot_id]=before_count+1;_save();_update_currency_ui();arrangement_ui.sync_state(owned_pots,saved_arrangements,arrangement_save_capacity);arrangement_ui.sync_catalog_state(unlocked_series,puku_points);arrangement_ui.sync_seed_shop_state(_seed_shop_products(),puku_points);arrangement_ui.show_pot_purchase_success(pot_id,before_count,_owned_pot_total(pot_id))
+	var spent_units:=_change_puku_balance(-price_units,"pot_purchase",false,true,Vector2(-10000,-10000),false)
+	if spent_units!=-price_units:arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"not_enough_puku"));return
+	owned_pots[pot_id]=before_count+1
+	var profile_purchase:bool=arrangement_ui.has_pot_purchase_request_timestamp(pot_id)
+	arrangement_ui.show_pot_purchase_success(pot_id,before_count,_owned_pot_total(pot_id),puku_points)
 	audio_manager.notify_user_gesture();audio_manager.play_se("purchase",1.0)
+	_persist_pot_purchase_after_first_frame(pot_id,profile_purchase)
+
+func _persist_pot_purchase_after_first_frame(pot_id:String,profile_purchase:bool)->void:
+	if DisplayServer.get_name()=="headless":await get_tree().process_frame
+	else:await RenderingServer.frame_post_draw
+	var save_started_usec:=Time.get_ticks_usec()
+	_update_currency_ui();_update_play_ui();_save()
+	if profile_purchase and OS.is_debug_build():print("POT_PURCHASE_PROFILE pot_id=",pot_id," save_after_first_frame_ms=",snappedf(float(Time.get_ticks_usec()-save_started_usec)/1000.0,.001))
 
 func _on_pot_unlock_requested(product_id:String)->void:
 	var pot:=_pot_entry_for_product(product_id)
@@ -5080,7 +5092,7 @@ func add_seed_pod_gauge_cm(amount_cm:float,save_immediately:=true,show_effect:=t
 	if save_immediately or completed_gauges>0:_save()
 	return earned_bags
 
-func _change_puku_balance(delta_units:int,source:="",save_immediately:=true,show_effect:=true,source_position:=Vector2(-10000,-10000))->int:
+func _change_puku_balance(delta_units:int,source:="",save_immediately:=true,show_effect:=true,source_position:=Vector2(-10000,-10000),refresh_ui:=true)->int:
 	if delta_units==0:return 0
 	var previous_units:=puku_balance_units
 	puku_balance_units=maxi(0,puku_balance_units+delta_units)
@@ -5100,7 +5112,7 @@ func _change_puku_balance(delta_units:int,source:="",save_immediately:=true,show
 		if puku_gauge_animation_running or not puku_gauge_animation_queue.is_empty():_cancel_puku_gauge_animations()
 		puku_gauge_display_units=float(_puku_fraction_units())
 		puku_points_display=_puku_whole_count()
-	_update_puku_ui();_update_play_ui()
+	if refresh_ui:_update_puku_ui();_update_play_ui()
 	if save_immediately:_save()
 	return applied_units
 

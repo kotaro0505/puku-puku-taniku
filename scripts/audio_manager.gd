@@ -199,6 +199,11 @@ func play_se(key: String, gain := 1.0) -> void:
 	player.volume_db = linear_to_db(maxf(se_volume * clampf(gain, 0.0, 1.0), 0.001))
 	player.play()
 
+func prepare_se(key:String)->void:
+	# Generate/load tap-critical effects before the gesture that needs them.
+	# _stream_for() caches fallback sounds and ResourceLoader caches files.
+	_stream_for("se",key)
+
 func _stream_for(section: String, key: String) -> AudioStream:
 	var paths = config.get(section, {})
 	if paths is Dictionary:

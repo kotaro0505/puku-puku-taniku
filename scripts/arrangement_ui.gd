@@ -120,6 +120,9 @@ var shop_grid:VBoxContainer
 var shop_restore_button:Button
 var pot_purchase_feedback:Dictionary={}
 var pot_purchase_feedback_generation:=0
+var pot_purchase_request_started_usec:Dictionary={}
+var last_pot_purchase_ui_ready_latency_msec:float=-1.0
+var last_pot_purchase_first_frame_latency_msec:float=-1.0
 var catalog_shop_page:Control
 var catalog_shop_wallet:Label
 var catalog_shop_message:Label
@@ -294,20 +297,69 @@ func close()->void:
 func show_pot_shop_message(message:String)->void:
 	shop_message.text=message;_refresh_pot_shop_cards()
 
-func show_pot_purchase_success(pot_id:String,before_count:int,after_count:int)->void:
+func show_pot_purchase_success(pot_id:String,before_count:int,after_count:int,puku_points:int=-1)->void:
 	if after_count<=before_count:return
 	pot_purchase_feedback_generation+=1
 	var generation:=pot_purchase_feedback_generation
-	pot_purchase_feedback[pot_id]={"before":before_count,"after":after_count,"generation":generation,"expires_msec":Time.get_ticks_msec()+roundi(POT_PURCHASE_FEEDBACK_SECONDS*1000.0)}
+	var profile_requested:=pot_purchase_request_started_usec.has(pot_id)
+	var request_usec:=int(pot_purchase_request_started_usec.get(pot_id,Time.get_ticks_usec()))
+	pot_purchase_request_started_usec.erase(pot_id)
+	pot_purchase_feedback[pot_id]={"before":before_count,"after":after_count,"generation":generation,"request_usec":request_usec,"profile_requested":profile_requested,"expires_msec":Time.get_ticks_msec()+10000}
+	owned_pots[pot_id]=after_count
+	if puku_points>=0:wallet_puku_points=maxi(0,puku_points)
 	# Normal Puku purchases use the card-local feedback below. Keep the small
 	# page-level message for hints, failures, and StoreKit status only.
 	shop_message.text=GameLocalizer.text(language_code,"all_pots_one_puku")
-	if visible and shop_page.visible:_refresh_pot_shop_cards()
-	await get_tree().create_timer(POT_PURCHASE_FEEDBACK_SECONDS).timeout
+	if visible and shop_page.visible:_update_pot_shop_after_purchase(pot_id)
+	var ready_usec:=Time.get_ticks_usec()
+	if profile_requested:last_pot_purchase_ui_ready_latency_msec=float(ready_usec-request_usec)/1000.0
+	if DisplayServer.get_name()=="headless":await get_tree().process_frame
+	else:await RenderingServer.frame_post_draw
 	var current_value=pot_purchase_feedback.get(pot_id,{})
+	if not current_value is Dictionary or int(current_value.get("generation",-1))!=generation:return
+	var first_frame_usec:=Time.get_ticks_usec()
+	if profile_requested:last_pot_purchase_first_frame_latency_msec=float(first_frame_usec-request_usec)/1000.0
+	current_value["expires_msec"]=Time.get_ticks_msec()+roundi(POT_PURCHASE_FEEDBACK_SECONDS*1000.0)
+	pot_purchase_feedback[pot_id]=current_value
+	if profile_requested and OS.is_debug_build():print("POT_PURCHASE_PROFILE pot_id=",pot_id," ui_ready_ms=",snappedf(last_pot_purchase_ui_ready_latency_msec,.001)," first_frame_ms=",snappedf(last_pot_purchase_first_frame_latency_msec,.001))
+	await get_tree().create_timer(POT_PURCHASE_FEEDBACK_SECONDS).timeout
+	current_value=pot_purchase_feedback.get(pot_id,{})
 	if current_value is Dictionary and int(current_value.get("generation",-1))==generation:
 		pot_purchase_feedback.erase(pot_id)
-		if visible and shop_page.visible and is_instance_valid(shop_grid):_refresh_pot_shop_cards()
+		var card:=_pot_shop_card_node(pot_id)
+		if card!=null:
+			var feedback_node:=card.find_child("PotPurchaseFeedback",true,false) as Control
+			if feedback_node!=null:_hide_pot_purchase_feedback(feedback_node)
+
+func _pot_shop_card_node(pot_id:String)->Control:
+	if not is_instance_valid(shop_grid):return null
+	for child_value in shop_grid.get_children():
+		if child_value is Control and str(child_value.get_meta("pot_id",""))==pot_id:return child_value as Control
+	return null
+
+func has_pot_purchase_request_timestamp(pot_id:String)->bool:
+	return pot_purchase_request_started_usec.has(pot_id)
+
+func _update_pot_shop_after_purchase(purchased_pot_id:String)->void:
+	if is_instance_valid(shop_wallet):shop_wallet.text=GameLocalizer.text(language_code,"wallet",[wallet_puku_points])
+	if not is_instance_valid(shop_grid):return
+	for card_value in shop_grid.get_children():
+		if not card_value is Control:continue
+		var card:=card_value as Control
+		var pot_id:=str(card.get_meta("pot_id",""))
+		var pot:=_pot_entry(pot_id)
+		if pot.is_empty():continue
+		var buy:=card.find_child("PotBuyButton",true,false) as Button
+		if buy!=null and bool(buy.get_meta("puku_purchase",false)):
+			var price:=maxi(0,int(pot.get("price_puku",0)))
+			buy.text=GameLocalizer.text(language_code,"buy_puku",[price])
+			buy.disabled=wallet_puku_points<price
+		if pot_id!=purchased_pot_id:continue
+		var owned_label:=card.find_child("PotOwnedTotal",true,false) as Label
+		if owned_label!=null:owned_label.text=GameLocalizer.text(language_code,"pot_owned_total",[_pot_total_count(pot_id)])
+		var content:=card.find_child("PotCardContent",true,false) as Control
+		if content==null:continue
+		if pot_purchase_feedback.has(pot_id):_show_pot_purchase_feedback(content,pot,pot_purchase_feedback[pot_id])
 
 func show_catalog_shop_message(message:String)->void:
 	catalog_shop_message.text=message;_refresh_catalog_shop()
@@ -1347,10 +1399,10 @@ func _refresh_pot_shop_cards()->void:
 		if not _pot_sales_stage_unlocked(pot):continue
 		var pot_id:=str(pot.get("pot_id",""));var total:=_pot_total_count(pot_id);var design_unlocked:=_pot_design_unlocked(pot);var price_value=pot.get("price_puku");var priced:=price_value is int or price_value is float;var price:=maxi(0,int(price_value)) if priced else 0
 		var card:=PanelContainer.new();card.name="PotCard_%s"%pot_id;card.set_meta("pot_id",pot_id);card.custom_minimum_size=Vector2(504,204);card.mouse_filter=Control.MOUSE_FILTER_PASS;card.clip_contents=true;card.add_theme_stylebox_override("panel",_box(Color("#f4e1bc"),Color("#b77c48"),20,3));shop_grid.add_child(card)
-		var content:=Control.new();content.custom_minimum_size=Vector2(484,184);content.mouse_filter=Control.MOUSE_FILTER_PASS;content.clip_contents=true;card.add_child(content)
+		var content:=Control.new();content.name="PotCardContent";content.custom_minimum_size=Vector2(484,184);content.mouse_filter=Control.MOUSE_FILTER_PASS;content.clip_contents=true;card.add_child(content)
 		var preview:=Control.new();preview.position=Vector2(2,2);preview.size=Vector2(214,176);preview.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.add_child(preview);_render_pot(preview,pot,true)
 		var name:=Label.new();name.text=GameLocalizer.pot_name(language_code,pot);name.position=Vector2(220,12);name.size=Vector2(258,45);name.mouse_filter=Control.MOUSE_FILTER_IGNORE;name.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name.add_theme_font_size_override("font_size",19);name.add_theme_color_override("font_color",UI_BROWN);content.add_child(name)
-		var condition:=Label.new();condition.text=GameLocalizer.text(language_code,"pot_owned_total",[total]) if design_unlocked else GameLocalizer.text(language_code,"pot_permanent_unlock");condition.position=Vector2(220,55);condition.size=Vector2(258,34);condition.mouse_filter=Control.MOUSE_FILTER_IGNORE;condition.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;condition.add_theme_font_size_override("font_size",13);condition.add_theme_color_override("font_color",Color("#79543a"));content.add_child(condition)
+		var condition:=Label.new();condition.name="PotOwnedTotal";condition.text=GameLocalizer.text(language_code,"pot_owned_total",[total]) if design_unlocked else GameLocalizer.text(language_code,"pot_permanent_unlock");condition.position=Vector2(220,55);condition.size=Vector2(258,34);condition.mouse_filter=Control.MOUSE_FILTER_IGNORE;condition.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;condition.add_theme_font_size_override("font_size",13);condition.add_theme_color_override("font_color",Color("#79543a"));content.add_child(condition)
 		var buy_text:="";var buy_enabled:=false;var product_id:=str(pot.get("iap_product_id",""));var buy_action:=Callable()
 		if design_unlocked:
 			buy_text=GameLocalizer.text(language_code,"buy_puku",[price]) if priced else GameLocalizer.text(language_code,"price_tbd")
@@ -1366,10 +1418,13 @@ func _refresh_pot_shop_cards()->void:
 				_:buy_text=GameLocalizer.text(language_code,"iap_purchase_unavailable")
 			buy_action=_request_pot_unlock.bind(product_id)
 		var buy:=_button(buy_text,Vector2(232,102),Vector2(236,58),Color("#d7aa64") if buy_enabled else Color("#b9a17d"),15)
+		buy.name="PotBuyButton";buy.set_meta("puku_purchase",design_unlocked)
 		_prepare_scroll_button(buy);buy.disabled=not buy_enabled
 		if buy_action.is_valid():buy.pressed.connect(buy_action)
 		content.add_child(buy)
-		if pot_purchase_feedback.has(pot_id):_add_pot_purchase_feedback(content,pot,pot_purchase_feedback[pot_id])
+		if design_unlocked:
+			_build_pot_purchase_feedback(content)
+			if pot_purchase_feedback.has(pot_id):_show_pot_purchase_feedback(content,pot,pot_purchase_feedback[pot_id])
 
 func _prune_pot_purchase_feedback()->void:
 	var now:=Time.get_ticks_msec()
@@ -1377,19 +1432,47 @@ func _prune_pot_purchase_feedback()->void:
 		var feedback_value=pot_purchase_feedback.get(pot_id_value,{})
 		if not feedback_value is Dictionary or int(feedback_value.get("expires_msec",0))<=now:pot_purchase_feedback.erase(pot_id_value)
 
-func _add_pot_purchase_feedback(content:Control,pot:Dictionary,feedback:Dictionary)->void:
+func _build_pot_purchase_feedback(content:Control)->Control:
+	var existing:=content.find_child("PotPurchaseFeedback",true,false) as Control
+	if existing!=null:return existing
 	var panel:=Panel.new();panel.name="PotPurchaseFeedback";panel.position=Vector2(218,2);panel.size=Vector2(262,94);panel.mouse_filter=Control.MOUSE_FILTER_IGNORE
 	var panel_style:=_box(Color("#fff4d2"),Color("#e2b75e"),14,2);panel_style.shadow_size=0;panel_style.shadow_offset=Vector2.ZERO;panel.add_theme_stylebox_override("panel",panel_style);content.add_child(panel)
 	for sparkle_index in 4:
 		var sparkle:=Label.new();sparkle.name="PotPurchaseSparkle%d"%sparkle_index;sparkle.text="✦";sparkle.position=[Vector2(7,4),Vector2(238,5),Vector2(10,69),Vector2(235,68)][sparkle_index];sparkle.size=Vector2(18,20);sparkle.mouse_filter=Control.MOUSE_FILTER_IGNORE;sparkle.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;sparkle.add_theme_font_size_override("font_size",13 if sparkle_index%2==0 else 11);sparkle.add_theme_color_override("font_color",Color("#d89b2b"));sparkle.modulate.a=.35;panel.add_child(sparkle)
-		var sparkle_tween:=sparkle.create_tween().set_loops();sparkle_tween.tween_property(sparkle,"modulate:a",1.0,.28+.05*sparkle_index);sparkle_tween.tween_property(sparkle,"modulate:a",.35,.34+.04*sparkle_index)
-	var success:=Label.new();success.name="PotPurchaseSuccessMessage";success.text=GameLocalizer.text(language_code,"pot_purchase_success",[GameLocalizer.pot_name(language_code,pot)]);success.position=Vector2(14,3);success.size=Vector2(234,50);success.mouse_filter=Control.MOUSE_FILTER_IGNORE;success.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;success.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;success.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;success.add_theme_font_size_override("font_size",17 if language_code==GameLocalizer.LANGUAGE_JA else 16);success.add_theme_color_override("font_color",UI_BROWN);panel.add_child(success)
+	var success:=Label.new();success.name="PotPurchaseSuccessMessage";success.position=Vector2(14,3);success.size=Vector2(234,50);success.mouse_filter=Control.MOUSE_FILTER_IGNORE;success.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;success.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;success.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;success.add_theme_font_size_override("font_size",17 if language_code==GameLocalizer.LANGUAGE_JA else 16);success.add_theme_color_override("font_color",UI_BROWN);panel.add_child(success)
 	var count_row:=HBoxContainer.new();count_row.name="PotPurchaseCountChange";count_row.position=Vector2(14,51);count_row.size=Vector2(234,38);count_row.mouse_filter=Control.MOUSE_FILTER_IGNORE;count_row.alignment=BoxContainer.ALIGNMENT_CENTER;count_row.add_theme_constant_override("separation",5);panel.add_child(count_row)
-	var before:=Label.new();before.name="PotPurchaseCountBefore";before.text=GameLocalizer.text(language_code,"pot_purchase_owned_before",[int(feedback.get("before",0))]);before.custom_minimum_size=Vector2(0,36);before.mouse_filter=Control.MOUSE_FILTER_IGNORE;before.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;before.add_theme_font_size_override("font_size",14);before.add_theme_color_override("font_color",Color("#79543a"));count_row.add_child(before)
-	var after:=Label.new();after.name="PotPurchaseCountAfter";after.text=GameLocalizer.text(language_code,"pot_purchase_owned_after",[int(feedback.get("after",0))]);after.custom_minimum_size=Vector2(0,36);after.mouse_filter=Control.MOUSE_FILTER_IGNORE;after.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;after.add_theme_font_size_override("font_size",23);after.add_theme_color_override("font_color",Color("#bc6f19"));after.add_theme_color_override("font_outline_color",Color("#fff9e8"));after.add_theme_constant_override("outline_size",4);count_row.add_child(after)
+	var before:=Label.new();before.name="PotPurchaseCountBefore";before.custom_minimum_size=Vector2(0,36);before.mouse_filter=Control.MOUSE_FILTER_IGNORE;before.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;before.add_theme_font_size_override("font_size",14);before.add_theme_color_override("font_color",Color("#79543a"));count_row.add_child(before)
+	var after:=Label.new();after.name="PotPurchaseCountAfter";after.custom_minimum_size=Vector2(0,36);after.mouse_filter=Control.MOUSE_FILTER_IGNORE;after.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;after.add_theme_font_size_override("font_size",23);after.add_theme_color_override("font_color",Color("#bc6f19"));after.add_theme_color_override("font_outline_color",Color("#fff9e8"));after.add_theme_constant_override("outline_size",4);count_row.add_child(after)
+	panel.visible=false
+	return panel
+
+func _show_pot_purchase_feedback(content:Control,pot:Dictionary,feedback:Dictionary)->void:
+	var panel:=_build_pot_purchase_feedback(content)
+	(panel.find_child("PotPurchaseSuccessMessage",true,false) as Label).text=GameLocalizer.text(language_code,"pot_purchase_success",[GameLocalizer.pot_name(language_code,pot)])
+	(panel.find_child("PotPurchaseCountBefore",true,false) as Label).text=GameLocalizer.text(language_code,"pot_purchase_owned_before",[int(feedback.get("before",0))])
+	(panel.find_child("PotPurchaseCountAfter",true,false) as Label).text=GameLocalizer.text(language_code,"pot_purchase_owned_after",[int(feedback.get("after",0))])
+	for sparkle_index in 4:
+		var sparkle:=panel.find_child("PotPurchaseSparkle%d"%sparkle_index,true,false) as Label
+		var previous_tween=sparkle.get_meta("purchase_feedback_tween") if sparkle.has_meta("purchase_feedback_tween") else null
+		if previous_tween is Tween and previous_tween.is_valid():previous_tween.kill()
+		sparkle.modulate.a=.35
+		var sparkle_tween:=sparkle.create_tween().set_loops();sparkle_tween.tween_property(sparkle,"modulate:a",1.0,.28+.05*sparkle_index);sparkle_tween.tween_property(sparkle,"modulate:a",.35,.34+.04*sparkle_index);sparkle.set_meta("purchase_feedback_tween",sparkle_tween)
+	panel.visible=true;panel.move_to_front()
+
+func _hide_pot_purchase_feedback(panel:Control)->void:
+	panel.visible=false
+	for sparkle_value in panel.find_children("PotPurchaseSparkle*","Label",true,false):
+		var sparkle:=sparkle_value as Label
+		var sparkle_tween=sparkle.get_meta("purchase_feedback_tween") if sparkle.has_meta("purchase_feedback_tween") else null
+		if sparkle_tween is Tween and sparkle_tween.is_valid():sparkle_tween.kill()
+		sparkle.remove_meta("purchase_feedback_tween");sparkle.modulate.a=.35
 
 func _request_pot_purchase(pot_id:String)->void:
+	pot_purchase_request_started_usec[pot_id]=Time.get_ticks_usec()
 	pot_purchase_requested.emit(pot_id)
+	# The purchase signal is synchronous. Success consumes the timestamp in
+	# show_pot_purchase_success(); failures discard it here.
+	pot_purchase_request_started_usec.erase(pot_id)
 
 func _request_pot_unlock(product_id:String)->void:
 	pot_unlock_requested.emit(product_id)
