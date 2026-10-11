@@ -7,6 +7,7 @@ const FONT_COLOR := Color("#4a2618")
 const FONT_SIZE := 19
 const CORNER_RADIUS := 20
 const BORDER_WIDTH := 3
+const PANEL_BOTTOM_MARGIN := 0.0
 
 
 static func apply(button: Button) -> void:
@@ -20,7 +21,7 @@ static func apply(button: Button) -> void:
 	button.add_theme_stylebox_override("pressed", _style(BACKGROUND_COLOR.darkened(0.08), BACKGROUND_COLOR.lightened(0.20)))
 
 
-static func place_at_panel_bottom(button: Button, panel: Control, bottom_margin := 13.0) -> void:
+static func place_at_panel_bottom(button: Button, panel: Control, bottom_margin := PANEL_BOTTOM_MARGIN) -> void:
 	button.position = Vector2(
 		panel.position.x + (panel.size.x - BUTTON_SIZE.x) * 0.5,
 		panel.position.y + panel.size.y - BUTTON_SIZE.y - bottom_margin
