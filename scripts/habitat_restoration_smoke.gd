@@ -546,21 +546,45 @@ func _test_integrated_final_chapter() -> void:
 	assert(not game.habitat_restoration_ui.lamp_panel.visible)
 	assert(game.scripted_dialog_kind == "post_ending_greenhouse")
 	var expected_post_ending_greenhouse_lines := [
-		"原生地、元気になって良かったね",
-		"ジュレジュレ団も、ジュレジュレ団なりにがんばってたしね",
-		"うん。みんなで戻したんだ",
-		"この先もずっと、多肉植物がある世界だといいね",
+		"原生地、\n元気になって良かったね！",
+		"ジュレジュレ団も、ジュレジュレ団\nなりにがんばってたしね！",
+		"うん。みんなで戻したんだ。",
+		"この先もずっと、多肉植物がある世界だといいね。",
 		"よーし",
 		"これからも、いっぱいたね蒔こ！",
 		"まだまだ、僕たちの多肉植物の物語は始まったばかりだ！",
 	]
+	var expected_post_ending_greenhouse_speakers := ["girl", "panda", "armadillo", "girl", "girl", "girl", "panda"]
+	var expected_portrait_paths := {
+		"girl": "res://assets/dialogue/girl-dialogue.png",
+		"panda": "res://assets/panda-clerk.png",
+		"armadillo": "res://assets/armadillo-dialogue.png",
+	}
+	var expected_speaker_keys := {
+		"girl": "story_speaker_girl",
+		"panda": "story_speaker_panda",
+		"armadillo": "armadillo_name",
+	}
 	assert(game.scripted_dialog_pages.size() == expected_post_ending_greenhouse_lines.size())
 	for index in expected_post_ending_greenhouse_lines.size():
 		assert(str(game.scripted_dialog_pages[index].get("text", "")) == expected_post_ending_greenhouse_lines[index])
+		var expected_speaker := str(expected_post_ending_greenhouse_speakers[index])
+		assert(str(game.scripted_dialog_pages[index].get("speaker", "")) == expected_speaker)
+		assert(game.scripted_dialog_index == index)
+		assert(game.intro_dialogue_label.text == expected_post_ending_greenhouse_lines[index])
+		assert(game.intro_speaker_label.text == Localizer.text(game.language_code, str(expected_speaker_keys[expected_speaker])))
+		assert(game.intro_panda_portrait.visible and game.intro_panda_portrait.texture != null)
+		var portrait_texture := game.intro_panda_portrait.texture as Texture2D
+		var portrait_path := portrait_texture.resource_path
+		if portrait_texture is AtlasTexture:
+			portrait_path = (portrait_texture as AtlasTexture).atlas.resource_path
+		assert(portrait_path == str(expected_portrait_paths[expected_speaker]))
+		game._advance_scripted_dialog()
 	assert(HabitatRestorationClass.post_ending_greenhouse_dialog_seen(game._restoration_state()))
-	_finish_dialog(game)
 	await get_tree().process_frame
 	assert(game.scripted_dialog_kind.is_empty())
+	assert(not game.intro_overlay.visible)
+	assert(game.current_mode == "greenhouse")
 	game._try_start_pending_story_event()
 	assert(game.scripted_dialog_kind.is_empty())
 	assert(not game._resume_restoration_ending())
