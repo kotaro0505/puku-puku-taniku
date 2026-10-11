@@ -31,6 +31,11 @@ func _ready()->void:
 	assert("おはなやさんの ぱんだ" in Localizer.text("hiragana","opening_story_4"))
 	assert("a girl who loved gardening" in Localizer.text("en","opening_story_1"))
 	assert("Panda from the flower shop" in Localizer.text("en","opening_story_4"))
+	assert(Localizer.text("ja","opening_story_1")=="ある日、\n\nガーデニングが大好きな女の子が、\n\n古い倉庫のすみで、ほこりをかぶった\n\n一冊の本を見つけました。\n\n「なんだろう、これ……」")
+	assert(Localizer.text("ja","opening_story_4")=="翌日、お花屋さんのパンダが、\n\n古いタネ袋を見つけました。\n\n「これ、なんのタネだろう？」\n\n3人は顔を見合わせました。\n\n「もしかして……多肉植物のタネ！？」\n\n3人は、そのタネを蒔いてみることにしました。")
+	for locale in Localizer.SUPPORTED_LANGUAGES:
+		assert("\n" not in Localizer.text(locale,"opening_story_1").replace("\n\n",""))
+		assert("\n" not in Localizer.text(locale,"opening_story_4").replace("\n\n",""))
 	assert("古い植物の本" in Localizer.text("ja","opening_story_2"))
 	assert("原種図鑑" not in Localizer.text("ja","opening_story_2"))
 	assert(not "売れ残った" in Localizer.text("ja","intro_old_seed"))
@@ -59,6 +64,12 @@ func _ready()->void:
 	var panel_style:=story.text_panel.get_theme_stylebox("panel") as StyleBoxFlat
 	assert(panel_style!=null and panel_style.border_width_left==2 and panel_style.border_width_top==2 and panel_style.border_width_right==2 and panel_style.border_width_bottom==2)
 	assert(story.text_panel.position.x>0.0 and story.text_panel.position.x+story.text_panel.size.x<576.0 and story.text_panel.position.y+story.text_panel.size.y<=1000.0)
+	for locale in Localizer.SUPPORTED_LANGUAGES:
+		for page_index in [0,3]:
+			story.start(true,page_index,locale)
+			await get_tree().process_frame
+			assert(story.story_text.get_line_count()*story.story_text.get_line_height()<=story.story_text.size.y)
+	story.start(false,0,"ja")
 	for expected_page in range(4):
 		assert(story.current_page_index==expected_page)
 		assert(story.page_image.texture.resource_path=="res://assets/opening_story/page-%d.jpg"%[expected_page+1])
