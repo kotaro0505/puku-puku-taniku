@@ -36,8 +36,10 @@ func _test_localized_continuation_copy() -> void:
 		assert(Localizer.text(locale, "tap_to_close") != expected)
 	assert("\n" not in Localizer.text("ja", "awakening_promise_3"))
 	assert("\n" not in Localizer.text("hiragana", "awakening_promise_3"))
-	for key in ["story_trio_3", "story_habitat_found_1", "awakening_memory", "awakening_promise_3", "final_theme_girl", "jurejure_confront_girl_1", "story_complete_2"]:
+	for key in ["story_habitat_found_1", "awakening_memory", "awakening_promise_3", "final_theme_girl", "story_complete_2"]:
 		assert("\n" not in Localizer.text("en", key))
+	assert(Localizer.text("en", "story_trio_3") == "I can't believe it.\nPlants lost for so long\nare right before our eyes...")
+	assert(Localizer.text("en", "jurejure_confront_girl_1") == "Succulents went extinct long ago\nbecause of people like you!")
 
 
 func _test_story_overlay_continuation_copy() -> void:

@@ -17,6 +17,9 @@ func _ready() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	game._reset_progression_state()
+	# This story-flow suite invokes the GET close handler directly. Leave the
+	# input-latency profiler to input_response_smoke, which supplies real taps.
+	game.get_close_profile_enabled=false
 	_hide_foreground(game)
 	_test_base_catalog_contract(game)
 	_test_mission_copy_and_progress(game)

@@ -17,16 +17,24 @@ func _ready()->void:
 	game._open_play_modal();assert(not game.play_active and game.puku_balance_units==999 and game.shop_overlay.visible)
 	game._close_shop()
 	game.puku_balance_units=5000;game._update_play_ui()
-	assert(game.play_open_button.visible and game.play_open_button.text=="たねをまく　1ぷくコイン")
+	assert(game.play_open_button.visible and game.play_open_button.text=="たねをまく\n1ぷくコイン消費")
 	game._open_play_modal()
 	assert(game.play_active and game.puku_balance_units==4000 and game.endless_economy_seed_cost_units==1000)
 	assert(game.play_concurrent_target>=7 and game.play_concurrent_target<=10)
 	assert(game.play_seeds_remaining==12-game.play_concurrent_target)
 	await get_tree().create_timer(.42).timeout
 	assert(game.plants.size()==game.play_concurrent_target and game.endless_economy_seed_count==game.play_concurrent_target)
-	for settlement_index in range(12):
+	# This suite settles the round manually. Pause the game's frame loop and
+	# disable automatic checks before each manual tick so the formal random
+	# jelly system cannot race the deterministic twelve-settlement assertions.
+	game.set_process(false)
+	var manual_settlements_remaining: int = game.NORMAL_GERMINATION_COUNT-game.endless_economy_harvest_count-game.endless_economy_jelly_count
+	assert(manual_settlements_remaining==12)
+	for settlement_index in range(manual_settlements_remaining):
+		for remaining_plant in game.plants:
+			if is_instance_valid(remaining_plant) and remaining_plant.state=="growing":remaining_plant.jelly_checks_enabled=false
 		assert(game.play_active and not game.plants.is_empty(),"round ended before all 12 seeds settled")
-		var plant=game.plants[0];plant.jelly_checks_enabled=false;plant.jelly()
+		var plant=game.plants[0];plant.jelly()
 		await get_tree().process_frame
 		if game.play_active and game.play_spawn_queue>0:
 			game.play_spawn_timer=0.0;game._process(.01)

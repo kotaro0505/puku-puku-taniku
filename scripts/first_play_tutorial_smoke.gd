@@ -388,13 +388,20 @@ func _ready() -> void:
 	assert(not Localizer.text("ja","puku_buyback_2").contains("1ぷく未満"))
 	assert(not game.first_seed_pod_reward_event_active and game.normal_seed_bags == 0 and is_zero_approx(game.puku_gauge_cm))
 
-	# The scripted jelly and NEW harvest settled two seeds. Settle the remaining
-	# ten as jelly so this tutorial suite also proves
-	# that the first formal round ends at exactly twelve settlements.
-	for settlement_index in range(10):
+	# The scripted jelly and NEW harvest settled two seeds. This final section
+	# deliberately drives the other settlements itself, so disable automatic
+	# jelly checks on every currently growing plant before each manual tick.
+	# Production rates stay untouched and are covered by jelly_dev_smoke; this
+	# keeps this tutorial-flow test deterministic on slower CI machines too.
+	assert(game.endless_economy_harvest_count == 1 and game.endless_economy_jelly_count == 1)
+	var manual_settlements_remaining: int = game.NORMAL_GERMINATION_COUNT - game.endless_economy_harvest_count - game.endless_economy_jelly_count
+	assert(manual_settlements_remaining == 10)
+	for settlement_index in range(manual_settlements_remaining):
+		for remaining_plant in game.plants:
+			if is_instance_valid(remaining_plant) and remaining_plant.state == "growing":
+				remaining_plant.jelly_checks_enabled = false
 		assert(game.play_active and not game.plants.is_empty(), "first normal round ended before all 12 seeds settled")
 		var plant_to_jelly = game.plants[0]
-		plant_to_jelly.jelly_checks_enabled=false
 		plant_to_jelly.jelly()
 		await get_tree().process_frame
 		if game.play_active and game.play_spawn_queue>0:

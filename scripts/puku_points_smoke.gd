@@ -5,6 +5,9 @@ func _ready()->void:
 	await get_tree().process_frame;await get_tree().process_frame
 	game.endless_greenhouse.configure(false)
 	game._reset_progression_state();game.intro_story_complete=true;game.mystery_items_acquired=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.habitat_tutorial_complete=true;game.puku_gauge_intro_complete=true;game.normal_play_tutorial_complete=true;game.seed_pod_gauge_discovery_complete=true;game.seed_pod_first_reward_seen=true;game.puku_buyback_tutorial_complete=true;game.total_play_count=3
+	# This economy suite invokes the GET close handler directly without a real
+	# close tap. Input-response profiling is covered by its dedicated smoke.
+	game.get_close_profile_enabled=false
 	_test_seed_pod_thresholds(game)
 	game.endless_greenhouse.configure(true)
 	_test_fixed_point_and_harvest_curve(game)
@@ -137,7 +140,7 @@ func _test_panda_rescue(game)->void:
 	game._request_rescue_reward_ad();await get_tree().create_timer(.8).timeout
 	assert(game.puku_balance_units==1100 and game.normal_round_free_plays==0 and not game.rescue_reward_in_progress and not game.play_active)
 	game._close_shop();game._update_play_ui()
-	assert(game.play_open_button.text=="たねをまく　1ぷくコイン")
+	assert(game.play_open_button.text=="たねをまく\n1ぷくコイン消費")
 	game._start_greenhouse_play("normal");assert(game.play_active and game.normal_round_free_plays==0 and game.puku_balance_units==100 and game.endless_economy_seed_cost_units==1000)
 	assert(game.FOREST_GACHA_SPIN_COST==1)
 	game.play_active=false
