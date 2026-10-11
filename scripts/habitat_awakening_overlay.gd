@@ -23,14 +23,25 @@ const SPEAKER_KEYS := [
 const GHOST_TEXTURES: Array[Texture2D] = [
 	preload("res://assets/plants/habitat/sprite-colorata.png"),
 	preload("res://assets/plants/habitat/sprite-lutea.png"),
+	preload("res://assets/plants/habitat/sprite-hyalina-san-luis.png"),
+	preload("res://assets/plants/habitat/sprite-purpusorum.png"),
 	preload("res://assets/plants/habitat/sprite-shaviana.png"),
+	preload("res://assets/plants/habitat/sprite-pinwheel.png"),
+	preload("res://assets/plants/habitat/sprite-carnicolor-glau-grey.png"),
+	preload("res://assets/plants/habitat/sprite-affinis.png"),
 	preload("res://assets/plants/habitat/sprite-laui.png"),
-	preload("res://assets/plants/habitat/sprite-kante.png")
+	preload("res://assets/plants/habitat/sprite-kante.png"),
+	preload("res://assets/plants/habitat/sprite-tovarensis-tovar.png")
 ]
 const GHOST_CENTER_RATIOS := [
-	Vector2(0.115, 0.34), Vector2(0.30, 0.52), Vector2(0.50, 0.29),
-	Vector2(0.70, 0.49), Vector2(0.885, 0.36)
+	Vector2(0.10, 0.16), Vector2(0.31, 0.13), Vector2(0.53, 0.18),
+	Vector2(0.75, 0.14), Vector2(0.91, 0.23), Vector2(0.17, 0.38),
+	Vector2(0.49, 0.33), Vector2(0.80, 0.41), Vector2(0.13, 0.61),
+	Vector2(0.40, 0.58), Vector2(0.70, 0.61)
 ]
+const GHOST_SIZE_SCALES := [0.62, 0.76, 0.58, 0.70, 0.66, 0.96, 1.24, 0.90, 1.08, 0.82, 1.28]
+const GHOST_PEAK_ALPHAS := [0.33, 0.38, 0.30, 0.36, 0.34, 0.54, 0.62, 0.50, 0.58, 0.47, 0.66]
+const GHOST_SETTLE_ALPHAS := [0.18, 0.22, 0.16, 0.20, 0.19, 0.32, 0.40, 0.29, 0.35, 0.26, 0.42]
 const SPROUT_TEXTURES: Array[Texture2D] = [
 	preload("res://assets/plants/habitat/sprite-colorata.png"),
 	preload("res://assets/plants/habitat/sprite-affinis.png"),
@@ -257,7 +268,8 @@ func _layout_ghosts() -> void:
 	var side := clampf(minf(area.x * 0.23, area.y * 0.13), 104.0, 145.0)
 	for index in mini(ghosts.size(), GHOST_CENTER_RATIOS.size()):
 		var ghost := ghosts[index]
-		ghost.size = Vector2(side, side)
+		var ghost_side := side * float(GHOST_SIZE_SCALES[index])
+		ghost.size = Vector2(ghost_side, ghost_side)
 		ghost.position = Vector2(area.x * GHOST_CENTER_RATIOS[index].x, area.y * GHOST_CENTER_RATIOS[index].y) - ghost.size * 0.5
 
 func _show_page() -> void:
@@ -349,12 +361,13 @@ func _begin_memory_reveal() -> void:
 	)
 
 func _show_ghosts() -> void:
+	var stagger_seconds := 0.40 / maxf(1.0, float(ghosts.size() - 1))
 	for index in ghosts.size():
 		var ghost := ghosts[index]
 		var tween := create_tween()
-		tween.tween_interval(float(index) * 0.10)
-		tween.tween_property(ghost, "modulate:a", 0.58, 0.42)
-		tween.tween_property(ghost, "modulate:a", 0.34, 0.36)
+		tween.tween_interval(float(index) * stagger_seconds)
+		tween.tween_property(ghost, "modulate:a", float(GHOST_PEAK_ALPHAS[index]), 0.42)
+		tween.tween_property(ghost, "modulate:a", float(GHOST_SETTLE_ALPHAS[index]), 0.36)
 
 func _begin_rain_softening() -> void:
 	transitioning = true

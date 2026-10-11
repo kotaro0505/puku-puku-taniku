@@ -43,11 +43,27 @@ func _ready() -> void:
 	await get_tree().process_frame
 	assert(not game.habitat_lookaround_active and is_equal_approx(game.view_yaw, arrival_end_yaw))
 	assert(game.habitat_awakening_overlay.page_index == 1)
+	assert(game.habitat_awakening_overlay.ghosts.size() == 11)
 	var ghost_centers: Array[Vector2] = []
+	var ghost_sizes: Array[float] = []
+	var ghost_texture_paths: Dictionary = {}
+	var ghost_top_count := 0
+	var ghost_middle_count := 0
+	var ghost_bottom_count := 0
 	for ghost in game.habitat_awakening_overlay.ghosts:
-		ghost_centers.append(ghost.position + ghost.size * 0.5)
-	assert(ghost_centers[0].x < 0.2 * 576.0 and ghost_centers[2].x > 0.4 * 576.0 and ghost_centers[2].x < 0.6 * 576.0 and ghost_centers[4].x > 0.8 * 576.0)
-	assert(not is_equal_approx(ghost_centers[0].y, ghost_centers[1].y) and not is_equal_approx(ghost_centers[2].y, ghost_centers[3].y))
+		var center: Vector2 = ghost.position + ghost.size * 0.5
+		ghost_centers.append(center)
+		ghost_sizes.append(ghost.size.x)
+		ghost_texture_paths[ghost.texture.resource_path] = true
+		assert(ghost.position.y + ghost.size.y < game.habitat_awakening_overlay.text_back.position.y)
+		if center.y < 0.27 * 1024.0:ghost_top_count += 1
+		elif center.y < 0.52 * 1024.0:ghost_middle_count += 1
+		else:ghost_bottom_count += 1
+	assert(ghost_texture_paths.size() == 11)
+	assert(ghost_centers[0].x < 0.2 * 576.0 and ghost_centers[6].x > 0.4 * 576.0 and ghost_centers[6].x < 0.6 * 576.0 and ghost_centers[4].x > 0.8 * 576.0)
+	assert(ghost_top_count >= 4 and ghost_middle_count >= 3 and ghost_bottom_count >= 3)
+	assert(ghost_sizes.min() < 90.0 and ghost_sizes.max() > 160.0 and ghost_sizes.max() - ghost_sizes.min() > 80.0)
+	assert(game.habitat_awakening_overlay.GHOST_SETTLE_ALPHAS.min() < 0.20 and game.habitat_awakening_overlay.GHOST_SETTLE_ALPHAS.max() > 0.40)
 	for locale in Localizer.SUPPORTED_LANGUAGES:
 		for key in game.habitat_awakening_overlay.DIALOG_KEYS:
 			if not str(key).begins_with("_pause_"):
