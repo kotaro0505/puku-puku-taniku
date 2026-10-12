@@ -106,10 +106,23 @@ func _test_mission_copy_and_progress(game: Node) -> void:
 		game.species_get_counts[fantasy_ids[index]] = 1
 	assert(game._unique_fantasy_species_get_count() == 10)
 	assert(game._unique_act2_species_get_count() == 15)
-	assert(game._current_mission_text() == "最高記録を目指しながら、新しい品種を24種類見つけよう！　15/24")
+	assert(game._current_mission_text() == "最高記録を目指しながら、新しい品種を\n24種類見つけよう！　15/24")
 	game._update_mission_ui()
 	assert(game.mission_panel.visible)
 	assert(game.mission_title_label.text == "ミッション")
+	var localized_missions := {
+		"ja": "最高記録を目指しながら、新しい品種を\n24種類見つけよう！　15/24",
+		"hiragana": "さいこうきろくを めざしながら、あたらしい ひんしゅを\n24しゅるい みつけよう！　15/24",
+		"en": "Aim for a new personal best while discovering 24 new varieties!  15/24",
+	}
+	for locale in Localizer.SUPPORTED_LANGUAGES:
+		game.language_code = locale
+		game._update_mission_ui()
+		assert(game.mission_text_label.text == localized_missions[locale])
+		assert(game.mission_text_label.get_visible_line_count() == game.mission_text_label.get_line_count(), "mission text clipped locale=%s visible=%d total=%d size=%s" % [locale, game.mission_text_label.get_visible_line_count(), game.mission_text_label.get_line_count(), game.mission_text_label.size])
+	assert(str(localized_missions["ja"]).count("\n") == 1)
+	game.language_code = "ja"
+	game._update_mission_ui()
 	game.play_active = true
 	game._update_mission_ui()
 	assert(not game.mission_panel.visible)
@@ -127,7 +140,7 @@ func _test_mission_copy_and_progress(game: Node) -> void:
 	game.act3_intro_seen = false
 	assert(game._unique_fantasy_species_get_count() == 11)
 	assert(game._unique_act2_species_get_count() == 23)
-	assert(game._current_mission_text() == "最高記録を目指しながら、新しい品種を24種類見つけよう！　23/24")
+	assert(game._current_mission_text() == "最高記録を目指しながら、新しい品種を\n24種類見つけよう！　23/24")
 	game._refresh_narrative_species_progress()
 	assert(not game.act3_unlocked)
 	game.species_get_counts[fantasy_ids[11]] = 1
@@ -147,7 +160,7 @@ func _test_mission_copy_and_progress(game: Node) -> void:
 	game.act3_intro_pending = false
 	assert(game._unique_fantasy_species_get_count() == 10)
 	assert(game._unique_act2_species_get_count() == 22)
-	assert(game._current_mission_text() == "最高記録を目指しながら、新しい品種を24種類見つけよう！　22/24")
+	assert(game._current_mission_text() == "最高記録を目指しながら、新しい品種を\n24種類見つけよう！　22/24")
 
 	game.species_get_counts.clear()
 	game.act3_intro_seen = true

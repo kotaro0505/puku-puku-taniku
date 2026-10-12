@@ -4846,6 +4846,8 @@ func _update_mission_ui()->void:
 	var mission_text:=_current_mission_text()
 	mission_title_label.text=Localizer.text(language_code,"mission_title")
 	mission_text_label.text=mission_text
+	var hiragana_fantasy_mission:=language_code=="hiragana" and mission_text==Localizer.text(language_code,"mission_fantasy_species",[mini(24,_unique_act2_species_get_count())])
+	mission_text_label.add_theme_font_size_override("font_size",15 if hiragana_fantasy_mission else 16)
 	mission_panel.visible=not play_active and not mission_text.is_empty() and _mission_foreground_safe() and not arrangement_scene_active and not arrangement_transitioning
 
 func _update_play_ui()->void:
