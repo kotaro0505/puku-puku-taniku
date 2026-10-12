@@ -92,14 +92,25 @@ func _next_stage_boundary(age:float)->float:
 	return (floorf(age/KakuhenSystemClass.INTERVAL_SECONDS)+1.0)*KakuhenSystemClass.INTERVAL_SECONDS
 
 
+func _integrated_growth_rhythm(start_age:float,end_age:float,period:float,phase:float)->float:
+	var duration:=maxf(0.0,end_age-start_age)
+	var amplitude:=float(JellyBalanceClass.FORMAL.rhythm_amplitude)
+	if duration<=0.0 or amplitude<=0.0:return duration
+	var omega:=TAU/maxf(.001,period)
+	return duration+(amplitude/omega)*(cos(omega*start_age+phase)-cos(omega*end_age+phase))
+
+
 func _monte_carlo_reach_counts()->Array[int]:
 	var counts:Array[int]=[]
 	for _target in TARGETS:counts.append(0)
 	var random:=RandomNumberGenerator.new();random.seed=20261015
+	var growth_random:=RandomNumberGenerator.new();growth_random.seed=20261016
 	var rates:=JellyBalanceClass.rate_values(JellyBalanceClass.FORMAL)
 	var base_cm_per_second:=SucculentClass.GROWTH_CM_PER_SECOND*float(JellyBalanceClass.FORMAL.growth_speed)
 	for _sample in range(MONTE_CARLO_SAMPLES):
 		var state_name:=KakuhenSystemClass.entry_outcome(random.randf())
+		var rhythm_period:=growth_random.randf_range(16.0,28.0)
+		var rhythm_phase:=growth_random.randf_range(0.0,TAU)
 		var age:=0.0;var diameter:=1.6;var target_index:=0
 		while target_index<TARGETS.size():
 			var kakuhen_boundary:=(floorf(age/KakuhenSystemClass.INTERVAL_SECONDS)+1.0)*KakuhenSystemClass.INTERVAL_SECONDS
@@ -112,7 +123,7 @@ func _monte_carlo_reach_counts()->Array[int]:
 				elif chance_per_second>0.0:failure_after=log(maxf(random.randf(),.000000000001))/log(1.0-chance_per_second)
 			var lived_duration:=minf(duration,failure_after)
 			var speed_factor:=KakuhenSystemClass.ACCELERATION_MULTIPLIER if KakuhenSystemClass.is_accelerated(state_name) else 1.0
-			diameter+=lived_duration*base_cm_per_second*speed_factor
+			diameter+=_integrated_growth_rhythm(age,age+lived_duration,rhythm_period,rhythm_phase)*base_cm_per_second*speed_factor
 			while target_index<TARGETS.size() and diameter>=TARGETS[target_index]:
 				counts[target_index]+=1;target_index+=1
 			if failure_after<duration-.000000001:break
@@ -167,7 +178,7 @@ func _ready()->void:
 	assert(is_equal_approx(float(rows[5].reward_puku),62.0))
 	assert(is_equal_approx(float(rows[6].reward_puku),122.0))
 	assert(is_equal_approx(float(rows[7].reward_puku),272.0))
-	print("PUKU_ECONOMY_BALANCE_REPORT current_trial_rates=1/2/4.5/7.5 normal_rates=1/2.5/5/8 growth=1.6 kakuhen=.5 continuation=91 samples=",MONTE_CARLO_SAMPLES," rows=",JSON.stringify(rows))
+	print("PUKU_ECONOMY_BALANCE_REPORT current_trial_rates=1/2/4.5/7.5 normal_rates=1/2.5/5/8 growth=1.6 rhythm=+-10% kakuhen=.5 continuation=91 samples=",MONTE_CARLO_SAMPLES," rows=",JSON.stringify(rows))
 	print("PUKU_ECONOMY_BALANCE_SMOKE_OK targets=50-1000 exact=true monte_carlo=true reward_curve=unchanged")
 	economy.free()
 	get_tree().quit()
