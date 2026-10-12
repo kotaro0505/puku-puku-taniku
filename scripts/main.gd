@@ -1365,14 +1365,21 @@ func _trial_dev_controls_enabled_for_context(_is_web_build:bool)->bool:
 func _is_endless_normal_play()->bool:
 	return _is_endless_greenhouse_enabled() and play_active and active_seed_type=="normal"
 
+func _is_normal_twelve_seed_play()->bool:
+	return play_active and active_seed_type=="normal" and current_target_count==NORMAL_GERMINATION_COUNT
+
 func _endless_puku_economy_active()->bool:
 	return _is_endless_normal_play() and puku_gauge_intro_complete
 
 func _greenhouse_jelly_balance_for_spawn()->Dictionary:
 	# Every new greenhouse plant snapshots the currently active four-stage rates.
 	# Developer overrides are runtime-only and never enter the save payload.
-	var balance:=JellyBalanceClass.effective() if _trial_dev_controls_enabled() and JellyBalanceClass.override_enabled else JellyBalanceClass.FORMAL
-	return balance.duplicate(true)
+	var normal_twelve_seed:=_is_normal_twelve_seed_play()
+	var use_dev_override:=_trial_dev_controls_enabled() and JellyBalanceClass.override_enabled and (normal_twelve_seed or dev_jelly_test_active)
+	var source:=JellyBalanceClass.effective() if use_dev_override else JellyBalanceClass.FORMAL if normal_twelve_seed or dev_jelly_test_active else JellyBalanceClass.NON_NORMAL
+	var balance:Dictionary=source.duplicate(true)
+	balance["kakuhen_enabled"]=normal_twelve_seed
+	return balance
 
 func _normal_seed_play_available()->bool:
 	# Unlimited supply begins only after the story actually grants the mysterious
@@ -4824,7 +4831,10 @@ func _spawn_specific_plant(species_id:String,is_catalog_preview:=false)->void:
 	if chosen.is_empty():return
 	var spawn_rng:=catalog_preview_rng if is_catalog_preview else rng
 	var pos:=_find_spawn_position(spawn_rng);var label:=_plant_label();labels_layer.add_child(label)
-	var p=SucculentClass.new();p.original_pos=pos;p.position=pos;p.set_meta("catalog_preview",is_catalog_preview);world_root.add_child(p);p.setup(chosen,spawn_rng.randi(),label,null)
+	var spawn_balance:=_greenhouse_jelly_balance_for_spawn()
+	if is_catalog_preview:
+		spawn_balance=JellyBalanceClass.NON_NORMAL.duplicate(true);spawn_balance["kakuhen_enabled"]=false
+	var p=SucculentClass.new();p.original_pos=pos;p.position=pos;p.set_meta("catalog_preview",is_catalog_preview);world_root.add_child(p);p.setup(chosen,spawn_rng.randi(),label,null,false,spawn_balance)
 	if is_catalog_preview:
 		p.harvested.connect(_on_catalog_preview_harvested);p.jellied.connect(_on_catalog_preview_jellied)
 	else:

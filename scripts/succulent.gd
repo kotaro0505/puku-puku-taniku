@@ -2,6 +2,7 @@ class_name Succulent
 extends Node3D
 
 const JellyBalanceClass = preload("res://scripts/jelly_balance.gd")
+const KakuhenSystemClass = preload("res://scripts/kakuhen_system.gd")
 
 signal harvested(plant: Succulent)
 signal jellied(plant: Succulent)
@@ -138,17 +139,28 @@ var jelly_rates_per_second:Array[float]=[0.01,0.02,0.03,0.04]
 var jelly_rng:=RandomNumberGenerator.new()
 var jelly_permission:Callable
 var jelly_checks_enabled := true
+var kakuhen_enabled := false
+var kakuhen_state := KakuhenSystemClass.STATE_NONE
+var kakuhen_next_boundary_age := INF
+var kakuhen_entry_roll_count := 0
+var kakuhen_continuation_roll_count := 0
+var kakuhen_boundary_count := 0
+var kakuhen_rng:=RandomNumberGenerator.new()
 var sway_phase := 0.0
 
 func setup(species: Dictionary, seed_value: int, screen_label: Label, _danger: Label, logic_only := false, balance_override:Dictionary = {}) -> void:
 	data = species
 	rng.seed = seed_value
 	jelly_rng.seed = int(seed_value) ^ 0x5A17B3C9
+	kakuhen_rng.seed = int(seed_value) ^ 0x41C64E6D
 	sway_phase = rng.randf_range(0.0, TAU)
 	is_special = rng.randf() < 0.10
-	var balance:=balance_override if not balance_override.is_empty() else JellyBalanceClass.effective()
+	var balance:=balance_override if not balance_override.is_empty() else JellyBalanceClass.NON_NORMAL
 	jelly_rates_per_second=JellyBalanceClass.rate_values(balance)
 	growth_speed_multiplier=float(balance.get("growth_speed",1.0));growth_rhythm_amplitude=float(balance.get("rhythm_amplitude",GROWTH_RHYTHM_AMPLITUDE))
+	kakuhen_enabled=bool(balance.get("kakuhen_enabled",false));kakuhen_state=KakuhenSystemClass.STATE_NONE;kakuhen_entry_roll_count=0;kakuhen_continuation_roll_count=0;kakuhen_boundary_count=0
+	kakuhen_next_boundary_age=KakuhenSystemClass.INTERVAL_SECONDS if kakuhen_enabled else INF
+	if kakuhen_enabled:_roll_kakuhen_entry()
 	growth_rhythm_period = rng.randf_range(16.0, 28.0)
 	growth_rhythm_phase = rng.randf_range(0.0, TAU)
 	label = screen_label
@@ -267,20 +279,59 @@ void fragment(){vec2 p=(UV-vec2(.5))*2.0;float a=smoothstep(1.0,.08,dot(p,p));AL
 	add_child(contact_shadow)
 
 func simulate(delta: float) -> void:
-	if state != "growing": return
-	if growth_time == 0.0 and diameter_cm > 1.6:
-		growth_time = (diameter_cm - 1.6) / (GROWTH_CM_PER_SECOND * growth_rate * effective_growth_speed_multiplier())
-	var previous_age := age
-	age += delta
-	growth_time += _integrated_growth_multiplier(previous_age, age)
-	diameter_cm = 1.6 + growth_time * GROWTH_CM_PER_SECOND * growth_rate * effective_growth_speed_multiplier()
+	if state != "growing" or delta<=0.0:return
+	if growth_time==0.0 and diameter_cm>1.6:
+		# growth_time stores already-earned effective growth.  Speed changes can
+		# therefore affect only future growth and can never resize the past.
+		growth_time=(diameter_cm-1.6)/(GROWTH_CM_PER_SECOND*maxf(.000001,growth_rate))
+	var target_age:=age+delta
+	while state=="growing" and age<target_age-.0000001:
+		var segment_end:=target_age
+		if kakuhen_enabled:segment_end=minf(segment_end,kakuhen_next_boundary_age)
+		if segment_end>age+.0000001:
+			_simulate_growth_segment(segment_end-age)
+			if state!="growing":return
+		if kakuhen_enabled and age>=kakuhen_next_boundary_age-.0000001 and age<=target_age+.0000001:
+			_advance_kakuhen_boundary()
+			kakuhen_next_boundary_age+=KakuhenSystemClass.INTERVAL_SECONDS
+
+
+func _simulate_growth_segment(segment_seconds:float)->void:
+	var segment_start:=age
+	var segment_end:=age+segment_seconds
+	var segment_speed:=effective_growth_speed_multiplier()
+	growth_time+=_integrated_growth_multiplier(segment_start,segment_end)*segment_speed
+	age=segment_end
+	diameter_cm=1.6+growth_time*GROWTH_CM_PER_SECOND*growth_rate
 	# One physical-looking scale mapping for all sizes, with no clamp or cap.
 	# 30cm is now a moderate plant; 60–70cm is when it dominates the view.
-	visual_scale = .18 + (diameter_cm - 1.6) * .058
-	_update_visual(delta)
-	if jelly_checks_enabled:
-		var jelly_probability := jelly_probability_for_interval(age-delta,delta,jelly_rates_per_second)
+	visual_scale=.18+(diameter_cm-1.6)*.058
+	_update_visual(segment_seconds)
+	if jelly_checks_enabled and not KakuhenSystemClass.is_real(kakuhen_state):
+		var jelly_probability:=jelly_probability_for_interval(segment_start,segment_seconds,jelly_rates_per_second)
 		if jelly_rng.randf()<jelly_probability and (not jelly_permission.is_valid() or bool(jelly_permission.call())):jelly()
+
+
+func _roll_kakuhen_entry()->void:
+	if not kakuhen_enabled:return
+	kakuhen_entry_roll_count+=1
+	kakuhen_state=KakuhenSystemClass.entry_outcome(kakuhen_rng.randf())
+
+
+func _advance_kakuhen_boundary()->void:
+	kakuhen_boundary_count+=1
+	if KakuhenSystemClass.is_real(kakuhen_state):
+		kakuhen_continuation_roll_count+=1
+		if kakuhen_rng.randf()>=KakuhenSystemClass.CONTINUE_CHANCE:
+			# A real mode that ends cannot immediately enter again at this same
+			# boundary. STATE_NONE receives its next entry roll ten seconds later.
+			kakuhen_state=KakuhenSystemClass.STATE_NONE
+		return
+	if kakuhen_state==KakuhenSystemClass.STATE_FAKE_ACCELERATED:
+		# Fake acceleration expires after one interval. It may use that boundary as
+		# its next ordinary entry opportunity, as specified.
+		kakuhen_state=KakuhenSystemClass.STATE_NONE
+	_roll_kakuhen_entry()
 
 func _integrated_growth_multiplier(start_time: float, end_time: float) -> float:
 	# Integrate 1 + amplitude*sin(omega*t+phase) exactly. The multiplier stays
@@ -292,7 +343,7 @@ func _integrated_growth_multiplier(start_time: float, end_time: float) -> float:
 	)
 
 func effective_growth_speed_multiplier()->float:
-	return growth_speed_multiplier
+	return growth_speed_multiplier*(KakuhenSystemClass.ACCELERATION_MULTIPLIER if KakuhenSystemClass.is_accelerated(kakuhen_state) else 1.0)
 
 static func jelly_stage_index(at_age:float)->int:
 	if at_age<5.0:return 0
@@ -327,18 +378,26 @@ static func jelly_chance_per_second(at_age:float,rates_per_second:Array=[]) -> f
 
 func fast_forward_to_diameter(target_cm:float)->void:
 	var clamped_target_cm:=maxf(1.6,target_cm)
-	var target_growth:=(clamped_target_cm-1.6)/(GROWTH_CM_PER_SECOND*growth_rate*effective_growth_speed_multiplier())
-	var low:=0.0;var high:=maxf(1.0,target_growth*1.2)
-	while _integrated_growth_multiplier(0.0,high)<target_growth:high*=2.0
+	var target_growth:=(clamped_target_cm-1.6)/(GROWTH_CM_PER_SECOND*maxf(.000001,growth_rate))
+	var base_speed:=maxf(.000001,growth_speed_multiplier)
+	var target_rhythmic_time:=target_growth/base_speed
+	var low:=0.0;var high:=maxf(1.0,target_rhythmic_time*1.2)
+	while _integrated_growth_multiplier(0.0,high)<target_rhythmic_time:high*=2.0
 	for i in range(32):
 		var mid:=(low+high)*.5
-		if _integrated_growth_multiplier(0.0,mid)<target_growth:low=mid
+		if _integrated_growth_multiplier(0.0,mid)<target_rhythmic_time:low=mid
 		else:high=mid
 	# The bisection finds the matching rhythmic age, while this development/test
 	# helper must land on the requested diameter exactly. Re-evaluating the
 	# integral at the approximate age can round microscopically below a story
 	# threshold and make otherwise deterministic smoke tests intermittent.
-	age=(low+high)*.5;growth_time=target_growth;diameter_cm=clamped_target_cm;visual_scale=.18+(diameter_cm-1.6)*.058;_update_visual(0.0)
+	age=(low+high)*.5;growth_time=target_growth;diameter_cm=clamped_target_cm;visual_scale=.18+(diameter_cm-1.6)*.058
+	# This is a deterministic development/test teleport rather than simulated
+	# history. Clear any transient mode and resume rolls at the next boundary.
+	if kakuhen_enabled:
+		kakuhen_state=KakuhenSystemClass.STATE_NONE
+		kakuhen_next_boundary_age=(floorf(age/KakuhenSystemClass.INTERVAL_SECONDS)+1.0)*KakuhenSystemClass.INTERVAL_SECONDS
+	_update_visual(0.0)
 
 func _update_visual(delta: float) -> void:
 	if plant_sprite == null: return

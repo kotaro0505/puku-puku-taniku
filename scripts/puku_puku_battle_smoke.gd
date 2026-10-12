@@ -206,6 +206,9 @@ func _verify_shared_growth_source() -> void:
 	assert(is_equal_approx(normal_reference.age, 4.0))
 	assert(normal_reference.diameter_cm > 6.4 and normal_reference.diameter_cm < 7.8)
 	assert(is_equal_approx(normal_reference.growth_rate, 1.0))
+	assert(is_equal_approx(normal_reference.growth_speed_multiplier,1.0))
+	assert(normal_reference.jelly_rates_per_second==[0.01,0.02,0.03,0.04])
+	assert(not normal_reference.kakuhen_enabled and not battle_reference.kakuhen_enabled)
 	normal_reference.free()
 	battle_reference.free()
 

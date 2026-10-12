@@ -3,6 +3,17 @@ extends RefCounted
 
 const FORMAL := {
 	"rate_0_5":0.01,
+	"rate_5_10":0.025,
+	"rate_10_15":0.05,
+	"rate_15_plus":0.08,
+	"growth_speed":1.6,"rhythm_amplitude":0.10
+}
+
+# Non-normal modes deliberately retain the balance they had before the formal
+# normal-round adjustment.  Battle, old seeds, premium/volume/series seeds and
+# catalog previews all use this snapshot unless a caller explicitly overrides it.
+const NON_NORMAL := {
+	"rate_0_5":0.01,
 	"rate_5_10":0.02,
 	"rate_10_15":0.03,
 	"rate_15_plus":0.04,

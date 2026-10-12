@@ -32,6 +32,7 @@ func _ready()->void:
 	assert(game.play_seeds_remaining==12-game.play_concurrent_target)
 	assert(await _wait_for_population(game,5),"initial population did not settle: %s"%_round_state(game,-1))
 	assert(game.plants.size()==5 and game.endless_economy_seed_count==5)
+	_assert_normal_plant_balance(game)
 	print("NORMAL_ROUND_STAGE initial ",_round_state(game,-1))
 	# This suite settles the round manually. Pause the game's frame loop and
 	# disable automatic checks before each manual tick so the formal random
@@ -50,6 +51,7 @@ func _ready()->void:
 	var expanded_ready:=await _wait_for_population(game,8)
 	assert(expanded_ready,"target-eight refill did not settle: %s"%_round_state(game,-1))
 	assert(game.plants.size()==8 and game.endless_economy_seed_count==9)
+	_assert_normal_plant_balance(game)
 	print("NORMAL_ROUND_STAGE expanded ",_round_state(game,-1))
 
 	# A lower re-roll never deletes living plants. Three consecutive target-five
@@ -111,6 +113,12 @@ func _planned_population(game:Node)->int:
 func _disable_automatic_jelly(game:Node)->void:
 	for plant in game.plants:
 		if is_instance_valid(plant) and plant.state=="growing":plant.jelly_checks_enabled=false
+
+func _assert_normal_plant_balance(game:Node)->void:
+	for plant in game.plants:
+		assert(plant.jelly_rates_per_second==[0.01,0.025,0.05,0.08])
+		assert(is_equal_approx(plant.growth_speed_multiplier,1.6))
+		assert(plant.kakuhen_enabled)
 
 func _wait_for_population(game:Node,expected_population:int)->bool:
 	var deadline_msec:=Time.get_ticks_msec()+int(WAIT_TIMEOUT_SECONDS*1000.0)

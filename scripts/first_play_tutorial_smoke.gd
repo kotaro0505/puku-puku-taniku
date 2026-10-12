@@ -61,6 +61,8 @@ func _ready() -> void:
 	var first_plant = game.plants[0]
 	assert(str(first_plant.data.get("species_id", "")) == FIRST_SPECIES_ID)
 	assert(is_equal_approx(first_plant.growth_rate, game.FIRST_STORY_COLORATA_GROWTH_MULTIPLIER))
+	assert(is_equal_approx(first_plant.growth_speed_multiplier,1.0) and not first_plant.kakuhen_enabled)
+	assert(first_plant.jelly_rates_per_second==[0.01,0.02,0.03,0.04])
 	assert(is_equal_approx(float(first_plant.get_meta("first_story_growth_multiplier", 0.0)), 1.3))
 	assert(not game._allow_plant_jelly(first_plant))
 	game._update_play_ui()
@@ -283,6 +285,9 @@ func _ready() -> void:
 	assert(not game.first_play_tutorial_reserved_species_id.is_empty())
 	for normal_tutorial_plant in game.plants:
 		assert(is_equal_approx(normal_tutorial_plant.growth_rate, 1.0))
+		assert(is_equal_approx(normal_tutorial_plant.growth_speed_multiplier,1.6))
+		assert(normal_tutorial_plant.jelly_rates_per_second==[0.01,0.025,0.05,0.08])
+		assert(normal_tutorial_plant.kakuhen_enabled)
 		assert(not normal_tutorial_plant.has_meta("first_story_growth_multiplier"))
 	assert(not game.tutorial_guide_overlay.visible and str(game.tutorial_guide_button.get_meta("target", "")) != "normal_seed")
 	for plant in game.plants:plant.fast_forward_to_diameter(2.0)
@@ -467,7 +472,7 @@ func _ready() -> void:
 
 	assert(Localizer.text("ja","puku_buyback_1") == "そうだ！育てた多肉は\nうちのお店で買い取るよ！")
 	assert(Localizer.text("ja","puku_buyback_2") == "大きい株ほど\n高く買い取るからね！")
-	print("FIRST_PLAY_TUTORIAL_SMOKE_OK old_colorata_growth=1.3 normal_growth=unchanged cost_note=once trio_cards=catalog_only pre_sow=true start_guide=play_open_normal tutorial_continue=9_pages_visible tutorial_speakers=8_correct+system_none button+fullscreen_single_step=true operation_prompt_continue=false forced_jelly=true reserved_original_new=true reserved_front_random=true observed_3s=true post_result_GET=true act2_guarantee_untouched=true total=12 result=1_harvest+11_jelly")
+	print("FIRST_PLAY_TUTORIAL_SMOKE_OK old_colorata_growth=1.3 normal_growth=1.6 normal_kakuhen=true cost_note=once trio_cards=catalog_only pre_sow=true start_guide=play_open_normal tutorial_continue=9_pages_visible tutorial_speakers=8_correct+system_none button+fullscreen_single_step=true operation_prompt_continue=false forced_jelly=true reserved_original_new=true reserved_front_random=true observed_3s=true post_result_GET=true act2_guarantee_untouched=true total=12 result=1_harvest+11_jelly")
 	get_tree().quit()
 
 

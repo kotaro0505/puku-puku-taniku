@@ -105,7 +105,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	_remove_test_file(NORMAL_PATH)
 	_remove_test_file(EXPERIMENT_PATH)
-	print("ENDLESS_GREENHOUSE_SMOKE_OK default_without_flags=true player_start=true round_seeds=12 round_cost=1 concurrent=5-8_dynamic refill_free=true harvest_direct=true wallet=fixed_point jelly_extra_penalty=false result=true jelly_rates=1/2/3/4 boundaries=5/10/15 new_roll=max_carryover_x0.4 jelly_new_roll=false discovery_curve=unchanged forced_new=true candidate_pool=uniform deferred_formal_get=true pending_duplicate=false first_get_floor=once virtual_batch=12 pause=true navigation=habitat+catalog+shop+gacha production_gacha=1puku+species_get fusion=1-2-3puku restoration_pending=true finite=true save_isolated=true")
+	print("ENDLESS_GREENHOUSE_SMOKE_OK default_without_flags=true player_start=true round_seeds=12 round_cost=1 concurrent=5-8_dynamic refill_free=true harvest_direct=true wallet=fixed_point jelly_extra_penalty=false result=true normal_jelly_rates=1/2.5/5/8 normal_growth=1.6 normal_kakuhen=true non_normal_jelly_rates=1/2/3/4 boundaries=5/10/15 new_roll=max_carryover_x0.4 jelly_new_roll=false discovery_curve=unchanged forced_new=true candidate_pool=uniform deferred_formal_get=true pending_duplicate=false first_get_floor=once virtual_batch=12 pause=true navigation=habitat+catalog+shop+gacha production_gacha=1puku+species_get fusion=1-2-3puku restoration_pending=true finite=true save_isolated=true")
 	get_tree().quit()
 
 
@@ -644,8 +644,9 @@ func _test_formal_endless_main_features(game: Node) -> void:
 	game.habitat_debug_enabled = false
 	assert(game._trial_dev_controls_enabled())
 	var trial_balance:Dictionary=game._greenhouse_jelly_balance_for_spawn()
-	assert(JellyBalanceClass.rate_values(trial_balance)==[0.01,0.02,0.03,0.04])
-	assert(JellyBalanceClass.rate_values(JellyBalanceClass.FORMAL)==[0.01,0.02,0.03,0.04])
+	assert(JellyBalanceClass.rate_values(trial_balance)==[0.01,0.025,0.05,0.08])
+	assert(is_equal_approx(float(trial_balance.get("growth_speed",0.0)),1.6) and bool(trial_balance.get("kakuhen_enabled",false)))
+	assert(JellyBalanceClass.rate_values(JellyBalanceClass.FORMAL)==[0.01,0.025,0.05,0.08])
 	game.puku_gauge_intro_complete=false
 	game._start_puku_gauge_intro_dialog()
 	assert(game.scripted_dialog_kind=="puku_gauge_first_gift" and game.scripted_dialog_pages.size()==3)
@@ -758,8 +759,12 @@ func _test_debug_controls_and_gacha(game: Node) -> void:
 	var debug_balance:Dictionary=game._greenhouse_jelly_balance_for_spawn()
 	assert(JellyBalanceClass.rate_values(debug_balance)==[0.01,0.02,0.03,0.04])
 	game._change_jelly_dev_value("rate_0_5",.005)
+	# Opening the controls while no normal round is active must not alter a
+	# non-normal spawn. The edited runtime value is picked up by the next normal
+	# 12-seed plant (or the dedicated dev preview) instead.
+	assert(is_equal_approx(float(JellyBalanceClass.effective().rate_0_5),.015))
 	debug_balance=game._greenhouse_jelly_balance_for_spawn()
-	assert(is_equal_approx(float(debug_balance.rate_0_5),.015))
+	assert(is_equal_approx(float(debug_balance.rate_0_5),.01))
 	game._dev_reset_jelly()
 	assert(not JellyBalanceClass.override_enabled)
 	var production_balance:Dictionary=game._greenhouse_jelly_balance_for_spawn()
@@ -1121,7 +1126,8 @@ func _test_finite_mode_unchanged(game: Node) -> void:
 	game.habitat_debug_enabled=false
 	assert(game._trial_dev_controls_enabled())
 	assert(JellyBalanceClass.rate_values(game._greenhouse_jelly_balance_for_spawn())==[0.01,0.02,0.03,0.04])
-	assert(JellyBalanceClass.rate_values(JellyBalanceClass.FORMAL)==[0.01,0.02,0.03,0.04])
+	assert(is_equal_approx(float(game._greenhouse_jelly_balance_for_spawn().get("growth_speed",0.0)),1.0) and not bool(game._greenhouse_jelly_balance_for_spawn().get("kakuhen_enabled",true)))
+	assert(JellyBalanceClass.rate_values(JellyBalanceClass.FORMAL)==[0.01,0.025,0.05,0.08])
 	game.normal_seed_bags = 1
 	game.volume_seed_unlocked = true
 	game.volume_seed_bags = 1
