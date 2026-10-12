@@ -2,6 +2,7 @@ extends Node
 
 const Localizer = preload("res://scripts/game_localizer.gd")
 const StoryContinueButtonStyleClass = preload("res://scripts/story_continue_button_style.gd")
+const StandardStoryDialoguePanelClass = preload("res://scripts/standard_story_dialogue_panel.gd")
 const FIRST_SPECIES_ID := "colorata"
 
 func _ready() -> void:
@@ -280,7 +281,7 @@ func _ready() -> void:
 	game._process(game.FIRST_PLAY_TUTORIAL_INITIAL_DELAY+.01)
 	assert(game.first_play_tutorial_dialog_visible and game.tutorial_guide_message.text==Localizer.text("ja","tutorial_normal_sprout"), "sprout dialog missing: active=%s play=%s plants=%s message_index=%s wait=%s text=%s" % [game.first_play_tutorial_active, game.play_active, game.plants.size(), game.first_play_tutorial_message_index, game.first_play_tutorial_wait_remaining, game.tutorial_guide_message.text])
 	await get_tree().process_frame
-	_assert_visible_tutorial_continue(game,"ja",true)
+	_assert_visible_tutorial_continue(game,"ja","panda")
 	var sprout_message_index:int=game.first_play_tutorial_message_index
 	game.tutorial_continue_button.pressed.emit()
 	assert(game.first_play_tutorial_message_index==sprout_message_index+1 and not game.first_play_tutorial_dialog_visible)
@@ -294,7 +295,7 @@ func _ready() -> void:
 	game._process(growth_wait_before_process + .001)
 	assert(game.first_play_tutorial_dialog_visible and game.tutorial_guide_message.text==Localizer.text("ja","tutorial_normal_growth"), "growth dialog missing: phase=%s index=%s wait=%.9f visible=%s overlay=%s fade=%s diameters=%s text=%s" % [game.first_play_tutorial_phase, game.first_play_tutorial_message_index, game.first_play_tutorial_wait_remaining, game.first_play_tutorial_dialog_visible, game.tutorial_guide_overlay.visible, game.scene_transition_fade.visible, growth_diameters, game.tutorial_guide_message.text])
 	await get_tree().process_frame
-	_assert_visible_tutorial_continue(game,"ja",true)
+	_assert_visible_tutorial_continue(game,"ja","girl")
 	var growth_message_index:int=game.first_play_tutorial_message_index
 	game.tutorial_guide_button.pressed.emit()
 	assert(game.first_play_tutorial_message_index==growth_message_index+1 and not game.first_play_tutorial_dialog_visible)
@@ -308,7 +309,7 @@ func _ready() -> void:
 	game._process(jelly_wait_before_process + .001)
 	assert(game.first_play_tutorial_dialog_visible and game.tutorial_guide_message.text==Localizer.text("ja","tutorial_normal_jelly"), "jelly dialog missing: phase=%s index=%s wait=%.9f visible=%s overlay=%s fade=%s diameters=%s text=%s" % [game.first_play_tutorial_phase, game.first_play_tutorial_message_index, game.first_play_tutorial_wait_remaining, game.first_play_tutorial_dialog_visible, game.tutorial_guide_overlay.visible, game.scene_transition_fade.visible, jelly_diameters, game.tutorial_guide_message.text])
 	await get_tree().process_frame
-	_assert_visible_tutorial_continue(game,"ja",true)
+	_assert_visible_tutorial_continue(game,"ja","armadillo")
 	var initially_spawned_count: int = game.endless_economy_seed_count
 	var remaining_before_forced_jelly: int = game.play_seeds_remaining
 	game.tutorial_continue_button.pressed.emit()
@@ -324,7 +325,7 @@ func _ready() -> void:
 	assert(game.tutorial_guide_message.text == "うわ、ジュレた！")
 	assert(game.endless_economy_seed_count == initially_spawned_count)
 	await get_tree().process_frame
-	_assert_visible_tutorial_continue(game,"ja",true)
+	_assert_visible_tutorial_continue(game,"ja","panda")
 	game.tutorial_continue_button.pressed.emit()
 	assert(game.first_play_tutorial_phase == "reserved_seed_sowing")
 	await get_tree().create_timer(.36).timeout
@@ -362,12 +363,12 @@ func _ready() -> void:
 	assert(game.first_play_tutorial_dialog_visible)
 	assert(game.tutorial_guide_message.text == "見て！\nはじめて見る品種が出てる！")
 	await get_tree().process_frame
-	_assert_visible_tutorial_continue(game,"ja",true)
+	_assert_visible_tutorial_continue(game,"ja","panda")
 	game.tutorial_continue_button.pressed.emit()
 	assert(game.first_play_tutorial_phase == "new_species_girl")
 	assert(game.tutorial_guide_message.text == "ジュレる前に収穫しよう！")
 	await get_tree().process_frame
-	_assert_visible_tutorial_continue(game,"ja",true)
+	_assert_visible_tutorial_continue(game,"ja","girl")
 	game.tutorial_guide_button.pressed.emit()
 	assert(game.first_play_tutorial_sequence_complete)
 	assert(game.first_play_harvest_guide_active)
@@ -375,6 +376,7 @@ func _ready() -> void:
 	assert(game.tutorial_guide_message.text == Localizer.text("ja", "tutorial_harvest_tap"))
 	assert(game.tutorial_guide_overlay.visible)
 	assert(not game.tutorial_continue_button.visible and not game.tutorial_continue_button.is_visible_in_tree())
+	assert(not game.tutorial_portrait_slot.visible and not game.tutorial_speaker_label.visible and game.tutorial_speaker_label.text.is_empty())
 	assert(is_zero_approx(game.puku_gauge_cm) and game.puku_balance_units == puku_before_round - game.NORMAL_ROUND_COST_UNITS)
 	assert(not game.seed_pod_gauge_discovery_complete and game.scripted_dialog_kind.is_empty())
 	var tutorial_harvest_was_new: bool = game._species_get_count(tutorial_harvest_species_id) <= 0
@@ -394,12 +396,12 @@ func _ready() -> void:
 	assert(game.tutorial_guide_message.text=="そうだ！育てた多肉は\nうちのお店で買い取るよ！")
 	assert(game.tutorial_panda_portrait.visible)
 	await get_tree().process_frame
-	_assert_visible_tutorial_continue(game,"ja",true)
+	_assert_visible_tutorial_continue(game,"ja","panda")
 	game.tutorial_continue_button.pressed.emit()
 	assert(game.tutorial_guide_message.text=="大きい株ほど\n高く買い取るからね！")
 	assert(game.tutorial_panda_portrait.visible)
 	await get_tree().process_frame
-	_assert_visible_tutorial_continue(game,"ja",true)
+	_assert_visible_tutorial_continue(game,"ja","panda")
 	game.tutorial_guide_button.pressed.emit()
 	assert(bool(game.first_play_harvest_spotlight_material.get_shader_parameter("focus_ellipse")))
 	var puku_center: Vector2 = game.first_play_harvest_spotlight_material.get_shader_parameter("focus_uv_a")
@@ -409,7 +411,7 @@ func _ready() -> void:
 	assert(game.tutorial_guide_message.text==Localizer.text("ja","puku_buyback_2_endless"))
 	assert(not game.tutorial_panda_portrait.visible)
 	await get_tree().process_frame
-	_assert_visible_tutorial_continue(game,"ja",false)
+	_assert_visible_tutorial_continue(game,"ja","")
 	game.tutorial_continue_button.pressed.emit()
 	assert(game.puku_buyback_tutorial_complete and not game.puku_buyback_tutorial_active)
 	assert(not game.tutorial_continue_button.visible)
@@ -456,7 +458,7 @@ func _ready() -> void:
 
 	assert(Localizer.text("ja","puku_buyback_1") == "そうだ！育てた多肉は\nうちのお店で買い取るよ！")
 	assert(Localizer.text("ja","puku_buyback_2") == "大きい株ほど\n高く買い取るからね！")
-	print("FIRST_PLAY_TUTORIAL_SMOKE_OK old_colorata_growth=1.3 normal_growth=unchanged cost_note=once trio_cards=catalog_only pre_sow=true start_guide=play_open_normal tutorial_continue=9_pages_visible button+fullscreen_single_step=true operation_prompt_continue=false forced_jelly=true reserved_original_new=true reserved_front_random=true observed_3s=true post_result_GET=true act2_guarantee_untouched=true total=12 result=1_harvest+11_jelly")
+	print("FIRST_PLAY_TUTORIAL_SMOKE_OK old_colorata_growth=1.3 normal_growth=unchanged cost_note=once trio_cards=catalog_only pre_sow=true start_guide=play_open_normal tutorial_continue=9_pages_visible tutorial_speakers=8_correct+system_none button+fullscreen_single_step=true operation_prompt_continue=false forced_jelly=true reserved_original_new=true reserved_front_random=true observed_3s=true post_result_GET=true act2_guarantee_untouched=true total=12 result=1_harvest+11_jelly")
 	get_tree().quit()
 
 
@@ -477,10 +479,14 @@ func _press_species_overlay(overlay:Control,position:Vector2,touch:bool)->void:
 		overlay._input(event)
 
 
-func _assert_visible_tutorial_continue(game:Node,locale:String,portrait_expected:bool)->void:
+func _assert_visible_tutorial_continue(game:Node,locale:String,speaker_id:String)->void:
 	var button:=game.tutorial_continue_button as Button
 	var panel:=game.tutorial_dialog_panel as Control
 	var dialogue:=game.tutorial_guide_message as Label
+	var portrait_slot:=game.tutorial_portrait_slot as Control
+	var portrait:=game.tutorial_panda_portrait as TextureRect
+	var speaker:=game.tutorial_speaker_label as Label
+	var has_speaker:=not speaker_id.is_empty()
 	assert(button.visible and button.is_visible_in_tree())
 	assert(panel.visible and game.tutorial_guide_overlay.visible)
 	assert(panel.is_ancestor_of(button))
@@ -491,8 +497,24 @@ func _assert_visible_tutorial_continue(game:Node,locale:String,portrait_expected
 	assert(panel.get_global_rect().grow(.5).encloses(button.get_global_rect()))
 	assert(not button.get_global_rect().intersects(_visible_label_text_rect(dialogue)))
 	assert(dialogue.get_line_count()*dialogue.get_line_height()<=dialogue.size.y+.5)
-	assert(game.tutorial_panda_portrait.visible==portrait_expected)
-	if portrait_expected:assert(not game.tutorial_panda_portrait.get_global_rect().intersects(button.get_global_rect()))
+	assert(portrait_slot.visible==has_speaker)
+	assert(portrait.visible==has_speaker)
+	assert(speaker.visible==has_speaker)
+	if has_speaker:
+		assert(portrait_slot.is_visible_in_tree() and portrait.is_visible_in_tree() and speaker.is_visible_in_tree())
+		assert(speaker.text==Localizer.text(locale,"story_speaker_"+speaker_id))
+		assert(speaker.position.is_equal_approx(StandardStoryDialoguePanelClass.SPEAKER_LABEL_POSITION))
+		assert(speaker.size.y==StandardStoryDialoguePanelClass.SPEAKER_LABEL_SIZE.y)
+		assert(speaker.get_theme_font_size("font_size")==17)
+		assert(speaker.get_theme_color("font_color").is_equal_approx(StandardStoryDialoguePanelClass.SPEAKER_COLOR))
+		assert(speaker.get_line_height()<=speaker.size.y+.5)
+		assert(portrait_slot.get_global_rect().grow(.5).encloses(speaker.get_global_rect()))
+		assert(portrait_slot.get_global_rect().grow(.5).encloses(portrait.get_global_rect()))
+		assert(speaker.get_global_rect().end.y<=portrait.get_global_rect().position.y+.5)
+		assert(not portrait.get_global_rect().intersects(button.get_global_rect()))
+		assert(not portrait.get_global_rect().intersects(dialogue.get_global_rect()))
+	else:
+		assert(speaker.text.is_empty())
 
 
 func _visible_label_text_rect(label:Label)->Rect2:

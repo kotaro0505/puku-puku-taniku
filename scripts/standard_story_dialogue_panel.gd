@@ -9,6 +9,9 @@ const PANEL_BACKGROUND := Color(0.97, 0.90, 0.75, 0.96)
 const PANEL_BORDER := Color("#a86f36")
 const TEXT_COLOR := Color("#4a2618")
 const SPEAKER_COLOR := Color("#8b5528")
+const SPEAKER_LABEL_POSITION := Vector2(0, 8)
+const SPEAKER_LABEL_SIZE := Vector2(132, 25)
+const PORTRAIT_TOP_OFFSET := 34.0
 
 var portrait_slot: Control
 var speaker_portrait: TextureRect
@@ -43,14 +46,14 @@ func _init() -> void:
 	speaker_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	speaker_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	speaker_portrait.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	speaker_portrait.offset_top = 32.0
+	speaker_portrait.offset_top = PORTRAIT_TOP_OFFSET
 	speaker_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	portrait_slot.add_child(speaker_portrait)
 
 	speaker_label = Label.new()
 	speaker_label.name = "StorySpeaker"
-	speaker_label.position = Vector2.ZERO
-	speaker_label.size = Vector2(132, 30)
+	speaker_label.position = SPEAKER_LABEL_POSITION
+	speaker_label.size = SPEAKER_LABEL_SIZE
 	speaker_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	speaker_label.add_theme_font_size_override("font_size", 17)
 	speaker_label.add_theme_color_override("font_color", SPEAKER_COLOR)

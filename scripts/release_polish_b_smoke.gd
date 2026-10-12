@@ -27,7 +27,7 @@ func _ready() -> void:
 	await _test_get_to_catalog_unlock_handoff(game)
 	_test_visible_copy_has_no_internal_paths(game)
 	game._reset_progression_state()
-	print("RELEASE_POLISH_B_SMOKE_OK continuation=6_overlays+scripted+collection+tutorial_9_pages locales=3 greenhouse_dialogue_shared=5_contexts standard_style=true inside_panels=true input=button+fullscreen_single_step operation_guides=no_continue obsolete_keys=removed ending=exact_all_locales get_to_catalog=5_contexts no_intermediate_foreground=true internal_paths=clean")
+	print("RELEASE_POLISH_B_SMOKE_OK continuation=6_overlays+scripted+collection+tutorial_9_pages locales=3 tutorial_speakers=8_pages_localized+system_none speaker_top_gap=8 greenhouse_dialogue_shared=5_contexts standard_style=true inside_panels=true input=button+fullscreen_single_step operation_guides=no_continue obsolete_keys=removed ending=exact_all_locales get_to_catalog=5_contexts no_intermediate_foreground=true internal_paths=clean")
 	get_tree().quit()
 
 
@@ -179,8 +179,13 @@ func _assert_standard_dialogue_panel(panel: Control, button: Button, dialogue_te
 	var portrait := panel.find_child("SpeakerPortrait", true, false) as TextureRect
 	assert(speaker != null and portrait != null)
 	assert(speaker.get_theme_color("font_color").is_equal_approx(StandardStoryDialoguePanelClass.SPEAKER_COLOR))
+	assert(speaker.position.is_equal_approx(StandardStoryDialoguePanelClass.SPEAKER_LABEL_POSITION))
+	assert(speaker.size.is_equal_approx(StandardStoryDialoguePanelClass.SPEAKER_LABEL_SIZE))
+	assert(speaker.get_line_height() <= speaker.size.y + 0.5)
 	if portrait.is_visible_in_tree():
 		assert(not portrait.get_global_rect().intersects(dialogue_text.get_global_rect()))
+		assert(speaker.is_visible_in_tree())
+		assert(speaker.get_global_rect().end.y <= portrait.get_global_rect().position.y + 0.5)
 	assert(not button.get_global_rect().intersects(_visible_label_text_rect(dialogue_text as Label)))
 	var text_label := dialogue_text as Label
 	assert(text_label.get_line_count() * text_label.get_line_height() <= text_label.size.y + 0.5, "standard dialogue text is clipped: lines=%d line_height=%d size=%s text=%s" % [text_label.get_line_count(), text_label.get_line_height(), text_label.size, text_label.text])
@@ -246,7 +251,7 @@ func _test_tutorial_dialog_continuation(game: Node) -> void:
 			game._show_first_play_tutorial_custom_dialog(str(page["key"]), str(page["speaker"]))
 			await get_tree().process_frame
 			await get_tree().process_frame
-			_assert_tutorial_dialog_continue(game, locale, true)
+			_assert_tutorial_dialog_continue(game, locale, str(page["speaker"]))
 			assert(game.tutorial_guide_message.text == Localizer.text(locale, str(page["key"])))
 			game._hide_first_play_tutorial_overlay()
 		for page_index in range(3):
@@ -255,7 +260,7 @@ func _test_tutorial_dialog_continuation(game: Node) -> void:
 			game._show_puku_buyback_tutorial_page()
 			await get_tree().process_frame
 			await get_tree().process_frame
-			_assert_tutorial_dialog_continue(game, locale, page_index < 2)
+			_assert_tutorial_dialog_continue(game, locale, "panda" if page_index < 2 else "")
 			var key: String = ["puku_buyback_1", "puku_buyback_2", "puku_buyback_2_endless"][page_index]
 			assert(game.tutorial_guide_message.text == Localizer.text(locale, key))
 			game._hide_first_play_tutorial_overlay()
@@ -300,11 +305,13 @@ func _test_tutorial_dialog_continuation(game: Node) -> void:
 	await get_tree().process_frame
 	assert(game.tutorial_guide_overlay.visible and game.tutorial_dialog_panel.visible)
 	assert(not game.tutorial_continue_button.visible and not game.tutorial_continue_button.is_visible_in_tree())
+	assert(not game.tutorial_portrait_slot.visible and not game.tutorial_speaker_label.visible and game.tutorial_speaker_label.text.is_empty())
 	game.first_play_harvest_guide_active = false
 	game._hide_first_play_tutorial_overlay()
 	game._show_tutorial_guide("play_open")
 	assert(game.tutorial_guide_overlay.visible and not game.tutorial_dialog_panel.visible)
 	assert(not game.tutorial_continue_button.visible)
+	assert(not game.tutorial_portrait_slot.visible and not game.tutorial_speaker_label.visible and game.tutorial_speaker_label.text.is_empty())
 	game._hide_first_play_tutorial_overlay()
 	game.first_play_tutorial_active = false
 
@@ -320,10 +327,14 @@ func _test_tutorial_dialog_continuation(game: Node) -> void:
 	game.intro_overlay.visible = false
 
 
-func _assert_tutorial_dialog_continue(game: Node, locale: String, portrait_expected: bool) -> void:
+func _assert_tutorial_dialog_continue(game: Node, locale: String, speaker_id: String) -> void:
 	var button := game.tutorial_continue_button as Button
 	var panel := game.tutorial_dialog_panel as Control
 	var dialogue := game.tutorial_guide_message as Label
+	var portrait_slot := game.tutorial_portrait_slot as Control
+	var portrait := game.tutorial_panda_portrait as TextureRect
+	var speaker := game.tutorial_speaker_label as Label
+	var has_speaker := not speaker_id.is_empty()
 	assert(game.tutorial_guide_overlay.visible and panel.visible)
 	assert(button.visible and button.is_visible_in_tree())
 	assert(panel.is_ancestor_of(button))
@@ -331,9 +342,24 @@ func _assert_tutorial_dialog_continue(game: Node, locale: String, portrait_expec
 	assert(str(button.get_meta("target", "")) in ["first_play_dialog", "puku_buyback"])
 	_assert_standard_continue_button(button, panel, dialogue, locale)
 	assert(dialogue.get_line_count() * dialogue.get_line_height() <= dialogue.size.y + 0.5, "tutorial dialogue text is clipped: locale=%s size=%s text=%s" % [locale, dialogue.size, dialogue.text])
-	assert(game.tutorial_panda_portrait.visible == portrait_expected)
-	if portrait_expected:
-		assert(not game.tutorial_panda_portrait.get_global_rect().intersects(button.get_global_rect()))
+	assert(portrait_slot.visible == has_speaker)
+	assert(portrait.visible == has_speaker)
+	assert(speaker.visible == has_speaker)
+	if has_speaker:
+		assert(portrait_slot.is_visible_in_tree() and portrait.is_visible_in_tree() and speaker.is_visible_in_tree())
+		assert(speaker.text == Localizer.text(locale, "story_speaker_" + speaker_id))
+		assert(speaker.position.is_equal_approx(StandardStoryDialoguePanelClass.SPEAKER_LABEL_POSITION))
+		assert(speaker.size.y == StandardStoryDialoguePanelClass.SPEAKER_LABEL_SIZE.y)
+		assert(speaker.get_theme_font_size("font_size") == 17)
+		assert(speaker.get_theme_color("font_color").is_equal_approx(StandardStoryDialoguePanelClass.SPEAKER_COLOR))
+		assert(speaker.get_line_height() <= speaker.size.y + 0.5)
+		assert(portrait_slot.get_global_rect().grow(0.5).encloses(speaker.get_global_rect()))
+		assert(portrait_slot.get_global_rect().grow(0.5).encloses(portrait.get_global_rect()))
+		assert(speaker.get_global_rect().end.y <= portrait.get_global_rect().position.y + 0.5)
+		assert(not portrait.get_global_rect().intersects(button.get_global_rect()))
+		assert(not portrait.get_global_rect().intersects(dialogue.get_global_rect()))
+	else:
+		assert(speaker.text.is_empty())
 
 
 func _test_ending_credit(game: Node) -> void:

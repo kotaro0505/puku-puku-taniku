@@ -1,5 +1,7 @@
 extends Node
 
+const StandardStoryDialoguePanelClass = preload("res://scripts/standard_story_dialogue_panel.gd")
+
 
 func _ready() -> void:
 	var game = load("res://main.tscn").instantiate()
@@ -11,7 +13,7 @@ func _ready() -> void:
 	await _test_single_speaker_portraits(game)
 	_test_dialog_hides_navigation(game)
 	game._reset_progression_state()
-	print("DIALOG_PORTRAIT_LAYOUT_SMOKE_OK speakers=6 portrait=clipped+contained text_overlap=false continue_overlap=false navigation=hidden")
+	print("DIALOG_PORTRAIT_LAYOUT_SMOKE_OK speakers=6 speaker_top_gap=8 name_portrait_overlap=false portrait=clipped+contained text_overlap=false continue_overlap=false navigation=hidden")
 	get_tree().quit()
 
 
@@ -43,14 +45,19 @@ func _test_single_speaker_portraits(game: Node) -> void:
 		await get_tree().process_frame
 		var slot_rect: Rect2 = game.intro_portrait_slot.get_global_rect()
 		var portrait_rect: Rect2 = game.intro_panda_portrait.get_global_rect()
+		var speaker_rect: Rect2 = game.intro_speaker_label.get_global_rect()
 		var dialogue_rect: Rect2 = game.intro_dialogue_label.get_global_rect()
 		var continue_rect: Rect2 = game.intro_continue_button.get_global_rect()
 		assert(game.intro_panda_portrait.visible and game.intro_panda_portrait.texture != null)
 		assert(slot_rect.grow(0.5).encloses(portrait_rect))
 		assert(not portrait_rect.intersects(dialogue_rect))
 		assert(not portrait_rect.intersects(continue_rect))
-		assert(is_equal_approx(portrait_rect.position.y, slot_rect.position.y + 32.0))
-		assert(is_equal_approx(portrait_rect.size.y, slot_rect.size.y - 32.0))
+		assert(game.intro_speaker_label.position.is_equal_approx(StandardStoryDialoguePanelClass.SPEAKER_LABEL_POSITION))
+		assert(game.intro_speaker_label.size.is_equal_approx(StandardStoryDialoguePanelClass.SPEAKER_LABEL_SIZE))
+		assert(game.intro_speaker_label.get_line_height() <= game.intro_speaker_label.size.y + 0.5)
+		assert(speaker_rect.end.y <= portrait_rect.position.y + 0.5)
+		assert(is_equal_approx(portrait_rect.position.y, slot_rect.position.y + StandardStoryDialoguePanelClass.PORTRAIT_TOP_OFFSET))
+		assert(is_equal_approx(portrait_rect.size.y, slot_rect.size.y - StandardStoryDialoguePanelClass.PORTRAIT_TOP_OFFSET))
 
 
 func _test_dialog_hides_navigation(game: Node) -> void:
