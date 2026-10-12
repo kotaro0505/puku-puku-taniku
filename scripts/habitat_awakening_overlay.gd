@@ -7,7 +7,7 @@ signal lookaround_requested(context: String)
 const Localizer = preload("res://scripts/game_localizer.gd")
 const DialoguePortraits = preload("res://scripts/dialogue_portraits.gd")
 const UISymbolIconClass = preload("res://scripts/ui_symbol_icon.gd")
-const StoryContinueButtonStyleClass = preload("res://scripts/story_continue_button_style.gd")
+const StandardStoryDialoguePanelClass = preload("res://scripts/standard_story_dialogue_panel.gd")
 const DIALOG_KEYS := [
 	"awakening_empty_1", "awakening_empty_2", "awakening_overharvest", "awakening_sow",
 	"_pause_before_memory", "awakening_surprise", "awakening_memory", "awakening_thanks",
@@ -67,7 +67,7 @@ var dialogue_label: Label
 var speaker_label: Label
 var speaker_portrait: TextureRect
 var instruction_label: Button
-var text_back: Panel
+var text_back
 var darkness: ColorRect
 var rain_tint: ColorRect
 var ghost_layer: Control
@@ -153,58 +153,6 @@ func _build_ui() -> void:
 	seed_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(seed_layer)
 
-	text_back = Panel.new()
-	text_back.name = "StoryTextPanel"
-	text_back.position = Vector2(24, 744)
-	text_back.size = Vector2(528, 226)
-	text_back.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var text_style := StyleBoxFlat.new()
-	text_style.bg_color = Color(0.08, 0.06, 0.05, 0.90)
-	text_style.border_color = Color(0.91, 0.75, 0.48, 0.62)
-	text_style.set_border_width_all(2)
-	text_style.set_corner_radius_all(24)
-	text_back.add_theme_stylebox_override("panel", text_style)
-	add_child(text_back)
-
-	speaker_portrait = TextureRect.new()
-	speaker_portrait.name = "SpeakerPortrait"
-	speaker_portrait.position = Vector2(40, 786)
-	speaker_portrait.size = Vector2(116, 126)
-	speaker_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	speaker_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	speaker_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(speaker_portrait)
-
-	speaker_label = Label.new()
-	speaker_label.position = Vector2(40, 752)
-	speaker_label.size = Vector2(116, 30)
-	speaker_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	speaker_label.add_theme_font_size_override("font_size", 14)
-	speaker_label.add_theme_color_override("font_color", Color("#f4ca7b"))
-	speaker_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(speaker_label)
-
-	dialogue_label = Label.new()
-	dialogue_label.position = Vector2(170, 784)
-	dialogue_label.size = Vector2(354, 131)
-	dialogue_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	dialogue_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	dialogue_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	dialogue_label.add_theme_font_size_override("font_size", 20)
-	dialogue_label.add_theme_color_override("font_color", Color("#fff6df"))
-	dialogue_label.add_theme_color_override("font_outline_color", Color(0.08, 0.04, 0.02, 0.8))
-	dialogue_label.add_theme_constant_override("outline_size", 4)
-	dialogue_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(dialogue_label)
-
-	instruction_label = Button.new()
-	instruction_label.name = "StoryContinueButton"
-	StoryContinueButtonStyleClass.apply(instruction_label)
-	StoryContinueButtonStyleClass.place_at_panel_bottom(instruction_label, text_back)
-	StoryContinueButtonStyleClass.balance_text_above_button(dialogue_label, instruction_label, text_back)
-	instruction_label.pressed.connect(advance)
-	add_child(instruction_label)
-
 	var tap_area := Button.new()
 	tap_area.name = "StoryTapArea"
 	tap_area.flat = true
@@ -212,7 +160,14 @@ func _build_ui() -> void:
 	tap_area.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	tap_area.pressed.connect(advance)
 	add_child(tap_area)
-	instruction_label.move_to_front()
+
+	text_back = StandardStoryDialoguePanelClass.new()
+	add_child(text_back)
+	speaker_portrait = text_back.speaker_portrait
+	speaker_label = text_back.speaker_label
+	dialogue_label = text_back.dialogue_label
+	instruction_label = text_back.continue_button
+	instruction_label.pressed.connect(advance)
 
 	for index in 52:
 		rain_drops.append({
@@ -375,19 +330,14 @@ func _begin_sow_animation() -> void:
 func _show_current_dialogue() -> void:
 	_set_dialogue_visible(true)
 	var speaker_key := str(SPEAKER_KEYS[page_index])
-	speaker_label.text = "" if speaker_key.is_empty() else Localizer.text(language_code, speaker_key)
-	speaker_label.visible = not speaker_key.is_empty()
-	speaker_portrait.texture = DialoguePortraits.texture(DialoguePortraits.speaker_id_from_key(speaker_key))
-	speaker_portrait.visible = speaker_portrait.texture != null
+	text_back.set_speaker(
+		"" if speaker_key.is_empty() else Localizer.text(language_code, speaker_key),
+		DialoguePortraits.texture(DialoguePortraits.speaker_id_from_key(speaker_key))
+	)
 	dialogue_label.text = Localizer.text(language_code, DIALOG_KEYS[page_index])
 
 func _set_dialogue_visible(show: bool) -> void:
 	text_back.visible = show
-	var speaker_key := str(SPEAKER_KEYS[page_index]) if page_index >= 0 and page_index < SPEAKER_KEYS.size() else ""
-	speaker_label.visible = show and not speaker_key.is_empty()
-	speaker_portrait.visible = show and speaker_portrait.texture != null
-	dialogue_label.visible = show
-	instruction_label.visible = show
 
 func _begin_memory_reveal() -> void:
 	transitioning = true

@@ -8,6 +8,7 @@ const HabitatSecondAwakeningOverlayClass = preload("res://scripts/habitat_second
 const JureJureFirstEncounterOverlayClass = preload("res://scripts/jurejure_first_encounter_overlay.gd")
 const HabitatRestorationUIClass = preload("res://scripts/habitat_restoration_ui.gd")
 const StoryContinueButtonStyleClass = preload("res://scripts/story_continue_button_style.gd")
+const StandardStoryDialoguePanelClass = preload("res://scripts/standard_story_dialogue_panel.gd")
 
 const ENDING_THANKS := "THANK YOU FOR PLAYING\nPUKU PUKU TANIKU!"
 const ENDING_CREDIT := "PRODUCED BY OHANAYA NOUEN"
@@ -25,7 +26,7 @@ func _ready() -> void:
 	await _test_get_to_catalog_unlock_handoff(game)
 	_test_visible_copy_has_no_internal_paths(game)
 	game._reset_progression_state()
-	print("RELEASE_POLISH_B_SMOKE_OK continuation=6_overlays+scripted+collection locales=3 standard_style=true inside_panels=true fullscreen_tap_preserved=true obsolete_keys=removed ending=exact_all_locales get_to_catalog=5_contexts no_intermediate_foreground=true internal_paths=clean")
+	print("RELEASE_POLISH_B_SMOKE_OK continuation=6_overlays+scripted+collection locales=3 greenhouse_dialogue_shared=5_contexts standard_style=true inside_panels=true input=button+fullscreen_single_step obsolete_keys=removed ending=exact_all_locales get_to_catalog=5_contexts no_intermediate_foreground=true internal_paths=clean")
 	get_tree().quit()
 
 
@@ -47,10 +48,10 @@ func _test_localized_continuation_copy() -> void:
 func _test_story_overlay_continuation_buttons() -> void:
 	var overlay_specs := [
 		{"overlay": OpeningStoryOverlayClass.new(), "button": "tap_hint", "panel_property": "text_panel", "text_property": "story_text", "panel_rect": Rect2(14, 586, 548, 414), "panel_bg": Color(0.105, 0.055, 0.035, 0.92), "text_color": Color("#fff6df")},
-		{"overlay": HabitatAwakeningOverlayClass.new(), "button": "instruction_label", "panel_property": "text_back", "text_property": "dialogue_label", "panel_rect": Rect2(24, 744, 528, 226), "panel_bg": Color(0.08, 0.06, 0.05, 0.90), "text_color": Color("#fff6df"), "dialog_keys": HabitatAwakeningOverlayClass.DIALOG_KEYS},
-		{"overlay": SeedPodStoryOverlayClass.new(), "button": "tap_hint", "text_property": "story_text", "panel_rect": Rect2(14, 730, 548, 240), "panel_bg": Color(0.105, 0.055, 0.035, 0.92), "text_color": Color("#fff6df"), "dialog_keys": SeedPodStoryOverlayClass.DIALOG_KEYS},
-		{"overlay": HabitatSecondAwakeningOverlayClass.new(), "button": "instruction_label", "text_property": "dialogue_label", "panel_rect": Rect2(24, 744, 528, 226), "panel_bg": Color(0.07, 0.045, 0.09, 0.92), "text_color": Color("#fff7ff"), "dialog_keys": HabitatSecondAwakeningOverlayClass.DIALOG_KEYS},
-		{"overlay": JureJureFirstEncounterOverlayClass.new(), "button": "tap_hint", "text_property": "dialogue_label", "panel_rect": Rect2(24, 758, 528, 220), "panel_bg": Color(0.08, 0.045, 0.025, 0.92), "text_color": Color("#fff6df"), "dialog_keys": JureJureFirstEncounterOverlayClass.DIALOG_KEYS},
+		{"overlay": HabitatAwakeningOverlayClass.new(), "button": "instruction_label", "panel_property": "text_back", "text_property": "dialogue_label", "standard_panel": true, "dialog_keys": HabitatAwakeningOverlayClass.DIALOG_KEYS},
+		{"overlay": SeedPodStoryOverlayClass.new(), "button": "tap_hint", "text_property": "story_text", "standard_panel": true, "dialog_keys": SeedPodStoryOverlayClass.DIALOG_KEYS},
+		{"overlay": HabitatSecondAwakeningOverlayClass.new(), "button": "instruction_label", "text_property": "dialogue_label", "standard_panel": true, "dialog_keys": HabitatSecondAwakeningOverlayClass.DIALOG_KEYS},
+		{"overlay": JureJureFirstEncounterOverlayClass.new(), "button": "tap_hint", "text_property": "dialogue_label", "standard_panel": true, "dialog_keys": JureJureFirstEncounterOverlayClass.DIALOG_KEYS},
 	]
 	for spec_value in overlay_specs:
 		var spec: Dictionary = spec_value
@@ -68,27 +69,34 @@ func _test_story_overlay_continuation_buttons() -> void:
 			if panel == null:
 				panel = overlay.find_child("StoryTextPanel", true, false) as Control
 			var dialogue_text := overlay.get(str(spec["text_property"])) as Control
-			_assert_standard_continue_button(button, panel, dialogue_text, locale, true)
+			var uses_standard_panel := bool(spec.get("standard_panel", false))
+			_assert_standard_continue_button(button, panel, dialogue_text, locale, not uses_standard_panel)
 			if overlay is HabitatAwakeningOverlay and locale == "ja":
 				assert((dialogue_text as Label).text == "記録では、ここで間違いないはずなんだけど……。")
-				assert(button.position.is_equal_approx(Vector2(163, 898)))
 			assert(dialogue_text.get_theme_font_size("font_size") == 20)
-			assert(dialogue_text.get_theme_color("font_color").is_equal_approx(spec["text_color"]))
-			var expected_panel_rect: Rect2 = spec["panel_rect"]
+			var expected_text_color: Color = StandardStoryDialoguePanelClass.TEXT_COLOR if uses_standard_panel else spec["text_color"]
+			assert(dialogue_text.get_theme_color("font_color").is_equal_approx(expected_text_color))
+			var expected_panel_rect := Rect2(StandardStoryDialoguePanelClass.DEFAULT_POSITION, StandardStoryDialoguePanelClass.PANEL_SIZE) if uses_standard_panel else spec["panel_rect"] as Rect2
 			assert(panel.position.is_equal_approx(expected_panel_rect.position))
 			assert(panel.size.is_equal_approx(expected_panel_rect.size))
 			var panel_style := panel.get_theme_stylebox("panel") as StyleBoxFlat
-			var expected_panel_bg: Color = spec["panel_bg"]
+			var expected_panel_bg: Color = StandardStoryDialoguePanelClass.PANEL_BACKGROUND if uses_standard_panel else spec["panel_bg"]
 			assert(panel_style != null and panel_style.bg_color.is_equal_approx(expected_panel_bg))
-			assert(panel_style.border_width_left == 2 and panel_style.corner_radius_top_left == 24)
+			assert(panel_style.border_width_left == (4 if uses_standard_panel else 2) and panel_style.corner_radius_top_left == 24)
 			var tap_area := overlay.find_child("StoryTapArea", true, false) as Button
 			assert(tap_area != null and tap_area.pressed.get_connections().size() == 1)
-			assert(button.get_parent() == tap_area.get_parent() and button.get_index() > tap_area.get_index())
+			if uses_standard_panel:
+				_assert_standard_dialogue_panel(panel, button, dialogue_text)
+				assert(panel.get_script() == StandardStoryDialoguePanelClass)
+				assert(panel.is_ancestor_of(button))
+				assert(panel.get_parent() == tap_area.get_parent() and panel.get_index() > tap_area.get_index())
+			else:
+				assert(button.get_parent() == tap_area.get_parent() and button.get_index() > tap_area.get_index())
 			if overlay is OpeningStoryOverlay:
 				for page_index in range(OpeningStoryOverlayClass.PAGE_TEXT_KEYS.size()):
 					overlay._show_page(page_index)
 					await get_tree().process_frame
-					_assert_standard_continue_button(button, panel, dialogue_text, locale, true)
+					_assert_standard_continue_button(button, panel, dialogue_text, locale, not uses_standard_panel)
 			else:
 				for key_value in spec.get("dialog_keys", []):
 					var dialogue_key := str(key_value)
@@ -96,7 +104,19 @@ func _test_story_overlay_continuation_buttons() -> void:
 						continue
 					(dialogue_text as Label).text = Localizer.text(locale, dialogue_key)
 					await get_tree().process_frame
-					_assert_standard_continue_button(button, panel, dialogue_text, locale, true)
+					_assert_standard_continue_button(button, panel, dialogue_text, locale, not uses_standard_panel)
+					if uses_standard_panel:
+						_assert_standard_dialogue_panel(panel, button, dialogue_text)
+			if uses_standard_panel and locale == "ja":
+				overlay.start(locale)
+				await get_tree().process_frame
+				_prepare_overlay_for_input_check(overlay)
+				var starting_page := int(overlay.get("page_index"))
+				button.pressed.emit()
+				assert(int(overlay.get("page_index")) == starting_page + 1)
+				_prepare_overlay_for_input_check(overlay)
+				tap_area.pressed.emit()
+				assert(int(overlay.get("page_index")) == starting_page + 2)
 			overlay.visible = false
 		overlay.queue_free()
 	await get_tree().process_frame
@@ -148,6 +168,34 @@ func _assert_standard_continue_button(button: Button, panel: Control, dialogue_t
 	assert(button.pressed.get_connections().size() >= 1)
 
 
+func _assert_standard_dialogue_panel(panel: Control, button: Button, dialogue_text: Control) -> void:
+	assert(panel.get_script() == StandardStoryDialoguePanelClass)
+	var panel_style := panel.get_theme_stylebox("panel") as StyleBoxFlat
+	assert(panel_style.bg_color.is_equal_approx(StandardStoryDialoguePanelClass.PANEL_BACKGROUND))
+	assert(panel_style.border_color.is_equal_approx(StandardStoryDialoguePanelClass.PANEL_BORDER))
+	assert(dialogue_text.get_theme_color("font_color").is_equal_approx(StandardStoryDialoguePanelClass.TEXT_COLOR))
+	var speaker := panel.find_child("StorySpeaker", true, false) as Label
+	var portrait := panel.find_child("SpeakerPortrait", true, false) as TextureRect
+	assert(speaker != null and portrait != null)
+	assert(speaker.get_theme_color("font_color").is_equal_approx(StandardStoryDialoguePanelClass.SPEAKER_COLOR))
+	if portrait.is_visible_in_tree():
+		assert(not portrait.get_global_rect().intersects(dialogue_text.get_global_rect()))
+	assert(not button.get_global_rect().intersects(_visible_label_text_rect(dialogue_text as Label)))
+	var text_label := dialogue_text as Label
+	assert(text_label.get_line_count() * text_label.get_line_height() <= text_label.size.y + 0.5, "standard dialogue text is clipped: lines=%d line_height=%d size=%s text=%s" % [text_label.get_line_count(), text_label.get_line_height(), text_label.size, text_label.text])
+
+
+func _prepare_overlay_for_input_check(overlay: Control) -> void:
+	if overlay is HabitatAwakeningOverlay:
+		overlay.waiting_for_arrival_lookaround = false
+		overlay.transitioning = false
+	elif overlay is SeedPodStoryOverlay:
+		overlay.transitioning = false
+		overlay.story_image.modulate.a = 1.0
+	elif overlay is JureJureFirstEncounterOverlay:
+		overlay.transitioning = false
+
+
 func _visible_label_text_rect(label: Label) -> Rect2:
 	var content_height := minf(label.size.y, float(label.get_line_count() * label.get_line_height()))
 	var top := label.global_position.y
@@ -163,10 +211,12 @@ func _test_scripted_dialog_continuation(game: Node) -> void:
 	await get_tree().process_frame
 	assert(game.intro_overlay.visible)
 	assert(game.intro_dialog_panel.size.is_equal_approx(Vector2(496, 255)))
+	assert(game.intro_dialog_panel.get_script() == StandardStoryDialoguePanelClass)
 	var greenhouse_panel_style := game.intro_dialog_panel.get_theme_stylebox("panel") as StyleBoxFlat
 	assert(greenhouse_panel_style != null and greenhouse_panel_style.bg_color.is_equal_approx(Color(0.97, 0.90, 0.75, 0.96)))
 	assert(game.intro_continue_button.text == Localizer.text(game.language_code, "continue"))
 	_assert_standard_continue_button(game.intro_continue_button, game.intro_dialog_panel, game.intro_dialogue_label, game.language_code)
+	_assert_standard_dialogue_panel(game.intro_dialog_panel, game.intro_continue_button, game.intro_dialogue_label)
 	game.collection_complete_overlay.visible = true
 	game._show_collection_complete_card()
 	await get_tree().process_frame

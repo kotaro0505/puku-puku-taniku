@@ -5,7 +5,7 @@ signal story_finished
 
 const Localizer = preload("res://scripts/game_localizer.gd")
 const DialoguePortraits = preload("res://scripts/dialogue_portraits.gd")
-const StoryContinueButtonStyleClass = preload("res://scripts/story_continue_button_style.gd")
+const StandardStoryDialoguePanelClass = preload("res://scripts/standard_story_dialogue_panel.gd")
 const STORY_TEXTURE: Texture2D = preload("res://assets/story/first-awakening-seed-pod.jpg")
 const IMAGE_AREA_SIZE := Vector2(576, 744)
 const DIALOG_KEYS := [
@@ -30,6 +30,7 @@ var text_tween: Tween
 var fade_tween: Tween
 var transitioning := false
 var exit_fade: ColorRect
+var dialogue_panel
 
 
 func _ready() -> void:
@@ -62,66 +63,6 @@ func _build_ui() -> void:
 	story_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(story_image)
 
-	var text_panel := Panel.new()
-	text_panel.name = "StoryTextPanel"
-	text_panel.position = Vector2(14, 730)
-	text_panel.size = Vector2(548, 240)
-	text_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var panel_style := StyleBoxFlat.new()
-	panel_style.bg_color = Color(0.105, 0.055, 0.035, 0.92)
-	panel_style.border_color = Color(0.89, 0.68, 0.39, 0.48)
-	panel_style.set_border_width_all(2)
-	panel_style.set_corner_radius_all(24)
-	panel_style.shadow_color = Color(0.04, 0.02, 0.01, 0.35)
-	panel_style.shadow_size = 8
-	text_panel.add_theme_stylebox_override("panel", panel_style)
-	add_child(text_panel)
-
-	speaker_portrait = TextureRect.new()
-	speaker_portrait.name = "SpeakerPortrait"
-	speaker_portrait.position = Vector2(40, 786)
-	speaker_portrait.size = Vector2(116, 126)
-	speaker_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	speaker_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	speaker_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	speaker_portrait.z_index = 2
-	add_child(speaker_portrait)
-
-	speaker_label = Label.new()
-	speaker_label.name = "StorySpeaker"
-	speaker_label.position = Vector2(40, 752)
-	speaker_label.size = Vector2(116, 32)
-	speaker_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	speaker_label.add_theme_font_size_override("font_size", 16)
-	speaker_label.add_theme_color_override("font_color", Color("#f2cf92"))
-	speaker_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	speaker_label.z_index = 2
-	add_child(speaker_label)
-
-	story_text = Label.new()
-	story_text.name = "StoryText"
-	story_text.position = Vector2(170, 784)
-	story_text.size = Vector2(354, 131)
-	story_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	story_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	story_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	story_text.add_theme_font_size_override("font_size", 20)
-	story_text.add_theme_color_override("font_color", Color("#fff6df"))
-	story_text.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.72))
-	story_text.add_theme_constant_override("shadow_offset_x", 1)
-	story_text.add_theme_constant_override("shadow_offset_y", 2)
-	story_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	story_text.z_index = 2
-	add_child(story_text)
-
-	tap_hint = Button.new()
-	tap_hint.name = "StoryContinueButton"
-	StoryContinueButtonStyleClass.apply(tap_hint)
-	StoryContinueButtonStyleClass.place_at_panel_bottom(tap_hint, text_panel)
-	StoryContinueButtonStyleClass.balance_text_above_button(story_text, tap_hint, text_panel)
-	tap_hint.pressed.connect(advance)
-	add_child(tap_hint)
-
 	var tap_area := Button.new()
 	tap_area.name = "StoryTapArea"
 	tap_area.flat = true
@@ -130,7 +71,13 @@ func _build_ui() -> void:
 	tap_area.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	tap_area.pressed.connect(advance)
 	add_child(tap_area)
-	tap_hint.move_to_front()
+	dialogue_panel = StandardStoryDialoguePanelClass.new()
+	add_child(dialogue_panel)
+	speaker_portrait = dialogue_panel.speaker_portrait
+	speaker_label = dialogue_panel.speaker_label
+	story_text = dialogue_panel.dialogue_label
+	tap_hint = dialogue_panel.continue_button
+	tap_hint.pressed.connect(advance)
 
 	exit_fade = ColorRect.new()
 	exit_fade.name = "ExitFade"
@@ -193,8 +140,9 @@ func _advance_after_image_fade() -> void:
 
 func _show_page() -> void:
 	var speaker_key := str(SPEAKER_KEYS[page_index])
-	speaker_label.text = Localizer.text(language_code, speaker_key)
-	speaker_portrait.texture = DialoguePortraits.texture(DialoguePortraits.speaker_id_from_key(speaker_key))
-	speaker_portrait.visible = speaker_portrait.texture != null
+	dialogue_panel.set_speaker(
+		Localizer.text(language_code, speaker_key),
+		DialoguePortraits.texture(DialoguePortraits.speaker_id_from_key(speaker_key))
+	)
 	story_text.text = Localizer.text(language_code, DIALOG_KEYS[page_index])
 	story_text.modulate = Color.WHITE

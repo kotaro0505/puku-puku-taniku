@@ -4,7 +4,7 @@ extends Control
 signal story_finished
 
 const Localizer = preload("res://scripts/game_localizer.gd")
-const StoryContinueButtonStyleClass = preload("res://scripts/story_continue_button_style.gd")
+const StandardStoryDialoguePanelClass = preload("res://scripts/standard_story_dialogue_panel.gd")
 const STORY_TEXTURE: Texture2D = preload("res://assets/story/jurejure-first-encounter.jpg")
 const DIALOG_KEYS := [
 	"jurejure_first_peccary",
@@ -22,6 +22,7 @@ var dialogue_label: Label
 var tap_hint: Button
 var fade_tween: Tween
 var text_tween: Tween
+var dialogue_panel
 
 
 func _ready() -> void:
@@ -49,60 +50,6 @@ func _build_ui() -> void:
 	story_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(story_image)
 
-	var text_panel := Panel.new()
-	text_panel.name = "StoryTextPanel"
-	text_panel.position = Vector2(24, 758)
-	text_panel.size = Vector2(528, 220)
-	text_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var panel_style := StyleBoxFlat.new()
-	panel_style.bg_color = Color(0.08, 0.045, 0.025, 0.92)
-	panel_style.border_color = Color(0.92, 0.69, 0.35, 0.68)
-	panel_style.set_border_width_all(2)
-	panel_style.set_corner_radius_all(24)
-	panel_style.shadow_color = Color(0.0, 0.0, 0.0, 0.48)
-	panel_style.shadow_size = 8
-	text_panel.add_theme_stylebox_override("panel", panel_style)
-	add_child(text_panel)
-
-	speaker_portrait = TextureRect.new()
-	speaker_portrait.name = "SpeakerPortrait"
-	speaker_portrait.position = Vector2(40, 795)
-	speaker_portrait.size = Vector2(116, 126)
-	speaker_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	speaker_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	speaker_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(speaker_portrait)
-
-	speaker_label = Label.new()
-	speaker_label.position = Vector2(40, 762)
-	speaker_label.size = Vector2(116, 30)
-	speaker_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	speaker_label.add_theme_font_size_override("font_size", 15)
-	speaker_label.add_theme_color_override("font_color", Color("#f4ca7b"))
-	speaker_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(speaker_label)
-
-	dialogue_label = Label.new()
-	dialogue_label.position = Vector2(170, 802)
-	dialogue_label.size = Vector2(354, 116)
-	dialogue_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	dialogue_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	dialogue_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	dialogue_label.add_theme_font_size_override("font_size", 20)
-	dialogue_label.add_theme_color_override("font_color", Color("#fff6df"))
-	dialogue_label.add_theme_color_override("font_outline_color", Color(0.08, 0.04, 0.02, 0.85))
-	dialogue_label.add_theme_constant_override("outline_size", 4)
-	dialogue_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(dialogue_label)
-
-	tap_hint = Button.new()
-	tap_hint.name = "StoryContinueButton"
-	StoryContinueButtonStyleClass.apply(tap_hint)
-	StoryContinueButtonStyleClass.place_at_panel_bottom(tap_hint, text_panel)
-	StoryContinueButtonStyleClass.balance_text_above_button(dialogue_label, tap_hint, text_panel)
-	tap_hint.pressed.connect(advance)
-	add_child(tap_hint)
-
 	var tap_area := Button.new()
 	tap_area.name = "StoryTapArea"
 	tap_area.flat = true
@@ -111,7 +58,13 @@ func _build_ui() -> void:
 	tap_area.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	tap_area.pressed.connect(advance)
 	add_child(tap_area)
-	tap_hint.move_to_front()
+	dialogue_panel = StandardStoryDialoguePanelClass.new()
+	add_child(dialogue_panel)
+	speaker_portrait = dialogue_panel.speaker_portrait
+	speaker_label = dialogue_panel.speaker_label
+	dialogue_label = dialogue_panel.dialogue_label
+	tap_hint = dialogue_panel.continue_button
+	tap_hint.pressed.connect(advance)
 
 
 func start(requested_language := "ja") -> void:
@@ -156,8 +109,10 @@ func advance() -> void:
 
 func _show_page() -> void:
 	var speaker_id: String = str(SPEAKER_IDS[page_index])
-	speaker_label.text = Localizer.text(language_code, "jurejure_%s_name" % speaker_id)
-	speaker_portrait.texture = _portrait_texture(speaker_id)
+	dialogue_panel.set_speaker(
+		Localizer.text(language_code, "jurejure_%s_name" % speaker_id),
+		_portrait_texture(speaker_id)
+	)
 	dialogue_label.text = Localizer.text(language_code, DIALOG_KEYS[page_index])
 	dialogue_label.modulate = Color.WHITE
 

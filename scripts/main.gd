@@ -20,6 +20,7 @@ const Localizer = preload("res://scripts/game_localizer.gd")
 const DialoguePortraitsClass = preload("res://scripts/dialogue_portraits.gd")
 const UISymbolIconClass = preload("res://scripts/ui_symbol_icon.gd")
 const StoryContinueButtonStyleClass = preload("res://scripts/story_continue_button_style.gd")
+const StandardStoryDialoguePanelClass = preload("res://scripts/standard_story_dialogue_panel.gd")
 const HabitatWildSystemClass = preload("res://scripts/habitat_wild_system.gd")
 const HabitatNotificationServiceClass = preload("res://scripts/habitat_notification_service.gd")
 const HabitatPlantPanelClass = preload("res://scripts/habitat_plant_panel.gd")
@@ -2656,18 +2657,16 @@ func _grant_rescue_seed_bags()->void:
 func _build_intro_story(hud:Control)->void:
 	intro_overlay=Control.new();intro_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);intro_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;intro_overlay.visible=false;hud.add_child(intro_overlay)
 	var shade:=ColorRect.new();shade.color=Color(0.08,0.05,0.025,.18);shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);shade.mouse_filter=Control.MOUSE_FILTER_STOP;intro_overlay.add_child(shade)
-	intro_dialog_panel=PanelContainer.new();intro_dialog_panel.position=Vector2(40,690);intro_dialog_panel.size=Vector2(496,255);intro_dialog_panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;intro_dialog_panel.add_theme_stylebox_override("panel",_box(Color(0.97,0.90,0.75,.96),Color("#a86f36"),24,4));intro_overlay.add_child(intro_dialog_panel)
-	var dialog_row:=HBoxContainer.new();dialog_row.alignment=BoxContainer.ALIGNMENT_CENTER;dialog_row.add_theme_constant_override("separation",12);dialog_row.mouse_filter=Control.MOUSE_FILTER_IGNORE;intro_dialog_panel.add_child(dialog_row)
-	intro_portrait_slot=Control.new();intro_portrait_slot.custom_minimum_size=Vector2(132,205);intro_portrait_slot.clip_contents=true;intro_portrait_slot.mouse_filter=Control.MOUSE_FILTER_IGNORE;dialog_row.add_child(intro_portrait_slot)
-	intro_panda_portrait=TextureRect.new();intro_panda_portrait.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;intro_panda_portrait.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;intro_panda_portrait.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);intro_panda_portrait.offset_top=32.0;intro_panda_portrait.texture=_panda_portrait_texture();intro_panda_portrait.mouse_filter=Control.MOUSE_FILTER_IGNORE;intro_panda_portrait.visible=false;intro_portrait_slot.add_child(intro_panda_portrait)
+	var standard_dialogue=StandardStoryDialoguePanelClass.new();intro_dialog_panel=standard_dialogue;intro_dialog_panel.position=Vector2(40,690);intro_overlay.add_child(intro_dialog_panel)
+	intro_portrait_slot=standard_dialogue.portrait_slot
+	intro_panda_portrait=standard_dialogue.speaker_portrait;intro_panda_portrait.texture=_panda_portrait_texture();intro_panda_portrait.visible=false
+	intro_speaker_label=standard_dialogue.speaker_label;intro_speaker_label.text=Localizer.text(language_code,"story_speaker_panda")
+	intro_dialogue_label=standard_dialogue.dialogue_label
+	intro_continue_button=standard_dialogue.continue_button;intro_continue_button.text=Localizer.text(language_code,"continue");_skin_story_continue_button(intro_continue_button);intro_continue_button.pressed.connect(_advance_intro_story)
 	intro_trio_portraits=Control.new();intro_trio_portraits.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);intro_trio_portraits.mouse_filter=Control.MOUSE_FILTER_IGNORE;intro_trio_portraits.visible=false;intro_portrait_slot.add_child(intro_trio_portraits)
 	var trio_layout:=[{"speaker":"panda","position":Vector2(0,88)},{"speaker":"armadillo","position":Vector2(76,88)},{"speaker":"girl","position":Vector2(38,32)}]
 	for trio_entry in trio_layout:
 		var trio_position:Vector2=trio_entry.get("position",Vector2.ZERO);var trio_portrait:=TextureRect.new();trio_portrait.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;trio_portrait.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;trio_portrait.texture=_speaker_portrait_texture(str(trio_entry.speaker));trio_portrait.position=trio_position;trio_portrait.size=Vector2(86,112);trio_portrait.mouse_filter=Control.MOUSE_FILTER_IGNORE;intro_trio_portraits.add_child(trio_portrait)
-	intro_speaker_label=Label.new();intro_speaker_label.text=Localizer.text(language_code,"story_speaker_panda");intro_speaker_label.position=Vector2.ZERO;intro_speaker_label.size=Vector2(132,30);intro_speaker_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;intro_speaker_label.add_theme_font_size_override("font_size",17);intro_speaker_label.add_theme_color_override("font_color",Color("#8b5528"));intro_speaker_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;intro_speaker_label.z_index=2;intro_portrait_slot.add_child(intro_speaker_label)
-	var content:=VBoxContainer.new();content.alignment=BoxContainer.ALIGNMENT_CENTER;content.add_theme_constant_override("separation",12);content.size_flags_horizontal=Control.SIZE_EXPAND_FILL;content.mouse_filter=Control.MOUSE_FILTER_IGNORE;dialog_row.add_child(content)
-	intro_dialogue_label=Label.new();intro_dialogue_label.custom_minimum_size=Vector2(300,90);intro_dialogue_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;intro_dialogue_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;intro_dialogue_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;intro_dialogue_label.add_theme_font_size_override("font_size",20);intro_dialogue_label.add_theme_color_override("font_color",UI_BROWN);intro_dialogue_label.size_flags_horizontal=Control.SIZE_EXPAND_FILL;intro_dialogue_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.add_child(intro_dialogue_label)
-	intro_continue_button=Button.new();intro_continue_button.name="StoryContinueButton";intro_continue_button.text=Localizer.text(language_code,"continue");_skin_story_continue_button(intro_continue_button);intro_continue_button.pressed.connect(_advance_intro_story);content.add_child(intro_continue_button)
 	intro_fullscreen_continue_button=Button.new();intro_fullscreen_continue_button.name="OldSeedGetContinueArea";intro_fullscreen_continue_button.flat=true;intro_fullscreen_continue_button.focus_mode=Control.FOCUS_NONE;intro_fullscreen_continue_button.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);intro_fullscreen_continue_button.visible=false;intro_fullscreen_continue_button.pressed.connect(_advance_intro_story);intro_overlay.add_child(intro_fullscreen_continue_button)
 	intro_overlay.move_child(intro_fullscreen_continue_button,intro_dialog_panel.get_index())
 

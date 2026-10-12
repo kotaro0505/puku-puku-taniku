@@ -88,7 +88,8 @@ func _ready() -> void:
 		assert(game.habitat_awakening_overlay.page_index == expected_page)
 		assert(game.habitat_awakening_overlay.speaker_portrait.visible)
 		assert(game.habitat_awakening_overlay.speaker_portrait.texture != null)
-		assert(game.habitat_awakening_overlay.speaker_portrait.position.x < game.habitat_awakening_overlay.dialogue_label.position.x)
+		assert(game.habitat_awakening_overlay.speaker_portrait.global_position.x < game.habitat_awakening_overlay.dialogue_label.global_position.x)
+		assert(not game.habitat_awakening_overlay.speaker_portrait.get_global_rect().intersects(game.habitat_awakening_overlay.dialogue_label.get_global_rect()))
 		game.habitat_awakening_overlay.advance()
 		await get_tree().process_frame
 	assert(game.habitat_awakening_overlay.page_index == 3)
@@ -209,7 +210,8 @@ func _ready() -> void:
 		assert(game.seed_pod_story_overlay.page_index == expected_page)
 		assert(game.seed_pod_story_overlay.story_text.text == Localizer.text("ja", game.seed_pod_story_overlay.DIALOG_KEYS[expected_page]))
 		assert(game.seed_pod_story_overlay.speaker_portrait.visible and game.seed_pod_story_overlay.speaker_portrait.texture != null)
-		assert(game.seed_pod_story_overlay.speaker_portrait.position.x < game.seed_pod_story_overlay.story_text.position.x)
+		assert(game.seed_pod_story_overlay.speaker_portrait.global_position.x < game.seed_pod_story_overlay.story_text.global_position.x)
+		assert(not game.seed_pod_story_overlay.speaker_portrait.get_global_rect().intersects(game.seed_pod_story_overlay.story_text.get_global_rect()))
 		game.seed_pod_story_overlay.advance()
 		if expected_page < 2:
 			await get_tree().create_timer(0.25).timeout
