@@ -472,6 +472,8 @@ var scripted_dialog_shop_context := false
 var tutorial_guide_overlay: Control
 var tutorial_guide_shade: ColorRect
 var tutorial_guide_button: Button
+var tutorial_continue_button: Button
+var tutorial_continue_bottom_spacer: Control
 var tutorial_highlight_tween: Tween
 var tutorial_guide_message: Label
 var tutorial_panda_portrait: TextureRect
@@ -3281,7 +3283,10 @@ void fragment(){
 	tutorial_dialog_panel=PanelContainer.new();tutorial_dialog_panel.position=Vector2(40,790);tutorial_dialog_panel.size=Vector2(496,190);tutorial_dialog_panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_dialog_panel.add_theme_stylebox_override("panel",_box(Color(0.97,0.90,0.75,.97),Color("#a86f36"),24,4));tutorial_dialog_panel.visible=false;tutorial_guide_overlay.add_child(tutorial_dialog_panel)
 	var tutorial_row:=HBoxContainer.new();tutorial_row.alignment=BoxContainer.ALIGNMENT_CENTER;tutorial_row.add_theme_constant_override("separation",12);tutorial_row.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_dialog_panel.add_child(tutorial_row)
 	tutorial_panda_portrait=TextureRect.new();tutorial_panda_portrait.texture=_panda_portrait_texture();tutorial_panda_portrait.custom_minimum_size=Vector2(126,164);tutorial_panda_portrait.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;tutorial_panda_portrait.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;tutorial_panda_portrait.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_row.add_child(tutorial_panda_portrait)
-	tutorial_guide_message=Label.new();tutorial_guide_message.custom_minimum_size=Vector2(330,150);tutorial_guide_message.size_flags_horizontal=Control.SIZE_EXPAND_FILL;tutorial_guide_message.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;tutorial_guide_message.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;tutorial_guide_message.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;tutorial_guide_message.add_theme_font_size_override("font_size",22);tutorial_guide_message.add_theme_color_override("font_color",UI_BROWN);tutorial_guide_message.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_row.add_child(tutorial_guide_message)
+	var tutorial_content:=VBoxContainer.new();tutorial_content.alignment=BoxContainer.ALIGNMENT_CENTER;tutorial_content.add_theme_constant_override("separation",8);tutorial_content.size_flags_horizontal=Control.SIZE_EXPAND_FILL;tutorial_content.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_row.add_child(tutorial_content)
+	tutorial_guide_message=Label.new();tutorial_guide_message.custom_minimum_size=Vector2(330,96);tutorial_guide_message.size_flags_horizontal=Control.SIZE_EXPAND_FILL;tutorial_guide_message.size_flags_vertical=Control.SIZE_EXPAND_FILL;tutorial_guide_message.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;tutorial_guide_message.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;tutorial_guide_message.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;tutorial_guide_message.add_theme_font_size_override("font_size",22);tutorial_guide_message.add_theme_color_override("font_color",UI_BROWN);tutorial_guide_message.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_content.add_child(tutorial_guide_message)
+	tutorial_continue_button=Button.new();tutorial_continue_button.name="StoryContinueButton";tutorial_continue_button.text=Localizer.text(language_code,"continue");_skin_story_continue_button(tutorial_continue_button);tutorial_continue_button.pressed.connect(_advance_visible_tutorial_dialog);tutorial_continue_button.visible=false;tutorial_content.add_child(tutorial_continue_button)
+	tutorial_continue_bottom_spacer=Control.new();tutorial_continue_bottom_spacer.custom_minimum_size=Vector2(0,10);tutorial_continue_bottom_spacer.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_continue_bottom_spacer.visible=false;tutorial_content.add_child(tutorial_continue_bottom_spacer)
 	tutorial_cost_note_panel=PanelContainer.new();tutorial_cost_note_panel.name="FirstNormalCostNote";tutorial_cost_note_panel.position=Vector2(118,418);tutorial_cost_note_panel.size=Vector2(340,64);tutorial_cost_note_panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_cost_note_panel.add_theme_stylebox_override("panel",_box(Color("#fff4cd"),Color("#d28a2d"),16,3));tutorial_cost_note_panel.visible=false;tutorial_guide_overlay.add_child(tutorial_cost_note_panel)
 	tutorial_cost_note_label=Label.new();tutorial_cost_note_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;tutorial_cost_note_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;tutorial_cost_note_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;tutorial_cost_note_label.add_theme_font_size_override("font_size",18);tutorial_cost_note_label.add_theme_color_override("font_color",UI_BROWN);tutorial_cost_note_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_cost_note_panel.add_child(tutorial_cost_note_label)
 
@@ -3315,7 +3320,7 @@ func _show_tutorial_guide(target:String)->void:
 	elif target=="old_seed":source=old_seed_play_button
 	elif target=="normal_seed":source=normal_play_button
 	else:return
-	_prepare_standard_tutorial_guide();tutorial_guide_button.icon=null;tutorial_guide_button.expand_icon=false;tutorial_dialog_panel.visible=false
+	_prepare_standard_tutorial_guide();tutorial_guide_button.icon=null;tutorial_guide_button.expand_icon=false;tutorial_dialog_panel.visible=false;tutorial_continue_button.visible=false;tutorial_continue_bottom_spacer.visible=false
 	if target=="habitat":
 		_mirror_habitat_tutorial_button(source)
 	else:
@@ -3334,6 +3339,8 @@ func _show_tutorial_guide(target:String)->void:
 func _prepare_standard_tutorial_guide()->void:
 	tutorial_guide_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_shade.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_shade.material=null;tutorial_guide_shade.color=Color(0.05,0.035,0.025,.72)
 	if tutorial_cost_note_panel:tutorial_cost_note_panel.visible=false
+	if tutorial_continue_button:tutorial_continue_button.visible=false
+	if tutorial_continue_bottom_spacer:tutorial_continue_bottom_spacer.visible=false
 	first_play_harvest_spotlight_material.set_shader_parameter("focus_ellipse",false)
 	tutorial_guide_button.visible=true;tutorial_guide_button.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_button.flat=false;tutorial_guide_button.focus_mode=Control.FOCUS_ALL
 
@@ -3428,7 +3435,19 @@ func _show_first_play_tutorial_custom_dialog(message_key:String,speaker_id:Strin
 	var empty_style:=StyleBoxEmpty.new()
 	for state in ["normal","hover","pressed","disabled","focus"]:tutorial_guide_button.add_theme_stylebox_override(state,empty_style)
 	for connection in tutorial_guide_button.pressed.get_connections():tutorial_guide_button.pressed.disconnect(connection.callable)
-	tutorial_guide_button.pressed.connect(_dismiss_first_play_tutorial_dialog);tutorial_panda_portrait.texture=_speaker_portrait_texture(speaker_id);tutorial_panda_portrait.visible=true;tutorial_guide_message.text=Localizer.text(language_code,message_key);tutorial_dialog_panel.visible=true;tutorial_dialog_panel.position=Vector2(40,790);tutorial_guide_overlay.visible=true
+	tutorial_guide_button.pressed.connect(_dismiss_first_play_tutorial_dialog);tutorial_panda_portrait.texture=_speaker_portrait_texture(speaker_id);tutorial_panda_portrait.visible=true;tutorial_guide_message.text=Localizer.text(language_code,message_key);tutorial_dialog_panel.visible=true;tutorial_dialog_panel.position=Vector2(40,790);_show_visible_tutorial_continue("first_play_dialog");tutorial_guide_overlay.visible=true
+
+func _show_visible_tutorial_continue(target:String)->void:
+	tutorial_continue_button.set_meta("target",target)
+	tutorial_continue_button.text=Localizer.text(language_code,"continue")
+	tutorial_continue_button.disabled=false
+	tutorial_continue_button.visible=true
+	tutorial_continue_bottom_spacer.visible=true
+
+func _advance_visible_tutorial_dialog()->void:
+	match str(tutorial_continue_button.get_meta("target","")):
+		"first_play_dialog":_dismiss_first_play_tutorial_dialog()
+		"puku_buyback":_advance_puku_buyback_tutorial()
 
 func _dismiss_first_play_tutorial_dialog()->void:
 	if not first_play_tutorial_dialog_visible:return
@@ -3491,7 +3510,7 @@ func _activate_first_play_tutorial_new_harvest_guide()->void:
 
 func _hide_first_play_tutorial_overlay()->void:
 	if tutorial_guide_overlay==null:return
-	tutorial_guide_overlay.visible=false;tutorial_dialog_panel.visible=false;tutorial_guide_button.visible=false;tutorial_guide_shade.material=null
+	tutorial_guide_overlay.visible=false;tutorial_dialog_panel.visible=false;tutorial_guide_button.visible=false;tutorial_continue_button.visible=false;tutorial_continue_bottom_spacer.visible=false;tutorial_guide_shade.material=null
 	if tutorial_cost_note_panel:tutorial_cost_note_panel.visible=false
 	_set_tutorial_dialog_system_style(false)
 	first_play_harvest_spotlight_material.set_shader_parameter("focus_ellipse",false)
@@ -3499,7 +3518,7 @@ func _hide_first_play_tutorial_overlay()->void:
 func _set_tutorial_dialog_system_style(system_page:bool)->void:
 	if tutorial_dialog_panel==null:return
 	tutorial_panda_portrait.visible=not system_page
-	tutorial_guide_message.custom_minimum_size=Vector2(454 if system_page else 330,150)
+	tutorial_guide_message.custom_minimum_size=Vector2(454 if system_page else 330,96)
 	tutorial_guide_message.add_theme_font_size_override("font_size",20 if system_page else 22)
 	tutorial_dialog_panel.add_theme_stylebox_override("panel",_box(Color("#edf5df") if system_page else Color(0.97,0.90,0.75,.97),Color("#739158") if system_page else Color("#a86f36"),24,4))
 
@@ -3527,7 +3546,7 @@ func _show_puku_buyback_tutorial_page()->void:
 	var empty_style:=StyleBoxEmpty.new()
 	for state in ["normal","hover","pressed","disabled","focus"]:tutorial_guide_button.add_theme_stylebox_override(state,empty_style)
 	for connection in tutorial_guide_button.pressed.get_connections():tutorial_guide_button.pressed.disconnect(connection.callable)
-	tutorial_guide_button.pressed.connect(_advance_puku_buyback_tutorial);tutorial_panda_portrait.texture=_speaker_portrait_texture("panda");tutorial_panda_portrait.visible=true;tutorial_guide_message.text=Localizer.text(language_code,str(keys[puku_buyback_tutorial_index]));tutorial_dialog_panel.visible=true;tutorial_dialog_panel.position=Vector2(40,790);tutorial_guide_overlay.visible=true
+	tutorial_guide_button.pressed.connect(_advance_puku_buyback_tutorial);tutorial_panda_portrait.texture=_speaker_portrait_texture("panda");tutorial_panda_portrait.visible=true;tutorial_guide_message.text=Localizer.text(language_code,str(keys[puku_buyback_tutorial_index]));tutorial_dialog_panel.visible=true;tutorial_dialog_panel.position=Vector2(40,790);_show_visible_tutorial_continue("puku_buyback");tutorial_guide_overlay.visible=true
 	_set_tutorial_dialog_system_style(puku_buyback_tutorial_index==2)
 
 func _advance_puku_buyback_tutorial()->void:
@@ -3622,7 +3641,7 @@ func _show_tutorial_harvest_spotlight()->void:
 	if tutorial_highlight_tween and tutorial_highlight_tween.is_valid():tutorial_highlight_tween.kill()
 	tutorial_highlight_tween=null;tutorial_guide_overlay.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_guide_shade.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_guide_shade.material=first_play_harvest_spotlight_material;tutorial_guide_shade.color=Color(0.025,0.035,0.045,.82)
 	first_play_harvest_spotlight_material.set_shader_parameter("focus_ellipse",false)
-	tutorial_guide_button.visible=false;tutorial_guide_button.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_guide_message.text=Localizer.text(language_code,"tutorial_harvest_tap");tutorial_dialog_panel.visible=true;tutorial_guide_overlay.visible=true;_update_first_play_harvest_guide_focus()
+	tutorial_guide_button.visible=false;tutorial_guide_button.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_continue_button.visible=false;tutorial_continue_bottom_spacer.visible=false;tutorial_guide_message.text=Localizer.text(language_code,"tutorial_harvest_tap");tutorial_dialog_panel.visible=true;tutorial_guide_overlay.visible=true;_update_first_play_harvest_guide_focus()
 	tutorial_panda_portrait.visible=false
 
 func _update_first_play_harvest_guide_focus()->void:

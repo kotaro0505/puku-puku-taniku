@@ -22,11 +22,12 @@ func _ready() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	await _test_scripted_dialog_continuation(game)
+	await _test_tutorial_dialog_continuation(game)
 	_test_ending_credit(game)
 	await _test_get_to_catalog_unlock_handoff(game)
 	_test_visible_copy_has_no_internal_paths(game)
 	game._reset_progression_state()
-	print("RELEASE_POLISH_B_SMOKE_OK continuation=6_overlays+scripted+collection locales=3 greenhouse_dialogue_shared=5_contexts standard_style=true inside_panels=true input=button+fullscreen_single_step obsolete_keys=removed ending=exact_all_locales get_to_catalog=5_contexts no_intermediate_foreground=true internal_paths=clean")
+	print("RELEASE_POLISH_B_SMOKE_OK continuation=6_overlays+scripted+collection+tutorial_9_pages locales=3 greenhouse_dialogue_shared=5_contexts standard_style=true inside_panels=true input=button+fullscreen_single_step operation_guides=no_continue obsolete_keys=removed ending=exact_all_locales get_to_catalog=5_contexts no_intermediate_foreground=true internal_paths=clean")
 	get_tree().quit()
 
 
@@ -227,6 +228,112 @@ func _test_scripted_dialog_continuation(game: Node) -> void:
 	game.scripted_dialog_kind = ""
 	game.scripted_dialog_pages.clear()
 	game.intro_overlay.visible = false
+
+
+func _test_tutorial_dialog_continuation(game: Node) -> void:
+	var first_play_pages := [
+		{"key": "tutorial_normal_sprout", "speaker": "panda"},
+		{"key": "tutorial_normal_growth", "speaker": "girl"},
+		{"key": "tutorial_normal_jelly", "speaker": "armadillo"},
+		{"key": "tutorial_normal_jellied", "speaker": "panda"},
+		{"key": "tutorial_normal_new_panda", "speaker": "panda"},
+		{"key": "tutorial_normal_new_girl", "speaker": "girl"},
+	]
+	for locale in Localizer.SUPPORTED_LANGUAGES:
+		game._set_language(locale)
+		for page_value in first_play_pages:
+			var page: Dictionary = page_value
+			game._show_first_play_tutorial_custom_dialog(str(page["key"]), str(page["speaker"]))
+			await get_tree().process_frame
+			await get_tree().process_frame
+			_assert_tutorial_dialog_continue(game, locale, true)
+			assert(game.tutorial_guide_message.text == Localizer.text(locale, str(page["key"])))
+			game._hide_first_play_tutorial_overlay()
+		for page_index in range(3):
+			game.puku_buyback_tutorial_active = true
+			game.puku_buyback_tutorial_index = page_index
+			game._show_puku_buyback_tutorial_page()
+			await get_tree().process_frame
+			await get_tree().process_frame
+			_assert_tutorial_dialog_continue(game, locale, page_index < 2)
+			var key: String = ["puku_buyback_1", "puku_buyback_2", "puku_buyback_2_endless"][page_index]
+			assert(game.tutorial_guide_message.text == Localizer.text(locale, key))
+			game._hide_first_play_tutorial_overlay()
+		game.puku_buyback_tutorial_active = false
+
+	# Both visible and full-screen controls advance exactly one page. The visible
+	# control is above the transparent hit area, so a real pointer event cannot
+	# reach both controls on the same release.
+	game._set_language("ja")
+	game.first_play_tutorial_active = true
+	game.first_play_tutorial_phase = "growth_dialogs"
+	game.first_play_tutorial_message_index = 0
+	game._show_first_play_tutorial_custom_dialog("tutorial_normal_sprout", "panda")
+	var first_play_index: int = game.first_play_tutorial_message_index
+	game.tutorial_continue_button.pressed.emit()
+	assert(game.first_play_tutorial_message_index == first_play_index + 1)
+	assert(not game.first_play_tutorial_dialog_visible)
+	game.first_play_tutorial_message_index = 0
+	game.first_play_tutorial_wait_remaining = 0.0
+	game._show_first_play_tutorial_custom_dialog("tutorial_normal_sprout", "panda")
+	game.tutorial_guide_button.pressed.emit()
+	assert(game.first_play_tutorial_message_index == 1)
+	assert(not game.first_play_tutorial_dialog_visible)
+
+	game.puku_buyback_tutorial_active = true
+	game.puku_buyback_tutorial_index = 0
+	game._show_puku_buyback_tutorial_page()
+	game.tutorial_continue_button.pressed.emit()
+	assert(game.puku_buyback_tutorial_index == 1)
+	assert(game.tutorial_guide_message.text == Localizer.text("ja", "puku_buyback_2"))
+	game.tutorial_guide_button.pressed.emit()
+	assert(game.puku_buyback_tutorial_index == 2)
+	assert(game.tutorial_guide_message.text == Localizer.text("ja", "puku_buyback_2_endless"))
+	game.puku_buyback_tutorial_active = false
+	game._hide_first_play_tutorial_overlay()
+
+	# Instructions that require gameplay input intentionally keep the dialogue
+	# text but never show a misleading continuation action.
+	game.first_play_harvest_guide_active = true
+	game.tutorial_harvest_plant = null
+	game._show_tutorial_harvest_spotlight()
+	await get_tree().process_frame
+	assert(game.tutorial_guide_overlay.visible and game.tutorial_dialog_panel.visible)
+	assert(not game.tutorial_continue_button.visible and not game.tutorial_continue_button.is_visible_in_tree())
+	game.first_play_harvest_guide_active = false
+	game._hide_first_play_tutorial_overlay()
+	game._show_tutorial_guide("play_open")
+	assert(game.tutorial_guide_overlay.visible and not game.tutorial_dialog_panel.visible)
+	assert(not game.tutorial_continue_button.visible)
+	game._hide_first_play_tutorial_overlay()
+	game.first_play_tutorial_active = false
+
+	# The later Puku-gauge explanation uses the standard greenhouse dialogue
+	# component and therefore also retains a visible continuation button.
+	game.puku_gauge_intro_complete = false
+	game._start_puku_gauge_intro_dialog()
+	await get_tree().process_frame
+	_assert_standard_continue_button(game.intro_continue_button, game.intro_dialog_panel, game.intro_dialogue_label, "ja")
+	assert(game.intro_continue_button.is_visible_in_tree())
+	game.scripted_dialog_kind = ""
+	game.scripted_dialog_pages.clear()
+	game.intro_overlay.visible = false
+
+
+func _assert_tutorial_dialog_continue(game: Node, locale: String, portrait_expected: bool) -> void:
+	var button := game.tutorial_continue_button as Button
+	var panel := game.tutorial_dialog_panel as Control
+	var dialogue := game.tutorial_guide_message as Label
+	assert(game.tutorial_guide_overlay.visible and panel.visible)
+	assert(button.visible and button.is_visible_in_tree())
+	assert(panel.is_ancestor_of(button))
+	assert(game.tutorial_guide_button.get_index() < panel.get_index())
+	assert(str(button.get_meta("target", "")) in ["first_play_dialog", "puku_buyback"])
+	_assert_standard_continue_button(button, panel, dialogue, locale)
+	assert(dialogue.get_line_count() * dialogue.get_line_height() <= dialogue.size.y + 0.5, "tutorial dialogue text is clipped: locale=%s size=%s text=%s" % [locale, dialogue.size, dialogue.text])
+	assert(game.tutorial_panda_portrait.visible == portrait_expected)
+	if portrait_expected:
+		assert(not game.tutorial_panda_portrait.get_global_rect().intersects(button.get_global_rect()))
 
 
 func _test_ending_credit(game: Node) -> void:
