@@ -110,8 +110,9 @@ func _ready() -> void:
 	assert(bool(game.discovered.get(FIRST_SPECIES_ID, false)))
 	assert(not game.first_colorata_confirmed)
 	assert(game.species_get_overlay.visible)
-	assert(game.species_get_overlay.badge_label.text == Localizer.text("ja", "new"))
+	assert(game.species_get_overlay.badge_label.visible and game.species_get_overlay.badge_label.text == Localizer.text("ja", "new"))
 	assert(game.species_get_overlay.name_label.text == Localizer.species_name("ja", game._catalog_entry(FIRST_SPECIES_ID)))
+	assert(game.species_get_overlay.series_label.text == "原種")
 	game.species_get_overlay.close_overlay()
 	await get_tree().create_timer(0.2).timeout
 	assert(game.scripted_dialog_kind == "first_colorata_discovery")
@@ -170,7 +171,8 @@ func _ready() -> void:
 	await get_tree().create_timer(.65).timeout
 	assert(game.species_get_overlay.visible)
 	assert(game.species_get_overlay.name_label.text == Localizer.species_name("ja", game._catalog_entry("affinis")))
-	assert(game.species_get_overlay.badge_label.text == Localizer.text("ja", "original_catalog_new"))
+	assert(game.species_get_overlay.badge_label.visible and game.species_get_overlay.badge_label.text == Localizer.text("ja", "original_catalog_new"))
+	assert(game.species_get_overlay.series_label.text == "原種")
 	assert(bool(game.discovered.get("affinis", false)))
 	assert(game._species_get_count("affinis") == 0 and not bool(game.greenhouse_available.get("affinis", false)))
 	_press_species_overlay(game.species_get_overlay,game.species_get_overlay.card.position+game.species_get_overlay.card.size*.5,true)
@@ -182,7 +184,7 @@ func _ready() -> void:
 	assert(Localizer.species_name("ja", game._catalog_entry("shaviana")) in game.intro_dialogue_label.text)
 	# Re-open an Affinis probe to verify that the dimmed edge is the same close
 	# target as the card itself, without changing the story sequence.
-	game.species_get_overlay.show_species(game._catalog_entry("affinis"),game._species_texture(game._catalog_entry("affinis")),true,"input_probe_affinis","ja")
+	game.species_get_overlay.show_species(game._catalog_entry("affinis"),game._species_texture(game._catalog_entry("affinis")),true,"input_probe_affinis","ja","原種")
 	await get_tree().create_timer(.65).timeout
 	_press_species_overlay(game.species_get_overlay,Vector2(8,8),false)
 	await get_tree().create_timer(.35).timeout
@@ -194,7 +196,8 @@ func _ready() -> void:
 	await get_tree().create_timer(.65).timeout
 	assert(game.species_get_overlay.visible)
 	assert(game.species_get_overlay.name_label.text == Localizer.species_name("ja", game._catalog_entry("shaviana")))
-	assert(game.species_get_overlay.badge_label.text == Localizer.text("ja", "original_catalog_new"))
+	assert(game.species_get_overlay.badge_label.visible and game.species_get_overlay.badge_label.text == Localizer.text("ja", "original_catalog_new"))
+	assert(game.species_get_overlay.series_label.text == "原種")
 	assert(bool(game.discovered.get("shaviana", false)))
 	assert(game._species_get_count("shaviana") == 0 and not bool(game.greenhouse_available.get("shaviana", false)))
 	_press_species_overlay(game.species_get_overlay,game.species_get_overlay.card.position+game.species_get_overlay.card.size*.5,true)
@@ -449,8 +452,9 @@ func _ready() -> void:
 	assert(bool(game.discovered.get(tutorial_harvest_species_id, false)))
 	assert(bool(game.greenhouse_available.get(tutorial_harvest_species_id, false)))
 	assert(game.species_get_overlay.visible)
-	assert(game.species_get_overlay.badge_label.text == Localizer.text("ja", "new"))
+	assert(game.species_get_overlay.badge_label.visible and game.species_get_overlay.badge_label.text == Localizer.text("ja", "new"))
 	assert(game.species_get_overlay.name_label.text == Localizer.species_name("ja", tutorial_new_entry))
+	assert(game.species_get_overlay.series_label.text == "原種")
 	assert(not game.act2_unlocked)
 	assert(not game.StoryProgressionClass.fantasy_is_unlocked(game.story_progression_state))
 	assert(not bool(game.story_progression_state.get("original_new_guarantee_pending", false)))

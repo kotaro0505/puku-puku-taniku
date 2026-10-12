@@ -60,8 +60,12 @@ func _test_get_card_response(game: Node) -> Dictionary:
 	var capture := func(context: String) -> void: closed_contexts.append(context)
 	overlay.closed.connect(capture)
 	var entry: Dictionary = game._catalog_entry("colorata")
-	overlay.show_species(entry, CatalogImageLoader.placeholder_texture, true, "latency_probe", "ja")
+	overlay.show_species(entry, CatalogImageLoader.placeholder_texture, true, "latency_probe", "ja", "原種")
 	assert(await _wait_until(func() -> bool: return not overlay.busy, 900))
+	assert(overlay.badge_label.visible and overlay.badge_label.text == "NEW!" and overlay.badge_label.get_theme_font_size("font_size") == 46)
+	assert(overlay.series_label.visible and overlay.series_label.text == "原種")
+	_assert_get_card_layout(overlay, true)
+	var new_image_frame_rect: Rect2 = (overlay.result_image.get_parent() as Control).get_global_rect()
 	var expected_path: String = game._species_image_path(entry)
 	overlay.result_image.set_meta("catalog_loaded_path", expected_path)
 	overlay.result_image.set_meta("catalog_request_path", expected_path)
@@ -77,6 +81,16 @@ func _test_get_card_response(game: Node) -> Dictionary:
 	assert(str(overlay.result_image.get_meta("catalog_request_path", "")).is_empty())
 	game._apply_requested_species_texture(CatalogImageLoader.placeholder_texture, overlay.result_image, expected_path)
 	assert(overlay.result_image.texture == null and closed_contexts == ["latency_probe"])
+	overlay.show_species(entry, CatalogImageLoader.placeholder_texture, false, "existing_probe", "en", "Original Species")
+	assert(await _wait_until(func() -> bool: return not overlay.busy, 900))
+	assert(not overlay.badge_label.visible and overlay.badge_label.text.is_empty())
+	assert(overlay.series_label.visible and overlay.series_label.text == "Original Species")
+	assert(overlay.hint_label.text == "Tap to close")
+	_assert_get_card_layout(overlay, false)
+	var existing_image_frame_rect: Rect2 = (overlay.result_image.get_parent() as Control).get_global_rect()
+	assert(existing_image_frame_rect.position.is_equal_approx(new_image_frame_rect.position) and existing_image_frame_rect.size.is_equal_approx(new_image_frame_rect.size))
+	await overlay.close_overlay()
+	assert(closed_contexts == ["latency_probe", "existing_probe"])
 	overlay.closed.disconnect(capture)
 	overlay.closed.connect(main_handler)
 
@@ -92,6 +106,7 @@ func _test_get_card_response(game: Node) -> Dictionary:
 	game.get_close_profile_enabled=true;game.get_close_profile_total_msec=-1
 	game._show_next_round_result_species()
 	assert(await _wait_until(func()->bool:return overlay.visible and game.species_get_active_species_id==single_id,800))
+	assert(overlay.badge_label.visible and overlay.series_label.text == "原種")
 	assert(game.round_result_species_save_pending and game._species_get_count(single_id)==1)
 	assert(await _wait_until(func()->bool:return not overlay.busy,900))
 	_tap_get_overlay(overlay)
@@ -137,6 +152,26 @@ func _test_get_card_response(game: Node) -> Dictionary:
 		var queue_end:=main_source.find("func _start_result_new_species_pulse",queue_start)
 		assert(main_source.substr(queue_start,queue_end-queue_start).count("_save()") == 1)
 	return {"feedback": feedback_latency, "visual": overlay.last_close_first_visual_latency_msec, "hidden": hidden_latency, "profile_total": game.get_close_profile_total_msec}
+
+func _assert_get_card_layout(overlay: Control, expect_badge: bool) -> void:
+	var card_rect: Rect2 = overlay.card.get_global_rect()
+	var image_frame_rect: Rect2 = (overlay.result_image.get_parent() as Control).get_global_rect()
+	var name_rect: Rect2 = overlay.name_label.get_global_rect()
+	var series_rect: Rect2 = overlay.series_label.get_global_rect()
+	var hint_rect: Rect2 = overlay.hint_label.get_global_rect()
+	assert(image_frame_rect.position.y > card_rect.position.y)
+	assert(name_rect.position.y >= image_frame_rect.end.y)
+	assert(series_rect.position.y >= name_rect.end.y)
+	assert(hint_rect.position.y >= series_rect.end.y)
+	assert(hint_rect.end.y <= card_rect.end.y - 20.0)
+	assert(absf(series_rect.get_center().x - card_rect.get_center().x) <= 1.0)
+	assert(absf(hint_rect.get_center().x - card_rect.get_center().x) <= 1.0)
+	if expect_badge:
+		var badge_rect: Rect2 = overlay.badge_label.get_global_rect()
+		var upper_gap_center_y: float = (card_rect.position.y + image_frame_rect.position.y) * .5
+		assert(absf(badge_rect.get_center().x - card_rect.get_center().x) <= 1.0)
+		assert(absf(badge_rect.get_center().y - upper_gap_center_y) <= 14.0)
+		assert(badge_rect.end.y < image_frame_rect.position.y)
 
 func _test_gacha_response(game: Node) -> int:
 	game.forest_gacha_preview_mode = false

@@ -4304,7 +4304,8 @@ func _show_next_species_get()->void:
 	var texture:=CatalogImageLoader.placeholder_texture if forest_gacha_reveal else _species_texture(entry)
 	if forest_gacha_reveal:_gacha_capsule_profile_mark("get_card_show_start")
 	if first_colorata_reveal:_old_colorata_profile_mark("get_card_show_start")
-	species_get_overlay.show_species(entry,texture if texture!=null else CatalogImageLoader.placeholder_texture,bool(queued.get("is_new",true)),species_get_active_context,language_code)
+	var catalog_page_name:=_species_get_catalog_page_name(entry,language_code)
+	species_get_overlay.show_species(entry,texture if texture!=null else CatalogImageLoader.placeholder_texture,bool(queued.get("is_new",true)),species_get_active_context,language_code,catalog_page_name)
 	if forest_gacha_reveal:
 		gacha_capsule_profile_started_with_placeholder=species_get_overlay.result_image.texture==CatalogImageLoader.placeholder_texture
 		if forest_gacha_ui:forest_gacha_ui.complete_capsule_reveal_transition()
@@ -5711,6 +5712,11 @@ func _catalog_display_series_id_for_entry(entry:Dictionary)->String:
 	if not fusion_display_series.is_empty():display_series_id=fusion_display_series
 	elif display_series_id=="hybrid":display_series_id=str(entry.get("fusion_series",""))
 	return JUREJURE_SERIES_ID if display_series_id=="jure" else display_series_id
+
+func _species_get_catalog_page_name(entry:Dictionary,language:String)->String:
+	var display_series_id:=_catalog_display_series_id_for_entry(entry)
+	var display_series:=_series_entry(display_series_id)
+	return "" if display_series.is_empty() else Localizer.series_name(language,display_series)
 
 func _catalog_series_hidden_from_navigation(series_entry:Dictionary)->bool:
 	var source_entries:=_series_species_entries(str(series_entry.get("series_id","")))

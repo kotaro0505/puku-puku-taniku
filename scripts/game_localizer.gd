@@ -2177,7 +2177,7 @@ const HIRAGANA_SERIES_NAMES := {
 	"base":"げんしゅ", "metal":"きんぞくたにく",
 	"jewel":"ほうせきたにく", "jelly":"ぜりー", "sweets":"すいーつたにく", "gummy":"ぐみたにく",
 	"stardust":"ほしくずたにく", "glow":"ちっこうたにく", "neon":"ねおんたにく",
-	"stone":"すとーん", "sea":"うみ", "yumekawa":"ゆめふわ", "forest_amber":"もりと こはく", "hybrid":"はいごうたにく", "fusion_tier1":"とくしゅはいごう", "fusion_tier2":"じょういとくしゅはいごう", "fusion_tier3":"さいじょういとくしゅはいごう"
+	"stone":"すとーん", "sea":"うみ", "yumekawa":"ゆめふわ", "forest_amber":"もりと こはく", "jurejure":"じゅれじゅれだんたにく", "hybrid":"はいごうたにく", "fusion_tier1":"とくしゅはいごう", "fusion_tier2":"じょういとくしゅはいごう", "fusion_tier3":"さいじょういとくしゅはいごう"
 }
 
 static func normalize_language(value:String)->String:

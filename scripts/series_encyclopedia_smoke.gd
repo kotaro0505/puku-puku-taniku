@@ -39,6 +39,14 @@ func _ready()->void:
 	var sea_fusion_ids:Array=game._catalog_display_entries_for_series("sea").slice(game._series_species_entries("sea").size()).map(func(entry):return str(entry.get("species_id","")))
 	assert(sea_fusion_ids==["hyb_gummy_sea","hyb_glow_sea","hyb_jewel_sea","hyb_stone_sea","hyb_sea_sea","hyb_sea_yumekawa","fus1_deep_sea_aquarium","fus1_tide_pool","fus2_abyss_glass","fus2_soda_sugar","fus3_lagoon_lutea"])
 	assert(game._catalog_display_series_id_for_entry(game._catalog_entry("hyb_sweets_jure"))=="jurejure" and game._catalog_display_series_id_for_entry(game._catalog_entry("fus1_bonus_time"))=="jurejure" and game._catalog_display_series_id_for_entry(game._catalog_entry("fus2_moon_resort"))=="jurejure" and game._catalog_display_series_id_for_entry(game._catalog_entry("fus3_black_hole"))=="jurejure")
+	assert(game._species_get_catalog_page_name(game._catalog_entry("colorata"),"ja")=="原種")
+	assert(game._species_get_catalog_page_name(game._catalog_entry("jewel_sapphire_star"),"ja")=="宝石多肉")
+	assert(game._species_get_catalog_page_name(game._catalog_entry("hyb_jewel_jewel"),"ja")=="宝石多肉")
+	assert(game._species_get_catalog_page_name(game._catalog_entry("fus1_kaleidoscope"),"ja")=="宝石多肉")
+	assert(game._species_get_catalog_page_name(game._catalog_entry("fus1_kaleidoscope"),"hiragana")=="ほうせきたにく")
+	assert(game._species_get_catalog_page_name(game._catalog_entry("fus1_kaleidoscope"),"en")=="Jewel Catalog")
+	assert(game._species_get_catalog_page_name(game._catalog_entry("fus3_black_hole"),"hiragana")=="じゅれじゅれだんたにく")
+	assert(game._species_get_catalog_page_name({"series_id":"missing_internal_page"},"ja").is_empty())
 	assert(game._series_species_entries("sea").size()==10 and game._series_seed_draw_candidates("sea").all(func(entry):return not game._catalog_entry_is_fusion(entry)))
 	var unique_base_ids:Dictionary={}
 	for entry in game._series_species_entries("base"):unique_base_ids[str(entry.species_id)]=true

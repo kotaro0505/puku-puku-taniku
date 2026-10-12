@@ -390,6 +390,11 @@ func _test_get_to_catalog_unlock_handoff(game: Node) -> void:
 		game._queue_species_get(entry, true, contexts[index])
 		game._show_next_species_get()
 		assert(game.species_get_overlay.visible and not game.catalog_series_unlock_overlay.visible)
+		var expected_page_name: String = game._species_get_catalog_page_name(entry,game.language_code)
+		var story_catalog_card: bool = contexts[index].begins_with("scripted_dialog_card:")
+		var expected_badge: String = Localizer.text(game.language_code,"original_catalog_new" if story_catalog_card else "new")
+		assert(game.species_get_overlay.badge_label.visible and game.species_get_overlay.badge_label.text==expected_badge)
+		assert(not expected_page_name.is_empty() and game.species_get_overlay.series_label.visible and game.species_get_overlay.series_label.text==expected_page_name)
 		# The close animation itself is already covered by the overlay smoke. Drive
 		# its completion callback synchronously here so every acquisition context
 		# proves that no ordinary foreground can occupy the handoff frame.
