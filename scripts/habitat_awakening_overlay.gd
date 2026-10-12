@@ -54,7 +54,8 @@ const SPROUT_TEXTURES: Array[Texture2D] = [
 const SPROUT_GROUP_SIZE := Vector2(132, 132)
 const SPROUT_CENTER_YS := [635.0, 570.0, 642.0]
 const SPROUT_HORIZONTAL_HALF_SPAN := 150.0
-const SPROUT_SIDE_PADDING := 24.0
+const SPROUT_SIDE_PADDING := 40.0
+const SPROUT_FINAL_SCALE := 0.54
 
 var language_code := "ja"
 var page_index := 0
@@ -233,6 +234,7 @@ func start(requested_language := "ja") -> void:
 	darkness.color.a = 0.12
 	rain_tint.color.a = 0.0
 	_layout_ghosts()
+	_layout_sprouts()
 	for ghost in ghosts:
 		ghost.modulate = GHOST_BASE_COLOR
 		ghost.scale = Vector2.ONE * GHOST_REVEAL_INITIAL_SCALE
@@ -297,8 +299,23 @@ func _layout_sprouts() -> void:
 	if area.x <= 0.0:
 		area.x = 576.0
 	var half_size := SPROUT_GROUP_SIZE * 0.5
+	var side_half_widths := [half_size.x, half_size.x]
+	for index in sprout_layer.get_child_count():
+		var sprout_group := sprout_layer.get_child(index) as Control
+		var plant := sprout_group.get_node("Plant") as TextureRect
+		# TextureRect can retain a larger texture minimum size even though the story
+		# group is 132px. Center the actual transformed plant in its group instead
+		# of positioning from the smaller group rectangle alone.
+		plant.pivot_offset = plant.size * 0.5
+		plant.position = half_size - plant.pivot_offset
+		if index == 0:
+			side_half_widths[0] = plant.size.x * SPROUT_FINAL_SCALE * 0.5
+		elif index == sprout_layer.get_child_count() - 1:
+			side_half_widths[1] = plant.size.x * SPROUT_FINAL_SCALE * 0.5
 	var center_x := area.x * 0.5
-	var half_span := minf(SPROUT_HORIZONTAL_HALF_SPAN, maxf(0.0, center_x - half_size.x - SPROUT_SIDE_PADDING))
+	var left_safe_span := center_x - float(side_half_widths[0]) - SPROUT_SIDE_PADDING
+	var right_safe_span := center_x - float(side_half_widths[1]) - SPROUT_SIDE_PADDING
+	var half_span := minf(SPROUT_HORIZONTAL_HALF_SPAN, maxf(0.0, minf(left_safe_span, right_safe_span)))
 	var center_xs := [center_x - half_span, center_x, center_x + half_span]
 	for index in mini(mini(sprout_layer.get_child_count(), center_xs.size()), SPROUT_CENTER_YS.size()):
 		var sprout_group := sprout_layer.get_child(index) as Control
@@ -446,7 +463,7 @@ func _begin_three_species_reveal() -> void:
 		var sprout_group: Control = sprout_layer.get_child(index)
 		var plant: Control = sprout_group.get_node("Plant")
 		sequence.tween_property(plant, "modulate:a", 1.0, 0.28)
-		sequence.parallel().tween_property(plant, "scale", Vector2(0.54, 0.54), 0.46).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		sequence.parallel().tween_property(plant, "scale", Vector2.ONE * SPROUT_FINAL_SCALE, 0.46).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		sequence.tween_interval(0.08)
 	sequence.tween_interval(0.18)
 	sequence.tween_callback(func():

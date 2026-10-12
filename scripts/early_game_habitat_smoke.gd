@@ -123,23 +123,31 @@ func _ready() -> void:
 	assert(not game.habitat_lookaround_active and game.habitat_lookaround_context != "sprouts")
 	assert(game.habitat_awakening_overlay.sprout_layer.get_child_count() == 3)
 	var sprout_centers: Array[Vector2] = []
+	var sprout_visual_rects: Array[Rect2] = []
+	var sprout_visual_bounds := Rect2()
 	for index in game.habitat_awakening_overlay.sprout_layer.get_child_count():
 		var sprout_group := game.habitat_awakening_overlay.sprout_layer.get_child(index) as Control
 		var story_plant := sprout_group.get_node("Plant") as TextureRect
 		sprout_centers.append(sprout_group.position + sprout_group.size * 0.5)
+		var global_visual_rect := story_plant.get_global_rect()
+		var local_visual_rect := Rect2(global_visual_rect.position - game.habitat_awakening_overlay.sprout_layer.global_position, global_visual_rect.size)
+		sprout_visual_rects.append(local_visual_rect)
+		sprout_visual_bounds = local_visual_rect if index == 0 else sprout_visual_bounds.merge(local_visual_rect)
 		assert(sprout_group.size.is_equal_approx(game.habitat_awakening_overlay.SPROUT_GROUP_SIZE))
 		assert(story_plant.texture == game.habitat_awakening_overlay.SPROUT_TEXTURES[index])
 		assert(sprout_group.get_node_or_null("GreenGlow") == null)
 		assert(story_plant.modulate.a > 0.95)
-		assert(story_plant.scale.is_equal_approx(Vector2(.54, .54)))
+		assert(story_plant.scale.is_equal_approx(Vector2.ONE * game.habitat_awakening_overlay.SPROUT_FINAL_SCALE))
 		assert(is_equal_approx(story_plant.modulate.r, 1.0) and is_equal_approx(story_plant.modulate.g, 1.0) and is_equal_approx(story_plant.modulate.b, 1.0))
 	var sprout_area_width: float = game.habitat_awakening_overlay.sprout_layer.size.x
-	var left_margin: float = game.habitat_awakening_overlay.sprout_layer.get_child(0).position.x
-	var right_edge: float = game.habitat_awakening_overlay.sprout_layer.get_child(2).position.x + game.habitat_awakening_overlay.sprout_layer.get_child(2).size.x
+	var left_margin: float = sprout_visual_bounds.position.x
+	var right_margin: float = sprout_area_width - sprout_visual_bounds.end.x
 	assert(is_equal_approx(sprout_centers[1].x, sprout_area_width * 0.5))
 	assert(is_equal_approx(sprout_centers[1].x - sprout_centers[0].x, sprout_centers[2].x - sprout_centers[1].x))
-	assert(is_equal_approx(left_margin, sprout_area_width - right_edge))
-	assert(left_margin >= game.habitat_awakening_overlay.SPROUT_SIDE_PADDING and right_edge <= sprout_area_width)
+	assert(is_equal_approx(sprout_visual_bounds.get_center().x, sprout_area_width * 0.5))
+	assert(is_equal_approx(left_margin, right_margin))
+	assert(left_margin >= game.habitat_awakening_overlay.SPROUT_SIDE_PADDING and right_margin >= game.habitat_awakening_overlay.SPROUT_SIDE_PADDING)
+	assert(sprout_visual_rects[2].end.x <= sprout_area_width - game.habitat_awakening_overlay.SPROUT_SIDE_PADDING)
 	assert(Localizer.text("ja", "awakening_sprout_panda") == "あ、芽が出てる！")
 	assert(game.habitat_wild_plants.size() == 3)
 	assert(game.habitat_pickups.filter(func(item): return str(item.get("kind", "")) == "wild_plant").size() == 3)
