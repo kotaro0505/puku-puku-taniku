@@ -66,9 +66,9 @@ func _ready() -> void:
 	game._open_encyclopedia()
 	await get_tree().process_frame
 	assert(game._current_series_entry().get("series_id", "") == "jewel")
-	assert(game.encyclopedia_list_title.text == "宝石多肉")
+	assert(not game.encyclopedia_list_title.visible and game.encyclopedia_list_title.text.is_empty())
 	assert(game.encyclopedia_grid.get_child_count() == 19)
-	assert(game.series_cover_image.texture == null and game.series_cover_placeholder.visible)
+	assert(game.series_cover_image.texture == null and not game.series_cover_placeholder.visible)
 	var first_card: Button = game.encyclopedia_grid.get_child(0)
 	assert(first_card.disabled)
 	game._register_species_discovery(JEWEL_IDS[0], true)

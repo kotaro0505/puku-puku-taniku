@@ -101,12 +101,16 @@ func _ready()->void:
 	game.pending_habitat_species.clear();game._queue_random_species("シリーズ未解禁");assert(game.pending_habitat_species.is_empty())
 	game.greenhouse_available["gummy_peach_milk"]=true;game.discovered["gummy_peach_milk"]=true;game._apply_saved_unlocks();assert(game.species.any(func(entry):return str(entry.species_id)=="gummy_peach_milk"));game.greenhouse_available.erase("gummy_peach_milk");game.discovered.erase("gummy_peach_milk");game._apply_saved_unlocks()
 	game.formal_play_count=0;game._sync_arrangement_ui();game.arrangement_ui.open_catalog_shop();assert(game.arrangement_ui.catalog_shop_grid.get_child_count()==0);game.arrangement_ui.visible=false
-	game._open_encyclopedia();assert(game._owned_series_entries().size()==1 and game._current_series_entry().series_id=="base" and not game.series_position_label.visible and not game.all_series_get_label.visible and game.series_cover_image.texture==null and game.series_cover_placeholder.visible)
+	game._open_encyclopedia();assert(game._owned_series_entries().size()==1 and game._current_series_entry().series_id=="base" and not game.series_position_label.visible and not game.all_series_get_label.visible and game.series_cover_image.texture==null and not game.series_cover_placeholder.visible and game.series_cover_placeholder.text.is_empty())
+	assert(not game.series_subtitle_label.visible and game.series_subtitle_label.text.is_empty() and not game.series_description_label.visible and game.series_description_label.text.is_empty())
 	for carousel_card in game.series_carousel_cards:assert(str(carousel_card.container.get_meta("series_id"))=="base")
 	game._close_encyclopedia();game.unlocked_series["sweets"]=true;game.unlocked_series["gummy"]=true;assert(game._owned_series_entries().map(func(entry):return str(entry.series_id))==["base","sweets","gummy"])
 	assert(game._series_cover_texture(game._series_entry("sweets"))==null and game._series_cover_texture(game._series_entry("gummy"))==null)
-	game.selected_series_index=2;game._open_encyclopedia();assert(not game.series_lock_label.visible and game.series_cover_image.texture==null and game.series_cover_placeholder.visible);await get_tree().process_frame
-	assert(game.encyclopedia_list_page.visible and game.encyclopedia_list_title.text=="グミ多肉" and game.encyclopedia_grid.get_child_count()==17 and not game.encyclopedia_list_progress.visible and not game.encyclopedia_list_get.visible)
+	game.selected_series_index=2;game._open_encyclopedia();assert(not game.series_lock_label.visible and game.series_cover_image.texture==null and not game.series_cover_placeholder.visible);await get_tree().process_frame
+	assert(game.encyclopedia_list_page.visible and not game.encyclopedia_list_title.visible and game.encyclopedia_list_title.text.is_empty() and game.encyclopedia_grid.get_child_count()==17 and not game.encyclopedia_list_progress.visible and not game.encyclopedia_list_get.visible)
+	var forbidden_catalog_copy:=["品種登録済み・開放条件準備中","今後追加予定","シリーズです","表紙画像","準備中"]
+	for catalog_label in game.encyclopedia_series_page.find_children("*","Label",true,false):
+		for forbidden_copy in forbidden_catalog_copy:assert(forbidden_copy not in str(catalog_label.text))
 	for gummy_card in game.encyclopedia_grid.get_children():
 		assert(gummy_card.disabled)
 		var card_texts:Array[String]=[]
@@ -122,29 +126,29 @@ func _ready()->void:
 		else:assert(game._catalog_entry_is_fusion(gummy_entry) and gummy_image.material==game.encyclopedia_silhouette_material)
 	base_style.free();gummy_style.free();hybrid_style.free();tier1_style.free();tier2_style.free()
 	var first_gummy_card:Button=game.encyclopedia_grid.get_child(0);first_gummy_card.pressed.emit();assert(not game.encyclopedia_detail_page.visible and game.encyclopedia_list_page.visible)
-	game._register_species_discovery("gummy_peach_milk",true);game._record_species_get("gummy_peach_milk",2);game._refresh_series_selection();await get_tree().process_frame;game._update_encyclopedia_visible_textures()
+	game._register_species_discovery("gummy_peach_milk",true);game._record_species_get("gummy_peach_milk",2);game.bests["gummy_peach_milk"]=6.4;game._refresh_series_selection();await get_tree().process_frame;game._update_encyclopedia_visible_textures()
 	var found_card:Button=game.encyclopedia_grid.get_child(0);var found_texts:Array[String]=[]
 	for label in found_card.find_children("*","Label",true,false):found_texts.append(str(label.text))
-	assert(not found_card.disabled and "ももミルクグミ" in found_texts and "GET 3" in found_texts and game.encyclopedia_card_images[0].material==null and game.encyclopedia_card_images[0].modulate.is_equal_approx(Color.WHITE))
-	found_card.pressed.emit();assert(game.encyclopedia_detail_page.find_child("SpeciesName",true,false).text=="ももミルクグミ" and not game.encyclopedia_detail_page.find_child("SpeciesDescription",true,false).text.is_empty() and game.encyclopedia_detail_page.find_child("SpeciesGetCount",true,false).text=="GET 3" and game.encyclopedia_detail_page.find_child("SpeciesImage",true,false).material==null)
+	assert(not found_card.disabled and "ももミルクグミ" in found_texts and "最大サイズ 6.4cm" in found_texts and "GET 3" in found_texts and game.encyclopedia_card_images[0].material==null and game.encyclopedia_card_images[0].modulate.is_equal_approx(Color.WHITE))
+	found_card.pressed.emit();assert(game.encyclopedia_detail_page.find_child("SpeciesName",true,false).text=="ももミルクグミ" and not game.encyclopedia_detail_page.find_child("SpeciesDescription",true,false).text.is_empty() and game.encyclopedia_detail_page.find_child("SpeciesBest",true,false).text=="最大サイズ 6.4cm" and game.encyclopedia_detail_page.find_child("SpeciesGetCount",true,false).text=="GET 3" and game.encyclopedia_detail_page.find_child("SpeciesImage",true,false).material==null)
 	game._return_to_series_selection();game._register_species_discovery("hyb_gummy_gummy",true);game._refresh_encyclopedia_cards();await get_tree().process_frame;game._update_encyclopedia_visible_textures()
 	var found_hybrid_index:int=game.encyclopedia_card_entries.find(game._catalog_entry("hyb_gummy_gummy"));assert(found_hybrid_index==8)
 	var found_hybrid_card:Button=game.encyclopedia_grid.get_child(found_hybrid_index);var found_hybrid_texts:Array[String]=[]
 	for label in found_hybrid_card.find_children("*","Label",true,false):found_hybrid_texts.append(str(label.text))
 	assert(not found_hybrid_card.disabled and "ダブルグミ" in found_hybrid_texts and "GET 1" in found_hybrid_texts and game.encyclopedia_card_images[found_hybrid_index].material==null)
 	found_hybrid_card.pressed.emit();assert(game.encyclopedia_detail_page.find_child("SpeciesName",true,false).text=="ダブルグミ")
-	game._close_encyclopedia();game.discovered.erase("gummy_peach_milk");game.species_get_counts.erase("gummy_peach_milk");game.discovered.erase("hyb_gummy_gummy");game.species_get_counts.erase("hyb_gummy_gummy");game.selected_series_index=0
-	game.selected_series_index=1;game._open_encyclopedia();assert(game.series_cover_image.texture==null and game.series_cover_placeholder.visible);await get_tree().process_frame
-	assert(game.encyclopedia_list_page.visible and game.encyclopedia_list_title.text=="スイーツ多肉" and game.encyclopedia_grid.get_child_count()==22 and not game.encyclopedia_list_progress.visible and not game.encyclopedia_list_get.visible)
+	game._close_encyclopedia();game.discovered.erase("gummy_peach_milk");game.species_get_counts.erase("gummy_peach_milk");game.bests.erase("gummy_peach_milk");game.discovered.erase("hyb_gummy_gummy");game.species_get_counts.erase("hyb_gummy_gummy");game.selected_series_index=0
+	game.selected_series_index=1;game._open_encyclopedia();assert(game.series_cover_image.texture==null and not game.series_cover_placeholder.visible);await get_tree().process_frame
+	assert(game.encyclopedia_list_page.visible and not game.encyclopedia_list_title.visible and game.encyclopedia_grid.get_child_count()==22 and not game.encyclopedia_list_progress.visible and not game.encyclopedia_list_get.visible)
 	game._register_species_discovery("sweets_strawberry_shortcake",true);game._refresh_series_selection();await get_tree().process_frame;game._update_encyclopedia_visible_textures()
 	var first_sweets_card:Button=game.encyclopedia_grid.get_child(0);assert(not first_sweets_card.disabled);first_sweets_card.pressed.emit();assert(game.encyclopedia_detail_page.find_child("SpeciesName",true,false).text=="いちごショート多肉" and game.encyclopedia_detail_page.find_child("SpeciesImage",true,false).texture.resource_path=="res://assets/catalog/sweets/sweets-strawberry-shortcake.png")
 	game._close_encyclopedia();game.discovered.erase("sweets_strawberry_shortcake");game.species_get_counts.erase("sweets_strawberry_shortcake");game.selected_series_index=0
 	game.unlocked_series["jelly"]=true;game.selected_series_index=1;game._open_encyclopedia();await get_tree().process_frame
-	assert(game.encyclopedia_list_page.visible and game.encyclopedia_list_title.text=="ゼリー" and game.encyclopedia_grid.get_child_count()==24 and game.series_cover_image.texture==null and game.series_cover_placeholder.visible)
+	assert(game.encyclopedia_list_page.visible and not game.encyclopedia_list_title.visible and game.encyclopedia_grid.get_child_count()==24 and game.series_cover_image.texture==null and not game.series_cover_placeholder.visible)
 	game._register_species_discovery("jelly_grape",true);game._record_species_get("jelly_grape",1);game._refresh_series_selection();await get_tree().process_frame;game._update_encyclopedia_visible_textures()
 	var first_jelly_card:Button=game.encyclopedia_grid.get_child(0);assert(not first_jelly_card.disabled);first_jelly_card.pressed.emit();assert(game.encyclopedia_detail_page.find_child("SpeciesName",true,false).text=="ぶどうゼリー" and game.encyclopedia_detail_page.find_child("SpeciesGetCount",true,false).text=="GET 2" and game.encyclopedia_detail_page.find_child("SpeciesImage",true,false).texture.resource_path=="res://assets/catalog/jelly/jelly-grape.png")
 	game._close_encyclopedia();game.unlocked_series.erase("jelly");game.discovered.erase("jelly_grape");game.species_get_counts.erase("jelly_grape");game.selected_series_index=0
-	game._open_encyclopedia();assert(game.encyclopedia_series_page.visible and game.encyclopedia_list_page==game.encyclopedia_series_page and game.series_title_label.text=="原種" and game.series_cover_placeholder.visible and game.series_cover_image.texture==null)
+	game._open_encyclopedia();assert(game.encyclopedia_series_page.visible and game.encyclopedia_list_page==game.encyclopedia_series_page and game.series_title_label.text=="原種" and not game.series_cover_placeholder.visible and game.series_cover_image.texture==null)
 	assert(game.encyclopedia_scroll.get_child(0).get_child(0).name=="SeriesCoverSection" and game.encyclopedia_scroll.get_child(0).get_child(1).name=="SpeciesListHeader" and game.encyclopedia_grid.get_parent()==game.encyclopedia_scroll.get_child(0))
 	assert(game.encyclopedia_series_page.find_children("*","Button",true,false).all(func(button):return button.text!="図鑑をひらく"))
 	assert(game.series_carousel_cards.size()==3)
@@ -176,7 +180,7 @@ func _ready()->void:
 	game._save();game.species_get_counts.clear();game._load_save();assert(game._species_get_count("colorata")==2 and game._species_get_count("pinwheel")==1)
 	game.unlocked_series["base"]=true;game.selected_series_index=0
 	game._open_encyclopedia();await get_tree().process_frame
-	assert(game.encyclopedia_list_page.visible and game.encyclopedia_grid.get_child_count()==game._series_species_entries("base").size() and game.encyclopedia_list_title.text=="原種" and not game.encyclopedia_list_get.visible)
+	assert(game.encyclopedia_list_page.visible and game.encyclopedia_grid.get_child_count()==game._series_species_entries("base").size() and not game.encyclopedia_list_title.visible and game.encyclopedia_list_title.text.is_empty() and not game.encyclopedia_list_get.visible)
 	assert(game.encyclopedia_overlay.find_children("*","Button",true,false).all(func(button):return button.text!="このシリーズの原生地へ"))
 	assert(game.mode_button!=null and game.mode_button.text=="原生地へ")
 	print("SERIES_ENCYCLOPEDIA_SMOKE_OK series=",game.series_catalog.size()," base_species=",game._series_species_entries("base").size()," total_get=",game._all_series_get_count())

@@ -59,5 +59,5 @@ func _test_first_series_page_notice(game:Node)->void:
 	assert(game._register_species_discovery("metal_silver_rosette",true))
 	assert(game.catalog_series_unlock_notice_queue.is_empty())
 	game.catalog_series_unlock_overlay.show_series({},null,"画像なし多肉","catalog_notice_missing_cover","ja")
-	assert(game.catalog_series_unlock_overlay.visible and game.catalog_series_unlock_overlay.cover_placeholder.visible and game.catalog_series_unlock_overlay.card.size==Vector2(508,770))
+	assert(game.catalog_series_unlock_overlay.visible and not game.catalog_series_unlock_overlay.cover_placeholder.visible and game.catalog_series_unlock_overlay.cover_placeholder.text.is_empty() and game.catalog_series_unlock_overlay.card.size==Vector2(508,770))
 	game.catalog_series_unlock_overlay.busy=false;await game.catalog_series_unlock_overlay.close_overlay()

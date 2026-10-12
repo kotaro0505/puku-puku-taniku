@@ -5619,19 +5619,22 @@ func _build_series_selection_page()->void:
 	encyclopedia_scroll=ScrollContainer.new();encyclopedia_scroll.position=Vector2(0,88);encyclopedia_scroll.size=Vector2(576,907);encyclopedia_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;encyclopedia_scroll.vertical_scroll_mode=ScrollContainer.SCROLL_MODE_AUTO;encyclopedia_scroll.scroll_deadzone=12;encyclopedia_scroll.mouse_filter=Control.MOUSE_FILTER_STOP;encyclopedia_series_page.add_child(encyclopedia_scroll)
 	encyclopedia_scroll.get_v_scroll_bar().value_changed.connect(func(_value:float):call_deferred("_update_encyclopedia_visible_textures"))
 	var scroll_content:=VBoxContainer.new();scroll_content.custom_minimum_size=Vector2(576,0);scroll_content.mouse_filter=Control.MOUSE_FILTER_PASS;scroll_content.add_theme_constant_override("separation",12);encyclopedia_scroll.add_child(scroll_content)
-	var cover_section:=Control.new();cover_section.name="SeriesCoverSection";cover_section.custom_minimum_size=Vector2(576,608);cover_section.mouse_filter=Control.MOUSE_FILTER_PASS;scroll_content.add_child(cover_section)
+	var cover_section:=Control.new();cover_section.name="SeriesCoverSection";cover_section.custom_minimum_size=Vector2(576,510);cover_section.mouse_filter=Control.MOUSE_FILTER_PASS;scroll_content.add_child(cover_section)
 	series_carousel_track=Control.new();series_carousel_track.name="SeriesCarouselTrack";series_carousel_track.position=SERIES_CAROUSEL_TRACK_ORIGIN;series_carousel_track.size=SERIES_CAROUSEL_CARD_SIZE;series_carousel_track.mouse_filter=Control.MOUSE_FILTER_IGNORE;cover_section.add_child(series_carousel_track)
 	series_carousel_cards.clear()
 	for relative_index in [-1,0,1]:series_carousel_cards.append(_build_series_card(series_carousel_track,relative_index))
 	var center_card:Dictionary=series_carousel_cards[1]
 	series_title_label=center_card.title;series_subtitle_label=center_card.subtitle;series_description_label=center_card.description;series_cover_image=center_card.cover_image;series_cover_placeholder=center_card.cover_placeholder;series_lock_label=center_card.lock_label;series_progress_label=center_card.progress;series_get_label=center_card.get_label
-	var swipe_area:=Control.new();swipe_area.name="SeriesSwipeArea";swipe_area.position=Vector2.ZERO;swipe_area.size=Vector2(576,590);swipe_area.mouse_filter=Control.MOUSE_FILTER_PASS;swipe_area.mouse_force_pass_scroll_events=true;swipe_area.gui_input.connect(_on_series_swipe_input);cover_section.add_child(swipe_area)
-	series_previous_button=Button.new();series_previous_button.text="＜";series_previous_button.position=Vector2(16,275);series_previous_button.size=Vector2(58,64);series_previous_button.mouse_force_pass_scroll_events=true;_skin_button(series_previous_button,Color("#f3dfb9"),25);series_previous_button.pressed.connect(_change_series_selection.bind(-1));cover_section.add_child(series_previous_button)
-	series_next_button=Button.new();series_next_button.text="＞";series_next_button.position=Vector2(502,275);series_next_button.size=Vector2(58,64);series_next_button.mouse_force_pass_scroll_events=true;_skin_button(series_next_button,Color("#f3dfb9"),25);series_next_button.pressed.connect(_change_series_selection.bind(1));cover_section.add_child(series_next_button)
+	var swipe_area:=Control.new();swipe_area.name="SeriesSwipeArea";swipe_area.position=Vector2.ZERO;swipe_area.size=Vector2(576,510);swipe_area.mouse_filter=Control.MOUSE_FILTER_PASS;swipe_area.mouse_force_pass_scroll_events=true;swipe_area.gui_input.connect(_on_series_swipe_input);cover_section.add_child(swipe_area)
+	series_previous_button=Button.new();series_previous_button.text="＜";series_previous_button.position=Vector2(16,240);series_previous_button.size=Vector2(58,64);series_previous_button.mouse_force_pass_scroll_events=true;_skin_button(series_previous_button,Color("#f3dfb9"),25);series_previous_button.pressed.connect(_change_series_selection.bind(-1));cover_section.add_child(series_previous_button)
+	series_next_button=Button.new();series_next_button.text="＞";series_next_button.position=Vector2(502,240);series_next_button.size=Vector2(58,64);series_next_button.mouse_force_pass_scroll_events=true;_skin_button(series_next_button,Color("#f3dfb9"),25);series_next_button.pressed.connect(_change_series_selection.bind(1));cover_section.add_child(series_next_button)
 	series_position_label=Label.new();series_position_label.visible=false;cover_section.add_child(series_position_label)
-	var species_header:=Control.new();species_header.name="SpeciesListHeader";species_header.custom_minimum_size=Vector2(576,58);species_header.mouse_filter=Control.MOUSE_FILTER_PASS;scroll_content.add_child(species_header)
-	encyclopedia_list_title=Label.new();encyclopedia_list_title.position=Vector2(28,0);encyclopedia_list_title.size=Vector2(520,42);encyclopedia_list_title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;encyclopedia_list_title.add_theme_font_size_override("font_size",27);encyclopedia_list_title.add_theme_color_override("font_color",UI_CREAM);species_header.add_child(encyclopedia_list_title)
-	encyclopedia_complete_badge_label=Label.new();encyclopedia_complete_badge_label.name="CollectionCompleteBadge";encyclopedia_complete_badge_label.position=Vector2(28,43);encyclopedia_complete_badge_label.size=Vector2(520,35);encyclopedia_complete_badge_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;encyclopedia_complete_badge_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;encyclopedia_complete_badge_label.add_theme_font_size_override("font_size",14);encyclopedia_complete_badge_label.add_theme_color_override("font_color",Color("#f6cf69"));encyclopedia_complete_badge_label.add_theme_color_override("font_outline_color",Color("#4d271b"));encyclopedia_complete_badge_label.add_theme_constant_override("outline_size",4);encyclopedia_complete_badge_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;encyclopedia_complete_badge_label.visible=false;species_header.add_child(encyclopedia_complete_badge_label)
+	var species_header:=Control.new();species_header.name="SpeciesListHeader";species_header.custom_minimum_size=Vector2(576,0);species_header.mouse_filter=Control.MOUSE_FILTER_PASS;scroll_content.add_child(species_header)
+	# Keep this reference for compatibility, but do not repeat the series title
+	# immediately above the species grid. The carousel title is the single page
+	# heading for the selected series.
+	encyclopedia_list_title=Label.new();encyclopedia_list_title.visible=false;species_header.add_child(encyclopedia_list_title)
+	encyclopedia_complete_badge_label=Label.new();encyclopedia_complete_badge_label.name="CollectionCompleteBadge";encyclopedia_complete_badge_label.position=Vector2(28,0);encyclopedia_complete_badge_label.size=Vector2(520,35);encyclopedia_complete_badge_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;encyclopedia_complete_badge_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;encyclopedia_complete_badge_label.add_theme_font_size_override("font_size",14);encyclopedia_complete_badge_label.add_theme_color_override("font_color",Color("#f6cf69"));encyclopedia_complete_badge_label.add_theme_color_override("font_outline_color",Color("#4d271b"));encyclopedia_complete_badge_label.add_theme_constant_override("outline_size",4);encyclopedia_complete_badge_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;encyclopedia_complete_badge_label.visible=false;species_header.add_child(encyclopedia_complete_badge_label)
 	encyclopedia_list_progress=Label.new();encyclopedia_list_progress.visible=false;species_header.add_child(encyclopedia_list_progress)
 	encyclopedia_list_get=Label.new();encyclopedia_list_get.visible=false;species_header.add_child(encyclopedia_list_get)
 	encyclopedia_unlock_panel=PanelContainer.new();encyclopedia_unlock_panel.visible=false;species_header.add_child(encyclopedia_unlock_panel)
@@ -5643,17 +5646,17 @@ func _build_series_selection_page()->void:
 func _build_series_card(parent:Control,relative_index:int)->Dictionary:
 	var card:=Control.new();card.name="SeriesCard%d"%relative_index;card.position=Vector2(relative_index*SERIES_CAROUSEL_SPACING,0);card.size=SERIES_CAROUSEL_CARD_SIZE;card.mouse_filter=Control.MOUSE_FILTER_IGNORE;parent.add_child(card)
 	var title:=Label.new();title.position=Vector2(40,0);title.size=Vector2(400,50);title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;title.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;title.add_theme_font_size_override("font_size",29);title.add_theme_color_override("font_color",UI_CREAM);title.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(title)
-	var subtitle:=Label.new();subtitle.position=Vector2(-8,48);subtitle.size=Vector2(496,31);subtitle.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;subtitle.add_theme_font_size_override("font_size",16);subtitle.add_theme_color_override("font_color",Color("#e9cda3"));subtitle.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(subtitle)
-	var cover_panel:=PanelContainer.new();cover_panel.name="SeriesCoverFrame";cover_panel.position=Vector2(50,88);cover_panel.size=Vector2(380,420);cover_panel.add_theme_stylebox_override("panel",_box(Color("#ead9b5"),Color("#c38c4b"),28,4));cover_panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(cover_panel)
+	var subtitle:=Label.new();subtitle.visible=false;card.add_child(subtitle)
+	var cover_panel:=PanelContainer.new();cover_panel.name="SeriesCoverFrame";cover_panel.position=Vector2(50,62);cover_panel.size=Vector2(380,420);cover_panel.add_theme_stylebox_override("panel",_box(Color("#ead9b5"),Color("#c38c4b"),28,4));cover_panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(cover_panel)
 	var cover_content:=Control.new();cover_content.custom_minimum_size=Vector2(352,392);cover_content.mouse_filter=Control.MOUSE_FILTER_IGNORE;cover_panel.add_child(cover_content)
 	var cover_image:=TextureRect.new();cover_image.name="SeriesCoverImage";cover_image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);cover_image.offset_left=12;cover_image.offset_top=12;cover_image.offset_right=-12;cover_image.offset_bottom=-12;cover_image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;cover_image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;cover_image.mouse_filter=Control.MOUSE_FILTER_IGNORE;cover_content.add_child(cover_image)
-	var cover_placeholder:=Label.new();cover_placeholder.text="表紙画像\n準備中";cover_placeholder.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);cover_placeholder.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;cover_placeholder.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;cover_placeholder.add_theme_font_size_override("font_size",25);cover_placeholder.add_theme_color_override("font_color",Color("#815d43"));cover_placeholder.mouse_filter=Control.MOUSE_FILTER_IGNORE;cover_content.add_child(cover_placeholder)
+	var cover_placeholder:=Label.new();cover_placeholder.name="SeriesCoverPlaceholder";cover_placeholder.visible=false;cover_placeholder.mouse_filter=Control.MOUSE_FILTER_IGNORE;cover_content.add_child(cover_placeholder)
 	var lock_label:=Label.new();lock_label.position=Vector2(62,165);lock_label.size=Vector2(260,90);lock_label.text="未開放";lock_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;lock_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;lock_label.add_theme_font_size_override("font_size",24);lock_label.add_theme_color_override("font_color",UI_CREAM);lock_label.add_theme_color_override("font_outline_color",UI_BROWN);lock_label.add_theme_constant_override("outline_size",7);lock_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;cover_content.add_child(lock_label)
 	var lock_icon:=UISymbolIcon.new();lock_icon.symbol="lock";lock_icon.icon_color=Color("#fff0b0");lock_icon.position=Vector2(155,105);lock_icon.size=Vector2(54,54);cover_content.add_child(lock_icon)
-	var description:=Label.new();description.position=Vector2(-6,523);description.size=Vector2(492,61);description.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;description.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;description.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;description.add_theme_font_size_override("font_size",17);description.add_theme_color_override("font_color",UI_CREAM);description.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(description)
+	var description:=Label.new();description.visible=false;card.add_child(description)
 	var progress:=Label.new();progress.visible=false;card.add_child(progress)
 	var get_label:=Label.new();get_label.visible=false;card.add_child(get_label)
-	return {"relative_index":relative_index,"container":card,"title":title,"subtitle":subtitle,"cover_image":cover_image,"cover_placeholder":cover_placeholder,"lock_label":lock_label,"lock_icon":lock_icon,"description":description,"progress":progress,"get_label":get_label,"detail_nodes":[title,subtitle,description,progress,get_label]}
+	return {"relative_index":relative_index,"container":card,"title":title,"subtitle":subtitle,"cover_image":cover_image,"cover_placeholder":cover_placeholder,"lock_label":lock_label,"lock_icon":lock_icon,"description":description,"progress":progress,"get_label":get_label,"detail_nodes":[title,progress,get_label]}
 
 func _open_encyclopedia()->void:
 	if catalog_preview_mode_active or play_active:return
@@ -5921,7 +5924,7 @@ func _refresh_collection_complete_badge()->void:
 	encyclopedia_complete_badge_label.visible=completed
 	var species_header:=encyclopedia_complete_badge_label.get_parent() as Control
 	if species_header:
-		species_header.custom_minimum_size.y=86.0 if completed else 58.0
+		species_header.custom_minimum_size.y=43.0 if completed else 0.0
 	if not completed:return
 	var date_text:=_collection_complete_date_text(record)
 	encyclopedia_complete_badge_label.text="Ver.%s COMPLETE ✓"%_game_version_key()
@@ -6998,11 +7001,11 @@ func _refresh_series_carousel_cards()->void:
 func _populate_series_card(card:Dictionary,series_index:int,owned:Array[Dictionary])->void:
 	var entry:Dictionary=owned[series_index];var series_id:=str(entry.get("series_id",""));var cover_entry:=_catalog_cover_entry_for_series(series_id);var unlocked:=_is_series_unlocked(entry)
 	var container:Control=card.container;var cover_image:TextureRect=card.cover_image
-	card.title.text=Localizer.series_name(language_code,entry);card.subtitle.text=Localizer.series_subtitle(language_code,entry);card.description.text=Localizer.series_description(language_code,entry)
+	card.title.text=Localizer.series_name(language_code,entry);card.subtitle.text="";card.description.text=""
 	cover_image.set_meta("catalog_loaded_path","");cover_image.set_meta("catalog_request_path","")
 	cover_image.texture=_series_cover_texture(entry)
 	if not cover_entry.is_empty():_request_species_texture(cover_entry,cover_image,true)
-	card.cover_placeholder.visible=cover_image.texture==null and unlocked;card.cover_placeholder.text=Localizer.text(language_code,"catalog_cover_preparing");card.lock_label.visible=not unlocked;card.lock_label.text=Localizer.text(language_code,"catalog_locked_preparing" if cover_image.texture==null else "catalog_locked")
+	card.cover_placeholder.visible=false;card.cover_placeholder.text="";card.lock_label.visible=not unlocked;card.lock_label.text=Localizer.text(language_code,"catalog_locked")
 	var lock_icon:Control=card.get("lock_icon")
 	if is_instance_valid(lock_icon):lock_icon.visible=not unlocked
 	container.visible=owned.size()>1 or int(card.relative_index)==0;container.set_meta("series_index",series_index);container.set_meta("series_id",series_id)
@@ -7086,9 +7089,9 @@ func _return_to_series_selection()->void:
 	encyclopedia_detail_page.visible=false;encyclopedia_series_page.visible=true;_refresh_series_selection()
 
 func _refresh_encyclopedia_header()->void:
-	if encyclopedia_list_title==null:return
-	var entry:=_series_entry(current_encyclopedia_series_id)
-	encyclopedia_list_title.text=Localizer.series_name(language_code,entry)
+	if encyclopedia_list_title:
+		encyclopedia_list_title.text=""
+		encyclopedia_list_title.visible=false
 	_refresh_collection_complete_badge()
 	encyclopedia_unlock_panel.visible=false;encyclopedia_unlock_puku_button.visible=false
 

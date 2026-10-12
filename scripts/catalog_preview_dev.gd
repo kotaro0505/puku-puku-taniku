@@ -99,7 +99,7 @@ func _build_ui()->void:
 	close_button.pressed.connect(_close_overlay)
 	title_row.add_child(close_button)
 	var note:=Label.new()
-	note.text="図鑑登録・GET数・自己ベスト・コイン・セーブには反映されません"
+	note.text="図鑑登録・GET数・最大サイズ・コイン・セーブには反映されません"
 	note.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
 	note.add_theme_font_size_override("font_size",13)
 	note.add_theme_color_override("font_color",Color("#76513b"))

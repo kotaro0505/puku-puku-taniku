@@ -63,8 +63,12 @@ func _test_localized_copy() -> void:
 	assert(Localizer.text("hiragana", "new") == "にゅー！")
 	assert(Localizer.text("hiragana", "original_catalog_new") == "にゅー！")
 	assert(Localizer.text("hiragana", "fusion_new") == "にゅー")
-	assert(Localizer.text("hiragana", "self_best", [12.3]).begins_with("こじこべすと"))
-	assert(Localizer.text("hiragana", "self_best_none") == "こじこべすと　ー")
+	assert(Localizer.text("ja", "self_best", [12.3]) == "最大サイズ 12.3cm")
+	assert(Localizer.text("ja", "self_best_none") == "最大サイズ ー")
+	assert(Localizer.text("hiragana", "self_best", [12.3]) == "さいだいさいず 12.3cm")
+	assert(Localizer.text("hiragana", "self_best_none") == "さいだいさいず ー")
+	assert(Localizer.text("en", "self_best", [12.3]) == "Max Size 12.3 cm")
+	assert(Localizer.text("en", "self_best_none") == "Max Size —")
 	assert(Localizer.text("hiragana", "share_record") == "こじこべすと！")
 	for locale in Localizer.SUPPORTED_LANGUAGES:
 		for key in [
