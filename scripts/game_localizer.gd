@@ -28,7 +28,7 @@ const TEXT := {
 		"opening_story_1": "ある日、\n\nガーデニングが大好きな女の子が、\n\n古い倉庫のすみで、ほこりをかぶった\n\n一冊の本を見つけました。\n\n「なんだろう、これ……」",
 		"opening_story_2": "ほこりを払い、みんなで本を見てみると——\n\nそれは、古い植物の本のようでした。",
 		"opening_story_3": "ページを開くと、そこには見たことのない植物がたくさん描かれていました。\n\nぷっくりした葉。変わったかたち。不思議な色。\n\nそこには、「多肉植物」という言葉が。\n\n「こんな植物、本当にあったのかな……」",
-		"opening_story_4": "翌日、お花屋さんのパンダが、\n\n古いたね袋を見つけました。\n\n「これ、なんのたねだろう？」\n\n3人は顔を見合わせました。\n\n「もしかして……多肉植物のたね！？」\n\n3人は、そのたねを蒔いてみることにしました。",
+		"opening_story_4": "翌日、お花屋さんのパンダが、\n\n古いたね袋を見つけました。\n\n「これ、なんのたねだろう？」\n\n3人は顔を見合わせました。\n\n「もしかして……多肉植物のたね！？」\n\n3人は、そのたねをまいてみることにしました。",
 		"panda_shop_name": "パンダのお店",
 		"armadillo_name": "アルマジロ",
 		"story_speaker_girl": "女の子",
@@ -48,7 +48,7 @@ const TEXT := {
 		"story_colorata_1": "本当に多肉植物のたねだったなんて！",
 		"story_colorata_2": "この本によると、これは『%s』っていう種類らしいよ！",
 		"story_colorata_3": "すごい。世界に多肉植物が帰って来てくれたんだ……！",
-		"story_trio_1": "聞いて！ ぼくが蒔いたたねも育ったんだ！\nこの本によると『%s』っていうみたい。",
+		"story_trio_1": "聞いて！ ぼくがまいたたねも育ったんだ！\nこの本によると『%s』っていうみたい。",
 		"story_trio_2": "僕もだよ！『%s』っていう種類らしい。",
 		"story_trio_3": "信じられない。\n長い間失われていた植物を\nこうして見られるなんて…。",
 		"story_trio_4": "とってもきれい。そして、\nぷくぷくしてて可愛いね！",
@@ -58,7 +58,7 @@ const TEXT := {
 		"awakening_empty_1": "記録では、ここで間違いないはずなんだけど……。",
 		"awakening_empty_2": "何もないね……。",
 		"awakening_overharvest": "乱獲や密猟も、絶滅の大きな\n原因だったみたいだ…。",
-		"awakening_sow": "たねがまだ少し残ってる。\nここに蒔いてみよう。",
+		"awakening_sow": "たねがまだ少し残ってる。\nここにまいてみよう。",
 		"awakening_surprise": "なんだ！？",
 		"awakening_memory": "……この場所、\n昔ここにあった多肉たちを\n思い出しているように見える……。",
 		"awakening_thanks": "素敵な想い出を見せてくれて、\nありがとう。",
@@ -200,7 +200,7 @@ const TEXT := {
 		"post_crisis_greenhouse_girl": "じゃあ、とにかく大きな株を作って持っていってみない？",
 		"post_crisis_greenhouse_armadillo_2": "育った多肉は、今までどおり原生地にぼくが持って行くよ。",
 		"post_crisis_greenhouse_panda_2": "ぼくも一緒に行くよ！",
-		"post_crisis_greenhouse_girl_2": "私はどんどんたねを蒔くね！",
+		"post_crisis_greenhouse_girl_2": "私はどんどんたねをまくね！",
 		"post_crisis_greenhouse_panda_3": "うん。やってみよう！",
 		"restoration_join_home_armadillo": "そうだ！ジュレジュレ団にも手伝ってもらおうよ。",
 		"restoration_join_home_panda": "そうしよう！ジュレジュレ団、いつも原生地にいるもんね！",
@@ -274,7 +274,7 @@ const TEXT := {
 		"post_ending_greenhouse_armadillo": "うん。みんなで戻したんだ。",
 		"post_ending_greenhouse_girl_2": "この先もずっと、多肉植物がある世界だといいね。",
 		"post_ending_greenhouse_girl_3": "よーし",
-		"post_ending_greenhouse_girl_4": "これからも、いっぱいたね蒔こ！",
+		"post_ending_greenhouse_girl_4": "これからも、いっぱいたねまこう！",
 		"post_ending_greenhouse_panda_2": "まだまだ、僕たちの多肉植物の物語は始まったばかりだ！",
 		"restoration_record_harvested": "収穫した多肉\n\n%s株",
 		"restoration_record_size": "育てた多肉の累計サイズ\n\n%scm",
@@ -294,7 +294,7 @@ const TEXT := {
 		"jurejure_battle_choice_title": "ぷくぷくバトルで勝負する？",
 		"jurejure_battle_yes": "バトルする",
 		"jurejure_battle_no": "バトルしない",
-		"jurejure_battle_sow": "たねを蒔く",
+		"jurejure_battle_sow": "たねをまく",
 		"jurejure_battle_enemy_score": "%.1f cm",
 		"jurejure_battle_player_score": "%.1f cm",
 		"jurejure_battle_win": "勝利！",
@@ -329,7 +329,7 @@ const TEXT := {
 		"story_complete_2": "昔の図鑑に残っていた原種が、\n全部この世界に戻ってきたんだ。",
 		"story_complete_3": "最初は、絵の中でしか知らなかったのにね。\n今はちゃんと、ここにいる。",
 		"story_complete_4": "でも原生地は、まだ新しい多肉を生み続けている。\nこれからも一緒に見つけていこう。",
-		"tutorial_normal_pre_sow": "じゃあ、蒔いてみるね！",
+		"tutorial_normal_pre_sow": "じゃあ、まいてみるね！",
 		"tutorial_normal_sprout": "芽が出た！",
 		"tutorial_normal_growth": "どんどん大きくなってる……。",
 		"tutorial_normal_jelly": "突然溶けてしまうこともあるって書いてあったよ。\n『ジュレる』って言うみたい。",
@@ -337,7 +337,7 @@ const TEXT := {
 		"tutorial_normal_new_panda": "見て！\nはじめて見る品種が出てる！",
 		"tutorial_normal_new_girl": "ジュレる前に収穫しよう！",
 		"tutorial_harvest_tap": "育った株をタップで収穫！",
-		"main_play": "たねを蒔く",
+		"main_play": "たねをまく",
 		"main_shop": "パンダのお店",
 		"main_arrangement": "寄せ植え",
 		"main_forest_gacha": "森のガチャ",
@@ -367,8 +367,8 @@ const TEXT := {
 		"initial_seed_stock_armadillo": "12粒あるみたいだね。まずは育ててみよう。",
 		"initial_seed_stock_received": "たね（12粒）×1セット　GET！",
 		"initial_seed_stock_endless_girl": "原生地がくれたさやからたねが\nどんどん出てくるよ！",
-		"initial_seed_stock_endless_armadillo": "すごい！さっそく蒔いてみようよ！",
-		"tutorial_normal_pre_sow_endless": "じゃあ、蒔いてみるね！",
+		"initial_seed_stock_endless_armadillo": "すごい！さっそくまいてみようよ！",
+		"tutorial_normal_pre_sow_endless": "じゃあ、まいてみるね！",
 		"first_normal_cost_notice": "1ぷくコインを消費します",
 		"seed_pod_tutorial_girl": "さやが光ってる！",
 		"seed_pod_tutorial_armadillo": "育てると少しずつ光が溜まっていくみたいだね。",
@@ -406,21 +406,21 @@ const TEXT := {
 		,"puku_gain": "ぷくコイン +%d"
 		,"puku_gauge_reward": "ぷくコイン +%d"
 		,"seed_pod_gauge_reward": "たね（12粒）×%dセット GET！"
-		,"play_choose_seed": "どのたねを蒔く？"
+		,"play_choose_seed": "どのたねをまく？"
 		,"seed_remaining": "たね\n残り %d粒"
 		,"series_seed_remaining": "シリーズのたね\n残り %d粒"
-		,"play_old_seed": "古いたねを蒔く　1粒　残り%d袋"
-		,"play_first_old_seed": "古いたねを蒔く"
-		,"play_normal_seed": "たねを蒔く　12粒　残り%dセット"
-		,"play_normal_seed_endless": "たねを蒔く"
-		,"play_normal_seed_round": "たねを蒔く\n1ぷくコイン消費"
-		,"play_normal_seed_round_free": "たねを蒔く　無料"
+		,"play_old_seed": "古いたねをまく　1粒　残り%d袋"
+		,"play_first_old_seed": "古いたねをまく"
+		,"play_normal_seed": "たねをまく　12粒　残り%dセット"
+		,"play_normal_seed_endless": "たねをまく"
+		,"play_normal_seed_round": "たねをまく\n1ぷくコイン消費"
+		,"play_normal_seed_round_free": "たねをまく　無料"
 		,"play_normal_seed_round_help": "パンダのお手伝いをする\n＋1ぷくコイン"
 		,"normal_sets_endless": "通常のたね：∞"
 		,"normal_sets_held": "たね（12粒）×%dセット"
-		,"play_volume_seed": "ボリュームパックのたねを蒔く　36粒　残り%d袋"
-		,"play_premium_seed": "プレミアムのたねを蒔く　24粒　残り%d袋"
-		,"play_mystery_seed": "謎のたねパックを蒔く　5粒　残り%d袋"
+		,"play_volume_seed": "ボリュームパックのたねをまく　36粒　残り%d袋"
+		,"play_premium_seed": "プレミアムのたねをまく　24粒　残り%d袋"
+		,"play_mystery_seed": "謎のたねパックをまく　5粒　残り%d袋"
 		,"old_seed_name": "古いたね"
 		,"bags_held": "%s %d袋"
 		,"shop_choose_category": "なにを見ますか？"
@@ -629,7 +629,7 @@ const TEXT := {
 		,"result_hidden_registered": "%sを図鑑登録！"
 		,"arrangement_default_name": "寄せ植え %d"
 		,"shop_rescue_offer": "たねなくなっちゃった？\n少し分けてあげるよ！"
-		,"shop_rescue_success": "はい、どうぞ！大事に蒔いてみてね。"
+		,"shop_rescue_success": "はい、どうぞ！大事にまいてみてね。"
 		,"shop_puku_rescue_offer": "ぷくが足りないの？\nお店を手伝ってくれたら、1ぷくコイン渡すよ！"
 		,"shop_puku_rescue_success": "お手伝いありがとう！\n1ぷくコインを受け取ってね。"
 		,"shop_help_action": "お手伝いする"
@@ -986,7 +986,7 @@ const TEXT := {
 		"post_ending_greenhouse_armadillo": "うん。みんなで もどしたんだ",
 		"post_ending_greenhouse_girl_2": "このさきも ずっと、たにくしょくぶつが ある せかいだと いいね",
 		"post_ending_greenhouse_girl_3": "よーし",
-		"post_ending_greenhouse_girl_4": "これからも、いっぱい たね まこ！",
+		"post_ending_greenhouse_girl_4": "これからも、いっぱい たね まこう！",
 		"post_ending_greenhouse_panda_2": "まだまだ、ぼくたちの たにくしょくぶつの ものがたりは はじまったばかりだ！",
 		"restoration_record_harvested": "しゅうかくした たにく\n\n%sかぶ",
 		"restoration_record_size": "そだてた たにくの るいけいさいず\n\n%sせんち",

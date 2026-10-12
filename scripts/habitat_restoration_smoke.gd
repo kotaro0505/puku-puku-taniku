@@ -551,7 +551,7 @@ func _test_integrated_final_chapter() -> void:
 		"うん。みんなで戻したんだ。",
 		"この先もずっと、多肉植物がある世界だといいね。",
 		"よーし",
-		"これからも、いっぱいたね蒔こ！",
+		"これからも、いっぱいたねまこう！",
 		"まだまだ、僕たちの多肉植物の物語は始まったばかりだ！",
 	]
 	var expected_post_ending_greenhouse_speakers := ["girl", "panda", "armadillo", "girl", "girl", "girl", "panda"]

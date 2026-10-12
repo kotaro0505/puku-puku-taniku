@@ -32,7 +32,7 @@ func _ready()->void:
 	assert("a girl who loved gardening" in Localizer.text("en","opening_story_1"))
 	assert("Panda from the flower shop" in Localizer.text("en","opening_story_4"))
 	assert(Localizer.text("ja","opening_story_1")=="ある日、\n\nガーデニングが大好きな女の子が、\n\n古い倉庫のすみで、ほこりをかぶった\n\n一冊の本を見つけました。\n\n「なんだろう、これ……」")
-	assert(Localizer.text("ja","opening_story_4")=="翌日、お花屋さんのパンダが、\n\n古いたね袋を見つけました。\n\n「これ、なんのたねだろう？」\n\n3人は顔を見合わせました。\n\n「もしかして……多肉植物のたね！？」\n\n3人は、そのたねを蒔いてみることにしました。")
+	assert(Localizer.text("ja","opening_story_4")=="翌日、お花屋さんのパンダが、\n\n古いたね袋を見つけました。\n\n「これ、なんのたねだろう？」\n\n3人は顔を見合わせました。\n\n「もしかして……多肉植物のたね！？」\n\n3人は、そのたねをまいてみることにしました。")
 	for locale in Localizer.SUPPORTED_LANGUAGES:
 		assert("\n" not in Localizer.text(locale,"opening_story_1").replace("\n\n",""))
 		assert("\n" not in Localizer.text(locale,"opening_story_4").replace("\n\n",""))
