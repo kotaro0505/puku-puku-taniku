@@ -4,6 +4,9 @@ const Localizer = preload("res://scripts/game_localizer.gd")
 const StoryContinueButtonStyleClass = preload("res://scripts/story_continue_button_style.gd")
 const StandardStoryDialoguePanelClass = preload("res://scripts/standard_story_dialogue_panel.gd")
 const FIRST_SPECIES_ID := "colorata"
+const MANUAL_SETTLEMENT_PLANT_TIMEOUT_SECONDS := 5.0
+
+var manual_settlement_wait_failure := ""
 
 func _ready() -> void:
 	var game = load("res://main.tscn").instantiate()
@@ -430,16 +433,15 @@ func _ready() -> void:
 	var manual_settlements_remaining: int = game.NORMAL_GERMINATION_COUNT - game.endless_economy_harvest_count - game.endless_economy_jelly_count
 	assert(manual_settlements_remaining == 10)
 	for settlement_index in range(manual_settlements_remaining):
-		for remaining_plant in game.plants:
-			if is_instance_valid(remaining_plant) and remaining_plant.state == "growing":
-				remaining_plant.jelly_checks_enabled = false
-		assert(game.play_active and not game.plants.is_empty(), "first normal round ended before all 12 seeds settled")
+		var expected_settled_before: int = 2 + settlement_index
+		var plant_ready: bool = await _wait_for_manual_settlement_plant(game, expected_settled_before)
+		assert(plant_ready, "first normal round ended before all 12 seeds settled: reason=%s %s" % [manual_settlement_wait_failure, _first_normal_round_state(game, settlement_index)])
+		_disable_automatic_jelly_for_current_plants(game)
 		var plant_to_jelly = game.plants[0]
+		assert(is_instance_valid(plant_to_jelly) and plant_to_jelly.state == "growing", "manual jelly target was not growing: %s" % _first_normal_round_state(game, settlement_index))
 		plant_to_jelly.jelly()
 		await get_tree().process_frame
-		if game.play_active and game.play_spawn_queue>0:
-			game.play_spawn_timer=0.0;game._process(.01)
-			await get_tree().create_timer(.32).timeout
+		assert(game.endless_economy_harvest_count + game.endless_economy_jelly_count == expected_settled_before + 1, "manual settlement count did not advance exactly once: %s" % _first_normal_round_state(game, settlement_index))
 	assert(await _wait_until(func()->bool:return not game.play_active and game.result_overlay.visible), "round result did not wait for/complete the Puku gauge queue: active=%s result=%s puku_running=%s puku_queue=%s plants=%s seeds_remaining=%s spawn_queue=%s" % [game.play_active, game.result_overlay.visible, game.puku_gauge_animation_running, game.puku_gauge_animation_queue.size(), game.plants.size(), game.play_seeds_remaining, game.play_spawn_queue])
 	assert(game.endless_economy_seed_count == 12 and game.endless_economy_harvest_count == 1 and game.endless_economy_jelly_count == 11)
 	assert(game.endless_economy_seed_cost_units == game.NORMAL_ROUND_COST_UNITS)
@@ -464,6 +466,45 @@ func _ready() -> void:
 	assert(Localizer.text("ja","puku_buyback_2") == "大きい株ほど\n高く買い取るからね！")
 	print("FIRST_PLAY_TUTORIAL_SMOKE_OK old_colorata_growth=1.3 normal_growth=unchanged cost_note=once trio_cards=catalog_only pre_sow=true start_guide=play_open_normal tutorial_continue=9_pages_visible tutorial_speakers=8_correct+system_none button+fullscreen_single_step=true operation_prompt_continue=false forced_jelly=true reserved_original_new=true reserved_front_random=true observed_3s=true post_result_GET=true act2_guarantee_untouched=true total=12 result=1_harvest+11_jelly")
 	get_tree().quit()
+
+
+func _wait_for_manual_settlement_plant(game:Node,expected_settled:int)->bool:
+	manual_settlement_wait_failure=""
+	var deadline_msec: int = Time.get_ticks_msec() + int(MANUAL_SETTLEMENT_PLANT_TIMEOUT_SECONDS * 1000.0)
+	while Time.get_ticks_msec() < deadline_msec:
+		_disable_automatic_jelly_for_current_plants(game)
+		var settled_count: int = game.endless_economy_harvest_count + game.endless_economy_jelly_count
+		if settled_count != expected_settled:
+			manual_settlement_wait_failure="unexpected settlement count %s (expected %s)" % [settled_count,expected_settled]
+			return false
+		if not game.play_active:
+			manual_settlement_wait_failure="play became inactive while waiting for a replacement plant"
+			return false
+		if not game.plants.is_empty():
+			return true
+		# The smoke disables Main._process() so it can drive tutorial thresholds
+		# deterministically. Advance only a queued replacement here; the seed drop
+		# tween itself is awaited by state instead of assuming it finishes in .32s.
+		if game.play_spawn_queue>0 and game.play_seed_animations_pending==0:
+			game.play_spawn_timer=0.0
+			game._process(.01)
+		await get_tree().process_frame
+	manual_settlement_wait_failure="timed out after %.1fs waiting for a replacement plant or seed animation" % MANUAL_SETTLEMENT_PLANT_TIMEOUT_SECONDS
+	return false
+
+
+func _disable_automatic_jelly_for_current_plants(game:Node)->void:
+	for remaining_plant in game.plants:
+		if is_instance_valid(remaining_plant) and remaining_plant.state=="growing":
+			remaining_plant.jelly_checks_enabled=false
+
+
+func _first_normal_round_state(game:Node,settlement_index:int)->String:
+	var plant_states:Array[String]=[]
+	for plant in game.plants:
+		if is_instance_valid(plant):plant_states.append(str(plant.state))
+		else:plant_states.append("invalid")
+	return "settlement_index=%s play_active=%s plants.size()=%s plant_states=%s play_seeds_remaining=%s play_spawn_queue=%s play_seed_animations_pending=%s harvest_count=%s jelly_count=%s seeds_used=%s" % [settlement_index,game.play_active,game.plants.size(),plant_states,game.play_seeds_remaining,game.play_spawn_queue,game.play_seed_animations_pending,game.endless_economy_harvest_count,game.endless_economy_jelly_count,game.endless_economy_seed_count]
 
 
 func _wait_until(predicate:Callable,timeout_seconds:=5.0)->bool:
