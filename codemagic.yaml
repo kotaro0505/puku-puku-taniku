@@ -167,6 +167,7 @@ workflows:
           run_scene_smoke res://scripts/story_dev_presets_smoke.tscn STORY_DEV_PRESETS_SMOKE_OK
           run_scene_smoke res://scripts/catalog_cover_species_smoke.tscn CATALOG_COVER_SPECIES_SMOKE_OK
           run_scene_smoke res://scripts/collection_complete_smoke.tscn COLLECTION_COMPLETE_SMOKE_OK
+          run_scene_smoke res://scripts/carnicolor_first_get_story_smoke.tscn CARNICOLOR_FIRST_GET_STORY_SMOKE_OK
           run_scene_smoke res://scripts/pot_unlock_iap_smoke.tscn POT_UNLOCK_IAP_SMOKE_OK
           run_scene_smoke res://scripts/puku_points_smoke.tscn PUKU_POINTS_SMOKE_OK
           run_scene_smoke res://scripts/normal_round_smoke.tscn NORMAL_ROUND_SMOKE_OK
