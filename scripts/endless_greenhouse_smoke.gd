@@ -44,26 +44,30 @@ func _ready() -> void:
 	game._update_play_ui()
 	assert(game.play_active and game.active_seed_type == "normal")
 	assert(game.normal_seed_bags == 0)
-	assert(game.ENDLESS_NORMAL_MIN_PLANTS==7 and game.ENDLESS_NORMAL_MAX_PLANTS==10)
+	assert(game.ENDLESS_NORMAL_MIN_PLANTS==5 and game.ENDLESS_NORMAL_MAX_PLANTS==8)
 	assert(game.play_concurrent_target>=game.ENDLESS_NORMAL_MIN_PLANTS and game.play_concurrent_target<=game.ENDLESS_NORMAL_MAX_PLANTS)
-	assert(game.plants.size()==game.play_concurrent_target and game.plants.size()<=10)
+	assert(game.plants.size()>=game.ENDLESS_NORMAL_MIN_PLANTS and game.plants.size()<=game.ENDLESS_NORMAL_MAX_PLANTS)
+	assert(_planned_greenhouse_population(game)<=game.ENDLESS_NORMAL_MAX_PLANTS)
 	assert(not game.play_open_button.visible and not game.play_overlay.visible and not game.normal_play_button.visible)
 	assert(not game.seed_bag_panel.visible and not game.seed_pod_gauge_area.visible and game.puku_gauge_area.visible)
 	assert(not game.result_overlay.visible)
 	for plant in game.plants:
 		plant.jelly_checks_enabled = false
 
-	var concurrent_target: int = game.play_concurrent_target
 	var harvested = game.plants[0]
 	harvested.diameter_cm = 30.0
+	var harvest_commit_before:int=game.harvest_commit_count
 	harvested.harvest()
-	await get_tree().create_timer(1.55).timeout
-	assert(game.play_active and game.plants.size() == concurrent_target and game.plants.size()<=10)
+	assert(await _wait_until(func()->bool:return game.harvest_commit_count==harvest_commit_before+1))
+	assert(await _wait_for_greenhouse_refill(game))
+	assert(game.play_active and game.play_concurrent_target>=5 and game.play_concurrent_target<=8)
+	assert(game.plants.size()>=5 and game.plants.size()<=8 and _planned_greenhouse_population(game)<=8)
 	var jellied = game.plants[0]
 	jellied.jelly()
-	await get_tree().create_timer(1.75).timeout
-	assert(game.play_active and game.plants.size() == mini(concurrent_target,9) and game.plants.size()<=10)
-	assert(game.play_seeds_remaining == maxi(0,game.NORMAL_GERMINATION_COUNT-concurrent_target-3))
+	assert(await _wait_for_greenhouse_refill(game))
+	assert(game.play_active and game.play_concurrent_target>=5 and game.play_concurrent_target<=8)
+	assert(game.plants.size()>=5 and game.plants.size()<=8 and _planned_greenhouse_population(game)<=8)
+	assert(game.play_seeds_remaining+game.endless_economy_seed_count==game.NORMAL_GERMINATION_COUNT)
 	game._finish_greenhouse_play()
 	assert(game.play_active and not game.result_overlay.visible)
 
@@ -101,7 +105,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	_remove_test_file(NORMAL_PATH)
 	_remove_test_file(EXPERIMENT_PATH)
-	print("ENDLESS_GREENHOUSE_SMOKE_OK default_without_flags=true player_start=true round_seeds=12 round_cost=1 concurrent=7-10 refill_free=true harvest_direct=true wallet=fixed_point jelly_extra_penalty=false result=true jelly_rates=1/2/3/4 boundaries=5/10/15 new_roll=max_carryover_x0.4 jelly_new_roll=false discovery_curve=unchanged forced_new=true candidate_pool=uniform deferred_formal_get=true pending_duplicate=false first_get_floor=once virtual_batch=12 pause=true navigation=habitat+catalog+shop+gacha production_gacha=1puku+species_get fusion=1-2-3puku restoration_pending=true finite=true save_isolated=true")
+	print("ENDLESS_GREENHOUSE_SMOKE_OK default_without_flags=true player_start=true round_seeds=12 round_cost=1 concurrent=5-8_dynamic refill_free=true harvest_direct=true wallet=fixed_point jelly_extra_penalty=false result=true jelly_rates=1/2/3/4 boundaries=5/10/15 new_roll=max_carryover_x0.4 jelly_new_roll=false discovery_curve=unchanged forced_new=true candidate_pool=uniform deferred_formal_get=true pending_duplicate=false first_get_floor=once virtual_batch=12 pause=true navigation=habitat+catalog+shop+gacha production_gacha=1puku+species_get fusion=1-2-3puku restoration_pending=true finite=true save_isolated=true")
 	get_tree().quit()
 
 
@@ -406,7 +410,9 @@ func _test_endless_first_play_tutorial(game: Node) -> void:
 	game._advance_puku_buyback_tutorial()
 	assert(game.puku_buyback_tutorial_complete and not game.puku_buyback_tutorial_active)
 	await get_tree().create_timer(1.55).timeout
-	assert(game.play_active and game.plants.size() == game.play_concurrent_target)
+	assert(game.play_active and game.play_concurrent_target>=game.ENDLESS_NORMAL_MIN_PLANTS and game.play_concurrent_target<=game.ENDLESS_NORMAL_MAX_PLANTS)
+	assert(game.plants.size()>=game.ENDLESS_NORMAL_MIN_PLANTS and game.plants.size()<=game.ENDLESS_NORMAL_MAX_PLANTS)
+	assert(_planned_greenhouse_population(game)<=game.ENDLESS_NORMAL_MAX_PLANTS)
 
 
 func _test_deferred_species_get_and_pause(game: Node) -> void:
@@ -445,10 +451,11 @@ func _test_deferred_species_get_and_pause(game: Node) -> void:
 	var observer = game.plants[0]
 	observer.jelly_checks_enabled = false
 	var age_before: float = observer.age
-	var spawn_queue_before: int = game.play_spawn_queue
 	game._process(1.0)
 	assert(observer.age > age_before)
-	assert(game.play_spawn_queue == spawn_queue_before)
+	# Dynamic normal-round density may legitimately consume or add a scheduled
+	# refill while this observer grows; it must only preserve the eight-plant cap.
+	assert(_planned_greenhouse_population(game)<=game.ENDLESS_NORMAL_MAX_PLANTS)
 	game.pending_round_new_species_ids.erase(species_id)
 	assert(game._should_simulate_endless_greenhouse())
 
@@ -1156,6 +1163,29 @@ func _test_finite_mode_unchanged(game: Node) -> void:
 	game._save()
 	var finite_payload = JSON.parse_string(FileAccess.get_file_as_string(NORMAL_PATH))
 	assert(finite_payload is Dictionary and not finite_payload.has("endless_discovery_state"))
+
+
+func _planned_greenhouse_population(game:Node)->int:
+	return game.plants.size()+game.play_spawn_queue+game.play_seed_animations_pending
+
+
+func _wait_for_greenhouse_refill(game:Node,timeout_seconds:=8.0)->bool:
+	var deadline_msec:=Time.get_ticks_msec()+int(timeout_seconds*1000.0)
+	while Time.get_ticks_msec()<deadline_msec:
+		for plant in game.plants:
+			if is_instance_valid(plant) and plant.state=="growing":plant.jelly_checks_enabled=false
+		if _planned_greenhouse_population(game)>game.ENDLESS_NORMAL_MAX_PLANTS:return false
+		if game.play_spawn_queue==0 and game.play_seed_animations_pending==0:return true
+		if game.play_spawn_queue>0 and game.play_seed_animations_pending==0:
+			game.play_spawn_timer=0.0;game._process(.01)
+		await get_tree().process_frame
+	return false
+
+
+func _wait_until(predicate:Callable,timeout_seconds:=8.0)->bool:
+	var deadline_msec:=Time.get_ticks_msec()+int(timeout_seconds*1000.0)
+	while Time.get_ticks_msec()<deadline_msec and not bool(predicate.call()):await get_tree().process_frame
+	return bool(predicate.call())
 
 
 func _remove_test_file(path: String) -> void:

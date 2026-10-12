@@ -275,8 +275,10 @@ func _ready() -> void:
 	await get_tree().create_timer(.45).timeout
 	assert(game.play_active and game.first_play_tutorial_active and game.normal_seed_bags==0 and game.current_target_count==12)
 	assert(game.puku_balance_units == puku_before_round - game.NORMAL_ROUND_COST_UNITS)
+	assert(game.ENDLESS_NORMAL_MIN_PLANTS==5 and game.ENDLESS_NORMAL_MAX_PLANTS==8)
 	assert(game.play_concurrent_target >= game.ENDLESS_NORMAL_MIN_PLANTS and game.play_concurrent_target <= game.ENDLESS_NORMAL_MAX_PLANTS)
 	assert(game.play_seeds_remaining == 12 - game.play_concurrent_target)
+	assert(game.plants.size()+game.play_spawn_queue+game.play_seed_animations_pending<=game.ENDLESS_NORMAL_MAX_PLANTS)
 	assert(game.first_play_tutorial_reserved_seed_pending)
 	assert(not game.first_play_tutorial_reserved_species_id.is_empty())
 	for normal_tutorial_plant in game.plants:
@@ -337,6 +339,7 @@ func _ready() -> void:
 	await get_tree().create_timer(.36).timeout
 	assert(game.endless_economy_seed_count == initially_spawned_count + 1)
 	assert(game.play_seeds_remaining == remaining_before_forced_jelly - 1)
+	assert(game.plants.size()+game.play_spawn_queue+game.play_seed_animations_pending<=game.ENDLESS_NORMAL_MAX_PLANTS)
 	assert(game.first_play_tutorial_phase == "reserved_seed_observe")
 	assert(is_instance_valid(game.first_play_tutorial_reserved_plant))
 	var reserved_spawn_position:Vector3=game.first_play_tutorial_reserved_plant.original_pos
@@ -473,6 +476,9 @@ func _wait_for_manual_settlement_plant(game:Node,expected_settled:int)->bool:
 	var deadline_msec: int = Time.get_ticks_msec() + int(MANUAL_SETTLEMENT_PLANT_TIMEOUT_SECONDS * 1000.0)
 	while Time.get_ticks_msec() < deadline_msec:
 		_disable_automatic_jelly_for_current_plants(game)
+		if game.plants.size()+game.play_spawn_queue+game.play_seed_animations_pending>game.ENDLESS_NORMAL_MAX_PLANTS:
+			manual_settlement_wait_failure="scheduled population exceeded %s"%game.ENDLESS_NORMAL_MAX_PLANTS
+			return false
 		var settled_count: int = game.endless_economy_harvest_count + game.endless_economy_jelly_count
 		if settled_count != expected_settled:
 			manual_settlement_wait_failure="unexpected settlement count %s (expected %s)" % [settled_count,expected_settled]
@@ -504,7 +510,7 @@ func _first_normal_round_state(game:Node,settlement_index:int)->String:
 	for plant in game.plants:
 		if is_instance_valid(plant):plant_states.append(str(plant.state))
 		else:plant_states.append("invalid")
-	return "settlement_index=%s play_active=%s plants.size()=%s plant_states=%s play_seeds_remaining=%s play_spawn_queue=%s play_seed_animations_pending=%s harvest_count=%s jelly_count=%s seeds_used=%s" % [settlement_index,game.play_active,game.plants.size(),plant_states,game.play_seeds_remaining,game.play_spawn_queue,game.play_seed_animations_pending,game.endless_economy_harvest_count,game.endless_economy_jelly_count,game.endless_economy_seed_count]
+	return "settlement_index=%s play_active=%s plants.size()=%s plant_states=%s play_seeds_remaining=%s play_spawn_queue=%s play_seed_animations_pending=%s harvest_count=%s jelly_count=%s seeds_used=%s target=%s planned=%s" % [settlement_index,game.play_active,game.plants.size(),plant_states,game.play_seeds_remaining,game.play_spawn_queue,game.play_seed_animations_pending,game.endless_economy_harvest_count,game.endless_economy_jelly_count,game.endless_economy_seed_count,game.play_concurrent_target,game.plants.size()+game.play_spawn_queue+game.play_seed_animations_pending]
 
 
 func _wait_until(predicate:Callable,timeout_seconds:=5.0)->bool:

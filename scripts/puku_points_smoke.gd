@@ -81,7 +81,7 @@ func _test_signed_balance_animation(game)->void:
 func _test_round_entry_and_harvest(game)->void:
 	game._cancel_puku_gauge_animations();game.puku_gauge_animation_speed_scale=.02;game._clear_greenhouse_plants();game.opening_finished=true;game.opening_overlay.visible=false;game.current_mode="greenhouse";game._apply_mode();game.first_habitat_gift_claimed=true;game.puku_balance_units=1400;game.normal_round_free_plays=0
 	game._start_greenhouse_play("normal")
-	assert(game.play_active and game.current_target_count==12 and game.play_concurrent_target>=7 and game.play_concurrent_target<=10)
+	assert(game.play_active and game.current_target_count==12 and game.play_concurrent_target>=game.ENDLESS_NORMAL_MIN_PLANTS and game.play_concurrent_target<=game.ENDLESS_NORMAL_MAX_PLANTS)
 	assert(game.puku_balance_units==400 and game.endless_economy_seed_cost_units==1000)
 	assert(game.play_seeds_remaining==12-game.play_concurrent_target)
 	await get_tree().create_timer(.4).timeout

@@ -93,8 +93,8 @@ const OLD_SEED_REACTION_SPROUT_CM := 2.2
 const OLD_SEED_REACTION_GROWTH_CM := 12.0
 const PLAY_INITIAL_MIN_PLANTS := 9
 const PLAY_INITIAL_MAX_PLANTS := 12
-const ENDLESS_NORMAL_MIN_PLANTS := 7
-const ENDLESS_NORMAL_MAX_PLANTS := 10
+const ENDLESS_NORMAL_MIN_PLANTS := 5
+const ENDLESS_NORMAL_MAX_PLANTS := 8
 const GREENHOUSE_MASTER_PATH := "res://assets/greenhouse-master-horizontal.png"
 const GREENHOUSE_MASTER_SOURCE_SIZE := Vector2(1448.0,1086.0)
 const SOIL_SOURCE_CENTER := Vector2(1060.0,600.0)
@@ -4733,8 +4733,11 @@ func _start_greenhouse_play(seed_type:String)->void:
 func _initial_greenhouse_concurrent_target(seed_type:String)->int:
 	if seed_type.begins_with("series:"):return 1
 	if seed_type=="old":return OLD_SEED_GERMINATION_COUNT
-	if seed_type=="normal" and _is_endless_greenhouse_enabled():return rng.randi_range(ENDLESS_NORMAL_MIN_PLANTS,ENDLESS_NORMAL_MAX_PLANTS)
+	if seed_type=="normal" and _is_endless_greenhouse_enabled():return _roll_normal_greenhouse_concurrent_target()
 	return mini(current_target_count,rng.randi_range(PLAY_INITIAL_MIN_PLANTS,PLAY_INITIAL_MAX_PLANTS))
+
+func _roll_normal_greenhouse_concurrent_target()->int:
+	return rng.randi_range(ENDLESS_NORMAL_MIN_PLANTS,ENDLESS_NORMAL_MAX_PLANTS)
 
 func _ensure_first_tutorial_species()->String:
 	first_tutorial_species_id=FIRST_STORY_SPECIES_ID
@@ -7796,6 +7799,10 @@ func _queue_greenhouse_replacements()->void:
 	# One of the formal round's twelve seeds is held back for the scripted NEW
 	# sprout.  Never let ordinary slot refill consume or overtake that seed.
 	if first_play_tutorial_active and (first_play_tutorial_reserved_seed_pending or first_play_tutorial_phase in ["forcing_jelly","jelly_observe","jelly_reaction","reserved_seed_sowing"]):return
+	# A normal twelve-seed round deliberately changes density after every
+	# settlement. Existing or already scheduled plants are never removed when the
+	# new target is lower; the target only controls whether this vacancy is filled.
+	if _is_endless_normal_play():play_concurrent_target=_roll_normal_greenhouse_concurrent_target()
 	var open_slots:=maxi(0,play_concurrent_target-(plants.size()+play_spawn_queue+play_seed_animations_pending))
 	var add_count:=mini(open_slots,maxi(0,play_seeds_remaining-play_spawn_queue))
 	if add_count<=0:return
