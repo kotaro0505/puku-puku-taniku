@@ -6,6 +6,7 @@ const MAIN_SPRITES := {
 	"colorata": "res://assets/plants/sprite-colorata.png",
 	"juliana": "res://assets/plants/sprite-carnicolor-glau-grey.png",
 	"tovarensis_tovar": "res://assets/plants/sprite-tovarensis-tovar.png",
+	"strictiflora_bustamante": "res://assets/plants/sprite-strictiflora-bustamante.png",
 	"jewel_opal_rosette": "res://assets/catalog/jewel/jewel-opal-rosette.png",
 }
 
@@ -13,6 +14,7 @@ const HABITAT_SPRITES := {
 	"colorata": "res://assets/plants/habitat/sprite-colorata.png",
 	"juliana": "res://assets/plants/habitat/sprite-carnicolor-glau-grey.png",
 	"tovarensis_tovar": "res://assets/plants/habitat/sprite-tovarensis-tovar.png",
+	"strictiflora_bustamante": "res://assets/plants/habitat/sprite-strictiflora-bustamante.png",
 }
 
 
@@ -23,6 +25,7 @@ func _ready() -> void:
 	var colorata := _entry(species, "colorata")
 	var carnicolor := _entry(species, "juliana")
 	var tovar := _entry(species, "tovarensis_tovar")
+	var bustamante := _entry(species, "strictiflora_bustamante")
 	var opal := _entry(species, "jewel_opal_rosette")
 
 	assert(str(colorata.get("name_ja", "")) == "コロラータ")
@@ -30,6 +33,8 @@ func _ready() -> void:
 	assert(str(carnicolor.get("name_hiragana", "")) == "かるにからー ぐらうぐれい")
 	assert(str(carnicolor.get("name_en", "")) == "Carnicolor Glau Grey")
 	assert(str(tovar.get("name_ja", "")) == "トバレンシス・トバー")
+	assert(str(bustamante.get("name_ja", "")) == "ストリクチフローラ ブスタマンテ")
+	assert(str(bustamante.get("image_path", "")) == MAIN_SPRITES.strictiflora_bustamante)
 	assert(str(opal.get("name_ja", "")) == "オパールロゼット")
 
 	# The former Juliana save/progression key deliberately remains unchanged.
@@ -54,7 +59,7 @@ func _ready() -> void:
 
 	assert(str(SucculentClass.SPRITES.get("lutea", "")) == "res://assets/plants/sprite-lutea.png")
 	_assert_shop_backgrounds()
-	print("IMAGE_REPLACEMENT_SMOKE_OK plants=4 transparent=true habitat=320 shop=720x1280 save_ids=stable")
+	print("IMAGE_REPLACEMENT_SMOKE_OK plants=5 transparent=true habitat=320 shop=720x1280 save_ids=stable")
 	get_tree().quit()
 
 

@@ -75,8 +75,17 @@ func _ready()->void:
 	for entry in game.catalog_species:species_ids.append(str(entry.species_id))
 	for required in ["laui","golden_laui","colorata","affinis","lutea","hyalina_san_luis_de_la_paz","purpusorum","shaviana","kannte","pinwheel","tovarensis_tovar","transparent_succulent","strictiflora_bustamante","gummy_peach_milk","gummy_melon_milk","gummy_fruit_punch","gummy_grape_milk","gummy_strawberry","gummy_orange","gummy_rainbow","gummy_soda","glow_emerald_rosette","glow_aqua_drops","glow_amber_glow","glow_lavender_rosette","glow_ruby_star","glow_lime_fingers","glow_peach_lantern","glow_sunlight_rosette","glow_mint_star","glow_magenta_beads","glow_aurora_rosette","glow_lime_heart","metal_silver_rosette","metal_cobalt_cluster","metal_rose_copper","metal_gold_cluster","metal_gunmetal_rosette","metal_iridescent_star","metal_silver_branch","metal_obsidian_spike","metal_sage_silver","metal_patina_copper","jewel_diamond_rosette","jewel_emerald_rosette","jewel_sapphire_star","jewel_opal_rosette","jewel_amethyst_rosette","jewel_rose_quartz_rosette","jewel_fluorite_rosette","jewel_labradorite_star","jewel_citrine_rosette","jewel_turquoise_cluster","stone_black_lava_rosette","stone_serpentine_rosette","stone_granite_rosette","stone_red_lava_rosette","stone_sandstone_rosette","stone_slate_rosette","stone_green_schist_rosette","stone_silver_gneiss_rosette","stone_obsidian_rosette","stone_white_marble_rosette","yumekawa_milky_dream","yumekawa_pastel_drops","yumekawa_fairy_branch","yumekawa_moonlight_rosette","yumekawa_bubble_candy","yumekawa_mint_milk","yumekawa_lavender_frill","yumekawa_dream_bouquet","yumekawa_princess_rose","yumekawa_tricolor_rosettes","sea_coralline_drops","sea_sandy_tide","sea_coral_fingers","sea_jellyfish_rosette","sea_seafoam_bubbles","sea_starlight_lagoon","sea_sandy_lagoon","sea_neon_coral","sea_pearl_shell","sea_tropical_bubbles"]:assert(required in species_ids)
 	for retired_id in game.StoryProgressionClass.RETIRED_SPECIAL_BASE_SPECIES_IDS:assert(str(retired_id) not in species_ids)
-	assert(str(game._catalog_entry("strictiflora_bustamante").name_ja)=="ストリクチフローラ　ブスタマンテ")
+	var bustamante_entry:Dictionary=game._catalog_entry("strictiflora_bustamante")
+	var bustamante_path:="res://assets/plants/sprite-strictiflora-bustamante.png"
+	var bustamante_habitat_path:="res://assets/plants/habitat/sprite-strictiflora-bustamante.png"
+	assert(str(bustamante_entry.name_ja)=="ストリクチフローラ ブスタマンテ")
+	assert(str(bustamante_entry.image_path)==bustamante_path and str(bustamante_entry.habitat_image_path)==bustamante_habitat_path)
+	assert(game._species_image_path(bustamante_entry)==bustamante_path and ResourceLoader.exists(bustamante_path))
+	assert(ResourceLoader.exists(bustamante_habitat_path))
+	var bustamante_texture:Texture2D=game._species_texture(bustamante_entry)
+	assert(bustamante_texture!=null and bustamante_texture.get_size()==Vector2(1254,1254))
 	var succulent_assets = load("res://scripts/succulent.gd")
+	assert(succulent_assets.SPRITES.strictiflora_bustamante==bustamante_path)
 	assert(succulent_assets.SPRITES.pinwheel=="res://assets/plants/sprite-pinwheel.png" and ResourceLoader.exists(succulent_assets.SPRITES.pinwheel))
 	assert(succulent_assets.SPRITES.transparent_mystery=="res://assets/plants/sprite-transparent-mystery.png" and ResourceLoader.exists(succulent_assets.SPRITES.transparent_mystery))
 	assert(succulent_assets.SPRITES.hyalina_san_luis=="res://assets/plants/sprite-hyalina-san-luis.png" and ResourceLoader.exists(succulent_assets.SPRITES.hyalina_san_luis));assert(succulent_assets.SPRITES.purpusorum=="res://assets/plants/sprite-purpusorum.png" and ResourceLoader.exists(succulent_assets.SPRITES.purpusorum))

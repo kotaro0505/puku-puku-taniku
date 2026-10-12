@@ -19,6 +19,7 @@ const SPRITES := {
 	"shaviana": "res://assets/plants/sprite-shaviana.png",
 	"pinwheel": "res://assets/plants/sprite-pinwheel.png",
 	"tovarensis_tovar": "res://assets/plants/sprite-tovarensis-tovar.png",
+	"strictiflora_bustamante": "res://assets/plants/sprite-strictiflora-bustamante.png",
 	"transparent_mystery": "res://assets/plants/sprite-transparent-mystery.png",
 	"gummy_peach_milk": "res://assets/catalog/gummy/gummy-peach-milk.png",
 	"gummy_melon_milk": "res://assets/catalog/gummy/gummy-melon-milk.png",
