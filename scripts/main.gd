@@ -3697,7 +3697,7 @@ func _maybe_activate_old_seed_harvest_guide()->bool:
 func _clamp_tutorial_harvest_plant(plant)->void:
 	if not is_instance_valid(plant) or float(plant.diameter_cm)<=TUTORIAL_HARVEST_CM:return
 	plant.diameter_cm=TUTORIAL_HARVEST_CM
-	plant.visual_scale=.18+(TUTORIAL_HARVEST_CM-1.6)*.058
+	plant.visual_scale=SucculentClass.visual_scale_for_diameter(TUTORIAL_HARVEST_CM)
 	plant._update_visual(0.0)
 
 func _show_tutorial_harvest_spotlight()->void:
@@ -7514,9 +7514,10 @@ func _add_restoration_habitat_plants()->void:
 		if texture==null:continue
 		var sprite:=Sprite3D.new();sprite.name="RestorationMedalPlant%d"%(index+1);sprite.texture=texture;sprite.billboard=BaseMaterial3D.BILLBOARD_ENABLED;sprite.no_depth_test=true;sprite.texture_filter=BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 		sprite.pixel_size=1.22/maxf(1.0,float(texture.get_width()));sprite.offset.y=-float(texture.get_height())*.18;sprite.position=_panorama_point_to_world(points[index],HABITAT_ITEM_RADIUS-.18)
-		var diameter:=float(snapshot.get("diameter_cm",100.0));var saved_visual_scale:=float(snapshot.get("visual_scale",0.0));var expected_visual_scale:=.18+(diameter-1.6)*.058
-		if saved_visual_scale<2.0:saved_visual_scale=expected_visual_scale
-		var visual_diameter:=1.6+maxf(0.0,saved_visual_scale-.18)/.058;var represented_diameter:=(diameter+visual_diameter)*.5
+		# The greenhouse billboard now uses display-only giant-size compression.
+		# Restoration presentation must continue to represent the saved real size,
+		# not reverse the temporary greenhouse visual scale into a smaller diameter.
+		var diameter:=float(snapshot.get("diameter_cm",100.0));var represented_diameter:=diameter
 		var compressed_scale:=clampf(2.15+(represented_diameter-100.0)*.012,2.15,3.65);sprite.scale=Vector3.ONE*compressed_scale
 		sprite.set_meta("restoration_stage",index+1);sprite.set_meta("restoration_snapshot",snapshot.duplicate(true))
 		sprite.modulate=Color(1.08,1.08,1.02,1.0);habitat_items_root.add_child(sprite)
@@ -8738,16 +8739,35 @@ func _plant_label_rect(screen:Vector2,label_size:Vector2,occupied:Array[Rect2],v
 func _plant_is_visible_for_label(plant,viewport_rect:Rect2)->bool:
 	# The point above the plant is only a label anchor. On giant plants it leaves
 	# the top of the viewport long before the rendered leaves do, so visibility
-	# follows the rooted plant plus its actual Sprite3D artwork instead. This also
+	# follows the actual Sprite3D artwork instead. This also
 	# lets horizontal greenhouse scrolling hide the label once the complete plant
 	# is off-screen.
-	var root_screen:Vector2=camera.unproject_position(plant.global_position)
-	if viewport_rect.has_point(root_screen):return true
 	var plant_rect:Rect2=plant.screen_visual_rect(camera)
 	if plant_rect.size.x>0.0 and plant_rect.size.y>0.0:return viewport_rect.intersects(plant_rect,true)
-	# A texture can be unavailable for a frame while an external image is loading.
-	# Keep the label tied to the root in that transient case rather than flickering.
+	# Only use the rooted fallback while there is no drawable texture. If a valid
+	# sprite projects to no rectangle, keeping its label would recreate the old
+	# orphaned-label bug where the plant itself had crossed the camera plane.
+	if plant.plant_sprite==null or plant.plant_sprite.texture==null:
+		var root_screen:Vector2=camera.unproject_position(plant.global_position)
+		return viewport_rect.has_point(root_screen)
 	return false
+
+func _plant_label_anchor(plant,viewport_rect:Rect2)->Vector2:
+	var root_screen:Vector2=camera.unproject_position(plant.global_position)
+	var rendered_scale:=float(plant.visual_scale)
+	if plant.plant_sprite!=null:rendered_scale=float(plant.plant_sprite.scale.x)
+	var desired_world:Vector3=plant.global_position+Vector3(0,rendered_scale*.7,0)
+	var desired_camera:Vector3=camera.to_local(desired_world)
+	if -desired_camera.z>maxf(.01,camera.near*1.01):
+		var projected:Vector2=camera.unproject_position(desired_world)
+		if not is_nan(projected.x) and not is_inf(projected.x) and not is_nan(projected.y) and not is_inf(projected.y):return projected
+	var plant_rect:Rect2=plant.screen_visual_rect(camera)
+	if plant_rect.has_area():
+		var visible_rect:=plant_rect.intersection(viewport_rect)
+		if visible_rect.has_area():return Vector2(clampf(root_screen.x,visible_rect.position.x,visible_rect.end.x),visible_rect.position.y)
+	# A safe root-relative fallback can clamp at the top or stay near the pot, but
+	# can never invert to the bottom as a behind-camera projection did.
+	return root_screen
 
 func _update_labels()->void:
 	if _old_seed_story_active():
@@ -8773,7 +8793,7 @@ func _update_labels()->void:
 			var reward_units:=_harvest_puku_reward_units(float(p.diameter_cm),_plant_is_first_get_for_puku(p))
 			lines.append(Localizer.text(language_code,"growing_puku_preview",[_format_puku_units(reward_units)]))
 		var label_size:=_plant_label_size(p.label,lines,show_preview)
-		var screen:=camera.unproject_position(p.global_position+Vector3(0,p.visual_scale*.7,0));var r:=_plant_label_rect(screen,label_size,occupied,viewport_rect);occupied.append(r)
+		var screen:=_plant_label_anchor(p,viewport_rect);var r:=_plant_label_rect(screen,label_size,occupied,viewport_rect);occupied.append(r)
 		p.label.position=r.position;p.label.size=label_size;p.label.text="\n".join(lines);p.label.add_theme_color_override("font_color",Color("#ffe56f") if not new_prefix.is_empty() else Color.WHITE);p.label.visible=p.state=="growing" and _plant_is_visible_for_label(p,viewport_rect)
 
 func _greenhouse_area_navigation_available()->bool:
@@ -8933,12 +8953,19 @@ func _try_harvest(screen_pos:Vector2)->void:
 	if first_play_tutorial_active and not first_play_has_harvested and not first_play_harvest_guide_active:return
 	var candidates:Array=[]
 	for p in plants:
-		if not is_instance_valid(p) or p.state!="growing" or camera.is_position_behind(p.global_position):continue
+		if not is_instance_valid(p) or p.state!="growing":continue
 		if (first_play_harvest_guide_active or old_seed_harvest_guide_active) and p!=tutorial_harvest_plant:continue
 		var hit:Dictionary=p.screen_hit_test(camera,screen_pos)
-		if bool(hit.get("hit",false)):candidates.append({"p":p,"score":float(hit.get("score",INF))})
+		if bool(hit.get("hit",false)):candidates.append({"p":p,"score":float(hit.get("score",INF)),"depth":float(hit.get("depth",INF)),"opaque":bool(hit.get("opaque_artwork_hit",false))})
 	if candidates.size()>0:
-		candidates.sort_custom(func(a,b):return a.score<b.score)
+		# Match the visible overlap: an opaque leaf beats accessibility padding. The
+		# leaf nearest the tap's normalized center remains the primary target (so a
+		# smaller rosette centered over a giant one stays selectable); camera depth
+		# resolves only an otherwise equal overlap.
+		candidates.sort_custom(func(a,b):
+			if bool(a.opaque)!=bool(b.opaque):return bool(a.opaque)
+			if not is_equal_approx(float(a.score),float(b.score)):return float(a.score)<float(b.score)
+			return float(a.depth)<float(b.depth))
 		var selected_plant=candidates[0].p
 		if old_colorata_profile_active and selected_plant==tutorial_harvest_plant:
 			_old_colorata_profile_mark("harvest_target_decided");selected_plant.set_meta("old_colorata_profile",true)

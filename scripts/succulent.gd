@@ -126,8 +126,12 @@ var label: Label
 const GROWTH_CM_PER_SECOND := 1.365625
 const GROWTH_RHYTHM_AMPLITUDE := 0.10
 const JELLY_STAGE_ENDS := [5.0,10.0,15.0]
+const VISUAL_SCALE_BASE := 0.18
+const VISUAL_SCALE_PER_CM := 0.058
+const GIANT_VISUAL_COMPRESSION_START_CM := 120.0
+const GIANT_VISUAL_SCALE_LIMIT := 8.5
 
-var visual_scale := 0.18
+var visual_scale := VISUAL_SCALE_BASE
 var plant_sprite: Sprite3D
 var contact_shadow: MeshInstance3D
 var is_special := false
@@ -147,6 +151,7 @@ var kakuhen_continuation_roll_count := 0
 var kakuhen_boundary_count := 0
 var kakuhen_rng:=RandomNumberGenerator.new()
 var sway_phase := 0.0
+var screen_hit_image:Image
 
 func setup(species: Dictionary, seed_value: int, screen_label: Label, _danger: Label, logic_only := false, balance_override:Dictionary = {}) -> void:
 	data = species
@@ -177,6 +182,7 @@ func setup(species: Dictionary, seed_value: int, screen_label: Label, _danger: L
 	var configured_image_path:=str(data.get("image_path",""))
 	var texture_path:=configured_image_path if not configured_image_path.is_empty() and (CatalogImageLoader.is_external_path(configured_image_path) or ResourceLoader.exists(configured_image_path)) else str(SPRITES.get(variant, ""))
 	plant_sprite.texture = CatalogImageLoader.get_texture(texture_path) if not texture_path.is_empty() else CatalogImageLoader.placeholder_texture
+	screen_hit_image=null
 	plant_sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	plant_sprite.no_depth_test = false
 	plant_sprite.alpha_cut = SpriteBase3D.ALPHA_CUT_DISABLED
@@ -195,6 +201,7 @@ func _apply_external_plant_texture(texture:Texture2D)->void:
 	if not is_instance_valid(plant_sprite) or texture==null:return
 	plant_sprite.texture=texture
 	plant_sprite.remove_meta("screen_hit_used_rect")
+	screen_hit_image=null
 	plant_sprite.offset.y=-float(texture.get_height())*.18
 	plant_sprite.pixel_size=1.42/maxf(1.0,float(texture.get_width()))
 
@@ -206,6 +213,7 @@ func _screen_hit_used_rect()->Rect2:
 	var texture_size:=plant_sprite.texture.get_size()
 	var result:=Rect2(Vector2.ZERO,texture_size)
 	var image:=plant_sprite.texture.get_image()
+	screen_hit_image=image
 	if image!=null and not image.is_empty():
 		var used:=image.get_used_rect()
 		if used.size.x>0 and used.size.y>0:result=Rect2(used)
@@ -215,7 +223,13 @@ func _screen_hit_used_rect()->Rect2:
 func _screen_visual_polygon(camera:Camera3D)->PackedVector2Array:
 	var points:=PackedVector2Array()
 	if camera==null or plant_sprite==null or plant_sprite.texture==null:return points
-	if camera.is_position_behind(plant_sprite.global_position):return points
+	# Validate the billboard plane against the camera near plane before projecting.
+	# unproject_position() can return very large, inverted coordinates behind that
+	# plane; those coordinates previously made giant labels jump to the bottom and
+	# made the harvest polygon unusable.
+	var near_depth:=maxf(.01,camera.near*1.01)
+	var center_camera:Vector3=camera.to_local(plant_sprite.global_position)
+	if -center_camera.z<=near_depth:return points
 	var texture_size:=plant_sprite.texture.get_size()
 	if texture_size.x<=0.0 or texture_size.y<=0.0:return points
 	var used:=_screen_hit_used_rect()
@@ -232,8 +246,16 @@ func _screen_visual_polygon(camera:Camera3D)->PackedVector2Array:
 			-(pixel_point.y-texture_size.y*.5+plant_sprite.offset.y)
 		)
 		var world_point:=origin+plane_right*local_pixels.x*plant_sprite.pixel_size*global_scale.x+plane_up*local_pixels.y*plant_sprite.pixel_size*global_scale.y
-		points.append(camera.unproject_position(world_point))
+		var camera_point:Vector3=camera.to_local(world_point)
+		if -camera_point.z<=near_depth:return PackedVector2Array()
+		var projected:Vector2=camera.unproject_position(world_point)
+		if is_nan(projected.x) or is_inf(projected.x) or is_nan(projected.y) or is_inf(projected.y):return PackedVector2Array()
+		points.append(projected)
 	return points
+
+func screen_depth(camera:Camera3D)->float:
+	if camera==null or plant_sprite==null:return INF
+	return -camera.to_local(plant_sprite.global_position).z
 
 func screen_visual_rect(camera:Camera3D)->Rect2:
 	var points:=_screen_visual_polygon(camera)
@@ -254,11 +276,38 @@ func screen_hit_test(camera:Camera3D,screen_point:Vector2)->Dictionary:
 	for point in points:visible_rect=visible_rect.expand(point)
 	var padding:=clampf(minf(visible_rect.size.x,visible_rect.size.y)*.08,14.0,36.0)
 	var inside_artwork_bounds:=Geometry2D.is_point_in_polygon(screen_point,points)
+	var opaque_artwork_hit:=inside_artwork_bounds and _screen_point_hits_opaque_artwork(screen_point,points)
+	# Transparent space remains a low-priority accessibility target so the center
+	# of a single tutorial rosette is still tappable. Opaque leaves always win when
+	# another plant overlaps this fallback area.
 	if not inside_artwork_bounds and not visible_rect.grow(padding).has_point(screen_point):return {"hit":false,"rect":visible_rect,"polygon":points}
 	var half_size:=Vector2(maxf(visible_rect.size.x*.5,1.0),maxf(visible_rect.size.y*.5,1.0))
 	var normalized_delta:=(screen_point-visible_rect.get_center())/half_size
-	var score:=normalized_delta.length()+(0.0 if inside_artwork_bounds else .85)
-	return {"hit":true,"score":score,"rect":visible_rect,"polygon":points,"center":visible_rect.get_center(),"inside_artwork_bounds":inside_artwork_bounds}
+	var score:=normalized_delta.length()+(0.0 if opaque_artwork_hit else .85)
+	return {"hit":true,"score":score,"rect":visible_rect,"polygon":points,"center":visible_rect.get_center(),"inside_artwork_bounds":inside_artwork_bounds,"opaque_artwork_hit":opaque_artwork_hit,"depth":screen_depth(camera)}
+
+func _screen_point_hits_opaque_artwork(screen_point:Vector2,points:PackedVector2Array)->bool:
+	if points.size()!=4:return false
+	var axis_u:=points[1]-points[0];var axis_v:=points[3]-points[0];var delta:=screen_point-points[0];var determinant:=axis_u.cross(axis_v)
+	if absf(determinant)<.00001:return false
+	var u:=delta.cross(axis_v)/determinant;var v:=axis_u.cross(delta)/determinant
+	if u<0.0 or u>1.0 or v<0.0 or v>1.0:return false
+	if screen_hit_image==null or screen_hit_image.is_empty():return true
+	var used:=_screen_hit_used_rect();var pixel:=used.position+Vector2(u*used.size.x,v*used.size.y)
+	var image_size:=screen_hit_image.get_size();var pixel_position:=Vector2i(clampi(floori(pixel.x),0,maxi(0,image_size.x-1)),clampi(floori(pixel.y),0,maxi(0,image_size.y-1)))
+	return screen_hit_image.get_pixelv(pixel_position).a>.08
+
+static func visual_scale_for_diameter(value_cm:float)->float:
+	# Preserve the established look through 120 cm, then ease smoothly toward a
+	# display-only ceiling. Diameter, rewards, records, jelly and growth continue
+	# without any cap; only the billboard presentation is compressed.
+	var diameter:=maxf(1.6,value_cm)
+	var linear_scale:=VISUAL_SCALE_BASE+(diameter-1.6)*VISUAL_SCALE_PER_CM
+	if diameter<=GIANT_VISUAL_COMPRESSION_START_CM:return linear_scale
+	var transition_scale:=VISUAL_SCALE_BASE+(GIANT_VISUAL_COMPRESSION_START_CM-1.6)*VISUAL_SCALE_PER_CM
+	var remaining_scale:=GIANT_VISUAL_SCALE_LIMIT-transition_scale
+	var easing_rate:=VISUAL_SCALE_PER_CM/remaining_scale
+	return GIANT_VISUAL_SCALE_LIMIT-remaining_scale*exp(-(diameter-GIANT_VISUAL_COMPRESSION_START_CM)*easing_rate)
 
 func _play_special_birth_glow() -> void:
 	# A brief warm bloom announces the 10% roll without leaving a permanent mark.
@@ -315,9 +364,7 @@ func _simulate_growth_segment(segment_seconds:float)->void:
 	growth_time+=_integrated_growth_multiplier(segment_start,segment_end)*segment_speed
 	age=segment_end
 	diameter_cm=1.6+growth_time*GROWTH_CM_PER_SECOND*growth_rate
-	# One physical-looking scale mapping for all sizes, with no clamp or cap.
-	# 30cm is now a moderate plant; 60–70cm is when it dominates the view.
-	visual_scale=.18+(diameter_cm-1.6)*.058
+	visual_scale=visual_scale_for_diameter(diameter_cm)
 	_update_visual(segment_seconds)
 	if jelly_checks_enabled and not KakuhenSystemClass.is_real(kakuhen_state):
 		var jelly_probability:=jelly_probability_for_interval(segment_start,segment_seconds,jelly_rates_per_second)
@@ -403,7 +450,7 @@ func fast_forward_to_diameter(target_cm:float)->void:
 	# helper must land on the requested diameter exactly. Re-evaluating the
 	# integral at the approximate age can round microscopically below a story
 	# threshold and make otherwise deterministic smoke tests intermittent.
-	age=(low+high)*.5;growth_time=target_growth;diameter_cm=clamped_target_cm;visual_scale=.18+(diameter_cm-1.6)*.058
+	age=(low+high)*.5;growth_time=target_growth;diameter_cm=clamped_target_cm;visual_scale=visual_scale_for_diameter(diameter_cm)
 	# This is a deterministic development/test teleport rather than simulated
 	# history. Clear any transient mode and resume rolls at the next boundary.
 	if kakuhen_enabled:
@@ -417,11 +464,13 @@ func _update_visual(delta: float) -> void:
 	var response: float = 1.0 if delta <= 0.0 else min(delta * 4.5, 1.0)
 	plant_sprite.scale = plant_sprite.scale.lerp(target, response)
 	# Anchor the lower edge near the soil as the centered billboard grows.
-	# Only the artwork rises; the plant node itself never changes position.
-	plant_sprite.position.y = .10 + visual_scale * .62
+	# Use the actually rendered scale so accelerated frames cannot lift the image
+	# away from its root while its scale interpolation is still catching up.
+	var rendered_scale:=plant_sprite.scale.x
+	plant_sprite.position.y = .10 + rendered_scale * .62
 	plant_sprite.rotation.z = sin(age * .72 + sway_phase) * .0045
 	plant_sprite.position.x = sin(age * .58 + sway_phase * .73) * .007
-	contact_shadow.scale = Vector3(visual_scale * 1.04, visual_scale * 1.04, visual_scale * .72)
+	contact_shadow.scale = Vector3(rendered_scale * 1.04, rendered_scale * 1.04, rendered_scale * .72)
 
 func get_risk_percent() -> float: return 0.0
 
