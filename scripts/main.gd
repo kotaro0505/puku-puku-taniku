@@ -8707,25 +8707,24 @@ func _plant_is_first_get_for_puku(plant)->bool:
 func _should_show_growing_puku_preview(plant)->bool:
 	return show_growing_puku_preview and _endless_puku_economy_active() and is_instance_valid(plant) and not bool(plant.get_meta("story_dev_101",false))
 
+func _plant_label_size(label:Label,lines:Array[String],show_preview:bool)->Vector2:
+	var font_size:=15 if show_preview else 17;var line_spacing:=-2 if show_preview else 0
+	label.add_theme_font_size_override("font_size",font_size);label.add_theme_constant_override("line_spacing",line_spacing)
+	var font:=label.get_theme_font("font");var text_width:=0.0
+	for line in lines:text_width=maxf(text_width,font.get_string_size(line,HORIZONTAL_ALIGNMENT_LEFT,-1,font_size).x)
+	var line_height:=font.get_height(font_size);var content_height:=line_height*float(lines.size())+float(line_spacing*maxi(0,lines.size()-1))
+	return Vector2(maxf(92.0,ceilf(text_width)+16.0),maxf(34.0,ceilf(content_height)+8.0))
+
 func _plant_label_rect(screen:Vector2,label_size:Vector2,occupied:Array[Rect2],viewport_rect:Rect2)->Rect2:
 	var margin:=Vector2(6.0,6.0);var min_position:=viewport_rect.position+margin;var max_position:=viewport_rect.end-label_size-margin
 	max_position.x=maxf(min_position.x,max_position.x);max_position.y=maxf(min_position.y,max_position.y)
-	var horizontal_shift:=minf(68.0,label_size.x*.32);var x_offsets:=[0.0,-horizontal_shift,horizontal_shift]
-	var best:=Rect2(Vector2(clampf(screen.x-label_size.x*.5,min_position.x,max_position.x),clampf(screen.y-label_size.y-28.0,min_position.y,max_position.y)),label_size)
-	var best_overlap:=INF
-	for row in range(6):
-		for x_offset in x_offsets:
-			var desired:=Vector2(screen.x-label_size.x*.5+float(x_offset),screen.y-label_size.y-28.0-float(row)*(label_size.y+4.0))
-			var candidate:=Rect2(Vector2(clampf(desired.x,min_position.x,max_position.x),clampf(desired.y,min_position.y,max_position.y)),label_size)
-			var overlap:=0.0
-			for other in occupied:
-				if candidate.intersects(other):overlap+=candidate.intersection(other).get_area()
-			if overlap<=0.0:return candidate
-			if overlap<best_overlap:best_overlap=overlap;best=candidate
-	for x_offset in x_offsets:
-		var desired:=Vector2(screen.x-label_size.x*.5+float(x_offset),screen.y+18.0)
-		var candidate:=Rect2(Vector2(clampf(desired.x,min_position.x,max_position.x),clampf(desired.y,min_position.y,max_position.y)),label_size)
-		var overlap:=0.0
+	# Keep every label anchored beside its plant. Collision avoidance is deliberately
+	# limited to a small neighborhood; a little overlap is preferable to detaching a
+	# label and stacking it over the greenhouse HUD.
+	var offsets:Array[Vector2]=[Vector2.ZERO,Vector2(-18,0),Vector2(18,0),Vector2(0,-9),Vector2(0,9),Vector2(-18,-9),Vector2(18,-9),Vector2(-18,9),Vector2(18,9),Vector2(-30,0),Vector2(30,0),Vector2(0,-18),Vector2(0,18)]
+	var base_position:=Vector2(screen.x-label_size.x*.5,screen.y-label_size.y-28.0);var best:=Rect2();var best_overlap:=INF
+	for offset in offsets:
+		var desired:=base_position+offset;var candidate:=Rect2(Vector2(clampf(desired.x,min_position.x,max_position.x),clampf(desired.y,min_position.y,max_position.y)),label_size);var overlap:=0.0
 		for other in occupied:
 			if candidate.intersects(other):overlap+=candidate.intersection(other).get_area()
 		if overlap<=0.0:return candidate
@@ -8755,9 +8754,9 @@ func _update_labels()->void:
 		if show_preview:
 			var reward_units:=_harvest_puku_reward_units(float(p.diameter_cm),_plant_is_first_get_for_puku(p))
 			lines.append(Localizer.text(language_code,"growing_puku_preview",[_format_puku_units(reward_units)]))
-		var label_size:=Vector2(210.0 if show_preview else 92.0,34.0+23.0*float(lines.size()-1))
+		var label_size:=_plant_label_size(p.label,lines,show_preview)
 		var screen:=camera.unproject_position(p.global_position+Vector3(0,p.visual_scale*.7,0));var r:=_plant_label_rect(screen,label_size,occupied,viewport_rect);occupied.append(r)
-		p.label.position=r.position;p.label.size=label_size;p.label.add_theme_font_size_override("font_size",15 if show_preview else 17);p.label.text="\n".join(lines);p.label.add_theme_color_override("font_color",Color("#ffe56f") if not new_prefix.is_empty() else Color.WHITE);p.label.visible=p.state=="growing" and viewport_rect.grow(80).has_point(screen)
+		p.label.position=r.position;p.label.size=label_size;p.label.text="\n".join(lines);p.label.add_theme_color_override("font_color",Color("#ffe56f") if not new_prefix.is_empty() else Color.WHITE);p.label.visible=p.state=="growing" and viewport_rect.grow(80).has_point(screen)
 
 func _greenhouse_area_navigation_available()->bool:
 	if not StoryProgressionClass.arrangement_is_unlocked(story_progression_state) or not _tutorial_fully_complete() or current_mode!="greenhouse" or play_active or catalog_preview_mode_active or arrangement_transitioning:return false

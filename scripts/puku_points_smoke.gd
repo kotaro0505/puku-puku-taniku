@@ -60,20 +60,20 @@ func _test_live_harvest_preview(game)->void:
 	game._clear_greenhouse_plants();game.current_mode="greenhouse";game.play_active=true;game.active_seed_type="normal";game.current_target_count=12;game.puku_gauge_intro_complete=true;game.show_growing_puku_preview=true;game.species_get_counts["colorata"]=1
 	game._spawn_specific_plant("colorata");var known=game.plants.back();known.jelly_checks_enabled=false;known.diameter_cm=70.0;game._update_labels()
 	assert(known.label.text=="70.0 cm\n+0.80ぷくコイン")
-	assert(known.label.visible and known.label.size.x>=200.0 and known.label.get_global_rect().position.x>=0.0 and known.label.get_global_rect().end.x<=game.get_viewport().get_visible_rect().end.x)
+	assert(known.label.visible and known.label.size.x<170.0 and known.label.size.y<58.0 and known.label.get_global_rect().position.x>=0.0 and known.label.get_global_rect().end.x<=game.get_viewport().get_visible_rect().end.x)
 	game.species_get_counts.erase("colorata");known.set_meta("new_species_candidate",true);known.diameter_cm=8.0;game._update_labels()
 	assert(known.label.text=="NEW！\n8.0 cm\n+0.20ぷくコイン")
 	game.language_code="hiragana";game._update_labels();assert(known.label.text.ends_with("+0.20ぷくこいん"))
 	game.language_code="en";game._update_labels();assert(known.label.text.ends_with("+0.20 Puku Coins"))
-	game.language_code="ja";game._change_growing_puku_preview(false);game._update_labels();assert(known.label.text=="NEW！\n8.0 cm" and game.growing_puku_preview_toggle.text.ends_with("OFF"))
+	game.language_code="ja";game._change_growing_puku_preview(false);game._update_labels();assert(known.label.text=="NEW！\n8.0 cm" and known.label.size.x<=92.0 and known.label.size.y<58.0 and game.growing_puku_preview_toggle.text.ends_with("OFF"))
 	game._change_growing_puku_preview(true);game.puku_gauge_intro_complete=false;game._update_labels();assert(known.label.text=="NEW！\n8.0 cm")
 	game.puku_gauge_intro_complete=true;game.active_seed_type="old";game._update_labels();assert(known.label.text=="NEW！\n8.0 cm")
-	var sample_label:Label=game._plant_label();sample_label.add_theme_font_size_override("font_size",15);var sample_width:=sample_label.get_theme_font("font").get_string_size("+150.00ぷくコイン",HORIZONTAL_ALIGNMENT_LEFT,-1,15).x;assert(sample_width<210.0);sample_label.free()
+	var sample_label:Label=game._plant_label();var long_lines:Array[String]=["NEW！","150.0 cm","+150.00ぷくコイン"];var long_size:Vector2=game._plant_label_size(sample_label,long_lines,true);var sample_width:=sample_label.get_theme_font("font").get_string_size(long_lines[-1],HORIZONTAL_ALIGNMENT_LEFT,-1,15).x;assert(long_size.x>=sample_width+16.0 and long_size.x<170.0 and long_size.y<76.0);sample_label.free()
 	var occupied:Array[Rect2]=[];var viewport_rect:=Rect2(0,0,576,1024)
 	for index in range(8):
-		var rect:Rect2=game._plant_label_rect(Vector2(68.0+float(index)*63.0,650.0),Vector2(210,80),occupied,viewport_rect)
+		var plant_screen:=Vector2(68.0+float(index)*63.0,650.0);var rect:Rect2=game._plant_label_rect(plant_screen,long_size,occupied,viewport_rect)
 		assert(viewport_rect.encloses(rect))
-		for other in occupied:assert(not rect.intersects(other),"three-line preview labels overlapped")
+		assert(rect.end.y<=plant_screen.y-10.0 and rect.end.y>=plant_screen.y-48.0,"preview label drifted away from its plant")
 		occupied.append(rect)
 	game.play_active=false;game._clear_greenhouse_plants();game.show_growing_puku_preview=true
 
