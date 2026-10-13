@@ -57,19 +57,42 @@ func _test_fixed_point_and_harvest_curve(game)->void:
 
 func _test_live_harvest_preview(game)->void:
 	assert(game.growing_puku_preview_toggle and game.growing_puku_preview_toggle.button_pressed and game.growing_puku_preview_toggle.text=="育成中のぷくコイン表示　ON")
+	var foreground_ui:=game.labels_layer.get_parent() as CanvasLayer;var foreground_hud:Node=game.main_status_hud.get_parent()
+	assert(game.greenhouse_layer.layer<game.best_record_layer.layer and game.best_record_layer.layer<0,"best record canvas is not between the greenhouse backdrop and 3D plants")
+	assert(game.best_panel.get_parent()==game.best_record_layer and foreground_ui and foreground_ui.layer>0,"best record or growing labels are on the wrong canvas")
+	assert(game.labels_layer.get_index()<foreground_hud.get_index(),"growing labels would cover the logo, gauges, or operation HUD")
 	game._clear_greenhouse_plants();game.current_mode="greenhouse";game.play_active=true;game.active_seed_type="normal";game.current_target_count=12;game.puku_gauge_intro_complete=true;game.show_growing_puku_preview=true;game.species_get_counts["colorata"]=1
 	game._spawn_specific_plant("colorata");var known=game.plants.back();known.jelly_checks_enabled=false;known.diameter_cm=70.0;game._update_labels()
 	assert(known.label.text=="70.0 cm\n+0.80ぷくコイン")
 	assert(known.label.visible and known.label.size.x<170.0 and known.label.size.y<58.0 and known.label.get_global_rect().position.x>=0.0 and known.label.get_global_rect().end.x<=game.get_viewport().get_visible_rect().end.x)
-	game.species_get_counts.erase("colorata");known.set_meta("new_species_candidate",true);known.diameter_cm=8.0;game._update_labels()
+	var viewport_rect:Rect2=game.get_viewport().get_visible_rect();var giant_sizes:Array[float]=[100.0,150.0,160.0,200.0,300.0,500.0,1000.0];var top_clamped_count:=0
+	for target_cm in giant_sizes:
+		known.fast_forward_to_diameter(target_cm);game._update_labels()
+		var root_screen:Vector2=game.camera.unproject_position(known.global_position)
+		assert(viewport_rect.has_point(root_screen),"giant plant root left the viewport at %.0fcm"%target_cm)
+		assert(known.label.visible,"giant plant label disappeared at %.0fcm"%target_cm)
+		var anchor:Vector2=game.camera.unproject_position(known.global_position+Vector3(0,known.visual_scale*.7,0))
+		if anchor.y-known.label.size.y-28.0<=viewport_rect.position.y+6.0:
+			top_clamped_count+=1
+			assert(is_equal_approx(known.label.position.y,viewport_rect.position.y+6.0),"giant label was not clamped to the viewport top at %.0fcm"%target_cm)
+	assert(top_clamped_count>=4,"giant-label regression did not exercise the top clamp")
+	var saved_original_pos:Vector3=known.original_pos;var saved_position:Vector3=known.position
+	known.original_pos.x+=1000.0;known.position.x+=1000.0;game._update_labels()
+	var scrolled_root:Vector2=game.camera.unproject_position(known.global_position);var scrolled_artwork:Rect2=known.screen_visual_rect(game.camera)
+	assert(not game._plant_is_visible_for_label(known,viewport_rect) and not known.label.visible,"fully scrolled-off plant kept its label root=%s artwork=%s visible=%s"%[scrolled_root,scrolled_artwork,known.label.visible])
+	known.original_pos=saved_original_pos;known.position=saved_position;game._update_labels();assert(known.label.visible,"label did not return with its plant after horizontal scrolling")
+	known.state="harvested";game._update_labels();assert(not known.label.visible,"harvested plant kept its growing label")
+	known.state="jelly";game._update_labels();assert(not known.label.visible,"jellied plant kept its growing label")
+	known.state="growing";game._update_labels();assert(known.label.visible,"growing plant label did not return after state regression checks")
+	game.species_get_counts.erase("colorata");known.set_meta("new_species_candidate",true);known.fast_forward_to_diameter(8.0);game._update_labels()
 	assert(known.label.text=="NEW！\n8.0 cm\n+0.20ぷくコイン")
 	game.language_code="hiragana";game._update_labels();assert(known.label.text.ends_with("+0.20ぷくこいん"))
 	game.language_code="en";game._update_labels();assert(known.label.text.ends_with("+0.20 Puku Coins"))
-	game.language_code="ja";game._change_growing_puku_preview(false);game._update_labels();assert(known.label.text=="NEW！\n8.0 cm" and known.label.size.x<=92.0 and known.label.size.y<58.0 and game.growing_puku_preview_toggle.text.ends_with("OFF"))
+	game.language_code="ja";game._change_growing_puku_preview(false);game._update_labels();assert(known.label.text=="NEW！\n8.0 cm" and known.label.size.x<=92.0 and known.label.size.y<68.0 and game.growing_puku_preview_toggle.text.ends_with("OFF"),"OFF label did not compact text=%s size=%s toggle=%s"%[known.label.text,known.label.size,game.growing_puku_preview_toggle.text])
 	game._change_growing_puku_preview(true);game.puku_gauge_intro_complete=false;game._update_labels();assert(known.label.text=="NEW！\n8.0 cm")
 	game.puku_gauge_intro_complete=true;game.active_seed_type="old";game._update_labels();assert(known.label.text=="NEW！\n8.0 cm")
 	var sample_label:Label=game._plant_label();var long_lines:Array[String]=["NEW！","150.0 cm","+150.00ぷくコイン"];var long_size:Vector2=game._plant_label_size(sample_label,long_lines,true);var sample_width:=sample_label.get_theme_font("font").get_string_size(long_lines[-1],HORIZONTAL_ALIGNMENT_LEFT,-1,15).x;assert(long_size.x>=sample_width+16.0 and long_size.x<170.0 and long_size.y<76.0);sample_label.free()
-	var occupied:Array[Rect2]=[];var viewport_rect:=Rect2(0,0,576,1024)
+	var occupied:Array[Rect2]=[];viewport_rect=Rect2(0,0,576,1024)
 	for index in range(8):
 		var plant_screen:=Vector2(68.0+float(index)*63.0,650.0);var rect:Rect2=game._plant_label_rect(plant_screen,long_size,occupied,viewport_rect)
 		assert(viewport_rect.encloses(rect))
@@ -118,8 +141,11 @@ func _test_signed_balance_animation(game)->void:
 
 func _test_round_entry_and_harvest(game)->void:
 	game._cancel_puku_gauge_animations();game.puku_gauge_animation_speed_scale=.02;game._clear_greenhouse_plants();game.opening_finished=true;game.opening_overlay.visible=false;game.current_mode="greenhouse";game._apply_mode();game.first_habitat_gift_claimed=true;game.puku_balance_units=1400;game.normal_round_free_plays=0
+	# Isolate this entry check from any deferred round state produced while the
+	# preceding live-label test advances frames for the wallet animation.
+	game.play_active=false
 	game._start_greenhouse_play("normal")
-	assert(game.play_active and game.current_target_count==12 and game.play_concurrent_target>=game.ENDLESS_NORMAL_MIN_PLANTS and game.play_concurrent_target<=game.ENDLESS_NORMAL_MAX_PLANTS)
+	assert(game.play_active and game.current_target_count==12 and game.play_concurrent_target>=game.ENDLESS_NORMAL_MIN_PLANTS and game.play_concurrent_target<=game.ENDLESS_NORMAL_MAX_PLANTS,"normal round did not start active=%s endless=%s target=%d concurrent=%d range=%d-%d balance=%d"%[game.play_active,game._is_endless_greenhouse_enabled(),game.current_target_count,game.play_concurrent_target,game.ENDLESS_NORMAL_MIN_PLANTS,game.ENDLESS_NORMAL_MAX_PLANTS,game.puku_balance_units])
 	assert(game.puku_balance_units==400 and game.endless_economy_seed_cost_units==1000)
 	assert(game.play_seeds_remaining==12-game.play_concurrent_target)
 	await get_tree().create_timer(.4).timeout

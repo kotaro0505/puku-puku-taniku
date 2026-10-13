@@ -212,16 +212,12 @@ func _screen_hit_used_rect()->Rect2:
 	plant_sprite.set_meta("screen_hit_used_rect",result)
 	return result
 
-func screen_hit_test(camera:Camera3D,screen_point:Vector2)->Dictionary:
-	# Sprite3D's billboard rotation is applied by the renderer and is not present
-	# in its Node3D transform. Reconstruct the rendered quad in the camera plane
-	# from the actual texture, pixel size, offset, and current sprite scale. This
-	# keeps touch input aligned with leaves even when a 100+ cm plant's root and
-	# old center-radius test sit far outside the visible part of the artwork.
-	if camera==null or plant_sprite==null or plant_sprite.texture==null:return {"hit":false}
-	if camera.is_position_behind(plant_sprite.global_position):return {"hit":false}
+func _screen_visual_polygon(camera:Camera3D)->PackedVector2Array:
+	var points:=PackedVector2Array()
+	if camera==null or plant_sprite==null or plant_sprite.texture==null:return points
+	if camera.is_position_behind(plant_sprite.global_position):return points
 	var texture_size:=plant_sprite.texture.get_size()
-	if texture_size.x<=0.0 or texture_size.y<=0.0:return {"hit":false}
+	if texture_size.x<=0.0 or texture_size.y<=0.0:return points
 	var used:=_screen_hit_used_rect()
 	if used.size.x<=0.0 or used.size.y<=0.0:used=Rect2(Vector2.ZERO,texture_size)
 	var basis:=camera.global_transform.basis
@@ -230,7 +226,6 @@ func screen_hit_test(camera:Camera3D,screen_point:Vector2)->Dictionary:
 	var plane_up:Vector3=-basis.x*sin(angle)+basis.y*cos(angle)
 	var global_scale:=plant_sprite.global_transform.basis.get_scale()
 	var origin:=plant_sprite.global_position
-	var points:=PackedVector2Array()
 	for pixel_point in [used.position,Vector2(used.end.x,used.position.y),used.end,Vector2(used.position.x,used.end.y)]:
 		var local_pixels:=Vector2(
 			pixel_point.x-texture_size.x*.5+plant_sprite.offset.x,
@@ -238,6 +233,23 @@ func screen_hit_test(camera:Camera3D,screen_point:Vector2)->Dictionary:
 		)
 		var world_point:=origin+plane_right*local_pixels.x*plant_sprite.pixel_size*global_scale.x+plane_up*local_pixels.y*plant_sprite.pixel_size*global_scale.y
 		points.append(camera.unproject_position(world_point))
+	return points
+
+func screen_visual_rect(camera:Camera3D)->Rect2:
+	var points:=_screen_visual_polygon(camera)
+	if points.is_empty():return Rect2()
+	var visible_rect:=Rect2(points[0],Vector2.ZERO)
+	for point in points:visible_rect=visible_rect.expand(point)
+	return visible_rect
+
+func screen_hit_test(camera:Camera3D,screen_point:Vector2)->Dictionary:
+	# Sprite3D's billboard rotation is applied by the renderer and is not present
+	# in its Node3D transform. Reconstruct the rendered quad in the camera plane
+	# from the actual texture, pixel size, offset, and current sprite scale. This
+	# keeps touch input aligned with leaves even when a 100+ cm plant's root and
+	# old center-radius test sit far outside the visible part of the artwork.
+	var points:=_screen_visual_polygon(camera)
+	if points.is_empty():return {"hit":false}
 	var visible_rect:=Rect2(points[0],Vector2.ZERO)
 	for point in points:visible_rect=visible_rect.expand(point)
 	var padding:=clampf(minf(visible_rect.size.x,visible_rect.size.y)*.08,14.0,36.0)

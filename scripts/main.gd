@@ -197,6 +197,7 @@ var camera: Camera3D
 var world_root: Node3D
 var pot_root: Node3D
 var greenhouse_layer: CanvasLayer
+var best_record_layer: CanvasLayer
 var greenhouse_backdrop: TextureRect
 var greenhouse_pan_x := 0.0
 var greenhouse_pan_target_x := 0.0
@@ -1835,6 +1836,9 @@ func _soil_material()->ShaderMaterial:
 void fragment(){float a=sin(UV.x*173.0+sin(UV.y*61.0)*2.7)*sin(UV.y*157.0+sin(UV.x*47.0)*2.2);float b=sin(UV.x*43.0+UV.y*51.0)*.5+.5;float grain=clamp(a*.5+.5,0.0,1.0);vec3 lo=vec3(.105,.047,.027);vec3 hi=vec3(.31,.145,.075);vec3 c=mix(lo,hi,grain*.34+b*.12);ALBEDO=c;ROUGHNESS=.96;SPECULAR=.08;}""";var material:=ShaderMaterial.new();material.shader=shader;return material
 
 func _build_ui() -> void:
+	# The record card sits over the greenhouse artwork but under the 3D plants.
+	# Gameplay labels and the rest of the HUD stay on the foreground UI canvas.
+	best_record_layer=CanvasLayer.new();best_record_layer.name="BestRecordLayer";best_record_layer.layer=-5;add_child(best_record_layer)
 	var ui:=CanvasLayer.new(); ui.layer=10; add_child(ui)
 	labels_layer=Control.new(); labels_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); labels_layer.mouse_filter=Control.MOUSE_FILTER_IGNORE; ui.add_child(labels_layer)
 	var hud:=Control.new(); hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); hud.mouse_filter=Control.MOUSE_FILTER_IGNORE; ui.add_child(hud)
@@ -1845,7 +1849,7 @@ func _build_ui() -> void:
 	# logo
 	var logo:=Label.new(); logo.name="MainLogo";logo.text=Localizer.text(language_code,"game_title"); logo.position=Vector2(16,34); logo.size=Vector2(180,105); logo.add_theme_font_size_override("font_size",31); logo.add_theme_color_override("font_color",Color("#fff2d3")); logo.add_theme_color_override("font_outline_color",UI_BROWN); logo.add_theme_constant_override("outline_size",8); logo.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;logo.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; main_status_hud.add_child(logo)
 	var ribbon:=Label.new(); ribbon.text=" PUKU PUKU TANIKU "; ribbon.position=Vector2(45,126); ribbon.add_theme_font_size_override("font_size",11); ribbon.add_theme_color_override("font_color",Color.WHITE); ribbon.add_theme_stylebox_override("normal",_box(Color("#d99a3c"),Color("#7b4a25"),12,2)); main_status_hud.add_child(ribbon)
-	best_panel=PanelContainer.new(); best_panel.position=Vector2(204,122); best_panel.size=Vector2(168,65); best_panel.add_theme_stylebox_override("panel",_box(Color("#47261b"),Color("#f5c985"),16,2)); main_status_hud.add_child(best_panel)
+	best_panel=PanelContainer.new(); best_panel.position=Vector2(204,122); best_panel.size=Vector2(168,65); best_panel.theme=game_theme;best_panel.add_theme_stylebox_override("panel",_box(Color("#47261b"),Color("#f5c985"),16,2)); best_record_layer.add_child(best_panel)
 	best_label=Label.new();best_label.name="BestLabel";best_label.text="最高記録\n0.0 cm"; best_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; best_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; best_label.add_theme_font_size_override("font_size",17); best_label.add_theme_color_override("font_color",Color.WHITE); best_panel.add_child(best_label)
 	seed_pod_gauge_area=Control.new();seed_pod_gauge_area.name="SeedPodGaugeArea";seed_pod_gauge_area.position=Vector2(42,145);seed_pod_gauge_area.size=Vector2(158,47);seed_pod_gauge_area.mouse_filter=Control.MOUSE_FILTER_IGNORE;main_status_hud.add_child(seed_pod_gauge_area)
 	var pod_content:=VBoxContainer.new();pod_content.position=Vector2(13,0);pod_content.size=Vector2(132,47);pod_content.alignment=BoxContainer.ALIGNMENT_CENTER;pod_content.mouse_filter=Control.MOUSE_FILTER_IGNORE;pod_content.add_theme_constant_override("separation",2);seed_pod_gauge_area.add_child(pod_content)
@@ -4940,7 +4944,7 @@ func _update_play_ui()->void:
 	var external_navigation_available:=not play_active
 	if main_status_hud:main_status_hud.visible=not arrangement_hud_hidden and not battle_open
 	if labels_layer:labels_layer.visible=not arrangement_hud_hidden and not battle_open
-	if best_panel:best_panel.visible=mystery_catalog_tutorial_complete and not _old_seed_story_active()
+	if best_panel:best_panel.visible=not arrangement_hud_hidden and not battle_open and mystery_catalog_tutorial_complete and not _old_seed_story_active()
 	if puku_gauge_area:puku_gauge_area.visible=mystery_items_acquired
 	if seed_pod_gauge_area:seed_pod_gauge_area.visible=mystery_items_acquired and not _is_endless_greenhouse_enabled()
 	if trial_dev_gacha_button:trial_dev_gacha_button.visible=_is_endless_greenhouse_enabled() and _trial_dev_controls_enabled()
@@ -8731,6 +8735,20 @@ func _plant_label_rect(screen:Vector2,label_size:Vector2,occupied:Array[Rect2],v
 		if overlap<best_overlap:best_overlap=overlap;best=candidate
 	return best
 
+func _plant_is_visible_for_label(plant,viewport_rect:Rect2)->bool:
+	# The point above the plant is only a label anchor. On giant plants it leaves
+	# the top of the viewport long before the rendered leaves do, so visibility
+	# follows the rooted plant plus its actual Sprite3D artwork instead. This also
+	# lets horizontal greenhouse scrolling hide the label once the complete plant
+	# is off-screen.
+	var root_screen:Vector2=camera.unproject_position(plant.global_position)
+	if viewport_rect.has_point(root_screen):return true
+	var plant_rect:Rect2=plant.screen_visual_rect(camera)
+	if plant_rect.size.x>0.0 and plant_rect.size.y>0.0:return viewport_rect.intersects(plant_rect,true)
+	# A texture can be unavailable for a frame while an external image is loading.
+	# Keep the label tied to the root in that transient case rather than flickering.
+	return false
+
 func _update_labels()->void:
 	if _old_seed_story_active():
 		for p in plants:
@@ -8756,7 +8774,7 @@ func _update_labels()->void:
 			lines.append(Localizer.text(language_code,"growing_puku_preview",[_format_puku_units(reward_units)]))
 		var label_size:=_plant_label_size(p.label,lines,show_preview)
 		var screen:=camera.unproject_position(p.global_position+Vector3(0,p.visual_scale*.7,0));var r:=_plant_label_rect(screen,label_size,occupied,viewport_rect);occupied.append(r)
-		p.label.position=r.position;p.label.size=label_size;p.label.text="\n".join(lines);p.label.add_theme_color_override("font_color",Color("#ffe56f") if not new_prefix.is_empty() else Color.WHITE);p.label.visible=p.state=="growing" and viewport_rect.grow(80).has_point(screen)
+		p.label.position=r.position;p.label.size=label_size;p.label.text="\n".join(lines);p.label.add_theme_color_override("font_color",Color("#ffe56f") if not new_prefix.is_empty() else Color.WHITE);p.label.visible=p.state=="growing" and _plant_is_visible_for_label(p,viewport_rect)
 
 func _greenhouse_area_navigation_available()->bool:
 	if not StoryProgressionClass.arrangement_is_unlocked(story_progression_state) or not _tutorial_fully_complete() or current_mode!="greenhouse" or play_active or catalog_preview_mode_active or arrangement_transitioning:return false
