@@ -73,12 +73,16 @@ const LEGACY_PUKU_GAUGE_TARGET_CM := 500.0
 const LEGACY_PUKU_GAUGE_REWARD_UNITS := 3000
 const HARVEST_PUKU_REWARD_ANCHORS := [
 	Vector2(0.0,0.0),Vector2(20.0,50.0),Vector2(30.0,120.0),
-	Vector2(40.0,220.0),Vector2(50.0,400.0),Vector2(60.0,650.0),
-	Vector2(70.0,1050.0),Vector2(80.0,1650.0),Vector2(90.0,2500.0),
-	Vector2(100.0,3750.0),Vector2(110.0,5500.0),Vector2(120.0,8000.0),
-	Vector2(130.0,11000.0),Vector2(140.0,14000.0),Vector2(150.0,17000.0),
+	Vector2(40.0,230.0),Vector2(50.0,360.0),Vector2(60.0,540.0),
+	Vector2(70.0,800.0),Vector2(80.0,1390.0),Vector2(90.0,2430.0),
+	Vector2(100.0,3750.0),Vector2(110.0,4980.0),Vector2(120.0,6000.0),
+	Vector2(125.0,7570.0),Vector2(130.0,10320.0),Vector2(135.0,13600.0),
+	Vector2(140.0,16990.0),Vector2(145.0,20270.0),Vector2(150.0,23320.0),
+	Vector2(160.0,28570.0),Vector2(170.0,32710.0),Vector2(180.0,35950.0),
+	Vector2(200.0,40700.0),Vector2(250.0,48650.0),Vector2(300.0,55490.0),
+	Vector2(500.0,82500.0),Vector2(700.0,109500.0),Vector2(1000.0,150000.0),
 ]
-const HARVEST_PUKU_POST_150_UNITS_PER_10_CM := 3000.0
+const PUKU_GAUGE_LARGE_REWARD_BATCH_UNITS := 8000
 const ENDLESS_AUTO_SOW_TUTORIAL_STEP := "endless_auto_sow_prompt_seen"
 const HABITAT_TIME_MULTIPLIERS := [1, 60, 3600, 21600, 86400]
 const DEFAULT_POT_ID := "shallow_terracotta"
@@ -571,6 +575,9 @@ var habitat_old_catalog_page_point:=Vector2(905,452)
 var old_catalog_page_roll_play_count:=-1
 var audio_manager: Node
 var audio_settings: Dictionary = {"bgm_enabled":true,"se_enabled":true,"bgm_volume":0.65,"se_volume":0.62}
+var show_growing_puku_preview := true
+var growing_puku_preview_toggle: CheckButton
+var harvest_puku_reward_slopes:Array[float]=[]
 var habitat_glow_tween: Tween
 var habitat_sparkle: Control
 var rain_visual: Control
@@ -1145,7 +1152,7 @@ func _load_save() -> void:
 					if not normalized_arrangement.is_empty():normalized_arrangements.append(normalized_arrangement)
 			saved_arrangements=normalized_arrangements.slice(0,arrangement_save_capacity)
 			if _reconcile_pot_inventory_with_arrangements():pot_inventory_migration_dirty=true
-			intro_story_complete=bool(value.get("intro_story_complete",false));opening_story_complete=bool(value.get("opening_story_complete",intro_story_complete));total_play_count=int(value.get("total_play_count",0));completed_unlock_conditions=value.get("completed_unlock_conditions",{});pending_habitat_species=value.get("pending_habitat_species",[]);audio_settings=value.get("audio_settings",audio_settings)
+			intro_story_complete=bool(value.get("intro_story_complete",false));opening_story_complete=bool(value.get("opening_story_complete",intro_story_complete));total_play_count=int(value.get("total_play_count",0));completed_unlock_conditions=value.get("completed_unlock_conditions",{});pending_habitat_species=value.get("pending_habitat_species",[]);audio_settings=value.get("audio_settings",audio_settings);show_growing_puku_preview=bool(value.get("show_growing_puku_preview",true))
 			encyclopedia_unlocked=bool(value.get("encyclopedia_unlocked",intro_story_complete and total_play_count>=1));habitat_unlocked=bool(value.get("habitat_unlocked",intro_story_complete and total_play_count>=3));tutorial_steps=value.get("tutorial_steps",{});old_seed_bags=int(value.get("old_seed_bags",0));puku_gauge_intro_complete=bool(value.get("puku_gauge_intro_complete",value.get("buyback_unlocked",total_play_count>=4)));first_tutorial_species_id=str(value.get("first_tutorial_species_id",""))
 			first_colorata_confirmed=bool(value.get("first_colorata_confirmed",false));trio_originals_confirmed=bool(value.get("trio_originals_confirmed",false));habitat_arrival_started=bool(value.get("habitat_arrival_started",false));habitat_awakened=bool(value.get("habitat_awakened",false));habitat_awakening_event_complete=bool(value.get("habitat_awakening_event_complete",habitat_awakened));seed_shop_open=bool(value.get("seed_shop_open",false));mystery_items_acquired=bool(value.get("mystery_items_acquired",false));mystery_catalog_tutorial_complete=bool(value.get("mystery_catalog_tutorial_complete",false));habitat_returned_species=value.get("habitat_returned_species",{});special_series_explanation_seen=bool(value.get("special_series_explanation_seen",false));main_story_stage=clampi(int(value.get("main_story_stage",StoryProgressionClass.ACT_1)),StoryProgressionClass.LEGACY_STAGE_MIN,StoryProgressionClass.LEGACY_STAGE_MAX);main_story_complete=bool(value.get("main_story_complete",false));main_story_completion_seen=bool(value.get("main_story_completion_seen",main_story_complete))
 			var legacy_tutorials_complete:=saved_progression_version<PROGRESSION_VERSION and (mystery_items_acquired or bool(value.get("habitat_tutorial_complete",false)) or habitat_awakened)
@@ -1325,7 +1332,7 @@ func _save() -> void:
 		"armadillo_research_rewards":armadillo_research_rewards,"armadillo_research_intro_seen":armadillo_research_intro_seen,
 		"normal_seed_bags":normal_seed_bags,"volume_seed_bags":volume_seed_bags,"premium_seed_bags":premium_seed_bags,"mystery_seed_bags":mystery_seed_bags,
 		"volume_seed_unlocked":volume_seed_unlocked,"volume_seed_intro_seen":volume_seed_intro_seen,"premium_seed_unlocked":premium_seed_unlocked,"mystery_seed_pack_unlocked":mystery_seed_pack_unlocked,
-		"best_100_achieved":best_100_achieved,"login_bonus_date":login_bonus_date,"audio_settings":audio_settings,"pending_round_new_species_ids":pending_round_new_species_ids,
+		"best_100_achieved":best_100_achieved,"login_bonus_date":login_bonus_date,"audio_settings":audio_settings,"show_growing_puku_preview":show_growing_puku_preview,"pending_round_new_species_ids":pending_round_new_species_ids,
 		"series_seed_inventory":series_seed_inventory,"forest_gacha_draw_count":forest_gacha_draw_count,"forest_gacha_encountered":forest_gacha_encountered,
 		"puku_gauge_cm":puku_gauge_cm,"puku_balance_units":puku_balance_units,"normal_round_free_plays":normal_round_free_plays,"puku_coin_gauge_cm":_legacy_puku_coin_gauge_cm_for_save(),"puku_points":puku_points,"old_catalog_pages":old_catalog_pages,"old_catalog_page_inventory":old_catalog_page_inventory,
 		"old_catalog_intro_seen":old_catalog_intro_seen,"old_catalog_intro_pending":old_catalog_intro_pending,"research_catalog_reward_pending":research_catalog_reward_pending,
@@ -3727,6 +3734,7 @@ func _build_settings(hud:Control)->void:
 	_add_audio_setting_controls(content,Localizer.text(language_code,"audio_bgm"),true)
 	_add_audio_setting_controls(content,Localizer.text(language_code,"audio_se"),false)
 	var note:=Label.new();note.name="AudioSettingsNote";note.text=Localizer.text(language_code,"audio_note");note.custom_minimum_size=Vector2(420,40);note.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;note.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;note.add_theme_font_size_override("font_size",14);note.add_theme_color_override("font_color",Color("#76513b"));content.add_child(note)
+	growing_puku_preview_toggle=CheckButton.new();growing_puku_preview_toggle.name="GrowingPukuPreviewToggle";growing_puku_preview_toggle.text=_growing_puku_preview_setting_text();growing_puku_preview_toggle.button_pressed=show_growing_puku_preview;growing_puku_preview_toggle.custom_minimum_size=Vector2(420,52);growing_puku_preview_toggle.alignment=HORIZONTAL_ALIGNMENT_CENTER;growing_puku_preview_toggle.add_theme_font_size_override("font_size",16);growing_puku_preview_toggle.add_theme_color_override("font_color",UI_BROWN);growing_puku_preview_toggle.toggled.connect(_change_growing_puku_preview);content.add_child(growing_puku_preview_toggle)
 	if _trial_dev_controls_enabled():
 		var habitat_test:=Button.new();habitat_test.name="HabitatDevOpen";habitat_test.text="開発用：通常原生地テスト";habitat_test.custom_minimum_size=Vector2(370,58);_skin_button(habitat_test,Color("#adcbb8"),16);habitat_test.pressed.connect(_open_habitat_dev);content.add_child(habitat_test)
 		var opening_story_replay:=Button.new();opening_story_replay.name="OpeningStoryReplay";opening_story_replay.text="開発用：オープニングストーリー再表示";opening_story_replay.custom_minimum_size=Vector2(370,58);_skin_button(opening_story_replay,Color("#d8c29e"),15);opening_story_replay.pressed.connect(_replay_opening_story_for_development);content.add_child(opening_story_replay)
@@ -3995,6 +4003,7 @@ func _apply_language_to_ui()->void:
 	if se_toggle:se_toggle.text=Localizer.text(language_code,"audio_se_on")
 	var audio_note:=find_child("AudioSettingsNote",true,false) as Label
 	if audio_note:audio_note.text=Localizer.text(language_code,"audio_note")
+	if growing_puku_preview_toggle:growing_puku_preview_toggle.text=_growing_puku_preview_setting_text()
 	if intro_speaker_label:intro_speaker_label.text=Localizer.text(language_code,"story_speaker_panda")
 	if tutorial_speaker_label and not tutorial_speaker_id.is_empty():_set_tutorial_speaker(tutorial_speaker_id)
 	for code in language_buttons:
@@ -4584,6 +4593,15 @@ func _change_audio_enabled(enabled:bool,is_bgm:bool)->void:
 func _change_audio_volume(value:float,is_bgm:bool)->void:
 	audio_settings["bgm_volume" if is_bgm else "se_volume"]=value/100.0;audio_manager.apply_settings(audio_settings);_save()
 
+func _growing_puku_preview_setting_text()->String:
+	return Localizer.text(language_code,"growing_puku_preview_on" if show_growing_puku_preview else "growing_puku_preview_off")
+
+func _change_growing_puku_preview(enabled:bool)->void:
+	show_growing_puku_preview=enabled
+	if growing_puku_preview_toggle:
+		growing_puku_preview_toggle.set_pressed_no_signal(enabled);growing_puku_preview_toggle.text=_growing_puku_preview_setting_text()
+	_update_labels();_save()
+
 func _reset_progression_state()->void:
 	_end_first_play_tutorial_context()
 	_reset_collection_complete_presentation(true)
@@ -4606,7 +4624,8 @@ func _reset_progression_state()->void:
 	original_catalog_complete_event_seen=false;habitat_tutorial_returned_to_greenhouse=false;jurejure_intro_complete=false;jurejure_enabled=false;jurejure_growth_stage=JureJureSystemClass.GROWTH_EARLY;jurejure_growth_event_mask=0;active_jurejure_event={};jurejure_next_check_unix=0.0;jurejure_cooldown_until_unix=0.0;jurejure_return_event_complete=false;jurejure_waiting_for_seed_pod_reward=false;jurejure_battle_count=0;jurejure_battle_win_count=0;jurejure_habitat_visit_point=Vector2(-1.0,-1.0);jurejure_pending_reward_species_id="";jurejure_pending_reward_is_new=false;jurejure_last_battle_result.clear();habitat_second_awakened=false;habitat_second_awakening_complete=false;jurejure_update_accumulator=0.0
 	first_seed_pod_reward_event_active=false;habitat_visit_id=0;jurejure_focused_habitat_visit_id=-1;act3_intro_eligible_visit_id=0;habitat_crisis_eligible_visit_id=0
 	if habitat_crisis_atmosphere:habitat_crisis_atmosphere.deactivate()
-	_cancel_puku_gauge_animations();puku_gauge_cm=0.0;puku_balance_units=0;bests.clear();discovered.clear();species_get_counts.clear();catalog_cover_species.clear();unlocked_series={INITIAL_SERIES_ID:true};series_seed_inventory.clear();forest_gacha_draw_count=0;forest_gacha_encountered.clear();active_series_seed_id="";owned_pots={DEFAULT_POT_ID:1};saved_arrangements.clear();arrangement_save_capacity=20;greenhouse_available=_initial_greenhouse_state();unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;opening_story_complete=false;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;puku_gauge_intro_complete=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;mystery_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;mystery_seed_pack_unlocked=false;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;habitat_mystery_seeds_pending=0;mystery_seed_count=0;armadillo_research_total=0;armadillo_research_rewards.clear();armadillo_research_intro_seen=false;armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();result_deferred_species_queue.clear();pending_round_new_species_ids.clear();round_result_species_finalize_queue.clear();round_result_species_finalize_active=false;round_result_species_save_pending=false;shop_chatter_acquired_species.clear();species_get_queue.clear();play_share_record.clear();play_active=false;play_time_remaining=0.0;play_harvest_cm_total=0.0;play_puku_reward_units_total=0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;_reset_endless_economy_stats();rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_time_multiplier=1;habitat_simulation_unix=Time.get_unix_time_from_system();habitat_debug_log.clear();habitat_scroll_tutorial_active=false;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_clear_habitat_items();_save();_update_currency_ui();_update_play_ui()
+	_cancel_puku_gauge_animations();puku_gauge_cm=0.0;puku_balance_units=0;show_growing_puku_preview=true;bests.clear();discovered.clear();species_get_counts.clear();catalog_cover_species.clear();unlocked_series={INITIAL_SERIES_ID:true};series_seed_inventory.clear();forest_gacha_draw_count=0;forest_gacha_encountered.clear();active_series_seed_id="";owned_pots={DEFAULT_POT_ID:1};saved_arrangements.clear();arrangement_save_capacity=20;greenhouse_available=_initial_greenhouse_state();unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;opening_story_complete=false;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;puku_gauge_intro_complete=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;mystery_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;mystery_seed_pack_unlocked=false;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;habitat_mystery_seeds_pending=0;mystery_seed_count=0;armadillo_research_total=0;armadillo_research_rewards.clear();armadillo_research_intro_seen=false;armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();result_deferred_species_queue.clear();pending_round_new_species_ids.clear();round_result_species_finalize_queue.clear();round_result_species_finalize_active=false;round_result_species_save_pending=false;shop_chatter_acquired_species.clear();species_get_queue.clear();play_share_record.clear();play_active=false;play_time_remaining=0.0;play_harvest_cm_total=0.0;play_puku_reward_units_total=0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;_reset_endless_economy_stats();rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_time_multiplier=1;habitat_simulation_unix=Time.get_unix_time_from_system();habitat_debug_log.clear();habitat_scroll_tutorial_active=false;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_clear_habitat_items();_save();_update_currency_ui();_update_play_ui()
+	if growing_puku_preview_toggle:growing_puku_preview_toggle.set_pressed_no_signal(true);growing_puku_preview_toggle.text=_growing_puku_preview_setting_text()
 	normal_round_free_plays=0
 	normal_play_count=0;shop_visit_count=0;hidden_species_acquired.clear();tovar_next_play=TOVAR_FIRST_PLAY;tovar_attempt_count=0;tovar_event_active=false;tovar_harvested_this_play=false;armadillo_present=false;_save()
 
@@ -5224,20 +5243,49 @@ func _change_puku_balance(delta_units:int,source:="",save_immediately:=true,show
 func add_puku_points(amount:int,save_immediately:=true,show_effect:=true)->void:
 	_change_puku_balance(amount*PUKU_UNITS_PER_PUKU,"legacy_api",save_immediately,show_effect)
 
+func _harvest_puku_curve_slopes()->Array[float]:
+	if harvest_puku_reward_slopes.size()==HARVEST_PUKU_REWARD_ANCHORS.size():return harvest_puku_reward_slopes
+	var count:=HARVEST_PUKU_REWARD_ANCHORS.size()
+	var widths:Array[float]=[];var secants:Array[float]=[]
+	for index in range(count-1):
+		var left:Vector2=HARVEST_PUKU_REWARD_ANCHORS[index];var right:Vector2=HARVEST_PUKU_REWARD_ANCHORS[index+1]
+		var width:=float(right.x-left.x);widths.append(width);secants.append(float(right.y-left.y)/width)
+	harvest_puku_reward_slopes.resize(count);harvest_puku_reward_slopes.fill(0.0)
+	if count==2:
+		harvest_puku_reward_slopes[0]=secants[0];harvest_puku_reward_slopes[1]=secants[0];return harvest_puku_reward_slopes
+	for index in range(1,count-1):
+		var previous_secant:=secants[index-1];var next_secant:=secants[index]
+		if previous_secant*next_secant<=0.0:
+			harvest_puku_reward_slopes[index]=0.0
+		else:
+			var first_weight:=2.0*widths[index]+widths[index-1];var second_weight:=widths[index]+2.0*widths[index-1]
+			harvest_puku_reward_slopes[index]=(first_weight+second_weight)/(first_weight/previous_secant+second_weight/next_secant)
+	var first_slope:=((2.0*widths[0]+widths[1])*secants[0]-widths[0]*secants[1])/(widths[0]+widths[1])
+	if first_slope*secants[0]<=0.0:first_slope=0.0
+	elif secants[0]*secants[1]<0.0 and absf(first_slope)>absf(3.0*secants[0]):first_slope=3.0*secants[0]
+	var last_index:=count-1
+	var last_slope:=((2.0*widths[-1]+widths[-2])*secants[-1]-widths[-1]*secants[-2])/(widths[-1]+widths[-2])
+	if last_slope*secants[-1]<=0.0:last_slope=0.0
+	elif secants[-1]*secants[-2]<0.0 and absf(last_slope)>absf(3.0*secants[-1]):last_slope=3.0*secants[-1]
+	harvest_puku_reward_slopes[0]=first_slope;harvest_puku_reward_slopes[last_index]=last_slope
+	return harvest_puku_reward_slopes
+
+func _harvest_puku_curve_units(diameter_cm:float)->float:
+	var harvested_cm:=maxf(0.0,diameter_cm);var last_anchor:Vector2=HARVEST_PUKU_REWARD_ANCHORS[-1]
+	var slopes:=_harvest_puku_curve_slopes()
+	if harvested_cm>=last_anchor.x:return last_anchor.y+(harvested_cm-last_anchor.x)*slopes[-1]
+	for index in range(HARVEST_PUKU_REWARD_ANCHORS.size()-1):
+		var left:Vector2=HARVEST_PUKU_REWARD_ANCHORS[index];var right:Vector2=HARVEST_PUKU_REWARD_ANCHORS[index+1]
+		if harvested_cm<=right.x:
+			if is_equal_approx(harvested_cm,left.x):return left.y
+			if is_equal_approx(harvested_cm,right.x):return right.y
+			var width:=float(right.x-left.x);var ratio:=(harvested_cm-left.x)/width;var ratio2:=ratio*ratio;var ratio3:=ratio2*ratio
+			var interpolated:=(2.0*ratio3-3.0*ratio2+1.0)*left.y+(ratio3-2.0*ratio2+ratio)*width*slopes[index]+(-2.0*ratio3+3.0*ratio2)*right.y+(ratio3-ratio2)*width*slopes[index+1]
+			return clampf(interpolated,left.y,right.y)
+	return 0.0
+
 func _harvest_puku_reward_units(diameter_cm:float,is_first_get:bool)->int:
-	var harvested_cm:=maxf(0.0,diameter_cm)
-	var reward_units:=0.0
-	if harvested_cm>=float(HARVEST_PUKU_REWARD_ANCHORS[-1].x):
-		reward_units=float(HARVEST_PUKU_REWARD_ANCHORS[-1].y)+(harvested_cm-float(HARVEST_PUKU_REWARD_ANCHORS[-1].x))/10.0*HARVEST_PUKU_POST_150_UNITS_PER_10_CM
-	else:
-		for index in range(HARVEST_PUKU_REWARD_ANCHORS.size()-1):
-			var left:Vector2=HARVEST_PUKU_REWARD_ANCHORS[index]
-			var right:Vector2=HARVEST_PUKU_REWARD_ANCHORS[index+1]
-			if harvested_cm<=right.x:
-				var ratio:=inverse_lerp(left.x,right.x,harvested_cm)
-				reward_units=lerpf(left.y,right.y,ratio)
-				break
-	var rounded_units:=maxi(0,roundi(reward_units))
+	var rounded_units:=maxi(0,roundi(_harvest_puku_curve_units(diameter_cm)))
 	return maxi(FIRST_GET_MIN_REWARD_UNITS,rounded_units) if is_first_get else rounded_units
 
 func _format_puku_units(units:int)->String:
@@ -5327,6 +5375,12 @@ func _animate_puku_balance_delta(delta_units:int,generation:int)->void:
 	var direction:=1 if delta_units>0 else -1
 	while remaining>0 and generation==puku_gauge_animation_generation:
 		if direction>0:
+			if puku_gauge_combo_count>0 and puku_gauge_display_units<=.001 and remaining>=PUKU_GAUGE_LARGE_REWARD_BATCH_UNITS:
+				var batch_count:=floori(float(remaining)/float(PUKU_UNITS_PER_PUKU))
+				if batch_count>0:
+					remaining-=batch_count*PUKU_UNITS_PER_PUKU
+					await _play_puku_balance_boundary_batch(batch_count,generation)
+					continue
 			var positive_room:=PUKU_UNITS_PER_PUKU-roundi(puku_gauge_display_units)
 			if positive_room<=0:
 				await _play_puku_balance_boundary(1,generation)
@@ -5364,6 +5418,15 @@ func _play_puku_balance_boundary(direction:int,generation:int)->void:
 	if generation==puku_gauge_animation_generation and direction>0 and puku_gauge_combo_count>=2:
 		await _pulse_puku_combo_display(generation)
 	if generation==puku_gauge_animation_generation and direction>0:_set_puku_gauge_display_units(0.0)
+
+func _play_puku_balance_boundary_batch(count:int,generation:int)->void:
+	if generation!=puku_gauge_animation_generation or count<=0:return
+	puku_gauge_threshold_flash_count+=count;puku_points_display+=count;puku_gauge_combo_count+=count;_set_puku_gauge_display_units(float(PUKU_UNITS_PER_PUKU))
+	if puku_point_label:puku_point_label.text=Localizer.text(language_code,"puku_count",[puku_points_display])
+	puku_gauge_meter.pivot_offset=puku_gauge_meter.size*.5;puku_gauge_active_tween=create_tween();puku_gauge_active_tween.tween_property(puku_gauge_meter,"scale",Vector2(1.08,1.24),maxf(.001,.04*_puku_gauge_effective_speed_scale())).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT);puku_gauge_active_tween.tween_property(puku_gauge_meter,"scale",Vector2.ONE,maxf(.001,.06*_puku_gauge_effective_speed_scale())).set_trans(Tween.TRANS_QUAD)
+	await puku_gauge_active_tween.finished
+	if generation==puku_gauge_animation_generation:await _pulse_puku_combo_display(generation)
+	if generation==puku_gauge_animation_generation:_set_puku_gauge_display_units(0.0)
 
 func _pulse_puku_combo_display(generation:int)->void:
 	if generation!=puku_gauge_animation_generation or puku_combo_label==null:return
@@ -8142,7 +8205,7 @@ func _spawn_center_inside_soil(candidate:Vector3)->bool:
 	return pow(normalized.x/safe_radii.x,2.0)+pow(normalized.y/safe_radii.y,2.0)<=1.0
 
 func _plant_label()->Label:
-	var l:=Label.new(); l.text="1.6 cm"; l.size=Vector2(92,34); l.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; l.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; l.add_theme_font_size_override("font_size",17); l.add_theme_color_override("font_color",Color.WHITE); l.add_theme_stylebox_override("normal",_box(Color(0.14,0.08,0.05,.92),Color("#f4e1be"),11,2)); l.mouse_filter=Control.MOUSE_FILTER_IGNORE; return l
+	var l:=Label.new(); l.text="1.6 cm"; l.size=Vector2(92,34); l.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; l.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; l.add_theme_font_size_override("font_size",17); l.add_theme_color_override("font_color",Color.WHITE); l.add_theme_stylebox_override("normal",_box(Color(0.14,0.08,0.05,.92),Color("#f4e1be"),11,2)); l.mouse_filter=Control.MOUSE_FILTER_IGNORE; l.clip_text=false; return l
 
 func _stop_rain_visual()->void:
 	if rain_visual and is_instance_valid(rain_visual):rain_visual.free()
@@ -8636,6 +8699,39 @@ func _greenhouse_world_offset_for_position(world_position:Vector3)->float:
 	var background_delta:=greenhouse_background_position_x-greenhouse_main_position_x
 	return background_delta/pixels_per_world if absf(pixels_per_world)>.001 else greenhouse_world_pan_x
 
+func _plant_is_first_get_for_puku(plant)->bool:
+	if not is_instance_valid(plant):return false
+	var species_id:=str(plant.data.get("species_id",""))
+	return not species_id.is_empty() and _species_get_count(species_id)<=0 and species_id not in pending_round_new_species_ids
+
+func _should_show_growing_puku_preview(plant)->bool:
+	return show_growing_puku_preview and _endless_puku_economy_active() and is_instance_valid(plant) and not bool(plant.get_meta("story_dev_101",false))
+
+func _plant_label_rect(screen:Vector2,label_size:Vector2,occupied:Array[Rect2],viewport_rect:Rect2)->Rect2:
+	var margin:=Vector2(6.0,6.0);var min_position:=viewport_rect.position+margin;var max_position:=viewport_rect.end-label_size-margin
+	max_position.x=maxf(min_position.x,max_position.x);max_position.y=maxf(min_position.y,max_position.y)
+	var horizontal_shift:=minf(68.0,label_size.x*.32);var x_offsets:=[0.0,-horizontal_shift,horizontal_shift]
+	var best:=Rect2(Vector2(clampf(screen.x-label_size.x*.5,min_position.x,max_position.x),clampf(screen.y-label_size.y-28.0,min_position.y,max_position.y)),label_size)
+	var best_overlap:=INF
+	for row in range(6):
+		for x_offset in x_offsets:
+			var desired:=Vector2(screen.x-label_size.x*.5+float(x_offset),screen.y-label_size.y-28.0-float(row)*(label_size.y+4.0))
+			var candidate:=Rect2(Vector2(clampf(desired.x,min_position.x,max_position.x),clampf(desired.y,min_position.y,max_position.y)),label_size)
+			var overlap:=0.0
+			for other in occupied:
+				if candidate.intersects(other):overlap+=candidate.intersection(other).get_area()
+			if overlap<=0.0:return candidate
+			if overlap<best_overlap:best_overlap=overlap;best=candidate
+	for x_offset in x_offsets:
+		var desired:=Vector2(screen.x-label_size.x*.5+float(x_offset),screen.y+18.0)
+		var candidate:=Rect2(Vector2(clampf(desired.x,min_position.x,max_position.x),clampf(desired.y,min_position.y,max_position.y)),label_size)
+		var overlap:=0.0
+		for other in occupied:
+			if candidate.intersects(other):overlap+=candidate.intersection(other).get_area()
+		if overlap<=0.0:return candidate
+		if overlap<best_overlap:best_overlap=overlap;best=candidate
+	return best
+
 func _update_labels()->void:
 	if _old_seed_story_active():
 		for p in plants:
@@ -8645,21 +8741,23 @@ func _update_labels()->void:
 		for p in plants:
 			if is_instance_valid(p):p.label.visible=false
 		return
-	var occupied:Array[Rect2]=[]
+	var occupied:Array[Rect2]=[];var viewport_rect:=get_viewport().get_visible_rect()
 	var sorted:=plants.duplicate(); sorted.sort_custom(func(a,b):return a.position.z<b.position.z)
 	for p in sorted:
 		if not is_instance_valid(p):continue
 		if camera.is_position_behind(p.global_position):
 			p.label.visible=false
 			continue
-		var screen:=camera.unproject_position(p.global_position+Vector3(0,p.visual_scale*.7,0))
-		var label_size:=Vector2(92,34)
-		var r:=Rect2(screen-Vector2(label_size.x*.5,label_size.y+28),label_size)
-		for other in occupied:
-			if r.intersects(other):r.position.y=other.position.y-label_size.y-3
-		occupied.append(r)
 		var new_prefix:="NEW！\n" if bool(p.get_meta("new_species_candidate",false)) and _species_get_count(str(p.data.get("species_id","")))<=0 else ""
-		p.label.position=r.position;p.label.size=label_size+Vector2(0,26 if not new_prefix.is_empty() else 0);p.label.add_theme_font_size_override("font_size",17);p.label.text=new_prefix+"%.1f cm"%p.diameter_cm;p.label.add_theme_color_override("font_color",Color("#ffe56f") if not new_prefix.is_empty() else Color.WHITE);p.label.visible=p.state=="growing" and Rect2(Vector2.ZERO,get_viewport().get_visible_rect().size).grow(80).has_point(screen)
+		var show_preview:=_should_show_growing_puku_preview(p);var lines:Array[String]=[]
+		if not new_prefix.is_empty():lines.append(new_prefix.trim_suffix("\n"))
+		lines.append("%.1f cm"%p.diameter_cm)
+		if show_preview:
+			var reward_units:=_harvest_puku_reward_units(float(p.diameter_cm),_plant_is_first_get_for_puku(p))
+			lines.append(Localizer.text(language_code,"growing_puku_preview",[_format_puku_units(reward_units)]))
+		var label_size:=Vector2(210.0 if show_preview else 92.0,34.0+23.0*float(lines.size()-1))
+		var screen:=camera.unproject_position(p.global_position+Vector3(0,p.visual_scale*.7,0));var r:=_plant_label_rect(screen,label_size,occupied,viewport_rect);occupied.append(r)
+		p.label.position=r.position;p.label.size=label_size;p.label.add_theme_font_size_override("font_size",15 if show_preview else 17);p.label.text="\n".join(lines);p.label.add_theme_color_override("font_color",Color("#ffe56f") if not new_prefix.is_empty() else Color.WHITE);p.label.visible=p.state=="growing" and viewport_rect.grow(80).has_point(screen)
 
 func _greenhouse_area_navigation_available()->bool:
 	if not StoryProgressionClass.arrangement_is_unlocked(story_progression_state) or not _tutorial_fully_complete() or current_mode!="greenhouse" or play_active or catalog_preview_mode_active or arrangement_transitioning:return false

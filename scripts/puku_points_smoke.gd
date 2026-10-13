@@ -11,6 +11,7 @@ func _ready()->void:
 	_test_seed_pod_thresholds(game)
 	game.endless_greenhouse.configure(true)
 	_test_fixed_point_and_harvest_curve(game)
+	_test_live_harvest_preview(game)
 	await _test_signed_balance_animation(game)
 	await _test_round_entry_and_harvest(game)
 	_test_catalog_auto_record(game)
@@ -34,15 +35,47 @@ func _test_fixed_point_and_harvest_curve(game)->void:
 	assert(game.PUKU_UNITS_PER_PUKU==1000)
 	assert(game.NORMAL_ROUND_COST_UNITS==1000 and game.FIRST_GET_MIN_REWARD_UNITS==200)
 	assert(game.INITIAL_PUKU_CAPITAL_UNITS==5000)
-	for sample in [[0.0,0],[20.0,50],[30.0,120],[40.0,220],[50.0,400],[60.0,650],[70.0,1050],[80.0,1650],[90.0,2500],[100.0,3750],[110.0,5500],[120.0,8000],[130.0,11000],[140.0,14000],[150.0,17000],[160.0,20000],[180.0,26000],[200.0,32000]]:
+	for sample in [[0.0,0],[20.0,50],[30.0,120],[40.0,230],[50.0,360],[60.0,540],[70.0,800],[80.0,1390],[90.0,2430],[100.0,3750],[110.0,4980],[120.0,6000],[125.0,7570],[130.0,10320],[135.0,13600],[140.0,16990],[145.0,20270],[150.0,23320],[160.0,28570],[170.0,32710],[180.0,35950],[200.0,40700],[250.0,48650],[300.0,55490],[500.0,82500],[700.0,109500],[1000.0,150000]]:
 		assert(game._harvest_puku_reward_units(float(sample[0]),false)==int(sample[1]))
-	assert(game._harvest_puku_reward_units(25.0,false)==85)
-	assert(game._harvest_puku_reward_units(8.0,false)==20)
+	var previous_units:=-1
+	for step in range(0,4801):
+		var units:int=game._harvest_puku_reward_units(float(step)*.25,false)
+		assert(units>=previous_units,"reward curve decreased at %.2fcm"%(float(step)*.25));previous_units=units
+	assert(game._harvest_puku_reward_units(25.0,false)>50 and game._harvest_puku_reward_units(25.0,false)<120)
+	assert(game._harvest_puku_reward_units(1001.0,false)>150000)
+	var peak_slope:=-INF;var peak_cm:=0.0
+	for quarter_step in range(480,640):
+		var cm:=float(quarter_step)*.25;var slope:float=(game._harvest_puku_curve_units(cm+.05)-game._harvest_puku_curve_units(cm-.05))/.1
+		if slope>peak_slope:peak_slope=slope;peak_cm=cm
+	assert(peak_cm>=135.0 and peak_cm<=145.0,"reward growth peak was not near 140cm: %.2f"%peak_cm)
+	assert(game._harvest_puku_curve_units(1100.0)-game._harvest_puku_curve_units(1000.0)<=14000.0)
 	assert(game._harvest_puku_reward_units(8.0,true)==200)
-	assert(game._harvest_puku_reward_units(50.0,true)==400)
+	assert(game._harvest_puku_reward_units(50.0,true)==360)
 	game.puku_balance_units=100;assert(game._change_puku_balance(-200,"test",false,false)==-100 and game.puku_balance_units==0)
 	assert(game._puku_whole_count(4300)==4 and game._puku_fraction_units(4300)==300)
 	assert(game._format_puku_units(2700)=="2.70")
+
+func _test_live_harvest_preview(game)->void:
+	assert(game.growing_puku_preview_toggle and game.growing_puku_preview_toggle.button_pressed and game.growing_puku_preview_toggle.text=="育成中のぷくコイン表示　ON")
+	game._clear_greenhouse_plants();game.current_mode="greenhouse";game.play_active=true;game.active_seed_type="normal";game.current_target_count=12;game.puku_gauge_intro_complete=true;game.show_growing_puku_preview=true;game.species_get_counts["colorata"]=1
+	game._spawn_specific_plant("colorata");var known=game.plants.back();known.jelly_checks_enabled=false;known.diameter_cm=70.0;game._update_labels()
+	assert(known.label.text=="70.0 cm\n+0.80ぷくコイン")
+	assert(known.label.visible and known.label.size.x>=200.0 and known.label.get_global_rect().position.x>=0.0 and known.label.get_global_rect().end.x<=game.get_viewport().get_visible_rect().end.x)
+	game.species_get_counts.erase("colorata");known.set_meta("new_species_candidate",true);known.diameter_cm=8.0;game._update_labels()
+	assert(known.label.text=="NEW！\n8.0 cm\n+0.20ぷくコイン")
+	game.language_code="hiragana";game._update_labels();assert(known.label.text.ends_with("+0.20ぷくこいん"))
+	game.language_code="en";game._update_labels();assert(known.label.text.ends_with("+0.20 Puku Coins"))
+	game.language_code="ja";game._change_growing_puku_preview(false);game._update_labels();assert(known.label.text=="NEW！\n8.0 cm" and game.growing_puku_preview_toggle.text.ends_with("OFF"))
+	game._change_growing_puku_preview(true);game.puku_gauge_intro_complete=false;game._update_labels();assert(known.label.text=="NEW！\n8.0 cm")
+	game.puku_gauge_intro_complete=true;game.active_seed_type="old";game._update_labels();assert(known.label.text=="NEW！\n8.0 cm")
+	var sample_label:Label=game._plant_label();sample_label.add_theme_font_size_override("font_size",15);var sample_width:=sample_label.get_theme_font("font").get_string_size("+150.00ぷくコイン",HORIZONTAL_ALIGNMENT_LEFT,-1,15).x;assert(sample_width<210.0);sample_label.free()
+	var occupied:Array[Rect2]=[];var viewport_rect:=Rect2(0,0,576,1024)
+	for index in range(8):
+		var rect:Rect2=game._plant_label_rect(Vector2(68.0+float(index)*63.0,650.0),Vector2(210,80),occupied,viewport_rect)
+		assert(viewport_rect.encloses(rect))
+		for other in occupied:assert(not rect.intersects(other),"three-line preview labels overlapped")
+		occupied.append(rect)
+	game.play_active=false;game._clear_greenhouse_plants();game.show_growing_puku_preview=true
 
 func _wait_for_puku_animation(game)->void:
 	for _i in range(240):
@@ -76,6 +109,11 @@ func _test_signed_balance_animation(game)->void:
 	assert(game._change_puku_balance(-2000,"test_spend",false,true)==-2000)
 	await _wait_for_puku_animation(game)
 	assert(game.puku_balance_units==4200 and game.puku_points_display==4 and roundi(game.puku_gauge_display_units)==200 and game.puku_gauge_threshold_flash_count==4)
+	game._cancel_puku_gauge_animations();game.puku_balance_units=0;game.puku_gauge_threshold_flash_count=0;game._update_puku_ui();var large_start:=Time.get_ticks_msec()
+	assert(game._change_puku_balance(150000,"test_jackpot",false,true)==150000)
+	await _wait_for_puku_animation(game)
+	assert(game.puku_balance_units==150000 and game.puku_points_display==150 and game.puku_gauge_threshold_flash_count==150)
+	assert(Time.get_ticks_msec()-large_start<2000,"150 Puku animation took too long")
 	game.puku_gauge_animation_speed_scale=1.0
 
 func _test_round_entry_and_harvest(game)->void:
@@ -117,12 +155,12 @@ func _test_catalog_auto_record(game)->void:
 
 func _test_save_and_legacy_load(game)->void:
 	var save_path:String=str(game._active_save_path())
-	game.puku_gauge_cm=250.5;game.puku_balance_units=4375;game.normal_round_free_plays=1;game._save();var current=JSON.parse_string(FileAccess.get_file_as_string(save_path));assert(current is Dictionary and int(current.get("puku_balance_units",-1))==4375 and int(current.get("normal_round_free_plays",0))==1);game.puku_gauge_cm=0.0;game.puku_balance_units=0;game.normal_round_free_plays=0;game._load_save()
-	assert(is_equal_approx(game.puku_gauge_cm,250.5) and game.puku_balance_units==4375 and game.puku_points==4 and game.normal_round_free_plays==1)
+	game.puku_gauge_cm=250.5;game.puku_balance_units=4375;game.normal_round_free_plays=1;game.show_growing_puku_preview=false;game._save();var current=JSON.parse_string(FileAccess.get_file_as_string(save_path));assert(current is Dictionary and int(current.get("puku_balance_units",-1))==4375 and int(current.get("normal_round_free_plays",0))==1 and not bool(current.get("show_growing_puku_preview",true)));game.puku_gauge_cm=0.0;game.puku_balance_units=0;game.normal_round_free_plays=0;game.show_growing_puku_preview=true;game._load_save()
+	assert(is_equal_approx(game.puku_gauge_cm,250.5) and game.puku_balance_units==4375 and game.puku_points==4 and game.normal_round_free_plays==1 and not game.show_growing_puku_preview)
 	# A legacy wallet keeps both whole coins and the old 500cm=>3 puku partial gauge.
-	current.erase("puku_balance_units");current["puku_points"]=4;current["puku_coin_gauge_cm"]=125.0;current["puku_gauge_intro_complete"]=false;current["mystery_items_acquired"]=false;current["habitat_awakened"]=false;current["habitat_tutorial_started"]=false;current["habitat_tutorial_complete"]=false;current["habitat_unlocked"]=false;current["tutorial_steps"]={}
+	current.erase("puku_balance_units");current.erase("show_growing_puku_preview");current["puku_points"]=4;current["puku_coin_gauge_cm"]=125.0;current["puku_gauge_intro_complete"]=false;current["mystery_items_acquired"]=false;current["habitat_awakened"]=false;current["habitat_tutorial_started"]=false;current["habitat_tutorial_complete"]=false;current["habitat_unlocked"]=false;current["tutorial_steps"]={}
 	var legacy_wallet:=FileAccess.open(save_path,FileAccess.WRITE);legacy_wallet.store_string(JSON.stringify(current));legacy_wallet.close();game.puku_balance_units=0;game._load_save()
-	assert(game.puku_balance_units==4750)
+	assert(game.puku_balance_units==4750 and game.show_growing_puku_preview)
 	# Already-unlocked old saves receive the one-time minimum operating capital.
 	current.erase("puku_balance_units");current["puku_points"]=1;current["puku_coin_gauge_cm"]=0.0;current["puku_gauge_intro_complete"]=true
 	legacy_wallet=FileAccess.open(save_path,FileAccess.WRITE);legacy_wallet.store_string(JSON.stringify(current));legacy_wallet.close();game.puku_balance_units=0;game._load_save()

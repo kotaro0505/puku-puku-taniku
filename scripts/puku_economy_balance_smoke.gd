@@ -7,9 +7,9 @@ const MainScript=preload("res://scripts/main.gd")
 
 const ROUND_SEEDS:=12
 const MONTE_CARLO_SAMPLES:=500000
-const TARGETS:Array[float]=[50.0,70.0,100.0,150.0,200.0,300.0,500.0,1000.0]
+const TARGETS:Array[float]=[30.0,50.0,60.0,70.0,80.0,100.0,120.0,130.0,140.0,150.0,200.0,300.0,500.0,1000.0]
 const CURRENT_TRIAL_RATES:Array[float]=[0.01,0.02,0.045,0.075]
-const EXPECTED_NEW_PERCENT:Array[float]=[36.311272,17.485572,6.276349,1.727118,.933624,.590064,.300930,.059000]
+const EXPECTED_CHECKPOINT_PERCENT:Dictionary={50.0:36.311272,70.0:17.485572,100.0:6.276349,150.0:1.727118,200.0:.933624,300.0:.590064,500.0:.300930,1000.0:.059000}
 
 
 func _combination(n:int,k:int)->float:
@@ -135,19 +135,61 @@ func _monte_carlo_reach_counts()->Array[int]:
 	return counts
 
 
+func _append_target(targets:Array[float],target:float,count:int)->void:
+	for _index in range(count):targets.append(target)
+
+
+func _strategy_definitions()->Array[Dictionary]:
+	var early:Array[float]=[];_append_target(early,30.0,4);_append_target(early,40.0,4);_append_target(early,50.0,4)
+	var frequent:Array[float]=[];_append_target(frequent,60.0,6);_append_target(frequent,70.0,6)
+	var balanced:Array[float]=[]
+	for target in [70.0,80.0,90.0,100.0]:_append_target(balanced,target,3)
+	var ambitious:Array[float]=[];_append_target(ambitious,100.0,6);_append_target(ambitious,120.0,4);_append_target(ambitious,150.0,2)
+	var large:Array[float]=[]
+	for target in [120.0,130.0,140.0,150.0]:_append_target(large,target,3)
+	var legend:Array[float]=[];_append_target(legend,70.0,8);_append_target(legend,100.0,2);legend.append(300.0);legend.append(500.0)
+	return [
+		{"id":"early_30_50","targets":early},
+		{"id":"frequent_60_70","targets":frequent},
+		{"id":"balanced_70_100","targets":balanced},
+		{"id":"ambitious_100_plus","targets":ambitious},
+		{"id":"large_120_150","targets":large},
+		{"id":"some_300_plus","targets":legend},
+	]
+
+
+func _strategy_report(definition:Dictionary,probability_by_target:Dictionary,economy)->Dictionary:
+	var distribution:Dictionary={0:1.0}
+	for target_value in definition.targets:
+		var target:=float(target_value);var probability:=float(probability_by_target[target]) if probability_by_target.has(target) else _exact_kakuhen_reach_probability(target);var reward_units:int=economy._harvest_puku_reward_units(target,false);var next_distribution:Dictionary={}
+		for raw_units in distribution:
+			var units:=int(raw_units);var mass:=float(distribution[raw_units])
+			next_distribution[units]=float(next_distribution.get(units,0.0))+mass*(1.0-probability)
+			var success_units:int=units+reward_units;next_distribution[success_units]=float(next_distribution.get(success_units,0.0))+mass*probability
+		distribution=next_distribution
+	var average_gross:=0.0;var red_rate:=0.0;var break_even_rate:=0.0;var black_rate:=0.0
+	for raw_units in distribution:
+		var units:=int(raw_units);var mass:=float(distribution[raw_units]);average_gross+=mass*float(units)/float(economy.PUKU_UNITS_PER_PUKU)
+		if units<economy.NORMAL_ROUND_COST_UNITS:red_rate+=mass
+		elif units>economy.NORMAL_ROUND_COST_UNITS:black_rate+=mass
+		else:break_even_rate+=mass
+	return {"id":str(definition.id),"targets_cm":definition.targets,"average_income_puku":snappedf(average_gross,.0001),"average_net_puku":snappedf(average_gross-1.0,.0001),"red_game_percent":snappedf(red_rate*100.0,.0001),"break_even_percent":snappedf(break_even_rate*100.0,.0001),"black_game_percent":snappedf(black_rate*100.0,.0001)}
+
+
 func _ready()->void:
 	var economy=MainScript.new()
 	var monte_carlo_counts:=_monte_carlo_reach_counts()
-	var rows:Array=[]
+	var rows:Array=[];var probability_by_target:Dictionary={}
 	for target_index in range(TARGETS.size()):
 		var target:=TARGETS[target_index]
 		var target_age:=(target-1.6)/(SucculentClass.GROWTH_CM_PER_SECOND*1.6)
 		var current_trial_survival:=_survival_probability(0.0,target_age,CURRENT_TRIAL_RATES)
 		var exact_survival:=_exact_kakuhen_reach_probability(target)
 		var observed_survival:=float(monte_carlo_counts[target_index])/MONTE_CARLO_SAMPLES
-		assert(absf(exact_survival*100.0-EXPECTED_NEW_PERCENT[target_index])<.00002,"target=%s actual=%s expected=%s"%[target,exact_survival*100.0,EXPECTED_NEW_PERCENT[target_index]])
+		if EXPECTED_CHECKPOINT_PERCENT.has(target):assert(absf(exact_survival*100.0-float(EXPECTED_CHECKPOINT_PERCENT[target]))<.00002,"target=%s actual=%s expected=%s"%[target,exact_survival*100.0,EXPECTED_CHECKPOINT_PERCENT[target]])
 		var monte_carlo_tolerance:=.003 if target<=100.0 else .001 if target<=300.0 else .0006 if target<=500.0 else .00035
 		assert(absf(observed_survival-exact_survival)<monte_carlo_tolerance,"target=%s observed=%s exact=%s"%[target,observed_survival,exact_survival])
+		probability_by_target[target]=exact_survival
 		var reward_puku:float=float(economy._harvest_puku_reward_units(target,false))/float(economy.PUKU_UNITS_PER_PUKU)
 		var reached_plants:float=ROUND_SEEDS*exact_survival
 		var average_gross:float=reached_plants*reward_puku
@@ -174,11 +216,14 @@ func _ready()->void:
 			"black_game_percent":snappedf(black_rate*100.0,.0001),
 			"big_win_net_5plus_percent":snappedf(big_win_rate*100.0,.0001),
 		})
-	assert(absf(float(rows[2].new_exact_percent)-float(rows[2].current_trial_percent))<.5)
-	assert(is_equal_approx(float(rows[5].reward_puku),62.0))
-	assert(is_equal_approx(float(rows[6].reward_puku),122.0))
-	assert(is_equal_approx(float(rows[7].reward_puku),272.0))
+	assert(absf(float(rows[5].new_exact_percent)-float(rows[5].current_trial_percent))<.5)
+	assert(is_equal_approx(float(rows[11].reward_puku),55.49))
+	assert(is_equal_approx(float(rows[12].reward_puku),82.50))
+	assert(is_equal_approx(float(rows[13].reward_puku),150.0))
+	var strategies:Array=[]
+	for definition in _strategy_definitions():strategies.append(_strategy_report(definition,probability_by_target,economy))
 	print("PUKU_ECONOMY_BALANCE_REPORT current_trial_rates=1/2/4.5/7.5 normal_rates=1/2.5/5/8 growth=1.6 rhythm=+-10% kakuhen=.5 continuation=91 samples=",MONTE_CARLO_SAMPLES," rows=",JSON.stringify(rows))
-	print("PUKU_ECONOMY_BALANCE_SMOKE_OK targets=50-1000 exact=true monte_carlo=true reward_curve=unchanged")
+	print("PUKU_ECONOMY_STRATEGY_REPORT assumptions=independent_plants_no_first_get_floor strategies=",JSON.stringify(strategies))
+	print("PUKU_ECONOMY_BALANCE_SMOKE_OK targets=30-1000 exact=true monte_carlo=true reward_curve=jackpot_pchip mixed_strategies=true")
 	economy.free()
 	get_tree().quit()
