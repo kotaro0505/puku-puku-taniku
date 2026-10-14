@@ -25,7 +25,7 @@ func _ready()->void:
 	await _test_panda_rescue(game)
 	_test_max_size_record_is_silent(game)
 	game._reset_progression_state();game.queue_free()
-	print("PUKU_POINTS_SMOKE_OK unit=1/1000 round_cost=1.00 direct_harvest=true giant=100,120,150,200,300,500,700,1000,1500,2000,10000cm_linear_rooted_species3_positions3_speeds1.6+10 label_toggle=localized_persistent_on_off+main_only_live_recalc max_record=silent_visual_preserved reward1000+2000=true new_floor=.20 migration=points+legacy_gauge forest_cost=1 rescue=wallet_plus_1 combo=true fly_removed=true result=removed automatic_get=true")
+	print("PUKU_POINTS_SMOKE_OK unit=1/1000 round_cost=1.00 direct_harvest=true rooted_contact=1.6,10,30,60,100,120,150,200,300,500,700,1000,1500,2000,10000cm_species3_positions3_speeds1.6+10 label_toggle=localized_persistent_on_off+main_only_live_recalc max_record=silent_visual_preserved reward1000+2000=true new_floor=.20 migration=points+legacy_gauge forest_cost=1 rescue=wallet_plus_1 combo=true fly_removed=true result=removed automatic_get=true")
 	get_tree().quit()
 
 func _test_seed_pod_thresholds(game)->void:
@@ -143,10 +143,15 @@ func _test_plant_label_visibility_toggle(game)->void:
 	game._toggle_growing_plant_labels();game._toggle_growing_plant_labels();assert(not game.show_growing_puku_preview and known.label.visible and known.label.text=="100.0 cm","whole-label toggle was not independent from reward-preview setting")
 	known.fast_forward_to_diameter(1000.0);known.original_pos=Vector3(0,.12,2.5);known.position=known.original_pos;game._update_labels()
 	var button_hit_point:=Vector2(-1,-1);var toggle_rect:Rect2=game.plant_label_visibility_button.get_global_rect()
-	for row in range(1,8):
-		for column in range(1,12):
-			var candidate:=toggle_rect.position+Vector2(toggle_rect.size.x*float(column)/12.0,toggle_rect.size.y*float(row)/8.0)
-			if bool(known.screen_hit_test(game.camera,candidate).get("opaque_artwork_hit",false)):button_hit_point=candidate;break
+	for target_cm in [1000.0,2000.0,5000.0,10000.0]:
+		for position_x in [-4.0,-3.0,-2.0,-1.0,0.0,1.0]:
+			known.fast_forward_to_diameter(target_cm);known.original_pos=Vector3(position_x,.12,2.5);known.position=known.original_pos;known.sync_screen_visual(game.camera)
+			for row in range(1,8):
+				for column in range(1,12):
+					var candidate:=toggle_rect.position+Vector2(toggle_rect.size.x*float(column)/12.0,toggle_rect.size.y*float(row)/8.0)
+					if bool(known.screen_hit_test(game.camera,candidate).get("opaque_artwork_hit",false)):button_hit_point=candidate;break
+				if button_hit_point.x>=0.0:break
+			if button_hit_point.x>=0.0:break
 		if button_hit_point.x>=0.0:break
 	assert(button_hit_point.x>=0.0,"input-isolation test did not place a giant leaf behind the label toggle")
 	var press:=InputEventMouseButton.new();press.button_index=MOUSE_BUTTON_LEFT;press.position=button_hit_point;press.pressed=true
@@ -169,11 +174,27 @@ func _opaque_hit_point(plant,camera:Camera3D,visible_rect:Rect2)->Vector2:
 			var point:=visible_rect.position+Vector2(visible_rect.size.x*float(column)/48.0,visible_rect.size.y*float(row)/48.0)
 			var hit:Dictionary=plant.screen_hit_test(camera,point)
 			if bool(hit.get("hit",false)) and bool(hit.get("opaque_artwork_hit",false)):return point
+	# At extreme unbounded scales only a narrow source-image slice may intersect
+	# the viewport. Inspect that exact slice so the regression proves that a real
+	# visible leaf pixel, rather than merely the projected rectangle, is tappable.
+	if plant.screen_texture_transform_valid and plant.screen_hit_image!=null and not plant.screen_hit_image.is_empty():
+		var inverse:Transform2D=plant.screen_texture_transform.affine_inverse()
+		var source_bounds:=Rect2(inverse*visible_rect.position,Vector2.ZERO)
+		for corner in [Vector2(visible_rect.end.x,visible_rect.position.y),visible_rect.end,Vector2(visible_rect.position.x,visible_rect.end.y)]:source_bounds=source_bounds.expand(inverse*corner)
+		var used:Rect2=plant._screen_hit_used_rect();source_bounds=source_bounds.intersection(used)
+		var image_size:Vector2i=plant.screen_hit_image.get_size()
+		for y in range(clampi(floori(source_bounds.position.y),0,image_size.y-1),clampi(ceili(source_bounds.end.y),0,image_size.y)):
+			for x in range(clampi(floori(source_bounds.position.x),0,image_size.x-1),clampi(ceili(source_bounds.end.x),0,image_size.x)):
+				if plant.screen_hit_image.get_pixel(x,y).a<=plant.SCREEN_ALPHA_HIT_THRESHOLD:continue
+				var point:Vector2=plant.screen_texture_transform*Vector2(float(x)+.5,float(y)+.5)
+				if not visible_rect.has_point(point):continue
+				var hit:Dictionary=plant.screen_hit_test(camera,point)
+				if bool(hit.get("hit",false)) and bool(hit.get("opaque_artwork_hit",false)):return point
 	return Vector2(-10000,-10000)
 
 func _test_giant_plant_display_and_hit(game)->void:
 	var viewport_rect:Rect2=game.get_viewport().get_visible_rect()
-	var sizes:Array[float]=[100.0,120.0,150.0,200.0,300.0,500.0,700.0,1000.0,1500.0,2000.0,10000.0]
+	var sizes:Array[float]=[1.6,10.0,30.0,60.0,100.0,120.0,150.0,200.0,300.0,500.0,700.0,1000.0,1500.0,2000.0,10000.0]
 	var positions:Array=[Vector3(0,.12,2.5),Vector3(0,.12,0),Vector3(0,.12,-2.5)]
 	var shape_species:Array[String]=["colorata","laui","yumekawa_milky_dream"]
 	for target_cm in sizes:
@@ -188,9 +209,13 @@ func _test_giant_plant_display_and_hit(game)->void:
 	for species_id in shape_species:
 		game.species_get_counts[species_id]=1;game._spawn_specific_plant(species_id);plant=game.plants.back();plant.jelly_checks_enabled=false
 		if plant.harvested.is_connected(harvest_handler):plant.harvested.disconnect(harvest_handler)
-		var used_rect:Rect2=plant._screen_hit_used_rect();var anchor_pixel:Vector2=plant._screen_growth_anchor_pixel()
+		var used_rect:Rect2=plant._screen_hit_used_rect();var anchor_pixel:Vector2=plant._screen_growth_anchor_pixel();var planting_anchor_pixel:Vector2=plant._screen_planting_anchor_pixel()
 		assert(used_rect.has_point(anchor_pixel),"growth anchor left opaque bounds species=%s anchor=%s used=%s"%[species_id,anchor_pixel,used_rect])
 		assert(anchor_pixel.y<used_rect.position.y+used_rect.size.y*.80,"growth anchor still follows the bottom fringe species=%s anchor=%s used=%s"%[species_id,anchor_pixel,used_rect])
+		assert(used_rect.has_point(planting_anchor_pixel),"planting anchor left opaque bounds species=%s anchor=%s used=%s"%[species_id,planting_anchor_pixel,used_rect])
+		assert(planting_anchor_pixel.y>=used_rect.position.y+used_rect.size.y*.90 and planting_anchor_pixel.y>anchor_pixel.y,"planting anchor does not represent the substantial lower artwork species=%s planting=%s center=%s used=%s"%[species_id,planting_anchor_pixel,anchor_pixel,used_rect])
+		var planting_pixel:=Vector2i(floori(planting_anchor_pixel.x),floori(planting_anchor_pixel.y))
+		assert(plant.screen_hit_image.get_pixelv(planting_pixel).a>plant.SCREEN_ALPHA_HIT_THRESHOLD,"planting anchor selected transparent artwork species=%s anchor=%s"%[species_id,planting_anchor_pixel])
 		for growth_speed in [1.6,10.0]:
 			plant.growth_speed_multiplier=growth_speed
 			for position in positions:
@@ -201,33 +226,40 @@ func _test_giant_plant_display_and_hit(game)->void:
 				var threshold_after:PackedVector2Array=plant._projected_texture_polygon(game.camera)
 				assert(threshold_before.size()==4 and threshold_after.size()==4,"120cm transition polygon was missing species=%s speed=%.1f pos=%s"%[species_id,growth_speed,position])
 				for corner in range(4):assert(threshold_before[corner].distance_to(threshold_after[corner])<.25,"artwork jumped at 120cm transition species=%s speed=%.1f pos=%s corner=%d before=%s after=%s"%[species_id,growth_speed,position,corner,threshold_before[corner],threshold_after[corner]])
-				var previous_extent:=0.0;var width_500:=0.0;var width_1000:=0.0;var reference_root:=Vector2.ZERO;var reference_main:=Vector2.ZERO;var reference_bottom_y:=-INF
+				var previous_extent:=0.0;var width_500:=0.0;var width_1000:=0.0;var reference_root:=Vector2.ZERO;var reference_root_set:=false;var previous_main_y:=INF;var previous_top_y:=INF
 				for target_cm in sizes:
 					plant.state="growing";plant.fast_forward_to_diameter(target_cm)
 					# Isolate the growth transform from the deliberately tiny ambient sway
 					# while measuring the soil/root relationship at each exact checkpoint.
 					plant.plant_sprite.position.x=0.0;plant.plant_sprite.rotation.z=0.0;plant.sync_screen_visual(game.camera);game._update_labels()
-					var rect:Rect2=plant.screen_visual_rect(game.camera);var visible_rect:=rect.intersection(viewport_rect);var root_screen:Vector2=game.camera.unproject_position(plant.global_position);var main_screen:Vector2=plant.screen_texture_transform*anchor_pixel;var bottom_screen:Vector2=plant.screen_texture_transform*Vector2(anchor_pixel.x,used_rect.end.y)
+					var rect:Rect2=plant.screen_visual_rect(game.camera);var visible_rect:=rect.intersection(viewport_rect);var root_screen:Vector2=game.camera.unproject_position(plant._screen_planting_world_position());var contact_screen:Vector2=plant.screen_texture_transform*planting_anchor_pixel;var main_screen:Vector2=plant.screen_texture_transform*anchor_pixel;var top_screen:Vector2=plant.screen_texture_transform*Vector2(planting_anchor_pixel.x,used_rect.position.y);var bottom_screen:Vector2=plant.screen_texture_transform*Vector2(planting_anchor_pixel.x,used_rect.end.y)
 					assert(plant.screen_sprite!=null and plant.screen_sprite.visible and not plant.plant_sprite.visible,"plant did not use the screen compositor species=%s speed=%.1f pos=%s cm=%.0f"%[species_id,growth_speed,position,target_cm])
 					assert(plant.screen_sprite.polygon.size()>=3,"viewport-clipped giant artwork had no render polygon species=%s speed=%.1f pos=%s cm=%.0f"%[species_id,growth_speed,position,target_cm])
 					for rendered_point in plant.screen_sprite.polygon:assert(viewport_rect.grow(3.0).has_point(rendered_point),"giant render polygon escaped viewport clipping species=%s speed=%.1f pos=%s cm=%.0f point=%s"%[species_id,growth_speed,position,target_cm,rendered_point])
 					assert(plant.screen_depth(game.camera)>game.camera.near and viewport_rect.has_point(root_screen),"giant root crossed or left the camera view species=%s speed=%.1f pos=%s cm=%.0f"%[species_id,growth_speed,position,target_cm])
 					assert(rect.has_area() and visible_rect.has_area(),"giant artwork disappeared species=%s speed=%.1f pos=%s cm=%.0f rect=%s"%[species_id,growth_speed,position,target_cm,rect])
 					var extent:=maxf(rect.size.x,rect.size.y);assert(extent>previous_extent,"giant artwork stopped growing species=%s speed=%.1f pos=%s cm=%.0f extent=%.2f previous=%.2f"%[species_id,growth_speed,position,target_cm,extent,previous_extent]);previous_extent=extent
-					if is_equal_approx(target_cm,120.0):reference_root=root_screen;reference_main=main_screen;reference_bottom_y=bottom_screen.y
-					elif target_cm>120.0:
-						assert(root_screen.distance_to(reference_root)<.01,"soil planting point moved species=%s speed=%.1f pos=%s cm=%.0f root=%s reference=%s"%[species_id,growth_speed,position,target_cm,root_screen,reference_root])
-						assert(main_screen.distance_to(reference_main)<.05,"main leaf mass escaped upward species=%s speed=%.1f pos=%s cm=%.0f main=%s reference=%s"%[species_id,growth_speed,position,target_cm,main_screen,reference_main])
-						assert(bottom_screen.y>=reference_bottom_y-.05,"lower leaves floated away from soil species=%s speed=%.1f pos=%s cm=%.0f bottom=%.2f reference=%.2f"%[species_id,growth_speed,position,target_cm,bottom_screen.y,reference_bottom_y])
+					if not reference_root_set:reference_root=root_screen;reference_root_set=true
+					assert(root_screen.distance_to(reference_root)<.01,"soil planting point moved species=%s speed=%.1f pos=%s cm=%.1f root=%s reference=%s"%[species_id,growth_speed,position,target_cm,root_screen,reference_root])
+					assert(contact_screen.distance_to(root_screen)<.05,"rendered opaque contact floated from soil species=%s speed=%.1f pos=%s cm=%.1f contact=%s root=%s"%[species_id,growth_speed,position,target_cm,contact_screen,root_screen])
+					assert(main_screen.y<root_screen.y and bottom_screen.y>=root_screen.y-.05,"rendered plant sank or floated around its soil contact species=%s speed=%.1f pos=%s cm=%.1f main=%s bottom=%s root=%s"%[species_id,growth_speed,position,target_cm,main_screen,bottom_screen,root_screen])
+					if not is_inf(previous_main_y):assert(main_screen.y<previous_main_y-.01 and top_screen.y<previous_top_y-.01,"rooted artwork did not grow upward from its fixed contact species=%s speed=%.1f pos=%s cm=%.1f main_y=%.3f previous=%.3f top_y=%.3f previous_top=%.3f"%[species_id,growth_speed,position,target_cm,main_screen.y,previous_main_y,top_screen.y,previous_top_y])
+					previous_main_y=main_screen.y;previous_top_y=top_screen.y
+					var anchor_local_y:float=-(planting_anchor_pixel.y-float(plant.plant_sprite.texture.get_height())*.5+plant.plant_sprite.offset.y)
+					var fallback_contact_y:float=plant.plant_sprite.position.y+anchor_local_y*plant.plant_sprite.pixel_size*plant.plant_sprite.scale.y
+					assert(absf(fallback_contact_y)<.0001,"Sprite3D fallback contact is not rooted species=%s speed=%.1f cm=%.1f local_y=%.6f"%[species_id,growth_speed,target_cm,fallback_contact_y])
 					if is_equal_approx(target_cm,500.0):width_500=rect.size.x
 					if is_equal_approx(target_cm,1000.0):width_1000=rect.size.x
-					assert(plant.label.visible and plant.label.position.y<viewport_rect.get_center().y,"giant label disappeared or jumped downward species=%s speed=%.1f pos=%s cm=%.0f label=%s"%[species_id,growth_speed,position,target_cm,plant.label.position])
+					assert(plant.label.visible,"plant label disappeared species=%s speed=%.1f pos=%s cm=%.1f"%[species_id,growth_speed,position,target_cm])
+					if target_cm>=100.0:assert(plant.label.position.y<viewport_rect.get_center().y,"giant label disappeared or jumped downward species=%s speed=%.1f pos=%s cm=%.0f label=%s"%[species_id,growth_speed,position,target_cm,plant.label.position])
 					var tap_point:=_opaque_hit_point(plant,game.camera,visible_rect);var hit:Dictionary=plant.screen_hit_test(game.camera,tap_point)
 					assert(tap_point.x>-9999.0 and bool(hit.get("hit",false)) and bool(hit.get("opaque_artwork_hit",false)),"visible giant leaf was not alpha-hittable species=%s speed=%.1f pos=%s cm=%.0f tap=%s"%[species_id,growth_speed,position,target_cm,tap_point])
 					# Advance one real frame at each configured speed as well as checking the
 					# exact checkpoint, then harvest through the visible alpha-tested leaf.
 					plant.simulate(1.0/12.0 if growth_speed>=10.0 else 1.0/60.0);plant.sync_screen_visual(game.camera)
 					assert(plant.screen_sprite.visible and plant.screen_visual_rect(game.camera).intersection(viewport_rect).has_area(),"giant artwork failed after a live growth frame species=%s speed=%.1f pos=%s cm=%.0f"%[species_id,growth_speed,position,target_cm])
+					var live_contact:Vector2=plant.screen_texture_transform*planting_anchor_pixel;var live_root:Vector2=game.camera.unproject_position(plant._screen_planting_world_position())
+					assert(live_contact.distance_to(live_root)<.05,"live growth frame lifted rendered contact species=%s speed=%.1f pos=%s cm=%.1f contact=%s root=%s"%[species_id,growth_speed,position,target_cm,live_contact,live_root])
 					game._try_harvest(tap_point);assert(plant.state=="harvested","visible giant leaf did not harvest species=%s speed=%.1f pos=%s cm=%.0f"%[species_id,growth_speed,position,target_cm])
 				assert(width_500>0.0 and width_1000/width_500>1.95 and width_1000/width_500<2.05,"rendered 500cm to 1000cm ratio was not approximately 2x species=%s: %.4f"%[species_id,width_1000/width_500])
 		game._clear_greenhouse_plants();plant=null
