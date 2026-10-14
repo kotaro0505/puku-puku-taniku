@@ -22,7 +22,7 @@ func _ready()->void:
 	_test_save_and_legacy_load(game)
 	await _test_panda_rescue(game)
 	game._reset_progression_state();game.queue_free()
-	print("PUKU_POINTS_SMOKE_OK unit=1/1000 round_cost=1.00 direct_harvest=true giant=100..1500cm_positions3_speeds1.6+10 reward709=true new_floor=.20 migration=points+legacy_gauge forest_cost=1 rescue=wallet_plus_1 combo=true fly_removed=true result_waits=true")
+	print("PUKU_POINTS_SMOKE_OK unit=1/1000 round_cost=1.00 direct_harvest=true giant=100..10000cm_linear_positions3_speeds1.6+10 reward1000+2000=true new_floor=.20 migration=points+legacy_gauge forest_cost=1 rescue=wallet_plus_1 combo=true fly_removed=true result_waits=true")
 	get_tree().quit()
 
 func _test_seed_pod_thresholds(game)->void:
@@ -62,8 +62,8 @@ func _test_fixed_point_and_harvest_curve(game)->void:
 func _test_live_harvest_preview(game)->void:
 	assert(game.growing_puku_preview_toggle and game.growing_puku_preview_toggle.button_pressed and game.growing_puku_preview_toggle.text=="育成中のぷくコイン表示　ON")
 	var foreground_ui:=game.labels_layer.get_parent() as CanvasLayer;var foreground_hud:Node=game.main_status_hud.get_parent()
-	assert(game.greenhouse_layer.layer<game.best_record_layer.layer and game.best_record_layer.layer<0,"best record canvas is not between the greenhouse backdrop and 3D plants")
-	assert(game.best_panel.get_parent()==game.best_record_layer and foreground_ui and foreground_ui.layer>0,"best record or growing labels are on the wrong canvas")
+	assert(game.greenhouse_layer.layer<game.best_record_layer.layer and game.best_record_layer.layer<game.plant_screen_layer.layer,"best record canvas is not behind the screen-space plants")
+	assert(game.best_panel.get_parent()==game.best_record_layer and foreground_ui and game.plant_screen_layer.layer<foreground_ui.layer,"plants, best record, or growing labels are on the wrong canvas")
 	assert(game.labels_layer.get_index()<foreground_hud.get_index(),"growing labels would cover the logo, gauges, or operation HUD")
 	game._clear_greenhouse_plants();game.current_mode="greenhouse";game.play_active=true;game.active_seed_type="normal";game.current_target_count=12;game.puku_gauge_intro_complete=true;game.show_growing_puku_preview=true;game.species_get_counts["colorata"]=1
 	game._spawn_specific_plant("colorata");var known=game.plants.back();known.jelly_checks_enabled=false;known.diameter_cm=70.0;game._update_labels()
@@ -86,20 +86,23 @@ func _test_live_harvest_preview(game)->void:
 	game.play_active=false;game._clear_greenhouse_plants();game.show_growing_puku_preview=true
 
 func _opaque_hit_point(plant,camera:Camera3D,visible_rect:Rect2)->Vector2:
-	for row in range(1,8):
-		for column in range(1,8):
-			var point:=visible_rect.position+Vector2(visible_rect.size.x*float(column)/8.0,visible_rect.size.y*float(row)/8.0)
+	for row in range(1,48):
+		for column in range(1,48):
+			var point:=visible_rect.position+Vector2(visible_rect.size.x*float(column)/48.0,visible_rect.size.y*float(row)/48.0)
 			var hit:Dictionary=plant.screen_hit_test(camera,point)
 			if bool(hit.get("hit",false)) and bool(hit.get("opaque_artwork_hit",false)):return point
-	return visible_rect.get_center()
+	return Vector2(-10000,-10000)
 
 func _test_giant_plant_display_and_hit(game)->void:
-	var viewport_rect:Rect2=game.get_viewport().get_visible_rect();var viewport_area:=viewport_rect.get_area()
-	var sizes:Array[float]=[100.0,150.0,160.0,200.0,300.0,400.0,468.0,486.0,500.0,709.0,1000.0,1500.0]
+	var viewport_rect:Rect2=game.get_viewport().get_visible_rect()
+	var sizes:Array[float]=[100.0,150.0,300.0,500.0,700.0,1000.0,1500.0,2000.0,10000.0]
 	var positions:Array=[Vector3(0,.12,2.5),Vector3(0,.12,0),Vector3(0,.12,-2.5)]
-	assert(is_equal_approx(SucculentClass.visual_scale_for_diameter(100.0),.18+(100.0-1.6)*.058),"100cm appearance changed before giant-size compression")
-	assert(is_equal_approx(SucculentClass.visual_scale_for_diameter(120.0),.18+(120.0-1.6)*.058),"compression transition is not continuous")
-	assert(SucculentClass.visual_scale_for_diameter(1500.0)<=SucculentClass.GIANT_VISUAL_SCALE_LIMIT and SucculentClass.visual_scale_for_diameter(1500.0)>SucculentClass.visual_scale_for_diameter(120.0),"giant display scale is capped incorrectly")
+	for target_cm in sizes:
+		assert(is_equal_approx(SucculentClass.visual_scale_for_diameter(target_cm),.18+(target_cm-1.6)*.058),"visual scale stopped being linear at %.0fcm"%target_cm)
+	var scale_ratio:=SucculentClass.visual_scale_for_diameter(1000.0)/SucculentClass.visual_scale_for_diameter(500.0)
+	assert(scale_ratio>1.95 and scale_ratio<2.05,"500cm to 1000cm is not approximately 2x: %.4f"%scale_ratio)
+	assert(SucculentClass.visual_scale_for_diameter(2000.0)>SucculentClass.visual_scale_for_diameter(1000.0)*1.99,"2000cm visual scale stopped growing linearly")
+	assert(SucculentClass.visual_scale_for_diameter(10000.0)>SucculentClass.visual_scale_for_diameter(2000.0)*4.99,"10000cm visual scale introduced a practical cap")
 	game._clear_greenhouse_plants();game.current_mode="greenhouse";game.play_active=true;game.active_seed_type="normal";game.current_target_count=12;game.puku_gauge_intro_complete=true;game.show_growing_puku_preview=true;game.species_get_counts["colorata"]=1
 	game._spawn_specific_plant("colorata");var plant=game.plants.back();plant.jelly_checks_enabled=false
 	var harvest_handler:=Callable(game,"_on_harvested")
@@ -108,29 +111,33 @@ func _test_giant_plant_display_and_hit(game)->void:
 		plant.growth_speed_multiplier=growth_speed
 		for position in positions:
 			plant.original_pos=position;plant.position=position
-			var previous_scale:=0.0
+			var previous_extent:=0.0;var width_500:=0.0;var width_1000:=0.0
 			for target_cm in sizes:
-				plant.state="growing";plant.fast_forward_to_diameter(target_cm);plant.simulate(1.0/60.0);game._update_labels()
-				var rect:Rect2=plant.screen_visual_rect(game.camera);var visible_rect:=rect.intersection(viewport_rect);var center_world:Vector3=plant.plant_sprite.global_position;var center_screen:Vector2=game.camera.unproject_position(center_world)
-				assert(not game.camera.is_position_behind(center_world) and plant.screen_depth(game.camera)>game.camera.near,"giant sprite crossed the camera plane speed=%.1f pos=%s cm=%.0f"%[growth_speed,position,target_cm])
-				assert(plant.plant_sprite.visible and rect.has_area() and visible_rect.has_area(),"giant sprite left the viewport speed=%.1f pos=%s cm=%.0f rect=%s"%[growth_speed,position,target_cm,rect])
-				assert(viewport_rect.grow(24.0).has_point(center_screen),"giant sprite center projected outside the safe viewport speed=%.1f pos=%s cm=%.0f center=%s"%[growth_speed,position,target_cm,center_screen])
-				assert(visible_rect.get_area()/viewport_area<.80,"giant artwork covered too much of the screen speed=%.1f pos=%s cm=%.0f coverage=%.3f"%[growth_speed,position,target_cm,visible_rect.get_area()/viewport_area])
-				assert(plant.visual_scale>=previous_scale and plant.visual_scale<=plant.GIANT_VISUAL_SCALE_LIMIT+.001,"display scale was not safely compressed speed=%.1f cm=%.0f scale=%.3f"%[growth_speed,target_cm,plant.visual_scale]);previous_scale=plant.visual_scale
+				plant.state="growing";plant.fast_forward_to_diameter(target_cm);plant.simulate(1.0/12.0 if growth_speed>=10.0 else 1.0/60.0);game._update_labels()
+				var rect:Rect2=plant.screen_visual_rect(game.camera);var visible_rect:=rect.intersection(viewport_rect);var root_screen:Vector2=game.camera.unproject_position(plant.global_position)
+				assert(plant.screen_sprite!=null and plant.screen_sprite.visible and not plant.plant_sprite.visible,"plant did not use the screen compositor speed=%.1f pos=%s cm=%.0f"%[growth_speed,position,target_cm])
+				assert(plant.screen_sprite.polygon.size()>=3,"viewport-clipped giant artwork had no render polygon speed=%.1f pos=%s cm=%.0f"%[growth_speed,position,target_cm])
+				for rendered_point in plant.screen_sprite.polygon:assert(viewport_rect.grow(3.0).has_point(rendered_point),"giant render polygon escaped viewport clipping speed=%.1f pos=%s cm=%.0f point=%s"%[growth_speed,position,target_cm,rendered_point])
+				assert(plant.screen_depth(game.camera)>game.camera.near and viewport_rect.has_point(root_screen),"giant root crossed or left the camera view speed=%.1f pos=%s cm=%.0f"%[growth_speed,position,target_cm])
+				assert(rect.has_area() and visible_rect.has_area(),"giant artwork disappeared speed=%.1f pos=%s cm=%.0f rect=%s"%[growth_speed,position,target_cm,rect])
+				var extent:=maxf(rect.size.x,rect.size.y);assert(extent>previous_extent,"giant artwork stopped growing speed=%.1f pos=%s cm=%.0f extent=%.2f previous=%.2f"%[growth_speed,position,target_cm,extent,previous_extent]);previous_extent=extent
+				if is_equal_approx(target_cm,500.0):width_500=rect.size.x
+				if is_equal_approx(target_cm,1000.0):width_1000=rect.size.x
 				assert(plant.label.visible and plant.label.position.y<viewport_rect.get_center().y,"giant label disappeared or jumped downward speed=%.1f pos=%s cm=%.0f label=%s"%[growth_speed,position,target_cm,plant.label.position])
 				var tap_point:=_opaque_hit_point(plant,game.camera,visible_rect);var hit:Dictionary=plant.screen_hit_test(game.camera,tap_point)
-				assert(bool(hit.get("hit",false)),"visible giant leaf was not hittable speed=%.1f pos=%s cm=%.0f tap=%s"%[growth_speed,position,target_cm,tap_point])
+				assert(tap_point.x>-9999.0 and bool(hit.get("hit",false)) and bool(hit.get("opaque_artwork_hit",false)),"visible giant leaf was not alpha-hittable speed=%.1f pos=%s cm=%.0f tap=%s"%[growth_speed,position,target_cm,tap_point])
 				game._try_harvest(tap_point);assert(plant.state=="harvested","visible giant leaf did not harvest speed=%.1f pos=%s cm=%.0f"%[growth_speed,position,target_cm])
+			assert(width_500>0.0 and width_1000/width_500>1.95 and width_1000/width_500<2.05,"rendered 500cm to 1000cm ratio was not approximately 2x: %.4f"%(width_1000/width_500))
 	# Horizontal scrolling, harvesting and jelly must still control visibility.
 	plant.state="growing";plant.growth_speed_multiplier=1.6;plant.fast_forward_to_diameter(1000.0);plant.original_pos=Vector3(0,.12,0);plant.position=plant.original_pos;game._update_labels();assert(plant.label.visible)
 	var saved_original_pos:Vector3=plant.original_pos;var saved_position:Vector3=plant.position;plant.original_pos.x+=1000.0;plant.position.x+=1000.0;game._update_labels();assert(not game._plant_is_visible_for_label(plant,viewport_rect) and not plant.label.visible,"fully scrolled-off giant plant kept its label")
 	plant.original_pos=saved_original_pos;plant.position=saved_position;game._update_labels();assert(plant.label.visible,"giant label did not return with its plant after horizontal scrolling")
 	plant.state="harvested";game._update_labels();assert(not plant.label.visible,"harvested giant plant kept its label");plant.state="jelly";game._update_labels();assert(not plant.label.visible,"jellied giant plant kept its label");plant.state="growing";game._update_labels();assert(plant.label.visible)
-	# When two opaque billboards overlap, normalized tap proximity owns the tap;
-	# camera depth resolves a tie rather than array order.
+	# When two opaque leaves overlap, the front root is drawn and picked on top.
 	plant.fast_forward_to_diameter(500.0);plant.original_pos=Vector3(0,.12,-1.0);plant.position=plant.original_pos
 	game._spawn_specific_plant("colorata");var front_plant=game.plants.back();front_plant.jelly_checks_enabled=false;front_plant.original_pos=Vector3(0,.12,2.5);front_plant.position=front_plant.original_pos;front_plant.fast_forward_to_diameter(100.0)
 	if front_plant.harvested.is_connected(harvest_handler):front_plant.harvested.disconnect(harvest_handler)
+	game._update_labels()
 	var overlap_rect:Rect2=plant.screen_visual_rect(game.camera).intersection(front_plant.screen_visual_rect(game.camera)).intersection(viewport_rect);var overlap_point:=Vector2(-1,-1)
 	for row in range(1,10):
 		for column in range(1,10):
@@ -138,18 +145,20 @@ func _test_giant_plant_display_and_hit(game)->void:
 			if bool(back_hit.get("opaque_artwork_hit",false)) and bool(front_hit.get("opaque_artwork_hit",false)):overlap_point=candidate;break
 		if overlap_point.x>=0.0:break
 	assert(overlap_point.x>=0.0,"overlap regression could not find two visible leaves")
-	var giant_overlap_hit:Dictionary=plant.screen_hit_test(game.camera,overlap_point);var normal_overlap_hit:Dictionary=front_plant.screen_hit_test(game.camera,overlap_point)
-	var normal_wins:bool=float(normal_overlap_hit.get("score",INF))<float(giant_overlap_hit.get("score",INF)) or (is_equal_approx(float(normal_overlap_hit.get("score",INF)),float(giant_overlap_hit.get("score",INF))) and front_plant.screen_depth(game.camera)<plant.screen_depth(game.camera))
-	var expected_selected=front_plant if normal_wins else plant;var expected_unselected=plant if normal_wins else front_plant
-	game._try_harvest(overlap_point);assert(expected_selected.state=="harvested" and expected_unselected.state=="growing","overlapping harvest did not select the intended visible leaf")
+	assert(front_plant.screen_draw_order()>plant.screen_draw_order(),"front plant was not drawn above the rear giant")
+	game._try_harvest(overlap_point);assert(front_plant.state=="harvested" and plant.state=="growing","overlapping harvest did not select the topmost visible leaf")
 	game.play_active=false;game._clear_greenhouse_plants()
 
 func _test_giant_harvest_reward(game)->void:
-	game._cancel_puku_gauge_animations();game.puku_gauge_animation_speed_scale=.02;game._clear_greenhouse_plants();game.current_mode="greenhouse";game.play_active=true;game.active_seed_type="normal";game.current_target_count=12;game.play_seeds_remaining=0;game.play_spawn_queue=0;game.play_seed_animations_pending=1;game.puku_gauge_intro_complete=true;game.puku_balance_units=0;game.species_get_counts["colorata"]=1;game.bests["colorata"]=0.0
-	game._spawn_specific_plant("colorata");var plant=game.plants.back();plant.jelly_checks_enabled=false;plant.original_pos=Vector3(0,.12,0);plant.position=plant.original_pos;plant.fast_forward_to_diameter(709.0);game._update_labels()
-	var expected_units:int=game._harvest_puku_reward_units(plant.diameter_cm,false);var visible_rect:Rect2=plant.screen_visual_rect(game.camera).intersection(game.get_viewport().get_visible_rect());var tap_point:=_opaque_hit_point(plant,game.camera,visible_rect)
-	game._try_harvest(tap_point);await get_tree().process_frame;await get_tree().process_frame
-	assert(game.puku_balance_units==expected_units,"giant screen-tap harvest paid the wrong reward expected=%d actual=%d"%[expected_units,game.puku_balance_units]);assert(is_equal_approx(float(game.bests.get("colorata",0.0)),709.0),"giant screen-tap harvest did not preserve the real-size record")
+	game._cancel_puku_gauge_animations();game.puku_gauge_animation_speed_scale=.02;game._clear_greenhouse_plants();game.current_mode="greenhouse";game.play_active=true;game.active_seed_type="normal";game.current_target_count=12;game.play_seeds_remaining=0;game.play_spawn_queue=0;game.play_seed_animations_pending=1;game.puku_gauge_intro_complete=true;game.species_get_counts["colorata"]=1
+	for target_cm in [1000.0,2000.0]:
+		game.puku_balance_units=0;game.bests["colorata"]=0.0
+		game._spawn_specific_plant("colorata");var plant=game.plants.back();plant.jelly_checks_enabled=false;plant.original_pos=Vector3(0,.12,0);plant.position=plant.original_pos;plant.fast_forward_to_diameter(target_cm);game._update_labels()
+		var expected_units:int=game._harvest_puku_reward_units(plant.diameter_cm,false);var visible_rect:Rect2=plant.screen_visual_rect(game.camera).intersection(game.get_viewport().get_visible_rect());var tap_point:=_opaque_hit_point(plant,game.camera,visible_rect)
+		assert(tap_point.x>-9999.0,"could not find a visible leaf for %.0fcm reward test"%target_cm)
+		game._try_harvest(tap_point);await get_tree().process_frame;await get_tree().process_frame
+		assert(game.puku_balance_units==expected_units,"%.0fcm screen-tap harvest paid the wrong reward expected=%d actual=%d"%[target_cm,expected_units,game.puku_balance_units]);assert(is_equal_approx(float(game.bests.get("colorata",0.0)),target_cm),"giant screen-tap harvest did not preserve the %.0fcm record"%target_cm)
+		game._clear_greenhouse_plants();game._cancel_puku_gauge_animations()
 	game.play_active=false;game.play_seed_animations_pending=0;game._clear_greenhouse_plants();game._cancel_puku_gauge_animations();game.puku_gauge_animation_speed_scale=1.0
 	for result_panel in game.effects_layer.find_children("HarvestResult","",true,false):result_panel.free()
 

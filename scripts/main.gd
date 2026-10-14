@@ -197,6 +197,7 @@ var camera: Camera3D
 var world_root: Node3D
 var pot_root: Node3D
 var greenhouse_layer: CanvasLayer
+var plant_screen_layer: CanvasLayer
 var best_record_layer: CanvasLayer
 var greenhouse_backdrop: TextureRect
 var greenhouse_pan_x := 0.0
@@ -867,7 +868,8 @@ func _ready() -> void:
 	_layout()
 	_wire_ui_sounds(self)
 	_update_main_story_progress(false)
-	if _opening_story_preview_requested():call_deferred("_open_opening_story_preview")
+	if _giant_plant_preview_requested():call_deferred("_open_giant_plant_preview")
+	elif _opening_story_preview_requested():call_deferred("_open_opening_story_preview")
 	elif _seed_pod_story_preview_requested():call_deferred("_open_seed_pod_story_preview")
 	elif _arrangement_test_preview_requested():call_deferred("_open_arrangement_test_preview")
 	elif _forest_gacha_preview_requested():call_deferred("_open_forest_gacha_preview")
@@ -883,6 +885,19 @@ func _habitat_debug_requested()->bool:
 		var screen=JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('screen')",true)
 		return str(requested)=="1" or str(screen)=="habitat-test"
 	return "--habitat-debug" in OS.get_cmdline_user_args()
+
+func _giant_plant_preview_requested()->bool:
+	if not _trial_dev_controls_enabled():return false
+	if OS.has_feature("web"):
+		var requested=JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('screen')",true)
+		return str(requested)=="giant-plant"
+	return "--giant-plant-preview" in OS.get_cmdline_user_args()
+
+func _giant_plant_preview_parameter(key:String,fallback:String)->String:
+	if not OS.has_feature("web"):return fallback
+	var script:="new URLSearchParams(window.location.search).get(%s)"%JSON.stringify(key)
+	var value=JavaScriptBridge.eval(script,true)
+	return fallback if value==null or str(value).is_empty() else str(value)
 
 func _habitat_test_preview_requested()->bool:
 	if not _trial_dev_controls_enabled():return false
@@ -1778,6 +1793,9 @@ func _build_world() -> void:
 	greenhouse_layer=CanvasLayer.new();greenhouse_layer.layer=-10;add_child(greenhouse_layer)
 	greenhouse_backdrop=TextureRect.new();greenhouse_backdrop.name="GreenhouseMasterBackdrop";greenhouse_backdrop.texture=load(GREENHOUSE_MASTER_PATH);greenhouse_backdrop.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;greenhouse_backdrop.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT;greenhouse_backdrop.mouse_filter=Control.MOUSE_FILTER_IGNORE;greenhouse_layer.add_child(greenhouse_backdrop)
 	world_root = Node3D.new(); add_child(world_root)
+	# Greenhouse plants are composited from camera-projected texture transforms.
+	# Layer 0 keeps them above the record card (-5) and below all gameplay UI (10).
+	plant_screen_layer=CanvasLayer.new();plant_screen_layer.name="PlantScreenLayer";plant_screen_layer.layer=0;add_child(plant_screen_layer)
 	habitat_env=WorldEnvironment.new(); var env:=Environment.new()
 	_build_habitat_background(env)
 	env.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR; env.ambient_light_color=Color("#d6b98b"); env.ambient_light_energy=0.32
@@ -1836,7 +1854,7 @@ func _soil_material()->ShaderMaterial:
 void fragment(){float a=sin(UV.x*173.0+sin(UV.y*61.0)*2.7)*sin(UV.y*157.0+sin(UV.x*47.0)*2.2);float b=sin(UV.x*43.0+UV.y*51.0)*.5+.5;float grain=clamp(a*.5+.5,0.0,1.0);vec3 lo=vec3(.105,.047,.027);vec3 hi=vec3(.31,.145,.075);vec3 c=mix(lo,hi,grain*.34+b*.12);ALBEDO=c;ROUGHNESS=.96;SPECULAR=.08;}""";var material:=ShaderMaterial.new();material.shader=shader;return material
 
 func _build_ui() -> void:
-	# The record card sits over the greenhouse artwork but under the 3D plants.
+	# The record card sits over the greenhouse artwork but under the plant layer.
 	# Gameplay labels and the rest of the HUD stay on the foreground UI canvas.
 	best_record_layer=CanvasLayer.new();best_record_layer.name="BestRecordLayer";best_record_layer.layer=-5;add_child(best_record_layer)
 	var ui:=CanvasLayer.new(); ui.layer=10; add_child(ui)
@@ -4182,6 +4200,33 @@ func _open_forest_gacha_preview()->void:
 	if play_overlay:play_overlay.visible=false
 	forest_gacha_ui.open_gacha(forest_gacha_preview_puku_points,forest_gacha_preview_draw_count);audio_manager.play_bgm("shop");_update_play_ui()
 
+func _open_giant_plant_preview()->void:
+	if not _trial_dev_controls_enabled():return
+	opening_finished=true
+	for overlay in [opening_overlay,opening_story_overlay,intro_overlay,settings_overlay,play_overlay,result_overlay,tutorial_guide_overlay]:
+		if overlay:overlay.visible=false
+	_clear_greenhouse_plants()
+	current_mode="greenhouse";catalog_preview_mode_active=false;dev_jelly_test_active=false
+	play_active=true;active_seed_type="normal";current_target_count=NORMAL_GERMINATION_COUNT
+	play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=1
+	first_play_tutorial_active=false;first_play_harvest_guide_active=false;old_seed_harvest_guide_active=false
+	puku_gauge_intro_complete=true;show_growing_puku_preview=true;normal_play_tutorial_complete=true
+	species_get_counts[FIRST_STORY_SPECIES_ID]=maxi(1,_species_get_count(FIRST_STORY_SPECIES_ID))
+	_apply_mode()
+	_spawn_specific_plant(FIRST_STORY_SPECIES_ID)
+	if plants.is_empty():return
+	var plant=plants.back();plant.jelly_checks_enabled=false
+	var position_name:=_giant_plant_preview_parameter("position","center")
+	var z_position:=2.5 if position_name=="front" else (-2.5 if position_name=="back" else 0.0)
+	plant.original_pos=Vector3(0,.12,z_position);plant.position=plant.original_pos
+	plant.growth_speed_multiplier=clampf(_giant_plant_preview_parameter("speed","1").to_float(),.1,10.0)
+	var requested_cm:=maxf(1.6,_giant_plant_preview_parameter("cm","1000").to_float())
+	plant.fast_forward_to_diameter(requested_cm)
+	_update_labels();_update_best_ui();_update_play_ui()
+	# Keep browser QA checkpoints exact while leaving input, Tweens and the
+	# succulent's own screen-sync process active for real harvest verification.
+	set_process(false)
+
 func _open_trial_dev_forest_gacha()->void:
 	if not _is_endless_greenhouse_enabled() or not _trial_dev_controls_enabled() or forest_gacha_ui==null:return
 	if arrangement_scene_active:return
@@ -4857,7 +4902,7 @@ func _spawn_specific_plant(species_id:String,is_catalog_preview:=false)->void:
 	var spawn_balance:=_greenhouse_jelly_balance_for_spawn()
 	if is_catalog_preview:
 		spawn_balance=JellyBalanceClass.NON_NORMAL.duplicate(true);spawn_balance["kakuhen_enabled"]=false
-	var p=SucculentClass.new();p.original_pos=pos;p.position=pos;p.set_meta("catalog_preview",is_catalog_preview);world_root.add_child(p);p.setup(chosen,spawn_rng.randi(),label,null,false,spawn_balance)
+	var p=SucculentClass.new();p.original_pos=pos;p.position=pos;p.set_meta("catalog_preview",is_catalog_preview);world_root.add_child(p);p.setup(chosen,spawn_rng.randi(),label,null,false,spawn_balance);p.attach_screen_visual(plant_screen_layer,camera)
 	if is_catalog_preview:
 		p.harvested.connect(_on_catalog_preview_harvested);p.jellied.connect(_on_catalog_preview_jellied)
 	else:
@@ -7514,9 +7559,8 @@ func _add_restoration_habitat_plants()->void:
 		if texture==null:continue
 		var sprite:=Sprite3D.new();sprite.name="RestorationMedalPlant%d"%(index+1);sprite.texture=texture;sprite.billboard=BaseMaterial3D.BILLBOARD_ENABLED;sprite.no_depth_test=true;sprite.texture_filter=BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 		sprite.pixel_size=1.22/maxf(1.0,float(texture.get_width()));sprite.offset.y=-float(texture.get_height())*.18;sprite.position=_panorama_point_to_world(points[index],HABITAT_ITEM_RADIUS-.18)
-		# The greenhouse billboard now uses display-only giant-size compression.
-		# Restoration presentation must continue to represent the saved real size,
-		# not reverse the temporary greenhouse visual scale into a smaller diameter.
+		# Restoration medals use their own compact habitat presentation. Always base
+		# it on the saved real diameter, independent of greenhouse screen rendering.
 		var diameter:=float(snapshot.get("diameter_cm",100.0));var represented_diameter:=diameter
 		var compressed_scale:=clampf(2.15+(represented_diameter-100.0)*.012,2.15,3.65);sprite.scale=Vector3.ONE*compressed_scale
 		sprite.set_meta("restoration_stage",index+1);sprite.set_meta("restoration_snapshot",snapshot.duplicate(true))
@@ -7837,7 +7881,7 @@ func spawn_plant(force_golden := false,spawn_position:Variant=null) -> void:
 		# regardless of whether it came from the carryover roll or a story slot.
 		endless_greenhouse.clear_discovery_carryover()
 		if not endless_forced_new and endless_greenhouse.forced_new_pending:endless_greenhouse.cancel_forced_new_pending()
-	p.original_pos=pos; p.position=pos;p.set_meta("new_species_candidate",new_species_candidate);p.set_meta("endless_forced_new",endless_forced_new); world_root.add_child(p); p.setup(chosen,rng.randi(),label,null,false,_greenhouse_jelly_balance_for_spawn());p.jelly_permission=Callable(self,"_allow_plant_jelly").bind(p)
+	p.original_pos=pos; p.position=pos;p.set_meta("new_species_candidate",new_species_candidate);p.set_meta("endless_forced_new",endless_forced_new); world_root.add_child(p); p.setup(chosen,rng.randi(),label,null,false,_greenhouse_jelly_balance_for_spawn());p.attach_screen_visual(plant_screen_layer,camera);p.jelly_permission=Callable(self,"_allow_plant_jelly").bind(p)
 	if active_seed_type=="old" and chosen_species_id==FIRST_STORY_SPECIES_ID and not first_colorata_confirmed:
 		p.growth_rate*=FIRST_STORY_COLORATA_GROWTH_MULTIPLIER
 		p.set_meta("first_story_growth_multiplier",FIRST_STORY_COLORATA_GROWTH_MULTIPLIER)
@@ -8661,6 +8705,7 @@ func _apply_mode()->void:
 		_clear_habitat_items()
 		_print_habitat_memory_snapshot("exit_after")
 	greenhouse_layer.visible=greenhouse_mode
+	if plant_screen_layer:plant_screen_layer.visible=greenhouse_mode
 	habitat_items_root.visible=not greenhouse_mode
 	if habitat_crisis_atmosphere:
 		if habitat_crisis_started:habitat_crisis_atmosphere.activate()
@@ -8709,6 +8754,21 @@ func _plant_is_first_get_for_puku(plant)->bool:
 	var species_id:=str(plant.data.get("species_id",""))
 	return not species_id.is_empty() and _species_get_count(species_id)<=0 and species_id not in pending_round_new_species_ids
 
+func _sync_plant_screen_visuals()->void:
+	if camera==null:return
+	var draw_items:Array=[]
+	for plant_index in range(plants.size()):
+		var plant=plants[plant_index]
+		if not is_instance_valid(plant):continue
+		plant.sync_screen_visual(camera)
+		draw_items.append({"plant":plant,"depth":float(plant.screen_depth(camera)),"spawn_order":plant_index})
+	# Canvas z increases toward the viewer. Draw distant roots first and use spawn
+	# order only as a deterministic tie-breaker for plants sharing one soil point.
+	draw_items.sort_custom(func(a,b):
+		if not is_equal_approx(float(a.depth),float(b.depth)):return float(a.depth)>float(b.depth)
+		return int(a.spawn_order)<int(b.spawn_order))
+	for draw_order in range(draw_items.size()):draw_items[draw_order].plant.set_screen_draw_order(draw_order)
+
 func _should_show_growing_puku_preview(plant)->bool:
 	return show_growing_puku_preview and _endless_puku_economy_active() and is_instance_valid(plant) and not bool(plant.get_meta("story_dev_101",false))
 
@@ -8754,13 +8814,8 @@ func _plant_is_visible_for_label(plant,viewport_rect:Rect2)->bool:
 
 func _plant_label_anchor(plant,viewport_rect:Rect2)->Vector2:
 	var root_screen:Vector2=camera.unproject_position(plant.global_position)
-	var rendered_scale:=float(plant.visual_scale)
-	if plant.plant_sprite!=null:rendered_scale=float(plant.plant_sprite.scale.x)
-	var desired_world:Vector3=plant.global_position+Vector3(0,rendered_scale*.7,0)
-	var desired_camera:Vector3=camera.to_local(desired_world)
-	if -desired_camera.z>maxf(.01,camera.near*1.01):
-		var projected:Vector2=camera.unproject_position(desired_world)
-		if not is_nan(projected.x) and not is_inf(projected.x) and not is_nan(projected.y) and not is_inf(projected.y):return projected
+	var projected:Vector2=plant.screen_label_anchor(camera)
+	if not is_nan(projected.x) and not is_inf(projected.x) and not is_nan(projected.y) and not is_inf(projected.y):return projected
 	var plant_rect:Rect2=plant.screen_visual_rect(camera)
 	if plant_rect.has_area():
 		var visible_rect:=plant_rect.intersection(viewport_rect)
@@ -8770,6 +8825,7 @@ func _plant_label_anchor(plant,viewport_rect:Rect2)->Vector2:
 	return root_screen
 
 func _update_labels()->void:
+	if current_mode=="greenhouse":_sync_plant_screen_visuals()
 	if _old_seed_story_active():
 		for p in plants:
 			if is_instance_valid(p):p.label.visible=false
@@ -8946,25 +9002,27 @@ func _apply_view_rotation()->void:
 	if camera:camera.rotation_degrees=Vector3(view_pitch,view_yaw,0.0)
 
 func _try_harvest(screen_pos:Vector2)->void:
-	# Each plant reconstructs its rendered Sprite3D quad in screen space. Unlike a
-	# capped radius around the root, this remains aligned with huge visible leaves.
+	# Drawing and picking share the same screen-space texture transform, including
+	# per-pixel alpha and the visible overlap order at unlimited giant sizes.
 	if play_active and active_seed_type=="old" and not old_seed_harvest_guide_active:return
 	if first_play_tutorial_active and not first_play_tutorial_sequence_complete:return
 	if first_play_tutorial_active and not first_play_has_harvested and not first_play_harvest_guide_active:return
+	_sync_plant_screen_visuals()
 	var candidates:Array=[]
 	for p in plants:
 		if not is_instance_valid(p) or p.state!="growing":continue
 		if (first_play_harvest_guide_active or old_seed_harvest_guide_active) and p!=tutorial_harvest_plant:continue
 		var hit:Dictionary=p.screen_hit_test(camera,screen_pos)
-		if bool(hit.get("hit",false)):candidates.append({"p":p,"score":float(hit.get("score",INF)),"depth":float(hit.get("depth",INF)),"opaque":bool(hit.get("opaque_artwork_hit",false))})
+		if bool(hit.get("hit",false)):candidates.append({"p":p,"score":float(hit.get("score",INF)),"depth":float(hit.get("depth",INF)),"draw_order":int(hit.get("draw_order",-1)),"opaque":bool(hit.get("opaque_artwork_hit",false))})
 	if candidates.size()>0:
-		# Match the visible overlap: an opaque leaf beats accessibility padding. The
-		# leaf nearest the tap's normalized center remains the primary target (so a
-		# smaller rosette centered over a giant one stays selectable); camera depth
-		# resolves only an otherwise equal overlap.
+		# An opaque leaf always beats transparent accessibility padding. If multiple
+		# opaque leaves overlap, select the one actually drawn on top; transparent
+		# fallbacks retain the old center-proximity behavior for tutorial plants.
 		candidates.sort_custom(func(a,b):
 			if bool(a.opaque)!=bool(b.opaque):return bool(a.opaque)
+			if bool(a.opaque) and int(a.draw_order)!=int(b.draw_order):return int(a.draw_order)>int(b.draw_order)
 			if not is_equal_approx(float(a.score),float(b.score)):return float(a.score)<float(b.score)
+			if int(a.draw_order)!=int(b.draw_order):return int(a.draw_order)>int(b.draw_order)
 			return float(a.depth)<float(b.depth))
 		var selected_plant=candidates[0].p
 		if old_colorata_profile_active and selected_plant==tutorial_harvest_plant:

@@ -128,8 +128,10 @@ const GROWTH_RHYTHM_AMPLITUDE := 0.10
 const JELLY_STAGE_ENDS := [5.0,10.0,15.0]
 const VISUAL_SCALE_BASE := 0.18
 const VISUAL_SCALE_PER_CM := 0.058
-const GIANT_VISUAL_COMPRESSION_START_CM := 120.0
-const GIANT_VISUAL_SCALE_LIMIT := 8.5
+const SCREEN_SPACE_GIANT_REFERENCE_CM := 120.0
+const SCREEN_ALPHA_HIT_THRESHOLD := .08
+
+static var screen_growth_anchor_cache:Dictionary={}
 
 var visual_scale := VISUAL_SCALE_BASE
 var plant_sprite: Sprite3D
@@ -152,6 +154,11 @@ var kakuhen_boundary_count := 0
 var kakuhen_rng:=RandomNumberGenerator.new()
 var sway_phase := 0.0
 var screen_hit_image:Image
+var screen_sprite:Polygon2D
+var screen_camera:Camera3D
+var screen_texture_transform:=Transform2D.IDENTITY
+var screen_texture_transform_valid:=false
+var screen_draw_order_value:=0
 
 func setup(species: Dictionary, seed_value: int, screen_label: Label, _danger: Label, logic_only := false, balance_override:Dictionary = {}) -> void:
 	data = species
@@ -200,10 +207,169 @@ func setup(species: Dictionary, seed_value: int, screen_label: Label, _danger: L
 func _apply_external_plant_texture(texture:Texture2D)->void:
 	if not is_instance_valid(plant_sprite) or texture==null:return
 	plant_sprite.texture=texture
+	if is_instance_valid(screen_sprite):screen_sprite.texture=texture
 	plant_sprite.remove_meta("screen_hit_used_rect")
 	screen_hit_image=null
 	plant_sprite.offset.y=-float(texture.get_height())*.18
 	plant_sprite.pixel_size=1.42/maxf(1.0,float(texture.get_width()))
+	sync_screen_visual(screen_camera)
+
+func attach_screen_visual(screen_parent:Node,camera:Camera3D)->void:
+	if screen_parent==null or camera==null or plant_sprite==null or plant_sprite.texture==null:return
+	if is_instance_valid(screen_sprite):screen_sprite.queue_free()
+	screen_camera=camera
+	screen_sprite=Polygon2D.new()
+	screen_sprite.name="ScreenArtwork"
+	screen_sprite.texture=plant_sprite.texture
+	screen_sprite.z_as_relative=false
+	screen_sprite.texture_filter=CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	screen_parent.add_child(screen_sprite)
+	# The 3D sprite remains the source of texture, tint, sway and interpolated
+	# growth state, but only the screen-space copy is drawn in the greenhouse.
+	# Its quad can therefore grow past the camera without entering the near plane.
+	plant_sprite.visible=false
+	sync_screen_visual(camera)
+
+func _process(_delta:float)->void:
+	if is_instance_valid(screen_sprite):sync_screen_visual(screen_camera)
+
+func _exit_tree()->void:
+	if is_instance_valid(screen_sprite):screen_sprite.queue_free()
+	screen_sprite=null
+	screen_texture_transform_valid=false
+
+func set_screen_draw_order(value:int)->void:
+	screen_draw_order_value=value
+	if is_instance_valid(screen_sprite):screen_sprite.z_index=value
+
+func screen_draw_order()->int:
+	return screen_draw_order_value
+
+func uses_giant_screen_transform()->bool:
+	if plant_sprite==null:return false
+	return plant_sprite.scale.x>visual_scale_for_diameter(SCREEN_SPACE_GIANT_REFERENCE_CM)+.0001
+
+func _screen_growth_anchor_pixel()->Vector2:
+	if plant_sprite==null or plant_sprite.texture==null:return Vector2.ZERO
+	var texture_size:=plant_sprite.texture.get_size()
+	var fallback:=Vector2(texture_size.x*.5,texture_size.y)
+	var cache_key:="%s:%s"%[plant_sprite.texture.get_rid(),texture_size]
+	if screen_growth_anchor_cache.has(cache_key):return screen_growth_anchor_cache[cache_key]
+	var image:=screen_hit_image
+	if image==null or image.is_empty():image=plant_sprite.texture.get_image();screen_hit_image=image
+	if image==null or image.is_empty():return fallback
+	var used:=image.get_used_rect()
+	if used.size.x<=0 or used.size.y<=0:return fallback
+	# Find the lowest meaningfully opaque pixel once per texture. Imported PNGs
+	# can retain RGB and 1-alpha fringe rows inside their transparent padding;
+	# anchoring those rows would magnify the padding until the leaf itself left the
+	# viewport. Keeping the actual bottom leaf pixel fixed preserves its soil root
+	# and still leaves an opaque, tappable pixel at arbitrarily large scales.
+	var center_x:=float(used.position.x)+float(used.size.x)*.5
+	var anchor:=fallback
+	for y in range(mini(used.end.y-1,image.get_height()-1),maxi(used.position.y,0)-1,-1):
+		var best_x:=-1;var best_alpha:=SCREEN_ALPHA_HIT_THRESHOLD
+		for x in range(maxi(used.position.x,0),mini(used.end.x,image.get_width())):
+			var alpha:=image.get_pixel(x,y).a
+			if alpha>best_alpha+.0001 or (is_equal_approx(alpha,best_alpha) and best_x>=0 and absf(float(x)-center_x)<absf(float(best_x)-center_x)):
+				best_alpha=alpha;best_x=x
+		if best_x>=0:
+			anchor=Vector2(float(best_x)+.5,float(y)+.5)
+			break
+	screen_growth_anchor_cache[cache_key]=anchor
+	return anchor
+
+func _projected_texture_polygon(camera:Camera3D)->PackedVector2Array:
+	var points:=PackedVector2Array()
+	if camera==null or plant_sprite==null or plant_sprite.texture==null:return points
+	var texture_size:=plant_sprite.texture.get_size()
+	if texture_size.x<=0.0 or texture_size.y<=0.0:return points
+	var near_depth:=maxf(.01,camera.near*1.01)
+	var root_camera:=camera.to_local(global_position)
+	if -root_camera.z<=near_depth:return points
+	var basis:=camera.global_transform.basis
+	var angle:=plant_sprite.rotation.z
+	var plane_right:Vector3=basis.x*cos(angle)+basis.y*sin(angle)
+	var plane_up:Vector3=-basis.x*sin(angle)+basis.y*cos(angle)
+	var origin:=plant_sprite.global_position
+	var global_scale:=plant_sprite.global_transform.basis.get_scale()
+	var giant_transform:=uses_giant_screen_transform()
+	var reference_scale:=visual_scale_for_diameter(SCREEN_SPACE_GIANT_REFERENCE_CM)
+	if giant_transform:
+		# Freeze the 3D projection at the established 120 cm appearance. Growth
+		# beyond it is applied below in screen space around the projected root, so
+		# neither the quad center nor its top can cross the camera plane.
+		var owner_scale:=global_transform.basis.get_scale()
+		var reference_local_position:=Vector3(plant_sprite.position.x,.10+reference_scale*.62,plant_sprite.position.z)
+		origin=global_transform*reference_local_position
+		global_scale=Vector3(owner_scale.x*reference_scale,owner_scale.y*reference_scale,owner_scale.z*reference_scale)
+	var texture_points:=[Vector2.ZERO,Vector2(texture_size.x,0.0),texture_size,Vector2(0.0,texture_size.y)]
+	for pixel_point in texture_points:
+		var local_pixels:=Vector2(
+			pixel_point.x-texture_size.x*.5+plant_sprite.offset.x,
+			-(pixel_point.y-texture_size.y*.5+plant_sprite.offset.y)
+		)
+		var world_point:=origin+plane_right*local_pixels.x*plant_sprite.pixel_size*global_scale.x+plane_up*local_pixels.y*plant_sprite.pixel_size*global_scale.y
+		var camera_point:=camera.to_local(world_point)
+		if -camera_point.z<=near_depth:return PackedVector2Array()
+		var projected:=camera.unproject_position(world_point)
+		if is_nan(projected.x) or is_inf(projected.x) or is_nan(projected.y) or is_inf(projected.y):return PackedVector2Array()
+		points.append(projected)
+	if giant_transform:
+		var reference_axis_x:=(points[1]-points[0])/texture_size.x
+		var reference_axis_y:=(points[3]-points[0])/texture_size.y
+		var reference_transform:=Transform2D(reference_axis_x,reference_axis_y,points[0])
+		var growth_anchor:=reference_transform*_screen_growth_anchor_pixel()
+		if is_nan(growth_anchor.x) or is_inf(growth_anchor.x) or is_nan(growth_anchor.y) or is_inf(growth_anchor.y):return PackedVector2Array()
+		var growth_ratio:=plant_sprite.scale.x/reference_scale
+		for index in range(points.size()):points[index]=growth_anchor+(points[index]-growth_anchor)*growth_ratio
+	return points
+
+func sync_screen_visual(camera:Camera3D)->void:
+	if not is_instance_valid(screen_sprite):return
+	if camera==null or plant_sprite==null or plant_sprite.texture==null:
+		screen_sprite.visible=false;screen_texture_transform_valid=false;return
+	var texture_size:=plant_sprite.texture.get_size()
+	var points:=_projected_texture_polygon(camera)
+	if points.size()!=4 or texture_size.x<=0.0 or texture_size.y<=0.0:
+		screen_sprite.visible=false;screen_texture_transform_valid=false;return
+	var axis_x:=(points[1]-points[0])/texture_size.x
+	var axis_y:=(points[3]-points[0])/texture_size.y
+	screen_texture_transform=Transform2D(axis_x,axis_y,points[0])
+	screen_texture_transform_valid=true
+	# A transformed Sprite2D eventually exceeds the Compatibility renderer's
+	# canvas-item bounds and vanishes even though its texture still crosses the
+	# viewport. Draw only the on-screen slice of the same unbounded transform.
+	# Polygon vertices therefore remain viewport-sized at 2,000 cm and beyond,
+	# while UVs retain the exact linear scale and root anchoring of the full image.
+	var viewport_rect:=camera.get_viewport().get_visible_rect().grow(2.0)
+	var viewport_polygon:=PackedVector2Array([
+		viewport_rect.position,
+		Vector2(viewport_rect.end.x,viewport_rect.position.y),
+		viewport_rect.end,
+		Vector2(viewport_rect.position.x,viewport_rect.end.y)
+	])
+	var clipped_polygons:=Geometry2D.intersect_polygons(points,viewport_polygon)
+	var clipped:=PackedVector2Array()
+	for candidate in clipped_polygons:
+		if candidate.size()>=3:
+			clipped=candidate
+			break
+	if clipped.size()<3:
+		screen_sprite.visible=false
+		screen_sprite.polygon=PackedVector2Array()
+		screen_sprite.uv=PackedVector2Array()
+		return
+	var inverse_transform:=screen_texture_transform.affine_inverse()
+	var texture_uv:=PackedVector2Array()
+	for screen_point in clipped:texture_uv.append(inverse_transform*screen_point)
+	screen_sprite.texture=plant_sprite.texture
+	screen_sprite.transform=Transform2D.IDENTITY
+	screen_sprite.polygon=clipped
+	screen_sprite.uv=texture_uv
+	screen_sprite.modulate=plant_sprite.modulate
+	screen_sprite.z_index=screen_draw_order_value
+	screen_sprite.visible=is_visible_in_tree()
 
 func _screen_hit_used_rect()->Rect2:
 	if plant_sprite==null or plant_sprite.texture==null:return Rect2()
@@ -223,39 +389,51 @@ func _screen_hit_used_rect()->Rect2:
 func _screen_visual_polygon(camera:Camera3D)->PackedVector2Array:
 	var points:=PackedVector2Array()
 	if camera==null or plant_sprite==null or plant_sprite.texture==null:return points
-	# Validate the billboard plane against the camera near plane before projecting.
-	# unproject_position() can return very large, inverted coordinates behind that
-	# plane; those coordinates previously made giant labels jump to the bottom and
-	# made the harvest polygon unusable.
-	var near_depth:=maxf(.01,camera.near*1.01)
-	var center_camera:Vector3=camera.to_local(plant_sprite.global_position)
-	if -center_camera.z<=near_depth:return points
+	if is_instance_valid(screen_sprite):
+		sync_screen_visual(camera)
+		if not screen_texture_transform_valid:return points
+		var screen_used:=_screen_hit_used_rect()
+		if screen_used.size.x<=0.0 or screen_used.size.y<=0.0:screen_used=Rect2(Vector2.ZERO,plant_sprite.texture.get_size())
+		for pixel_point in [screen_used.position,Vector2(screen_used.end.x,screen_used.position.y),screen_used.end,Vector2(screen_used.position.x,screen_used.end.y)]:
+			points.append(screen_texture_transform*pixel_point)
+		return points
 	var texture_size:=plant_sprite.texture.get_size()
 	if texture_size.x<=0.0 or texture_size.y<=0.0:return points
 	var used:=_screen_hit_used_rect()
 	if used.size.x<=0.0 or used.size.y<=0.0:used=Rect2(Vector2.ZERO,texture_size)
-	var basis:=camera.global_transform.basis
-	var angle:=plant_sprite.rotation.z
-	var plane_right:Vector3=basis.x*cos(angle)+basis.y*sin(angle)
-	var plane_up:Vector3=-basis.x*sin(angle)+basis.y*cos(angle)
-	var global_scale:=plant_sprite.global_transform.basis.get_scale()
-	var origin:=plant_sprite.global_position
-	for pixel_point in [used.position,Vector2(used.end.x,used.position.y),used.end,Vector2(used.position.x,used.end.y)]:
-		var local_pixels:=Vector2(
-			pixel_point.x-texture_size.x*.5+plant_sprite.offset.x,
-			-(pixel_point.y-texture_size.y*.5+plant_sprite.offset.y)
-		)
-		var world_point:=origin+plane_right*local_pixels.x*plant_sprite.pixel_size*global_scale.x+plane_up*local_pixels.y*plant_sprite.pixel_size*global_scale.y
-		var camera_point:Vector3=camera.to_local(world_point)
-		if -camera_point.z<=near_depth:return PackedVector2Array()
-		var projected:Vector2=camera.unproject_position(world_point)
-		if is_nan(projected.x) or is_inf(projected.x) or is_nan(projected.y) or is_inf(projected.y):return PackedVector2Array()
-		points.append(projected)
+	var full_points:=_projected_texture_polygon(camera)
+	if full_points.size()!=4:return points
+	var axis_x:=(full_points[1]-full_points[0])/texture_size.x
+	var axis_y:=(full_points[3]-full_points[0])/texture_size.y
+	var texture_transform:=Transform2D(axis_x,axis_y,full_points[0])
+	for pixel_point in [used.position,Vector2(used.end.x,used.position.y),used.end,Vector2(used.position.x,used.end.y)]:points.append(texture_transform*pixel_point)
 	return points
 
 func screen_depth(camera:Camera3D)->float:
-	if camera==null or plant_sprite==null:return INF
-	return -camera.to_local(plant_sprite.global_position).z
+	if camera==null:return INF
+	# Root depth is stable at every diameter and is also the natural overlap order
+	# for screen-space plants rooted in the soil.
+	return -camera.to_local(global_position).z
+
+func screen_label_anchor(camera:Camera3D)->Vector2:
+	if camera==null:return Vector2.ZERO
+	var root_screen:=camera.unproject_position(global_position)
+	var rendered_scale:=visual_scale
+	if plant_sprite!=null:rendered_scale=plant_sprite.scale.x
+	var reference_scale:=visual_scale_for_diameter(SCREEN_SPACE_GIANT_REFERENCE_CM)
+	var anchor_scale:=minf(rendered_scale,reference_scale)
+	var reference_world:=global_position+Vector3(0,anchor_scale*.7,0)
+	var reference_camera:=camera.to_local(reference_world)
+	if -reference_camera.z<=maxf(.01,camera.near*1.01):return root_screen
+	var reference_screen:=camera.unproject_position(reference_world)
+	if is_nan(reference_screen.x) or is_inf(reference_screen.x) or is_nan(reference_screen.y) or is_inf(reference_screen.y):return root_screen
+	if rendered_scale<=reference_scale:return reference_screen
+	# Continue the label's upward motion around the same fixed artwork base as the
+	# giant sprite. The UI clamp can then stop it at the top without any
+	# behind-camera projection sending it to the bottom.
+	var growth_anchor:=root_screen
+	if is_instance_valid(screen_sprite) and screen_texture_transform_valid:growth_anchor=screen_texture_transform*_screen_growth_anchor_pixel()
+	return growth_anchor+(reference_screen-growth_anchor)*(rendered_scale/reference_scale)
 
 func screen_visual_rect(camera:Camera3D)->Rect2:
 	var points:=_screen_visual_polygon(camera)
@@ -277,6 +455,7 @@ func screen_hit_test(camera:Camera3D,screen_point:Vector2)->Dictionary:
 	var padding:=clampf(minf(visible_rect.size.x,visible_rect.size.y)*.08,14.0,36.0)
 	var inside_artwork_bounds:=Geometry2D.is_point_in_polygon(screen_point,points)
 	var opaque_artwork_hit:=inside_artwork_bounds and _screen_point_hits_opaque_artwork(screen_point,points)
+	if uses_giant_screen_transform() and not opaque_artwork_hit:return {"hit":false,"rect":visible_rect,"polygon":points,"inside_artwork_bounds":inside_artwork_bounds,"opaque_artwork_hit":false,"depth":screen_depth(camera),"draw_order":screen_draw_order_value}
 	# Transparent space remains a low-priority accessibility target so the center
 	# of a single tutorial rosette is still tappable. Opaque leaves always win when
 	# another plant overlaps this fallback area.
@@ -284,7 +463,7 @@ func screen_hit_test(camera:Camera3D,screen_point:Vector2)->Dictionary:
 	var half_size:=Vector2(maxf(visible_rect.size.x*.5,1.0),maxf(visible_rect.size.y*.5,1.0))
 	var normalized_delta:=(screen_point-visible_rect.get_center())/half_size
 	var score:=normalized_delta.length()+(0.0 if opaque_artwork_hit else .85)
-	return {"hit":true,"score":score,"rect":visible_rect,"polygon":points,"center":visible_rect.get_center(),"inside_artwork_bounds":inside_artwork_bounds,"opaque_artwork_hit":opaque_artwork_hit,"depth":screen_depth(camera)}
+	return {"hit":true,"score":score,"rect":visible_rect,"polygon":points,"center":visible_rect.get_center(),"inside_artwork_bounds":inside_artwork_bounds,"opaque_artwork_hit":opaque_artwork_hit,"depth":screen_depth(camera),"draw_order":screen_draw_order_value}
 
 func _screen_point_hits_opaque_artwork(screen_point:Vector2,points:PackedVector2Array)->bool:
 	if points.size()!=4:return false
@@ -295,19 +474,14 @@ func _screen_point_hits_opaque_artwork(screen_point:Vector2,points:PackedVector2
 	if screen_hit_image==null or screen_hit_image.is_empty():return true
 	var used:=_screen_hit_used_rect();var pixel:=used.position+Vector2(u*used.size.x,v*used.size.y)
 	var image_size:=screen_hit_image.get_size();var pixel_position:=Vector2i(clampi(floori(pixel.x),0,maxi(0,image_size.x-1)),clampi(floori(pixel.y),0,maxi(0,image_size.y-1)))
-	return screen_hit_image.get_pixelv(pixel_position).a>.08
+	return screen_hit_image.get_pixelv(pixel_position).a>SCREEN_ALPHA_HIT_THRESHOLD
 
 static func visual_scale_for_diameter(value_cm:float)->float:
-	# Preserve the established look through 120 cm, then ease smoothly toward a
-	# display-only ceiling. Diameter, rewards, records, jelly and growth continue
-	# without any cap; only the billboard presentation is compressed.
+	# One linear physical-looking mapping for every size. The renderer switches to
+	# a root-anchored screen transform after 120 cm, so this can remain genuinely
+	# unbounded without pushing a 3D billboard through the camera.
 	var diameter:=maxf(1.6,value_cm)
-	var linear_scale:=VISUAL_SCALE_BASE+(diameter-1.6)*VISUAL_SCALE_PER_CM
-	if diameter<=GIANT_VISUAL_COMPRESSION_START_CM:return linear_scale
-	var transition_scale:=VISUAL_SCALE_BASE+(GIANT_VISUAL_COMPRESSION_START_CM-1.6)*VISUAL_SCALE_PER_CM
-	var remaining_scale:=GIANT_VISUAL_SCALE_LIMIT-transition_scale
-	var easing_rate:=VISUAL_SCALE_PER_CM/remaining_scale
-	return GIANT_VISUAL_SCALE_LIMIT-remaining_scale*exp(-(diameter-GIANT_VISUAL_COMPRESSION_START_CM)*easing_rate)
+	return VISUAL_SCALE_BASE+(diameter-1.6)*VISUAL_SCALE_PER_CM
 
 func _play_special_birth_glow() -> void:
 	# A brief warm bloom announces the 10% roll without leaving a permanent mark.
