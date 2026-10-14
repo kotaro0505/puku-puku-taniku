@@ -31,7 +31,7 @@ func _ready() -> void:
 	await _test_save_compatibility(game)
 	_test_post_ending_friendly_battle(game)
 	game._reset_progression_state()
-	print("JUREJURE_STORY_SMOKE_OK group=three_close first_encounter=camera+bgm home_warning=once battle=active6_total12 act2_only=true exploitation=act3+forced_first+normal_repeat+permanent midpoint=4+camera crisis=8 exploit_dialog=three-pattern-nonrepeat retired_secret=tombstone pool_unlock=all_10 ownership=exact reward=random post_ending=friendly+normal_pool+known_not_new save_fresh=true")
+	print("JUREJURE_STORY_SMOKE_OK group=three_close composition=all_6_points_above_dialog first_encounter=camera+bgm home_warning=once battle=active6_total12 act2_only=true exploitation=act3+forced_first+normal_repeat+permanent midpoint=4+camera crisis=8 exploit_dialog=three-pattern-nonrepeat retired_secret=tombstone pool_unlock=all_10 ownership=exact reward=random post_ending=friendly+normal_pool+known_not_new save_fresh=true")
 	get_tree().quit()
 
 
@@ -115,6 +115,8 @@ func _test_habitat_group_and_intro(game: Node) -> void:
 	assert(game.jurejure_intro_camera_active and not is_equal_approx(game.view_yaw, camera_start_yaw))
 	game._update_habitat_view_follow(.41)
 	assert(not game.jurejure_intro_camera_active and game.audio_manager.current_bgm_key == "jurejure")
+	assert(game.intro_dialog_panel.position == Vector2(40, 725))
+	_assert_jurejure_group_above_dialog(game, group)
 	for _frame in range(90):
 		if game.jurejure_first_encounter_overlay.visible:
 			break
@@ -175,11 +177,25 @@ func _test_habitat_group_and_intro(game: Node) -> void:
 	assert(game.current_mode == "habitat" and game.scripted_dialog_kind.is_empty() and not game.jurejure_first_encounter_overlay.visible)
 	# Every later habitat visit briefly frames the gang once before interaction.
 	await get_tree().create_timer(.9).timeout
+	var original_visit_point: Vector2 = game.jurejure_habitat_visit_point
+	for visit_point in JureJureSystemClass.HABITAT_GROUP_POINTS:
+		game.jurejure_habitat_visit_point = visit_point
+		game._build_habitat_items(true)
+		var composition_group := _group_item(game).get("group_node") as Node3D
+		game._focus_jurejure_group("composition_smoke")
+		game._update_habitat_view_follow(1.0)
+		_assert_jurejure_group_above_dialog(game, composition_group)
+	game.jurejure_habitat_visit_point = original_visit_point
+	game._build_habitat_items(true)
+	game._focus_jurejure_group("composition_smoke")
+	game._update_habitat_view_follow(1.0)
 
 	game._on_jurejure_group_pressed()
 	assert(game.scripted_dialog_kind == "jurejure_challenge")
 	assert(game.audio_manager.current_bgm_key == "jurejure")
 	assert(game.scripted_dialog_pages.size() == 2)
+	assert(game.intro_dialog_panel.position == Vector2(40, 725))
+	_assert_jurejure_group_above_dialog(game, (_group_item(game).get("group_node") as Node3D))
 	_finish_dialog(game)
 	await get_tree().process_frame
 	assert(game.puku_puku_battle.choice_layer.visible)
@@ -309,6 +325,8 @@ func _test_battle_loss(game: Node) -> void:
 	game.puku_puku_battle._return_to_habitat()
 	assert(game.audio_manager.current_bgm_key == "habitat")
 	assert(game.scripted_dialog_kind == "jurejure_battle_loss")
+	assert(game.intro_dialog_panel.position == Vector2(40, 725))
+	_assert_jurejure_group_above_dialog(game, (_group_item(game).get("group_node") as Node3D))
 	assert(str(game.scripted_dialog_pages[1].get("text", "")) == Localizer.text("ja", "jurejure_battle_loss_penalty", [puku_lost]))
 	_finish_dialog(game)
 	await get_tree().process_frame
@@ -824,6 +842,20 @@ func _group_item(game: Node) -> Dictionary:
 		if str(item.get("kind", "")) == "jurejure_group":
 			return item
 	return {}
+
+
+func _assert_jurejure_group_above_dialog(game: Node, group: Node3D) -> void:
+	assert(is_instance_valid(group))
+	var panel_rect := Rect2(game.intro_dialog_panel.position, game.intro_dialog_panel.size)
+	var tap_anchor := group.get_node("TapAnchor") as Node3D
+	var anchor_screen: Vector2 = game.camera.unproject_position(tap_anchor.global_position)
+	assert(absf(anchor_screen.y - game.get_viewport().get_visible_rect().size.y * 0.5) < 2.0)
+	for member_name in ["Skunk", "Mouse", "Peccary"]:
+		var member := group.get_node(member_name) as Sprite3D
+		var probe: Dictionary = game._habitat_sprite_screen_hit_test(member, Vector2(-10000.0, -10000.0))
+		var artwork_rect := probe.get("rect", Rect2()) as Rect2
+		assert(artwork_rect.has_area())
+		assert(artwork_rect.end.y < panel_rect.position.y)
 
 
 func _count_named_nodes(root: Node, target_name: String) -> int:

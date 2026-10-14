@@ -806,6 +806,8 @@ var jurejure_intro_camera_active := false
 var jurejure_intro_camera_elapsed := 0.0
 var jurejure_intro_camera_start_yaw := 0.0
 var jurejure_intro_camera_target_yaw := 0.0
+var jurejure_intro_camera_start_pitch := -3.0
+var jurejure_intro_camera_target_pitch := -3.0
 var jurejure_camera_focus_context := ""
 var habitat_visit_id := 0
 var jurejure_focused_habitat_visit_id := -1
@@ -2820,50 +2822,14 @@ func _current_dialog_avoid_rect()->Rect2:
 			return Rect2(screen-Vector2(80,80),Vector2(160,160))
 	return Rect2()
 
-func _dialog_avoid_rect_for_world_node(node:Node3D,half_size:Vector2)->Rect2:
-	if not is_instance_valid(node) or camera==null or camera.is_position_behind(node.global_position):return Rect2()
-	var screen:=camera.unproject_position(node.global_position)
-	return Rect2(screen-half_size,half_size*2.0)
-
-func _habitat_dialog_avoid_rects()->Array[Rect2]:
-	var result:Array[Rect2]=[]
-	var tutorial_avoid:=_current_dialog_avoid_rect()
-	if tutorial_avoid.has_area():result.append(tutorial_avoid)
-	for item in habitat_pickups:
-		var kind:=str(item.get("kind",""))
-		var node:=item.get("node") as Node3D
-		var avoid:=Rect2()
-		if kind=="jurejure_group":avoid=_dialog_avoid_rect_for_world_node(node,Vector2(150,150))
-		elif kind=="restoration_plant":avoid=_dialog_avoid_rect_for_world_node(node,Vector2(90,120))
-		if avoid.has_area():result.append(avoid)
-	return result
-
-func _dialog_position_avoiding(base:Vector2,avoid_rects:Array[Rect2])->Vector2:
-	var viewport_height:=get_viewport().get_visible_rect().size.y
-	var edge_margin:=40.0
-	var min_y:=minf(edge_margin,maxf(0.0,viewport_height-intro_dialog_panel.size.y))
-	var max_y:=maxf(min_y,viewport_height-intro_dialog_panel.size.y-edge_margin)
-	var candidates:Array[float]=[clampf(base.y,min_y,max_y)]
-	for avoid in avoid_rects:
-		candidates.append(clampf(avoid.position.y-intro_dialog_panel.size.y-16.0,min_y,max_y))
-		candidates.append(clampf(avoid.end.y+16.0,min_y,max_y))
-	var best_y:=candidates[0];var best_overlap:=INF;var best_distance:=INF
-	for candidate_y in candidates:
-		var panel_rect:=Rect2(Vector2(base.x,candidate_y),intro_dialog_panel.size)
-		var overlap:=0.0
-		for avoid in avoid_rects:
-			if panel_rect.intersects(avoid):overlap+=panel_rect.intersection(avoid).get_area()
-		var distance:=absf(candidate_y-base.y)
-		if overlap<best_overlap or is_equal_approx(overlap,best_overlap) and distance<best_distance:
-			best_y=candidate_y;best_overlap=overlap;best_distance=distance
-	return Vector2(base.x,best_y)
-
 func _position_intro_dialog()->void:
-	var bottom:=Vector2(40,725);var center:=Vector2(40,385)
-	if current_mode=="habitat":
-		intro_dialog_panel.position=_dialog_position_avoiding(center,_habitat_dialog_avoid_rects())
+	var avoid:=_current_dialog_avoid_rect();var bottom:=Vector2(40,725);var center:=Vector2(40,385)
+	# Normal habitat dialogue uses the original lower position. Only the returned-
+	# plant reveal keeps the established raised composition so the featured plant
+	# remains visible; the next dialogue call automatically restores the default.
+	if current_mode=="habitat" and scripted_dialog_kind.begins_with("restoration_return_"):
+		intro_dialog_panel.position=center
 		return
-	var avoid:=_current_dialog_avoid_rect()
 	intro_dialog_panel.position=center if avoid.has_area() and Rect2(bottom,intro_dialog_panel.size).intersects(avoid) else bottom
 
 func _position_tutorial_dialog(avoid:Rect2)->void:
@@ -3299,6 +3265,13 @@ func _focus_jurejure_group(context:String)->void:
 	var target:=group_node.global_position
 	jurejure_intro_camera_start_yaw=view_yaw
 	jurejure_intro_camera_target_yaw=JureJureSystemClass.focus_yaw(view_yaw,target)
+	jurejure_intro_camera_start_pitch=view_pitch
+	# Aim at the group's shared interaction anchor instead of its feet. The old
+	# fixed -3 degree pitch put the grounded sprites behind the lower dialogue box.
+	var focus_anchor:=group_node.get_node_or_null("TapAnchor") as Node3D
+	var focus_target:=focus_anchor.global_position if is_instance_valid(focus_anchor) else target+Vector3.UP*1.35
+	var focus_delta:=focus_target-camera.global_position
+	jurejure_intro_camera_target_pitch=rad_to_deg(atan2(focus_delta.y,Vector2(focus_delta.x,focus_delta.z).length()))
 	jurejure_camera_focus_context=context;jurejure_intro_camera_elapsed=0.0;jurejure_intro_camera_active=true
 	pointer_down=false;greenhouse_drag_accumulator=0.0;greenhouse_drag_started=false
 	jurejure_focused_habitat_visit_id=habitat_visit_id
@@ -3317,7 +3290,7 @@ func _focus_restoration_returned_plant(stage:int,immediate:=false)->bool:
 	if immediate:
 		view_yaw=focus_yaw;view_pitch=-3.0;habitat_target_yaw=view_yaw;habitat_target_pitch=view_pitch;_apply_view_rotation()
 		return true
-	jurejure_intro_camera_start_yaw=view_yaw;jurejure_intro_camera_target_yaw=focus_yaw
+	jurejure_intro_camera_start_yaw=view_yaw;jurejure_intro_camera_target_yaw=focus_yaw;jurejure_intro_camera_start_pitch=view_pitch;jurejure_intro_camera_target_pitch=-3.0
 	jurejure_camera_focus_context="restoration_return_%d"%stage;jurejure_intro_camera_elapsed=0.0;jurejure_intro_camera_active=true
 	return true
 
@@ -8733,7 +8706,7 @@ func _update_habitat_view_follow(delta:float)->void:
 		jurejure_intro_camera_elapsed=minf(.82,jurejure_intro_camera_elapsed+delta)
 		var focus_progress:=clampf(jurejure_intro_camera_elapsed/.82,0.0,1.0)
 		var focus_eased:=0.5-0.5*cos(PI*focus_progress)
-		view_yaw=lerpf(jurejure_intro_camera_start_yaw,jurejure_intro_camera_target_yaw,focus_eased);habitat_target_yaw=view_yaw;view_pitch=lerpf(view_pitch,-3.0,focus_eased);habitat_target_pitch=view_pitch;_apply_view_rotation()
+		view_yaw=lerpf(jurejure_intro_camera_start_yaw,jurejure_intro_camera_target_yaw,focus_eased);habitat_target_yaw=view_yaw;view_pitch=lerpf(jurejure_intro_camera_start_pitch,jurejure_intro_camera_target_pitch,focus_eased);habitat_target_pitch=view_pitch;_apply_view_rotation()
 		if focus_progress>=1.0:
 			var focus_context:=jurejure_camera_focus_context
 			jurejure_intro_camera_active=false;jurejure_intro_camera_elapsed=0.0;jurejure_camera_focus_context=""

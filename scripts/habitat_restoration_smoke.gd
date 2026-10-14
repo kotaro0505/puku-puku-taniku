@@ -13,7 +13,7 @@ func _ready() -> void:
 	_test_localization_contract()
 	_test_ending_asset_contract()
 	await _test_integrated_final_chapter()
-	print("HABITAT_RESTORATION_SMOKE_OK post_crisis=4 sow_gate=retired first_large_before_join=true queued_returns=true joined_after_first=true lamps=5 threshold=100 returned=5 medals=5 stages=0..5 slides=3 finale=true epilogue=true ending_records=5 returned_recap=5 final_image=true ending_bgm=true post_ending_greenhouse_once=true lifetime_harvest=true save_resume=true")
+	print("HABITAT_RESTORATION_SMOKE_OK post_crisis=4 sow_gate=retired first_large_before_join=true queued_returns=true return_dialog=center+plant_visible normal_dialog=bottom joined_after_first=true lamps=5 threshold=100 returned=5 medals=5 stages=0..5 slides=3 finale=true epilogue=true ending_records=5 returned_recap=5 final_image=true ending_bgm=true post_ending_greenhouse_once=true lifetime_harvest=true save_resume=true")
 	get_tree().quit()
 
 
@@ -336,13 +336,17 @@ func _test_integrated_final_chapter() -> void:
 	assert(not game.result_overlay.visible and game.current_mode == "habitat", "return transition mode=%s dialog=%s fade=%s pending=%s" % [game.current_mode, game.scripted_dialog_kind, game.scene_transition_fade.visible, HabitatRestorationClass.pending_return_stages(game._restoration_state())])
 	assert(game.scripted_dialog_kind == "restoration_return_1", "unexpected rooted event: %s pending=%s" % [game.scripted_dialog_kind, HabitatRestorationClass.pending_return_stages(game._restoration_state())])
 	assert(game.jurejure_camera_focus_context == "restoration_return_1")
+	assert(game.intro_dialog_panel.position == Vector2(40, 385))
 	var first_medal:Node3D=game._restoration_returned_plant_node(1)
 	assert(is_instance_valid(first_medal))
 	assert(int(first_medal.get_meta("restoration_stage",0))==1)
 	assert(is_equal_approx(float((first_medal.get_meta("restoration_snapshot",{}) as Dictionary).get("diameter_cm",0.0)),120.0))
+	game._update_habitat_view_follow(1.0)
+	_assert_returned_plant_visible_around_dialog(game, first_medal)
 	_finish_dialog(game)
 	await get_tree().create_timer(1.0).timeout
 	assert(game.scripted_dialog_kind == "restoration_join_habitat")
+	assert(game.intro_dialog_panel.position == Vector2(40, 725))
 	assert(game.scripted_dialog_pages.size() == 19)
 	assert(str(game.scripted_dialog_pages[0].get("text", "")).begins_with("はぁー"))
 	assert("早くするんだチュー" in str(game.scripted_dialog_pages[18].get("text", "")))
@@ -354,6 +358,7 @@ func _test_integrated_final_chapter() -> void:
 	assert(game._current_mission_text() == "100cm以上の多肉を5株、原生地へ還そう！　2/5")
 	assert(game.scripted_dialog_kind == "restoration_return_2")
 	assert(game.jurejure_camera_focus_context == "restoration_return_2")
+	assert(game.intro_dialog_panel.position == Vector2(40, 385))
 	var second_medal:Node3D=game._restoration_returned_plant_node(2)
 	assert(is_equal_approx(float((second_medal.get_meta("restoration_snapshot",{}) as Dictionary).get("diameter_cm",0.0)),130.0))
 	_finish_dialog(game)
@@ -376,10 +381,12 @@ func _test_integrated_final_chapter() -> void:
 	game._try_start_pending_story_event()
 	await get_tree().process_frame
 	assert(game.scripted_dialog_kind=="restoration_return_3")
+	assert(game.intro_dialog_panel.position==Vector2(40,385))
 	_finish_dialog(game);await get_tree().process_frame
 	assert(game.scene_transition_fade.visible and game.scene_transition_fade.color.r<.01)
 	await get_tree().create_timer(1.16).timeout
 	assert(game.scripted_dialog_kind=="restoration_return_4")
+	assert(game.intro_dialog_panel.position==Vector2(40,385))
 	_finish_dialog(game);await get_tree().process_frame
 	assert(HabitatRestorationClass.pending_return_stages(restoration).is_empty())
 	# Let the once-per-visit group focus finish before leaving the habitat.
@@ -399,11 +406,15 @@ func _test_integrated_final_chapter() -> void:
 	await get_tree().create_timer(2.8).timeout
 	assert(game.current_mode=="habitat")
 	assert(game.scripted_dialog_kind=="restoration_return_5")
+	assert(game.intro_dialog_panel.position==Vector2(40,385))
 	assert(game.habitat_items_root.find_children("RestorationMedalPlant*","Sprite3D",true,false).size()==5)
 	assert(is_equal_approx(float((game._restoration_returned_plant_node(3).get_meta("restoration_snapshot",{}) as Dictionary).get("diameter_cm",0.0)),145.0))
 	assert(is_equal_approx(float((game._restoration_returned_plant_node(4).get_meta("restoration_snapshot",{}) as Dictionary).get("diameter_cm",0.0)),160.0))
 	assert(game.jurejure_camera_focus_context=="restoration_return_5")
-	assert(is_equal_approx(float((game._restoration_returned_plant_node(5).get_meta("restoration_snapshot",{}) as Dictionary).get("diameter_cm",0.0)),175.0))
+	var fifth_medal:Node3D=game._restoration_returned_plant_node(5)
+	assert(is_equal_approx(float((fifth_medal.get_meta("restoration_snapshot",{}) as Dictionary).get("diameter_cm",0.0)),175.0))
+	game._update_habitat_view_follow(1.0)
+	_assert_returned_plant_visible_around_dialog(game,fifth_medal)
 	_finish_dialog(game)
 	await get_tree().create_timer(1.2).timeout
 	assert(game.habitat_restoration_ui.ending_layer.visible)
@@ -590,6 +601,19 @@ func _test_integrated_final_chapter() -> void:
 	assert(game.habitat_items_root.find_children("RestorationMedalPlant*","Sprite3D",true,false).size()==5)
 	game.free()
 	await get_tree().process_frame
+
+
+func _assert_returned_plant_visible_around_dialog(game: Node, plant_node: Node3D) -> void:
+	var plant := plant_node as Sprite3D
+	assert(is_instance_valid(plant))
+	var probe: Dictionary = game._habitat_sprite_screen_hit_test(plant, Vector2(-10000.0, -10000.0))
+	var artwork_rect := probe.get("rect", Rect2()) as Rect2
+	var viewport_rect := Rect2(Vector2.ZERO, game.get_viewport().get_visible_rect().size)
+	var visible_rect := artwork_rect.intersection(viewport_rect)
+	var panel_rect := Rect2(game.intro_dialog_panel.position, game.intro_dialog_panel.size)
+	assert(visible_rect.has_area())
+	var obscured_area := visible_rect.intersection(panel_rect).get_area() if visible_rect.intersects(panel_rect) else 0.0
+	assert(visible_rect.get_area() - obscured_area > visible_rect.get_area() * 0.5)
 
 
 func _test_restoration_plant_pickups(game: Node) -> void:

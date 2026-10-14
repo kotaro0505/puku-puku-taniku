@@ -14,7 +14,7 @@ func _ready() -> void:
 	_test_dialog_hides_navigation(game)
 	await _test_habitat_dialog_position(game)
 	game._reset_progression_state()
-	print("DIALOG_PORTRAIT_LAYOUT_SMOKE_OK speakers=6 speaker_top_gap=8 name_portrait_overlap=false portrait=clipped+contained text_overlap=false continue_overlap=false navigation=hidden habitat_position=center habitat_avoidance=true internal_layout=unchanged greenhouse_shop=unchanged")
+	print("DIALOG_PORTRAIT_LAYOUT_SMOKE_OK speakers=6 speaker_top_gap=8 name_portrait_overlap=false portrait=clipped+contained text_overlap=false continue_overlap=false navigation=hidden habitat_position=original_bottom restoration_return=center internal_layout=unchanged greenhouse_shop=unchanged")
 	get_tree().quit()
 
 
@@ -98,31 +98,43 @@ func _test_habitat_dialog_position(game: Node) -> void:
 	])
 	await get_tree().process_frame
 	await get_tree().process_frame
-	assert(game.intro_dialog_panel.position == Vector2(40, 385))
+	assert(game.intro_dialog_panel.position == Vector2(40, 725))
 	_assert_panel_inside_viewport(game)
 	_assert_internal_layout_unchanged(game, baseline_layout, panel_size, panel_scale, dialogue_font_size, dialogue_wrap, continue_font_size)
 	game.intro_continue_button.pressed.emit()
 	await get_tree().process_frame
 	assert(game.scripted_dialog_index == 1)
 	assert(game.intro_dialogue_label.text == "layout 2")
-	assert(game.intro_dialog_panel.position == Vector2(40, 385))
+	assert(game.intro_dialog_panel.position == Vector2(40, 725))
 	_assert_internal_layout_unchanged(game, baseline_layout, panel_size, panel_scale, dialogue_font_size, dialogue_wrap, continue_font_size)
 
-	var target := Node3D.new()
-	game.add_child(target)
-	target.global_position = game.camera.project_position(Vector2(288, 510), 6.0)
-	var target_item := {"node": target, "kind": "jurejure_group"}
-	game.habitat_pickups.append(target_item)
+	# JureJure visibility is handled by camera composition, never by moving the
+	# completed dialogue panel away from its original habitat position.
 	game._position_intro_dialog()
-	var avoid_rect: Rect2 = game._dialog_avoid_rect_for_world_node(target, Vector2(150, 150))
-	var moved_panel_rect := Rect2(game.intro_dialog_panel.position, game.intro_dialog_panel.size)
-	assert(not moved_panel_rect.intersects(avoid_rect))
-	assert(game.intro_dialog_panel.position.x == 40)
-	assert(game.intro_dialog_panel.position.y != 385)
+	assert(game.intro_dialog_panel.position == Vector2(40, 725))
 	_assert_panel_inside_viewport(game)
 	_assert_internal_layout_unchanged(game, baseline_layout, panel_size, panel_scale, dialogue_font_size, dialogue_wrap, continue_font_size)
-	game.habitat_pickups.erase(target_item)
-	target.queue_free()
+
+	# A returned giant plant reveal is the sole habitat exception. Every page of
+	# that event stays raised, then ordinary habitat dialogue returns to bottom.
+	_clear_test_dialog(game)
+	game._start_scripted_dialog("restoration_return_3", [
+		{"speaker": "armadillo", "text": "return layout"},
+		{"speaker": "girl", "text": "return layout 2"}
+	])
+	await get_tree().process_frame
+	assert(game.intro_dialog_panel.position == Vector2(40, 385))
+	_assert_panel_inside_viewport(game)
+	_assert_internal_layout_unchanged(game, baseline_layout, panel_size, panel_scale, dialogue_font_size, dialogue_wrap, continue_font_size)
+	game.intro_continue_button.pressed.emit()
+	await get_tree().process_frame
+	assert(game.intro_dialog_panel.position == Vector2(40, 385))
+	_assert_internal_layout_unchanged(game, baseline_layout, panel_size, panel_scale, dialogue_font_size, dialogue_wrap, continue_font_size)
+	_clear_test_dialog(game)
+	game._start_scripted_dialog("habitat_dialog_after_return_smoke", [{"speaker": "peccary", "text": "layout"}])
+	await get_tree().process_frame
+	assert(game.intro_dialog_panel.position == Vector2(40, 725))
+	_assert_internal_layout_unchanged(game, baseline_layout, panel_size, panel_scale, dialogue_font_size, dialogue_wrap, continue_font_size)
 
 	_clear_test_dialog(game)
 	game.current_mode = "greenhouse"
