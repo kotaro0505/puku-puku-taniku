@@ -591,7 +591,15 @@ func _test_game_flow(game) -> void:
 	assert(str(game.fusion_lab_ui.result_image.get_meta("catalog_loaded_path", "")) == str(game._catalog_entry(hybrid_id).get("image_path", "")))
 	assert(not game.fusion_lab_ui.fuse_button.disabled)
 	assert(int(game.fusion_lab_ui.current_result.get("fusion_cost_puku", 0)) == 1)
+	assert(game.fusion_lab_ui.fusion_cost_label.visible)
 	assert(game.fusion_lab_ui.fusion_cost_label.text == "1ぷくコイン")
+	game.fusion_lab_ui.parent_a_button.pressed.emit()
+	assert(game.fusion_lab_ui.picker_page.visible)
+	game.fusion_lab_ui.picker_back_button.pressed.emit()
+	assert(game.fusion_lab_ui.main_page.visible and not game.fusion_lab_ui.picker_page.visible)
+	assert(game.fusion_parent_a_id == gummy_id and game.fusion_parent_b_id == metal_id)
+	assert(str(game.fusion_lab_ui.current_result.get("result_species_id", "")) == hybrid_id)
+	assert(not game.fusion_lab_ui.fuse_button.disabled)
 
 	var hybrid_entry: Dictionary = game._catalog_entry(hybrid_id)
 	hybrid_entry["fusion_cost_puku"] = 2
@@ -606,11 +614,15 @@ func _test_game_flow(game) -> void:
 	assert(game._species_get_count(hybrid_id) == 0)
 	assert(not game.fusion_in_progress)
 	assert(game.fusion_lab_ui.result_status_label.text == Localizer.text("ja", "not_enough_puku"))
+	assert(game.fusion_parent_a_id == gummy_id and game.fusion_parent_b_id == metal_id)
+	assert(not game.fusion_lab_ui.fuse_button.disabled)
+	assert(game.fusion_lab_ui.parent_a_image.texture != null and game.fusion_lab_ui.parent_b_image.texture != null)
 
 	game.puku_points = 3
 	game._perform_fusion(gummy_id, metal_id)
 	game._perform_fusion(gummy_id, metal_id)
 	assert(game.fusion_in_progress)
+	assert(game.fusion_parent_a_id == gummy_id and game.fusion_parent_b_id == metal_id)
 	assert(game.puku_points == 1)
 	assert(game._species_get_count(hybrid_id) == 1)
 	await get_tree().create_timer(1.25).timeout
@@ -640,11 +652,35 @@ func _test_game_flow(game) -> void:
 	await get_tree().create_timer(.25).timeout
 	await get_tree().process_frame
 	assert(game.fusion_lab_ui.visible)
-	assert(game.fusion_parent_a_id == gummy_id and game.fusion_parent_b_id == metal_id)
-	assert(game.fusion_lab_ui.result_name_label.text == "金箔グミ")
-	assert(game.fusion_lab_ui.result_image.texture != null)
+	assert(game.fusion_parent_a_id.is_empty() and game.fusion_parent_b_id.is_empty())
+	assert(game.fusion_lab_ui.selected_a_id.is_empty() and game.fusion_lab_ui.selected_b_id.is_empty())
+	assert(game.fusion_lab_ui.parent_a_name_label.text == Localizer.text("ja", "fusion_choose"))
+	assert(game.fusion_lab_ui.parent_b_name_label.text == Localizer.text("ja", "fusion_choose"))
+	assert(game.fusion_lab_ui.parent_a_image.texture == null and game.fusion_lab_ui.parent_b_image.texture == null)
+	assert(game.fusion_lab_ui.current_result.is_empty())
+	assert(game.fusion_lab_ui.result_name_label.text == Localizer.text("ja", "fusion_result_unknown"))
+	assert(game.fusion_lab_ui.result_image.texture == null)
 	assert(game.fusion_lab_ui.result_image.material == null)
+	assert(game.fusion_lab_ui.result_image.modulate == Color.WHITE)
+	assert(game.fusion_lab_ui.result_image.scale == Vector2.ONE)
 	assert(not game.fusion_lab_ui.result_new_label.visible)
+	assert(not game.fusion_lab_ui.fusion_cost_label.visible and game.fusion_lab_ui.fusion_cost_label.text.is_empty())
+	assert(game.fusion_lab_ui.fuse_button.disabled)
+	assert(not game.fusion_lab_ui.fusion_processing and not game.fusion_lab_ui.result_revealed)
+	assert(game.fusion_lab_ui.candidate_by_id.has(hybrid_id))
+	game._on_fusion_parent_selected(0, hybrid_id)
+	game._on_fusion_parent_selected(1, glow_id)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert(game.fusion_parent_a_id == hybrid_id and game.fusion_parent_b_id == glow_id)
+	assert(str(game.fusion_lab_ui.current_result.get("result_species_id", "")) == "hyb_gummy_glow")
+	assert(game.fusion_lab_ui.fusion_cost_label.visible)
+	assert(not game.fusion_lab_ui.fuse_button.disabled)
+	game._on_fusion_parent_selected(0, gummy_id)
+	game._on_fusion_parent_selected(1, metal_id)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert(game.fusion_parent_a_id == gummy_id and game.fusion_parent_b_id == metal_id)
 	assert(game.fusion_lab_ui.fuse_button.disabled)
 	game.puku_points = 2
 	var known_balance_before: int = game.puku_balance_units
@@ -652,6 +688,7 @@ func _test_game_flow(game) -> void:
 	assert(game._species_get_count(hybrid_id) == 1)
 	assert(game.puku_balance_units == known_balance_before)
 	assert(game.fusion_lab_ui.visible)
+	assert(game.fusion_parent_a_id == gummy_id and game.fusion_parent_b_id == metal_id)
 	assert(not game.fusion_lab_ui.result_new_label.visible)
 	assert(not game.species_get_overlay.visible)
 	assert(game.fusion_lab_ui.result_status_label.text == Localizer.text("ja", "fusion_result_known"))
@@ -1033,7 +1070,14 @@ func _test_tier3_game_flow(game) -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	assert(game.fusion_lab_ui.visible)
-	assert(str(game.fusion_lab_ui.current_result.get("result_species_id", "")) == result_id)
+	assert(game.fusion_parent_a_id.is_empty() and game.fusion_parent_b_id.is_empty())
+	assert(game.fusion_lab_ui.selected_a_id.is_empty() and game.fusion_lab_ui.selected_b_id.is_empty())
+	assert(game.fusion_lab_ui.parent_a_image.texture == null and game.fusion_lab_ui.parent_b_image.texture == null)
+	assert(game.fusion_lab_ui.current_result.is_empty())
+	assert(game.fusion_lab_ui.result_image.texture == null)
+	assert(game.fusion_lab_ui.result_name_label.text == Localizer.text("ja", "fusion_result_unknown"))
+	assert(not game.fusion_lab_ui.result_new_label.visible)
+	assert(not game.fusion_lab_ui.fusion_cost_label.visible)
 	assert(game.fusion_lab_ui.fuse_button.disabled)
 	game._close_fusion_lab()
 	game._save()

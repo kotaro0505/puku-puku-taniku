@@ -4177,9 +4177,10 @@ func _resume_fusion_lab_after_get()->void:
 	if not fusion_return_pending or fusion_lab_ui==null or current_mode!="greenhouse":return
 	if not species_get_queue.is_empty() or species_get_overlay and species_get_overlay.visible or catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible:return
 	fusion_return_pending=false
+	fusion_parent_a_id=""
+	fusion_parent_b_id=""
 	fusion_lab_ui.set_language(language_code)
-	fusion_lab_ui.open_lab(fusion_system.eligible_parents(species_get_counts),species_get_counts,fusion_parent_a_id,fusion_parent_b_id,species_picker_series_catalog)
-	_refresh_fusion_lab_result()
+	fusion_lab_ui.open_lab(fusion_system.eligible_parents(species_get_counts),species_get_counts,"","",species_picker_series_catalog)
 	fusion_lab_ui.move_to_front()
 	_update_play_ui()
 

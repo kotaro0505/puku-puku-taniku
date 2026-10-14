@@ -362,7 +362,15 @@ func open_lab(parent_candidates: Array[Dictionary], counts: Dictionary, parent_a
 	result_revealed = false
 	result_image.texture = null
 	result_image.material = null
+	result_image.modulate = Color.WHITE
+	result_image.scale = Vector2.ONE
+	result_image.set_meta("catalog_loaded_path", "")
+	result_image.set_meta("catalog_request_path", "")
+	result_image.set_meta("catalog_request_callback", Callable())
 	result_new_label.visible = false
+	result_new_label.modulate = Color.WHITE
+	parent_a_button.scale = Vector2.ONE
+	parent_b_button.scale = Vector2.ONE
 	set_processing_state(false)
 	picker_filter_series_id = "all"
 	_refresh_picker_filters(true)
@@ -413,12 +421,21 @@ func refresh_selection(parent_a_id: String, parent_b_id: String, result: Diction
 		return
 	_refresh_parent_card(0, selected_a_id)
 	_refresh_parent_card(1, selected_b_id)
-	fusion_cost_label.text = Localizer.text(language, "fusion_cost", [current_cost])
 	result_new_label.visible = false
+	result_new_label.modulate = Color.WHITE
+	result_image.modulate = Color.WHITE
+	result_image.scale = Vector2.ONE
+	parent_a_button.scale = Vector2.ONE
+	parent_b_button.scale = Vector2.ONE
 	var result_entry: Dictionary = current_result.get("result_entry", {})
+	fusion_cost_label.visible = not result_entry.is_empty()
+	fusion_cost_label.text = Localizer.text(language, "fusion_cost", [current_cost]) if fusion_cost_label.visible else ""
 	if result_entry.is_empty():
 		result_image.texture = null
 		result_image.material = null
+		result_image.set_meta("catalog_loaded_path", "")
+		result_image.set_meta("catalog_request_path", "")
+		result_image.set_meta("catalog_request_callback", Callable())
 		result_name_label.text = Localizer.text(language, "fusion_result_unknown")
 		result_status_label.text = Localizer.text(language, "fusion_result_hint")
 		fuse_button.disabled = true
@@ -525,6 +542,9 @@ func _refresh_parent_card(slot: int, species_id: String) -> void:
 	var image := parent_a_image if slot == 0 else parent_b_image
 	var name_label := parent_a_name_label if slot == 0 else parent_b_name_label
 	image.texture = null
+	image.set_meta("catalog_loaded_path", "")
+	image.set_meta("catalog_request_path", "")
+	image.set_meta("catalog_request_callback", Callable())
 	if species_id.is_empty() or not candidate_by_id.has(species_id):
 		name_label.text = Localizer.text(language, "fusion_choose")
 		return
