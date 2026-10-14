@@ -72,6 +72,8 @@ static func default_runtime_state() -> Dictionary:
 		"exploitation_started": false,
 		"act3_battle_intro_pending": false,
 		"act3_battle_intro_seen": false,
+		"act3_first_battle_pending": false,
+		"act3_first_battle_completed": false,
 		"exploitation_midpoint_pending": false,
 		"exploitation_midpoint_seen": false,
 		"pending_story_events": [],
@@ -90,6 +92,8 @@ static func normalize_runtime_state(raw_state: Variant, migration: Dictionary = 
 	var state := default_runtime_state()
 	var saved_runtime_version := 0
 	var raw_dictionary: Dictionary = raw_state if raw_state is Dictionary else {}
+	var had_first_battle_state := raw_dictionary.has("act3_first_battle_pending") \
+			or raw_dictionary.has("act3_first_battle_completed")
 	var retired_secret_evidence := bool(migration.get("secret_gacha_evidence", false)) \
 			or bool(raw_dictionary.get("secret_gacha_unlocked", false)) \
 			or bool(raw_dictionary.get("secret_gacha_install_seen", false))
@@ -220,6 +224,21 @@ static func normalize_runtime_state(raw_state: Variant, migration: Dictionary = 
 		state["pending_story_events"].erase(EVENT_ACT3_BATTLE_INTRO)
 	elif bool(state.get("act3_battle_intro_pending", false)):
 		queue_story_event(state, EVENT_ACT3_BATTLE_INTRO)
+	# The linked first battle adds optional durable booleans without replaying the
+	# broader phase migrations. A save without these fields but with a JureJure
+	# GET (or later crisis evidence) has already earned that battle's
+	# reward and must never receive it twice. If its introduction was seen but no
+	# reward exists, resume the mandatory battle instead of silently losing it.
+	var first_exploitation_battle_completed := bool(state.get("act3_first_battle_completed", false))
+	if not had_first_battle_state and bool(state.get("act3_battle_intro_seen", false)):
+		first_exploitation_battle_completed = int(migration.get("jurejure_get_count", 0)) > 0 \
+				or bool(migration.get("habitat_crisis_pending", false)) \
+				or bool(migration.get("habitat_crisis_started", false)) \
+				or retired_secret_evidence
+	state["act3_first_battle_completed"] = first_exploitation_battle_completed
+	state["act3_first_battle_pending"] = not first_exploitation_battle_completed \
+			and bool(state.get("exploitation_started", false)) \
+			and bool(state.get("act3_battle_intro_seen", false))
 	if bool(state.get("exploitation_midpoint_seen", false)):
 		state["exploitation_midpoint_pending"] = false
 		state["pending_story_events"].erase(EVENT_EXPLOITATION_MIDPOINT)
@@ -478,6 +497,18 @@ static func complete_act3_battle_intro(state: Dictionary) -> void:
 	consume_story_event(state, EVENT_ACT3_BATTLE_INTRO)
 	state["act3_battle_intro_pending"] = false
 	state["act3_battle_intro_seen"] = true
+	if not bool(state.get("act3_first_battle_completed", false)):
+		state["act3_first_battle_pending"] = true
+
+
+static func act3_first_battle_is_pending(state: Dictionary) -> bool:
+	return bool(state.get("act3_first_battle_pending", false)) \
+			and not bool(state.get("act3_first_battle_completed", false))
+
+
+static func complete_act3_first_battle(state: Dictionary) -> void:
+	state["act3_first_battle_pending"] = false
+	state["act3_first_battle_completed"] = true
 
 
 static func update_jurejure_progress(state: Dictionary, jurejure_get_count: int) -> void:

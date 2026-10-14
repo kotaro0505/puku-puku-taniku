@@ -290,6 +290,7 @@ var jurejure_habitat_visit_point := Vector2(-1.0,-1.0)
 var jurejure_pending_reward_species_id := ""
 var jurejure_pending_reward_is_new := false
 var jurejure_last_battle_result: Dictionary = {}
+var act3_first_battle_active := false
 var habitat_second_awakened := false
 var habitat_second_awakening_complete := false
 var jurejure_update_accumulator := 0.0
@@ -1094,6 +1095,7 @@ func _setup_pot_unlock_iap()->void:
 
 func _load_save() -> void:
 	_cancel_puku_gauge_animations()
+	act3_first_battle_active=false
 	_reset_collection_complete_presentation(true)
 	legacy_habitat_migration_dirty=false;puku_balance_migration_dirty=false;catalog_cover_migration_dirty=false;collection_completion_migration_dirty=false;pot_inventory_migration_dirty=false;retired_content_migration_dirty=false;legacy_habitat_notification_ids_to_cancel.clear();panda_beacon_unread_log.clear()
 	puku_balance_units=0
@@ -2835,7 +2837,7 @@ func _advance_scripted_dialog()->void:
 func _finish_scripted_dialog()->void:
 	var finished_kind:=scripted_dialog_kind;var keep_shop:=scripted_dialog_shop_context
 	scripted_dialog_kind="";scripted_dialog_pages.clear();scripted_dialog_index=-1;scripted_dialog_shop_context=false;intro_overlay.visible=false
-	var acquired:Array[String]=[];var open_puku_intro:=false;var open_catalog:=false;var guide_habitat:=false;var guide_catalog:=false;var show_pinwheel_get:=false;var show_armadillo_gift:=false;var start_second_awakening:=false;var start_trio_event:=false;var start_jurejure_reveal:=false;var show_jurejure_choice:=false;var queue_jurejure_reward:=false;var focus_act3_exploitation:=false;var show_arrangement_swipe_intro:=false
+	var acquired:Array[String]=[];var open_puku_intro:=false;var open_catalog:=false;var guide_habitat:=false;var guide_catalog:=false;var show_pinwheel_get:=false;var show_armadillo_gift:=false;var start_second_awakening:=false;var start_trio_event:=false;var start_jurejure_reveal:=false;var show_jurejure_choice:=false;var start_act3_first_battle:=false;var queue_jurejure_reward:=false;var focus_act3_exploitation:=false;var show_arrangement_swipe_intro:=false
 	var begin_restoration_join_habitat:=false;var restoration_return_stage:=0;var next_restoration_return_stage:=0;var start_restoration_join_after_return:=false;var start_restoration_epilogue:=false;var show_restoration_thank_you:=false;var start_habitat_crisis_travel:=false;var finish_collection_complete:=false
 	if finished_kind.begins_with("restoration_return_"):
 		restoration_return_stage=int(finished_kind.trim_prefix("restoration_return_"))
@@ -2881,7 +2883,7 @@ func _finish_scripted_dialog()->void:
 			act3_intro_seen=true;act3_intro_pending=false;jurejure_waiting_for_seed_pod_reward=false
 			StoryProgressionClass.begin_exploitation(story_progression_state,_unique_jurejure_species_get_count());focus_act3_exploitation=current_mode=="habitat"
 		"act3_exploitation_battle_intro":
-			StoryProgressionClass.complete_act3_battle_intro(story_progression_state);show_jurejure_choice=true
+			StoryProgressionClass.complete_act3_battle_intro(story_progression_state);start_act3_first_battle=StoryProgressionClass.act3_first_battle_is_pending(story_progression_state)
 		"jurejure_species_first":
 			jurejure_species_first_seen=true
 		"habitat_crisis":
@@ -2941,6 +2943,7 @@ func _finish_scripted_dialog()->void:
 	_update_main_story_progress(false);_save();shop_overlay.visible=keep_shop
 	if (habitat_crisis_pending or habitat_crisis_started) and finished_kind in ["jurejure_exploitation_challenge","act3_exploitation_battle_intro"]:
 		show_jurejure_choice=false
+		start_act3_first_battle=false
 		focus_act3_exploitation=false
 	if finished_kind=="act3_intro" and current_mode=="habitat":_build_habitat_items(true)
 	if keep_shop:
@@ -2983,6 +2986,7 @@ func _finish_scripted_dialog()->void:
 	elif finished_kind=="first_seed_pod_reward":
 		if first_play_has_harvested and not puku_buyback_tutorial_complete:_start_puku_buyback_tutorial()
 		else:call_deferred("_finish_greenhouse_play")
+	elif start_act3_first_battle and puku_puku_battle:call_deferred("_start_act3_first_puku_puku_battle")
 	elif show_jurejure_choice and puku_puku_battle:call_deferred("_show_jurejure_battle_choice")
 	elif queue_jurejure_reward:
 		var reward_species_id:=jurejure_pending_reward_species_id;var reward_is_new:=jurejure_pending_reward_is_new;jurejure_pending_reward_species_id="";jurejure_pending_reward_is_new=false;call_deferred("_queue_species_get_by_id",reward_species_id,reward_is_new,"jurejure_battle")
@@ -4278,7 +4282,11 @@ func _open_jurejure_habitat_preview()->void:
 func _open_puku_puku_battle_preview()->void:
 	if not _trial_dev_controls_enabled():return
 	_prepare_jurejure_preview_state()
-	_start_puku_puku_battle()
+	var linked_preview:="--act3-first-battle-preview" in OS.get_cmdline_user_args()
+	if OS.has_feature("web"):
+		var requested=JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('battle_mode')",true)
+		linked_preview=str(requested)=="act3-first"
+	_start_puku_puku_battle(linked_preview)
 
 func _close_forest_gacha()->void:
 	if forest_gacha_ui:forest_gacha_ui.close_gacha()
@@ -4698,7 +4706,7 @@ func _reset_progression_state()->void:
 	first_tutorial_species_id="";habitat_wild_plants.clear();habitat_wild_initialized=false;habitat_wild_next_spawn_unix=0.0;habitat_tutorial_started=false;habitat_tutorial_complete=false;habitat_tutorial_species_id="";original_catalog_gifted=false;panda_beacon_unlocked=false;panda_beacon_count=0;panda_beacon_unread_log.clear();first_habitat_gift_claimed=false;armadillo_intro_event_3_completed=false;armadillo_series_event_7_completed=false;pending_armadillo_story_event="";armadillo_gift_series_id="";armadillo_gift_species_id="";scripted_dialog_kind="";scripted_dialog_pages.clear();scripted_dialog_index=-1
 	first_colorata_confirmed=false;trio_originals_confirmed=false;carnicolor_first_get_dialog_seen=false;carnicolor_first_get_dialog_pending=false;habitat_arrival_started=false;habitat_awakened=false;habitat_awakening_event_complete=false;seed_shop_open=false;mystery_items_acquired=false;mystery_catalog_tutorial_complete=false;normal_play_tutorial_complete=false;seed_pod_gauge_discovery_complete=false;seed_pod_first_reward_seen=false;initial_seed_stock_notice_complete=false;puku_buyback_tutorial_complete=false;puku_buyback_tutorial_active=false;puku_buyback_tutorial_index=0;habitat_returned_species.clear();special_series_explanation_seen=false;pending_special_series_explanation=false;main_story_stage=StoryProgressionClass.ACT_1;main_story_complete=false;main_story_completion_seen=false;catalog_series_unlock_notice_queue.clear();catalog_series_unlock_notice_ready.clear()
 	act2_unlocked=false;story_progression_state=StoryProgressionClass.default_runtime_state();forest_gacha_unlocked=false;forest_gacha_intro_seen=false;fantasy_first_discovery_seen=false;fantasy_realization_seen=false;act3_unlocked=false;act3_intro_pending=false;act3_intro_seen=false;jurejure_pool_unlocked=false;jurejure_species_unlocked.clear();jurejure_species_first_seen=false;habitat_crisis_pending=false;habitat_crisis_started=false;finale_complete=false;habitat_return_dialog_seen=false
-	original_catalog_complete_event_seen=false;habitat_tutorial_returned_to_greenhouse=false;jurejure_intro_complete=false;jurejure_enabled=false;jurejure_growth_stage=JureJureSystemClass.GROWTH_EARLY;jurejure_growth_event_mask=0;active_jurejure_event={};jurejure_next_check_unix=0.0;jurejure_cooldown_until_unix=0.0;jurejure_return_event_complete=false;jurejure_waiting_for_seed_pod_reward=false;jurejure_battle_count=0;jurejure_battle_win_count=0;jurejure_habitat_visit_point=Vector2(-1.0,-1.0);jurejure_pending_reward_species_id="";jurejure_pending_reward_is_new=false;jurejure_last_battle_result.clear();habitat_second_awakened=false;habitat_second_awakening_complete=false;jurejure_update_accumulator=0.0
+	original_catalog_complete_event_seen=false;habitat_tutorial_returned_to_greenhouse=false;jurejure_intro_complete=false;jurejure_enabled=false;jurejure_growth_stage=JureJureSystemClass.GROWTH_EARLY;jurejure_growth_event_mask=0;active_jurejure_event={};jurejure_next_check_unix=0.0;jurejure_cooldown_until_unix=0.0;jurejure_return_event_complete=false;jurejure_waiting_for_seed_pod_reward=false;jurejure_battle_count=0;jurejure_battle_win_count=0;jurejure_habitat_visit_point=Vector2(-1.0,-1.0);jurejure_pending_reward_species_id="";jurejure_pending_reward_is_new=false;jurejure_last_battle_result.clear();act3_first_battle_active=false;habitat_second_awakened=false;habitat_second_awakening_complete=false;jurejure_update_accumulator=0.0
 	first_seed_pod_reward_event_active=false;habitat_visit_id=0;jurejure_focused_habitat_visit_id=-1;act3_intro_eligible_visit_id=0;habitat_crisis_eligible_visit_id=0
 	if habitat_crisis_atmosphere:habitat_crisis_atmosphere.deactivate()
 	_cancel_puku_gauge_animations();puku_gauge_cm=0.0;puku_balance_units=0;show_growing_puku_preview=true;bests.clear();discovered.clear();species_get_counts.clear();catalog_cover_species.clear();unlocked_series={INITIAL_SERIES_ID:true};series_seed_inventory.clear();forest_gacha_draw_count=0;forest_gacha_encountered.clear();active_series_seed_id="";owned_pots={DEFAULT_POT_ID:1};saved_arrangements.clear();arrangement_save_capacity=20;greenhouse_available=_initial_greenhouse_state();unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;opening_story_complete=false;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;puku_gauge_intro_complete=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;mystery_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;mystery_seed_pack_unlocked=false;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;habitat_mystery_seeds_pending=0;mystery_seed_count=0;armadillo_research_total=0;armadillo_research_rewards.clear();armadillo_research_intro_seen=false;armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();result_deferred_species_queue.clear();pending_round_new_species_ids.clear();round_result_species_finalize_queue.clear();round_result_species_finalize_active=false;round_result_species_save_pending=false;shop_chatter_acquired_species.clear();species_get_queue.clear();play_share_record.clear();play_active=false;play_time_remaining=0.0;play_harvest_cm_total=0.0;play_puku_reward_units_total=0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;_reset_endless_economy_stats();rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_time_multiplier=1;habitat_simulation_unix=Time.get_unix_time_from_system();habitat_debug_log.clear();habitat_scroll_tutorial_active=false;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_clear_habitat_items();_save();_update_currency_ui();_update_play_ui()
@@ -6755,6 +6763,10 @@ func _try_start_pending_story_event()->void:
 		call_deferred("_resume_fusion_lab_after_get")
 		return
 	if _try_start_pending_habitat_crisis_transition():return
+	if StoryProgressionClass.act3_first_battle_is_pending(story_progression_state):
+		if current_mode=="habitat":call_deferred("_start_act3_first_puku_puku_battle")
+		else:call_deferred("_transition_to_story_habitat","act3_first_battle")
+		return
 	var queued_story_event:=StoryProgressionClass.peek_story_event(story_progression_state)
 	if act3_intro_pending and not act3_intro_seen:
 		if current_mode=="habitat":_focus_jurejure_group("act3_intro")
@@ -6960,6 +6972,7 @@ func _transition_to_story_habitat(event_kind:String)->void:
 	scene_transition_fade.visible=false;scene_transition_fade.color=Color.BLACK
 	match event_kind:
 		"act3_intro":_focus_jurejure_group("act3_intro")
+		"act3_first_battle":call_deferred("_start_act3_first_puku_puku_battle")
 		"restoration_return":
 			if committed_stage>0:_start_restoration_return_event(committed_stage)
 			else:call_deferred("_try_start_pending_story_event")
@@ -8381,9 +8394,11 @@ func _on_jurejure_group_pressed()->void:
 
 func _show_jurejure_battle_choice()->void:
 	if puku_puku_battle==null:return
+	act3_first_battle_active=false
 	puku_puku_battle.show_choice(language_code);_update_play_ui()
 
 func _on_jurejure_battle_declined()->void:
+	act3_first_battle_active=false
 	_play_current_area_bgm()
 	_update_play_ui()
 
@@ -8408,16 +8423,23 @@ func _jurejure_battle_textures(entries:Array[Dictionary])->Dictionary:
 		if texture!=null:textures[species_id]=texture
 	return textures
 
-func _start_puku_puku_battle()->void:
+func _start_act3_first_puku_puku_battle()->void:
+	if not StoryProgressionClass.act3_first_battle_is_pending(story_progression_state):return
+	if habitat_crisis_pending or habitat_crisis_started:return
+	_start_puku_puku_battle(true)
+
+func _start_puku_puku_battle(link_opponent_harvest_to_player:=false)->void:
 	if puku_puku_battle==null:return
 	var entries:=_jurejure_battle_species_entries();var textures:=_jurejure_battle_textures(entries)
 	if entries.is_empty() or textures.is_empty():
+		act3_first_battle_active=false
 		puku_puku_battle.visible=false
 		_play_current_area_bgm()
 		_update_play_ui();return
+	act3_first_battle_active=link_opponent_harvest_to_player
 	jurejure_last_battle_result.clear();jurejure_pending_reward_species_id="";jurejure_pending_reward_is_new=false
 	if audio_manager:audio_manager.play_bgm("puku_battle")
-	puku_puku_battle.start_battle(entries,textures,language_code);_update_play_ui()
+	puku_puku_battle.start_battle(entries,textures,language_code,0,link_opponent_harvest_to_player);_update_play_ui()
 
 func _jurejure_reward_candidates()->Array[Dictionary]:
 	if _is_post_ending_jurejure_battle():return _post_ending_normal_reward_candidates()
@@ -8486,6 +8508,7 @@ func _on_puku_puku_battle_resolved(result:Dictionary)->void:
 	var post_ending_battle:=_is_post_ending_jurejure_battle()
 	jurejure_battle_count+=1;jurejure_last_battle_result=result.duplicate(true)
 	if bool(result.get("won",false)):
+		if act3_first_battle_active:StoryProgressionClass.complete_act3_first_battle(story_progression_state)
 		jurejure_battle_win_count+=1;jurejure_waiting_for_seed_pod_reward=not StoryProgressionClass.exploitation_is_started(story_progression_state)
 		jurejure_pending_reward_species_id=_grant_jurejure_battle_reward()
 	else:
@@ -8497,6 +8520,7 @@ func _on_puku_puku_battle_resolved(result:Dictionary)->void:
 	_save();_update_currency_ui();_build_habitat_items(true);_refresh_habitat_dev_panel();_update_play_ui()
 
 func _on_puku_puku_battle_return_requested()->void:
+	act3_first_battle_active=false
 	current_mode="habitat";_apply_mode();_update_play_ui()
 	if bool(jurejure_last_battle_result.get("won",false)):
 		var win_key:="jurejure_battle_win_mouse" if not jurejure_pending_reward_species_id.is_empty() else "jurejure_battle_win_no_reward"

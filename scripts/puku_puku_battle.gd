@@ -74,6 +74,8 @@ var pending_textures: Dictionary = {}
 var opponent_points: Array[Vector2] = []
 var player_points: Array[Vector2] = []
 var rng := RandomNumberGenerator.new()
+var player_linked_opponent_harvest := false
+var linked_opponent_harvest_count := 0
 
 
 func _ready() -> void:
@@ -209,9 +211,10 @@ func show_choice(language: String) -> void:
 	move_to_front()
 
 
-func start_battle(entries: Array[Dictionary], textures: Dictionary, language: String, random_seed: int = 0) -> void:
+func start_battle(entries: Array[Dictionary], textures: Dictionary, language: String, random_seed: int = 0, link_opponent_harvest_to_player: bool = false) -> void:
 	language_code = Localizer.normalize_language(language)
 	_clear_units()
+	player_linked_opponent_harvest = link_opponent_harvest_to_player
 	if random_seed == 0:
 		rng.randomize()
 	else:
@@ -448,7 +451,7 @@ func _process(delta: float) -> void:
 		units[unit_index] = unit
 		if str(logic.state) == "jelly":
 			_resolve_unit(unit_index, true)
-		elif bool(unit.get("opponent", false)) and float(logic.age) >= float(unit.get("ai_harvest_age", INF)):
+		elif bool(unit.get("opponent", false)) and not player_linked_opponent_harvest and float(logic.age) >= float(unit.get("ai_harvest_age", INF)):
 			_resolve_unit(unit_index, false)
 		else:
 			_update_unit_visual(unit_index)
@@ -461,9 +464,51 @@ func _harvest_player(unit_index: int) -> void:
 	if bool(unit.get("opponent", false)) or bool(unit.get("done", false)):
 		return
 	_resolve_unit(unit_index, false)
+	var resolved_player: Dictionary = units[unit_index]
+	if player_linked_opponent_harvest and not bool(resolved_player.get("jellied", false)):
+		_harvest_linked_opponent(float(resolved_player.get("score", 0.0)))
 
 
-func _resolve_unit(unit_index: int, jellied: bool) -> void:
+func _harvest_linked_opponent(player_harvest_score: float) -> void:
+	if not player_linked_opponent_harvest or not battle_active or player_harvest_score <= 0.0:
+		return
+	# Prefer a living plant whose real diameter already fits below the player's
+	# harvest. This keeps the floating cm value visually faithful whenever one is
+	# available. If every enemy plant is larger, harvest the smallest and cap only
+	# its awarded score; the plant itself is never rewound or otherwise mutated.
+	var score_cap := minf(player_harvest_score, maxf(0.0, player_score - opponent_score))
+	var fitting_index := -1
+	var fitting_size := -INF
+	var fallback_index := -1
+	var fallback_size := INF
+	for candidate_index in range(units.size()):
+		var candidate: Dictionary = units[candidate_index]
+		if not bool(candidate.get("opponent", false)) or bool(candidate.get("done", false)):
+			continue
+		var candidate_logic = candidate.get("logic")
+		if not is_instance_valid(candidate_logic) or str(candidate_logic.state) != "growing":
+			continue
+		var candidate_size := float(candidate.get("size_cm", 0.0))
+		if candidate_size <= score_cap + 0.0001:
+			if candidate_size > fitting_size:
+				fitting_size = candidate_size
+				fitting_index = candidate_index
+		elif candidate_size < fallback_size:
+			fallback_size = candidate_size
+			fallback_index = candidate_index
+	var target_index := fitting_index if fitting_index >= 0 else fallback_index
+	if target_index < 0:
+		return
+	var target: Dictionary = units[target_index]
+	target["linked_to_player_harvest"] = true
+	target["linked_player_score_cap"] = score_cap
+	units[target_index] = target
+	_resolve_unit(target_index, false, score_cap)
+	if bool(units[target_index].get("done", false)) and not bool(units[target_index].get("jellied", false)):
+		linked_opponent_harvest_count += 1
+
+
+func _resolve_unit(unit_index: int, jellied: bool, score_cap_cm: float = INF) -> void:
 	if unit_index < 0 or unit_index >= units.size():
 		return
 	var unit: Dictionary = units[unit_index]
@@ -478,6 +523,10 @@ func _resolve_unit(unit_index: int, jellied: bool) -> void:
 	unit["jellied"] = resolved_as_jelly
 	var opponent := bool(unit.get("opponent", false))
 	var score := 0.0 if resolved_as_jelly else float(unit.get("size_cm", 0.0))
+	unit["harvest_size_cm"] = score
+	if opponent and not resolved_as_jelly and score_cap_cm < INF:
+		score = minf(score, maxf(0.0, score_cap_cm))
+		unit["score_capped"] = score + 0.0001 < float(unit.get("harvest_size_cm", 0.0))
 	unit["score"] = score
 	units[unit_index] = unit
 	if opponent:
@@ -636,6 +685,8 @@ func _clear_units() -> void:
 		for child in logic_root.get_children():
 			child.free()
 	units.clear()
+	player_linked_opponent_harvest = false
+	linked_opponent_harvest_count = 0
 	player_spawned = 0
 	opponent_spawned = 0
 	pending_entries.clear()

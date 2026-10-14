@@ -30,7 +30,7 @@ func _ready() -> void:
 	await _test_save_compatibility(game)
 	_test_post_ending_friendly_battle(game)
 	game._reset_progression_state()
-	print("JUREJURE_STORY_SMOKE_OK group=three_close first_encounter=camera+bgm home_warning=once battle=active6_total12 act2_only=true exploitation=act3+choice+permanent midpoint=4+camera crisis=8 exploit_dialog=three-pattern-nonrepeat retired_secret=tombstone pool_unlock=all_10 ownership=exact reward=random post_ending=friendly+normal_pool+known_not_new save_fresh=true")
+	print("JUREJURE_STORY_SMOKE_OK group=three_close first_encounter=camera+bgm home_warning=once battle=active6_total12 act2_only=true exploitation=act3+forced_first+normal_repeat+permanent midpoint=4+camera crisis=8 exploit_dialog=three-pattern-nonrepeat retired_secret=tombstone pool_unlock=all_10 ownership=exact reward=random post_ending=friendly+normal_pool+known_not_new save_fresh=true")
 	get_tree().quit()
 
 
@@ -397,6 +397,7 @@ func _prepare_act_three_reward(game: Node) -> void:
 	# These tests exercise repeat exploitation battles; the dedicated one-time
 	# Act III camera introduction is covered by story_progression_smoke.
 	StoryProgressionClass.complete_act3_battle_intro(game.story_progression_state)
+	StoryProgressionClass.complete_act3_first_battle(game.story_progression_state)
 	game.current_mode = "habitat"
 	game._update_main_story_progress(false)
 	game._apply_mode()

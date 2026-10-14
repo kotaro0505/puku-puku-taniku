@@ -16,7 +16,7 @@ func _ready() -> void:
 	_test_retired_unlock_conditions(game)
 	_test_legacy_three_act_migration(game)
 	game._reset_progression_state()
-	print("STORY_PROGRESSION_SMOKE_OK acts=3 first_battle=act2 original_guarantee=true fantasy_gate=original_get fantasy_guarantee=true arrangement_gate=1 forest_gate=6 fantasy=1+6+24 safe_queue=true exploitation=act3 midpoint=4 crisis=8 post_crisis_home=once retired_secret=tombstone")
+	print("STORY_PROGRESSION_SMOKE_OK acts=3 first_battle=act2 original_guarantee=true fantasy_gate=original_get fantasy_guarantee=true arrangement_gate=1 forest_gate=6 fantasy=1+6+24 safe_queue=true exploitation=act3 forced_first_battle=true resume=true reward_once=true second_battle=normal midpoint=4 crisis=8 post_crisis_home=once retired_secret=tombstone")
 	get_tree().quit()
 
 
@@ -262,8 +262,56 @@ func _test_three_act_sequence(game: Node) -> void:
 	assert(not game.puku_puku_battle.visible)
 	_finish_dialog(game)
 	await get_tree().process_frame
-	assert(game.puku_puku_battle.visible and game.puku_puku_battle.choice_layer.visible)
+	assert(game.puku_puku_battle.visible and not game.puku_puku_battle.choice_layer.visible)
+	assert(game.puku_puku_battle.battle_layer.visible and game.puku_puku_battle.battle_phase == "awaiting_sow")
+	assert(game.puku_puku_battle.player_linked_opponent_harvest and game.act3_first_battle_active)
 	assert(not game.puku_puku_battle.battle_active and bool(game.story_progression_state.get("act3_battle_intro_seen", false)))
+	assert(StoryProgressionClass.act3_first_battle_is_pending(game.story_progression_state))
+	assert(not bool(game.story_progression_state.get("act3_first_battle_completed", false)))
+	var pending_battle_payload = JSON.parse_string(FileAccess.get_file_as_string(game._active_save_path()))
+	assert(pending_battle_payload is Dictionary)
+	var pending_battle_state := StoryProgressionClass.normalize_runtime_state(pending_battle_payload.get("story_progression_state", {}))
+	assert(StoryProgressionClass.act3_first_battle_is_pending(pending_battle_state))
+
+	# An interrupted battle is reconstructed from the durable pending state. The
+	# choice screen never becomes an escape hatch on recovery.
+	game.puku_puku_battle.visible = false
+	game.puku_puku_battle._clear_units()
+	game.act3_first_battle_active = false
+	game._try_start_pending_story_event()
+	await get_tree().process_frame
+	assert(game.puku_puku_battle.visible and not game.puku_puku_battle.choice_layer.visible)
+	assert(game.puku_puku_battle.player_linked_opponent_harvest and game.act3_first_battle_active)
+	var jurejure_gets_before_first_exploitation_battle: int = int(game._unique_jurejure_species_get_count())
+	game.puku_puku_battle.debug_force_result(0.0, 0.0)
+	assert(game.jurejure_last_battle_result.get("won", false))
+	assert(not StoryProgressionClass.act3_first_battle_is_pending(game.story_progression_state))
+	assert(bool(game.story_progression_state.get("act3_first_battle_completed", false)))
+	assert(game._unique_jurejure_species_get_count() == jurejure_gets_before_first_exploitation_battle + 1)
+	var first_exploitation_reward_id: String = str(game.jurejure_pending_reward_species_id)
+	assert(not first_exploitation_reward_id.is_empty() and game._species_get_count(first_exploitation_reward_id) == 1)
+	var completed_battle_payload = JSON.parse_string(FileAccess.get_file_as_string(game._active_save_path()))
+	var completed_battle_state := StoryProgressionClass.normalize_runtime_state(completed_battle_payload.get("story_progression_state", {}))
+	assert(bool(completed_battle_state.get("act3_first_battle_completed", false)))
+	assert(not StoryProgressionClass.act3_first_battle_is_pending(completed_battle_state))
+	game.jurejure_species_first_seen = true
+	game.jurejure_pending_reward_species_id = ""
+	game.jurejure_pending_reward_is_new = false
+	game.puku_puku_battle._return_to_habitat()
+	assert(game.scripted_dialog_kind == "jurejure_battle_win")
+	_finish_dialog(game)
+	await get_tree().process_frame
+	assert(not game.puku_puku_battle.visible and not game.act3_first_battle_active)
+	assert(game._species_get_count(first_exploitation_reward_id) == 1)
+
+	# The next exploitation challenge returns to the ordinary opt-in battle and
+	# its normal autonomous AI mode.
+	game._start_jurejure_challenge_event()
+	assert(game.scripted_dialog_kind == "jurejure_exploitation_challenge")
+	_finish_dialog(game)
+	await get_tree().process_frame
+	assert(game.puku_puku_battle.visible and game.puku_puku_battle.choice_layer.visible)
+	assert(not game.puku_puku_battle.player_linked_opponent_harvest and not game.act3_first_battle_active)
 	game.puku_puku_battle._decline_battle()
 	assert(game.audio_manager.current_bgm_key == "jurejure")
 	game.jurejure_waiting_for_seed_pod_reward = true
@@ -286,16 +334,20 @@ func _test_three_act_sequence(game: Node) -> void:
 	var jurejure_ids: Array[String] = []
 	for entry in game._series_species_entries("jurejure"):
 		jurejure_ids.append(str(entry.get("species_id", "")))
-	assert(game._unlock_jurejure_pool())
+	game._unlock_jurejure_pool()
+	assert(game.jurejure_pool_unlocked)
 	game.jurejure_species_first_seen = true
-	for index in range(3):
-		assert(game._register_species_discovery(jurejure_ids[index], true))
+	var unowned_jurejure_ids: Array[String] = []
+	for species_id in jurejure_ids:
+		if game._species_get_count(species_id) <= 0:unowned_jurejure_ids.append(species_id)
+	for index in range(2):
+		assert(game._register_species_discovery(unowned_jurejure_ids[index], true))
 	assert(game._unique_jurejure_species_get_count() == 3)
 	assert(not bool(game.story_progression_state.get("exploitation_midpoint_pending", false)))
 	assert(not game.habitat_crisis_pending and not game.habitat_crisis_started)
-	game._register_species_discovery(jurejure_ids[0], true)
+	game._register_species_discovery(first_exploitation_reward_id, true)
 	assert(game._unique_jurejure_species_get_count() == 3 and not game.habitat_crisis_pending)
-	assert(game._register_species_discovery(jurejure_ids[3], true))
+	assert(game._register_species_discovery(unowned_jurejure_ids[2], true))
 	assert(game._unique_jurejure_species_get_count() == 4)
 	assert(bool(game.story_progression_state.get("exploitation_midpoint_pending", false)))
 	assert(not game.habitat_crisis_pending and not game.habitat_crisis_started)
@@ -334,13 +386,13 @@ func _test_three_act_sequence(game: Node) -> void:
 	assert(not game.jurejure_intro_camera_active and is_equal_approx(game.view_yaw, late_visit_yaw))
 	_finish_dialog(game)
 
-	for index in range(4, 7):
-		assert(game._register_species_discovery(jurejure_ids[index], true))
+	for index in range(3, 6):
+		assert(game._register_species_discovery(unowned_jurejure_ids[index], true))
 	assert(game._unique_jurejure_species_get_count() == 7)
 	assert(not game.habitat_crisis_pending and not game.habitat_crisis_started)
-	game._register_species_discovery(jurejure_ids[0], true)
+	game._register_species_discovery(first_exploitation_reward_id, true)
 	assert(game._unique_jurejure_species_get_count() == 7 and not game.habitat_crisis_pending)
-	assert(game._register_species_discovery(jurejure_ids[7], true))
+	assert(game._register_species_discovery(unowned_jurejure_ids[6], true))
 	assert(game._unique_jurejure_species_get_count() == 8)
 	assert(game.habitat_crisis_pending and not game.habitat_crisis_started)
 	assert(StoryProgressionClass.habitat_crisis_route(game.story_progression_state) == StoryProgressionClass.CRISIS_ROUTE_SAME_HABITAT)
@@ -533,6 +585,8 @@ func _test_legacy_three_act_migration(game: Node) -> void:
 	})
 	assert(StoryProgressionClass.exploitation_is_started(old_crisis_state))
 	assert(StoryProgressionClass.exploitation_midpoint_is_seen(old_crisis_state))
+	assert(bool(old_crisis_state.get("act3_first_battle_completed", false)))
+	assert(not StoryProgressionClass.act3_first_battle_is_pending(old_crisis_state))
 	assert(not old_crisis_state.has("secret_gacha_unlocked") and not old_crisis_state.has("secret_gacha_install_seen"))
 	assert(bool(old_crisis_state.get("post_encounter_greenhouse_seen", false)))
 	assert(not bool(old_crisis_state.get("post_encounter_greenhouse_pending", false)))
@@ -549,9 +603,29 @@ func _test_legacy_three_act_migration(game: Node) -> void:
 		"secret_gacha_evidence": false,
 	})
 	assert(StoryProgressionClass.exploitation_is_started(old_midpoint_state))
+	assert(bool(old_midpoint_state.get("act3_first_battle_completed", false)))
+	assert(not StoryProgressionClass.act3_first_battle_is_pending(old_midpoint_state))
 	assert(bool(old_midpoint_state.get("exploitation_midpoint_pending", false)))
 	assert(StoryProgressionClass.peek_story_event(old_midpoint_state) == StoryProgressionClass.EVENT_EXPLOITATION_MIDPOINT)
 	assert(not old_midpoint_state.has("secret_gacha_unlocked") and not old_midpoint_state.has("secret_gacha_install_seen"))
+
+	# An older save without the dedicated fields that finished the Act III battle
+	# introduction but never received a JureJure species resumes the fight once.
+	var interrupted_first_battle_state := StoryProgressionClass.normalize_runtime_state({
+		"version": 9,
+		"exploitation_started": true,
+		"act3_battle_intro_seen": true,
+	}, {
+		"act3_intro_seen": true,
+		"jurejure_get_count": 0,
+		"habitat_crisis_started": false,
+	})
+	assert(StoryProgressionClass.act3_first_battle_is_pending(interrupted_first_battle_state))
+	assert(not bool(interrupted_first_battle_state.get("act3_first_battle_completed", false)))
+	StoryProgressionClass.complete_act3_first_battle(interrupted_first_battle_state)
+	var completed_first_battle_state := StoryProgressionClass.normalize_runtime_state(interrupted_first_battle_state)
+	assert(bool(completed_first_battle_state.get("act3_first_battle_completed", false)))
+	assert(not StoryProgressionClass.act3_first_battle_is_pending(completed_first_battle_state))
 
 	# A queued install from a retired build is consumed as phase evidence, then
 	# discarded. Current runtime state never persists the retired keys or event.
