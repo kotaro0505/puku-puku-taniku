@@ -23,8 +23,9 @@ func _ready()->void:
 	_test_catalog_auto_record(game)
 	_test_save_and_legacy_load(game)
 	await _test_panda_rescue(game)
+	_test_max_size_record_is_silent(game)
 	game._reset_progression_state();game.queue_free()
-	print("PUKU_POINTS_SMOKE_OK unit=1/1000 round_cost=1.00 direct_harvest=true giant=100,120,150,200,300,500,700,1000,1500,2000,10000cm_linear_rooted_species3_positions3_speeds1.6+10 label_toggle=localized_persistent_on_off+main_only_live_recalc reward1000+2000=true new_floor=.20 migration=points+legacy_gauge forest_cost=1 rescue=wallet_plus_1 combo=true fly_removed=true result=removed automatic_get=true")
+	print("PUKU_POINTS_SMOKE_OK unit=1/1000 round_cost=1.00 direct_harvest=true giant=100,120,150,200,300,500,700,1000,1500,2000,10000cm_linear_rooted_species3_positions3_speeds1.6+10 label_toggle=localized_persistent_on_off+main_only_live_recalc max_record=silent_visual_preserved reward1000+2000=true new_floor=.20 migration=points+legacy_gauge forest_cost=1 rescue=wallet_plus_1 combo=true fly_removed=true result=removed automatic_get=true")
 	get_tree().quit()
 
 func _test_seed_pod_thresholds(game)->void:
@@ -36,6 +37,16 @@ func _test_seed_pod_thresholds(game)->void:
 	assert(game.add_seed_pod_gauge_cm(1.0,false,false)==3 and is_zero_approx(game.puku_gauge_cm) and game.normal_seed_bags==3)
 	game.puku_gauge_cm=0.0;game.normal_seed_bags=0
 	assert(game.add_seed_pod_gauge_cm(1600.0,false,false)==6 and is_equal_approx(game.puku_gauge_cm,100.0) and game.normal_seed_bags==6)
+
+func _test_max_size_record_is_silent(game)->void:
+	var plant:=SucculentClass.new();plant.diameter_cm=321.0
+	game.endless_greenhouse.configure(true);game.play_active=true;game.active_seed_type="normal";game.language_code="ja"
+	game.audio_manager.last_se_key="";game.record_card.visible=false;game.record_card.modulate.a=1.0
+	game._show_record(plant)
+	assert(game.audio_manager.last_se_key.is_empty(),"maximum-size update still played SE: %s"%game.audio_manager.last_se_key)
+	assert(game.record_card.visible and game.record_text.text=="最大サイズ更新！\n321.0 cm","maximum-size text presentation changed: %s"%game.record_text.text)
+	assert(game.record_card.scale==Vector2(.72,.72),"maximum-size animation did not start from its established scale")
+	plant.free()
 
 func _test_fixed_point_and_harvest_curve(game)->void:
 	assert(game.PUKU_UNITS_PER_PUKU==1000)
