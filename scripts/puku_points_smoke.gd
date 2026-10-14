@@ -2,6 +2,8 @@ extends Node
 
 const SucculentClass=preload("res://scripts/succulent.gd")
 const Localizer=preload("res://scripts/game_localizer.gd")
+var sprite3d_render_oracle_status:="not_run"
+var sprite3d_render_max_edge_error_px:=0
 
 func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
@@ -14,6 +16,7 @@ func _ready()->void:
 	_test_seed_pod_thresholds(game)
 	game.endless_greenhouse.configure(true)
 	_test_fixed_point_and_harvest_curve(game)
+	await _test_sprite3d_render_alignment(game)
 	_test_giant_plant_display_and_hit(game)
 	_test_live_harvest_preview(game)
 	_test_plant_label_visibility_toggle(game)
@@ -25,7 +28,7 @@ func _ready()->void:
 	await _test_panda_rescue(game)
 	_test_max_size_record_is_silent(game)
 	game._reset_progression_state();game.queue_free()
-	print("PUKU_POINTS_SMOKE_OK unit=1/1000 round_cost=1.00 direct_harvest=true legacy_sprite3d_match=1.6,5,10,20,30,40,60,80,100,120cm giant=150,200,300,500,700,1000,1500,2000,10000cm_species3_positions3_speeds1.6+10 transition120=true label_toggle=localized_persistent_on_off+main_only_live_recalc max_record=silent_visual_preserved reward1000+2000=true new_floor=.20 migration=points+legacy_gauge forest_cost=1 rescue=wallet_plus_1 combo=true fly_removed=true result=removed automatic_get=true")
+	print("PUKU_POINTS_SMOKE_OK unit=1/1000 round_cost=1.00 direct_harvest=true sprite3d_render_oracle="+sprite3d_render_oracle_status+" legacy_sprite3d_match=1.6,5,10,20,30,40,60,80,100,120cm giant=150,200,300,500,700,1000,1500,2000,10000cm_species3_positions3_speeds1.6+10 transition120=true label_toggle=localized_persistent_on_off+main_only_live_recalc max_record=silent_visual_preserved reward1000+2000=true new_floor=.20 migration=points+legacy_gauge forest_cost=1 rescue=wallet_plus_1 combo=true fly_removed=true result=removed automatic_get=true")
 	get_tree().quit()
 
 func _test_seed_pod_thresholds(game)->void:
@@ -192,12 +195,13 @@ func _opaque_hit_point(plant,camera:Camera3D,visible_rect:Rect2)->Vector2:
 				if bool(hit.get("hit",false)) and bool(hit.get("opaque_artwork_hit",false)):return point
 	return Vector2(-10000,-10000)
 
-func _legacy_pre_giant_texture_polygon(plant,camera:Camera3D)->PackedVector2Array:
-	# This is the complete Sprite3D billboard projection used by 7ecbc903 and
-	# cf4d2dc7. Keep it independent from Succulent._projected_texture_polygon so
-	# the regression catches any new screen-space anchor or translation.
+func _sprite3d_item_rect_polygon(plant,camera:Camera3D)->PackedVector2Array:
+	# Ask Godot's Sprite3D for its own item rectangle instead of duplicating the
+	# production offset formula. Sprite3D maps the texture's top edge to the item
+	# rectangle's bottom edge because screen-space Y and billboard-local Y oppose.
 	var points:=PackedVector2Array()
 	var texture_size:Vector2=plant.plant_sprite.texture.get_size()
+	var item_rect:Rect2=plant.plant_sprite.get_item_rect()
 	var basis:Basis=camera.global_transform.basis
 	var angle:float=plant.plant_sprite.rotation.z
 	var plane_right:Vector3=basis.x*cos(angle)+basis.y*sin(angle)
@@ -206,8 +210,8 @@ func _legacy_pre_giant_texture_polygon(plant,camera:Camera3D)->PackedVector2Arra
 	var origin:Vector3=plant.plant_sprite.global_position
 	for pixel_point in [Vector2.ZERO,Vector2(texture_size.x,0.0),texture_size,Vector2(0.0,texture_size.y)]:
 		var local_pixels:=Vector2(
-			pixel_point.x-texture_size.x*.5+plant.plant_sprite.offset.x,
-			-(pixel_point.y-texture_size.y*.5+plant.plant_sprite.offset.y)
+			item_rect.position.x+pixel_point.x,
+			item_rect.end.y-pixel_point.y
 		)
 		var world_point:Vector3=origin+plane_right*local_pixels.x*plant.plant_sprite.pixel_size*global_scale.x+plane_up*local_pixels.y*plant.plant_sprite.pixel_size*global_scale.y
 		points.append(camera.unproject_position(world_point))
@@ -215,6 +219,98 @@ func _legacy_pre_giant_texture_polygon(plant,camera:Camera3D)->PackedVector2Arra
 
 func _texture_transform_from_full_polygon(points:PackedVector2Array,texture_size:Vector2)->Transform2D:
 	return Transform2D((points[1]-points[0])/texture_size.x,(points[3]-points[0])/texture_size.y,points[0])
+
+func _copy_probe_camera(source:Camera3D,target:Camera3D)->void:
+	target.projection=source.projection
+	target.keep_aspect=source.keep_aspect
+	target.fov=source.fov
+	target.size=source.size
+	target.frustum_offset=source.frustum_offset
+	target.near=source.near
+	target.far=source.far
+	target.h_offset=source.h_offset
+	target.v_offset=source.v_offset
+	target.global_transform=source.global_transform
+
+func _copy_probe_sprite(source:Sprite3D,target:Sprite3D)->void:
+	target.texture=source.texture
+	target.billboard=source.billboard
+	target.pixel_size=source.pixel_size
+	target.offset=source.offset
+	target.centered=source.centered
+	target.flip_h=source.flip_h
+	target.flip_v=source.flip_v
+	target.axis=source.axis
+	target.alpha_cut=source.alpha_cut
+	target.texture_filter=source.texture_filter
+	target.global_transform=source.global_transform
+
+func _capture_probe(viewport:SubViewport)->Image:
+	await get_tree().process_frame
+	await get_tree().process_frame
+	return viewport.get_texture().get_image()
+
+func _rect_edge_error(a:Rect2i,b:Rect2i)->int:
+	return maxi(maxi(absi(a.position.x-b.position.x),absi(a.position.y-b.position.y)),maxi(absi(a.end.x-b.end.x),absi(a.end.y-b.end.y)))
+
+func _test_sprite3d_render_alignment(game)->void:
+	# Render Godot's real Sprite3D and the production Polygon2D separately into
+	# the same transparent viewport. This catches a shared algebra mistake that a
+	# formula-vs-formula test cannot detect.
+	var display_driver:=DisplayServer.get_name()
+	var rendering_driver:=RenderingServer.get_current_rendering_driver_name()
+	if display_driver=="headless" or rendering_driver=="dummy" or rendering_driver.is_empty():
+		sprite3d_render_oracle_status="skipped_dummy_renderer"
+		print("SPRITE3D_RENDER_ORACLE_SKIPPED display=%s renderer=%s"%[display_driver,rendering_driver])
+		return
+	game._clear_greenhouse_plants();game.current_mode="greenhouse";game.play_active=true;game.active_seed_type="normal";game.current_target_count=12
+	var probe_viewport:=SubViewport.new()
+	probe_viewport.name="Sprite3DProjectionOracle"
+	probe_viewport.size=Vector2i(game.get_viewport().get_visible_rect().size)
+	probe_viewport.transparent_bg=true
+	probe_viewport.own_world_3d=true
+	probe_viewport.render_target_clear_mode=SubViewport.CLEAR_MODE_ALWAYS
+	probe_viewport.render_target_update_mode=SubViewport.UPDATE_ALWAYS
+	add_child(probe_viewport)
+	var probe_camera:=Camera3D.new();probe_viewport.add_child(probe_camera);_copy_probe_camera(game.camera,probe_camera);probe_camera.current=true
+	var probe_sprite:=Sprite3D.new();probe_viewport.add_child(probe_sprite)
+	var probe_polygon:=Polygon2D.new();probe_viewport.add_child(probe_polygon);probe_polygon.texture_filter=CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	var render_sizes:Array[float]=[1.6,5.0,10.0,20.0,30.0,40.0,60.0,80.0,100.0,120.0]
+	var positions:Array[Vector3]=[Vector3(0,.12,2.5),Vector3(0,.12,0),Vector3(0,.12,-2.5)]
+	var species_ids:Array[String]=["colorata","laui","yumekawa_milky_dream"]
+	var offset_direction_checked:=false
+	for species_id in species_ids:
+		game.species_get_counts[species_id]=1;game._spawn_specific_plant(species_id);var plant=game.plants.back();plant.jelly_checks_enabled=false
+		for position in positions:
+			plant.original_pos=position;plant.position=position
+			for target_cm in render_sizes:
+				plant.fast_forward_to_diameter(target_cm);plant.plant_sprite.position.x=0.0;plant.plant_sprite.rotation.z=0.0
+				_copy_probe_camera(game.camera,probe_camera);_copy_probe_sprite(plant.plant_sprite,probe_sprite)
+				var projected:PackedVector2Array=plant._projected_texture_polygon(game.camera)
+				assert(projected.size()==4,"render oracle projection missing species=%s pos=%s cm=%.1f"%[species_id,position,target_cm])
+				probe_polygon.texture=plant.plant_sprite.texture
+				probe_polygon.polygon=projected
+				var texture_size:Vector2=plant.plant_sprite.texture.get_size()
+				probe_polygon.uv=PackedVector2Array([Vector2.ZERO,Vector2(texture_size.x,0.0),texture_size,Vector2(0.0,texture_size.y)])
+				probe_sprite.visible=true;probe_polygon.visible=false
+				var sprite_image:Image=await _capture_probe(probe_viewport);var sprite_rect:Rect2i=sprite_image.get_used_rect()
+				probe_sprite.visible=false;probe_polygon.visible=true
+				var polygon_image:Image=await _capture_probe(probe_viewport);var polygon_rect:Rect2i=polygon_image.get_used_rect()
+				assert(sprite_rect.has_area() and polygon_rect.has_area(),"render oracle produced empty artwork species=%s pos=%s cm=%.1f sprite=%s polygon=%s"%[species_id,position,target_cm,sprite_rect,polygon_rect])
+				var edge_error:=_rect_edge_error(sprite_rect,polygon_rect);sprite3d_render_max_edge_error_px=maxi(sprite3d_render_max_edge_error_px,edge_error)
+				assert(edge_error<=3,"Polygon2D does not match rendered Sprite3D species=%s pos=%s cm=%.1f sprite=%s polygon=%s"%[species_id,position,target_cm,sprite_rect,polygon_rect])
+				if not offset_direction_checked and species_id=="colorata" and position==positions[1] and is_equal_approx(target_cm,20.0):
+					probe_polygon.visible=false;probe_sprite.visible=true
+					var negative_offset_rect:=sprite_rect
+					probe_sprite.offset.y=0.0
+					var zero_offset_image:Image=await _capture_probe(probe_viewport);var zero_offset_rect:Rect2i=zero_offset_image.get_used_rect()
+					assert(zero_offset_rect.has_area() and negative_offset_rect.get_center().y>zero_offset_rect.get_center().y,"negative Sprite3D offset.y did not move the rendered image downward negative=%s zero=%s"%[negative_offset_rect,zero_offset_rect])
+					offset_direction_checked=true
+		game._clear_greenhouse_plants()
+	assert(offset_direction_checked,"Sprite3D offset direction render check did not run")
+	sprite3d_render_oracle_status="pass_negative_offset_down_max_edge_%dpx"%sprite3d_render_max_edge_error_px
+	probe_viewport.queue_free();await get_tree().process_frame
+	game.play_active=false;game._clear_greenhouse_plants()
 
 func _test_giant_plant_display_and_hit(game)->void:
 	var viewport_rect:Rect2=game.get_viewport().get_visible_rect()
@@ -249,7 +345,7 @@ func _test_giant_plant_display_and_hit(game)->void:
 				var threshold_after:PackedVector2Array=plant._projected_texture_polygon(game.camera)
 				assert(threshold_before.size()==4 and threshold_after.size()==4,"120cm transition polygon was missing species=%s speed=%.1f pos=%s"%[species_id,growth_speed,position])
 				for corner in range(4):assert(threshold_before[corner].distance_to(threshold_after[corner])<.25,"artwork jumped at 120cm transition species=%s speed=%.1f pos=%s corner=%d before=%s after=%s"%[species_id,growth_speed,position,corner,threshold_before[corner],threshold_after[corner]])
-				var previous_extent:=0.0;var width_500:=0.0;var width_1000:=0.0;var reference_root:=Vector2.ZERO;var reference_root_set:=false;var reference_main:=Vector2.ZERO;var reference_top_y:=INF;var reference_bottom_y:=-INF
+				var previous_extent:=0.0;var width_500:=0.0;var width_1000:=0.0;var reference_root:=Vector2.ZERO;var reference_root_set:=false;var reference_main:=Vector2.ZERO;var reference_top_y:=INF;var reference_bottom_y:=-INF;var previous_normal_top_y:=INF;var previous_normal_bottom_y:=-INF
 				for target_cm in sizes:
 					plant.state="growing";plant.fast_forward_to_diameter(target_cm)
 					# Compare the exact legacy Sprite3D projection without ambient sway.
@@ -266,13 +362,17 @@ func _test_giant_plant_display_and_hit(game)->void:
 					if target_cm<=120.0:
 						assert(absf(plant.plant_sprite.position.y-(.10+plant.visual_scale*.62))<.00001,"legacy Sprite3D origin formula changed species=%s speed=%.1f pos=%s cm=%.1f y=%.6f expected=%.6f"%[species_id,growth_speed,position,target_cm,plant.plant_sprite.position.y,.10+plant.visual_scale*.62])
 						assert(plant.plant_sprite.scale.is_equal_approx(Vector3.ONE*plant.visual_scale),"legacy Sprite3D scale changed species=%s speed=%.1f pos=%s cm=%.1f scale=%s expected=%.6f"%[species_id,growth_speed,position,target_cm,plant.plant_sprite.scale,plant.visual_scale])
-						var expected_points:=_legacy_pre_giant_texture_polygon(plant,game.camera);var actual_points:PackedVector2Array=plant._projected_texture_polygon(game.camera)
+						var expected_points:=_sprite3d_item_rect_polygon(plant,game.camera);var actual_points:PackedVector2Array=plant._projected_texture_polygon(game.camera)
 						assert(expected_points.size()==4 and actual_points.size()==4,"legacy comparison polygon missing species=%s speed=%.1f pos=%s cm=%.1f"%[species_id,growth_speed,position,target_cm])
 						for corner in range(4):assert(actual_points[corner].distance_to(expected_points[corner])<.01,"legacy corner mismatch species=%s speed=%.1f pos=%s cm=%.1f corner=%d actual=%s expected=%s"%[species_id,growth_speed,position,target_cm,corner,actual_points[corner],expected_points[corner]])
 						var expected_transform:=_texture_transform_from_full_polygon(expected_points,texture_size)
 						var texture_center:=texture_size*.5;var opaque_bottom_center:=Vector2(used_rect.get_center().x,used_rect.end.y)
 						assert((plant.screen_texture_transform*texture_center).distance_to(expected_transform*texture_center)<.01,"legacy texture center mismatch species=%s speed=%.1f pos=%s cm=%.1f"%[species_id,growth_speed,position,target_cm])
 						assert((plant.screen_texture_transform*opaque_bottom_center).distance_to(expected_transform*opaque_bottom_center)<.01,"legacy opaque bottom mismatch species=%s speed=%.1f pos=%s cm=%.1f"%[species_id,growth_speed,position,target_cm])
+						if not is_inf(previous_normal_top_y):
+							assert(top_screen.y<previous_normal_top_y,"normal artwork stopped expanding upward species=%s speed=%.1f pos=%s cm=%.1f top=%.3f previous=%.3f"%[species_id,growth_speed,position,target_cm,top_screen.y,previous_normal_top_y])
+							assert(bottom_screen.y>previous_normal_bottom_y,"normal artwork floated upward instead of expanding downward species=%s speed=%.1f pos=%s cm=%.1f bottom=%.3f previous=%.3f"%[species_id,growth_speed,position,target_cm,bottom_screen.y,previous_normal_bottom_y])
+						previous_normal_top_y=top_screen.y;previous_normal_bottom_y=bottom_screen.y
 					if is_equal_approx(target_cm,120.0):reference_main=main_screen;reference_top_y=top_screen.y;reference_bottom_y=bottom_screen.y
 					elif target_cm>120.0:
 						assert(main_screen.distance_to(reference_main)<.05,"giant leaf-mass pivot moved from the legacy 120cm transform species=%s speed=%.1f pos=%s cm=%.1f main=%s reference=%s"%[species_id,growth_speed,position,target_cm,main_screen,reference_main])
@@ -289,7 +389,7 @@ func _test_giant_plant_display_and_hit(game)->void:
 					var live_visible_rect:Rect2=plant.screen_visual_rect(game.camera).intersection(viewport_rect)
 					assert(plant.screen_sprite.visible and live_visible_rect.has_area(),"giant artwork failed after a live growth frame species=%s speed=%.1f pos=%s cm=%.0f"%[species_id,growth_speed,position,target_cm])
 					if not plant.uses_giant_screen_transform():
-						var live_expected:=_legacy_pre_giant_texture_polygon(plant,game.camera);var live_actual:PackedVector2Array=plant._projected_texture_polygon(game.camera)
+						var live_expected:=_sprite3d_item_rect_polygon(plant,game.camera);var live_actual:PackedVector2Array=plant._projected_texture_polygon(game.camera)
 						for corner in range(4):assert(live_actual[corner].distance_to(live_expected[corner])<.01,"live legacy projection mismatch species=%s speed=%.1f pos=%s cm=%.1f corner=%d"%[species_id,growth_speed,position,plant.diameter_cm,corner])
 					tap_point=_opaque_hit_point(plant,game.camera,live_visible_rect)
 					assert(tap_point.x>-9999.0,"live growth frame left no tappable visible leaf species=%s speed=%.1f pos=%s cm=%.1f"%[species_id,growth_speed,position,target_cm])

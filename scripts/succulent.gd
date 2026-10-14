@@ -308,7 +308,7 @@ func _projected_texture_polygon(camera:Camera3D)->PackedVector2Array:
 	for pixel_point in texture_points:
 		var local_pixels:=Vector2(
 			pixel_point.x-texture_size.x*.5+plant_sprite.offset.x,
-			-(pixel_point.y-texture_size.y*.5+plant_sprite.offset.y)
+			-(pixel_point.y-texture_size.y*.5)+plant_sprite.offset.y
 		)
 		var world_point:=origin+plane_right*local_pixels.x*plant_sprite.pixel_size*global_scale.x+plane_up*local_pixels.y*plant_sprite.pixel_size*global_scale.y
 		var camera_point:=camera.to_local(world_point)
