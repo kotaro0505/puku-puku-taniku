@@ -21,6 +21,7 @@ func _ready() -> void:
 	await _test_habitat_group_and_intro(game)
 	await _test_battle_win_and_respawn(game)
 	await _test_battle_loss(game)
+	_test_battle_loss_coin_boundaries(game)
 	_test_act_one_stays_hostile(game)
 	_test_creative_gate(game)
 	await _test_act_three_reward_flow(game)
@@ -274,8 +275,9 @@ func _test_battle_win_and_respawn(game: Node) -> void:
 
 
 func _test_battle_loss(game: Node) -> void:
-	game.puku_points = 1
+	game.puku_balance_units = 6375
 	game.habitat_wild_plants = _population(game, 10)
+	var habitat_ids_before: Array[String] = game._habitat_individual_ids()
 	var settled_before: Dictionary = game.habitat_returned_species.duplicate(true)
 	assert(game.current_mode=="habitat")
 	assert(game._should_show_jurejure_group())
@@ -292,23 +294,56 @@ func _test_battle_loss(game: Node) -> void:
 	game.puku_puku_battle.debug_sow_immediately()
 	game.puku_puku_battle.debug_force_result(20.0, 260.0)
 	await get_tree().process_frame
-	var remaining: int = game.habitat_wild_plants.size()
-	assert(remaining >= 2 and remaining <= 6)
-	assert(game.puku_points == 0)
+	var puku_lost: int = int(game.jurejure_last_battle_result.get("puku_lost", -1))
+	assert(puku_lost >= 1 and puku_lost <= 5)
+	assert(game.puku_balance_units == 6375 - puku_lost * game.PUKU_UNITS_PER_PUKU)
+	assert(game._puku_fraction_units() == 375)
+	assert(game._habitat_individual_ids() == habitat_ids_before)
 	assert(game.habitat_returned_species == settled_before)
 	assert(not game.jurejure_waiting_for_seed_pod_reward)
 	assert(not _group_item(game).is_empty())
+	var settled_balance: int = game.puku_balance_units
+	var settled_battle_count: int = game.jurejure_battle_count
+	game._on_puku_puku_battle_resolved({"won":false,"player_score":20.0,"opponent_score":260.0})
+	assert(game.puku_balance_units == settled_balance and game.jurejure_battle_count == settled_battle_count)
 	game.puku_puku_battle._return_to_habitat()
 	assert(game.audio_manager.current_bgm_key == "habitat")
 	assert(game.scripted_dialog_kind == "jurejure_battle_loss")
+	assert(str(game.scripted_dialog_pages[1].get("text", "")) == Localizer.text("ja", "jurejure_battle_loss_penalty", [puku_lost]))
 	_finish_dialog(game)
 	await get_tree().process_frame
+	assert(game.puku_balance_units == settled_balance)
 
-	game.puku_points = 0
-	game.habitat_wild_plants = _population(game, 5)
-	var zero_penalty: Dictionary = game._apply_jurejure_battle_loss()
-	assert(int(zero_penalty.get("puku_lost", -1)) == 0)
-	assert(game.puku_points == 0)
+
+func _test_battle_loss_coin_boundaries(game: Node) -> void:
+	game._cancel_puku_gauge_animations()
+	var habitat_before: Array = _population(game, 5)
+	game.habitat_wild_plants = habitat_before.duplicate(true)
+	var cases: Array[Dictionary] = [
+		{"balance":0,"roll":5,"lost":0,"remaining":0},
+		{"balance":999,"roll":5,"lost":0,"remaining":999},
+		{"balance":1000,"roll":5,"lost":1,"remaining":0},
+		{"balance":1750,"roll":5,"lost":1,"remaining":750},
+		{"balance":3750,"roll":5,"lost":3,"remaining":750},
+		{"balance":8375,"roll":5,"lost":5,"remaining":3375},
+	]
+	for test_case in cases:
+		game.puku_balance_units = int(test_case["balance"])
+		var penalty: Dictionary = game._apply_jurejure_battle_loss(int(test_case["roll"]))
+		assert(int(penalty.get("puku_lost", -1)) == int(test_case["lost"]))
+		assert(game.puku_balance_units == int(test_case["remaining"]) and game.puku_balance_units >= 0)
+		assert(game.habitat_wild_plants == habitat_before)
+	for roll in range(game.JUREJURE_LOSS_MIN_PUKU, game.JUREJURE_LOSS_MAX_PUKU + 1):
+		game.puku_balance_units = 10375
+		var penalty: Dictionary = game._apply_jurejure_battle_loss(roll)
+		assert(int(penalty.get("puku_penalty_roll", -1)) == roll)
+		assert(int(penalty.get("puku_lost", -1)) == roll)
+		assert(game.puku_balance_units == 10375 - roll * game.PUKU_UNITS_PER_PUKU)
+		assert(game._puku_fraction_units() == 375)
+	assert(Localizer.text("ja", "jurejure_battle_loss_penalty", [3]) == "ジュレジュレ団に3ぷくコインを取られた！")
+	assert(Localizer.text("hiragana", "jurejure_battle_loss_penalty", [3]) == "じゅれじゅれだんに3ぷくこいんを とられた！")
+	assert(Localizer.text("en", "jurejure_battle_loss_penalty", [3]) == "The JureJure Gang took 3 Puku Coins!")
+	game._cancel_puku_gauge_animations()
 
 
 func _test_act_one_stays_hostile(game: Node) -> void:
@@ -783,7 +818,7 @@ func _test_post_ending_friendly_battle(game: Node) -> void:
 	var habitat_before: Array = game.habitat_wild_plants.duplicate(true)
 	var penalty: Dictionary = game._apply_jurejure_battle_loss()
 	assert(bool(penalty.get("friendly", false)))
-	assert(int(penalty.get("taken_count", -1)) == 0 and int(penalty.get("puku_lost", -1)) == 0)
+	assert(int(penalty.get("puku_penalty_roll", -1)) == 0 and int(penalty.get("puku_lost", -1)) == 0)
 	assert(game.puku_balance_units == puku_before and game.habitat_wild_plants == habitat_before)
 
 

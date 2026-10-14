@@ -11,8 +11,6 @@ const MID_STAGE_ORIGINAL_COUNT := 6
 const LATE_STAGE_ORIGINAL_COUNT := 10
 
 const BATTLE_PLANTS_PER_SIDE := 12
-const LOSS_TAKE_MIN_RATIO := 0.40
-const LOSS_TAKE_MAX_RATIO := 0.80
 
 const EXPLOITATION_DIALOG_PATTERNS := [
 	[
@@ -185,30 +183,3 @@ static func choose_visit_point(
 		for fallback_point in HABITAT_GROUP_POINTS:
 			source.append(fallback_point)
 	return source[rng.randi_range(0, source.size() - 1)]
-
-
-static func loss_take_count(population_size: int, ratio: float) -> int:
-	if population_size <= 0:
-		return 0
-	var safe_ratio := clampf(ratio, LOSS_TAKE_MIN_RATIO, LOSS_TAKE_MAX_RATIO)
-	return clampi(ceili(float(population_size) * safe_ratio), 1, population_size)
-
-
-static func choose_loss_ids(
-		plants: Array[Dictionary],
-		rng: RandomNumberGenerator,
-		ratio: float
-	) -> Array[String]:
-	var candidates: Array[String] = []
-	for plant in plants:
-		if bool(plant.get("jellied", false)) or bool(plant.get("story_protected", false)):
-			continue
-		var individual_id := str(plant.get("individual_id", ""))
-		if not individual_id.is_empty():
-			candidates.append(individual_id)
-	for index in range(candidates.size() - 1, 0, -1):
-		var swap_index := rng.randi_range(0, index)
-		var held := candidates[index]
-		candidates[index] = candidates[swap_index]
-		candidates[swap_index] = held
-	return candidates.slice(0, loss_take_count(candidates.size(), ratio))

@@ -65,6 +65,8 @@ const LEGACY_COMBINED_GAUGE_TARGET_CM := 600.0
 const SEED_POD_GAUGE_TARGET_CM := 750.0
 const SEED_POD_GAUGE_REWARD_BAGS := 3
 const PUKU_UNITS_PER_PUKU := 1000
+const JUREJURE_LOSS_MIN_PUKU := 1
+const JUREJURE_LOSS_MAX_PUKU := 5
 const NORMAL_ROUND_COST_UNITS := 1000
 const PUKU_GAUGE_FINISH_SPEED_SCALE := 0.5
 const FIRST_GET_MIN_REWARD_UNITS := 200
@@ -8516,18 +8518,19 @@ func _grant_jurejure_battle_reward()->String:
 	_register_species_discovery(species_id,true);_apply_saved_unlocks();_sync_arrangement_ui()
 	return species_id
 
-func _apply_jurejure_battle_loss()->Dictionary:
-	if _is_post_ending_jurejure_battle():return {"taken_count":0,"take_ratio":0.0,"puku_lost":0,"friendly":true}
-	var ratio:=rng.randf_range(JureJureSystemClass.LOSS_TAKE_MIN_RATIO,JureJureSystemClass.LOSS_TAKE_MAX_RATIO)
-	var taken_ids:=JureJureSystemClass.choose_loss_ids(habitat_wild_plants,rng,ratio)
-	for individual_id in taken_ids:
-		if habitat_plant_panel and habitat_plant_panel.visible and str(habitat_plant_panel.individual_id)==individual_id:habitat_plant_panel.close()
-		HabitatWildSystemClass.remove_individual(habitat_wild_plants,individual_id)
-	var puku_lost:=1 if _can_afford_puku_units(PUKU_UNITS_PER_PUKU) else 0
-	if puku_lost>0:_change_puku_balance(-PUKU_UNITS_PER_PUKU,"jurejure_battle_loss",false,true)
-	return {"taken_count":taken_ids.size(),"take_ratio":ratio,"puku_lost":puku_lost}
+func _apply_jurejure_battle_loss(forced_puku_roll:int=-1)->Dictionary:
+	if _is_post_ending_jurejure_battle():return {"puku_lost":0,"puku_penalty_roll":0,"friendly":true}
+	# randi_range includes both endpoints, so each integer amount has the same
+	# 20% chance. Only whole Puku Coins can be taken; fractional units survive.
+	var penalty_roll:=rng.randi_range(JUREJURE_LOSS_MIN_PUKU,JUREJURE_LOSS_MAX_PUKU) if forced_puku_roll<0 else clampi(forced_puku_roll,JUREJURE_LOSS_MIN_PUKU,JUREJURE_LOSS_MAX_PUKU)
+	var puku_lost:=mini(penalty_roll,_puku_whole_count())
+	if puku_lost>0:_change_puku_balance(-_puku_cost_units(puku_lost),"jurejure_battle_loss",false,true)
+	return {"puku_lost":puku_lost,"puku_penalty_roll":penalty_roll}
 
 func _on_puku_puku_battle_resolved(result:Dictionary)->void:
+	# The battle scene emits once, but keep settlement idempotent so a duplicate
+	# completion signal can never grant a reward or charge a loss twice.
+	if not jurejure_last_battle_result.is_empty():return
 	var first_resolved_battle:=jurejure_battle_count==0
 	var post_ending_battle:=_is_post_ending_jurejure_battle()
 	jurejure_battle_count+=1;jurejure_last_battle_result=result.duplicate(true)
@@ -8559,11 +8562,9 @@ func _on_puku_puku_battle_return_requested()->void:
 			],false)
 		else:
 			var puku_lost:=int(jurejure_last_battle_result.get("puku_lost",0))
-			var penalty_key:="jurejure_battle_loss_penalty" if puku_lost>0 else "jurejure_battle_loss_penalty_zero"
-			var penalty_args:Array=[int(jurejure_last_battle_result.get("taken_count",0)),puku_lost] if puku_lost>0 else [int(jurejure_last_battle_result.get("taken_count",0))]
 			_start_scripted_dialog("jurejure_battle_loss",[
 				{"speaker":"mouse","text":Localizer.text(language_code,"jurejure_battle_loss_mouse")},
-				{"speaker":"","text":Localizer.text(language_code,penalty_key,penalty_args)}
+				{"speaker":"","text":Localizer.text(language_code,"jurejure_battle_loss_penalty",[puku_lost])}
 			],false)
 
 func _clear_active_jurejure_event(_play_escape:=true,_clear_targeted_log:=true)->void:
