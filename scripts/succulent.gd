@@ -372,7 +372,8 @@ func _projected_texture_polygon(camera:Camera3D)->PackedVector2Array:
 	var owner_scale:=global_transform.basis.get_scale()
 	# Preserve the established apparent scale/perspective through 120 cm, but use
 	# this height only as a projection plane. The final artwork is translated so
-	# its measured opaque contact point stays on the real planting position.
+	# the historical alpha-mass growth center stays at the unchanged planting
+	# position; the leaves can therefore expand both upward and downward again.
 	var projection_local_position:=Vector3(plant_sprite.position.x,.10+projection_scale*.62,plant_sprite.position.z)
 	var origin:=global_transform*projection_local_position
 	var global_scale:=Vector3(owner_scale.x*projection_scale,owner_scale.y*projection_scale,owner_scale.z*projection_scale)
@@ -391,14 +392,14 @@ func _projected_texture_polygon(camera:Camera3D)->PackedVector2Array:
 	var reference_axis_x:=(points[1]-points[0])/texture_size.x
 	var reference_axis_y:=(points[3]-points[0])/texture_size.y
 	var reference_transform:=Transform2D(reference_axis_x,reference_axis_y,points[0])
-	var projected_contact:=reference_transform*_screen_planting_anchor_pixel()
+	var projected_growth_anchor:=reference_transform*_screen_growth_anchor_pixel()
 	var planting_screen:=camera.unproject_position(planting_world)
-	if is_nan(projected_contact.x) or is_inf(projected_contact.x) or is_nan(projected_contact.y) or is_inf(projected_contact.y):return PackedVector2Array()
-	var planting_delta:=planting_screen-projected_contact
-	for index in range(points.size()):points[index]+=planting_delta
+	if is_nan(projected_growth_anchor.x) or is_inf(projected_growth_anchor.x) or is_nan(projected_growth_anchor.y) or is_inf(projected_growth_anchor.y):return PackedVector2Array()
+	var growth_anchor_delta:=planting_screen-projected_growth_anchor
+	for index in range(points.size()):points[index]+=growth_anchor_delta
 	if rendered_scale>reference_scale:
-		# Growth beyond 120 cm remains an unbounded screen-space scale, now rooted
-		# at the same soil contact as ordinary plants instead of the leaf-mass center.
+		# This is the pre-90de9b2 unbounded screen-space expansion: keep the
+		# alpha-weighted leaf-mass center fixed and expand in every direction.
 		var growth_ratio:=rendered_scale/reference_scale
 		for index in range(points.size()):points[index]=planting_screen+(points[index]-planting_screen)*growth_ratio
 	return points
@@ -511,9 +512,9 @@ func screen_label_anchor(camera:Camera3D)->Vector2:
 	# the viewport top. Scaling around the main body must never send the label down.
 	if is_instance_valid(screen_sprite) and screen_texture_transform_valid:
 		var growth_ratio:=rendered_scale/reference_scale
-		var growth_anchor:=screen_texture_transform*_screen_planting_anchor_pixel()
+		var growth_anchor:=screen_texture_transform*_screen_growth_anchor_pixel()
 		var used:=_screen_hit_used_rect()
-		var current_top:=screen_texture_transform*Vector2(_screen_planting_anchor_pixel().x,used.position.y)
+		var current_top:=screen_texture_transform*Vector2(_screen_growth_anchor_pixel().x,used.position.y)
 		var reference_top:=growth_anchor+(current_top-growth_anchor)/growth_ratio
 		return current_top+(reference_screen-reference_top)
 	return reference_screen

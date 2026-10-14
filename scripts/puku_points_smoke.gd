@@ -25,7 +25,7 @@ func _ready()->void:
 	await _test_panda_rescue(game)
 	_test_max_size_record_is_silent(game)
 	game._reset_progression_state();game.queue_free()
-	print("PUKU_POINTS_SMOKE_OK unit=1/1000 round_cost=1.00 direct_harvest=true rooted_contact=1.6,10,30,60,100,120,150,200,300,500,700,1000,1500,2000,10000cm_species3_positions3_speeds1.6+10 label_toggle=localized_persistent_on_off+main_only_live_recalc max_record=silent_visual_preserved reward1000+2000=true new_floor=.20 migration=points+legacy_gauge forest_cost=1 rescue=wallet_plus_1 combo=true fly_removed=true result=removed automatic_get=true")
+	print("PUKU_POINTS_SMOKE_OK unit=1/1000 round_cost=1.00 direct_harvest=true centered_growth=1.6,10,30,60,100,120,150,200,300,500,700,1000,1500,2000,10000cm_species3_positions3_speeds1.6+10 rooted_fallback=true label_toggle=localized_persistent_on_off+main_only_live_recalc max_record=silent_visual_preserved reward1000+2000=true new_floor=.20 migration=points+legacy_gauge forest_cost=1 rescue=wallet_plus_1 combo=true fly_removed=true result=removed automatic_get=true")
 	get_tree().quit()
 
 func _test_seed_pod_thresholds(game)->void:
@@ -226,7 +226,7 @@ func _test_giant_plant_display_and_hit(game)->void:
 				var threshold_after:PackedVector2Array=plant._projected_texture_polygon(game.camera)
 				assert(threshold_before.size()==4 and threshold_after.size()==4,"120cm transition polygon was missing species=%s speed=%.1f pos=%s"%[species_id,growth_speed,position])
 				for corner in range(4):assert(threshold_before[corner].distance_to(threshold_after[corner])<.25,"artwork jumped at 120cm transition species=%s speed=%.1f pos=%s corner=%d before=%s after=%s"%[species_id,growth_speed,position,corner,threshold_before[corner],threshold_after[corner]])
-				var previous_extent:=0.0;var width_500:=0.0;var width_1000:=0.0;var reference_root:=Vector2.ZERO;var reference_root_set:=false;var previous_main_y:=INF;var previous_top_y:=INF
+				var previous_extent:=0.0;var width_500:=0.0;var width_1000:=0.0;var reference_root:=Vector2.ZERO;var reference_root_set:=false;var previous_top_y:=INF;var previous_bottom_y:=-INF
 				for target_cm in sizes:
 					plant.state="growing";plant.fast_forward_to_diameter(target_cm)
 					# Isolate the growth transform from the deliberately tiny ambient sway
@@ -241,10 +241,12 @@ func _test_giant_plant_display_and_hit(game)->void:
 					var extent:=maxf(rect.size.x,rect.size.y);assert(extent>previous_extent,"giant artwork stopped growing species=%s speed=%.1f pos=%s cm=%.0f extent=%.2f previous=%.2f"%[species_id,growth_speed,position,target_cm,extent,previous_extent]);previous_extent=extent
 					if not reference_root_set:reference_root=root_screen;reference_root_set=true
 					assert(root_screen.distance_to(reference_root)<.01,"soil planting point moved species=%s speed=%.1f pos=%s cm=%.1f root=%s reference=%s"%[species_id,growth_speed,position,target_cm,root_screen,reference_root])
-					assert(contact_screen.distance_to(root_screen)<.05,"rendered opaque contact floated from soil species=%s speed=%.1f pos=%s cm=%.1f contact=%s root=%s"%[species_id,growth_speed,position,target_cm,contact_screen,root_screen])
-					assert(main_screen.y<root_screen.y and bottom_screen.y>=root_screen.y-.05,"rendered plant sank or floated around its soil contact species=%s speed=%.1f pos=%s cm=%.1f main=%s bottom=%s root=%s"%[species_id,growth_speed,position,target_cm,main_screen,bottom_screen,root_screen])
-					if not is_inf(previous_main_y):assert(main_screen.y<previous_main_y-.01 and top_screen.y<previous_top_y-.01,"rooted artwork did not grow upward from its fixed contact species=%s speed=%.1f pos=%s cm=%.1f main_y=%.3f previous=%.3f top_y=%.3f previous_top=%.3f"%[species_id,growth_speed,position,target_cm,main_screen.y,previous_main_y,top_screen.y,previous_top_y])
-					previous_main_y=main_screen.y;previous_top_y=top_screen.y
+					assert(main_screen.distance_to(root_screen)<.05,"historical leaf-mass growth anchor moved species=%s speed=%.1f pos=%s cm=%.1f main=%s root=%s"%[species_id,growth_speed,position,target_cm,main_screen,root_screen])
+					assert(top_screen.y<root_screen.y and contact_screen.y>root_screen.y and bottom_screen.y>root_screen.y,"artwork no longer spans both sides of its growth center species=%s speed=%.1f pos=%s cm=%.1f top=%s contact=%s bottom=%s root=%s"%[species_id,growth_speed,position,target_cm,top_screen,contact_screen,bottom_screen,root_screen])
+					if not is_inf(previous_top_y):
+						assert(top_screen.y<previous_top_y-.01,"artwork did not keep expanding upward from its fixed growth center species=%s speed=%.1f pos=%s cm=%.1f top_y=%.3f previous=%.3f"%[species_id,growth_speed,position,target_cm,top_screen.y,previous_top_y])
+						assert(bottom_screen.y>previous_bottom_y+.01,"artwork did not restore downward growth from its fixed growth center species=%s speed=%.1f pos=%s cm=%.1f bottom_y=%.3f previous=%.3f"%[species_id,growth_speed,position,target_cm,bottom_screen.y,previous_bottom_y])
+					previous_top_y=top_screen.y;previous_bottom_y=bottom_screen.y
 					var anchor_local_y:float=-(planting_anchor_pixel.y-float(plant.plant_sprite.texture.get_height())*.5+plant.plant_sprite.offset.y)
 					var fallback_contact_y:float=plant.plant_sprite.position.y+anchor_local_y*plant.plant_sprite.pixel_size*plant.plant_sprite.scale.y
 					assert(absf(fallback_contact_y)<.0001,"Sprite3D fallback contact is not rooted species=%s speed=%.1f cm=%.1f local_y=%.6f"%[species_id,growth_speed,target_cm,fallback_contact_y])
@@ -257,9 +259,12 @@ func _test_giant_plant_display_and_hit(game)->void:
 					# Advance one real frame at each configured speed as well as checking the
 					# exact checkpoint, then harvest through the visible alpha-tested leaf.
 					plant.simulate(1.0/12.0 if growth_speed>=10.0 else 1.0/60.0);plant.sync_screen_visual(game.camera)
-					assert(plant.screen_sprite.visible and plant.screen_visual_rect(game.camera).intersection(viewport_rect).has_area(),"giant artwork failed after a live growth frame species=%s speed=%.1f pos=%s cm=%.0f"%[species_id,growth_speed,position,target_cm])
-					var live_contact:Vector2=plant.screen_texture_transform*planting_anchor_pixel;var live_root:Vector2=game.camera.unproject_position(plant._screen_planting_world_position())
-					assert(live_contact.distance_to(live_root)<.05,"live growth frame lifted rendered contact species=%s speed=%.1f pos=%s cm=%.1f contact=%s root=%s"%[species_id,growth_speed,position,target_cm,live_contact,live_root])
+					var live_visible_rect:Rect2=plant.screen_visual_rect(game.camera).intersection(viewport_rect)
+					assert(plant.screen_sprite.visible and live_visible_rect.has_area(),"giant artwork failed after a live growth frame species=%s speed=%.1f pos=%s cm=%.0f"%[species_id,growth_speed,position,target_cm])
+					var live_growth_anchor:Vector2=plant.screen_texture_transform*anchor_pixel;var live_root:Vector2=game.camera.unproject_position(plant._screen_planting_world_position())
+					assert(live_growth_anchor.distance_to(live_root)<.05,"live growth frame shifted the restored growth center species=%s speed=%.1f pos=%s cm=%.1f anchor=%s root=%s"%[species_id,growth_speed,position,target_cm,live_growth_anchor,live_root])
+					tap_point=_opaque_hit_point(plant,game.camera,live_visible_rect)
+					assert(tap_point.x>-9999.0,"live growth frame left no tappable visible leaf species=%s speed=%.1f pos=%s cm=%.1f"%[species_id,growth_speed,position,target_cm])
 					game._try_harvest(tap_point);assert(plant.state=="harvested","visible giant leaf did not harvest species=%s speed=%.1f pos=%s cm=%.0f"%[species_id,growth_speed,position,target_cm])
 				assert(width_500>0.0 and width_1000/width_500>1.95 and width_1000/width_500<2.05,"rendered 500cm to 1000cm ratio was not approximately 2x species=%s: %.4f"%[species_id,width_1000/width_500])
 		game._clear_greenhouse_plants();plant=null
