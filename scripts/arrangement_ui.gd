@@ -644,10 +644,12 @@ func _refresh_pot_selection()->void:
 		if not pot_value is Dictionary:continue
 		var pot:Dictionary=pot_value
 		if not _pot_sales_stage_unlocked(pot):continue
-		var pot_id:=str(pot.get("pot_id",""));var total:=_pot_total_count(pot_id);var available:=_pot_available_count(pot_id);var design_unlocked:=_pot_design_unlocked(pot);var selectable:=not capacity_full and design_unlocked and available>0
+		var pot_id:=str(pot.get("pot_id",""));var total:=_pot_total_count(pot_id)
+		if total<=0 or not _pot_design_unlocked(pot):continue
+		var available:=_pot_available_count(pot_id);var selectable:=not capacity_full and available>0
 		var card:=Button.new();card.custom_minimum_size=Vector2(248,230);_skin_button(card,Color("#f4e1bc") if selectable else Color("#c9b8a2"),15);_prepare_scroll_button(card);card.disabled=not selectable;pot_select_grid.add_child(card)
 		var preview:=Control.new();preview.position=Vector2(14,10);preview.size=Vector2(220,150);preview.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(preview);_render_pot(preview,pot,true)
-		var availability_text:=GameLocalizer.text(language_code,"pot_iap_locked_short") if not design_unlocked else (GameLocalizer.text(language_code,"pot_not_owned") if total<=0 else (GameLocalizer.text(language_code,"pot_available_count",[available]) if available>0 else GameLocalizer.text(language_code,"pot_all_in_use")))
+		var availability_text:=GameLocalizer.text(language_code,"pot_available_count",[available]) if available>0 else GameLocalizer.text(language_code,"pot_all_in_use")
 		var label:=Label.new();label.text=GameLocalizer.pot_name(language_code,pot)+"\n"+availability_text;label.position=Vector2(10,164);label.size=Vector2(228,56);label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.add_theme_font_size_override("font_size",16);label.add_theme_color_override("font_color",UI_BROWN);label.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(label)
 		card.pressed.connect(_select_editor_pot.bind(pot_id))
 

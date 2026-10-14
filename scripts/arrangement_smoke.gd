@@ -52,7 +52,8 @@ func _ready()->void:
 	for card_value in ui.picker_grid.get_children():
 		var card:=card_value as Button;assert(card!=null and card.find_child("SpeciesImage",true,false)!=null and card.find_child("SpeciesName",true,false)!=null and card.find_child("SpeciesName",true,false).text.count("\n")==0 and not _has_label_text_containing(card,"記録"))
 	game.discovered.erase("gummy_peach_milk");game.discovered.erase("hyb_gummy_metal");game._sync_arrangement_ui()
-	ui.open_home();assert(ui.home_page.visible and ui.pot_select_grid.get_child_count()==8 and not (ui.pot_select_grid.get_child(0) as Button).disabled and _has_label_text_containing(ui.pot_select_grid.get_child(0),"使用可能 ×1"))
+	ui.open_home();assert(ui.home_page.visible and ui.pot_select_grid.get_child_count()==1 and not (ui.pot_select_grid.get_child(0) as Button).disabled and _has_label_text_containing(ui.pot_select_grid.get_child(0),"使用可能 ×1"))
+	assert(_has_label_text_containing(ui.pot_select_grid,"浅型素焼き鉢") and not _has_label_text_containing(ui.pot_select_grid,"未所持") and not _has_label_text_containing(ui.pot_select_grid,"デザイン未アンロック"))
 	assert(_has_label_text_containing(ui.home_page,"好きな鉢を選んで作ってみよう") and _has_button_text(ui.home_page,"作った作品を見る") and not _has_button_text(ui.home_page,"＋ 新しく作る"))
 	ui._select_editor_pot("shallow_terracotta");assert(ui.editor_page.visible and str(ui.current_arrangement.pot_id)=="shallow_terracotta" and ui.editor_message.text.is_empty())
 	assert(not _has_button_text(ui.editor_page,"共有背景") and not _has_button_text(ui.editor_page,"共有") and not ui.share_background_panel.visible)
@@ -170,13 +171,13 @@ func _ready()->void:
 	ui._return_from_viewer();assert(ui.home_page.visible)
 	ui._open_saved_arrangements();assert(ui.saved_arrangements_page.visible and ui.viewer_gallery_mode and _has_label_text_containing(ui.saved_arrangements_page,"作った作品") and ui.saved_arrangements_tabs.get_child_count()==1 and ui.viewer_canvas.visible and ui.viewer_artwork_root.position.is_zero_approx() and is_equal_approx(ui.viewer_artwork_root.scale.x,1.0))
 	assert(not _has_button_text(ui.saved_arrangements_page,"見る") and ui.saved_arrangements_tab_scroll.horizontal_scroll_mode==ScrollContainer.SCROLL_MODE_AUTO and ui.saved_arrangements_tab_scroll.vertical_scroll_mode==ScrollContainer.SCROLL_MODE_DISABLED and "✓" in (ui.saved_arrangements_tabs.get_child(0) as Button).text)
-	ui._return_from_viewer();assert(ui.home_page.visible and ui.pot_select_grid.get_child_count()==8 and (ui.pot_select_grid.get_child(0) as Button).disabled and _has_label_text_containing(ui.pot_select_grid.get_child(0),"使用中（空きなし）") and not _has_button_text(ui.home_page,"編集"))
+	ui._return_from_viewer();assert(ui.home_page.visible and ui.pot_select_grid.get_child_count()==1 and (ui.pot_select_grid.get_child(0) as Button).disabled and _has_label_text_containing(ui.pot_select_grid.get_child(0),"使用中（空きなし）") and not _has_button_text(ui.home_page,"編集"))
 	# The grid remains visible at capacity, but even an otherwise available pot
 	# cannot bypass the guard and enter the editor.
 	var capacity_arrangements:Array=[]
 	for capacity_index in range(3):capacity_arrangements.append({"arrangement_id":"capacity_%d"%capacity_index,"name":"上限","pot_id":"unused","completed":true,"plants":[]})
 	var capacity_owned:Dictionary=game.owned_pots.duplicate(true);capacity_owned["shallow_terracotta"]=2
-	ui.sync_state(capacity_owned,capacity_arrangements,3);ui.open_home();assert(ui.pot_select_grid.get_child_count()==8 and (ui.pot_select_grid.get_child(0) as Button).disabled and "作品の保存上限" in ui.home_status.text)
+	ui.sync_state(capacity_owned,capacity_arrangements,3);ui.open_home();assert(ui.pot_select_grid.get_child_count()==1 and (ui.pot_select_grid.get_child(0) as Button).disabled and "作品の保存上限" in ui.home_status.text)
 	ui._select_editor_pot("shallow_terracotta");assert(ui.home_page.visible and not ui.editor_page.visible and ui.current_arrangement.is_empty())
 	game._sync_arrangement_ui();ui.open_home()
 	ui._open_saved_arrangements()
@@ -223,7 +224,7 @@ func _ready()->void:
 	game.owned_pots.erase("g1_crystal_goblet");game.owned_pots.erase("g1_gold_jackpot");game.owned_pots.erase("g2_ramen_bowl");game.pot_design_unlocks.erase(paid_product_id);game.pot_design_unlocks.erase(jackpot_product_id);game.pot_design_unlocks.erase(ramen_product_id);game.forest_gacha_unlocked=false;game.act3_unlocked=false
 	ui.open_pot_shop();classic_shop_card=_pot_shop_card(ui,"classic_terracotta");var classic_buy_buttons:=classic_shop_card.find_children("*","Button",true,false);assert(_has_label_text_containing(classic_shop_card,"所持 ×2") and classic_buy_buttons.size()==1 and not (classic_buy_buttons[0] as Button).disabled and "1ぷくコイン" in (classic_buy_buttons[0] as Button).text)
 	game._save();game.owned_pots.erase("classic_terracotta");game._load_save();assert(int(game.owned_pots.get("classic_terracotta",0))==2 and typeof(game.owned_pots.get("classic_terracotta"))==TYPE_INT)
-	game._sync_arrangement_ui();ui.open_home();assert(ui.pot_select_grid.get_child_count()==8);ui._select_editor_pot("classic_terracotta");assert(ui.editor_page.visible and str(ui.current_arrangement.pot_id)=="classic_terracotta")
+	game._sync_arrangement_ui();ui.open_home();assert(ui.pot_select_grid.get_child_count()==3 and _has_label_text_containing(ui.pot_select_grid.get_child(0),"浅型素焼き鉢") and _has_label_text_containing(ui.pot_select_grid.get_child(1),"素焼き鉢") and _has_label_text_containing(ui.pot_select_grid.get_child(2),"黒陶器鉢"));ui._select_editor_pot("classic_terracotta");assert(ui.editor_page.visible and str(ui.current_arrangement.pot_id)=="classic_terracotta")
 	assert(game.species_get_counts==get_before and game.bests==best_before and game.discovered==discovered_before)
 	var migrated:Dictionary=game._normalize_arrangement({"arrangement_id":"legacy","name":"旧作品","pot_id":"starter_terracotta","plants":[],"viewer_transform":{"x":91.0,"y":-42.0,"scale":2.0}});assert(str(migrated.pot_id)=="shallow_terracotta" and not migrated.has("viewer_transform") and str(migrated.share_background_id)=="greenhouse")
 	ui._open_viewer(migrated);assert(ui.viewer_plant_layer.get_child_count()==0 and ui.viewer_artwork_root.position.is_zero_approx() and ui.viewer_artwork_root.scale.is_equal_approx(Vector2.ONE));ui._return_from_viewer();ui._select_editor_pot("classic_terracotta")

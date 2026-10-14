@@ -107,12 +107,11 @@ func _ready()->void:
 	assert(unlock_buttons.size()==1 and "€0,99" in (unlock_buttons[0] as Button).text and not (unlock_buttons[0] as Button).disabled and not bool((unlock_buttons[0] as Button).get_meta("puku_purchase",true)))
 	assert(first_locked_price!=null and first_locked_price.visible and first_locked_price.text=="価格：2ぷくコイン" and first_locked_price.get_theme_font_size("font_size")==18)
 	assert((unlock_buttons[0] as Button).get_theme_font_size("font_size")==19)
-	ui.open_home();assert(ui.home_page.visible and ui.pot_select_grid.get_child_count()==22)
-	var first_paid_select:=ui.pot_select_grid.get_child(8) as Button;assert(first_paid_select.disabled and _has_label_text_containing(first_paid_select,"デザイン未アンロック"))
+	ui.open_home();assert(ui.home_page.visible and ui.pot_select_grid.get_child_count()==1 and _has_label_text_containing(ui.pot_select_grid.get_child(0),"浅型素焼き鉢") and not _has_label_text_containing(ui.pot_select_grid,"未所持") and not _has_label_text_containing(ui.pot_select_grid,"デザイン未アンロック"))
 	var unlocks:Dictionary={first_product:true}
 	ui.configure([],[],all_pots,{},owned,[],20,5,Callable(),Callable(),{},"ja",1,unlocks,service.product_states_snapshot(),false,false)
-	ui._refresh_pot_selection();first_paid_select=ui.pot_select_grid.get_child(8) as Button;assert(first_paid_select.disabled and _has_label_text_containing(first_paid_select,"未所持"))
-	owned["g1_crystal_goblet"]=1;ui.sync_state(owned,[],20);first_paid_select=ui.pot_select_grid.get_child(8) as Button;assert(not first_paid_select.disabled and _has_label_text_containing(first_paid_select,"使用可能 ×1"))
+	ui._refresh_pot_selection();assert(ui.pot_select_grid.get_child_count()==1 and not _has_label_text_containing(ui.pot_select_grid,"クリスタルゴブレット鉢"))
+	owned["g1_crystal_goblet"]=1;ui.sync_state(owned,[],20);var first_paid_select:=ui.pot_select_grid.get_child(1) as Button;assert(ui.pot_select_grid.get_child_count()==2 and not first_paid_select.disabled and _has_label_text_containing(first_paid_select,"クリスタルゴブレット鉢") and _has_label_text_containing(first_paid_select,"使用可能 ×1"))
 	ui.open_pot_shop();first_paid_card=ui.shop_grid.get_child(8);var puku_buttons:=first_paid_card.find_children("*","Button",true,false);var owned_label:=first_paid_card.find_child("PotOwnedTotal",true,false) as Label
 	assert(puku_buttons.size()==1 and "2ぷくコイン" in (puku_buttons[0] as Button).text and (puku_buttons[0] as Button).get_theme_font_size("font_size")==19 and bool((puku_buttons[0] as Button).get_meta("puku_purchase",false)))
 	assert(owned_label!=null and owned_label.get_theme_font_size("font_size")==17 and not (first_paid_card.find_child("PotLockedPukuPrice",true,false) as Label).visible)

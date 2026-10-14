@@ -7,6 +7,7 @@ func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
 	game._reset_progression_state();game.story_progression_state["arrangement_unlocked"]=true;game.story_progression_state["arrangement_intro_seen"]=true;game.intro_story_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.habitat_awakened=true;game.habitat_awakening_event_complete=true;game.habitat_tutorial_complete=true;game.seed_shop_open=true;game.panda_beacon_unlocked=true;game.puku_gauge_intro_complete=true;game.total_play_count=3;game.formal_play_count=3
+	game._sync_arrangement_ui()
 	game.opening_overlay.visible=false;game.intro_overlay.visible=false;game.result_overlay.visible=false;game.shop_overlay.visible=false;game.settings_overlay.visible=false;game.encyclopedia_overlay.visible=false;game.play_overlay.visible=false
 	game.greenhouse_pan_x=0.0;game.greenhouse_pan_target_x=0.0;game.arrangement_transition_x=0.0;game.arrangement_transition_target_x=0.0
 	game._update_play_ui();game._update_greenhouse_pan()
@@ -65,7 +66,7 @@ func _ready()->void:
 	game.greenhouse_area_drag_velocity_x=0.0;game._finish_greenhouse_area_drag(Vector2(40+expected_arrangement_transition*.75,450))
 	await get_tree().create_timer(game.ARRANGEMENT_TRANSITION_SECONDS+.08).timeout
 	assert(game.arrangement_scene_active and not game.arrangement_transitioning and game.arrangement_ui.visible and game.arrangement_ui.home_page.visible)
-	assert(game.arrangement_ui.pot_select_grid.get_child_count()==8 and _has_button_text(game.arrangement_ui.home_page,"作った作品を見る") and not _has_button_text(game.arrangement_ui.home_page,"＋ 新しく作る"))
+	assert(game.arrangement_ui.pot_select_grid.get_child_count()==1 and _has_button_text(game.arrangement_ui.home_page,"作った作品を見る") and not _has_button_text(game.arrangement_ui.home_page,"＋ 新しく作る"))
 	assert(not game.main_status_hud.visible and not game.labels_layer.visible)
 	assert(game.arrangement_ui.world_backdrop_enabled)
 	var expected_anchor:Vector2=viewport_size*game.ARRANGEMENT_POT_ANCHOR
