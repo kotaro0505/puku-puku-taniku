@@ -131,10 +131,8 @@ const VISUAL_SCALE_PER_CM := 0.058
 const SCREEN_SPACE_GIANT_REFERENCE_CM := 120.0
 const SCREEN_ALPHA_HIT_THRESHOLD := .08
 const SCREEN_ALPHA_PROFILE_SAMPLE_RESOLUTION := 192
-const SCREEN_CONTACT_ROW_ALPHA_RATIO := .05
 
 static var screen_growth_anchor_cache:Dictionary={}
-static var screen_planting_anchor_cache:Dictionary={}
 
 var visual_scale := VISUAL_SCALE_BASE
 var plant_sprite: Sprite3D
@@ -215,7 +213,6 @@ func _apply_external_plant_texture(texture:Texture2D)->void:
 	screen_hit_image=null
 	plant_sprite.offset.y=-float(texture.get_height())*.18
 	plant_sprite.pixel_size=1.42/maxf(1.0,float(texture.get_width()))
-	plant_sprite.position.y=_sprite_origin_y_for_planting_anchor(plant_sprite.scale.y)
 	sync_screen_visual(screen_camera)
 
 func attach_screen_visual(screen_parent:Node,camera:Camera3D)->void:
@@ -284,99 +281,29 @@ func _screen_growth_anchor_pixel()->Vector2:
 	screen_growth_anchor_cache[cache_key]=anchor
 	return anchor
 
-func _screen_planting_anchor_pixel()->Vector2:
-	if plant_sprite==null or plant_sprite.texture==null:return Vector2.ZERO
-	var texture_size:=plant_sprite.texture.get_size()
-	var fallback:=Vector2(texture_size.x*.5,texture_size.y*.9)
-	var cache_key:="%s:%s"%[plant_sprite.texture.get_rid(),texture_size]
-	if screen_planting_anchor_cache.has(cache_key):return screen_planting_anchor_cache[cache_key]
-	var image:=screen_hit_image
-	if image==null or image.is_empty():image=plant_sprite.texture.get_image();screen_hit_image=image
-	if image==null or image.is_empty():return fallback
-	var used:=image.get_used_rect()
-	if used.size.x<=0 or used.size.y<=0:return fallback
-	# The contact point is the lower edge of the substantial opaque artwork, not
-	# the texture edge or a single stray alpha pixel. A row must contain at least
-	# five percent of the strongest sampled row before it can define the soil
-	# contact. Its horizontal coordinate is the row's alpha-weighted median, which
-	# keeps the root on a real visible pixel even for asymmetric or split artwork;
-	# transparent padding therefore cannot move the apparent planting point.
-	var longest_side:=maxi(used.size.x,used.size.y)
-	var sample_step:=maxi(1,ceili(float(longest_side)/float(SCREEN_ALPHA_PROFILE_SAMPLE_RESOLUTION)))
-	var row_weights:Dictionary={}
-	var max_row_weight:=0.0
-	var weighted_x:=0.0
-	var total_weight:=0.0
-	for y in range(maxi(used.position.y,0),mini(used.end.y,image.get_height()),sample_step):
-		var row_weight:=0.0
-		for x in range(maxi(used.position.x,0),mini(used.end.x,image.get_width()),sample_step):
-			var alpha:=image.get_pixel(x,y).a
-			if alpha<=SCREEN_ALPHA_HIT_THRESHOLD:continue
-			row_weight+=alpha
-			weighted_x+=(float(x)+.5)*alpha
-			total_weight+=alpha
-		row_weights[y]=row_weight
-		max_row_weight=maxf(max_row_weight,row_weight)
-	var contact_y:=-INF
-	if max_row_weight>0.0:
-		var minimum_row_weight:=max_row_weight*SCREEN_CONTACT_ROW_ALPHA_RATIO
-		for y in row_weights:
-			if float(row_weights[y])>=minimum_row_weight:contact_y=maxf(contact_y,float(y)+.5)
-	if is_inf(contact_y):contact_y=float(used.end.y)-.5
-	var anchor_x:=weighted_x/total_weight if total_weight>0.0 else float(used.get_center().x)
-	var contact_row:=clampi(floori(contact_y),maxi(used.position.y,0),mini(used.end.y,image.get_height())-1)
-	var contact_weight:=0.0
-	for x in range(maxi(used.position.x,0),mini(used.end.x,image.get_width())):
-		var alpha:=image.get_pixel(x,contact_row).a
-		if alpha>SCREEN_ALPHA_HIT_THRESHOLD:contact_weight+=alpha
-	if contact_weight>0.0:
-		var accumulated:=0.0
-		for x in range(maxi(used.position.x,0),mini(used.end.x,image.get_width())):
-			var alpha:=image.get_pixel(x,contact_row).a
-			if alpha<=SCREEN_ALPHA_HIT_THRESHOLD:continue
-			accumulated+=alpha
-			if accumulated>=contact_weight*.5:
-				anchor_x=float(x)+.5
-				break
-	var anchor:=Vector2(anchor_x,contact_y)
-	screen_planting_anchor_cache[cache_key]=anchor
-	return anchor
-
-func _sprite_origin_y_for_planting_anchor(rendered_scale:float)->float:
-	if plant_sprite==null or plant_sprite.texture==null:return 0.0
-	var texture_height:=float(plant_sprite.texture.get_height())
-	var anchor_pixel:=_screen_planting_anchor_pixel()
-	var anchor_local_y:=-(anchor_pixel.y-texture_height*.5+plant_sprite.offset.y)
-	return -anchor_local_y*plant_sprite.pixel_size*rendered_scale
-
-func _screen_planting_world_position()->Vector3:
-	if plant_sprite==null:return global_position
-	return global_transform*Vector3(plant_sprite.position.x,0.0,plant_sprite.position.z)
-
 func _projected_texture_polygon(camera:Camera3D)->PackedVector2Array:
 	var points:=PackedVector2Array()
 	if camera==null or plant_sprite==null or plant_sprite.texture==null:return points
 	var texture_size:=plant_sprite.texture.get_size()
 	if texture_size.x<=0.0 or texture_size.y<=0.0:return points
 	var near_depth:=maxf(.01,camera.near*1.01)
-	var planting_world:=_screen_planting_world_position()
-	var root_camera:=camera.to_local(planting_world)
+	var root_camera:=camera.to_local(global_position)
 	if -root_camera.z<=near_depth:return points
 	var basis:=camera.global_transform.basis
 	var angle:=plant_sprite.rotation.z
 	var plane_right:Vector3=basis.x*cos(angle)+basis.y*sin(angle)
 	var plane_up:Vector3=-basis.x*sin(angle)+basis.y*cos(angle)
-	var rendered_scale:=plant_sprite.scale.x
+	var origin:=plant_sprite.global_position
+	var global_scale:=plant_sprite.global_transform.basis.get_scale()
+	var giant_transform:=uses_giant_screen_transform()
 	var reference_scale:=visual_scale_for_diameter(SCREEN_SPACE_GIANT_REFERENCE_CM)
-	var projection_scale:=minf(rendered_scale,reference_scale)
-	var owner_scale:=global_transform.basis.get_scale()
-	# Preserve the established apparent scale/perspective through 120 cm, but use
-	# this height only as a projection plane. The final artwork is translated so
-	# the historical alpha-mass growth center stays at the unchanged planting
-	# position; the leaves can therefore expand both upward and downward again.
-	var projection_local_position:=Vector3(plant_sprite.position.x,.10+projection_scale*.62,plant_sprite.position.z)
-	var origin:=global_transform*projection_local_position
-	var global_scale:=Vector3(owner_scale.x*projection_scale,owner_scale.y*projection_scale,owner_scale.z*projection_scale)
+	if giant_transform:
+		# Freeze the 3D projection at the exact legacy 120 cm transform. Further
+		# growth happens in screen space so a huge billboard cannot cross the camera.
+		var owner_scale:=global_transform.basis.get_scale()
+		var reference_local_position:=Vector3(plant_sprite.position.x,.10+reference_scale*.62,plant_sprite.position.z)
+		origin=global_transform*reference_local_position
+		global_scale=Vector3(owner_scale.x*reference_scale,owner_scale.y*reference_scale,owner_scale.z*reference_scale)
 	var texture_points:=[Vector2.ZERO,Vector2(texture_size.x,0.0),texture_size,Vector2(0.0,texture_size.y)]
 	for pixel_point in texture_points:
 		var local_pixels:=Vector2(
@@ -389,19 +316,14 @@ func _projected_texture_polygon(camera:Camera3D)->PackedVector2Array:
 		var projected:=camera.unproject_position(world_point)
 		if is_nan(projected.x) or is_inf(projected.x) or is_nan(projected.y) or is_inf(projected.y):return PackedVector2Array()
 		points.append(projected)
-	var reference_axis_x:=(points[1]-points[0])/texture_size.x
-	var reference_axis_y:=(points[3]-points[0])/texture_size.y
-	var reference_transform:=Transform2D(reference_axis_x,reference_axis_y,points[0])
-	var projected_growth_anchor:=reference_transform*_screen_growth_anchor_pixel()
-	var planting_screen:=camera.unproject_position(planting_world)
-	if is_nan(projected_growth_anchor.x) or is_inf(projected_growth_anchor.x) or is_nan(projected_growth_anchor.y) or is_inf(projected_growth_anchor.y):return PackedVector2Array()
-	var growth_anchor_delta:=planting_screen-projected_growth_anchor
-	for index in range(points.size()):points[index]+=growth_anchor_delta
-	if rendered_scale>reference_scale:
-		# This is the pre-90de9b2 unbounded screen-space expansion: keep the
-		# alpha-weighted leaf-mass center fixed and expand in every direction.
-		var growth_ratio:=rendered_scale/reference_scale
-		for index in range(points.size()):points[index]=planting_screen+(points[index]-planting_screen)*growth_ratio
+	if giant_transform:
+		var reference_axis_x:=(points[1]-points[0])/texture_size.x
+		var reference_axis_y:=(points[3]-points[0])/texture_size.y
+		var reference_transform:=Transform2D(reference_axis_x,reference_axis_y,points[0])
+		var growth_anchor:=reference_transform*_screen_growth_anchor_pixel()
+		if is_nan(growth_anchor.x) or is_inf(growth_anchor.x) or is_nan(growth_anchor.y) or is_inf(growth_anchor.y):return PackedVector2Array()
+		var growth_ratio:=plant_sprite.scale.x/reference_scale
+		for index in range(points.size()):points[index]=growth_anchor+(points[index]-growth_anchor)*growth_ratio
 	return points
 
 func sync_screen_visual(camera:Camera3D)->void:
@@ -721,14 +643,13 @@ func _update_visual(delta: float) -> void:
 	var target: Vector3 = Vector3.ONE * visual_scale
 	var response: float = 1.0 if delta <= 0.0 else min(delta * 4.5, 1.0)
 	plant_sprite.scale = plant_sprite.scale.lerp(target, response)
-	# Compensate the centered Sprite3D from the measured opaque contact row. This
-	# retains a valid rooted fallback sprite without using a hard-coded lift that
-	# makes differently padded textures float as they grow.
-	var rendered_scale:=plant_sprite.scale.x
-	plant_sprite.position.y=_sprite_origin_y_for_planting_anchor(rendered_scale)
+	# Exact pre-giant-renderer Sprite3D placement from 7ecbc903/cf4d2dc7.
+	# The texture offset below is part of this transform; do not replace it with a
+	# measured alpha anchor or force either the artwork center or bottom to soil.
+	plant_sprite.position.y = .10 + visual_scale * .62
 	plant_sprite.rotation.z = sin(age * .72 + sway_phase) * .0045
 	plant_sprite.position.x = sin(age * .58 + sway_phase * .73) * .007
-	contact_shadow.scale = Vector3(rendered_scale * 1.04, rendered_scale * 1.04, rendered_scale * .72)
+	contact_shadow.scale = Vector3(visual_scale * 1.04, visual_scale * 1.04, visual_scale * .72)
 
 func get_risk_percent() -> float: return 0.0
 
