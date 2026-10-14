@@ -15,6 +15,7 @@ func _ready()->void:
 	_test_fixed_point_and_harvest_curve(game)
 	_test_giant_plant_display_and_hit(game)
 	_test_live_harvest_preview(game)
+	_test_plant_label_visibility_toggle(game)
 	await _test_giant_harvest_reward(game)
 	await _test_signed_balance_animation(game)
 	await _test_round_entry_and_harvest(game)
@@ -22,7 +23,7 @@ func _ready()->void:
 	_test_save_and_legacy_load(game)
 	await _test_panda_rescue(game)
 	game._reset_progression_state();game.queue_free()
-	print("PUKU_POINTS_SMOKE_OK unit=1/1000 round_cost=1.00 direct_harvest=true giant=100,120,150,200,300,500,700,1000,1500,2000,10000cm_linear_rooted_species3_positions3_speeds1.6+10 reward1000+2000=true new_floor=.20 migration=points+legacy_gauge forest_cost=1 rescue=wallet_plus_1 combo=true fly_removed=true result_waits=true")
+	print("PUKU_POINTS_SMOKE_OK unit=1/1000 round_cost=1.00 direct_harvest=true giant=100,120,150,200,300,500,700,1000,1500,2000,10000cm_linear_rooted_species3_positions3_speeds1.6+10 label_toggle=main_only_live_recalc reward1000+2000=true new_floor=.20 migration=points+legacy_gauge forest_cost=1 rescue=wallet_plus_1 combo=true fly_removed=true result_waits=true")
 	get_tree().quit()
 
 func _test_seed_pod_thresholds(game)->void:
@@ -73,7 +74,7 @@ func _test_live_harvest_preview(game)->void:
 	assert(known.label.text=="NEW！\n8.0 cm\n+0.20ぷくコイン")
 	game.language_code="hiragana";game._update_labels();assert(known.label.text.ends_with("+0.20ぷくこいん"))
 	game.language_code="en";game._update_labels();assert(known.label.text.ends_with("+0.20 Puku Coins"))
-	game.language_code="ja";game._change_growing_puku_preview(false);game._update_labels();assert(known.label.text=="NEW！\n8.0 cm" and known.label.size.x<=92.0 and known.label.size.y<68.0 and game.growing_puku_preview_toggle.text.ends_with("OFF"),"OFF label did not compact text=%s size=%s toggle=%s"%[known.label.text,known.label.size,game.growing_puku_preview_toggle.text])
+	game.language_code="ja";game._change_growing_puku_preview(false);game._update_labels();assert(known.label.text=="NEW！\n8.0 cm" and known.label.size.x<=92.1 and known.label.size.y<68.0 and game.growing_puku_preview_toggle.text.ends_with("OFF"),"OFF label did not compact text=%s size=%s toggle=%s"%[known.label.text,known.label.size,game.growing_puku_preview_toggle.text])
 	game._change_growing_puku_preview(true);game.puku_gauge_intro_complete=false;game._update_labels();assert(known.label.text=="NEW！\n8.0 cm")
 	game.puku_gauge_intro_complete=true;game.active_seed_type="old";game._update_labels();assert(known.label.text=="NEW！\n8.0 cm")
 	var sample_label:Label=game._plant_label();var long_lines:Array[String]=["NEW！","150.0 cm","+150.00ぷくコイン"];var long_size:Vector2=game._plant_label_size(sample_label,long_lines,true);var sample_width:=sample_label.get_theme_font("font").get_string_size(long_lines[-1],HORIZONTAL_ALIGNMENT_LEFT,-1,15).x;assert(long_size.x>=sample_width+16.0 and long_size.x<170.0 and long_size.y<76.0);sample_label.free()
@@ -84,6 +85,54 @@ func _test_live_harvest_preview(game)->void:
 		assert(rect.end.y<=plant_screen.y-10.0 and rect.end.y>=plant_screen.y-48.0,"preview label drifted away from its plant")
 		occupied.append(rect)
 	game.play_active=false;game._clear_greenhouse_plants();game.show_growing_puku_preview=true
+
+func _test_plant_label_visibility_toggle(game)->void:
+	assert(game.show_growing_plant_labels and game.plant_label_visibility_button and game.plant_label_visibility_button.text=="UIを隠す")
+	var button_rect:Rect2=game.plant_label_visibility_button.get_rect()
+	assert(button_rect.position.x>=16.0 and button_rect.end.y<=1000.0 and button_rect.size.x<=130.0 and button_rect.size.y<=50.0,"label toggle is not compact or safely inset: %s"%button_rect)
+	game.opening_finished=true;game.opening_overlay.visible=false;game.intro_story_complete=true;game.habitat_awakened=true;game.habitat_tutorial_complete=true;game.seed_shop_open=true;game.puku_gauge_intro_complete=true
+	game.first_play_tutorial_active=false;game.puku_buyback_tutorial_active=false;game.first_seed_pod_reward_event_active=false;game.scripted_dialog_kind="";game.tutorial_dialog_kind="";game.current_mode="greenhouse";game.arrangement_scene_active=false;game.arrangement_transitioning=false;game.catalog_preview_mode_active=false
+	for overlay in [game.intro_overlay,game.result_overlay,game.play_overlay,game.shop_overlay,game.settings_overlay,game.encyclopedia_overlay,game.species_get_overlay,game.catalog_series_unlock_overlay,game.forest_gacha_ui,game.fusion_lab_ui,game.arrangement_ui,game.puku_puku_battle]:
+		if overlay:overlay.visible=false
+	game._clear_greenhouse_plants();game.play_active=true;game.active_seed_type="normal";game.current_target_count=12;game.show_growing_puku_preview=true;game.species_get_counts["colorata"]=1;game.species_get_counts.erase("laui")
+	game._spawn_specific_plant("colorata");var known=game.plants.back();known.jelly_checks_enabled=false;known.fast_forward_to_diameter(70.0)
+	game._spawn_specific_plant("laui");var new_plant=game.plants.back();new_plant.jelly_checks_enabled=false;new_plant.set_meta("new_species_candidate",true);new_plant.fast_forward_to_diameter(150.0)
+	game._update_play_ui();game._update_labels()
+	assert(game.plant_label_visibility_button.visible and known.label.visible and new_plant.label.visible)
+	assert(known.label.text=="70.0 cm\n+0.80ぷくコイン" and new_plant.label.text.begins_with("NEW！\n150.0 cm\n"))
+	game._toggle_growing_plant_labels()
+	assert(not game.show_growing_plant_labels and game.plant_label_visibility_button.visible and game.plant_label_visibility_button.text=="UIを表示")
+	assert(not known.label.visible and not new_plant.label.visible and game.show_growing_puku_preview,"whole-label toggle changed the separate reward-preview setting")
+	assert(known.visible and known.screen_sprite.visible and new_plant.visible and new_plant.screen_sprite.visible,"hiding labels also hid plant artwork")
+	game._spawn_specific_plant("colorata");var hidden_spawn=game.plants.back();hidden_spawn.jelly_checks_enabled=false
+	assert(not hidden_spawn.label.visible,"a plant spawned while labels were hidden flashed its label before the next update")
+	known.fast_forward_to_diameter(100.0);new_plant.fast_forward_to_diameter(200.0);game._update_labels();assert(not known.label.visible and not new_plant.label.visible)
+	game._toggle_growing_plant_labels()
+	assert(game.show_growing_plant_labels and game.plant_label_visibility_button.text=="UIを隠す" and known.label.visible and new_plant.label.visible and hidden_spawn.label.visible)
+	assert(known.label.text=="100.0 cm\n+3.75ぷくコイン" and new_plant.label.text.begins_with("NEW！\n200.0 cm\n"),"restored labels did not recalculate live values known=%s new=%s"%[known.label.text,new_plant.label.text])
+	game._change_growing_puku_preview(false);assert(game.show_growing_plant_labels and known.label.text=="100.0 cm" and new_plant.label.text=="NEW！\n200.0 cm")
+	game._toggle_growing_plant_labels();game._toggle_growing_plant_labels();assert(not game.show_growing_puku_preview and known.label.visible and known.label.text=="100.0 cm","whole-label toggle was not independent from reward-preview setting")
+	known.fast_forward_to_diameter(1000.0);known.original_pos=Vector3(0,.12,2.5);known.position=known.original_pos;game._update_labels()
+	var button_hit_point:=Vector2(-1,-1);var toggle_rect:Rect2=game.plant_label_visibility_button.get_global_rect()
+	for row in range(1,8):
+		for column in range(1,12):
+			var candidate:=toggle_rect.position+Vector2(toggle_rect.size.x*float(column)/12.0,toggle_rect.size.y*float(row)/8.0)
+			if bool(known.screen_hit_test(game.camera,candidate).get("opaque_artwork_hit",false)):button_hit_point=candidate;break
+		if button_hit_point.x>=0.0:break
+	assert(button_hit_point.x>=0.0,"input-isolation test did not place a giant leaf behind the label toggle")
+	var press:=InputEventMouseButton.new();press.button_index=MOUSE_BUTTON_LEFT;press.position=button_hit_point;press.pressed=true
+	var release:=InputEventMouseButton.new();release.button_index=MOUSE_BUTTON_LEFT;release.position=button_hit_point;release.pressed=false
+	game._input(press);game._input(release);assert(known.state=="growing" and not game.pointer_down,"label-toggle tap harvested the giant leaf behind the button")
+	game.active_seed_type="old";game.first_colorata_confirmed=false;game.play_active=true;game._update_play_ui();assert(not game.plant_label_visibility_button.visible,"label toggle appeared during the old-seed story")
+	game.active_seed_type="normal"
+	game.play_active=false;game._update_play_ui();assert(game.plant_label_visibility_button.visible,"label toggle disappeared after a normal game ended")
+	game.play_active=true;game.current_mode="habitat";game._update_play_ui();assert(not game.plant_label_visibility_button.visible,"label toggle appeared in habitat")
+	game.current_mode="greenhouse";game.arrangement_scene_active=true;game._update_play_ui();assert(not game.plant_label_visibility_button.visible,"label toggle appeared in arrangement")
+	game.arrangement_scene_active=false;game.first_play_tutorial_active=true;game._update_play_ui();assert(not game.plant_label_visibility_button.visible,"label toggle covered the first-play tutorial")
+	game.first_play_tutorial_active=false;game.intro_overlay.visible=true;game._update_play_ui();assert(not game.plant_label_visibility_button.visible,"label toggle appeared over story UI")
+	game.intro_overlay.visible=false;game.puku_puku_battle.visible=true;game._update_play_ui();assert(not game.plant_label_visibility_button.visible,"label toggle appeared in battle")
+	game.puku_puku_battle.visible=false;game.result_overlay.visible=true;game._update_play_ui();assert(not game.plant_label_visibility_button.visible,"label toggle appeared over the game result")
+	game.result_overlay.visible=false;game.play_active=false;game.show_growing_plant_labels=true;game.show_growing_puku_preview=true;game._update_play_ui();game._clear_greenhouse_plants()
 
 func _opaque_hit_point(plant,camera:Camera3D,visible_rect:Rect2)->Vector2:
 	for row in range(1,48):

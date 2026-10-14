@@ -306,6 +306,8 @@ var settings_button:Button
 var current_mode := "greenhouse"
 var labels_layer: Control
 var main_status_hud: Control
+var show_growing_plant_labels := true
+var plant_label_visibility_button: Button
 var mission_panel: PanelContainer
 var mission_title_label: Label
 var mission_text_label: Label
@@ -1888,6 +1890,7 @@ func _build_ui() -> void:
 	var mission_content:=VBoxContainer.new();mission_content.alignment=BoxContainer.ALIGNMENT_CENTER;mission_content.mouse_filter=Control.MOUSE_FILTER_IGNORE;mission_content.add_theme_constant_override("separation",1);mission_panel.add_child(mission_content)
 	mission_title_label=Label.new();mission_title_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;mission_title_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;mission_title_label.add_theme_font_size_override("font_size",15);mission_title_label.add_theme_color_override("font_color",Color("#f6cf69"));mission_content.add_child(mission_title_label)
 	mission_text_label=Label.new();mission_text_label.custom_minimum_size=Vector2(320,60);mission_text_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;mission_text_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;mission_text_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;mission_text_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;mission_text_label.add_theme_font_size_override("font_size",16);mission_text_label.add_theme_color_override("font_color",Color("#fff7dc"));mission_content.add_child(mission_text_label)
+	plant_label_visibility_button=Button.new();plant_label_visibility_button.name="PlantLabelVisibilityButton";plant_label_visibility_button.position=Vector2(18,952);plant_label_visibility_button.size=Vector2(124,48);plant_label_visibility_button.focus_mode=Control.FOCUS_NONE;plant_label_visibility_button.mouse_filter=Control.MOUSE_FILTER_STOP;_skin_button(plant_label_visibility_button,Color("#6f4932"),15);plant_label_visibility_button.pressed.connect(_toggle_growing_plant_labels);main_status_hud.add_child(plant_label_visibility_button)
 	for entry in [{"x":398,"t":"図鑑"},{"x":478,"t":"設定"}]:
 		var b:=Button.new(); b.text=entry.t; b.position=Vector2(entry.x,134); b.size=Vector2(73,55); _skin_button(b,Color("#fff0cf"),16); hud.add_child(b)
 		external_navigation_controls.append(b)
@@ -4026,6 +4029,7 @@ func _apply_language_to_ui()->void:
 	var audio_note:=find_child("AudioSettingsNote",true,false) as Label
 	if audio_note:audio_note.text=Localizer.text(language_code,"audio_note")
 	if growing_puku_preview_toggle:growing_puku_preview_toggle.text=_growing_puku_preview_setting_text()
+	_update_plant_label_visibility_button()
 	if intro_speaker_label:intro_speaker_label.text=Localizer.text(language_code,"story_speaker_panda")
 	if tutorial_speaker_label and not tutorial_speaker_id.is_empty():_set_tutorial_speaker(tutorial_speaker_id)
 	for code in language_buttons:
@@ -4210,7 +4214,9 @@ func _open_giant_plant_preview()->void:
 	play_active=true;active_seed_type="normal";current_target_count=NORMAL_GERMINATION_COUNT
 	play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=1
 	first_play_tutorial_active=false;first_play_harvest_guide_active=false;old_seed_harvest_guide_active=false
-	puku_gauge_intro_complete=true;show_growing_puku_preview=true;normal_play_tutorial_complete=true
+	# Browser QA represents the post-tutorial normal greenhouse so main-game-only
+	# controls can be exercised without exposing them during the real tutorial.
+	intro_story_complete=true;habitat_awakened=true;habitat_tutorial_complete=true;seed_shop_open=true;puku_gauge_intro_complete=true;show_growing_puku_preview=true;normal_play_tutorial_complete=true
 	species_get_counts[FIRST_STORY_SPECIES_ID]=maxi(1,_species_get_count(FIRST_STORY_SPECIES_ID))
 	_apply_mode()
 	_spawn_specific_plant(FIRST_STORY_SPECIES_ID)
@@ -4651,6 +4657,28 @@ func _change_growing_puku_preview(enabled:bool)->void:
 		growing_puku_preview_toggle.set_pressed_no_signal(enabled);growing_puku_preview_toggle.text=_growing_puku_preview_setting_text()
 	_update_labels();_save()
 
+func _plant_label_visibility_button_text()->String:
+	return Localizer.text(language_code,"plant_labels_hide" if show_growing_plant_labels else "plant_labels_show")
+
+func _plant_label_visibility_button_should_show()->bool:
+	if not opening_finished or not _tutorial_fully_complete() or first_play_tutorial_active or puku_buyback_tutorial_active or first_seed_pod_reward_event_active:return false
+	if _old_seed_story_active():return false
+	if _endless_greenhouse_auto_start_blocked():return false
+	if collection_complete_overlay and collection_complete_overlay.visible:return false
+	return _mission_foreground_safe()
+
+func _update_plant_label_visibility_button()->void:
+	if plant_label_visibility_button==null:return
+	plant_label_visibility_button.text=_plant_label_visibility_button_text()
+	plant_label_visibility_button.visible=_plant_label_visibility_button_should_show()
+
+func _toggle_growing_plant_labels()->void:
+	show_growing_plant_labels=not show_growing_plant_labels
+	_update_plant_label_visibility_button()
+	# Rebuilding all label text here makes a hidden plant's current size, reward,
+	# and NEW state appear immediately when the player turns labels back on.
+	_update_labels()
+
 func _reset_progression_state()->void:
 	_end_first_play_tutorial_context()
 	_reset_collection_complete_presentation(true)
@@ -5019,6 +5047,7 @@ func _update_play_ui()->void:
 	if forest_gacha_button:forest_gacha_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete() and forest_gacha_unlocked and forest_gacha_intro_seen
 	if fusion_lab_button:fusion_lab_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _fusion_lab_available()
 	if shop_forest_gacha_button:shop_forest_gacha_button.visible=forest_gacha_unlocked and forest_gacha_intro_seen
+	_update_plant_label_visibility_button()
 	if arrangement_navigation_hint:
 		arrangement_navigation_hint.update_hint(language_code,arrangement_scene_active,_arrangement_navigation_hint_safe())
 	if habitat_restoration_ui:
@@ -8254,7 +8283,7 @@ func _spawn_center_inside_soil(candidate:Vector3)->bool:
 	return pow(normalized.x/safe_radii.x,2.0)+pow(normalized.y/safe_radii.y,2.0)<=1.0
 
 func _plant_label()->Label:
-	var l:=Label.new(); l.text="1.6 cm"; l.size=Vector2(92,34); l.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; l.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; l.add_theme_font_size_override("font_size",17); l.add_theme_color_override("font_color",Color.WHITE); l.add_theme_stylebox_override("normal",_box(Color(0.14,0.08,0.05,.92),Color("#f4e1be"),11,2)); l.mouse_filter=Control.MOUSE_FILTER_IGNORE; l.clip_text=false; return l
+	var l:=Label.new(); l.text="1.6 cm"; l.size=Vector2(92,34); l.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; l.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; l.add_theme_font_size_override("font_size",17); l.add_theme_color_override("font_color",Color.WHITE); l.add_theme_stylebox_override("normal",_box(Color(0.14,0.08,0.05,.92),Color("#f4e1be"),11,2)); l.mouse_filter=Control.MOUSE_FILTER_IGNORE; l.clip_text=false; l.visible=false; return l
 
 func _stop_rain_visual()->void:
 	if rain_visual and is_instance_valid(rain_visual):rain_visual.free()
@@ -8834,6 +8863,10 @@ func _update_labels()->void:
 		for p in plants:
 			if is_instance_valid(p):p.label.visible=false
 		return
+	if not show_growing_plant_labels:
+		for p in plants:
+			if is_instance_valid(p):p.label.visible=false
+		return
 	var occupied:Array[Rect2]=[];var viewport_rect:=get_viewport().get_visible_rect()
 	var sorted:=plants.duplicate(); sorted.sort_custom(func(a,b):return a.position.z<b.position.z)
 	for p in sorted:
@@ -8871,6 +8904,14 @@ func _unhandled_input(event:InputEvent)->void:
 		return
 	if greenhouse_area_drag_tracking or (not arrangement_scene_active and _greenhouse_area_navigation_available()):
 		_handle_greenhouse_area_scroll_input(event,false)
+
+func _plant_label_visibility_button_owns_pointer_event(event:InputEvent)->bool:
+	if plant_label_visibility_button==null or not plant_label_visibility_button.visible or not plant_label_visibility_button.is_visible_in_tree():return false
+	var screen_position:=Vector2.ZERO
+	if event is InputEventScreenTouch or event is InputEventScreenDrag:screen_position=event.position
+	elif event is InputEventMouseButton or event is InputEventMouseMotion:screen_position=event.position
+	else:return false
+	return plant_label_visibility_button.get_global_rect().has_point(screen_position)
 
 func _on_arrangement_world_scroll_input(event:InputEvent)->void:
 	if arrangement_ui and (arrangement_ui.is_editor_active() or arrangement_ui.is_viewer_active()):
@@ -8941,6 +8982,12 @@ func _cancel_greenhouse_area_drag(update_ui:=true)->void:
 
 func _input(event:InputEvent)->void:
 	if audio_manager and (event is InputEventScreenTouch or event is InputEventMouseButton or event is InputEventKey):audio_manager.notify_user_gesture()
+	# `_input` runs before Godot dispatches the event to Controls. Exclude this
+	# gameplay-HUD button explicitly so a giant leaf behind it is never harvested
+	# by the same tap that toggles its label visibility.
+	if _plant_label_visibility_button_owns_pointer_event(event):
+		if (event is InputEventScreenTouch and not event.pressed) or (event is InputEventMouseButton and not event.pressed):pointer_down=false
+		return
 	if habitat_lookaround_active or jurejure_intro_camera_active:return
 	if habitat_restoration_ui and habitat_restoration_ui.is_modal_visible():return
 	if arrangement_scene_active or arrangement_transitioning:return
@@ -9123,6 +9170,7 @@ func _show_habitat_message(world_position:Vector3,message:String,color:Color)->v
 	var tween:=create_tween().bind_node(label).set_parallel();tween.tween_property(label,"position:y",label.position.y-70,.7);tween.tween_property(label,"modulate:a",0.0,.7).set_delay(.25);tween.chain().tween_callback(label.queue_free)
 
 func _on_harvested(p)->void:
+	if is_instance_valid(p) and p.label and is_instance_valid(p.label):p.label.visible=false
 	if bool(p.get_meta("catalog_preview",false)):_on_catalog_preview_harvested(p);return
 	if dev_jelly_test_active:
 		plants.erase(p);var tween:=create_tween().bind_node(p);tween.tween_property(p,"scale",Vector3.ONE*.01,.2);_cleanup_later(p,.25);return
@@ -9236,6 +9284,7 @@ func _is_terminal_first_tutorial_plant(plant)->bool:
 	return first_play_tutorial_active and not seed_pod_first_reward_seen and play_active and active_seed_type=="normal" and play_seeds_remaining==0 and play_spawn_queue==0 and play_seed_animations_pending==0 and plants.size()==1 and plants[0]==plant
 
 func _on_jellied(p)->void:
+	if is_instance_valid(p) and p.label and is_instance_valid(p.label):p.label.visible=false
 	if bool(p.get_meta("catalog_preview",false)):_on_catalog_preview_jellied(p);return
 	if _is_endless_normal_play():
 		endless_economy_jelly_count+=1
