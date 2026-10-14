@@ -99,15 +99,23 @@ var viewer_page:Control
 var viewer_header_title:Label
 var viewer_name:Label
 var viewer_canvas:Panel
-var viewer_background:Sprite2D
 var viewer_artwork_canvas:Control
 var viewer_artwork_root:Control
 var viewer_pot_layer:Control
 var viewer_plant_layer:Control
 var viewer_dismantle_button:Button
 var viewer_share_button:Button
+var share_editor_page:Control
+var share_editor_header_title:Label
+var share_editor_canvas:Panel
+var share_editor_background:Sprite2D
+var share_editor_artwork_canvas:Control
+var share_editor_artwork_root:Control
+var share_editor_pot_layer:Control
+var share_editor_plant_layer:Control
+var share_editor_share_button:Button
 var viewer_share_background_button:Button
-var viewer_share_status:Label
+var share_editor_status:Label
 var share_background_panel:Panel
 var share_background_scroll:ScrollContainer
 var share_background_cards:HBoxContainer
@@ -231,7 +239,7 @@ func configure(species_data:Array,series_data:Array,pots_data:Array,discovery:Di
 	pot_restore_in_progress=restore_in_progress
 	share_background_catalog=share_backgrounds.duplicate(true)
 	share_background_unlocks=background_unlocks.duplicate(true)
-	if visible and viewer_page!=null and viewer_page.visible and _share_background_panel_is_open():_refresh_share_background_panel()
+	if visible and is_share_editor_active() and _share_background_panel_is_open():_refresh_share_background_panel()
 
 func set_language(locale:String)->void:
 	language_code=GameLocalizer.normalize_language(locale)
@@ -243,6 +251,7 @@ func set_language(locale:String)->void:
 	elif picker_page.visible:_refresh_picker_filters();_refresh_species_picker()
 	elif viewer_page.visible and not current_arrangement.is_empty():
 		_apply_viewer_page_mode()
+	elif is_share_editor_active() and not current_arrangement.is_empty():
 		if _share_background_panel_is_open():_refresh_share_background_panel()
 	elif shop_page.visible:_refresh_pot_shop()
 	elif catalog_shop_page.visible:_refresh_catalog_shop()
@@ -278,7 +287,7 @@ func sync_pot_iap_state(design_unlocks:Dictionary,iap_products:Dictionary,restor
 
 func sync_share_background_state(backgrounds:Array,background_unlocks:Dictionary)->void:
 	share_background_catalog=backgrounds.duplicate(true);share_background_unlocks=background_unlocks.duplicate(true)
-	if visible and viewer_page.visible and _share_background_panel_is_open():_refresh_share_background_panel()
+	if visible and is_share_editor_active() and _share_background_panel_is_open():_refresh_share_background_panel()
 
 func sync_seed_shop_state(products:Array,puku_points:int)->void:
 	seed_shop_products=products;wallet_puku_points=maxi(0,puku_points)
@@ -389,6 +398,7 @@ func _build_ui()->void:
 	editor_page=_page();_build_editor_page()
 	picker_page=_page();_build_picker_page()
 	viewer_page=_page();saved_arrangements_page=viewer_page;_build_viewer_page()
+	share_editor_page=_page();_build_share_editor_page()
 	shop_page=_page();_build_shop_page()
 	catalog_shop_page=_page();_build_catalog_shop_page()
 	seed_shop_page=_page();_build_seed_shop_page()
@@ -445,16 +455,20 @@ func _page()->Control:
 
 func _show_page(page:Control)->void:
 	if editor_page and editor_page.visible and page!=editor_page:_cancel_editor_gesture()
-	if viewer_page and viewer_page.visible and page!=viewer_page:_cancel_viewer_gesture(false)
-	if page!=viewer_page:_hide_dismantle_confirmation();_close_share_background_panel()
-	for candidate in [home_page,editor_page,picker_page,viewer_page,shop_page,catalog_shop_page,seed_shop_page]:
+	if is_viewer_active() and page!=viewer_page and page!=share_editor_page:_cancel_viewer_gesture(false)
+	if page!=viewer_page:_hide_dismantle_confirmation()
+	if page!=share_editor_page:_close_share_background_panel()
+	for candidate in [home_page,editor_page,picker_page,viewer_page,share_editor_page,shop_page,catalog_shop_page,seed_shop_page]:
 		if candidate:candidate.visible=candidate==page
 
 func is_editor_active()->bool:
 	return visible and editor_page!=null and editor_page.visible
 
 func is_viewer_active()->bool:
-	return visible and viewer_page!=null and viewer_page.visible
+	return visible and ((viewer_page!=null and viewer_page.visible) or is_share_editor_active())
+
+func is_share_editor_active()->bool:
+	return visible and share_editor_page!=null and share_editor_page.visible
 
 func is_navigation_hint_safe()->bool:
 	# Viewer gestures are exclusively owned by the finished artwork. Keep the
@@ -466,7 +480,7 @@ func _input(event:InputEvent)->void:
 	# multi-touch gesture through a Control's gui_input signal. Track touch
 	# events at viewport level while an interactive canvas is active so both
 	# fingers use the same path. Mouse input remains owned by each canvas.
-	if is_viewer_active() and viewer_canvas!=null:
+	if is_viewer_active() and _active_viewer_canvas()!=null:
 		if event is InputEventScreenTouch or event is InputEventScreenDrag:
 			if _share_background_panel_is_open():
 				_cancel_viewer_gesture(true)
@@ -504,7 +518,7 @@ func _route_editor_touch_event(event:InputEvent,position_is_editor_local:bool)->
 	return false
 
 func _route_viewer_touch_event(event:InputEvent,position_is_viewer_local:bool)->bool:
-	if not is_viewer_active() or viewer_canvas==null or _share_background_panel_is_open():return false
+	if not is_viewer_active() or _active_viewer_canvas()==null or _share_background_panel_is_open():return false
 	if event is InputEventScreenTouch:
 		var touch:=event as InputEventScreenTouch
 		var local_position:=touch.position if position_is_viewer_local else _viewer_local_touch_position(touch.position)
@@ -527,10 +541,21 @@ func _editor_canvas_has_point(local_position:Vector2)->bool:
 	return Rect2(Vector2.ZERO,editor_canvas.size).has_point(local_position)
 
 func _viewer_local_touch_position(screen_position:Vector2)->Vector2:
-	return viewer_canvas.get_global_transform_with_canvas().affine_inverse()*screen_position
+	var canvas:=_active_viewer_canvas()
+	return screen_position if canvas==null else canvas.get_global_transform_with_canvas().affine_inverse()*screen_position
 
 func _viewer_canvas_has_point(local_position:Vector2)->bool:
-	return Rect2(Vector2.ZERO,viewer_canvas.size).has_point(local_position)
+	var canvas:=_active_viewer_canvas()
+	return canvas!=null and Rect2(Vector2.ZERO,canvas.size).has_point(local_position)
+
+func _active_viewer_canvas()->Panel:
+	return share_editor_canvas if is_share_editor_active() else viewer_canvas
+
+func _active_viewer_artwork_canvas()->Control:
+	return share_editor_artwork_canvas if is_share_editor_active() else viewer_artwork_canvas
+
+func _active_viewer_artwork_root()->Control:
+	return share_editor_artwork_root if is_share_editor_active() else viewer_artwork_root
 
 func _on_home_world_scroll_input(event:InputEvent)->void:
 	if world_backdrop_enabled and visible and home_page.visible:world_scroll_input.emit(event)
@@ -636,11 +661,10 @@ func _apply_viewer_page_mode()->void:
 	if saved_arrangements_empty:
 		saved_arrangements_empty.text=GameLocalizer.text(language_code,"arrangement_empty");saved_arrangements_empty.visible=viewer_gallery_mode and not has_work
 	if viewer_name:viewer_name.visible=not viewer_gallery_mode and has_work
-	for control in [viewer_canvas,viewer_share_button,viewer_share_background_button,viewer_dismantle_button]:
+	for control in [viewer_canvas,viewer_share_button,viewer_dismantle_button]:
 		if control:control.visible=has_work
 	if not has_work:
 		_close_share_background_panel()
-		if viewer_share_status:viewer_share_status.visible=false
 
 func _refresh_pot_selection()->void:
 	_clear_children(pot_select_grid)
@@ -984,22 +1008,25 @@ func _handle_viewer_touch(event:InputEvent)->void:
 		elif viewer_drag_active and viewer_drag_pointer_id==drag.index:_update_viewer_drag(drag.position)
 
 func _begin_viewer_drag(pointer_id:int,pointer_position:Vector2)->void:
-	if not is_viewer_active() or viewer_artwork_root==null:return
+	var artwork_root:=_active_viewer_artwork_root()
+	if not is_viewer_active() or artwork_root==null:return
 	viewer_drag_active=true;viewer_drag_pointer_id=pointer_id;viewer_drag_last_position=_viewer_artwork_local_position(pointer_position)
 
 func _update_viewer_drag(pointer_position:Vector2)->void:
-	if not viewer_drag_active or viewer_artwork_root==null:return
+	var artwork_root:=_active_viewer_artwork_root()
+	if not viewer_drag_active or artwork_root==null:return
 	var artwork_position:=_viewer_artwork_local_position(pointer_position)
 	var delta:=artwork_position-viewer_drag_last_position
 	viewer_drag_last_position=artwork_position
 	if delta.is_zero_approx():return
-	_set_viewer_artwork_transform(viewer_artwork_root.position+delta,viewer_artwork_root.scale.x,true)
+	_set_viewer_artwork_transform(artwork_root.position+delta,artwork_root.scale.x,true)
 
 func _finish_viewer_pointer(pointer_id:int)->void:
 	if viewer_drag_active and viewer_drag_pointer_id==pointer_id:_finish_viewer_gesture(true)
 
 func _begin_viewer_pinch()->void:
-	if viewer_artwork_root==null or viewer_touch_positions.size()<2:return
+	var artwork_root:=_active_viewer_artwork_root()
+	if artwork_root==null or viewer_touch_positions.size()<2:return
 	viewer_drag_active=false;viewer_drag_pointer_id=-999;viewer_pinch_active=true;viewer_pinch_touch_ids.clear()
 	var pointer_ids:Array=[]
 	for pointer_value in viewer_touch_positions.keys():pointer_ids.append(int(pointer_value))
@@ -1008,10 +1035,10 @@ func _begin_viewer_pinch()->void:
 		viewer_pinch_touch_ids.append(int(pointer_value))
 		if viewer_pinch_touch_ids.size()>=2:break
 	var first:=_viewer_artwork_local_position(viewer_touch_positions.get(viewer_pinch_touch_ids[0],Vector2.ZERO));var second:=_viewer_artwork_local_position(viewer_touch_positions.get(viewer_pinch_touch_ids[1],Vector2.ZERO))
-	viewer_pinch_start_distance=maxf(first.distance_to(second),1.0);viewer_pinch_start_scale=viewer_artwork_root.scale.x;viewer_pinch_start_position=viewer_artwork_root.position;viewer_pinch_start_midpoint=(first+second)*.5
+	viewer_pinch_start_distance=maxf(first.distance_to(second),1.0);viewer_pinch_start_scale=artwork_root.scale.x;viewer_pinch_start_position=artwork_root.position;viewer_pinch_start_midpoint=(first+second)*.5
 
 func _update_viewer_pinch()->void:
-	if not viewer_pinch_active or viewer_pinch_touch_ids.size()<2 or viewer_artwork_root==null:return
+	if not viewer_pinch_active or viewer_pinch_touch_ids.size()<2 or _active_viewer_artwork_root()==null:return
 	if not viewer_touch_positions.has(viewer_pinch_touch_ids[0]) or not viewer_touch_positions.has(viewer_pinch_touch_ids[1]):return
 	var first:=_viewer_artwork_local_position(viewer_touch_positions[viewer_pinch_touch_ids[0]]);var second:=_viewer_artwork_local_position(viewer_touch_positions[viewer_pinch_touch_ids[1]]);var midpoint:=(first+second)*.5
 	var scale_value:=clampf(viewer_pinch_start_scale*maxf(first.distance_to(second),1.0)/viewer_pinch_start_distance,VIEWER_SCALE_MIN,VIEWER_SCALE_MAX)
@@ -1019,24 +1046,32 @@ func _update_viewer_pinch()->void:
 	_set_viewer_artwork_transform(midpoint-artwork_point*scale_value,scale_value,true)
 
 func _viewer_artwork_local_position(viewer_position:Vector2)->Vector2:
-	if viewer_artwork_canvas==null:return viewer_position
-	return viewer_artwork_canvas.get_transform().affine_inverse()*viewer_position
+	var artwork_canvas:=_active_viewer_artwork_canvas()
+	if artwork_canvas==null:return viewer_position
+	return artwork_canvas.get_transform().affine_inverse()*viewer_position
 
 func _set_viewer_artwork_transform(position_value:Vector2,scale_value:float,_mark_dirty:bool=false)->void:
-	if viewer_artwork_root==null:return
+	var artwork_root:=_active_viewer_artwork_root()
+	if artwork_root==null:return
 	var safe_scale:=clampf(scale_value,VIEWER_SCALE_MIN,VIEWER_SCALE_MAX)
 	var safe_position:=_clamp_viewer_position(position_value,safe_scale)
-	viewer_artwork_root.position=safe_position;viewer_artwork_root.scale=Vector2.ONE*safe_scale;viewer_artwork_root.rotation=0.0
+	artwork_root.position=safe_position;artwork_root.scale=Vector2.ONE*safe_scale;artwork_root.rotation=0.0
+	if is_share_editor_active():_update_share_preview_transform_debug()
 
 func _clamp_viewer_position(position_value:Vector2,scale_value:float)->Vector2:
-	var scaled_size:=ShareRendererClass.VIEWER_CANVAS_SIZE*scale_value
+	var source_size:=ShareRendererClass.VIEWER_CANVAS_SIZE
+	var bounds_size:=ShareRendererClass.ARTWORK_VIRTUAL_SIZE
+	if not is_share_editor_active() and viewer_canvas!=null:
+		source_size=viewer_canvas.size;bounds_size=viewer_canvas.size
+	var scaled_size:=source_size*scale_value
 	var minimum:=Vector2(VIEWER_MIN_VISIBLE_PIXELS,VIEWER_MIN_VISIBLE_PIXELS)-scaled_size
-	var maximum:=ShareRendererClass.ARTWORK_VIRTUAL_SIZE-Vector2(VIEWER_MIN_VISIBLE_PIXELS,VIEWER_MIN_VISIBLE_PIXELS)
+	var maximum:=bounds_size-Vector2(VIEWER_MIN_VISIBLE_PIXELS,VIEWER_MIN_VISIBLE_PIXELS)
 	return Vector2(clampf(position_value.x,minimum.x,maximum.x),clampf(position_value.y,minimum.y,maximum.y))
 
 func _viewer_transform_state()->Dictionary:
-	if viewer_artwork_root==null:return normalize_viewer_transform({})
-	return {"x":viewer_artwork_root.position.x,"y":viewer_artwork_root.position.y,"scale":viewer_artwork_root.scale.x}
+	var artwork_root:=_active_viewer_artwork_root()
+	if artwork_root==null:return normalize_viewer_transform({})
+	return {"x":artwork_root.position.x,"y":artwork_root.position.y,"scale":artwork_root.scale.x}
 
 func _restore_viewer_transform(_arrangement:Dictionary={})->void:
 	# Finished-work framing is deliberately session-only. Legacy save metadata is
@@ -1223,21 +1258,34 @@ func _build_viewer_page()->void:
 	saved_arrangements_tabs=HBoxContainer.new();saved_arrangements_tabs.custom_minimum_size=Vector2(0,30);saved_arrangements_tabs.mouse_filter=Control.MOUSE_FILTER_PASS;saved_arrangements_tabs.add_theme_constant_override("separation",8);saved_arrangements_tab_scroll.add_child(saved_arrangements_tabs)
 	saved_arrangements_empty=Label.new();saved_arrangements_empty.position=Vector2(48,300);saved_arrangements_empty.size=Vector2(480,150);saved_arrangements_empty.z_index=500;saved_arrangements_empty.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;saved_arrangements_empty.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;saved_arrangements_empty.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;saved_arrangements_empty.add_theme_font_size_override("font_size",18);_style_overlay_label(saved_arrangements_empty,Color("#f8deb5"),4);saved_arrangements_empty.visible=false;viewer_page.add_child(saved_arrangements_empty)
 	viewer_name=Label.new();viewer_name.position=Vector2(30,90);viewer_name.size=Vector2(516,48);viewer_name.z_index=500;viewer_name.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;viewer_name.add_theme_font_size_override("font_size",24);_style_overlay_label(viewer_name,Color("#ffe0a0"),5);viewer_page.add_child(viewer_name)
-	viewer_canvas=Panel.new();viewer_canvas.name="SharePreview";viewer_canvas.position=SHARE_PREVIEW_POSITION;viewer_canvas.size=SHARE_PREVIEW_SIZE;viewer_canvas.clip_contents=true;viewer_canvas.mouse_filter=Control.MOUSE_FILTER_STOP;viewer_canvas.gui_input.connect(_on_viewer_canvas_gui_input);viewer_canvas.add_theme_stylebox_override("panel",StyleBoxEmpty.new());viewer_page.add_child(viewer_canvas)
-	viewer_background=Sprite2D.new();viewer_background.name="SharePreviewBackground";viewer_background.centered=false;viewer_background.texture_filter=CanvasItem.TEXTURE_FILTER_LINEAR;viewer_canvas.add_child(viewer_background)
-	viewer_artwork_canvas=Control.new();viewer_artwork_canvas.name="SharePreviewArtworkCanvas";viewer_artwork_canvas.size=ShareRendererClass.ARTWORK_VIRTUAL_SIZE;viewer_artwork_canvas.mouse_filter=Control.MOUSE_FILTER_IGNORE;viewer_canvas.add_child(viewer_artwork_canvas)
+	# The ordinary viewer stays in the greenhouse world, aligned to the same
+	# 536x552 table canvas used before share-composition previews were introduced.
+	viewer_canvas=Panel.new();viewer_canvas.name="ArrangementViewerCanvas";viewer_canvas.position=ARRANGEMENT_CANVAS_POSITION;viewer_canvas.size=ShareRendererClass.VIEWER_CANVAS_SIZE;viewer_canvas.clip_contents=false;viewer_canvas.mouse_filter=Control.MOUSE_FILTER_STOP;viewer_canvas.gui_input.connect(_on_viewer_canvas_gui_input);viewer_canvas.add_theme_stylebox_override("panel",StyleBoxEmpty.new());viewer_page.add_child(viewer_canvas)
+	viewer_artwork_canvas=Control.new();viewer_artwork_canvas.name="ViewerArtworkCanvas";viewer_artwork_canvas.size=viewer_canvas.size;viewer_artwork_canvas.mouse_filter=Control.MOUSE_FILTER_IGNORE;viewer_canvas.add_child(viewer_artwork_canvas)
 	viewer_artwork_root=Control.new();viewer_artwork_root.name="ViewerArtworkRoot";viewer_artwork_root.size=ShareRendererClass.VIEWER_CANVAS_SIZE;viewer_artwork_root.mouse_filter=Control.MOUSE_FILTER_IGNORE;viewer_artwork_canvas.add_child(viewer_artwork_root)
 	viewer_pot_layer=Control.new();viewer_pot_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);viewer_pot_layer.mouse_filter=Control.MOUSE_FILTER_IGNORE;viewer_artwork_root.add_child(viewer_pot_layer)
 	viewer_plant_layer=Control.new();viewer_plant_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);viewer_plant_layer.z_index=PLANT_LAYER_Z;viewer_plant_layer.mouse_filter=Control.MOUSE_FILTER_IGNORE;viewer_artwork_root.add_child(viewer_plant_layer)
-	viewer_share_button=_button(GameLocalizer.text(language_code,"share_action"),Vector2(28,790),Vector2(248,58),Color("#d7aa64"),18);viewer_share_button.z_index=500;_mark_localized(viewer_share_button,"share_action");viewer_share_button.pressed.connect(_request_current_arrangement_share);viewer_page.add_child(viewer_share_button)
-	viewer_share_background_button=_button(GameLocalizer.text(language_code,"share_background"),Vector2(300,790),Vector2(248,58),Color("#d7aa64"),18);viewer_share_background_button.z_index=500;_mark_localized(viewer_share_background_button,"share_background");viewer_share_background_button.pressed.connect(_toggle_share_background_panel);viewer_page.add_child(viewer_share_background_button)
-	viewer_share_status=Label.new();viewer_share_status.position=Vector2(28,852);viewer_share_status.size=Vector2(520,34);viewer_share_status.z_index=500;viewer_share_status.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;viewer_share_status.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;viewer_share_status.add_theme_font_size_override("font_size",14);_style_overlay_label(viewer_share_status,Color("#ffe0a0"),4);viewer_share_status.mouse_filter=Control.MOUSE_FILTER_IGNORE;viewer_share_status.visible=false;viewer_page.add_child(viewer_share_status)
+	viewer_share_button=_button(GameLocalizer.text(language_code,"share_action"),Vector2(28,790),Vector2(248,58),Color("#d7aa64"),18);viewer_share_button.z_index=500;_mark_localized(viewer_share_button,"share_action");viewer_share_button.pressed.connect(_open_share_editor);viewer_page.add_child(viewer_share_button)
 	viewer_dismantle_button=_button(GameLocalizer.text(language_code,"arrangement_dismantle"),Vector2(154,892),Vector2(268,58),Color("#b87962"),18);viewer_dismantle_button.z_index=500;_mark_localized(viewer_dismantle_button,"arrangement_dismantle");viewer_dismantle_button.pressed.connect(_show_dismantle_confirmation);viewer_page.add_child(viewer_dismantle_button)
-	_build_share_background_panel()
 	_apply_viewer_page_mode()
 
+func _build_share_editor_page()->void:
+	share_editor_header_title=_build_header(share_editor_page,"share_editor_title",_return_from_share_editor)
+	for header_control in share_editor_page.get_children():
+		if header_control is Control:(header_control as Control).z_index=500
+	share_editor_canvas=Panel.new();share_editor_canvas.name="SharePreview";share_editor_canvas.position=SHARE_PREVIEW_POSITION;share_editor_canvas.size=SHARE_PREVIEW_SIZE;share_editor_canvas.clip_contents=true;share_editor_canvas.mouse_filter=Control.MOUSE_FILTER_STOP;share_editor_canvas.gui_input.connect(_on_viewer_canvas_gui_input);share_editor_canvas.add_theme_stylebox_override("panel",StyleBoxEmpty.new());share_editor_page.add_child(share_editor_canvas)
+	share_editor_background=Sprite2D.new();share_editor_background.name="SharePreviewBackground";share_editor_background.centered=false;share_editor_background.texture_filter=CanvasItem.TEXTURE_FILTER_LINEAR;share_editor_canvas.add_child(share_editor_background)
+	share_editor_artwork_canvas=Control.new();share_editor_artwork_canvas.name="SharePreviewArtworkCanvas";share_editor_artwork_canvas.size=ShareRendererClass.ARTWORK_VIRTUAL_SIZE;share_editor_artwork_canvas.mouse_filter=Control.MOUSE_FILTER_IGNORE;share_editor_canvas.add_child(share_editor_artwork_canvas)
+	share_editor_artwork_root=Control.new();share_editor_artwork_root.name="ShareEditorArtworkRoot";share_editor_artwork_root.size=ShareRendererClass.VIEWER_CANVAS_SIZE;share_editor_artwork_root.mouse_filter=Control.MOUSE_FILTER_IGNORE;share_editor_artwork_canvas.add_child(share_editor_artwork_root)
+	share_editor_pot_layer=Control.new();share_editor_pot_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);share_editor_pot_layer.mouse_filter=Control.MOUSE_FILTER_IGNORE;share_editor_artwork_root.add_child(share_editor_pot_layer)
+	share_editor_plant_layer=Control.new();share_editor_plant_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);share_editor_plant_layer.z_index=PLANT_LAYER_Z;share_editor_plant_layer.mouse_filter=Control.MOUSE_FILTER_IGNORE;share_editor_artwork_root.add_child(share_editor_plant_layer)
+	viewer_share_background_button=_button(GameLocalizer.text(language_code,"share_background"),Vector2(28,790),Vector2(248,58),Color("#d7aa64"),18);viewer_share_background_button.z_index=500;_mark_localized(viewer_share_background_button,"share_background");viewer_share_background_button.pressed.connect(_toggle_share_background_panel);share_editor_page.add_child(viewer_share_background_button)
+	share_editor_share_button=_button(GameLocalizer.text(language_code,"share_confirm_action"),Vector2(300,790),Vector2(248,58),Color("#d7aa64"),18);share_editor_share_button.z_index=500;_mark_localized(share_editor_share_button,"share_confirm_action");share_editor_share_button.pressed.connect(_request_current_arrangement_share);share_editor_page.add_child(share_editor_share_button)
+	share_editor_status=Label.new();share_editor_status.position=Vector2(28,852);share_editor_status.size=Vector2(520,34);share_editor_status.z_index=500;share_editor_status.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;share_editor_status.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;share_editor_status.add_theme_font_size_override("font_size",14);_style_overlay_label(share_editor_status,Color("#ffe0a0"),4);share_editor_status.mouse_filter=Control.MOUSE_FILTER_IGNORE;share_editor_status.visible=false;share_editor_page.add_child(share_editor_status)
+	_build_share_background_panel()
+
 func _build_share_background_panel()->void:
-	share_background_panel=Panel.new();share_background_panel.position=Vector2(12,430);share_background_panel.size=Vector2(552,552);share_background_panel.z_index=700;share_background_panel.clip_contents=true;share_background_panel.mouse_filter=Control.MOUSE_FILTER_STOP;share_background_panel.visible=false;share_background_panel.add_theme_stylebox_override("panel",_box(Color("#f6e6c7"),Color("#b77c48"),26,4));viewer_page.add_child(share_background_panel)
+	share_background_panel=Panel.new();share_background_panel.position=Vector2(12,430);share_background_panel.size=Vector2(552,552);share_background_panel.z_index=700;share_background_panel.clip_contents=true;share_background_panel.mouse_filter=Control.MOUSE_FILTER_STOP;share_background_panel.visible=false;share_background_panel.add_theme_stylebox_override("panel",_box(Color("#f6e6c7"),Color("#b77c48"),26,4));share_editor_page.add_child(share_background_panel)
 	var title:=Label.new();_mark_localized(title,"share_background");title.position=Vector2(24,16);title.size=Vector2(394,52);title.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;title.add_theme_font_size_override("font_size",24);title.add_theme_color_override("font_color",UI_BROWN);title.mouse_filter=Control.MOUSE_FILTER_IGNORE;share_background_panel.add_child(title)
 	var close_button:=_button(GameLocalizer.text(language_code,"close"),Vector2(444,14),Vector2(88,52),Color("#ead4a5"),15);_mark_localized(close_button,"close");close_button.pressed.connect(_close_share_background_panel);share_background_panel.add_child(close_button)
 	share_background_scroll=ScrollContainer.new();share_background_scroll.position=Vector2(18,80);share_background_scroll.size=Vector2(516,446);share_background_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_AUTO;share_background_scroll.vertical_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;share_background_scroll.scroll_deadzone=12;share_background_scroll.mouse_filter=Control.MOUSE_FILTER_STOP;share_background_panel.add_child(share_background_scroll)
@@ -1251,12 +1299,12 @@ func _toggle_share_background_panel()->void:
 	else:_open_share_background_panel()
 
 func _open_share_background_panel()->void:
-	if not is_viewer_active() or current_arrangement.is_empty() or viewer_share_in_progress:return
-	_cancel_viewer_gesture(false);_hide_dismantle_confirmation();_refresh_share_background_panel();share_background_panel.visible=true;viewer_share_button.disabled=true;share_background_panel.move_to_front()
+	if not is_share_editor_active() or current_arrangement.is_empty() or viewer_share_in_progress:return
+	_cancel_viewer_gesture(false);_refresh_share_background_panel();share_background_panel.visible=true;share_editor_share_button.disabled=true;share_background_panel.move_to_front()
 
 func _close_share_background_panel()->void:
 	if share_background_panel:share_background_panel.visible=false
-	if viewer_share_button:viewer_share_button.disabled=viewer_share_in_progress
+	if share_editor_share_button:share_editor_share_button.disabled=viewer_share_in_progress
 
 func _current_share_background_id()->String:
 	return ShareBackgroundsClass.normalize_id(current_arrangement.get("share_background_id",ShareBackgroundsClass.DEFAULT_ID))
@@ -1291,6 +1339,7 @@ func _refresh_share_background_panel()->void:
 		card.pressed.connect(_select_share_background.bind(background_id))
 
 func _select_share_background(background_id:String)->void:
+	if not is_share_editor_active():return
 	var normalized_id:=ShareBackgroundsClass.normalize_id(background_id)
 	if normalized_id!=background_id or not _share_background_unlocked(normalized_id):return
 	var selection_changed:=normalized_id!=_current_share_background_id()
@@ -1303,33 +1352,34 @@ func _select_share_background(background_id:String)->void:
 		if not arrangement_id.is_empty():share_background_save_requested.emit(arrangement_id,normalized_id)
 
 func _request_current_arrangement_share()->void:
-	if viewer_share_in_progress or not is_viewer_active() or current_arrangement.is_empty():return
-	_close_share_background_panel();_cancel_viewer_gesture(false);_hide_dismantle_confirmation()
+	if viewer_share_in_progress or not is_share_editor_active() or current_arrangement.is_empty():return
+	_close_share_background_panel();_cancel_viewer_gesture(false)
 	var share_snapshot:=current_arrangement.duplicate(true);share_snapshot["viewer_transform"]=_viewer_transform_state().duplicate(true)
 	set_share_state(GameLocalizer.text(language_code,"share_creating"),true)
 	share_requested.emit(share_snapshot)
 
 func set_share_state(message:String,in_progress:bool)->void:
 	viewer_share_in_progress=in_progress
-	if viewer_share_button:viewer_share_button.disabled=in_progress or _share_background_panel_is_open()
+	if share_editor_share_button:share_editor_share_button.disabled=in_progress or _share_background_panel_is_open()
 	if viewer_share_background_button:viewer_share_background_button.disabled=in_progress
-	if viewer_share_status:
-		viewer_share_status.text=message
-		viewer_share_status.visible=not message.is_empty()
+	if share_editor_status:
+		share_editor_status.text=message
+		share_editor_status.visible=not message.is_empty()
 
 func create_share_image(arrangement:Dictionary,background_entry:Dictionary,output_path:String)->String:
 	last_share_render_debug={}
-	if not is_viewer_active() or arrangement.is_empty() or background_entry.is_empty() or output_path.is_empty():return ""
+	if not is_share_editor_active() or arrangement.is_empty() or background_entry.is_empty() or output_path.is_empty():return ""
 	var texture_path:=str(background_entry.get("texture_path",""));var crop_mode:=str(background_entry.get("crop_mode",""))
 	if texture_path.is_empty() or not ResourceLoader.exists(texture_path) or crop_mode not in ["cover","native_9_16"]:return ""
 	var background_texture:=load(texture_path) as Texture2D
 	if background_texture==null:return ""
 	# Rebuild once after async catalog textures have completed, then duplicate
-	# only the artwork root. Viewer labels and buttons never enter the viewport.
-	_render_readonly_arrangement(arrangement,arrangement.get("viewer_transform",{}))
+	# only the dedicated share-editor artwork root. Neither normal-viewer UI nor
+	# share-editor buttons can enter the export viewport.
+	_render_share_arrangement(arrangement,arrangement.get("viewer_transform",{}))
 	await get_tree().process_frame
-	if viewer_artwork_root==null:return ""
-	var artwork_clone:=viewer_artwork_root.duplicate() as Control
+	if share_editor_artwork_root==null:return ""
+	var artwork_clone:=share_editor_artwork_root.duplicate() as Control
 	if artwork_clone==null:return ""
 	artwork_clone.name="ShareArtworkRoot";artwork_clone.mouse_filter=Control.MOUSE_FILTER_IGNORE
 	var viewport:=SubViewport.new();viewport.name="ArrangementShareViewport";viewport.size=ShareRendererClass.OUTPUT_SIZE;viewport.transparent_bg=false;viewport.disable_3d=true;viewport.render_target_clear_mode=SubViewport.CLEAR_MODE_ALWAYS;viewport.render_target_update_mode=SubViewport.UPDATE_ONCE;add_child(viewport)
@@ -1340,11 +1390,11 @@ func create_share_image(arrangement:Dictionary,background_entry:Dictionary,outpu
 	var artwork_layout:Dictionary=ShareRendererClass.artwork_layout(background_entry)
 	var artwork_canvas:=Control.new();artwork_canvas.name="ShareArtworkCanvas";artwork_canvas.position=artwork_layout.position;artwork_canvas.size=ShareRendererClass.ARTWORK_VIRTUAL_SIZE;artwork_canvas.scale=Vector2.ONE*float(artwork_layout.scale);artwork_canvas.mouse_filter=Control.MOUSE_FILTER_IGNORE;composition.add_child(artwork_canvas);artwork_canvas.add_child(artwork_clone)
 	var z_indexes:Array=[];var rotations:Array=[];var plant_scales:Array=[]
-	for plant_node in viewer_plant_layer.get_children():
+	for plant_node in share_editor_plant_layer.get_children():
 		if plant_node is Control:z_indexes.append((plant_node as Control).z_index);rotations.append((plant_node as Control).rotation_degrees);plant_scales.append((plant_node as Control).scale.x)
 	last_share_render_debug={
 		"background_id":str(background_entry.get("id","")),"crop_mode":crop_mode,"output_size":ShareRendererClass.OUTPUT_SIZE,
-		"root_children":[str(background.name),str(artwork_canvas.name)],"pot_count":viewer_pot_layer.get_child_count(),"plant_count":viewer_plant_layer.get_child_count(),
+		"root_children":[str(background.name),str(artwork_canvas.name)],"pot_count":share_editor_pot_layer.get_child_count(),"plant_count":share_editor_plant_layer.get_child_count(),
 		"viewer_transform":normalize_viewer_transform(arrangement.get("viewer_transform",{})),"background_layout":background_layout.duplicate(true),"artwork_layout":artwork_layout.duplicate(true),
 		"mapped_viewer_transform":ShareRendererClass.mapped_viewer_transform(normalize_viewer_transform(arrangement.get("viewer_transform",{})),background_entry),
 		"z_indexes":z_indexes,"rotations":rotations,"plant_scales":plant_scales,
@@ -1366,56 +1416,65 @@ func _open_viewer(arrangement:Dictionary,return_target:String="home")->void:
 	_cancel_viewer_gesture(false);_close_share_background_panel();_hide_dismantle_confirmation();set_share_state("",false);current_arrangement=arrangement.duplicate(true);current_arrangement.erase("viewer_transform");current_arrangement["completed"]=true;current_arrangement["share_background_id"]=ShareBackgroundsClass.normalize_id(current_arrangement.get("share_background_id",ShareBackgroundsClass.DEFAULT_ID));viewer_name.text=str(arrangement.get("name",GameLocalizer.text(language_code,"arrangement_title")));_show_page(viewer_page);_render_readonly_arrangement(current_arrangement);_apply_viewer_page_mode()
 
 func _render_readonly_arrangement(arrangement:Dictionary,transient_transform:Variant=null)->void:
-	_clear_children(viewer_pot_layer);_clear_children(viewer_plant_layer)
+	last_share_preview_debug={}
+	_populate_readonly_layers(arrangement,viewer_pot_layer,viewer_plant_layer,_pot_holder_position(viewer_canvas,POT_HOLDER_SIZE))
+	var state:=normalize_viewer_transform(transient_transform if transient_transform is Dictionary else {})
+	_set_viewer_artwork_transform(Vector2(float(state.x),float(state.y)),float(state.scale),false)
+
+func _render_share_arrangement(arrangement:Dictionary,transient_transform:Variant=null)->void:
 	_apply_share_preview_layout(arrangement)
-	var pot:=_pot_entry(str(arrangement.get("pot_id","")));var holder:=Control.new();holder.size=POT_HOLDER_SIZE;holder.position=_viewer_pot_holder_position(holder.size);holder.mouse_filter=Control.MOUSE_FILTER_IGNORE;viewer_pot_layer.add_child(holder);_render_pot(holder,pot,false)
-	for plant_value in _plant_array(arrangement):
-		if not plant_value is Dictionary:continue
-		var plant:Dictionary=plant_value;var texture:=_resolve_texture(_species_entry(str(plant.get("species_id",""))))
-		if texture==null:continue
-		var root:=Control.new();root.size=PLANT_CONTROL_SIZE;root.pivot_offset=PLANT_CONTROL_SIZE*.5;root.position=Vector2(float(plant.get("x",0.0)),float(plant.get("y",0.0)))-PLANT_CONTROL_SIZE*.5;root.scale=Vector2.ONE*clampf(float(plant.get("scale",PLANT_SCALE_MIN)),PLANT_SCALE_MIN,_plant_scale_max(plant));root.rotation_degrees=fposmod(float(plant.get("rotation",0.0)),360.0);root.z_index=int(plant.get("z_index",0));root.mouse_filter=Control.MOUSE_FILTER_IGNORE;viewer_plant_layer.add_child(root)
-		var image:=TextureRect.new();image.texture=texture;image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.mouse_filter=Control.MOUSE_FILTER_IGNORE;root.add_child(image);_request_texture(_species_entry(str(plant.get("species_id",""))),image,true)
+	_populate_readonly_layers(arrangement,share_editor_pot_layer,share_editor_plant_layer,_share_pot_holder_position(POT_HOLDER_SIZE))
 	var state:=normalize_viewer_transform(transient_transform if transient_transform is Dictionary else {})
 	_set_viewer_artwork_transform(Vector2(float(state.x),float(state.y)),float(state.scale),false)
 	_update_share_preview_transform_debug()
 
+func _populate_readonly_layers(arrangement:Dictionary,pot_layer:Control,plant_layer:Control,pot_holder_position:Vector2)->void:
+	_clear_children(pot_layer);_clear_children(plant_layer)
+	var pot:=_pot_entry(str(arrangement.get("pot_id","")));var holder:=Control.new();holder.size=POT_HOLDER_SIZE;holder.position=pot_holder_position;holder.mouse_filter=Control.MOUSE_FILTER_IGNORE;pot_layer.add_child(holder);_render_pot(holder,pot,false)
+	for plant_value in _plant_array(arrangement):
+		if not plant_value is Dictionary:continue
+		var plant:Dictionary=plant_value;var texture:=_resolve_texture(_species_entry(str(plant.get("species_id",""))))
+		if texture==null:continue
+		var root:=Control.new();root.size=PLANT_CONTROL_SIZE;root.pivot_offset=PLANT_CONTROL_SIZE*.5;root.position=Vector2(float(plant.get("x",0.0)),float(plant.get("y",0.0)))-PLANT_CONTROL_SIZE*.5;root.scale=Vector2.ONE*clampf(float(plant.get("scale",PLANT_SCALE_MIN)),PLANT_SCALE_MIN,_plant_scale_max(plant));root.rotation_degrees=fposmod(float(plant.get("rotation",0.0)),360.0);root.z_index=int(plant.get("z_index",0));root.mouse_filter=Control.MOUSE_FILTER_IGNORE;plant_layer.add_child(root)
+		var image:=TextureRect.new();image.texture=texture;image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;image.mouse_filter=Control.MOUSE_FILTER_IGNORE;root.add_child(image);_request_texture(_species_entry(str(plant.get("species_id",""))),image,true)
+
 func _apply_share_preview_layout(arrangement:Dictionary)->void:
 	last_share_preview_debug={}
-	if viewer_canvas==null or viewer_background==null or viewer_artwork_canvas==null:return
+	if share_editor_canvas==null or share_editor_background==null or share_editor_artwork_canvas==null:return
 	var background_id:=ShareBackgroundsClass.normalize_id(arrangement.get("share_background_id",ShareBackgroundsClass.DEFAULT_ID))
 	var background_entry:=ShareBackgroundsClass.entry(background_id)
 	var texture_path:=str(background_entry.get("texture_path",""))
 	if background_entry.is_empty() or texture_path.is_empty() or not ResourceLoader.exists(texture_path):
-		viewer_background.texture=null
+		share_editor_background.texture=null
 		return
 	var background_texture:=load(texture_path) as Texture2D
 	if background_texture==null:
-		viewer_background.texture=null
+		share_editor_background.texture=null
 		return
 	var output_size:=Vector2(ShareRendererClass.OUTPUT_SIZE)
-	var preview_scale:=minf(viewer_canvas.size.x/output_size.x,viewer_canvas.size.y/output_size.y)
+	var preview_scale:=minf(share_editor_canvas.size.x/output_size.x,share_editor_canvas.size.y/output_size.y)
 	var background_layout:Dictionary=ShareRendererClass.background_layout(background_texture.get_size(),background_entry.get("focus",Vector2(.5,.5)))
 	var artwork_layout:Dictionary=ShareRendererClass.artwork_layout(background_entry)
 	if background_layout.is_empty() or artwork_layout.is_empty():return
-	viewer_background.texture=background_texture
-	viewer_background.position=(background_layout.position as Vector2)*preview_scale
-	viewer_background.scale=Vector2.ONE*float(background_layout.scale)*preview_scale
-	viewer_artwork_canvas.position=(artwork_layout.position as Vector2)*preview_scale
-	viewer_artwork_canvas.size=ShareRendererClass.ARTWORK_VIRTUAL_SIZE
-	viewer_artwork_canvas.scale=Vector2.ONE*float(artwork_layout.scale)*preview_scale
+	share_editor_background.texture=background_texture
+	share_editor_background.position=(background_layout.position as Vector2)*preview_scale
+	share_editor_background.scale=Vector2.ONE*float(background_layout.scale)*preview_scale
+	share_editor_artwork_canvas.position=(artwork_layout.position as Vector2)*preview_scale
+	share_editor_artwork_canvas.size=ShareRendererClass.ARTWORK_VIRTUAL_SIZE
+	share_editor_artwork_canvas.scale=Vector2.ONE*float(artwork_layout.scale)*preview_scale
 	last_share_preview_debug={
-		"background_id":background_id,"preview_size":viewer_canvas.size,"output_to_preview_scale":preview_scale,
+		"background_id":background_id,"preview_size":share_editor_canvas.size,"output_to_preview_scale":preview_scale,
 		"background_layout":background_layout.duplicate(true),"artwork_layout":artwork_layout.duplicate(true),
-		"background_position":viewer_background.position,"background_scale":viewer_background.scale.x,
-		"artwork_canvas_position":viewer_artwork_canvas.position,"artwork_canvas_scale":viewer_artwork_canvas.scale.x,
+		"background_position":share_editor_background.position,"background_scale":share_editor_background.scale.x,
+		"artwork_canvas_position":share_editor_artwork_canvas.position,"artwork_canvas_scale":share_editor_artwork_canvas.scale.x,
 		"texture_path":texture_path,
 	}
 	_update_share_preview_transform_debug()
 
 func _update_share_preview_transform_debug()->void:
-	if last_share_preview_debug.is_empty() or viewer_artwork_root==null:return
+	if last_share_preview_debug.is_empty() or share_editor_artwork_root==null:return
 	var background_entry:=ShareBackgroundsClass.entry(str(last_share_preview_debug.get("background_id",ShareBackgroundsClass.DEFAULT_ID)))
-	var viewer_transform:=_viewer_transform_state()
+	var viewer_transform:={"x":share_editor_artwork_root.position.x,"y":share_editor_artwork_root.position.y,"scale":share_editor_artwork_root.scale.x}
 	var mapped_transform:=ShareRendererClass.mapped_viewer_transform(viewer_transform,background_entry)
 	var preview_scale:=float(last_share_preview_debug.get("output_to_preview_scale",1.0))
 	last_share_preview_debug["viewer_transform"]=viewer_transform.duplicate(true)
@@ -1423,7 +1482,7 @@ func _update_share_preview_transform_debug()->void:
 	last_share_preview_debug["preview_mapped_position"]=(mapped_transform.position as Vector2)*preview_scale
 	last_share_preview_debug["preview_mapped_scale"]=float(mapped_transform.scale)*preview_scale
 
-func _viewer_pot_holder_position(holder_size:Vector2)->Vector2:
+func _share_pot_holder_position(holder_size:Vector2)->Vector2:
 	if not world_backdrop_enabled:return Vector2((ShareRendererClass.VIEWER_CANVAS_SIZE.x-holder_size.x)*.5,POT_LOCAL_BASELINE_Y-holder_size.y)
 	# The share artwork uses the same logical 536x552 source coordinates as the
 	# original viewer.  Its on-screen 9:16 placement must not move the pot inside
@@ -1436,6 +1495,16 @@ func _pot_holder_position(canvas:Control,holder_size:Vector2)->Vector2:
 
 func _return_from_viewer()->void:
 	_cancel_viewer_gesture(false);_close_share_background_panel();_show_page(home_page);_refresh_home()
+
+func _open_share_editor()->void:
+	if viewer_share_in_progress or viewer_page==null or not viewer_page.visible or current_arrangement.is_empty():return
+	_cancel_viewer_gesture(false);_close_share_background_panel();_hide_dismantle_confirmation();set_share_state("",false)
+	_show_page(share_editor_page);_render_share_arrangement(current_arrangement);_refresh_share_background_panel()
+
+func _return_from_share_editor()->void:
+	if viewer_share_in_progress:return
+	_cancel_viewer_gesture(false);_close_share_background_panel();set_share_state("",false);last_share_preview_debug={}
+	_show_page(viewer_page);_apply_viewer_page_mode()
 
 func _on_viewer_world_scroll_input(_event:InputEvent)->void:
 	# Compatibility hook for older tooling. Finished-viewer gestures are never

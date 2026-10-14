@@ -43,25 +43,33 @@ func _ready() -> void:
 	assert(not _has_button_text(ui.saved_arrangements_page, "見る"))
 	assert(not FileAccess.get_file_as_string("res://scripts/arrangement_ui.gd").contains("saved_arrangements_list"))
 
-	# A background metadata sync preserves the current session-only framing.
+	# The ordinary greenhouse viewer owns its own session-only framing and never
+	# exposes share-background controls.
 	ui._set_viewer_artwork_transform(Vector2(44.0, -21.0), 1.4, false)
+	assert(not _has_button_text(ui.viewer_page, "共有背景") and not ui.is_share_editor_active())
+	ui._open_share_editor()
+	assert(ui.is_share_editor_active() and ui.share_editor_artwork_root.position.is_zero_approx() and is_equal_approx(ui.share_editor_artwork_root.scale.x, 1.0))
 	ui._select_share_background("greenhouse")
 	assert(ui.viewer_artwork_root.position.is_equal_approx(Vector2(44.0, -21.0)))
 	assert(is_equal_approx(ui.viewer_artwork_root.scale.x, 1.4))
 	assert(str(game.saved_arrangements[19].share_background_id) == "greenhouse")
 	assert(not game.saved_arrangements[19].has("viewer_transform"))
 
-	# Sharing receives the live framing without adding it to persistent state.
+	# Sharing receives only the dedicated share editor's framing without adding
+	# it to persistent state or modifying the ordinary viewer.
 	var real_share_handler := Callable(game, "_on_arrangement_share_requested")
 	ui.share_requested.disconnect(real_share_handler)
 	var captured: Array = []
 	ui.share_requested.connect(func(snapshot: Dictionary) -> void: captured.append(snapshot))
+	ui._set_viewer_artwork_transform(Vector2(32.0, -18.0), 1.3, false)
 	ui._request_current_arrangement_share()
 	assert(captured.size() == 1)
 	var captured_transform: Dictionary = captured[0].viewer_transform
-	assert(Vector2(float(captured_transform.x), float(captured_transform.y)).is_equal_approx(Vector2(44.0, -21.0)) and is_equal_approx(float(captured_transform.scale), 1.4))
+	assert(Vector2(float(captured_transform.x), float(captured_transform.y)).is_equal_approx(Vector2(32.0, -18.0)) and is_equal_approx(float(captured_transform.scale), 1.3))
 	assert(not game.saved_arrangements[19].has("viewer_transform"))
 	ui.set_share_state("", false)
+	ui._return_from_share_editor()
+	assert(ui.viewer_page.visible and ui.viewer_artwork_root.position.is_equal_approx(Vector2(44.0, -21.0)) and is_equal_approx(ui.viewer_artwork_root.scale.x, 1.4))
 
 	# Every newly displayed work starts at the standard framing, even when
 	# returning to a work adjusted earlier in the same session.
@@ -95,7 +103,7 @@ func _ready() -> void:
 	assert(not _has_button_text(ui.saved_arrangements_page, "見る"))
 	ui.sync_state({"shallow_terracotta": 1}, [], 20)
 	assert(ui.saved_arrangements_empty.visible and not ui.viewer_canvas.visible)
-	assert(not ui.viewer_share_button.visible and not ui.viewer_share_background_button.visible and not ui.viewer_dismantle_button.visible)
+	assert(not ui.viewer_share_button.visible and not ui.viewer_dismantle_button.visible and not ui.share_editor_page.visible)
 
 	# Removing the selected work chooses its neighbour and resets that work.
 	game.owned_pots = {"shallow_terracotta": 20}
