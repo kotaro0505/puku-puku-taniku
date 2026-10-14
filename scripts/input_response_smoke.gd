@@ -149,7 +149,7 @@ func _test_get_card_response(game: Node) -> Dictionary:
 	if not OS.has_feature("web"):
 		var main_source:=FileAccess.get_file_as_string("res://scripts/main.gd")
 		var queue_start:=main_source.find("func _show_next_round_result_species")
-		var queue_end:=main_source.find("func _start_result_new_species_pulse",queue_start)
+		var queue_end:=main_source.find("func _share_personal_best",queue_start)
 		assert(main_source.substr(queue_start,queue_end-queue_start).count("_save()") == 1)
 	return {"feedback": feedback_latency, "visual": overlay.last_close_first_visual_latency_msec, "hidden": hidden_latency, "profile_total": game.get_close_profile_total_msec}
 

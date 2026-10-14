@@ -723,9 +723,8 @@ func _test_external_crisis_transition(game: Node) -> void:
 	for index in range(7):
 		game._register_species_discovery(JUREJURE_SPECIES_IDS[index], true)
 	assert(game._unique_jurejure_species_get_count() == 7)
-	# The Species card may close before Today's Harvest. The pending route must
-	# wait for both, then present Panda's line instead of silently jumping modes.
-	game.result_overlay.visible = true
+	# Once the Species card closes, the pending route must present Panda's line
+	# directly instead of waiting for the removed round result screen.
 	game._register_species_discovery(JUREJURE_SPECIES_IDS[7], true)
 	assert(game.habitat_crisis_pending and not game.habitat_crisis_started)
 	assert(StoryProgressionClass.habitat_crisis_route(game.story_progression_state) == StoryProgressionClass.CRISIS_ROUTE_FORCE_TRAVEL)
@@ -737,9 +736,7 @@ func _test_external_crisis_transition(game: Node) -> void:
 	while game.species_get_overlay.visible:
 		await get_tree().process_frame
 	await get_tree().process_frame
-	assert(game.scripted_dialog_kind.is_empty() and game.result_overlay.visible)
-	game._close_result()
-	await get_tree().process_frame
+	assert(not game.result_overlay.visible)
 	assert(game.scripted_dialog_kind == "habitat_crisis_departure")
 	assert(str(game.scripted_dialog_pages[0].get("text", "")) == Localizer.text("ja", "habitat_crisis_departure_panda"))
 	assert(game.current_mode == "greenhouse")

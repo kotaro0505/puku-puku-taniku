@@ -450,14 +450,10 @@ func _ready() -> void:
 		plant_to_jelly.jelly()
 		await get_tree().process_frame
 		assert(game.endless_economy_harvest_count + game.endless_economy_jelly_count == expected_settled_before + 1, "manual settlement count did not advance exactly once: %s" % _first_normal_round_state(game, settlement_index))
-	assert(await _wait_until(func()->bool:return not game.play_active and game.result_overlay.visible), "round result did not wait for/complete the Puku gauge queue: active=%s result=%s puku_running=%s puku_queue=%s plants=%s seeds_remaining=%s spawn_queue=%s" % [game.play_active, game.result_overlay.visible, game.puku_gauge_animation_running, game.puku_gauge_animation_queue.size(), game.plants.size(), game.play_seeds_remaining, game.play_spawn_queue])
+	assert(await _wait_until(func()->bool:return not game.play_active and game._species_get_count(tutorial_harvest_species_id)==1 and game.species_get_overlay.visible), "automatic NEW reveal did not wait for/complete the Puku gauge queue: active=%s result=%s puku_running=%s puku_queue=%s plants=%s seeds_remaining=%s spawn_queue=%s" % [game.play_active, game.result_overlay.visible, game.puku_gauge_animation_running, game.puku_gauge_animation_queue.size(), game.plants.size(), game.play_seeds_remaining, game.play_spawn_queue])
 	assert(game.endless_economy_seed_count == 12 and game.endless_economy_harvest_count == 1 and game.endless_economy_jelly_count == 11)
 	assert(game.endless_economy_seed_cost_units == game.NORMAL_ROUND_COST_UNITS)
-	assert(game.result_count_label.text.contains("収穫　1株") and game.result_count_label.text.contains("ジュレ　11株"))
-	assert(game.result_new_species_label.text.is_empty() and not game.result_new_species_label.visible)
-	assert(game._species_get_count(tutorial_harvest_species_id) == 0)
-	game._close_result()
-	assert(await _wait_until(func()->bool:return game._species_get_count(tutorial_harvest_species_id)==1 and game.species_get_overlay.visible), "post-result NEW reveal did not complete: count=%s overlay=%s pending=%s" % [game._species_get_count(tutorial_harvest_species_id), game.species_get_overlay.visible, game.pending_round_new_species_ids])
+	assert(not game.result_overlay.visible and game.result_overlay.get_child_count() == 0)
 	assert(game._species_get_count(tutorial_harvest_species_id) == 1)
 	assert(bool(game.discovered.get(tutorial_harvest_species_id, false)))
 	assert(bool(game.greenhouse_available.get(tutorial_harvest_species_id, false)))
@@ -472,7 +468,7 @@ func _ready() -> void:
 
 	assert(Localizer.text("ja","puku_buyback_1") == "そうだ！育てた多肉は\nうちのお店で買い取るよ！")
 	assert(Localizer.text("ja","puku_buyback_2") == "大きい株ほど\n高く買い取るからね！")
-	print("FIRST_PLAY_TUTORIAL_SMOKE_OK old_colorata_growth=1.3 normal_growth=1.6 normal_kakuhen=true cost_note=once trio_cards=catalog_only pre_sow=true start_guide=play_open_normal tutorial_continue=9_pages_visible tutorial_speakers=8_correct+system_none button+fullscreen_single_step=true operation_prompt_continue=false forced_jelly=true reserved_original_new=true reserved_front_random=true observed_3s=true post_result_GET=true act2_guarantee_untouched=true total=12 result=1_harvest+11_jelly")
+	print("FIRST_PLAY_TUTORIAL_SMOKE_OK old_colorata_growth=1.3 normal_growth=1.6 normal_kakuhen=true cost_note=once trio_cards=catalog_only pre_sow=true start_guide=play_open_normal tutorial_continue=9_pages_visible tutorial_speakers=8_correct+system_none button+fullscreen_single_step=true operation_prompt_continue=false forced_jelly=true reserved_original_new=true reserved_front_random=true observed_3s=true automatic_GET=true act2_guarantee_untouched=true total=12 settled=1_harvest+11_jelly result=removed")
 	get_tree().quit()
 
 

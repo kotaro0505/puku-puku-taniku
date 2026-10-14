@@ -11,7 +11,7 @@ func _ready()->void:
 	_test_one_time_gift_arrangement_and_share(game)
 	_test_removed_mystery_pod()
 	game._reset_progression_state();game.queue_free();await get_tree().process_frame
-	print("INTEGRATED_FEATURES_SMOKE_OK selection_metadata=1x2+2x1 player_rarity_ui=removed localization=3 gift=once arrangement=free-scale share=record-only mystery_pod=removed")
+	print("INTEGRATED_FEATURES_SMOKE_OK selection_metadata=1x2+2x1 player_rarity_ui=removed localization=3 gift=once arrangement=free-scale result_share=removed arrangement_share=preserved mystery_pod=removed")
 	get_tree().quit()
 
 func _test_catalog_and_collection_rarity(game)->void:
@@ -100,11 +100,12 @@ func _test_one_time_gift_arrangement_and_share(game)->void:
 	game.bests["laui"]=52.6;game._sync_arrangement_ui()
 	assert(is_equal_approx(game.arrangement_ui._species_scale_max("laui"),game.arrangement_ui.PLANT_SCALE_SAFETY_MAX))
 	assert(game.arrangement_ui.picker_scroll.vertical_scroll_mode==ScrollContainer.SCROLL_MODE_AUTO)
-	game.play_harvest_cm_total=10.0;game.play_puku_reward_units_total=0;game.play_harvest_count=1;game.play_max_size=10.0;game.play_notable_species.clear();game.result_new_species_queue.clear();game.play_updated_global_best=false
-	game.play_share_record.clear();game._show_play_result();assert(not game.result_share_button.visible)
-	game.play_share_record={"species_id":"colorata","size":32.1};game._show_play_result();assert(game.result_share_button.visible)
+	assert(not game.result_overlay.visible and game.result_overlay.get_child_count()==0)
+	assert(game.result_overlay.find_child("ResultCloseButton",true,false)==null and game.result_overlay.find_child("ResultTitle",true,false)==null)
+	assert(game.arrangement_ui.viewer_share_button and game.arrangement_ui.viewer_share_button.pressed.get_connections().size()>0)
 	var main_source:=FileAccess.get_file_as_string("res://scripts/main.gd")
 	assert(main_source.contains('Engine.has_singleton("SharePlugin")') and main_source.contains('has_method("share_image")') and main_source.contains("navigator.share") and main_source.contains("_create_arrangement_share_image") and main_source.contains("_queue_species_get"))
+	assert(not main_source.contains('pressed.connect(_share_personal_best)') and not main_source.contains('name="ResultCloseButton"'))
 	assert(not main_source.contains("原種として図鑑に登録したよ"))
 
 func _test_removed_mystery_pod()->void:

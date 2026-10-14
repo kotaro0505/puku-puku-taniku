@@ -23,7 +23,7 @@ func _ready()->void:
 	_test_save_and_legacy_load(game)
 	await _test_panda_rescue(game)
 	game._reset_progression_state();game.queue_free()
-	print("PUKU_POINTS_SMOKE_OK unit=1/1000 round_cost=1.00 direct_harvest=true giant=100,120,150,200,300,500,700,1000,1500,2000,10000cm_linear_rooted_species3_positions3_speeds1.6+10 label_toggle=main_only_live_recalc reward1000+2000=true new_floor=.20 migration=points+legacy_gauge forest_cost=1 rescue=wallet_plus_1 combo=true fly_removed=true result_waits=true")
+	print("PUKU_POINTS_SMOKE_OK unit=1/1000 round_cost=1.00 direct_harvest=true giant=100,120,150,200,300,500,700,1000,1500,2000,10000cm_linear_rooted_species3_positions3_speeds1.6+10 label_toggle=main_only_live_recalc reward1000+2000=true new_floor=.20 migration=points+legacy_gauge forest_cost=1 rescue=wallet_plus_1 combo=true fly_removed=true result=removed automatic_get=true")
 	get_tree().quit()
 
 func _test_seed_pod_thresholds(game)->void:
@@ -131,8 +131,8 @@ func _test_plant_label_visibility_toggle(game)->void:
 	game.arrangement_scene_active=false;game.first_play_tutorial_active=true;game._update_play_ui();assert(not game.plant_label_visibility_button.visible,"label toggle covered the first-play tutorial")
 	game.first_play_tutorial_active=false;game.intro_overlay.visible=true;game._update_play_ui();assert(not game.plant_label_visibility_button.visible,"label toggle appeared over story UI")
 	game.intro_overlay.visible=false;game.puku_puku_battle.visible=true;game._update_play_ui();assert(not game.plant_label_visibility_button.visible,"label toggle appeared in battle")
-	game.puku_puku_battle.visible=false;game.result_overlay.visible=true;game._update_play_ui();assert(not game.plant_label_visibility_button.visible,"label toggle appeared over the game result")
-	game.result_overlay.visible=false;game.play_active=false;game.show_growing_plant_labels=true;game.show_growing_puku_preview=true;game._update_play_ui();game._clear_greenhouse_plants()
+	game.puku_puku_battle.visible=false;assert(not game.result_overlay.visible and game.result_overlay.get_child_count()==0,"removed round result still has UI content")
+	game.play_active=false;game.show_growing_plant_labels=true;game.show_growing_puku_preview=true;game._update_play_ui();game._clear_greenhouse_plants()
 
 func _opaque_hit_point(plant,camera:Camera3D,visible_rect:Rect2)->Vector2:
 	for row in range(1,48):
@@ -301,11 +301,10 @@ func _test_round_entry_and_harvest(game)->void:
 	assert(game.effects_layer.find_child("PukuBalanceFly",true,false)==null)
 	assert(game.play_active and not game.result_overlay.visible and game._greenhouse_finish_block_reason()=="puku_gauge_animation")
 	await _wait_for_puku_animation(game);await get_tree().process_frame;await get_tree().process_frame
-	assert(not game.play_active and game.result_overlay.visible)
-	game._close_result();await get_tree().process_frame
+	assert(not game.play_active and not game.result_overlay.visible and game.greenhouse_finish_completed_count==1)
 	game._clear_greenhouse_plants();game.species_get_counts.erase("colorata");game.puku_balance_units=0;game.play_active=true;game.active_seed_type="normal";game.play_seeds_remaining=0;game.play_concurrent_target=0;game._reset_endless_economy_stats();game._spawn_specific_plant("colorata");var new_plant=game.plants.back();new_plant.jelly_checks_enabled=false;new_plant.diameter_cm=8.0;new_plant.harvest();await get_tree().process_frame
 	assert(game.puku_balance_units==200 and game._species_get_count("colorata")==0 and "colorata" in game.pending_round_new_species_ids)
-	game.play_active=false;game._play_result_new_species_animations();await get_tree().create_timer(.62).timeout
+	game.play_active=false;game.greenhouse_round_followup_started=false;game._continue_after_greenhouse_round();await get_tree().process_frame
 	assert(game._species_get_count("colorata")==1 and "colorata" not in game.pending_round_new_species_ids)
 	assert(game.species_get_overlay.visible and game.species_get_active_context=="round_result_new")
 	game.species_get_overlay.visible=false;game._on_species_get_overlay_closed("round_result_new");await get_tree().process_frame

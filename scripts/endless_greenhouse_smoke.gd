@@ -105,7 +105,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	_remove_test_file(NORMAL_PATH)
 	_remove_test_file(EXPERIMENT_PATH)
-	print("ENDLESS_GREENHOUSE_SMOKE_OK default_without_flags=true player_start=true round_seeds=12 round_cost=1 concurrent=5-8_dynamic refill_free=true harvest_direct=true wallet=fixed_point jelly_extra_penalty=false result=true normal_jelly_rates=1/2.5/5/8 normal_growth=1.6 normal_kakuhen=true non_normal_jelly_rates=1/2/3/4 boundaries=5/10/15 new_roll=max_carryover_x0.4 jelly_new_roll=false discovery_curve=unchanged forced_new=true candidate_pool=uniform deferred_formal_get=true pending_duplicate=false first_get_floor=once virtual_batch=12 pause=true navigation=habitat+catalog+shop+gacha production_gacha=1puku+species_get fusion=1-2-3puku restoration_pending=true finite=true save_isolated=true")
+	print("ENDLESS_GREENHOUSE_SMOKE_OK default_without_flags=true player_start=true round_seeds=12 round_cost=1 concurrent=5-8_dynamic refill_free=true harvest_direct=true wallet=fixed_point jelly_extra_penalty=false result=removed normal_jelly_rates=1/2.5/5/8 normal_growth=1.6 normal_kakuhen=true non_normal_jelly_rates=1/2/3/4 boundaries=5/10/15 new_roll=max_carryover_x0.4 jelly_new_roll=false discovery_curve=unchanged forced_new=true candidate_pool=uniform deferred_formal_get=true pending_duplicate=false first_get_floor=once virtual_batch=12 pause=true navigation=habitat+catalog+shop+gacha production_gacha=1puku+species_get fusion=1-2-3puku restoration_pending=true finite=true save_isolated=true")
 	get_tree().quit()
 
 
@@ -1027,8 +1027,8 @@ func _test_restoration_pending_until_habitat(game: Node) -> void:
 	assert(game.current_mode == "greenhouse" and game.play_active)
 	assert(game.scripted_dialog_kind.is_empty())
 	game.play_active=false
-	game.result_overlay.visible=true
-	game._close_result()
+	game.greenhouse_round_followup_started=false
+	game._continue_after_greenhouse_round()
 	# This transition is driven by real-time tweens (about one second total).
 	# Counting frames is flaky in headless mode because 120 frames can elapse
 	# before those tweens have advanced far enough.
@@ -1158,7 +1158,7 @@ func _test_finite_mode_unchanged(game: Node) -> void:
 	game.first_play_tutorial_active = false
 	game.puku_buyback_tutorial_active = false
 	game._finish_greenhouse_play()
-	assert(not game.play_active and game.result_overlay.visible)
+	assert(not game.play_active and not game.result_overlay.visible and game.greenhouse_finish_completed_count == 1)
 	assert(game.add_seed_pod_gauge_cm(10.0, false, false) == 0)
 	assert(is_equal_approx(game.puku_gauge_cm, 10.0))
 	game.puku_balance_units = 0

@@ -19,7 +19,7 @@ func _ready()->void:
 	game._reset_progression_state();game._set_language("ja");game.intro_story_complete=true;game._prepare_shop_visit(true);assert(game.shop_visit_count==0 and not game.armadillo_present);game.opening_story_complete=true;game.intro_story_complete=true;game.first_colorata_confirmed=true;game.trio_originals_confirmed=true;game.total_play_count=3;game.habitat_unlocked=true;game.habitat_arrival_started=true;game.habitat_awakened=true;game.habitat_awakening_event_complete=true;game.act2_unlocked=true;game.story_progression_state["fantasy_unlocked"]=true;game.forest_gacha_unlocked=true;game.forest_gacha_intro_seen=true;game.habitat_tutorial_started=true;game.habitat_tutorial_complete=true;game.mystery_items_acquired=true;game.mystery_catalog_tutorial_complete=true;game.normal_play_tutorial_complete=true;game.seed_pod_gauge_discovery_complete=true;game.seed_pod_first_reward_seen=true;game.initial_seed_stock_notice_complete=true;game.puku_buyback_tutorial_complete=true;game.seed_shop_open=true;game.panda_beacon_unlocked=true;game.panda_beacon_count=1;game.encyclopedia_unlocked=true;game.puku_gauge_intro_complete=true;game.special_series_explanation_seen=true;game.pending_special_series_explanation=false;game.armadillo_intro_event_3_completed=true;game.armadillo_research_intro_seen=true;game.unlocked_series={"base":true};game.intro_overlay.visible=false;game.shop_overlay.visible=false;game._update_play_ui()
 	game._prepare_shop_visit(true);assert(game.shop_visit_count==1 and game.armadillo_present and game.armadillo_tap_button.visible);game._queue_armadillo_progress_event();assert(game.pending_armadillo_story_event.is_empty() and not game._hidden_species_owned("pinwheel"));game._close_shop()
 	var armadillo_bitmap:Image=(load("res://assets/armadillo-dialogue.png") as Texture2D).get_image();var armadillo_used:=armadillo_bitmap.get_used_rect();assert(armadillo_used.position.x>0 and armadillo_used.position.y>0 and armadillo_used.end.x<armadillo_bitmap.get_width() and armadillo_used.end.y<armadillo_bitmap.get_height())
-	game.formal_play_count=0;game.habitat_mystery_seeds_pending=0;game.active_seed_type="normal";game.play_active=true;game.play_seeds_remaining=0;game.play_spawn_queue=0;game.play_seed_animations_pending=0;game._finish_greenhouse_play();assert(game.formal_play_count==1 and game.habitat_mystery_seeds_pending>=0 and game.habitat_mystery_seeds_pending<=3);game._close_result();game.habitat_mystery_seeds_pending=3;game.pending_habitat_species.clear();game.rain_event_pending=false;game._build_habitat_items(true);assert(game.habitat_pickups.filter(func(item):return str(item.kind)=="seed").size()==3)
+	game.formal_play_count=0;game.habitat_mystery_seeds_pending=0;game.active_seed_type="normal";game.play_active=true;game.play_seeds_remaining=0;game.play_spawn_queue=0;game.play_seed_animations_pending=0;game.greenhouse_round_followup_started=false;game._finish_greenhouse_play();assert(game.formal_play_count==1 and game.habitat_mystery_seeds_pending>=0 and game.habitat_mystery_seeds_pending<=3 and not game.result_overlay.visible);game.habitat_mystery_seeds_pending=3;game.pending_habitat_species.clear();game.rain_event_pending=false;game._build_habitat_items(true);assert(game.habitat_pickups.filter(func(item):return str(item.kind)=="seed").size()==3)
 	game.mystery_seed_count=0;game.shop_visit_count=100;game.rng.seed=20260901;var random_armadillo_visits:=0
 	for visit in range(25):game._prepare_shop_visit();random_armadillo_visits+=1 if game.armadillo_present else 0
 	assert(random_armadillo_visits>0 and random_armadillo_visits<25);game._hide_shop_chatter(true)
@@ -39,7 +39,7 @@ func _ready()->void:
 	assert(game.opening_overlay.visible and game.audio_manager.current_bgm_key=="opening" and opening_players<=1 and opening_stream is AudioStreamOggVorbis and opening_stream.loop and game.audio_manager._bgm_target_db("opening")<game.audio_manager._bgm_target_db("greenhouse"));game.opening_story_complete=true;game._finish_opening();assert(not game.opening_overlay.visible)
 	assert(game.best_label.get_parent().position==Vector2(204,122) and game.best_label.get_parent().size==Vector2(168,65))
 	var habitat_sky:Sky=game.habitat_environment.sky;var habitat_panorama:PanoramaSkyMaterial=habitat_sky.sky_material;assert(habitat_sky.radiance_size==Sky.RADIANCE_SIZE_512 and habitat_panorama.panorama.resource_path=="res://assets/highland-panorama.jpg" and habitat_panorama.panorama.get_width()==1280 and habitat_panorama.panorama.get_height()==640)
-	assert(game.mode_button.position==Vector2(398,198) and game.mode_button.size==Vector2(153,55));assert(game.shop_button.position==Vector2(398,262) and game.shop_button.size==Vector2(153,55));assert(game.result_confetti_layer.get_parent()==game.result_overlay)
+	assert(game.mode_button.position==Vector2(398,198) and game.mode_button.size==Vector2(153,55));assert(game.shop_button.position==Vector2(398,262) and game.shop_button.size==Vector2(153,55));assert(game.result_overlay.get_child_count()==0 and game.result_overlay.mouse_filter==Control.MOUSE_FILTER_IGNORE)
 	game._toggle_mode()
 	assert(game.current_mode=="habitat" and game.audio_manager.current_bgm_key=="habitat")
 	assert(not game.shop_button.visible and not game.habitat_status_label.visible and game.habitat_status_label.text.is_empty())
@@ -147,16 +147,21 @@ func _ready()->void:
 	assert(jelly_target.state=="jelly")
 	await get_tree().create_timer(1.2).timeout
 	assert(game.play_active)
+	# This section verifies all-harvest accounting and record persistence. Mark
+	# every possible refill as already owned so an unrelated NEW card cannot own
+	# the foreground after the result-less round completes.
+	for entry in game.species:
+		var owned_species_id:=str(entry.get("species_id",""))
+		if not owned_species_id.is_empty():game.species_get_counts[owned_species_id]=1;game.discovered[owned_species_id]=true
+	game.pending_round_new_species_ids.clear()
 	var drain_guard:=0
 	while game.play_active and drain_guard<100:
 		for plant in game.plants.duplicate():plant.harvest()
 		game._process(1.0);await get_tree().process_frame;drain_guard+=1
 	assert(game.plants.is_empty() and not game.play_active)
-	assert(game.result_overlay.visible)
+	assert(not game.result_overlay.visible and game.greenhouse_finish_completed_count==1)
 	assert(game.play_harvest_count>=1 and game.play_harvest_cm_total>=21.7 and game.play_max_size>=21.7)
-	assert(game.play_updated_global_best and "最大サイズ更新" in game.result_max_label.text and game.result_confetti_layer.get_child_count()>0)
-	assert(not game.play_open_button.visible)
-	game._close_result()
+	assert(game.play_updated_global_best and game._global_best_size()>=game.play_max_size)
 	assert(game.play_open_button.visible)
 	for control in game.external_navigation_controls:
 		if control==game.fusion_lab_button:assert(not control.visible)

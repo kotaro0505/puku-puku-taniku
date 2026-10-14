@@ -167,14 +167,23 @@ func _test_act3_and_crisis_presets() -> void:
 	assert(game._unique_jurejure_species_get_count() == 8)
 	assert(game.habitat_crisis_pending)
 	assert(not game.habitat_crisis_started)
+	await get_tree().process_frame
+	if game.species_get_overlay.visible:
+		while game.species_get_overlay.busy:
+			await get_tree().process_frame
+		game.species_get_overlay.close_overlay()
+		while game.species_get_overlay.visible:
+			await get_tree().process_frame
 	game.current_mode = "greenhouse"
 	game._apply_mode()
 	game.habitat_visit_id += 1
 	game.current_mode = "habitat"
 	game._apply_mode()
 	game._try_start_pending_story_event()
-	await get_tree().create_timer(1.0).timeout
-	assert(game.habitat_crisis_started)
+	var crisis_deadline_msec := Time.get_ticks_msec() + 6000
+	while not game.habitat_crisis_started and Time.get_ticks_msec() < crisis_deadline_msec:
+		await get_tree().create_timer(.02).timeout
+	assert(game.habitat_crisis_started, "crisis did not start: mode=%s pending=%s camera=%s dialog=%s get=%s intro=%s" % [game.current_mode, game.habitat_crisis_pending, game.jurejure_intro_camera_active, game.scripted_dialog_kind, game.species_get_overlay.visible, game.intro_overlay.visible])
 	game.free()
 	await get_tree().process_frame
 
@@ -276,33 +285,22 @@ func _test_restoration_and_101cm_presets() -> void:
 	assert(str(HabitatRestorationClass.pending_return_snapshots(restoration)[0].get("species_id", "")) == "colorata")
 	assert(float(HabitatRestorationClass.pending_return_snapshots(restoration)[0].get("diameter_cm", 0.0)) >= 100.0)
 	assert(game.current_mode == "greenhouse")
-	for _frame in range(300):
-		if game.result_overlay.visible:
-			break
-		await get_tree().process_frame
-	# The 101 cm helper is a one-plant development round. Under the formal
-	# 12-seed round result flow, settling its only plant opens the round result
-	# before queued story transitions are resumed.
-	assert(game.result_overlay.visible)
+	var transition_deadline_msec := Time.get_ticks_msec() + 12000
+	while (game.current_mode != "habitat" or game.scripted_dialog_kind != "restoration_return_5") and Time.get_ticks_msec() < transition_deadline_msec:
+		await get_tree().create_timer(.02).timeout
+	# The one-plant development round now resumes the queued return transition
+	# automatically after its Puku animation, without a result screen.
+	assert(not game.result_overlay.visible and game.result_overlay.get_child_count() == 0)
 	assert(not game.puku_gauge_animation_running and game.puku_gauge_animation_queue.is_empty())
 	game.puku_gauge_animation_speed_scale = 1.0
-	game._close_result()
-	# Result close dispatches the pending-story check, which in turn dispatches
-	# the habitat transition. Wait for that two-stage deferred handoff instead of
-	# depending on both callbacks landing in one idle frame.
-	for _frame in range(10):
-		if game.scene_transition_fade.visible:
-			break
-		await get_tree().process_frame
-	assert(game.scene_transition_fade.visible)
-	assert(game.scene_transition_fade.color.r > 0.99 and game.scene_transition_fade.color.g > 0.99 and game.scene_transition_fade.color.b > 0.99)
-	await get_tree().create_timer(2.8).timeout
 	assert(game.current_mode == "habitat")
-	assert(game.scripted_dialog_kind == "restoration_return_5")
+	assert(game.scripted_dialog_kind == "restoration_return_5", "automatic fifth return did not open: mode=%s dialog=%s fade=%s pending=%s followup=%s get=%s intro=%s camera=%s" % [game.current_mode, game.scripted_dialog_kind, game.scene_transition_fade.visible, HabitatRestorationClass.pending_return_count(restoration), game.greenhouse_round_followup_started, game.species_get_overlay.visible, game.intro_overlay.visible, game.jurejure_intro_camera_active])
 	assert(HabitatRestorationClass.returned_count(restoration) == 5)
 	assert(str(HabitatRestorationClass.returned_plants(restoration)[4].get("species_id", "")) == "colorata")
 	_finish_dialog(game)
-	await get_tree().create_timer(1.2).timeout
+	var ending_deadline_msec := Time.get_ticks_msec() + 6000
+	while not game.habitat_restoration_ui.ending_layer.visible and Time.get_ticks_msec() < ending_deadline_msec:
+		await get_tree().create_timer(.02).timeout
 	assert(HabitatRestorationClass.ending_phase(restoration) == "slides")
 	assert(game.habitat_restoration_ui.ending_layer.visible)
 	game.free()
@@ -316,7 +314,9 @@ func _test_ending_presets() -> void:
 	assert(HabitatRestorationClass.returned_count(game._restoration_state()) == 5)
 	assert(HabitatRestorationClass.ending_phase(game._restoration_state()) == "slides")
 	assert(not bool(game._restoration_state().get("full_recovery_revealed", false)))
-	await get_tree().create_timer(1.2).timeout
+	var preset_ending_deadline_msec := Time.get_ticks_msec() + 6000
+	while not game.habitat_restoration_ui.ending_layer.visible and Time.get_ticks_msec() < preset_ending_deadline_msec:
+		await get_tree().create_timer(.02).timeout
 	assert(game.habitat_restoration_ui.ending_layer.visible)
 	assert(game.habitat_restoration_ui.slide_index == 0)
 	game.habitat_restoration_ui._advance_ending()

@@ -327,13 +327,11 @@ func _test_integrated_final_chapter() -> void:
 	await get_tree().process_frame
 	assert(not game.result_overlay.visible and game.current_mode == "greenhouse" and game.play_active)
 	assert(game.scripted_dialog_kind.is_empty())
-	# The result modal owns the foreground. Only its close may release the queued
-	# automatic habitat transition.
+	# Ending the round releases the queued automatic habitat transition directly;
+	# there is no result modal or close action in between.
 	game.play_active = false
-	game.result_overlay.visible = true
-	game._try_start_pending_story_event()
-	assert(game.current_mode == "greenhouse")
-	game._close_result()
+	game.greenhouse_round_followup_started = false
+	game._continue_after_greenhouse_round()
 	await get_tree().create_timer(1.4).timeout
 	assert(not game.result_overlay.visible and game.current_mode == "habitat", "return transition mode=%s dialog=%s fade=%s pending=%s" % [game.current_mode, game.scripted_dialog_kind, game.scene_transition_fade.visible, HabitatRestorationClass.pending_return_stages(game._restoration_state())])
 	assert(game.scripted_dialog_kind == "restoration_return_1", "unexpected rooted event: %s pending=%s" % [game.scripted_dialog_kind, HabitatRestorationClass.pending_return_stages(game._restoration_state())])

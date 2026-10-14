@@ -282,6 +282,7 @@ static func spawn_101cm_colorata(game) -> bool:
 	game.pending_round_new_species_ids.clear()
 	game.round_result_species_finalize_queue.clear()
 	game.round_result_species_finalize_active = false
+	game.greenhouse_round_followup_started = false
 	game._spawn_specific_plant("colorata")
 	if game.plants.is_empty():
 		return false
@@ -399,6 +400,9 @@ static func _prepare_exploitation(game) -> void:
 	var progression: Dictionary = game.story_progression_state
 	StoryProgressionClass.begin_exploitation(progression, 0)
 	StoryProgressionClass.complete_act3_battle_intro(progression)
+	# Exploitation/restoration presets represent progress after the mandatory
+	# first Act III battle, so no unrelated battle may pre-empt their target event.
+	StoryProgressionClass.complete_act3_first_battle(progression)
 	progression["exploitation_midpoint_pending"] = false
 	progression["exploitation_midpoint_seen"] = true
 	StoryProgressionClass.consume_story_event(

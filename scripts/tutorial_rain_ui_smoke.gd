@@ -25,9 +25,9 @@ func _ready()->void:
 	game.rain_event_pending=false;game.rain_bonus_active=false;game._roll_rain_event()
 	assert(not game.rain_event_pending and not game.rain_bonus_active)
 	assert(game.habitat_awakening_overlay!=null and game.habitat_awakening_overlay.DIALOG_KEYS.has("_pause_before_memory"))
-	game.play_harvest_cm_total=12.0;game.play_puku_reward_units_total=0;game.play_harvest_count=1;game.play_max_size=12.0;game.play_updated_global_best=false;game.play_notable_species={"colorata":{"name":"コロラータ","size":12.0}};game.pending_round_new_species_ids.clear();game.pending_round_new_species_ids.append("colorata");game._show_play_result();await get_tree().process_frame
-	assert(not game.result_new_species_label.visible and game.result_new_species_label.text.is_empty())
-	assert("コロラータ" not in game.result_notable_label.text)
-	game.result_overlay.visible=false;game.pending_round_new_species_ids.clear();game._show_play_result();assert(not game.result_new_species_label.visible)
-	print("TUTORIAL_RAIN_UI_SMOKE_OK tutorial_finger=retired dark_highlight=true story_rain=preserved rain_bonus=retired result_new_spoiler=false")
+	game.play_harvest_cm_total=12.0;game.play_puku_reward_units_total=0;game.play_harvest_count=1;game.play_max_size=12.0;game.play_updated_global_best=false;game.play_notable_species={"colorata":{"name":"コロラータ","size":12.0}};game.pending_round_new_species_ids.clear();game.pending_round_new_species_ids.append("colorata");game.greenhouse_round_followup_started=false;game._continue_after_greenhouse_round();await get_tree().process_frame
+	assert(not game.result_overlay.visible and game.result_overlay.get_child_count()==0)
+	assert(game._species_get_count("colorata")==1 and game.species_get_overlay.visible)
+	assert(game.result_overlay.find_child("ResultCloseButton",true,false)==null)
+	print("TUTORIAL_RAIN_UI_SMOKE_OK tutorial_finger=retired dark_highlight=true story_rain=preserved rain_bonus=retired result=removed automatic_new=true")
 	get_tree().quit()

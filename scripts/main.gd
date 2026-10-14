@@ -590,17 +590,6 @@ var habitat_sparkle: Control
 var rain_visual: Control
 var rain_drops: Array = []
 var result_overlay: Control
-var result_card: PanelContainer
-var result_total_label: Label
-var result_count_label: Label
-var result_max_label: Label
-var result_notable_label: Label
-var result_new_species_label: Label
-var result_share_button: Button
-var result_share_status: Label
-var result_new_species_pulse_tween: Tween
-var result_confetti_layer: Control
-var result_record_pulse_tween: Tween
 var encyclopedia_icon_button: Button
 var external_navigation_controls: Array[Control] = []
 var encyclopedia_navigation_controls: Array[Control] = []
@@ -752,6 +741,7 @@ var greenhouse_finish_attempt_count := 0
 var greenhouse_finish_completed_count := 0
 var greenhouse_finish_last_block_reason := ""
 var greenhouse_finish_last_snapshot:Dictionary={}
+var greenhouse_round_followup_started := false
 var rain_bag_count := 0
 var rain_event_pending := false
 var rain_bonus_in_progress := false
@@ -4063,9 +4053,6 @@ func _apply_language_to_ui()->void:
 	_set_named_localized_text("ShopCategoryCatalog","shop_category_catalog")
 	_set_named_localized_text("ShopForestGachaButton","shop_category_gacha")
 	_set_named_localized_text("ShopCatalogBack","shop_category_back")
-	_set_named_localized_text("ResultTitle","result_title")
-	_set_named_localized_text("ResultNotableTitle","result_notable_title")
-	_set_named_localized_text("ResultCloseButton","result_close")
 	_set_named_localized_text("ResearchRewardTitle","research_reward_title")
 	_set_named_localized_text("ResearchRewardNote","research_reward_note")
 	_set_named_localized_text("ResearchRewardClose","research_reward_later")
@@ -4716,7 +4703,7 @@ func _reset_progression_state()->void:
 	original_catalog_complete_event_seen=false;habitat_tutorial_returned_to_greenhouse=false;jurejure_intro_complete=false;jurejure_enabled=false;jurejure_growth_stage=JureJureSystemClass.GROWTH_EARLY;jurejure_growth_event_mask=0;active_jurejure_event={};jurejure_next_check_unix=0.0;jurejure_cooldown_until_unix=0.0;jurejure_return_event_complete=false;jurejure_waiting_for_seed_pod_reward=false;jurejure_battle_count=0;jurejure_battle_win_count=0;jurejure_habitat_visit_point=Vector2(-1.0,-1.0);jurejure_pending_reward_species_id="";jurejure_pending_reward_is_new=false;jurejure_last_battle_result.clear();act3_first_battle_active=false;habitat_second_awakened=false;habitat_second_awakening_complete=false;jurejure_update_accumulator=0.0
 	first_seed_pod_reward_event_active=false;habitat_visit_id=0;jurejure_focused_habitat_visit_id=-1;act3_intro_eligible_visit_id=0;habitat_crisis_eligible_visit_id=0
 	if habitat_crisis_atmosphere:habitat_crisis_atmosphere.deactivate()
-	_cancel_puku_gauge_animations();puku_gauge_cm=0.0;puku_balance_units=0;show_growing_puku_preview=true;bests.clear();discovered.clear();species_get_counts.clear();catalog_cover_species.clear();unlocked_series={INITIAL_SERIES_ID:true};series_seed_inventory.clear();forest_gacha_draw_count=0;forest_gacha_encountered.clear();active_series_seed_id="";owned_pots={DEFAULT_POT_ID:1};saved_arrangements.clear();arrangement_save_capacity=20;greenhouse_available=_initial_greenhouse_state();unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;opening_story_complete=false;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;puku_gauge_intro_complete=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;mystery_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;mystery_seed_pack_unlocked=false;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;habitat_mystery_seeds_pending=0;mystery_seed_count=0;armadillo_research_total=0;armadillo_research_rewards.clear();armadillo_research_intro_seen=false;armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();result_deferred_species_queue.clear();pending_round_new_species_ids.clear();round_result_species_finalize_queue.clear();round_result_species_finalize_active=false;round_result_species_save_pending=false;shop_chatter_acquired_species.clear();species_get_queue.clear();play_share_record.clear();play_active=false;play_time_remaining=0.0;play_harvest_cm_total=0.0;play_puku_reward_units_total=0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;_reset_endless_economy_stats();rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_time_multiplier=1;habitat_simulation_unix=Time.get_unix_time_from_system();habitat_debug_log.clear();habitat_scroll_tutorial_active=false;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_clear_habitat_items();_save();_update_currency_ui();_update_play_ui()
+	_cancel_puku_gauge_animations();puku_gauge_cm=0.0;puku_balance_units=0;show_growing_puku_preview=true;bests.clear();discovered.clear();species_get_counts.clear();catalog_cover_species.clear();unlocked_series={INITIAL_SERIES_ID:true};series_seed_inventory.clear();forest_gacha_draw_count=0;forest_gacha_encountered.clear();active_series_seed_id="";owned_pots={DEFAULT_POT_ID:1};saved_arrangements.clear();arrangement_save_capacity=20;greenhouse_available=_initial_greenhouse_state();unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;opening_story_complete=false;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;puku_gauge_intro_complete=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;mystery_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;mystery_seed_pack_unlocked=false;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;habitat_mystery_seeds_pending=0;mystery_seed_count=0;armadillo_research_total=0;armadillo_research_rewards.clear();armadillo_research_intro_seen=false;armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();result_deferred_species_queue.clear();pending_round_new_species_ids.clear();round_result_species_finalize_queue.clear();round_result_species_finalize_active=false;round_result_species_save_pending=false;shop_chatter_acquired_species.clear();species_get_queue.clear();play_share_record.clear();play_active=false;play_time_remaining=0.0;play_harvest_cm_total=0.0;play_puku_reward_units_total=0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;greenhouse_round_followup_started=false;_reset_endless_economy_stats();rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_time_multiplier=1;habitat_simulation_unix=Time.get_unix_time_from_system();habitat_debug_log.clear();habitat_scroll_tutorial_active=false;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_clear_habitat_items();_save();_update_currency_ui();_update_play_ui()
 	if growing_puku_preview_toggle:growing_puku_preview_toggle.set_pressed_no_signal(true);growing_puku_preview_toggle.text=_growing_puku_preview_setting_text()
 	normal_round_free_plays=0
 	normal_play_count=0;shop_visit_count=0;hidden_species_acquired.clear();tovar_next_play=TOVAR_FIRST_PLAY;tovar_attempt_count=0;tovar_event_active=false;tovar_harvested_this_play=false;armadillo_present=false;_save()
@@ -4726,36 +4713,9 @@ func _reset_progression_for_development(button:Button)->void:
 	_reset_progression_state();button.text="リセットしました（再読み込みしてください）"
 
 func _build_result_overlay(hud:Control)->void:
-	result_overlay=Control.new();result_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);result_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;result_overlay.visible=false;hud.add_child(result_overlay)
-	var shade:=ColorRect.new();shade.color=Color(0.08,0.05,0.035,.68);shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);shade.mouse_filter=Control.MOUSE_FILTER_STOP;result_overlay.add_child(shade)
-	result_card=PanelContainer.new();result_card.position=Vector2(54,150);result_card.size=Vector2(468,730);result_card.clip_contents=true;result_card.add_theme_stylebox_override("panel",_box(Color("#f7e8c7"),Color("#c8944f"),28,4));result_overlay.add_child(result_card)
-	var content:=VBoxContainer.new();content.alignment=BoxContainer.ALIGNMENT_CENTER;content.add_theme_constant_override("separation",15);result_card.add_child(content)
-	var title:=Label.new();title.name="ResultTitle";title.text="今回の収穫";title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;title.add_theme_font_size_override("font_size",30);title.add_theme_color_override("font_color",UI_BROWN);content.add_child(title)
-	result_total_label=Label.new();result_total_label.custom_minimum_size=Vector2(410,108);result_total_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;result_total_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;result_total_label.add_theme_font_size_override("font_size",19);result_total_label.add_theme_color_override("font_color",Color("#b06c24"));content.add_child(result_total_label)
-	result_count_label=_result_line_label();content.add_child(result_count_label)
-	result_max_label=_result_line_label();content.add_child(result_max_label)
-	var divider:=HSeparator.new();divider.custom_minimum_size=Vector2(380,10);content.add_child(divider)
-	var notable_title:=Label.new();notable_title.name="ResultNotableTitle";notable_title.text="目立った収穫株";notable_title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;notable_title.add_theme_font_size_override("font_size",19);notable_title.add_theme_color_override("font_color",Color("#725039"));content.add_child(notable_title)
-	result_notable_label=Label.new();result_notable_label.custom_minimum_size=Vector2(390,112);result_notable_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;result_notable_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;result_notable_label.add_theme_font_size_override("font_size",18);result_notable_label.add_theme_color_override("font_color",UI_BROWN);content.add_child(result_notable_label)
-	result_new_species_label=Label.new();result_new_species_label.custom_minimum_size=Vector2(400,52);result_new_species_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;result_new_species_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;result_new_species_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;result_new_species_label.add_theme_font_size_override("font_size",23);result_new_species_label.add_theme_color_override("font_color",Color("#b75432"));result_new_species_label.add_theme_color_override("font_outline_color",Color("#fff6c7"));result_new_species_label.add_theme_constant_override("outline_size",5);result_new_species_label.visible=false;content.add_child(result_new_species_label)
-	result_share_button=Button.new();result_share_button.text=Localizer.text(language_code,"share_prompt");result_share_button.custom_minimum_size=Vector2(350,54);result_share_button.visible=false;_skin_button(result_share_button,Color("#d7aa64"),18);result_share_button.pressed.connect(_share_personal_best);content.add_child(result_share_button)
-	result_share_status=Label.new();result_share_status.custom_minimum_size=Vector2(390,28);result_share_status.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;result_share_status.add_theme_font_size_override("font_size",14);result_share_status.add_theme_color_override("font_color",Color("#79543a"));result_share_status.visible=false;content.add_child(result_share_status)
-	var close:=Button.new();close.name="ResultCloseButton";close.text="閉じる / 戻る";close.custom_minimum_size=Vector2(350,54);_skin_button(close,Color("#ead8b1"),17);close.pressed.connect(_close_result);content.add_child(close)
-	result_confetti_layer=Control.new();result_confetti_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);result_confetti_layer.mouse_filter=Control.MOUSE_FILTER_IGNORE;result_overlay.add_child(result_confetti_layer)
-
-func _result_line_label()->Label:
-	var label:=Label.new();label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;label.add_theme_font_size_override("font_size",21);label.add_theme_color_override("font_color",Color("#65432e"));return label
-
-func _clear_result_confetti()->void:
-	if result_record_pulse_tween and result_record_pulse_tween.is_valid():result_record_pulse_tween.kill()
-	result_record_pulse_tween=null
-	if result_max_label:result_max_label.scale=Vector2.ONE
-	if not result_confetti_layer:return
-	for piece in result_confetti_layer.get_children():piece.free()
-
-func _play_result_confetti()->void:
-	_clear_result_confetti()
-	_spawn_confetti(result_confetti_layer)
+	# Kept as a hidden compatibility sentinel for old saves and code paths that
+	# check modal visibility. The round-result screen itself no longer exists.
+	result_overlay=Control.new();result_overlay.name="RemovedRoundResult";result_overlay.mouse_filter=Control.MOUSE_FILTER_IGNORE;result_overlay.visible=false;hud.add_child(result_overlay)
 
 func _on_arrangement_completion_confetti_requested(layer:Control)->void:
 	_spawn_confetti(layer)
@@ -4768,10 +4728,6 @@ func _spawn_confetti(layer:Control)->void:
 		var piece:=ColorRect.new();piece.color=colors[rng.randi_range(0,colors.size()-1)];piece.color.a=.88;piece.size=Vector2(rng.randf_range(4.0,7.0),rng.randf_range(8.0,13.0));piece.position=Vector2(rng.randf_range(64.0,512.0),rng.randf_range(-65.0,115.0));piece.rotation=rng.randf_range(-1.0,1.0);piece.mouse_filter=Control.MOUSE_FILTER_IGNORE;layer.add_child(piece)
 		var destination:=piece.position+Vector2(rng.randf_range(-34.0,34.0),rng.randf_range(500.0,710.0));var duration:=rng.randf_range(2.8,4.0)
 		var tween:=create_tween().bind_node(piece).set_parallel();tween.tween_property(piece,"position",destination,duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN);tween.tween_property(piece,"rotation",piece.rotation+rng.randf_range(2.0,5.0),duration);tween.tween_property(piece,"modulate:a",0.0,.7).set_delay(duration-.7);tween.chain().tween_callback(piece.queue_free)
-
-func _start_result_record_pulse()->void:
-	result_max_label.pivot_offset=result_max_label.size*.5;result_max_label.scale=Vector2.ONE
-	result_record_pulse_tween=create_tween().set_loops();result_record_pulse_tween.tween_property(result_max_label,"scale",Vector2(1.10,1.10),.52).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT);result_record_pulse_tween.tween_property(result_max_label,"scale",Vector2.ONE,.52).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 func _open_play_modal()->void:
 	if play_active or current_mode!="greenhouse":return
@@ -4799,7 +4755,7 @@ func _start_greenhouse_play(seed_type:String)->void:
 	dev_jelly_test_active=false
 	if play_active or catalog_preview_mode_active:return
 	# A NEW harvested in an interrupted round is already earned, but its formal
-	# catalog registration belongs to the post-result reveal sequence. Resolve
+	# catalog registration belongs to the round-end reveal sequence. Resolve
 	# that foreground before charging or starting another round.
 	if not pending_round_new_species_ids.is_empty():
 		call_deferred("_play_result_new_species_animations")
@@ -4829,7 +4785,7 @@ func _start_greenhouse_play(seed_type:String)->void:
 		if not _is_endless_greenhouse_enabled():normal_seed_bags-=1
 		current_target_count=NORMAL_GERMINATION_COUNT
 	if seed_type=="old" and total_play_count==0:_ensure_first_tutorial_species()
-	active_seed_type=seed_type;old_seed_reaction_stage=0;old_seed_harvest_guide_active=false;tutorial_harvest_plant=null;play_time_remaining=0.0;play_active=true;play_modal_open=false;play_harvest_cm_total=0.0;play_puku_reward_units_total=0;play_harvest_count=0;play_max_size=0.0;play_previous_global_best=_global_best_size();play_updated_global_best=false;play_share_record.clear();play_notable_species.clear();play_hidden_species_unlocked="";result_new_species_queue.clear();result_deferred_species_queue.clear();round_result_species_finalize_queue.clear();round_result_species_finalize_active=false;round_result_species_save_pending=false;opening_species.clear();play_seeds_remaining=current_target_count;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=_initial_greenhouse_concurrent_target(seed_type);greenhouse_finish_attempt_count=0;greenhouse_finish_completed_count=0;greenhouse_finish_last_block_reason="";greenhouse_finish_last_snapshot.clear();_clear_greenhouse_plants();_reset_endless_economy_stats()
+	active_seed_type=seed_type;old_seed_reaction_stage=0;old_seed_harvest_guide_active=false;tutorial_harvest_plant=null;play_time_remaining=0.0;play_active=true;play_modal_open=false;play_harvest_cm_total=0.0;play_puku_reward_units_total=0;play_harvest_count=0;play_max_size=0.0;play_previous_global_best=_global_best_size();play_updated_global_best=false;play_share_record.clear();play_notable_species.clear();play_hidden_species_unlocked="";result_new_species_queue.clear();result_deferred_species_queue.clear();round_result_species_finalize_queue.clear();round_result_species_finalize_active=false;round_result_species_save_pending=false;opening_species.clear();play_seeds_remaining=current_target_count;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=_initial_greenhouse_concurrent_target(seed_type);greenhouse_finish_attempt_count=0;greenhouse_finish_completed_count=0;greenhouse_finish_last_block_reason="";greenhouse_finish_last_snapshot.clear();greenhouse_round_followup_started=false;_clear_greenhouse_plants();_reset_endless_economy_stats()
 	if seed_type=="normal" and _is_endless_greenhouse_enabled():
 		endless_greenhouse.begin_play()
 		if puku_gauge_intro_complete:
@@ -4883,7 +4839,7 @@ func _finish_greenhouse_play()->void:
 		_register_species_discovery(first_tutorial_species_id,false);greenhouse_available[first_tutorial_species_id]=true;unlocked_species=greenhouse_available.duplicate(true);_apply_saved_unlocks();unlocked_series[INITIAL_SERIES_ID]=true
 	_evaluate_unlock_rules("play_count",float(total_play_count))
 	if completed_endless_round:_log_endless_economy("round_complete")
-	_clear_greenhouse_plants();_save();_update_play_ui();_show_play_result();audio_manager.play_se("result",.7)
+	_clear_greenhouse_plants();_save();_update_play_ui();_continue_after_greenhouse_round()
 	if old_colorata_profile_active:_old_colorata_profile_mark("round_finish_end")
 
 func _greenhouse_finish_block_reason()->String:
@@ -5603,53 +5559,20 @@ func _claim_first_seed_pod_reward_once()->void:
 func _update_currency_ui()->void:
 	_update_puku_ui()
 
-func _show_play_result()->void:
-	if active_seed_type=="old" and total_play_count==1:
-		result_overlay.visible=false
-		_clear_result_confetti()
-		if not result_new_species_queue.is_empty() or not result_deferred_species_queue.is_empty():call_deferred("_play_result_new_species_animations")
-		else:call_deferred("_start_first_colorata_discovery_event")
-		return
-	result_total_label.visible=true
-	var endless_round_result:=active_seed_type=="normal" and _is_endless_greenhouse_enabled()
-	if endless_round_result:
-		var round_net_units:=endless_economy_harvest_reward_units-endless_economy_seed_cost_units
-		_set_named_localized_text("ResultTitle","round_result_title")
-		result_total_label.text=Localizer.text(language_code,"round_result_economy",[_format_puku_units(endless_economy_seed_cost_units),_format_puku_units(endless_economy_harvest_reward_units),("+" if round_net_units>=0 else "-")+_format_puku_units(round_net_units)])
-		result_count_label.text=Localizer.text(language_code,"round_result_count",[endless_economy_harvest_count,endless_economy_jelly_count])
-	else:
-		_set_named_localized_text("ResultTitle","result_title")
-		result_total_label.text=Localizer.text(language_code,"result_total_before_items",[_format_cm(play_harvest_cm_total)])
-		result_count_label.text=Localizer.text(language_code,"result_count",[play_harvest_count])
-	result_max_label.remove_theme_color_override("font_outline_color");result_max_label.remove_theme_constant_override("outline_size")
-	if play_updated_global_best:
-		result_max_label.text=Localizer.text(language_code,"result_best_update",[play_max_size]);result_max_label.add_theme_font_size_override("font_size",30);result_max_label.add_theme_color_override("font_color",Color("#b83b32"));result_max_label.add_theme_color_override("font_outline_color",Color("#f8e8c8"));result_max_label.add_theme_constant_override("outline_size",3);_play_result_confetti();call_deferred("_start_result_record_pulse");audio_manager.play_se("result_new_best",.48)
-	else:
-		result_max_label.text=Localizer.text(language_code,"result_max",[play_max_size]);result_max_label.add_theme_font_size_override("font_size",21);result_max_label.add_theme_color_override("font_color",Color("#65432e"));_clear_result_confetti()
-	var notable:Array=[]
-	for notable_species_id_value in play_notable_species:
-		var notable_species_id:=str(notable_species_id_value)
-		# Do not reveal a pending NEW on the result card. Its identity first appears
-		# on the Species GET card after the player closes this result.
-		if notable_species_id in pending_round_new_species_ids:continue
-		notable.append(play_notable_species[notable_species_id])
-	notable.sort_custom(func(a,b):return float(a.get("size",0.0))>float(b.get("size",0.0)));var lines:Array[String]=[]
-	for i in range(mini(3,notable.size())):lines.append("%s　%.1fcm"%[str(notable[i].get("name","")),float(notable[i].get("size",0.0))])
-	result_notable_label.text="\n".join(lines) if not lines.is_empty() else Localizer.text(language_code,"result_none")
-	if play_hidden_species_unlocked==HIDDEN_TOVAR_ID:result_notable_label.text+="\n\n"+Localizer.text(language_code,"result_hidden_registered",[Localizer.species_name(language_code,_catalog_entry(HIDDEN_TOVAR_ID))])
-	result_new_species_label.visible=false;result_new_species_label.text=""
-	var share_species_id:=str(play_share_record.get("species_id",""))
-	result_share_button.visible=not play_share_record.is_empty() and share_species_id not in pending_round_new_species_ids;result_share_button.disabled=false;result_share_button.text=Localizer.text(language_code,"share_prompt");result_share_status.visible=false;result_share_status.text=""
-	result_overlay.visible=true;result_overlay.modulate.a=0.0;result_card.position.y=170.0;play_open_button.visible=false
-	var tween:=create_tween().set_parallel();tween.tween_property(result_overlay,"modulate:a",1.0,.36).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT);tween.tween_property(result_card,"position:y",150.0,.42).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+func _continue_after_greenhouse_round()->void:
+	if greenhouse_round_followup_started:return
+	greenhouse_round_followup_started=true
+	if result_overlay:result_overlay.visible=false
+	_update_play_ui()
+	if not pending_round_new_species_ids.is_empty() or not result_new_species_queue.is_empty() or not result_deferred_species_queue.is_empty():call_deferred("_play_result_new_species_animations")
+	elif total_play_count==1 and not first_colorata_confirmed:call_deferred("_start_first_colorata_discovery_event")
+	else:call_deferred("_try_start_pending_story_event")
 
 func _play_result_new_species_animations()->void:
 	if round_result_species_finalize_active:return
 	round_result_species_finalize_active=true;round_result_species_save_pending=false
-	var immediate_first_colorata:=active_seed_type=="old" and total_play_count==1 and not first_colorata_confirmed and FIRST_STORY_SPECIES_ID in result_new_species_queue
-	if not immediate_first_colorata:await get_tree().create_timer(.48).timeout
 	# Finite/old-seed flows already registered their discoveries before the
-	# result. Keep their established card contexts and follow-ups unchanged.
+	# round ended. Keep their established card contexts and follow-ups unchanged.
 	if pending_round_new_species_ids.is_empty():
 		var registered_queue:=result_new_species_queue.duplicate();result_new_species_queue.clear()
 		registered_queue.append_array(result_deferred_species_queue);result_deferred_species_queue.clear()
@@ -5703,20 +5626,13 @@ func _show_next_round_result_species()->void:
 			return
 	_queue_species_get_by_id(species_id,is_new,"round_result_new")
 
-func _start_result_new_species_pulse()->void:
-	if result_new_species_pulse_tween and result_new_species_pulse_tween.is_valid():result_new_species_pulse_tween.kill()
-	if not result_new_species_label.visible:return
-	result_new_species_label.pivot_offset=result_new_species_label.size*.5;result_new_species_label.scale=Vector2.ONE
-	result_new_species_pulse_tween=create_tween().set_loops(3);result_new_species_pulse_tween.tween_property(result_new_species_label,"scale",Vector2(1.07,1.07),.38).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT);result_new_species_pulse_tween.tween_property(result_new_species_label,"scale",Vector2.ONE,.38).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-
 func _share_personal_best()->void:
-	if play_share_record.is_empty() or result_share_button.disabled:return
-	result_share_button.disabled=true;result_share_status.visible=true;result_share_status.text=Localizer.text(language_code,"share_creating")
+	# The former result-screen entry point is intentionally disconnected. Keep
+	# image generation available for a possible future redesign.
+	if play_share_record.is_empty():return
 	var image_path:String=await _create_personal_best_share_image(play_share_record)
-	if image_path.is_empty():
-		result_share_status.text=Localizer.text(language_code,"share_failed");result_share_button.disabled=false;return
-	var shared:=_open_native_share_or_fallback(image_path)
-	result_share_status.text=shared;result_share_button.disabled=false
+	if image_path.is_empty():return
+	_open_native_share_or_fallback(image_path)
 
 func _create_personal_best_share_image(record:Dictionary)->String:
 	var entry:=_catalog_entry(str(record.get("species_id","")))
@@ -5806,19 +5722,11 @@ func _on_native_share_failed(_message:="")->void:
 func _update_native_share_feedback(key:String)->void:
 	var message:=Localizer.text(language_code,key)
 	if native_share_context=="arrangement" and arrangement_ui:arrangement_ui.set_share_state(message,false)
-	elif result_share_status:result_share_status.visible=true;result_share_status.text=message
 	native_share_context=""
 
 func _play_shop_new_species_animations(species_ids:Array)->void:
 	for species_id_value in species_ids:
 		_queue_species_get_by_id(str(species_id_value),true,"armadillo_gift")
-
-func _close_result()->void:
-	if result_new_species_pulse_tween and result_new_species_pulse_tween.is_valid():result_new_species_pulse_tween.kill()
-	result_new_species_pulse_tween=null;result_new_species_label.scale=Vector2.ONE;result_overlay.visible=false;result_overlay.modulate.a=1.0;_clear_result_confetti();_update_play_ui()
-	if not pending_round_new_species_ids.is_empty() or not result_new_species_queue.is_empty() or not result_deferred_species_queue.is_empty():call_deferred("_play_result_new_species_animations")
-	elif total_play_count==1 and not first_colorata_confirmed:_start_first_colorata_discovery_event()
-	else:call_deferred("_try_start_pending_story_event")
 
 func _build_encyclopedia(hud:Control)->void:
 	encyclopedia_overlay=Control.new();encyclopedia_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);encyclopedia_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;encyclopedia_overlay.visible=false;hud.add_child(encyclopedia_overlay)
@@ -9287,7 +9195,7 @@ func _on_harvested(p)->void:
 		_record_endless_discovery_settlement(true,harvested_diameter_cm)
 		if defer_round_new:
 			# Formal GET, catalog progress, and story thresholds intentionally wait
-			# until the round result is closed. Only the active forced slot is cleared;
+			# until every plant settles. Only the active forced slot is cleared;
 			# a newly rolled reservation (including on the twelfth plant) survives.
 			if endless_forced_new:endless_greenhouse.complete_forced_new()
 		elif first_discovery:

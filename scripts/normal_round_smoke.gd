@@ -11,6 +11,7 @@ func _ready()->void:
 	game._set_language("ja")
 	game.endless_greenhouse.configure(true)
 	game.opening_finished=true;game.opening_story_complete=true;game.intro_story_complete=true;game.opening_overlay.visible=false;game.opening_story_overlay.visible=false
+	game.first_colorata_confirmed=true
 	game.first_habitat_gift_claimed=true;game.initial_seed_stock_notice_complete=true;game.habitat_awakened=true;game.seed_shop_open=true
 	game.habitat_tutorial_complete=true;game.mystery_items_acquired=true;game.mystery_catalog_tutorial_complete=true
 	game.normal_play_tutorial_complete=true;game.puku_buyback_tutorial_complete=true;game.puku_gauge_intro_complete=true
@@ -75,15 +76,30 @@ func _ready()->void:
 		var plant=game.plants[0];plant.jelly()
 		await get_tree().process_frame
 		assert(_planned_population(game)<=game.ENDLESS_NORMAL_MAX_PLANTS)
-	assert(await _wait_until(func()->bool:return not game.play_active and game.result_overlay.visible))
-	assert(not game.play_active and game.result_overlay.visible)
+	assert(await _wait_until(func()->bool:return not game.play_active))
+	assert(not game.play_active and not game.result_overlay.visible)
+	assert(game.result_overlay.get_child_count()==0 and game.greenhouse_finish_completed_count==1)
 	assert(game.endless_economy_seed_count==12 and game.endless_economy_jelly_count==12 and game.endless_economy_harvest_count==0)
 	assert(game.puku_balance_units==4000 and game.endless_economy_seed_cost_units==1000 and game.endless_economy_harvest_reward_units==0)
-	assert(game.result_count_label.text.contains("収穫　0株") and game.result_count_label.text.contains("ジュレ　12株"))
-	assert(game.result_total_label.text.contains("-1.00ぷく") and game.result_total_label.text.contains("今回の収支　-1.00ぷく"))
-	game._close_result();game._process(.2)
-	assert(not game.play_active)
-	print("NORMAL_ROUND_SMOKE_OK seeds=12 concurrent=5-8 dynamic=5_to_8_to_5 max_planned=8 entry_cost=1 refill_cost=0 all_jelly_net=-1 result=true no_autostart=true")
+	assert(game.play_open_button.visible and not game.play_open_button.disabled)
+	game.species=[game._catalog_entry("colorata")]
+	game.species_get_counts["colorata"]=1;game.discovered["colorata"]=true
+	game.puku_gauge_animation_speed_scale=.01
+	game._open_play_modal()
+	assert(game.play_active and game.puku_balance_units==3000)
+	for harvest_index in range(game.NORMAL_GERMINATION_COUNT):
+		assert(await _wait_for_settlement_plant(game),"all-harvest round ended early: %s"%_round_state(game,harvest_index))
+		_disable_automatic_jelly(game)
+		var harvest_plant=game.plants[0]
+		harvest_plant.fast_forward_to_diameter(30.0)
+		harvest_plant.harvest()
+		await get_tree().process_frame
+	assert(await _wait_until(func()->bool:return not game.play_active))
+	assert(not game.result_overlay.visible and game.greenhouse_finish_completed_count==1)
+	assert(game.endless_economy_seed_count==12 and game.endless_economy_harvest_count==12 and game.endless_economy_jelly_count==0)
+	assert(game.endless_economy_harvest_reward_units==1440 and game.puku_balance_units==4440)
+	assert(not game.species_get_overlay.visible and game.play_open_button.visible and not game.play_open_button.disabled)
+	print("NORMAL_ROUND_SMOKE_OK seeds=12 concurrent=5-8 dynamic=5_to_8_to_5 max_planned=8 entry_cost=1 refill_cost=0 all_jelly_net=-1 all_harvest_reward=1.44 result=removed next_round=immediate")
 	game.queue_free()
 	get_tree().quit()
 

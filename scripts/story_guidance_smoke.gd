@@ -28,12 +28,12 @@ func _ready() -> void:
 	_test_fantasy_six_candidate_contract(game)
 	_test_fusion_fantasy_count(game)
 	_test_crisis_exploitation_lockout(game)
-	await _test_result_before_new_card(game)
+	await _test_round_completion_before_new_cards(game)
 	_test_story_copy()
 	game._reset_progression_state()
 	game.queue_free()
 	await get_tree().process_frame
-	print("STORY_GUIDANCE_SMOKE_OK mission=single+live new_gate=first_encounter result_order=result_then_formal_get result_spoiler=none pending_duplicate=false nav=hidden arrangement=locked base=originals_only fantasy_six=four_series fusion_fantasy_count=display_series crisis=exploit_locked copy=updated dev_controls=all_builds")
+	print("STORY_GUIDANCE_SMOKE_OK mission=single+live new_gate=first_encounter result=removed automatic_formal_get=ordered_multiple pending_duplicate=false nav=hidden arrangement=locked base=originals_only fantasy_six=four_series fusion_fantasy_count=display_series crisis=exploit_locked copy=updated dev_controls=all_builds")
 	get_tree().quit()
 
 
@@ -343,7 +343,7 @@ func _test_crisis_exploitation_lockout(game: Node) -> void:
 	assert(not bool(restoration.get("jurejure_joined", false)))
 
 
-func _test_result_before_new_card(game: Node) -> void:
+func _test_round_completion_before_new_cards(game: Node) -> void:
 	_hide_foreground(game)
 	game.current_mode = "greenhouse"
 	game.play_active = false
@@ -361,25 +361,35 @@ func _test_result_before_new_card(game: Node) -> void:
 	game.result_deferred_species_queue.clear()
 	game.pending_round_new_species_ids.clear()
 	game.pending_round_new_species_ids.append("lutea")
+	game.pending_round_new_species_ids.append("shaviana")
 	game.discovered.erase("lutea")
+	game.discovered.erase("shaviana")
 	game.species_get_counts.erase("lutea")
+	game.species_get_counts.erase("shaviana")
 	game.play_notable_species = {"lutea": {"name": "ルテア", "size": 64.0}}
-	game._show_play_result()
-	assert(game.result_overlay.visible)
+	game.greenhouse_round_followup_started = false
+	game._continue_after_greenhouse_round()
+	assert(not game.result_overlay.visible and game.result_overlay.get_child_count() == 0)
 	assert(not game.species_get_overlay.visible)
-	assert(not game.result_new_species_label.visible and game.result_new_species_label.text.is_empty())
-	assert("ルテア" not in game.result_notable_label.text)
 	assert(game._species_get_count("lutea") == 0 and not bool(game.discovered.get("lutea", false)))
-	assert(game.pending_round_new_species_ids == ["lutea"])
-	game._close_result()
-	assert(not game.result_overlay.visible and not game.species_get_overlay.visible)
-	await get_tree().create_timer(.62).timeout
+	assert(game.pending_round_new_species_ids == ["lutea", "shaviana"])
+	await get_tree().process_frame
 	assert(game._species_get_count("lutea") == 1 and bool(game.discovered.get("lutea", false)))
 	assert("lutea" not in game.pending_round_new_species_ids)
 	assert(game.species_get_overlay.visible)
 	assert(game.species_get_active_context == "round_result_new")
-	game.species_get_overlay.visible = false
-	game._on_species_get_overlay_closed("round_result_new")
+	game.species_get_overlay.busy = false
+	game.species_get_overlay.close_overlay()
+	while game.species_get_overlay.visible:
+		await get_tree().process_frame
+	await get_tree().process_frame
+	assert(game._species_get_count("shaviana") == 1 and bool(game.discovered.get("shaviana", false)))
+	assert("shaviana" not in game.pending_round_new_species_ids)
+	assert(game.species_get_overlay.visible and game.species_get_active_context == "round_result_new")
+	game.species_get_overlay.busy = false
+	game.species_get_overlay.close_overlay()
+	while game.species_get_overlay.visible:
+		await get_tree().process_frame
 	await get_tree().process_frame
 
 

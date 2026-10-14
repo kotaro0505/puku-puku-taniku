@@ -20,7 +20,7 @@ func _ready()->void:
 	game.play_active=true;game.active_seed_type="normal"
 	game._spawn_specific_plant("sweets_strawberry_shortcake");var large=game.plants.back();large.jelly_checks_enabled=false;large.diameter_cm=18.4;large.harvest()
 	assert(not bool(game.discovered.get("sweets_strawberry_shortcake",false)) and "sweets_strawberry_shortcake" in game.pending_round_new_species_ids)
-	game._close_result();await get_tree().create_timer(.55).timeout
+	game.play_active=false;game.greenhouse_round_followup_started=false;game._continue_after_greenhouse_round();await get_tree().process_frame
 	assert(bool(game.discovered.get("sweets_strawberry_shortcake",false)) and bool(game.greenhouse_available.get("sweets_strawberry_shortcake",false)))
 	assert(bool(game.habitat_returned_species.get("sweets_strawberry_shortcake",false)))
 	assert("sweets_strawberry_shortcake" in game._habitat_population_candidate_ids())
