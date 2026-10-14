@@ -784,8 +784,6 @@ var pointer_travel := 0.0
 var greenhouse_drag_accumulator := 0.0
 var greenhouse_drag_started := false
 var opening_overlay: Control
-var opening_title_panel: PanelContainer
-var opening_title_label: Label
 var opening_prompt: TextureRect
 var opening_prompt_localized: PanelContainer
 var opening_prompt_localized_label: Label
@@ -1957,8 +1955,6 @@ func _build_ui() -> void:
 func _build_opening_screen(hud:Control)->void:
 	opening_overlay=Control.new();opening_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);opening_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;hud.add_child(opening_overlay)
 	var background:=TextureRect.new();background.texture=load("res://assets/opening-background.jpg");background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);background.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;background.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_COVERED;background.mouse_filter=Control.MOUSE_FILTER_IGNORE;opening_overlay.add_child(background)
-	opening_title_panel=PanelContainer.new();opening_title_panel.name="OpeningTitlePanel";opening_title_panel.position=Vector2(106,548);opening_title_panel.size=Vector2(364,208);opening_title_panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;opening_title_panel.add_theme_stylebox_override("panel",_box(Color("#fff0c4"),Color("#8c4f25"),34,6));opening_overlay.add_child(opening_title_panel)
-	opening_title_label=Label.new();opening_title_label.name="OpeningTitleLabel";opening_title_label.text=Localizer.text(language_code,"game_title_compact");opening_title_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;opening_title_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;opening_title_label.add_theme_font_size_override("font_size",31);opening_title_label.add_theme_color_override("font_color",Color("#5f7b38"));opening_title_label.add_theme_color_override("font_outline_color",Color("#fff9df"));opening_title_label.add_theme_constant_override("outline_size",4);opening_title_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;opening_title_panel.add_child(opening_title_label)
 	opening_prompt=TextureRect.new();opening_prompt.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;opening_prompt.texture=load("res://assets/opening-tap.png");opening_prompt.position=Vector2(86,820);opening_prompt.size=Vector2(404,136);opening_prompt.pivot_offset=opening_prompt.size*.5;opening_prompt.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;opening_prompt.mouse_filter=Control.MOUSE_FILTER_IGNORE;opening_overlay.add_child(opening_prompt)
 	opening_prompt_localized=PanelContainer.new();opening_prompt_localized.position=Vector2(86,834);opening_prompt_localized.size=Vector2(404,108);opening_prompt_localized.pivot_offset=opening_prompt_localized.size*.5;opening_prompt_localized.mouse_filter=Control.MOUSE_FILTER_IGNORE;opening_prompt_localized.add_theme_stylebox_override("panel",_box(Color("#b86e2d"),Color("#ffe18a"),38,5));opening_overlay.add_child(opening_prompt_localized)
 	opening_prompt_localized_label=Label.new();opening_prompt_localized_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;opening_prompt_localized_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;opening_prompt_localized_label.add_theme_font_size_override("font_size",30);opening_prompt_localized_label.add_theme_color_override("font_color",Color("#fff8df"));opening_prompt_localized_label.add_theme_color_override("font_outline_color",Color("#63331c"));opening_prompt_localized_label.add_theme_constant_override("outline_size",7);opening_prompt_localized_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;opening_prompt_localized.add_child(opening_prompt_localized_label)
@@ -1995,22 +1991,12 @@ func _select_initial_language(value:String)->void:
 
 func _refresh_opening_prompt()->void:
 	if opening_prompt==null or opening_prompt_localized==null:return
-	_refresh_opening_title_layout()
-	if opening_title_label:opening_title_label.text=Localizer.text(language_code,"game_title_compact")
 	if not language_selected:
 		opening_prompt.visible=false;opening_prompt_localized.visible=false
 		return
 	var use_art_prompt:=language_code=="ja"
 	opening_prompt.visible=use_art_prompt;opening_prompt_localized.visible=not use_art_prompt
 	if opening_prompt_localized_label:opening_prompt_localized_label.text=Localizer.text(language_code,"opening_tap")
-
-func _refresh_opening_title_layout()->void:
-	if opening_title_panel==null:return
-	if language_selected:
-		opening_title_panel.position=Vector2(106,548);opening_title_panel.size=Vector2(364,208)
-	else:
-		opening_title_panel.position=Vector2(106,472);opening_title_panel.size=Vector2(364,138)
-
 func _finish_opening()->void:
 	if opening_finished or not language_selected:return
 	opening_finished=true
@@ -4169,7 +4155,6 @@ func _apply_language_to_ui()->void:
 	_set_named_localized_text("EncyclopediaCloseButton","back")
 	_set_named_localized_text("MainLogo","game_title_compact")
 	_set_named_localized_text("MainLogoRibbon","game_title_ribbon")
-	_set_named_localized_text("OpeningTitleLabel","game_title_compact")
 	_set_named_localized_text("BgmToggle","audio_bgm_on")
 	_set_named_localized_text("SeToggle","audio_se_on")
 	_set_named_localized_text("AudioSettingsNote","audio_note")

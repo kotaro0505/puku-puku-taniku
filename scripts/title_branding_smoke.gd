@@ -29,19 +29,17 @@ func _ready() -> void:
 	var original_language := str(game.language_code)
 	var main_logo := game.find_child("MainLogo", true, false) as Label
 	var main_ribbon := game.find_child("MainLogoRibbon", true, false) as Label
-	var opening_panel := game.find_child("OpeningTitlePanel", true, false) as PanelContainer
-	var opening_title := game.find_child("OpeningTitleLabel", true, false) as Label
-	assert(main_logo != null and main_ribbon != null and opening_panel != null and opening_title != null)
-	var screen_rect := Rect2(Vector2.ZERO, Vector2(576, 1024))
+	var opening_background := game.opening_overlay.get_child(0) as TextureRect
+	assert(main_logo != null and main_ribbon != null and opening_background != null)
+	assert(opening_background.texture != null)
+	assert(opening_background.texture.get_size() == Vector2(720, 1280))
+	assert(opening_background.stretch_mode == TextureRect.STRETCH_KEEP_ASPECT_COVERED)
+	assert(game.find_child("OpeningTitlePanel", true, false) == null)
 	var original_language_selected := bool(game.language_selected)
 	game.language_selected = false
 	game._refresh_opening_prompt()
-	assert(opening_panel.get_rect() == Rect2(106, 472, 364, 138))
-	assert(opening_panel.get_rect().end.y <= game.opening_language_panel.position.y)
 	game.language_selected = true
 	game._refresh_opening_prompt()
-	assert(screen_rect.encloses(opening_panel.get_rect()))
-	assert(opening_panel.get_rect().encloses(Rect2(136, 560, 304, 184)))
 	for locale in Localizer.SUPPORTED_LANGUAGES:
 		assert(Localizer.text(locale, "game_title") == str(GAME_TITLES[locale]))
 		assert(Localizer.text(locale, "game_title_compact") == str(GAME_TITLES_COMPACT[locale]))
@@ -51,12 +49,9 @@ func _ready() -> void:
 		game.language_code = locale
 		game._apply_language_to_ui()
 		assert(main_logo.text == str(GAME_TITLES_COMPACT[locale]))
-		assert(opening_title.text == str(GAME_TITLES_COMPACT[locale]))
 		assert(main_ribbon.text == Localizer.text(locale, "game_title_ribbon"))
 		assert(main_logo.get_minimum_size().x <= main_logo.size.x + 0.5)
 		assert(main_logo.get_minimum_size().y <= main_logo.size.y + 0.5)
-		assert(opening_title.get_minimum_size().x <= opening_title.size.x + 0.5)
-		assert(opening_title.get_minimum_size().y <= opening_title.size.y + 0.5)
 		assert(main_ribbon.position.x + main_ribbon.get_minimum_size().x < 204.0)
 		game.habitat_restoration_ui.set_language(locale)
 		assert(game.habitat_restoration_ui.ending_thank_you_label.text == str(ENDING_TITLES[locale]))
