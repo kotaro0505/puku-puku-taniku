@@ -357,6 +357,9 @@ static func _prepare_common_progress(game) -> void:
 	progression["arrangement_intro_pending"] = false
 	progression["arrangement_intro_seen"] = true
 	progression["forest_gacha_unlock_pending"] = false
+	progression["fusion_lab_unlocked"] = true
+	progression["fusion_lab_intro_pending"] = false
+	progression["fusion_lab_intro_seen"] = true
 	progression["pending_story_events"] = []
 	game.story_progression_state = progression
 

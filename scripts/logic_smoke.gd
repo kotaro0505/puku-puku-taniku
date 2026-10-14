@@ -158,7 +158,9 @@ func _ready()->void:
 	assert(not game.play_open_button.visible)
 	game._close_result()
 	assert(game.play_open_button.visible)
-	for control in game.external_navigation_controls:assert(control.visible)
+	for control in game.external_navigation_controls:
+		if control==game.fusion_lab_button:assert(not control.visible)
+		else:assert(control.visible)
 	var panorama_resource_id:=habitat_panorama.panorama.get_instance_id();game.habitat_tutorial_complete=true;game.tutorial_steps["rain_first_dialog"]=true;game.rain_event_pending=false
 	for transition_cycle in range(8):
 		if game.current_mode!="greenhouse":game._toggle_mode()

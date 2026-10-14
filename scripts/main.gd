@@ -1720,6 +1720,8 @@ func _migrate_three_act_progress(saved_progression_version:int,retired_secret_ga
 		"fantasy_get_count":fantasy_count,
 		"arrangement_evidence":not saved_arrangements.is_empty(),
 		"forest_gacha_evidence":forest_gacha_unlocked or forest_gacha_draw_count>0,
+		"forest_gacha_intro_seen":forest_gacha_intro_seen,
+		"fusion_lab_legacy_access":_tutorial_fully_complete() and fusion_system!=null and not fusion_system.eligible_parents(species_get_counts).is_empty(),
 		"act3_intro_seen":act3_intro_seen,
 		"jurejure_get_count":jurejure_count,
 		"jurejure_intro_complete":jurejure_intro_complete,
@@ -1729,9 +1731,9 @@ func _migrate_three_act_progress(saved_progression_version:int,retired_secret_ga
 	})
 	if fantasy_first_discovery_seen:StoryProgressionClass.consume_story_event(story_progression_state,StoryProgressionClass.EVENT_FANTASY_FIRST)
 	if fantasy_realization_seen:StoryProgressionClass.consume_story_event(story_progression_state,StoryProgressionClass.EVENT_FANTASY_SIX)
-	# Existing access or a completed six-species milestone is durable evidence;
-	# never revoke Forest Gacha from a legacy save. New v28 games wait for the
-	# six-species realization dialogue before this flag is set.
+	# In older save formats the completed six-species milestone itself was the
+	# durable unlock evidence. Preserve that historical access, while current
+	# saves use the new eight-species gate exclusively.
 	if saved_progression_version<PROGRESSION_VERSION and (forest_gacha_unlocked or forest_gacha_draw_count>0 or fantasy_count>=6):
 		forest_gacha_unlocked=true
 		story_progression_state["forest_gacha_unlock_pending"]=false
@@ -1740,7 +1742,9 @@ func _migrate_three_act_progress(saved_progression_version:int,retired_secret_ga
 		# backlog on load; acknowledge thresholds the player already passed.
 		if fantasy_count>=1:fantasy_first_discovery_seen=true
 		if fantasy_count>=6:fantasy_realization_seen=true
-		if forest_gacha_draw_count>0:forest_gacha_intro_seen=true
+		if forest_gacha_draw_count>0:
+			forest_gacha_intro_seen=true
+			StoryProgressionClass.complete_forest_gacha_intro(story_progression_state)
 	elif saved_progression_version<PROGRESSION_VERSION:
 		if fantasy_count>=1 and not fantasy_first_discovery_seen:StoryProgressionClass.queue_story_event(story_progression_state,StoryProgressionClass.EVENT_FANTASY_FIRST)
 		if fantasy_count>=6 and not fantasy_realization_seen:StoryProgressionClass.queue_story_event(story_progression_state,StoryProgressionClass.EVENT_FANTASY_SIX)
@@ -1904,7 +1908,7 @@ func _build_ui() -> void:
 		habitat_dev_open_button=Button.new();habitat_dev_open_button.name="HabitatDevQuickOpen";habitat_dev_open_button.text="原生地テスト";habitat_dev_open_button.position=Vector2(398,262);habitat_dev_open_button.size=Vector2(153,55);_skin_button(habitat_dev_open_button,Color("#adcbb8"),15);habitat_dev_open_button.mouse_filter=Control.MOUSE_FILTER_STOP;habitat_dev_open_button.pressed.connect(_open_habitat_dev);hud.add_child(habitat_dev_open_button)
 	shop_button=Button.new();shop_button.text="おみせ";shop_button.position=Vector2(398,262);shop_button.size=Vector2(153,55);_skin_button(shop_button,Color("#fff0cf"),16);shop_button.mouse_filter=Control.MOUSE_FILTER_STOP;shop_button.pressed.connect(_open_shop);hud.add_child(shop_button)
 	external_navigation_controls.append(shop_button)
-	forest_gacha_button=Button.new();forest_gacha_button.name="ForestGachaButton";forest_gacha_button.text="森のガチャ";forest_gacha_button.position=Vector2(398,326);forest_gacha_button.size=Vector2(153,67);_skin_button(forest_gacha_button,Color("#d9c77d"),15);forest_gacha_button.mouse_filter=Control.MOUSE_FILTER_STOP;forest_gacha_button.pressed.connect(_open_forest_gacha);hud.add_child(forest_gacha_button)
+	forest_gacha_button=Button.new();forest_gacha_button.name="ForestGachaButton";forest_gacha_button.text="ガチャ";forest_gacha_button.position=Vector2(398,326);forest_gacha_button.size=Vector2(153,67);_skin_button(forest_gacha_button,Color("#d9c77d"),15);forest_gacha_button.mouse_filter=Control.MOUSE_FILTER_STOP;forest_gacha_button.pressed.connect(_open_forest_gacha);hud.add_child(forest_gacha_button)
 	external_navigation_controls.append(forest_gacha_button)
 	fusion_lab_button=Button.new();fusion_lab_button.name="FusionLabButton";fusion_lab_button.text="ハイブリッドラボ";fusion_lab_button.position=Vector2(398,400);fusion_lab_button.size=Vector2(153,58);_skin_button(fusion_lab_button,Color("#cda4d7"),16);fusion_lab_button.mouse_filter=Control.MOUSE_FILTER_STOP;fusion_lab_button.pressed.connect(_open_fusion_lab);hud.add_child(fusion_lab_button)
 	external_navigation_controls.append(fusion_lab_button)
@@ -2869,14 +2873,15 @@ func _finish_scripted_dialog()->void:
 		"first_seed_pod_reward":
 			first_seed_pod_reward_event_active=false
 		"forest_gacha_intro":
-			forest_gacha_intro_seen=true
+			forest_gacha_intro_seen=true;StoryProgressionClass.complete_forest_gacha_intro(story_progression_state)
 		"fantasy_first_discovery":
 			fantasy_first_discovery_seen=true;StoryProgressionClass.consume_story_event(story_progression_state,StoryProgressionClass.EVENT_FANTASY_FIRST)
 		"arrangement_intro":
 			StoryProgressionClass.complete_arrangement_intro(story_progression_state);show_arrangement_swipe_intro=true
 		"fantasy_realization":
 			fantasy_realization_seen=true;StoryProgressionClass.consume_story_event(story_progression_state,StoryProgressionClass.EVENT_FANTASY_SIX)
-			if StoryProgressionClass.take_forest_gacha_unlock(story_progression_state):forest_gacha_unlocked=true;forest_gacha_intro_seen=false
+		"fusion_lab_intro":
+			StoryProgressionClass.complete_fusion_lab_intro(story_progression_state)
 		"post_jurejure_encounter_home":
 			StoryProgressionClass.complete_post_encounter_greenhouse(story_progression_state)
 		"act3_intro":
@@ -4106,7 +4111,7 @@ func _on_fusion_candidate_image_requested(entry:Dictionary,target:TextureRect,hi
 	_request_species_texture(entry,target,high_priority)
 
 func _fusion_lab_available()->bool:
-	if fusion_system==null or not _tutorial_fully_complete():return false
+	if fusion_system==null or not StoryProgressionClass.fusion_lab_is_unlocked(story_progression_state):return false
 	return not fusion_system.eligible_parents(species_get_counts).is_empty()
 
 func _open_fusion_lab()->void:
@@ -6599,6 +6604,7 @@ func _record_species_get(species_id:String,amount:int=1)->void:
 			"fantasy_first_seen":fantasy_first_discovery_seen,
 			"fantasy_six_seen":fantasy_realization_seen,
 			"forest_gacha_unlocked":forest_gacha_unlocked,
+			"forest_gacha_intro_seen":forest_gacha_intro_seen,
 		})
 		if bool(transition.get("fantasy_unlocked_now",false)):_apply_saved_unlocks()
 		StoryProgressionClass.record_restoration_new_get(story_progression_state,species_id,habitat_crisis_started)
@@ -6803,6 +6809,10 @@ func _try_start_pending_story_event()->void:
 		_start_fantasy_first_discovery_event()
 	elif queued_story_event==StoryProgressionClass.EVENT_FANTASY_SIX:
 		_start_fantasy_realization_event()
+	elif current_mode=="greenhouse" and queued_story_event==StoryProgressionClass.EVENT_FOREST_GACHA_INTRO:
+		_start_forest_gacha_intro_event()
+	elif current_mode=="greenhouse" and queued_story_event==StoryProgressionClass.EVENT_FUSION_LAB_INTRO:
+		_start_fusion_lab_intro_event()
 	elif current_mode=="greenhouse" and forest_gacha_unlocked and not forest_gacha_intro_seen:
 		_start_forest_gacha_intro_event()
 	elif _unique_jurejure_species_get_count()>=1 and not jurejure_species_first_seen:
@@ -7092,10 +7102,24 @@ func _on_restoration_thank_you_closed()->void:
 	call_deferred("_poll_greenhouse_play_completion");call_deferred("_try_start_pending_story_event")
 
 func _start_forest_gacha_intro_event()->void:
-	if not forest_gacha_unlocked or forest_gacha_intro_seen or current_mode!="greenhouse":return
+	if forest_gacha_intro_seen or current_mode!="greenhouse":return
+	if not forest_gacha_unlocked:
+		if not StoryProgressionClass.take_forest_gacha_unlock(story_progression_state):return
+		forest_gacha_unlocked=true
 	_start_scripted_dialog("forest_gacha_intro",[
 		{"speaker":"panda","text":Localizer.text(language_code,"forest_gacha_intro_panda")},
 		{"speaker":"","text":Localizer.text(language_code,"forest_gacha_intro_system")}
+	],false)
+
+func _start_fusion_lab_intro_event()->void:
+	if current_mode!="greenhouse" or not StoryProgressionClass.fusion_lab_intro_is_pending(story_progression_state):return
+	_start_scripted_dialog("fusion_lab_intro",[
+		{"speaker":"armadillo","text":Localizer.text(language_code,"fusion_lab_intro_armadillo_1")},
+		{"speaker":"girl","text":Localizer.text(language_code,"fusion_lab_intro_girl_1")},
+		{"speaker":"armadillo","text":Localizer.text(language_code,"fusion_lab_intro_armadillo_2")},
+		{"speaker":"armadillo","text":Localizer.text(language_code,"fusion_lab_intro_armadillo_3")},
+		{"speaker":"girl","text":Localizer.text(language_code,"fusion_lab_intro_girl_2")},
+		{"speaker":"armadillo","text":Localizer.text(language_code,"fusion_lab_intro_armadillo_4")}
 	],false)
 
 func _start_fantasy_first_discovery_event()->void:

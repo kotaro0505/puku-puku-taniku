@@ -829,6 +829,8 @@ func _test_debug_controls_and_gacha(game: Node) -> void:
 
 func _test_fusion_lab_flow(game: Node) -> void:
 	assert(game._is_endless_normal_play())
+	game.story_progression_state["fusion_lab_unlocked"] = true
+	game.story_progression_state["fusion_lab_intro_seen"] = true
 	game.catalog_series_unlock_notice_queue.clear();game.catalog_series_unlock_notice_ready.clear();game.catalog_series_unlock_overlay.reset_overlay();game.species_get_queue.clear();game.species_get_overlay.visible=false
 	var gummy_id := "gummy_peach_milk"
 	var metal_id := "metal_silver_rosette"

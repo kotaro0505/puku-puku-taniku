@@ -21,7 +21,7 @@ func _ready() -> void:
 	_test_progression_thresholds()
 	_test_phase_bgm_policy(game)
 	game._reset_progression_state()
-	print("PROGRESSION_UI_REVISION_SMOKE_OK copy=updated language_ui=fixed shop_chatter=5 glow=gang_only arrangement=1+swipe forest=6 bgm=phase-aware migration=preserved")
+	print("PROGRESSION_UI_REVISION_SMOKE_OK copy=updated language_ui=fixed shop_chatter=5 glow=gang_only arrangement=3+swipe forest=8 fusion=12 bgm=phase-aware migration=preserved")
 	get_tree().quit()
 
 
@@ -54,7 +54,12 @@ func _test_localized_copy() -> void:
 	assert(Localizer.text("ja", "puku_buyback_1") == "そうだ！育てた多肉は\nうちのお店で買い取るよ！")
 	assert(Localizer.text("ja", "puku_buyback_2") == "大きい株ほど\n高く買い取るからね！")
 	assert(Localizer.text("ja", "puku_buyback_2_endless") == "大きい株を収穫するほど\nぷくゲージが溜まります。\n満タンになると +1ぷくコインGET！")
-	assert(Localizer.text("ja", "jurejure_first_peccary") == "いっぱい生えてるッペー！\nぜーんぶ頂きだッペー！")
+	assert(Localizer.text("ja", "jurejure_first_peccary") == "多肉植物が生えてるッペー！\nぜーんぶ頂きだッペー！")
+	assert(Localizer.text("hiragana", "jurejure_first_peccary") == "たにくしょくぶつが はえてるッペー！\nぜーんぶ いただきだッペー！")
+	assert(Localizer.text("en", "jurejure_first_peccary") == "There are succulents growing here!\nWe're taking every last one!")
+	assert(Localizer.text("ja", "restoration_final_girl_2") == "自然の中で、私たちは創造をしてるってことを忘れちゃダメだね。")
+	assert(Localizer.text("hiragana", "restoration_final_girl_2") == "しぜんの なかで、わたしたちは ものを つくりだしてるってことを わすれちゃ だめだね。")
+	assert(Localizer.text("en", "restoration_final_girl_2") == "We must never forget that we create within nature.")
 	assert(Localizer.text("ja", "fantasy_first_armadillo") == "こんな多肉、あの本には載ってないよ…。")
 	assert(Localizer.text("ja", "habitat_crisis_no_battle") == "…今は、バトルする気にならない\nチュー")
 	assert(Localizer.text("ja", "puku_gauge") == "ぷくゲージ")
@@ -63,6 +68,10 @@ func _test_localized_copy() -> void:
 	assert(Localizer.text("hiragana", "new") == "にゅー！")
 	assert(Localizer.text("hiragana", "original_catalog_new") == "にゅー！")
 	assert(Localizer.text("hiragana", "fusion_new") == "にゅー")
+	assert(Localizer.text("ja", "main_forest_gacha") == "ガチャ")
+	assert(Localizer.text("hiragana", "main_forest_gacha") == "がちゃ")
+	assert(Localizer.text("en", "main_forest_gacha") == "Gacha")
+	assert(Localizer.text("ja", "fusion_lab_intro_armadillo_3") == "多肉植物同士をかけあわせて\n新たな品種を作れるよ！")
 	assert(Localizer.text("ja", "self_best", [12.3]) == "最大サイズ 12.3cm")
 	assert(Localizer.text("ja", "self_best_none") == "最大サイズ ー")
 	assert(Localizer.text("hiragana", "self_best", [12.3]) == "さいだいさいず 12.3cm")
@@ -75,6 +84,9 @@ func _test_localized_copy() -> void:
 			"puku_buyback_1", "puku_buyback_2", "puku_buyback_2_endless", "jurejure_first_peccary", "fantasy_first_armadillo",
 			"arrangement_unlock_panda", "arrangement_swipe_intro",
 			"arrangement_mode_hint", "main_game_mode_hint",
+			"fusion_lab_intro_armadillo_1", "fusion_lab_intro_girl_1",
+			"fusion_lab_intro_armadillo_2", "fusion_lab_intro_armadillo_3",
+			"fusion_lab_intro_girl_2", "fusion_lab_intro_armadillo_4",
 			"act3_exploitation_battle_intro", "act3_exploitation_battle_intro_panda",
 			"act3_exploitation_battle_intro_mouse_2", "habitat_crisis_no_battle",
 			"post_crisis_greenhouse_panda_1", "post_crisis_greenhouse_armadillo",
@@ -194,6 +206,13 @@ func _test_arrangement_gate_and_direction(game: Node) -> void:
 	game.arrangement_ui.visible = false
 	game._update_play_ui()
 
+	var current_one_fantasy := StoryProgression.normalize_runtime_state({"version": StoryProgression.RUNTIME_STATE_VERSION}, {"fantasy_get_count": 1})
+	assert(not StoryProgression.arrangement_is_unlocked(current_one_fantasy))
+	assert(not bool(current_one_fantasy.get("arrangement_intro_pending", false)))
+	var current_three_fantasy := StoryProgression.normalize_runtime_state({"version": StoryProgression.RUNTIME_STATE_VERSION}, {"fantasy_get_count": 3})
+	assert(not StoryProgression.arrangement_is_unlocked(current_three_fantasy))
+	assert(bool(current_three_fantasy.get("arrangement_intro_pending", false)))
+	# Old saves really had access at one GET, so migration preserves it.
 	var migrated_from_fantasy := StoryProgression.normalize_runtime_state({"version": 2}, {"fantasy_get_count": 1})
 	assert(StoryProgression.arrangement_is_unlocked(migrated_from_fantasy))
 	assert(bool(migrated_from_fantasy.get("arrangement_intro_seen", false)))
@@ -204,7 +223,7 @@ func _test_arrangement_gate_and_direction(game: Node) -> void:
 func _test_progression_thresholds() -> void:
 	var state := StoryProgression.default_runtime_state()
 	state["fantasy_unlocked"] = true
-	for count in range(1, 6):
+	for count in range(1, 3):
 		StoryProgression.record_new_get(state, {
 			"act2_unlocked": true,
 			"is_original": false,
@@ -213,9 +232,35 @@ func _test_progression_thresholds() -> void:
 			"fantasy_first_seen": count > 1,
 			"fantasy_six_seen": false,
 			"forest_gacha_unlocked": false,
+			"forest_gacha_intro_seen": false,
+		})
+		assert(not bool(state.get("arrangement_intro_pending", false)))
+		assert(not bool(state.get("forest_gacha_unlock_pending", false)))
+	StoryProgression.record_new_get(state, {
+		"act2_unlocked": true,
+		"is_original": false,
+		"is_fantasy": true,
+		"fantasy_get_count": 3,
+		"fantasy_first_seen": true,
+		"fantasy_six_seen": false,
+		"forest_gacha_unlocked": false,
+		"forest_gacha_intro_seen": false,
+	})
+	assert(bool(state.get("arrangement_intro_pending", false)))
+	assert(StoryProgression.EVENT_ARRANGEMENT_INTRO in (state.get("pending_story_events", []) as Array))
+	StoryProgression.complete_arrangement_intro(state)
+	for count in range(4, 6):
+		StoryProgression.record_new_get(state, {
+			"act2_unlocked": true,
+			"is_original": false,
+			"is_fantasy": true,
+			"fantasy_get_count": count,
+			"fantasy_first_seen": true,
+			"fantasy_six_seen": false,
+			"forest_gacha_unlocked": false,
+			"forest_gacha_intro_seen": false,
 		})
 		assert(not bool(state.get("forest_gacha_unlock_pending", false)))
-	assert(bool(state.get("arrangement_intro_pending", false)))
 	StoryProgression.record_new_get(state, {
 		"act2_unlocked": true,
 		"is_original": false,
@@ -224,11 +269,105 @@ func _test_progression_thresholds() -> void:
 		"fantasy_first_seen": true,
 		"fantasy_six_seen": false,
 		"forest_gacha_unlocked": false,
+		"forest_gacha_intro_seen": false,
+	})
+	assert(not bool(state.get("forest_gacha_unlock_pending", false)))
+	assert(StoryProgression.EVENT_FANTASY_SIX in (state.get("pending_story_events", []) as Array))
+	StoryProgression.consume_story_event(state, StoryProgression.EVENT_FANTASY_SIX)
+	StoryProgression.record_new_get(state, {
+		"act2_unlocked": true,
+		"is_original": false,
+		"is_fantasy": true,
+		"fantasy_get_count": 7,
+		"fantasy_first_seen": true,
+		"fantasy_six_seen": true,
+		"forest_gacha_unlocked": false,
+		"forest_gacha_intro_seen": false,
+	})
+	assert(not bool(state.get("forest_gacha_unlock_pending", false)))
+	StoryProgression.record_new_get(state, {
+		"act2_unlocked": true,
+		"is_original": false,
+		"is_fantasy": true,
+		"fantasy_get_count": 8,
+		"fantasy_first_seen": true,
+		"fantasy_six_seen": true,
+		"forest_gacha_unlocked": false,
+		"forest_gacha_intro_seen": false,
 	})
 	assert(bool(state.get("forest_gacha_unlock_pending", false)))
-	assert(StoryProgression.EVENT_FANTASY_SIX in (state.get("pending_story_events", []) as Array))
+	assert(StoryProgression.EVENT_FOREST_GACHA_INTRO in (state.get("pending_story_events", []) as Array))
 	assert(StoryProgression.take_forest_gacha_unlock(state))
 	assert(not StoryProgression.take_forest_gacha_unlock(state))
+	StoryProgression.complete_forest_gacha_intro(state)
+	for count in range(9, 12):
+		StoryProgression.record_new_get(state, {
+			"act2_unlocked": true,
+			"is_original": false,
+			"is_fantasy": true,
+			"fantasy_get_count": count,
+			"fantasy_first_seen": true,
+			"fantasy_six_seen": true,
+			"forest_gacha_unlocked": true,
+			"forest_gacha_intro_seen": true,
+		})
+		assert(not StoryProgression.fusion_lab_intro_is_pending(state))
+	StoryProgression.record_new_get(state, {
+		"act2_unlocked": true,
+		"is_original": false,
+		"is_fantasy": true,
+		"fantasy_get_count": 12,
+		"fantasy_first_seen": true,
+		"fantasy_six_seen": true,
+		"forest_gacha_unlocked": true,
+		"forest_gacha_intro_seen": true,
+	})
+	assert(StoryProgression.fusion_lab_intro_is_pending(state))
+	assert(not StoryProgression.fusion_lab_is_unlocked(state))
+	assert(StoryProgression.EVENT_FUSION_LAB_INTRO in (state.get("pending_story_events", []) as Array))
+	StoryProgression.complete_fusion_lab_intro(state)
+	assert(StoryProgression.fusion_lab_is_unlocked(state))
+	assert(not StoryProgression.fusion_lab_intro_is_pending(state))
+	StoryProgression.record_new_get(state, {
+		"act2_unlocked": true,
+		"is_original": false,
+		"is_fantasy": true,
+		"fantasy_get_count": 13,
+		"fantasy_first_seen": true,
+		"fantasy_six_seen": true,
+		"forest_gacha_unlocked": true,
+		"forest_gacha_intro_seen": true,
+	})
+	assert(not StoryProgression.fusion_lab_intro_is_pending(state))
+	assert(StoryProgression.EVENT_FUSION_LAB_INTRO not in (state.get("pending_story_events", []) as Array))
+
+	# Loading a current-format six-GET save clears the old pending unlock, while
+	# genuine feature access from an established save remains authoritative.
+	var interrupted_old_six := StoryProgression.default_runtime_state()
+	interrupted_old_six["forest_gacha_unlock_pending"] = true
+	var normalized_old_six := StoryProgression.normalize_runtime_state(interrupted_old_six, {
+		"fantasy_get_count": 6,
+	})
+	assert(not bool(normalized_old_six.get("forest_gacha_unlock_pending", false)))
+	assert(StoryProgression.EVENT_FOREST_GACHA_INTRO not in (normalized_old_six.get("pending_story_events", []) as Array))
+	var preserved_gacha := StoryProgression.normalize_runtime_state(StoryProgression.default_runtime_state(), {
+		"fantasy_get_count": 2,
+		"forest_gacha_evidence": true,
+		"forest_gacha_intro_seen": false,
+	})
+	assert(StoryProgression.EVENT_FOREST_GACHA_INTRO in (preserved_gacha.get("pending_story_events", []) as Array))
+
+	# Pre-change saves had no lab fields; preserve their old tutorial access and
+	# still queue the new twelve-GET introduction exactly once.
+	var legacy_lab_state := StoryProgression.default_runtime_state()
+	for key in ["fusion_lab_unlocked", "fusion_lab_intro_pending", "fusion_lab_intro_seen"]:
+		legacy_lab_state.erase(key)
+	legacy_lab_state = StoryProgression.normalize_runtime_state(legacy_lab_state, {
+		"fantasy_get_count": 12,
+		"fusion_lab_legacy_access": true,
+	})
+	assert(StoryProgression.fusion_lab_is_unlocked(legacy_lab_state))
+	assert(StoryProgression.fusion_lab_intro_is_pending(legacy_lab_state))
 
 
 func _test_phase_bgm_policy(game: Node) -> void:

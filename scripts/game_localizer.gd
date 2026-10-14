@@ -88,7 +88,7 @@ const TEXT := {
 		"special_origin_2": "昔の多肉を戻してるだけじゃないんだ……。",
 		"special_origin_3": "この原生地、今の世界を見て、\n新しい多肉まで作ってるみたい。",
 		"forest_gacha_intro_panda": "僕が見つけた品種をガチャにしてみたんだ！良かったらやってみてよ！",
-		"forest_gacha_intro_system": "森のガチャが使えるようになった！",
+		"forest_gacha_intro_system": "ガチャが使えるようになった！",
 		"fantasy_first_girl": "……なにこれ！？",
 		"fantasy_first_armadillo": "こんな多肉、あの本には載ってないよ…。",
 		"fantasy_first_panda": "こんなの見たことないよ……。",
@@ -104,6 +104,12 @@ const TEXT := {
 		"fantasy_six_armadillo_2": "そうかもしれない…",
 		"fantasy_six_armadillo_3": "それと、大きな株を収穫するほど、新しい品種が出るような気がするよ",
 		"fantasy_six_armadillo_4": "本当に不思議だ…",
+		"fusion_lab_intro_armadillo_1": "できた！",
+		"fusion_lab_intro_girl_1": "えっ？",
+		"fusion_lab_intro_armadillo_2": "ハイブリッドラボだよ！",
+		"fusion_lab_intro_armadillo_3": "多肉植物同士をかけあわせて\n新たな品種を作れるよ！",
+		"fusion_lab_intro_girl_2": "楽しそう！",
+		"fusion_lab_intro_armadillo_4": "色々な組み合わせを試してみてね！",
 		"act3_mouse_realizes": "つまり、欲しいものを想像すれば\nいいんだチュー！？",
 		"act3_mouse_demands": "もっともっと\n作らせるチュー！",
 		"act3_peccary_wants": "食べきれないくらいのごちそうを\n作らせるッペー！",
@@ -135,7 +141,7 @@ const TEXT := {
 		"jurejure_panda_defend": "こらーー！！",
 		"jurejure_taken_small": "%sが\nジュレジュレ団に獲られてしまった！",
 		"jurejure_first_notice": "誰かいる！",
-		"jurejure_first_peccary": "いっぱい生えてるッペー！\nぜーんぶ頂きだッペー！",
+		"jurejure_first_peccary": "多肉植物が生えてるッペー！\nぜーんぶ頂きだッペー！",
 		"jurejure_first_skunk": "全部売ったらいくらになるッスカ",
 		"jurejure_first_mouse": "モタモタすんなチュー！",
 		"jurejure_confront_armadillo": "せっかく原生地に多肉が戻ってきたんだ。\n勝手に持っていくなよ。",
@@ -264,7 +270,7 @@ const TEXT := {
 		"restoration_final_girl_1": "戻ったね……。",
 		"restoration_final_armadillo": "うん。みんなで育てて、みんなで返したんだ。",
 		"restoration_final_panda": "よかったあ……。",
-		"restoration_final_girl_2": "自然の中で、私たちは想像をしてるってことを忘れちゃダメだね。",
+		"restoration_final_girl_2": "自然の中で、私たちは創造をしてるってことを忘れちゃダメだね。",
 		"restoration_epilogue_mouse": "こら！アルマジロ君！そこにはコロラータの赤ちゃんがいるんだチュー！もっとよく見て歩けチュー！",
 		"restoration_epilogue_armadillo": "えっ、ごめん……。",
 		"restoration_epilogue_peccary": "時代はSDGsだッペ！",
@@ -342,7 +348,7 @@ const TEXT := {
 		"main_play": "たねをまく",
 		"main_shop": "パンダのお店",
 		"main_arrangement": "寄せ植え",
-		"main_forest_gacha": "森のガチャ",
+		"main_forest_gacha": "ガチャ",
 		"main_habitat": "原生地へ",
 		"main_greenhouse": "温室へ",
 		"settings": "設定",
@@ -352,7 +358,7 @@ const TEXT := {
 		"puku_gauge": "ぷくゲージ",
 		"seed_pod_gauge": "さやゲージ",
 		"wallet": "所持　%dぷくコイン",
-		"forest_gacha": "森のガチャ",
+		"forest_gacha": "ガチャ",
 		"gacha_spin": "1ぷくコインで回す",
 		"gacha_dial_hint": "ダイヤルをタップして回そう",
 		"gacha_capsule_hint": "カプセルをタップ！",
@@ -428,7 +434,7 @@ const TEXT := {
 		,"shop_choose_category": "なにを見ますか？"
 		,"shop_category_pot": "鉢\n寄せ植え"
 		,"shop_category_catalog": "図鑑\n新シリーズ"
-		,"shop_category_gacha": "森の\nガチャ"
+		,"shop_category_gacha": "ガチャ"
 		,"shop_category_back": "カテゴリへもどる"
 		,"shop_seed_info": "通常のたねは、さやゲージが満ちるとできます"
 		,"normal_seed_price": "通常のたねは販売していません"
@@ -807,7 +813,7 @@ const TEXT := {
 		"special_origin_2": "むかしの たにくを もどしてるだけじゃないんだ……。",
 		"special_origin_3": "この げんせいち、いまの せかいを みて、\nあたらしい たにくまで つくってるみたい。",
 		"forest_gacha_intro_panda": "ぼくが みつけた ひんしゅを がちゃに してみたんだ！よかったら やってみてよ！",
-		"forest_gacha_intro_system": "もりの がちゃが つかえるように なった！",
+		"forest_gacha_intro_system": "がちゃが つかえるように なった！",
 		"fantasy_first_girl": "……なにこれ！？",
 		"fantasy_first_armadillo": "こんな たにく、あの ほんには のってないよ…。",
 		"fantasy_first_panda": "こんなの みたことないよ……。",
@@ -823,6 +829,12 @@ const TEXT := {
 		"fantasy_six_armadillo_2": "そうかもしれない…",
 		"fantasy_six_armadillo_3": "それと、おおきな かぶを しゅうかくするほど、あたらしい ひんしゅが でるような きがするよ",
 		"fantasy_six_armadillo_4": "ほんとうに ふしぎだ…",
+		"fusion_lab_intro_armadillo_1": "できた！",
+		"fusion_lab_intro_girl_1": "えっ？",
+		"fusion_lab_intro_armadillo_2": "はいぶりっどらぼだよ！",
+		"fusion_lab_intro_armadillo_3": "たにくしょくぶつどうしを かけあわせて\nあらたな ひんしゅを つくれるよ！",
+		"fusion_lab_intro_girl_2": "たのしそう！",
+		"fusion_lab_intro_armadillo_4": "いろいろな くみあわせを ためしてみてね！",
 		"act3_mouse_realizes": "つまり、ほしいものを そうぞうすれば\nいいんだチュー！？",
 		"act3_mouse_demands": "もっともっと\nつくらせるチュー！",
 		"act3_peccary_wants": "たべきれないくらいの ごちそうを\nつくらせるッペー！",
@@ -854,7 +866,7 @@ const TEXT := {
 		"jurejure_panda_defend": "こらーー！！",
 		"jurejure_taken_small": "%sが\nじゅれじゅれだんに とられてしまった！",
 		"jurejure_first_notice": "だれか いる！",
-		"jurejure_first_peccary": "いっぱい はえてるッペー！\nぜーんぶ いただきだッペー！",
+		"jurejure_first_peccary": "たにくしょくぶつが はえてるッペー！\nぜーんぶ いただきだッペー！",
 		"jurejure_first_skunk": "ぜんぶ うったら いくらに なるッスカ",
 		"jurejure_first_mouse": "もたもた すんなチュー！",
 		"jurejure_confront_armadillo": "せっかく げんせいちに たにくが もどってきたんだ。\nかってに もっていくなよ。",
@@ -983,7 +995,7 @@ const TEXT := {
 		"restoration_final_girl_1": "もどったね……。",
 		"restoration_final_armadillo": "うん。みんなで そだてて、みんなで かえしたんだ。",
 		"restoration_final_panda": "よかったあ……。",
-		"restoration_final_girl_2": "しぜんの なかで、わたしたちは そうぞうを してるってことを わすれちゃ だめだね。",
+		"restoration_final_girl_2": "しぜんの なかで、わたしたちは ものを つくりだしてるってことを わすれちゃ だめだね。",
 		"restoration_epilogue_mouse": "こら！あるまじろくん！そこには ころらーたの あかちゃんが いるんだチュー！もっと よくみて あるけチュー！",
 		"restoration_epilogue_armadillo": "えっ、ごめん……。",
 		"restoration_epilogue_peccary": "じだいは SDGsだッペ！",
@@ -1061,7 +1073,7 @@ const TEXT := {
 		"main_play": "たねをまく",
 		"main_shop": "ぱんだの おみせ",
 		"main_arrangement": "よせうえ",
-		"main_forest_gacha": "もりの がちゃ",
+		"main_forest_gacha": "がちゃ",
 		"main_habitat": "げんせいちへ",
 		"main_greenhouse": "おんしつへ",
 		"settings": "せってい",
@@ -1071,7 +1083,7 @@ const TEXT := {
 		"puku_gauge": "ぷくげーじ",
 		"seed_pod_gauge": "さやげーじ",
 		"wallet": "もっている ぷくこいん　%dまい",
-		"forest_gacha": "もりの がちゃ",
+		"forest_gacha": "がちゃ",
 		"gacha_spin": "1ぷくこいんで まわす",
 		"gacha_dial_hint": "だいやるを おして まわそう",
 		"gacha_capsule_hint": "かぷせるを おしてね！",
@@ -1147,7 +1159,7 @@ const TEXT := {
 		,"shop_choose_category": "なにを みますか？"
 		,"shop_category_pot": "はち\nよせうえ"
 		,"shop_category_catalog": "ずかん\nあたらしい しりーず"
-		,"shop_category_gacha": "もりの\nがちゃ"
+		,"shop_category_gacha": "がちゃ"
 		,"shop_category_back": "ぶんるいへ もどる"
 		,"shop_seed_info": "ふつうの たねは、さやげーじが みちると できます"
 		,"normal_seed_price": "ふつうの たねは うっていません"
@@ -1526,7 +1538,7 @@ const TEXT := {
 		"special_origin_2": "So the habitat is not only restoring old succulents...",
 		"special_origin_3": "It seems to be looking at today's world\nand creating new succulents too.",
 		"forest_gacha_intro_panda": "I turned the varieties I found into a gacha! Give it a try if you'd like!",
-		"forest_gacha_intro_system": "The Forest Gacha is now available!",
+		"forest_gacha_intro_system": "Gacha is now available!",
 		"fantasy_first_girl": "...What is this?!",
 		"fantasy_first_armadillo": "This succulent isn't in that book...",
 		"fantasy_first_panda": "I have never seen anything like it...",
@@ -1542,6 +1554,12 @@ const TEXT := {
 		"fantasy_six_armadillo_2": "Maybe you're right...",
 		"fantasy_six_armadillo_3": "And it feels like the bigger the plant you harvest, the more likely a new variety is to appear.",
 		"fantasy_six_armadillo_4": "It's really strange...",
+		"fusion_lab_intro_armadillo_1": "It's ready!",
+		"fusion_lab_intro_girl_1": "Huh?",
+		"fusion_lab_intro_armadillo_2": "It's the Hybrid Lab!",
+		"fusion_lab_intro_armadillo_3": "You can crossbreed succulents\nto create new varieties!",
+		"fusion_lab_intro_girl_2": "That sounds fun!",
+		"fusion_lab_intro_armadillo_4": "Try all kinds of combinations!",
 		"act3_mouse_realizes": "So all we have to do is imagine\nwhat we want, chuu?!",
 		"act3_mouse_demands": "We'll make it create\nmore and more, chuu!",
 		"act3_peccary_wants": "We'll make it create more food\nthan I could ever eat, ppe!",
@@ -1573,7 +1591,7 @@ const TEXT := {
 		"jurejure_panda_defend": "Hey! Leave it alone!",
 		"jurejure_taken_small": "%s was taken\nby the JureJure Gang!",
 		"jurejure_first_notice": "Someone's there!",
-		"jurejure_first_peccary": "There are tons of them!\nWe're taking every last one!",
+		"jurejure_first_peccary": "There are succulents growing here!\nWe're taking every last one!",
 		"jurejure_first_skunk": "How much can we get for all of these?",
 		"jurejure_first_mouse": "Quit dawdling! Move it!",
 		"jurejure_confront_armadillo": "The succulents have finally returned here.\nYou cannot just take them.",
@@ -1702,7 +1720,7 @@ const TEXT := {
 		"restoration_final_girl_1": "It's back...",
 		"restoration_final_armadillo": "Yes. We all grew them, and we all returned them.",
 		"restoration_final_panda": "Thank goodness...",
-		"restoration_final_girl_2": "We must never forget that our imagination exists within nature.",
+		"restoration_final_girl_2": "We must never forget that we create within nature.",
 		"restoration_epilogue_mouse": "Hey, Armadillo! There's a baby Colorata there, chuu! Watch where you're walking, chuu!",
 		"restoration_epilogue_armadillo": "Oh! Sorry...",
 		"restoration_epilogue_peccary": "Sustainability is the future, ppe!",
@@ -1780,7 +1798,7 @@ const TEXT := {
 		"main_play": "Plant Seeds",
 		"main_shop": "Panda's Shop",
 		"main_arrangement": "Arrangement",
-		"main_forest_gacha": "Forest Gacha",
+		"main_forest_gacha": "Gacha",
 		"main_habitat": "Wild Habitat",
 		"main_greenhouse": "Greenhouse",
 		"settings": "Settings",
@@ -1790,7 +1808,7 @@ const TEXT := {
 		"puku_gauge": "Puku Gauge",
 		"seed_pod_gauge": "Pod Gauge",
 		"wallet": "%d Puku Coins",
-		"forest_gacha": "Forest Gacha",
+		"forest_gacha": "Gacha",
 		"gacha_spin": "Spin for 1 Puku Coin",
 		"gacha_dial_hint": "Tap or turn the dial",
 		"gacha_capsule_hint": "Tap the capsule!",
@@ -1866,7 +1884,7 @@ const TEXT := {
 		,"shop_choose_category": "What would you like to see?"
 		,"shop_category_pot": "Pots\nArrangements"
 		,"shop_category_catalog": "Catalogs\nNew Series"
-		,"shop_category_gacha": "Forest\nGacha"
+		,"shop_category_gacha": "Gacha"
 		,"shop_category_back": "Back to categories"
 		,"shop_seed_info": "Normal seeds form when the Pod Gauge fills up"
 		,"normal_seed_price": "Normal seeds are not sold"

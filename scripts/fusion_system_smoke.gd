@@ -537,6 +537,8 @@ func _assert_transparent_catalog_image(image_path: String, expected_size: Vector
 
 func _test_game_flow(game) -> void:
 	game._reset_progression_state()
+	game.story_progression_state["fusion_lab_unlocked"] = true
+	game.story_progression_state["fusion_lab_intro_seen"] = true
 	game.opening_story_complete = true
 	game.intro_story_complete = true
 	game.habitat_awakened = true
@@ -716,6 +718,8 @@ func _test_parent_picker_touch_scrolling(game) -> void:
 
 func _test_tier1_game_flow(game) -> void:
 	game._reset_progression_state()
+	game.story_progression_state["fusion_lab_unlocked"] = true
+	game.story_progression_state["fusion_lab_intro_seen"] = true
 	game.fusion_lab_ui.close_lab()
 	game.species_get_overlay.visible = false
 	game.species_get_queue.clear()
@@ -836,6 +840,8 @@ func _test_tier1_game_flow(game) -> void:
 
 func _test_tier2_game_flow(game) -> void:
 	game._reset_progression_state()
+	game.story_progression_state["fusion_lab_unlocked"] = true
+	game.story_progression_state["fusion_lab_intro_seen"] = true
 	game.fusion_lab_ui.close_lab()
 	game.species_get_overlay.visible = false
 	game.species_get_queue.clear()
@@ -975,6 +981,8 @@ func _test_terminal_tier2_discovery_flow(game) -> void:
 
 func _test_tier3_game_flow(game) -> void:
 	game._reset_progression_state()
+	game.story_progression_state["fusion_lab_unlocked"] = true
+	game.story_progression_state["fusion_lab_intro_seen"] = true
 	game.opening_story_complete = true
 	game.intro_story_complete = true
 	game.habitat_awakened = true

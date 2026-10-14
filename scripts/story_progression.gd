@@ -26,6 +26,8 @@ const EVENT_POST_CRISIS_GREENHOUSE := "post_crisis_greenhouse"
 const EVENT_FANTASY_FIRST := "fantasy_first_discovery"
 const EVENT_ARRANGEMENT_INTRO := "arrangement_intro"
 const EVENT_FANTASY_SIX := "fantasy_realization"
+const EVENT_FOREST_GACHA_INTRO := "forest_gacha_intro"
+const EVENT_FUSION_LAB_INTRO := "fusion_lab_intro"
 const EVENT_ACT3_BATTLE_INTRO := "act3_exploitation_battle_intro"
 const EVENT_EXPLOITATION_MIDPOINT := "exploitation_midpoint"
 # Tombstone only. This ID is accepted as evidence from old saves, but is never
@@ -41,10 +43,16 @@ const RUNTIME_EVENT_IDS := [
 	EVENT_FANTASY_FIRST,
 	EVENT_ARRANGEMENT_INTRO,
 	EVENT_FANTASY_SIX,
+	EVENT_FOREST_GACHA_INTRO,
+	EVENT_FUSION_LAB_INTRO,
 	EVENT_ACT3_BATTLE_INTRO,
 	EVENT_EXPLOITATION_MIDPOINT,
 	EVENT_RESTORATION_JOIN_HOME,
 ]
+
+const ARRANGEMENT_UNLOCK_FANTASY_COUNT := 3
+const FOREST_GACHA_UNLOCK_FANTASY_COUNT := 8
+const FUSION_LAB_UNLOCK_FANTASY_COUNT := 12
 
 static func act_stage(act2_unlocked:bool,act3_unlocked:bool,finale_complete:bool)->int:
 	if finale_complete:return ACT_FINALE
@@ -69,6 +77,9 @@ static func default_runtime_state() -> Dictionary:
 		"arrangement_intro_pending": false,
 		"arrangement_intro_seen": false,
 		"forest_gacha_unlock_pending": false,
+		"fusion_lab_unlocked": false,
+		"fusion_lab_intro_pending": false,
+		"fusion_lab_intro_seen": false,
 		"exploitation_started": false,
 		"act3_battle_intro_pending": false,
 		"act3_battle_intro_seen": false,
@@ -94,6 +105,12 @@ static func normalize_runtime_state(raw_state: Variant, migration: Dictionary = 
 	var raw_dictionary: Dictionary = raw_state if raw_state is Dictionary else {}
 	var had_first_battle_state := raw_dictionary.has("act3_first_battle_pending") \
 			or raw_dictionary.has("act3_first_battle_completed")
+	var had_fusion_lab_state := raw_dictionary.has("fusion_lab_unlocked") \
+			or raw_dictionary.has("fusion_lab_intro_pending") \
+			or raw_dictionary.has("fusion_lab_intro_seen")
+	var fantasy_get_count := maxi(0, int(migration.get("fantasy_get_count", 0)))
+	var forest_gacha_evidence := bool(migration.get("forest_gacha_evidence", false))
+	var forest_gacha_intro_seen := bool(migration.get("forest_gacha_intro_seen", false))
 	var retired_secret_evidence := bool(migration.get("secret_gacha_evidence", false)) \
 			or bool(raw_dictionary.get("secret_gacha_unlocked", false)) \
 			or bool(raw_dictionary.get("secret_gacha_install_seen", false))
@@ -161,9 +178,9 @@ static func normalize_runtime_state(raw_state: Variant, migration: Dictionary = 
 		var old_crisis_started := bool(migration.get("habitat_crisis_started", false))
 		var old_act3_intro_seen := bool(migration.get("act3_intro_seen", false))
 		var old_jurejure_count := maxi(0, int(migration.get("jurejure_get_count", 0)))
-		var old_fantasy_count := maxi(0, int(migration.get("fantasy_get_count", 0)))
+		var old_fantasy_count := fantasy_get_count
 		var old_arrangement_evidence := bool(migration.get("arrangement_evidence", false))
-		var old_forest_gacha_evidence := bool(migration.get("forest_gacha_evidence", false))
+		var old_forest_gacha_evidence := forest_gacha_evidence
 		if old_fantasy_count >= 1 or old_arrangement_evidence:
 			# Arrangement play existed before this state was introduced. Do not
 			# take it away or replay the new gift tutorial for established saves.
@@ -217,8 +234,47 @@ static func normalize_runtime_state(raw_state: Variant, migration: Dictionary = 
 		state["arrangement_unlocked"] = true
 		state["arrangement_intro_pending"] = false
 		state["pending_story_events"].erase(EVENT_ARRANGEMENT_INTRO)
-	elif bool(state.get("arrangement_intro_pending", false)):
+	elif bool(state.get("arrangement_unlocked", false)):
+		# Never take an already available feature away from an established save.
+		state["arrangement_intro_pending"] = false
+		state["pending_story_events"].erase(EVENT_ARRANGEMENT_INTRO)
+	elif fantasy_get_count >= ARRANGEMENT_UNLOCK_FANTASY_COUNT:
+		state["arrangement_intro_pending"] = true
 		queue_story_event(state, EVENT_ARRANGEMENT_INTRO)
+	else:
+		# v28 could queue this at the first fantasy GET. The new three-GET rule
+		# applies until the unlock dialogue has actually completed.
+		state["arrangement_intro_pending"] = false
+		state["pending_story_events"].erase(EVENT_ARRANGEMENT_INTRO)
+	if forest_gacha_intro_seen:
+		state["forest_gacha_unlock_pending"] = false
+		state["pending_story_events"].erase(EVENT_FOREST_GACHA_INTRO)
+	elif forest_gacha_evidence:
+		# Existing access is authoritative even below the new eight-GET gate.
+		state["forest_gacha_unlock_pending"] = false
+		queue_story_event(state, EVENT_FOREST_GACHA_INTRO)
+	elif fantasy_get_count >= FOREST_GACHA_UNLOCK_FANTASY_COUNT:
+		state["forest_gacha_unlock_pending"] = true
+		queue_story_event(state, EVENT_FOREST_GACHA_INTRO)
+	else:
+		# A pre-change six-GET pending flag was not an unlocked feature yet.
+		state["forest_gacha_unlock_pending"] = false
+		state["pending_story_events"].erase(EVENT_FOREST_GACHA_INTRO)
+	var fusion_lab_unlocked := bool(state.get("fusion_lab_unlocked", false))
+	if not had_fusion_lab_state and bool(migration.get("fusion_lab_legacy_access", false)):
+		fusion_lab_unlocked = true
+	state["fusion_lab_unlocked"] = fusion_lab_unlocked
+	if bool(state.get("fusion_lab_intro_seen", false)):
+		state["fusion_lab_unlocked"] = true
+		state["fusion_lab_intro_pending"] = false
+		state["pending_story_events"].erase(EVENT_FUSION_LAB_INTRO)
+	elif fantasy_get_count >= FUSION_LAB_UNLOCK_FANTASY_COUNT \
+			or bool(state.get("fusion_lab_intro_pending", false)):
+		state["fusion_lab_intro_pending"] = true
+		queue_story_event(state, EVENT_FUSION_LAB_INTRO)
+	else:
+		state["fusion_lab_intro_pending"] = false
+		state["pending_story_events"].erase(EVENT_FUSION_LAB_INTRO)
 	if bool(state.get("act3_battle_intro_seen", false)):
 		state["act3_battle_intro_pending"] = false
 		state["pending_story_events"].erase(EVENT_ACT3_BATTLE_INTRO)
@@ -300,6 +356,7 @@ static func record_new_get(state: Dictionary, milestone: Dictionary) -> Dictiona
 		"fantasy_unlocked_now": false,
 		"arrangement_intro_queued_now": false,
 		"forest_gacha_unlock_ready": false,
+		"fusion_lab_intro_queued_now": false,
 	}
 	if not bool(milestone.get("act2_unlocked", false)):
 		return actions
@@ -313,7 +370,7 @@ static func record_new_get(state: Dictionary, milestone: Dictionary) -> Dictiona
 	var fantasy_count := maxi(0, int(milestone.get("fantasy_get_count", 0)))
 	if fantasy_count >= 1 and not bool(milestone.get("fantasy_first_seen", false)):
 		queue_story_event(state, EVENT_FANTASY_FIRST)
-	if fantasy_count >= 1 \
+	if fantasy_count >= ARRANGEMENT_UNLOCK_FANTASY_COUNT \
 			and not bool(state.get("arrangement_unlocked", false)) \
 			and not bool(state.get("arrangement_intro_pending", false)):
 		state["arrangement_intro_pending"] = true
@@ -321,9 +378,19 @@ static func record_new_get(state: Dictionary, milestone: Dictionary) -> Dictiona
 		actions["arrangement_intro_queued_now"] = true
 	if fantasy_count >= 6 and not bool(milestone.get("fantasy_six_seen", false)):
 		queue_story_event(state, EVENT_FANTASY_SIX)
-	if bool(state.get("fantasy_unlocked", false)) and fantasy_count >= 6 and not bool(milestone.get("forest_gacha_unlocked", false)):
-		state["forest_gacha_unlock_pending"] = true
-		actions["forest_gacha_unlock_ready"] = true
+	if bool(state.get("fantasy_unlocked", false)) \
+			and fantasy_count >= FOREST_GACHA_UNLOCK_FANTASY_COUNT \
+			and not bool(milestone.get("forest_gacha_intro_seen", false)):
+		if not bool(milestone.get("forest_gacha_unlocked", false)):
+			state["forest_gacha_unlock_pending"] = true
+			actions["forest_gacha_unlock_ready"] = true
+		queue_story_event(state, EVENT_FOREST_GACHA_INTRO)
+	if fantasy_count >= FUSION_LAB_UNLOCK_FANTASY_COUNT \
+			and not bool(state.get("fusion_lab_intro_seen", false)) \
+			and not bool(state.get("fusion_lab_intro_pending", false)):
+		state["fusion_lab_intro_pending"] = true
+		queue_story_event(state, EVENT_FUSION_LAB_INTRO)
+		actions["fusion_lab_intro_queued_now"] = true
 	return actions
 
 
@@ -339,6 +406,27 @@ static func take_forest_gacha_unlock(state: Dictionary) -> bool:
 		return false
 	state["forest_gacha_unlock_pending"] = false
 	return true
+
+
+static func complete_forest_gacha_intro(state: Dictionary) -> void:
+	consume_story_event(state, EVENT_FOREST_GACHA_INTRO)
+	state["forest_gacha_unlock_pending"] = false
+
+
+static func fusion_lab_is_unlocked(state: Dictionary) -> bool:
+	return bool(state.get("fusion_lab_unlocked", false))
+
+
+static func fusion_lab_intro_is_pending(state: Dictionary) -> bool:
+	return bool(state.get("fusion_lab_intro_pending", false)) \
+			and not bool(state.get("fusion_lab_intro_seen", false))
+
+
+static func complete_fusion_lab_intro(state: Dictionary) -> void:
+	consume_story_event(state, EVENT_FUSION_LAB_INTRO)
+	state["fusion_lab_intro_pending"] = false
+	state["fusion_lab_intro_seen"] = true
+	state["fusion_lab_unlocked"] = true
 
 
 static func queue_story_event(state: Dictionary, event_id: String) -> void:

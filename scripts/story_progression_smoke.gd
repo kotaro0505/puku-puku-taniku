@@ -16,7 +16,7 @@ func _ready() -> void:
 	_test_retired_unlock_conditions(game)
 	_test_legacy_three_act_migration(game)
 	game._reset_progression_state()
-	print("STORY_PROGRESSION_SMOKE_OK acts=3 first_battle=act2 original_guarantee=true fantasy_gate=original_get fantasy_guarantee=true arrangement_gate=1 forest_gate=6 fantasy=1+6+24 safe_queue=true exploitation=act3 forced_first_battle=true resume=true reward_once=true second_battle=normal midpoint=4 crisis=8 post_crisis_home=once retired_secret=tombstone")
+	print("STORY_PROGRESSION_SMOKE_OK acts=3 first_battle=act2 original_guarantee=true fantasy_gate=original_get fantasy_guarantee=true arrangement_gate=3 forest_gate=8 fusion_gate=12 fantasy=1+6+24 safe_queue=true exploitation=act3 forced_first_battle=true resume=true reward_once=true second_battle=normal midpoint=4 crisis=8 post_crisis_home=once retired_secret=tombstone")
 	get_tree().quit()
 
 
@@ -180,6 +180,17 @@ func _test_three_act_sequence(game: Node) -> void:
 	_finish_dialog(game)
 	await get_tree().process_frame
 	assert(game.fantasy_first_discovery_seen)
+	assert(game.scripted_dialog_kind.is_empty())
+	assert(not StoryProgressionClass.arrangement_is_unlocked(game.story_progression_state))
+	assert(not bool(game.story_progression_state.get("arrangement_intro_pending", false)))
+	game._record_species_get(fantasy_ids[1])
+	game._try_start_pending_story_event()
+	assert(game._unique_fantasy_species_get_count() == 2)
+	assert(game.scripted_dialog_kind.is_empty())
+	assert(not StoryProgressionClass.arrangement_is_unlocked(game.story_progression_state))
+	game._record_species_get(fantasy_ids[2])
+	game._try_start_pending_story_event()
+	assert(game._unique_fantasy_species_get_count() == 3)
 	assert(game.scripted_dialog_kind == "arrangement_intro")
 	assert(str(game.scripted_dialog_pages[0].get("text", "")) == "品種も集まって来たね！\n鉢をプレゼントするから寄せ植えしてみてよ！")
 	_finish_dialog(game)
@@ -191,13 +202,10 @@ func _test_three_act_sequence(game: Node) -> void:
 		game.arrangement_navigation_hint.intro_tween.kill()
 	game.arrangement_navigation_hint._finish_intro()
 	await get_tree().process_frame
-	game._record_species_get(fantasy_ids[1])
-	assert(game._unique_fantasy_species_get_count() == 2)
-	assert(not game.forest_gacha_unlocked and not game.forest_gacha_intro_seen)
-
-	for index in range(2, 5):
+	for index in range(3, 5):
 		game._record_species_get(fantasy_ids[index])
 		assert(not game.forest_gacha_unlocked)
+	assert(game._unique_fantasy_species_get_count() == 5)
 	game.puku_puku_battle.visible = true
 	game._record_species_get(fantasy_ids[5])
 	game._try_start_pending_story_event()
@@ -215,14 +223,70 @@ func _test_three_act_sequence(game: Node) -> void:
 	_finish_dialog(game)
 	await get_tree().process_frame
 	assert(game.fantasy_realization_seen)
+	assert(not game.forest_gacha_unlocked and not game.forest_gacha_intro_seen)
+	assert(game.scripted_dialog_kind.is_empty())
+	game._record_species_get(fantasy_ids[6])
+	game._try_start_pending_story_event()
+	assert(game._unique_fantasy_species_get_count() == 7)
+	assert(not game.forest_gacha_unlocked and game.scripted_dialog_kind.is_empty())
+	game._record_species_get(fantasy_ids[7])
+	game._try_start_pending_story_event()
+	assert(game._unique_fantasy_species_get_count() == 8)
 	assert(game.forest_gacha_unlocked and not game.forest_gacha_intro_seen)
 	assert(game.scripted_dialog_kind == "forest_gacha_intro")
 	_finish_dialog(game)
+	await get_tree().process_frame
 	assert(game.forest_gacha_intro_seen)
+	assert(not StoryProgressionClass.fusion_lab_is_unlocked(game.story_progression_state))
+	for index in range(8, 11):
+		game._record_species_get(fantasy_ids[index])
+		game._try_start_pending_story_event()
+		assert(game.scripted_dialog_kind.is_empty())
+		assert(not StoryProgressionClass.fusion_lab_is_unlocked(game.story_progression_state))
+	assert(game._unique_fantasy_species_get_count() == 11)
+	game._record_species_get(fantasy_ids[11])
+	game._try_start_pending_story_event()
+	assert(game._unique_fantasy_species_get_count() == 12)
+	assert(game.scripted_dialog_kind == "fusion_lab_intro")
+	assert(game.scripted_dialog_pages.size() == 6)
+	assert(not StoryProgressionClass.fusion_lab_is_unlocked(game.story_progression_state))
+	var fusion_intro_speakers := ["armadillo", "girl", "armadillo", "armadillo", "girl", "armadillo"]
+	var fusion_intro_texts := [
+		"できた！",
+		"えっ？",
+		"ハイブリッドラボだよ！",
+		"多肉植物同士をかけあわせて\n新たな品種を作れるよ！",
+		"楽しそう！",
+		"色々な組み合わせを試してみてね！",
+	]
+	for page_index in range(6):
+		assert(str(game.scripted_dialog_pages[page_index].get("speaker", "")) == fusion_intro_speakers[page_index])
+		assert(str(game.scripted_dialog_pages[page_index].get("text", "")) == fusion_intro_texts[page_index])
+	_finish_dialog(game)
+	await get_tree().process_frame
+	assert(StoryProgressionClass.fusion_lab_is_unlocked(game.story_progression_state))
+	assert(bool(game.story_progression_state.get("fusion_lab_intro_seen", false)))
+	assert(game._fusion_lab_available())
+	# The completed one-time event and its access survive a real save reload.
+	game.story_progression_state = StoryProgressionClass.default_runtime_state()
+	game._load_save()
+	assert(StoryProgressionClass.fusion_lab_is_unlocked(game.story_progression_state))
+	assert(bool(game.story_progression_state.get("fusion_lab_intro_seen", false)))
+	assert(not StoryProgressionClass.fusion_lab_intro_is_pending(game.story_progression_state))
+	assert(game._unique_fantasy_species_get_count() == 12)
+	game._record_species_get(fantasy_ids[12])
+	game._try_start_pending_story_event()
+	assert(game._unique_fantasy_species_get_count() == 13)
+	assert(game.scripted_dialog_kind.is_empty())
+	# A duplicate GET changes only the owned count, never a unique-species gate.
+	var pending_after_thirteen: Array = (game.story_progression_state.get("pending_story_events", []) as Array).duplicate()
+	game._record_species_get(fantasy_ids[12])
+	assert(game._unique_fantasy_species_get_count() == 13)
+	assert((game.story_progression_state.get("pending_story_events", []) as Array) == pending_after_thirteen)
 
 	# The Act III gate counts the one owned original above together with unique
-	# fantasy GETs. The fantasy-only 1/6 events remain unchanged.
-	for index in range(6, 22):
+	# fantasy GETs. Its combined 24-species condition remains unchanged.
+	for index in range(13, 22):
 		game._record_species_get(fantasy_ids[index])
 	assert(game._unique_fantasy_species_get_count() == 22)
 	assert(game._unique_act2_species_get_count() == 23)
@@ -541,6 +605,10 @@ func _test_legacy_three_act_migration(game: Node) -> void:
 	payload["progression_version"] = 24
 	for key in ["act2_unlocked", "forest_gacha_unlocked", "forest_gacha_intro_seen", "fantasy_first_discovery_seen", "fantasy_realization_seen", "act3_unlocked", "act3_intro_pending", "act3_intro_seen", "jurejure_pool_unlocked", "jurejure_species_unlocked", "jurejure_species_first_seen", "habitat_crisis_pending", "habitat_crisis_started", "finale_complete"]:
 		payload.erase(key)
+	var legacy_story_state: Dictionary = payload.get("story_progression_state", {})
+	for key in ["fusion_lab_unlocked", "fusion_lab_intro_pending", "fusion_lab_intro_seen"]:
+		legacy_story_state.erase(key)
+	payload["story_progression_state"] = legacy_story_state
 	var file := FileAccess.open(active_save_path, FileAccess.WRITE)
 	file.store_string(JSON.stringify(payload))
 	file.close()
@@ -549,6 +617,8 @@ func _test_legacy_three_act_migration(game: Node) -> void:
 	game._load_save()
 	assert(game.act2_unlocked and game.forest_gacha_unlocked)
 	assert(game.fantasy_first_discovery_seen and game.fantasy_realization_seen)
+	assert(StoryProgressionClass.fusion_lab_is_unlocked(game.story_progression_state))
+	assert(StoryProgressionClass.fusion_lab_intro_is_pending(game.story_progression_state))
 	# Base-page route specials such as transparent_succulent are not fantasy
 	# story progress; the count follows the integrated catalog display series.
 	assert(game._unique_fantasy_species_get_count() == 13)
