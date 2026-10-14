@@ -1,4 +1,4 @@
-# ぷくぷく多肉
+# ぷくぷく！たにくらいふ
 
 Godot 4.7 / GDScript / Compatibility renderer の縦画面3Dゲームです。
 

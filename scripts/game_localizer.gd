@@ -5,11 +5,18 @@ const LANGUAGE_JA := "ja"
 const LANGUAGE_HIRAGANA := "hiragana"
 const LANGUAGE_EN := "en"
 const SUPPORTED_LANGUAGES := [LANGUAGE_JA, LANGUAGE_HIRAGANA, LANGUAGE_EN]
+const GAME_TITLE_JA := "ぷくぷく！たにくらいふ"
+const GAME_TITLE_EN := "Puku Puku! Taniku Life"
+const GAME_TITLE_COMPACT_JA := "ぷくぷく！\nたにくらいふ"
+const GAME_TITLE_COMPACT_EN := "Puku Puku!\nTaniku Life"
+const GAME_TITLE_RIBBON := " PUKU PUKU! TANIKU LIFE "
 
 const TEXT := {
 	"ja": {
 		"language_name": "日本語",
-		"game_title": "ぷくぷく多肉",
+		"game_title": GAME_TITLE_JA,
+		"game_title_compact": GAME_TITLE_COMPACT_JA,
+		"game_title_ribbon": GAME_TITLE_RIBBON,
 		"mission_title": "ミッション",
 		"mission_old_seed": "古いたねからコロラータを育てよう！",
 		"mission_listen": "みんなの話を聞こう！",
@@ -290,8 +297,8 @@ const TEXT := {
 		"restoration_record_battles": "ジュレジュレ団と戦った回数\n\n%s回",
 		"restoration_record_wins": "ジュレジュレ団に勝った回数\n\n%s回",
 		"restoration_returned_plant_heading": "原生地へかえした大株",
-		"restoration_thank_you": "THANK YOU FOR PLAYING\nPUKU PUKU TANIKU!",
-		"restoration_product_by": "PRODUCED BY OHANAYA NOUEN",
+		"restoration_thank_you": "あそんでくれてありがとう！\n" + GAME_TITLE_JA,
+		"restoration_product_by": "Produced by オハナ屋農園",
 		"restoration_return_to_game": "温室へもどる",
 		"habitat_exploit_start_panda": "原生地は道具じゃないぞ…！",
 		"habitat_exploit_start_girl": "苦しんでるように見える…",
@@ -737,7 +744,9 @@ const TEXT := {
 	},
 	"hiragana": {
 		"language_name": "ひらがな",
-		"game_title": "ぷくぷくたにく",
+		"game_title": GAME_TITLE_JA,
+		"game_title_compact": GAME_TITLE_COMPACT_JA,
+		"game_title_ribbon": GAME_TITLE_RIBBON,
 		"mission_title": "ミッション",
 		"mission_old_seed": "ふるい たねから ころらーたを そだてよう！",
 		"mission_listen": "みんなの はなしを きこう！",
@@ -1018,8 +1027,8 @@ const TEXT := {
 		"restoration_record_battles": "じゅれじゅれだんと たたかった かいすう\n\n%sかい",
 		"restoration_record_wins": "じゅれじゅれだんに かった かいすう\n\n%sかい",
 		"restoration_returned_plant_heading": "げんせいちへ かえした おおかぶ",
-		"restoration_thank_you": "THANK YOU FOR PLAYING\nPUKU PUKU TANIKU!",
-		"restoration_product_by": "PRODUCED BY OHANAYA NOUEN",
+		"restoration_thank_you": "あそんでくれて ありがとう！\n" + GAME_TITLE_JA,
+		"restoration_product_by": "Produced by オハナ屋農園",
 		"restoration_return_to_game": "おんしつへ もどる",
 		"habitat_exploit_start_panda": "げんせいちは どうぐじゃ ないぞ…！",
 		"habitat_exploit_start_girl": "くるしんでるように みえる…",
@@ -1465,7 +1474,9 @@ const TEXT := {
 	},
 	"en": {
 		"language_name": "English",
-		"game_title": "Puku Puku Taniku",
+		"game_title": GAME_TITLE_EN,
+		"game_title_compact": GAME_TITLE_COMPACT_EN,
+		"game_title_ribbon": GAME_TITLE_RIBBON,
 		"mission_title": "MISSION",
 		"mission_old_seed": "Grow a Colorata from the old seed!",
 		"mission_listen": "Listen to your friends!",
@@ -1746,8 +1757,8 @@ const TEXT := {
 		"restoration_record_battles": "Battles against the JureJure Gang\n\n%s times",
 		"restoration_record_wins": "Victories over the JureJure Gang\n\n%s times",
 		"restoration_returned_plant_heading": "Large succulents returned to the habitat",
-		"restoration_thank_you": "THANK YOU FOR PLAYING\nPUKU PUKU TANIKU!",
-		"restoration_product_by": "PRODUCED BY OHANAYA NOUEN",
+		"restoration_thank_you": "Thank you for playing!\n" + GAME_TITLE_EN,
+		"restoration_product_by": "Produced by オハナ屋農園",
 		"restoration_return_to_game": "Return to Greenhouse",
 		"habitat_exploit_start_panda": "The habitat is not a tool...!",
 		"habitat_exploit_start_girl": "It looks like it is suffering...",

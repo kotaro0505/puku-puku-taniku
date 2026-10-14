@@ -1,6 +1,7 @@
 [application]
-config/name="ぷくぷく多肉"
+config/name="ぷくぷく！たにくらいふ"
 config/version="1.0.0"
+config/icon="res://assets/ios/app-icon-1024.png"
 run/main_scene="res://main.tscn"
 
 [autoload]

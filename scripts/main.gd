@@ -784,6 +784,8 @@ var pointer_travel := 0.0
 var greenhouse_drag_accumulator := 0.0
 var greenhouse_drag_started := false
 var opening_overlay: Control
+var opening_title_panel: PanelContainer
+var opening_title_label: Label
 var opening_prompt: TextureRect
 var opening_prompt_localized: PanelContainer
 var opening_prompt_localized_label: Label
@@ -1869,8 +1871,8 @@ func _build_ui() -> void:
 	var game_theme:=Theme.new();game_theme.default_font=load("res://assets/fonts/ZenMaruGothic-Bold.ttf") as Font;game_theme.default_font_size=16
 	labels_layer.theme=game_theme;hud.theme=game_theme;main_status_hud.theme=game_theme;effects_layer.theme=game_theme
 	# logo
-	var logo:=Label.new(); logo.name="MainLogo";logo.text=Localizer.text(language_code,"game_title"); logo.position=Vector2(16,34); logo.size=Vector2(180,105); logo.add_theme_font_size_override("font_size",31); logo.add_theme_color_override("font_color",Color("#fff2d3")); logo.add_theme_color_override("font_outline_color",UI_BROWN); logo.add_theme_constant_override("outline_size",8); logo.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;logo.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; main_status_hud.add_child(logo)
-	var ribbon:=Label.new(); ribbon.text=" PUKU PUKU TANIKU "; ribbon.position=Vector2(45,126); ribbon.add_theme_font_size_override("font_size",11); ribbon.add_theme_color_override("font_color",Color.WHITE); ribbon.add_theme_stylebox_override("normal",_box(Color("#d99a3c"),Color("#7b4a25"),12,2)); main_status_hud.add_child(ribbon)
+	var logo:=Label.new(); logo.name="MainLogo";logo.text=Localizer.text(language_code,"game_title_compact"); logo.position=Vector2(16,34); logo.size=Vector2(180,105); logo.add_theme_font_size_override("font_size",24); logo.add_theme_color_override("font_color",Color("#fff2d3")); logo.add_theme_color_override("font_outline_color",UI_BROWN); logo.add_theme_constant_override("outline_size",7); logo.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;logo.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; main_status_hud.add_child(logo)
+	var ribbon:=Label.new(); ribbon.name="MainLogoRibbon";ribbon.text=Localizer.text(language_code,"game_title_ribbon"); ribbon.position=Vector2(45,126); ribbon.add_theme_font_size_override("font_size",8); ribbon.add_theme_color_override("font_color",Color.WHITE); ribbon.add_theme_stylebox_override("normal",_box(Color("#d99a3c"),Color("#7b4a25"),12,2)); main_status_hud.add_child(ribbon)
 	best_panel=PanelContainer.new(); best_panel.position=Vector2(204,122); best_panel.size=Vector2(168,65); best_panel.theme=game_theme;best_panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;best_panel.add_theme_stylebox_override("panel",_box(Color("#47261b"),Color("#f5c985"),16,2));best_panel.gui_input.connect(_on_best_panel_gui_input);best_record_layer.add_child(best_panel)
 	best_label=Label.new();best_label.name="BestLabel";best_label.text="最高記録\n0.0 cm"; best_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; best_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; best_label.add_theme_font_size_override("font_size",17); best_label.add_theme_color_override("font_color",Color.WHITE);best_label.mouse_filter=Control.MOUSE_FILTER_IGNORE; best_panel.add_child(best_label)
 	seed_pod_gauge_area=Control.new();seed_pod_gauge_area.name="SeedPodGaugeArea";seed_pod_gauge_area.position=Vector2(42,145);seed_pod_gauge_area.size=Vector2(158,47);seed_pod_gauge_area.mouse_filter=Control.MOUSE_FILTER_IGNORE;main_status_hud.add_child(seed_pod_gauge_area)
@@ -1955,6 +1957,8 @@ func _build_ui() -> void:
 func _build_opening_screen(hud:Control)->void:
 	opening_overlay=Control.new();opening_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);opening_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;hud.add_child(opening_overlay)
 	var background:=TextureRect.new();background.texture=load("res://assets/opening-background.jpg");background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);background.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;background.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_COVERED;background.mouse_filter=Control.MOUSE_FILTER_IGNORE;opening_overlay.add_child(background)
+	opening_title_panel=PanelContainer.new();opening_title_panel.name="OpeningTitlePanel";opening_title_panel.position=Vector2(106,548);opening_title_panel.size=Vector2(364,208);opening_title_panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;opening_title_panel.add_theme_stylebox_override("panel",_box(Color("#fff0c4"),Color("#8c4f25"),34,6));opening_overlay.add_child(opening_title_panel)
+	opening_title_label=Label.new();opening_title_label.name="OpeningTitleLabel";opening_title_label.text=Localizer.text(language_code,"game_title_compact");opening_title_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;opening_title_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;opening_title_label.add_theme_font_size_override("font_size",31);opening_title_label.add_theme_color_override("font_color",Color("#5f7b38"));opening_title_label.add_theme_color_override("font_outline_color",Color("#fff9df"));opening_title_label.add_theme_constant_override("outline_size",4);opening_title_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;opening_title_panel.add_child(opening_title_label)
 	opening_prompt=TextureRect.new();opening_prompt.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;opening_prompt.texture=load("res://assets/opening-tap.png");opening_prompt.position=Vector2(86,820);opening_prompt.size=Vector2(404,136);opening_prompt.pivot_offset=opening_prompt.size*.5;opening_prompt.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;opening_prompt.mouse_filter=Control.MOUSE_FILTER_IGNORE;opening_overlay.add_child(opening_prompt)
 	opening_prompt_localized=PanelContainer.new();opening_prompt_localized.position=Vector2(86,834);opening_prompt_localized.size=Vector2(404,108);opening_prompt_localized.pivot_offset=opening_prompt_localized.size*.5;opening_prompt_localized.mouse_filter=Control.MOUSE_FILTER_IGNORE;opening_prompt_localized.add_theme_stylebox_override("panel",_box(Color("#b86e2d"),Color("#ffe18a"),38,5));opening_overlay.add_child(opening_prompt_localized)
 	opening_prompt_localized_label=Label.new();opening_prompt_localized_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;opening_prompt_localized_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;opening_prompt_localized_label.add_theme_font_size_override("font_size",30);opening_prompt_localized_label.add_theme_color_override("font_color",Color("#fff8df"));opening_prompt_localized_label.add_theme_color_override("font_outline_color",Color("#63331c"));opening_prompt_localized_label.add_theme_constant_override("outline_size",7);opening_prompt_localized_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;opening_prompt_localized.add_child(opening_prompt_localized_label)
@@ -1991,12 +1995,21 @@ func _select_initial_language(value:String)->void:
 
 func _refresh_opening_prompt()->void:
 	if opening_prompt==null or opening_prompt_localized==null:return
+	_refresh_opening_title_layout()
+	if opening_title_label:opening_title_label.text=Localizer.text(language_code,"game_title_compact")
 	if not language_selected:
 		opening_prompt.visible=false;opening_prompt_localized.visible=false
 		return
 	var use_art_prompt:=language_code=="ja"
 	opening_prompt.visible=use_art_prompt;opening_prompt_localized.visible=not use_art_prompt
 	if opening_prompt_localized_label:opening_prompt_localized_label.text=Localizer.text(language_code,"opening_tap")
+
+func _refresh_opening_title_layout()->void:
+	if opening_title_panel==null:return
+	if language_selected:
+		opening_title_panel.position=Vector2(106,548);opening_title_panel.size=Vector2(364,208)
+	else:
+		opening_title_panel.position=Vector2(106,472);opening_title_panel.size=Vector2(364,138)
 
 func _finish_opening()->void:
 	if opening_finished or not language_selected:return
@@ -4154,7 +4167,9 @@ func _apply_language_to_ui()->void:
 	_set_named_localized_text("ResearchRewardClose","research_reward_later")
 	_set_named_localized_text("EncyclopediaTitle","encyclopedia_title")
 	_set_named_localized_text("EncyclopediaCloseButton","back")
-	_set_named_localized_text("MainLogo","game_title")
+	_set_named_localized_text("MainLogo","game_title_compact")
+	_set_named_localized_text("MainLogoRibbon","game_title_ribbon")
+	_set_named_localized_text("OpeningTitleLabel","game_title_compact")
 	_set_named_localized_text("BgmToggle","audio_bgm_on")
 	_set_named_localized_text("SeToggle","audio_se_on")
 	_set_named_localized_text("AudioSettingsNote","audio_note")
@@ -5750,7 +5765,7 @@ func _create_personal_best_share_image(record:Dictionary)->String:
 	var species_name:=Localizer.species_name(language_code,entry);var size_cm:=float(record.get("size",0.0))
 	var record_label:=Label.new();record_label.text=Localizer.text(language_code,"share_harvest",[size_cm,species_name]);record_label.position=Vector2(70,1015);record_label.size=Vector2(940,100);record_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;record_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;record_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;record_label.add_theme_font_size_override("font_size",48);record_label.add_theme_color_override("font_color",UI_BROWN);root.add_child(record_label)
 	var best_label:=Label.new();best_label.text=Localizer.text(language_code,"share_record");best_label.position=Vector2(90,1125);best_label.size=Vector2(900,120);best_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;best_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;best_label.add_theme_font_size_override("font_size",58);best_label.add_theme_color_override("font_color",Color("#c17724"));root.add_child(best_label)
-	var footer:=Label.new();footer.text="puku puku taniku";footer.position=Vector2(90,1250);footer.size=Vector2(900,55);footer.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;footer.add_theme_font_size_override("font_size",28);footer.add_theme_color_override("font_color",Color("#8e6949"));root.add_child(footer)
+	var footer:=Label.new();footer.text=Localizer.text(language_code,"game_title");footer.position=Vector2(90,1250);footer.size=Vector2(900,55);footer.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;footer.add_theme_font_size_override("font_size",28);footer.add_theme_color_override("font_color",Color("#8e6949"));root.add_child(footer)
 	await get_tree().process_frame;await get_tree().process_frame
 	var rendered:=viewport.get_texture().get_image();var output_path:="user://puku-personal-best-%d.png"%int(Time.get_unix_time_from_system());var error:=rendered.save_png(output_path)
 	viewport.queue_free()

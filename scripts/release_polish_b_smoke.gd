@@ -10,8 +10,12 @@ const HabitatRestorationUIClass = preload("res://scripts/habitat_restoration_ui.
 const StoryContinueButtonStyleClass = preload("res://scripts/story_continue_button_style.gd")
 const StandardStoryDialoguePanelClass = preload("res://scripts/standard_story_dialogue_panel.gd")
 
-const ENDING_THANKS := "THANK YOU FOR PLAYING\nPUKU PUKU TANIKU!"
-const ENDING_CREDIT := "PRODUCED BY OHANAYA NOUEN"
+const ENDING_THANKS := {
+	"ja": "あそんでくれてありがとう！\nぷくぷく！たにくらいふ",
+	"hiragana": "あそんでくれて ありがとう！\nぷくぷく！たにくらいふ",
+	"en": "Thank you for playing!\nPuku Puku! Taniku Life",
+}
+const ENDING_CREDIT := "Produced by オハナ屋農園"
 
 
 func _ready() -> void:
@@ -364,11 +368,12 @@ func _assert_tutorial_dialog_continue(game: Node, locale: String, speaker_id: St
 
 func _test_ending_credit(game: Node) -> void:
 	for locale in Localizer.SUPPORTED_LANGUAGES:
-		assert(Localizer.text(locale, "restoration_thank_you") == ENDING_THANKS)
+		assert(Localizer.text(locale, "restoration_thank_you") == str(ENDING_THANKS[locale]))
 		assert(Localizer.text(locale, "restoration_product_by") == ENDING_CREDIT)
 		game.habitat_restoration_ui.set_language(locale)
-		assert(game.habitat_restoration_ui.ending_thank_you_label.text == ENDING_THANKS)
+		assert(game.habitat_restoration_ui.ending_thank_you_label.text == str(ENDING_THANKS[locale]))
 		assert(game.habitat_restoration_ui.ending_product_label.text == ENDING_CREDIT)
+		assert(game.habitat_restoration_ui.ending_thank_you_label.get_minimum_size().x <= game.habitat_restoration_ui.ending_thank_you_label.size.x)
 		assert(game.habitat_restoration_ui.ending_product_label.get_minimum_size().x <= game.habitat_restoration_ui.ending_product_label.size.x)
 
 
