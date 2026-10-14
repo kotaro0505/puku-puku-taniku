@@ -34,9 +34,11 @@ func _ready() -> void:
 	ui._open_viewer(arrangement, "saved")
 	await get_tree().process_frame
 	assert(ui.viewer_artwork_root.position.is_zero_approx() and is_equal_approx(ui.viewer_artwork_root.scale.x, 1.0))
+	assert(ui.viewer_canvas.clip_contents and is_equal_approx(ui.viewer_canvas.size.x / ui.viewer_canvas.size.y, 9.0 / 16.0))
+	assert(ui.viewer_canvas.position.y + ui.viewer_canvas.size.y < ui.viewer_share_button.position.y)
 	var state_before := JSON.stringify(arrangement)
 	var inventory_before: Dictionary = game.owned_pots.duplicate(true)
-	var output_directory := "res://tmp/arrangement-share-qa"
+	var output_directory := "user://arrangement-share-qa"
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(output_directory))
 	var hashes: Dictionary = {}
 	for entry_value in ShareBackgrounds.catalog():
@@ -54,7 +56,9 @@ func _ready() -> void:
 		for point in [Vector2i(0, 0), Vector2i(1079, 0), Vector2i(0, 1919), Vector2i(1079, 1919)]:
 			assert(image.get_pixelv(point).a > 0.99)
 		var debug: Dictionary = ui.last_share_render_debug
+		var preview: Dictionary = ui.last_share_preview_debug
 		assert(str(debug.background_id) == background_id and Vector2i(debug.output_size) == ShareRenderer.OUTPUT_SIZE)
+		assert(str(preview.background_id) == background_id and str(preview.texture_path) == str(entry.texture_path))
 		assert(debug.root_children == ["ShareBackground", "ShareArtworkCanvas"])
 		assert(int(debug.pot_count) == 1 and int(debug.plant_count) == 2)
 		assert(debug.z_indexes == [5, 2] and is_equal_approx(float(debug.rotations[0]), 123.0) and is_equal_approx(float(debug.rotations[1]), 27.0))
@@ -63,6 +67,16 @@ func _ready() -> void:
 		var layout: Dictionary = ShareRenderer.artwork_layout(entry)
 		assert((mapped.position as Vector2).is_equal_approx((layout.position as Vector2) + Vector2(34.0, -18.0) * float(layout.scale)))
 		assert(is_equal_approx(float(mapped.scale), float(layout.scale) * 1.28))
+		assert((preview.background_layout.position as Vector2).is_equal_approx(debug.background_layout.position as Vector2))
+		assert(is_equal_approx(float(preview.background_layout.scale), float(debug.background_layout.scale)))
+		assert((preview.artwork_layout.position as Vector2).is_equal_approx(debug.artwork_layout.position as Vector2))
+		assert(is_equal_approx(float(preview.artwork_layout.scale), float(debug.artwork_layout.scale)))
+		assert((preview.mapped_viewer_transform.position as Vector2).is_equal_approx(mapped.position as Vector2))
+		assert(is_equal_approx(float(preview.mapped_viewer_transform.scale), float(mapped.scale)))
+		var output_to_preview_scale := float(preview.output_to_preview_scale)
+		assert((preview.preview_mapped_position as Vector2).is_equal_approx((mapped.position as Vector2) * output_to_preview_scale))
+		assert(is_equal_approx(float(preview.preview_mapped_scale), float(mapped.scale) * output_to_preview_scale))
+		assert(ui.viewer_background.texture != null and ui.viewer_artwork_canvas.get_parent() == ui.viewer_canvas and ui.viewer_artwork_root.get_parent() == ui.viewer_artwork_canvas)
 		hashes[background_id] = FileAccess.get_sha256(output_path)
 	var unique_hashes: Dictionary = {}
 	for hash_value in hashes.values():unique_hashes[str(hash_value)] = true
@@ -91,8 +105,8 @@ func _ready() -> void:
 	assert(FileAccess.get_file_as_string("res://export_presets.cfg").contains("plugins/SharePlugin=true"))
 	ui._open_share_background_panel()
 	assert(ui.share_background_panel.visible and ui.viewer_share_button.disabled)
-	ui._close_share_background_panel()
-	assert(not ui.viewer_share_button.disabled)
+	ui._select_share_background("puku_members")
+	assert(not ui.share_background_panel.visible and not ui.viewer_share_button.disabled and str(ui.last_share_preview_debug.background_id) == "puku_members")
 	var share_handler := Callable(game, "_on_arrangement_share_requested")
 	assert(ui.share_requested.is_connected(share_handler))
 	ui.share_requested.disconnect(share_handler)

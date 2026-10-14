@@ -93,10 +93,11 @@ func _ready()->void:
 	var viewer_press:=InputEventScreenTouch.new();viewer_press.index=0;viewer_press.position=Vector2(520,450);viewer_press.pressed=true;game.arrangement_ui._on_viewer_world_scroll_input(viewer_press)
 	game._on_arrangement_world_scroll_input(viewer_press);assert(not game.greenhouse_area_drag_tracking and not game.arrangement_transitioning)
 	var artwork_start:Vector2=game.arrangement_ui.viewer_artwork_root.position
+	var preview_artwork_scale:float=game.arrangement_ui.viewer_artwork_canvas.scale.x
 	var viewer_mouse_press:=InputEventMouseButton.new();viewer_mouse_press.button_index=MOUSE_BUTTON_LEFT;viewer_mouse_press.pressed=true;viewer_mouse_press.position=Vector2(260,300);game.arrangement_ui._on_viewer_canvas_gui_input(viewer_mouse_press)
 	var viewer_motion:=InputEventMouseMotion.new();viewer_motion.position=Vector2(300,330);game.arrangement_ui._on_viewer_canvas_gui_input(viewer_motion)
 	var viewer_mouse_release:=InputEventMouseButton.new();viewer_mouse_release.button_index=MOUSE_BUTTON_LEFT;viewer_mouse_release.pressed=false;viewer_mouse_release.position=viewer_motion.position;game.arrangement_ui._on_viewer_canvas_gui_input(viewer_mouse_release)
-	assert(game.arrangement_ui.viewer_page.visible and game.arrangement_ui.viewer_artwork_root.position.is_equal_approx(artwork_start+Vector2(40,30)) and not game.greenhouse_area_drag_tracking and not game.arrangement_transitioning)
+	assert(game.arrangement_ui.viewer_page.visible and game.arrangement_ui.viewer_artwork_root.position.is_equal_approx(artwork_start+Vector2(40,30)/preview_artwork_scale) and not game.greenhouse_area_drag_tracking and not game.arrangement_transitioning)
 	game.arrangement_ui._return_from_viewer();assert(game.arrangement_ui.home_page.visible and game._greenhouse_area_navigation_available())
 
 	game._begin_greenhouse_area_drag(Vector2(520,450),true)

@@ -3,9 +3,9 @@ extends RefCounted
 
 const DEFAULT_ID := "greenhouse"
 
-# Share-only background metadata.  The normal arrangement editor and viewer
-# deliberately do not render these textures; phase 4 can use crop_mode/focus
-# to compose a 9:16 share image without duplicating catalog rules.
+# Share-preview background metadata.  The finished-work viewer and the PNG
+# renderer both consume crop_mode/focus/artwork_rect so their 9:16 composition
+# stays identical without duplicating layout rules.
 const CATALOG := [
 	{
 		"id": "greenhouse",
