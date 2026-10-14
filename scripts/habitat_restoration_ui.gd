@@ -8,10 +8,12 @@ signal ending_bgm_requested
 signal ending_slide_started(kind: String, index: int, payload: Dictionary)
 
 const Localizer = preload("res://scripts/game_localizer.gd")
-const DialoguePortraitsClass = preload("res://scripts/dialogue_portraits.gd")
 const StoryContinueButtonStyleClass = preload("res://scripts/story_continue_button_style.gd")
 const REQUIRED_PLANTS := 5
 const LAMP_PANEL_POSITION := Vector2(93, 772)
+const RECOVERY_IMAGE_PATH := "res://assets/ending/restoration-recovery.jpg"
+const RECOVERY_IMAGE_FADE_SECONDS := 2.5
+const RECOVERY_NARRATION_FADE_SECONDS := 1.75
 const FINAL_IMAGE_PATH := "res://assets/ending/restoration-finale.jpg"
 const ENDING_DARKEN_SECONDS := 1.1
 const ENDING_SLIDE_FADE_SECONDS := 0.8
@@ -33,6 +35,7 @@ var prompt_yes: Button
 var prompt_no: Button
 var ending_layer: Control
 var ending_background: TextureRect
+var ending_story_card: PanelContainer
 var ending_title: Label
 var ending_body: Label
 var ending_continue: Button
@@ -61,6 +64,10 @@ var ending_sequence_time_scale := 1.0
 var ending_current_phase := ""
 var ending_current_index := -1
 var ending_sequence_history: Array[Dictionary] = []
+var recovery_slide_generation := 0
+var recovery_slide_tween: Tween
+var recovery_slide_phase := ""
+var recovery_slide_history: Array[Dictionary] = []
 
 
 func _ready() -> void:
@@ -179,29 +186,29 @@ func _build_ending() -> void:
 	ending_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	ending_layer.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(ending_layer)
+	var black_background := ColorRect.new()
+	black_background.color = Color.BLACK
+	black_background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	black_background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ending_layer.add_child(black_background)
 	ending_background = TextureRect.new()
-	ending_background.texture = load("res://assets/highland-panorama.jpg")
+	ending_background.texture = load(RECOVERY_IMAGE_PATH)
 	ending_background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	ending_background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	ending_background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	ending_background.modulate = Color(1.05, 1.08, 1.0, 1.0)
+	ending_background.modulate = Color.WHITE
 	ending_background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ending_layer.add_child(ending_background)
-	var wash := ColorRect.new()
-	wash.color = Color(0.95, 0.87, 0.63, 0.38)
-	wash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	wash.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	ending_layer.add_child(wash)
-	var card := PanelContainer.new()
-	card.name = "StoryTextPanel"
-	card.position = Vector2(38, 78)
-	card.size = Vector2(500, 818)
-	card.add_theme_stylebox_override("panel", _panel_style(Color(0.12, 0.18, 0.13, 0.84), Color("#f3df9d"), 30, 3))
-	ending_layer.add_child(card)
+	ending_story_card = PanelContainer.new()
+	ending_story_card.name = "StoryTextPanel"
+	ending_story_card.position = Vector2(38, 78)
+	ending_story_card.size = Vector2(500, 818)
+	ending_story_card.add_theme_stylebox_override("panel", _panel_style(Color(0.12, 0.18, 0.13, 0.84), Color("#f3df9d"), 30, 3))
+	ending_layer.add_child(ending_story_card)
 	var content := VBoxContainer.new()
 	content.alignment = BoxContainer.ALIGNMENT_CENTER
 	content.add_theme_constant_override("separation", 20)
-	card.add_child(content)
+	ending_story_card.add_child(content)
 	ending_title = Label.new()
 	ending_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ending_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -400,6 +407,8 @@ func is_modal_visible() -> bool:
 
 func reset_view() -> void:
 	ending_sequence_generation += 1
+	recovery_slide_generation += 1
+	_stop_recovery_slide_tween()
 	current_snapshot.clear()
 	decision_sent = false
 	slide_index = -1
@@ -408,23 +417,69 @@ func reset_view() -> void:
 	ending_sequence_layer.visible = false
 	ending_current_phase = ""
 	ending_current_index = -1
+	recovery_slide_phase = ""
+	recovery_slide_history.clear()
+	ending_background.modulate.a = 0.0
+	ending_story_card.visible = false
+	ending_continue.disabled = true
 	lamp_panel.visible = false
 
 
 func start_recovery_slides() -> void:
+	recovery_slide_generation += 1
+	_stop_recovery_slide_tween()
+	var generation := recovery_slide_generation
 	slide_index = 0
+	recovery_slide_phase = "background_fade"
+	recovery_slide_history.clear()
+	recovery_slide_history.append({"kind": "background", "index": 0, "image_path": RECOVERY_IMAGE_PATH})
+	ending_background.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	ending_story_card.visible = false
+	ending_body.modulate.a = 0.0
+	ending_continue.disabled = true
+	_clear_character_row()
 	ending_layer.visible = true
 	ending_layer.move_to_front()
-	_show_slide()
+	_run_recovery_slide_intro(generation)
+
+
+func _run_recovery_slide_intro(generation: int) -> void:
+	recovery_slide_tween = create_tween()
+	recovery_slide_tween.tween_property(ending_background, "modulate:a", 1.0, _ending_duration(RECOVERY_IMAGE_FADE_SECONDS)).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	await recovery_slide_tween.finished
+	if generation != recovery_slide_generation or not ending_layer.visible:
+		return
+	ending_background.modulate.a = 1.0
+	ending_story_card.visible = true
+	await _fade_in_recovery_narration(generation)
 
 
 func _show_slide() -> void:
-	_clear_character_row()
 	ending_title.text = Localizer.text(language_code, "restoration_slide_title")
 	ending_body.text = Localizer.text(language_code, "restoration_slide_%d" % (slide_index + 1))
 	ending_continue.text = Localizer.text(language_code, "continue")
-	var speakers: Array = [["girl", "panda", "armadillo"], ["panda", "armadillo", "mouse", "peccary", "skunk"], ["girl", "panda", "armadillo", "mouse", "peccary", "skunk"]][slide_index]
-	_add_characters(speakers)
+
+
+func _fade_in_recovery_narration(generation: int) -> void:
+	if generation != recovery_slide_generation or slide_index < 0 or slide_index > 2:
+		return
+	recovery_slide_phase = "narration_fade"
+	ending_continue.disabled = true
+	_show_slide()
+	ending_body.modulate.a = 0.0
+	recovery_slide_history.append({
+		"kind": "narration",
+		"index": slide_index,
+		"text": ending_body.text,
+	})
+	recovery_slide_tween = create_tween()
+	recovery_slide_tween.tween_property(ending_body, "modulate:a", 1.0, _ending_duration(RECOVERY_NARRATION_FADE_SECONDS)).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	await recovery_slide_tween.finished
+	if generation != recovery_slide_generation or not ending_layer.visible:
+		return
+	ending_body.modulate.a = 1.0
+	recovery_slide_phase = "await_continue"
+	ending_continue.disabled = false
 
 
 func show_thank_you(records: Array[Dictionary] = [], returned_plants: Array[Dictionary] = []) -> void:
@@ -432,17 +487,30 @@ func show_thank_you(records: Array[Dictionary] = [], returned_plants: Array[Dict
 
 
 func _advance_ending() -> void:
+	if recovery_slide_phase != "await_continue" or ending_continue.disabled:
+		return
+	ending_continue.disabled = true
 	if slide_index >= 0 and slide_index < 2:
 		slide_index += 1
-		_show_slide()
+		_fade_in_recovery_narration(recovery_slide_generation)
 		return
-	ending_layer.visible = false
 	if slide_index == 2:
+		recovery_slide_phase = "complete"
+		ending_layer.visible = false
+		slide_index = -1
 		slides_finished.emit()
-	slide_index = -1
+
+
+func _stop_recovery_slide_tween() -> void:
+	if recovery_slide_tween != null and recovery_slide_tween.is_valid():
+		recovery_slide_tween.kill()
+	recovery_slide_tween = null
 
 
 func start_ending_sequence(records: Array[Dictionary], returned_plants: Array[Dictionary]) -> void:
+	recovery_slide_generation += 1
+	_stop_recovery_slide_tween()
+	recovery_slide_phase = ""
 	ending_sequence_generation += 1
 	var generation := ending_sequence_generation
 	ending_records.clear()
@@ -619,23 +687,3 @@ func fade_out_ending_sequence(duration_seconds := 1.2) -> void:
 func _clear_character_row() -> void:
 	for child in character_row.get_children():
 		child.queue_free()
-
-
-func _add_characters(speakers: Array) -> void:
-	for speaker_value in speakers:
-		var speaker := str(speaker_value)
-		var texture: Texture2D = null
-		match speaker:
-			"mouse": texture = load("res://assets/jurejure/mouse.png")
-			"peccary": texture = load("res://assets/jurejure/peccary.png")
-			"skunk": texture = load("res://assets/jurejure/skunk.png")
-			_: texture = DialoguePortraitsClass.texture(speaker)
-		if texture == null:
-			continue
-		var portrait := TextureRect.new()
-		portrait.custom_minimum_size = Vector2(82, 280)
-		portrait.texture = texture
-		portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		character_row.add_child(portrait)

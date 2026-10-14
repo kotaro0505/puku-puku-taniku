@@ -12,8 +12,9 @@ func _ready() -> void:
 	_test_restoration_state_machine()
 	_test_localization_contract()
 	_test_ending_asset_contract()
+	await _test_recovery_slide_presentation()
 	await _test_integrated_final_chapter()
-	print("HABITAT_RESTORATION_SMOKE_OK post_crisis=4 sow_gate=retired first_large_before_join=true queued_returns=true return_dialog=center+plant_visible normal_dialog=bottom joined_after_first=true lamps=5 threshold=100 returned=5 medals=5 stages=0..5 slides=3 finale=true epilogue=true ending_records=5 returned_recap=5 final_image=true ending_bgm=true post_ending_greenhouse_once=true lifetime_harvest=true save_resume=true")
+	print("HABITAT_RESTORATION_SMOKE_OK post_crisis=4 sow_gate=retired first_large_before_join=true queued_returns=true return_dialog=center+plant_visible normal_dialog=bottom joined_after_first=true lamps=5 threshold=100 returned=5 medals=5 recovery_image=1 recovery_narrations=3 recovery_input_lock=true finale=true epilogue=true ending_records=5 returned_recap=5 final_image=true ending_bgm=true post_ending_greenhouse_once=true lifetime_harvest=true save_resume=true")
 	get_tree().quit()
 
 
@@ -186,6 +187,9 @@ func _test_localization_contract() -> void:
 		for key in keys:
 			var value := Localizer.text(language, key)
 			assert(not value.is_empty() and value != key)
+	assert(Localizer.text("ja", "restoration_slide_1") == "それからも、みんなは何度も原生地へ通い、多肉たちを植え続けました。")
+	assert(Localizer.text("ja", "restoration_slide_2") == "原生地には少しずつ、多肉植物が戻って来ました。")
+	assert(Localizer.text("ja", "restoration_slide_3") == "色々な多肉植物が見たい。\n\nみんなの願いは、いつしか祈りとなっていたのです。")
 
 
 func _test_ending_asset_contract() -> void:
@@ -195,9 +199,94 @@ func _test_ending_asset_contract() -> void:
 	assert(str(bgm_config.get("ending", "")) == "res://assets/audio/ending-pssshh-new-batch.mp3")
 	var ending_stream := load("res://assets/audio/ending-pssshh-new-batch.mp3") as AudioStream
 	assert(ending_stream is AudioStreamMP3)
+	var recovery_texture := load(HabitatRestorationUIClass.RECOVERY_IMAGE_PATH) as Texture2D
+	assert(recovery_texture != null and recovery_texture.get_size() == Vector2(720, 1280))
+	assert(is_equal_approx(HabitatRestorationUIClass.RECOVERY_IMAGE_FADE_SECONDS, 2.5))
+	assert(HabitatRestorationUIClass.RECOVERY_NARRATION_FADE_SECONDS >= 1.5)
+	assert(HabitatRestorationUIClass.RECOVERY_NARRATION_FADE_SECONDS <= 2.0)
 	var ending_texture := load(HabitatRestorationUIClass.FINAL_IMAGE_PATH) as Texture2D
 	assert(ending_texture != null and ending_texture.get_size() == Vector2(720, 1280))
 	assert(HabitatRestorationUIClass.ENDING_FINAL_IMAGE_HOLD_SECONDS >= 4.0)
+
+
+func _test_recovery_slide_presentation() -> void:
+	var host := Control.new()
+	host.size = Vector2(576, 1024)
+	add_child(host)
+	var ui = HabitatRestorationUIClass.new()
+	host.add_child(ui)
+	await get_tree().process_frame
+	ui.set_language("ja")
+	ui.ending_sequence_time_scale = 0.04
+	var recovery_finished := {"count": 0}
+	ui.slides_finished.connect(func() -> void: recovery_finished["count"] = int(recovery_finished["count"]) + 1)
+	ui.start_recovery_slides()
+	var fixed_texture: Texture2D = ui.ending_background.texture
+	var fixed_background_position: Vector2 = ui.ending_background.position
+	var fixed_background_size: Vector2 = ui.ending_background.size
+	assert(fixed_texture != null and fixed_texture.resource_path == HabitatRestorationUIClass.RECOVERY_IMAGE_PATH)
+	assert(ui.ending_background.stretch_mode == TextureRect.STRETCH_KEEP_ASPECT_COVERED)
+	assert(ui.recovery_slide_phase == "background_fade")
+	assert(ui.ending_continue.disabled and not ui.ending_story_card.visible)
+	assert(is_zero_approx(ui.ending_background.modulate.a))
+	ui.ending_continue.pressed.emit()
+	ui._advance_ending()
+	assert(ui.slide_index == 0 and int(recovery_finished["count"]) == 0)
+	await _wait_for_recovery_slide_phase(ui, "await_continue")
+	assert(ui.ending_story_card.visible and not ui.ending_continue.disabled)
+	assert(is_equal_approx(ui.ending_background.modulate.a, 1.0))
+	assert(is_equal_approx(ui.ending_body.modulate.a, 1.0))
+	assert(ui.ending_body.text == Localizer.text("ja", "restoration_slide_1"))
+	assert(ui.character_row.get_child_count() == 0)
+	var original_card_position: Vector2 = ui.ending_story_card.position
+	var original_card_size: Vector2 = ui.ending_story_card.size
+	var original_body_position: Vector2 = ui.ending_body.position
+	var original_body_size: Vector2 = ui.ending_body.size
+	var original_button_position: Vector2 = ui.ending_continue.position
+	var original_button_size: Vector2 = ui.ending_continue.size
+
+	for expected_index in [1, 2]:
+		ui.ending_continue.pressed.emit()
+		assert(ui.slide_index == expected_index)
+		assert(ui.recovery_slide_phase == "narration_fade" and ui.ending_continue.disabled)
+		assert(is_zero_approx(ui.ending_body.modulate.a))
+		ui.ending_continue.pressed.emit()
+		ui._advance_ending()
+		assert(ui.slide_index == expected_index and int(recovery_finished["count"]) == 0)
+		await _wait_for_recovery_slide_phase(ui, "await_continue")
+		assert(ui.ending_body.text == Localizer.text("ja", "restoration_slide_%d" % (expected_index + 1)))
+		assert(ui.ending_background.texture == fixed_texture)
+		assert(ui.ending_background.position == fixed_background_position)
+		assert(ui.ending_background.size == fixed_background_size)
+		assert(is_equal_approx(ui.ending_background.modulate.a, 1.0))
+
+	var background_events := 0
+	var narration_events := 0
+	for event_value in ui.recovery_slide_history:
+		var event := event_value as Dictionary
+		if str(event.get("kind", "")) == "background":
+			background_events += 1
+		elif str(event.get("kind", "")) == "narration":
+			narration_events += 1
+	assert(background_events == 1 and narration_events == 3)
+	assert(ui.ending_story_card.position == original_card_position)
+	assert(ui.ending_story_card.size == original_card_size)
+	assert(ui.ending_body.position == original_body_position and ui.ending_body.size == original_body_size)
+	assert(ui.ending_continue.position == original_button_position and ui.ending_continue.size == original_button_size)
+	ui.ending_continue.pressed.emit()
+	ui.ending_continue.pressed.emit()
+	assert(int(recovery_finished["count"]) == 1)
+	assert(ui.recovery_slide_phase == "complete" and not ui.ending_layer.visible)
+	host.queue_free()
+	await get_tree().process_frame
+
+
+func _wait_for_recovery_slide_phase(ui: HabitatRestorationUI, phase: String) -> void:
+	for _frame in range(240):
+		if ui.recovery_slide_phase == phase:
+			return
+		await get_tree().process_frame
+	assert(false, "recovery slide phase timeout: expected=%s actual=%s" % [phase, ui.recovery_slide_phase])
 
 
 func _test_integrated_final_chapter() -> void:
