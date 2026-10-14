@@ -309,7 +309,6 @@ func show_pot_purchase_success(pot_id:String,before_count:int,after_count:int,pu
 	if puku_points>=0:wallet_puku_points=maxi(0,puku_points)
 	# Normal Puku purchases use the card-local feedback below. Keep the small
 	# page-level message for hints, failures, and StoreKit status only.
-	shop_message.text=GameLocalizer.text(language_code,"all_pots_one_puku")
 	if visible and shop_page.visible:_update_pot_shop_after_purchase(pot_id)
 	var ready_usec:=Time.get_ticks_usec()
 	if profile_requested:last_pot_purchase_ui_ready_latency_msec=float(ready_usec-request_usec)/1000.0
@@ -1384,7 +1383,6 @@ func _build_shop_page()->void:
 
 func _refresh_pot_shop()->void:
 	shop_wallet.text=GameLocalizer.text(language_code,"wallet",[wallet_puku_points])
-	if shop_message.text.is_empty():shop_message.text=GameLocalizer.text(language_code,"all_pots_one_puku")
 	shop_restore_button.visible=_has_visible_iap_pots()
 	shop_restore_button.text=GameLocalizer.text(language_code,"iap_restore_processing" if pot_restore_in_progress else "iap_restore_purchases")
 	shop_restore_button.disabled=not pot_restore_available or pot_restore_in_progress
@@ -1402,7 +1400,8 @@ func _refresh_pot_shop_cards()->void:
 		var content:=Control.new();content.name="PotCardContent";content.custom_minimum_size=Vector2(484,184);content.mouse_filter=Control.MOUSE_FILTER_PASS;content.clip_contents=true;card.add_child(content)
 		var preview:=Control.new();preview.position=Vector2(2,2);preview.size=Vector2(214,176);preview.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.add_child(preview);_render_pot(preview,pot,true)
 		var name:=Label.new();name.text=GameLocalizer.pot_name(language_code,pot);name.position=Vector2(220,12);name.size=Vector2(258,45);name.mouse_filter=Control.MOUSE_FILTER_IGNORE;name.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name.add_theme_font_size_override("font_size",19);name.add_theme_color_override("font_color",UI_BROWN);content.add_child(name)
-		var condition:=Label.new();condition.name="PotOwnedTotal";condition.text=GameLocalizer.text(language_code,"pot_owned_total",[total]) if design_unlocked else GameLocalizer.text(language_code,"pot_permanent_unlock");condition.position=Vector2(220,55);condition.size=Vector2(258,34);condition.mouse_filter=Control.MOUSE_FILTER_IGNORE;condition.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;condition.add_theme_font_size_override("font_size",13);condition.add_theme_color_override("font_color",Color("#79543a"));content.add_child(condition)
+		var condition:=Label.new();condition.name="PotOwnedTotal";condition.text=GameLocalizer.text(language_code,"pot_owned_total",[total]) if design_unlocked else GameLocalizer.text(language_code,"pot_permanent_unlock");condition.position=Vector2(220,52);condition.size=Vector2(258,32);condition.mouse_filter=Control.MOUSE_FILTER_IGNORE;condition.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;condition.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;condition.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;condition.add_theme_font_size_override("font_size",17 if design_unlocked else 14);condition.add_theme_color_override("font_color",Color("#79543a"));content.add_child(condition)
+		var locked_price:=Label.new();locked_price.name="PotLockedPukuPrice";locked_price.text=GameLocalizer.text(language_code,"pot_locked_puku_price",[price]) if priced else GameLocalizer.text(language_code,"price_tbd");locked_price.position=Vector2(220,84);locked_price.size=Vector2(258,30);locked_price.mouse_filter=Control.MOUSE_FILTER_IGNORE;locked_price.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;locked_price.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;locked_price.add_theme_font_size_override("font_size",18);locked_price.add_theme_color_override("font_color",Color("#9b5f27"));locked_price.visible=not design_unlocked;content.add_child(locked_price)
 		var buy_text:="";var buy_enabled:=false;var product_id:=str(pot.get("iap_product_id",""));var buy_action:=Callable()
 		if design_unlocked:
 			buy_text=GameLocalizer.text(language_code,"buy_puku",[price]) if priced else GameLocalizer.text(language_code,"price_tbd")
@@ -1417,7 +1416,8 @@ func _refresh_pot_shop_cards()->void:
 				"loading":buy_text=GameLocalizer.text(language_code,"iap_price_loading")
 				_:buy_text=GameLocalizer.text(language_code,"iap_purchase_unavailable")
 			buy_action=_request_pot_unlock.bind(product_id)
-		var buy:=_button(buy_text,Vector2(232,102),Vector2(236,58),Color("#d7aa64") if buy_enabled else Color("#b9a17d"),15)
+		var buy_position:=Vector2(220,102) if design_unlocked else Vector2(220,118)
+		var buy:=_button(buy_text,buy_position,Vector2(258,58),Color("#d7aa64") if buy_enabled else Color("#b9a17d"),19)
 		buy.name="PotBuyButton";buy.set_meta("puku_purchase",design_unlocked)
 		_prepare_scroll_button(buy);buy.disabled=not buy_enabled
 		if buy_action.is_valid():buy.pressed.connect(buy_action)

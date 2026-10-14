@@ -8,7 +8,7 @@ func _ready()->void:
 	var ui=game.arrangement_ui
 	var localizer=load("res://scripts/game_localizer.gd")
 	for locale in ["ja","hiragana","en"]:
-		for key in ["pot_available_count","pot_all_in_use","pot_save_unavailable","pot_owned_total","pot_bought_count","pot_purchase_success","pot_purchase_owned_before","pot_purchase_owned_after","arrangement_dismantle","arrangement_dismantle_confirm","arrangement_dismantle_confirm_button","arrangement_dismantle_cancel","arrangement_choose_pot_hint","arrangement_view_saved","arrangement_saved_title","arrangement_save_limit_help","share_action","share_creating","share_failed","share_opening","share_background","share_background_greenhouse","share_background_puku_members","share_background_jurejure_gang","share_background_all_characters","share_background_selected","share_background_available_from_start","share_background_unlock_exploitation","share_background_unlock_story_clear","share_background_unlock_collection_complete"]:assert(localizer.text(locale,key)!=key)
+		for key in ["pot_available_count","pot_all_in_use","pot_save_unavailable","pot_owned_total","pot_bought_count","pot_purchase_success","pot_purchase_owned_before","pot_purchase_owned_after","pot_locked_puku_price","arrangement_dismantle","arrangement_dismantle_confirm","arrangement_dismantle_confirm_button","arrangement_dismantle_cancel","arrangement_choose_pot_hint","arrangement_view_saved","arrangement_saved_title","arrangement_save_limit_help","share_action","share_creating","share_failed","share_opening","share_background","share_background_greenhouse","share_background_puku_members","share_background_jurejure_gang","share_background_all_characters","share_background_selected","share_background_available_from_start","share_background_unlock_exploitation","share_background_unlock_story_clear","share_background_unlock_collection_complete"]:assert(localizer.text(locale,key)!=key)
 	assert(localizer.text("ja","pot_purchase_success",["黒陶器鉢"])=="黒陶器鉢を購入しました！" and "購入できた" not in localizer.text("ja","pot_purchase_success",["黒陶器鉢"]))
 	assert(localizer.text("hiragana","pot_purchase_success",["くろとうきばち"])=="くろとうきばちを\nこうにゅうしました！" and localizer.text("en","pot_purchase_success",["Black Ceramic Pot"])=="Purchased Black Ceramic Pot!")
 	var share_backgrounds=load("res://scripts/arrangement_share_backgrounds.gd");var share_catalog:Array=share_backgrounds.catalog();assert(share_catalog.size()==4)
@@ -23,7 +23,15 @@ func _ready()->void:
 	assert(game.pot_catalog.size()==44 and int(game.owned_pots.get("shallow_terracotta",0))==1 and typeof(game.owned_pots.get("shallow_terracotta"))==TYPE_INT)
 	for pot_value in game.pot_catalog:
 		for required_key in ["pot_id","display_name","image_path","price_puku","sales_group","sales_stage","unlock_type","unlock_condition","iap_product_id","placement_area","sort_order"]:assert(pot_value.has(required_key))
-		assert(int(pot_value.price_puku)==1)
+		assert(int(pot_value.price_puku)>=1)
+	assert(str(game.pot_catalog[16].pot_id)=="g1_rock_bowl" and int(game.pot_catalog[16].price_puku)==2)
+	assert(str(game.pot_catalog[17].pot_id)=="g1_rose_gold_glass" and int(game.pot_catalog[17].price_puku)==3)
+	assert(str(game.pot_catalog[18].pot_id)=="g1_gold_jackpot" and int(game.pot_catalog[18].price_puku)==30)
+	assert(str(game.pot_catalog[22].pot_id)=="g2_shell_coral" and int(game.pot_catalog[22].price_puku)==5)
+	assert(str(game.pot_catalog[31].pot_id)=="g2_neon_crystal" and int(game.pot_catalog[31].price_puku)==10)
+	assert(str(game.pot_catalog[43].pot_id)=="g2_ramen_bowl" and int(game.pot_catalog[43].price_puku)==100)
+	for source_path in ["res://scripts/arrangement_ui.gd","res://scripts/game_localizer.gd"]:
+		var source_text:=FileAccess.get_file_as_string(source_path);assert(not "all_pots_one_puku" in source_text)
 	assert(game._current_pot_sales_stage()==0 and not game._pot_unlocked({"sales_stage":1,"unlock_condition":{"type":"default"}}))
 	game.forest_gacha_unlocked=true;assert(game._current_pot_sales_stage()==1 and game._pot_unlocked({"sales_stage":1,"unlock_condition":{"type":"default"}}));game.forest_gacha_unlocked=false
 	game.act3_unlocked=true;assert(game._current_pot_sales_stage()==2 and game._pot_unlocked({"sales_stage":2,"unlock_condition":{"type":"default"}}));game.act3_unlocked=false
@@ -183,7 +191,7 @@ func _ready()->void:
 	assert(int(game.owned_pots.get("classic_terracotta",0))==1 and game.puku_points==puku_before-1 and game.audio_manager.last_se_key=="purchase")
 	assert(classic_shop_card.get_instance_id()==classic_card_instance_id and classic_feedback!=null and classic_feedback.visible and classic_feedback.mouse_filter==Control.MOUSE_FILTER_IGNORE and classic_feedback.position.x>=0.0 and classic_feedback.position.y>=0.0 and classic_feedback.position.x+classic_feedback.size.x<=(classic_feedback.get_parent() as Control).size.x and classic_feedback.position.y+classic_feedback.size.y<=(classic_feedback.get_parent() as Control).size.y)
 	assert(_has_label_text_containing(classic_feedback,"素焼き鉢を購入しました！") and _has_label_text_containing(classic_feedback,"所持 ×0 →") and _has_label_text_containing(classic_feedback,"×1") and classic_feedback.find_children("PotPurchaseSparkle*","Label",true,false).size()==4)
-	assert(ui.shop_message.text==localizer.text("ja","all_pots_one_puku") and "購入しました" not in ui.shop_message.text and ui.shop_wallet.text==localizer.text("ja","wallet",[puku_before-1]))
+	assert(ui.shop_message.text.is_empty() and "購入しました" not in ui.shop_message.text and ui.shop_wallet.text==localizer.text("ja","wallet",[puku_before-1]))
 	assert(float(success_ready_usec-purchase_started_usec)/1000.0<50.0 and ui.last_pot_purchase_ui_ready_latency_msec<50.0)
 	await get_tree().process_frame
 	assert(ui.last_pot_purchase_first_frame_latency_msec>=0.0 and ui.last_pot_purchase_first_frame_latency_msec<50.0)
@@ -192,7 +200,7 @@ func _ready()->void:
 	classic_shop_card=_pot_shop_card(ui,"classic_terracotta");var repeat_classic_buttons:=classic_shop_card.find_children("*","Button",true,false);var initial_black_card:Node=_pot_shop_card(ui,"black_ceramic");var black_card_instance_id:=initial_black_card.get_instance_id();var initial_black_buttons:=initial_black_card.find_children("*","Button",true,false);assert(repeat_classic_buttons.size()==1 and initial_black_buttons.size()==1);(repeat_classic_buttons[0] as Button).pressed.emit();(initial_black_buttons[0] as Button).pressed.emit();await get_tree().process_frame
 	classic_shop_card=_pot_shop_card(ui,"classic_terracotta");classic_feedback=classic_shop_card.find_child("PotPurchaseFeedback",true,false) as Control
 	var black_shop_card:Node=_pot_shop_card(ui,"black_ceramic");var black_feedback:=black_shop_card.find_child("PotPurchaseFeedback",true,false) as Control
-	assert(int(game.owned_pots.get("classic_terracotta",0))==2 and int(game.owned_pots.get("black_ceramic",0))==1 and game.puku_points==puku_before-3)
+	assert(int(game.owned_pots.get("classic_terracotta",0))==2 and int(game.owned_pots.get("black_ceramic",0))==1 and game.puku_points==puku_before-4)
 	assert(classic_shop_card.get_instance_id()==classic_card_instance_id and black_shop_card.get_instance_id()==black_card_instance_id and ui.pot_purchase_feedback.has("classic_terracotta") and ui.pot_purchase_feedback.has("black_ceramic") and classic_feedback.visible and black_feedback.visible and _has_label_text_containing(classic_feedback,"所持 ×1 →") and _has_label_text_containing(classic_feedback,"×2") and _has_label_text_containing(black_feedback,"黒陶器鉢を購入しました！"))
 	await get_tree().create_timer(.80).timeout
 	assert((_pot_shop_card(ui,"classic_terracotta").find_child("PotPurchaseFeedback",true,false) as Control).visible and (_pot_shop_card(ui,"black_ceramic").find_child("PotPurchaseFeedback",true,false) as Control).visible)
@@ -203,9 +211,16 @@ func _ready()->void:
 	game.puku_points=puku_after_success;game._sync_arrangement_ui()
 	var paid_pot:Dictionary=game._pot_entry("g1_crystal_goblet");var paid_product_id:=str(paid_pot.iap_product_id);game.forest_gacha_unlocked=true;game.pot_design_unlocks.erase(paid_product_id);game.owned_pots.erase("g1_crystal_goblet")
 	var paid_puku_before:int=game.puku_points;game._on_pot_purchase_requested("g1_crystal_goblet");assert(game._owned_pot_total("g1_crystal_goblet")==0 and game.puku_points==paid_puku_before)
-	game.pot_design_unlocks[paid_product_id]=true;game._on_pot_purchase_requested("g1_crystal_goblet");assert(game._owned_pot_total("g1_crystal_goblet")==1 and game.puku_points==paid_puku_before-1)
-	game._save();game.pot_design_unlocks.clear();game._load_save();assert(bool(game.pot_design_unlocks.get(paid_product_id,false)) and game._owned_pot_total("g1_crystal_goblet")==1)
-	game.owned_pots.erase("g1_crystal_goblet");game.pot_design_unlocks.erase(paid_product_id);game.forest_gacha_unlocked=false
+	game.pot_design_unlocks[paid_product_id]=true;game._on_pot_purchase_requested("g1_crystal_goblet");assert(game._owned_pot_total("g1_crystal_goblet")==1 and game.puku_points==paid_puku_before-2)
+	var jackpot_pot:Dictionary=game._pot_entry("g1_gold_jackpot");var jackpot_product_id:=str(jackpot_pot.iap_product_id)
+	var ramen_pot:Dictionary=game._pot_entry("g2_ramen_bowl");var ramen_product_id:=str(ramen_pot.iap_product_id)
+	game.act3_unlocked=true;game.puku_points=200;game.pot_design_unlocks[jackpot_product_id]=true;game.pot_design_unlocks[ramen_product_id]=true
+	game._on_pot_purchase_requested("g1_gold_jackpot");assert(game._owned_pot_total("g1_gold_jackpot")==1 and game.puku_points==170)
+	game._on_pot_purchase_requested("g2_ramen_bowl");assert(game._owned_pot_total("g2_ramen_bowl")==1 and game.puku_points==70)
+	game._save();game.pot_design_unlocks.clear();game.owned_pots.erase("g1_crystal_goblet");game.owned_pots.erase("g1_gold_jackpot");game.owned_pots.erase("g2_ramen_bowl");game.puku_points=0;game._load_save()
+	assert(bool(game.pot_design_unlocks.get(paid_product_id,false)) and bool(game.pot_design_unlocks.get(jackpot_product_id,false)) and bool(game.pot_design_unlocks.get(ramen_product_id,false)))
+	assert(game._owned_pot_total("g1_crystal_goblet")==1 and game._owned_pot_total("g1_gold_jackpot")==1 and game._owned_pot_total("g2_ramen_bowl")==1 and game.puku_points==70)
+	game.owned_pots.erase("g1_crystal_goblet");game.owned_pots.erase("g1_gold_jackpot");game.owned_pots.erase("g2_ramen_bowl");game.pot_design_unlocks.erase(paid_product_id);game.pot_design_unlocks.erase(jackpot_product_id);game.pot_design_unlocks.erase(ramen_product_id);game.forest_gacha_unlocked=false;game.act3_unlocked=false
 	ui.open_pot_shop();classic_shop_card=_pot_shop_card(ui,"classic_terracotta");var classic_buy_buttons:=classic_shop_card.find_children("*","Button",true,false);assert(_has_label_text_containing(classic_shop_card,"所持 ×2") and classic_buy_buttons.size()==1 and not (classic_buy_buttons[0] as Button).disabled and "1ぷくコイン" in (classic_buy_buttons[0] as Button).text)
 	game._save();game.owned_pots.erase("classic_terracotta");game._load_save();assert(int(game.owned_pots.get("classic_terracotta",0))==2 and typeof(game.owned_pots.get("classic_terracotta"))==TYPE_INT)
 	game._sync_arrangement_ui();ui.open_home();assert(ui.pot_select_grid.get_child_count()==8);ui._select_editor_pot("classic_terracotta");assert(ui.editor_page.visible and str(ui.current_arrangement.pot_id)=="classic_terracotta")
