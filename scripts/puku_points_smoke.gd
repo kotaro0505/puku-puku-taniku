@@ -1,6 +1,7 @@
 extends Node
 
 const SucculentClass=preload("res://scripts/succulent.gd")
+const Localizer=preload("res://scripts/game_localizer.gd")
 
 func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
@@ -23,7 +24,7 @@ func _ready()->void:
 	_test_save_and_legacy_load(game)
 	await _test_panda_rescue(game)
 	game._reset_progression_state();game.queue_free()
-	print("PUKU_POINTS_SMOKE_OK unit=1/1000 round_cost=1.00 direct_harvest=true giant=100,120,150,200,300,500,700,1000,1500,2000,10000cm_linear_rooted_species3_positions3_speeds1.6+10 label_toggle=main_only_live_recalc reward1000+2000=true new_floor=.20 migration=points+legacy_gauge forest_cost=1 rescue=wallet_plus_1 combo=true fly_removed=true result=removed automatic_get=true")
+	print("PUKU_POINTS_SMOKE_OK unit=1/1000 round_cost=1.00 direct_harvest=true giant=100,120,150,200,300,500,700,1000,1500,2000,10000cm_linear_rooted_species3_positions3_speeds1.6+10 label_toggle=localized_persistent_on_off+main_only_live_recalc reward1000+2000=true new_floor=.20 migration=points+legacy_gauge forest_cost=1 rescue=wallet_plus_1 combo=true fly_removed=true result=removed automatic_get=true")
 	get_tree().quit()
 
 func _test_seed_pod_thresholds(game)->void:
@@ -87,9 +88,18 @@ func _test_live_harvest_preview(game)->void:
 	game.play_active=false;game._clear_greenhouse_plants();game.show_growing_puku_preview=true
 
 func _test_plant_label_visibility_toggle(game)->void:
-	assert(game.show_growing_plant_labels and game.plant_label_visibility_button and game.plant_label_visibility_button.text=="UIを隠す")
+	game.language_code="ja";game._update_plant_label_visibility_button()
+	assert(game.show_growing_plant_labels and game.plant_label_visibility_button and game.plant_label_visibility_button.text=="表示ON")
+	assert(Localizer.text("ja","plant_labels_on")=="表示ON" and Localizer.text("ja","plant_labels_off")=="表示OFF")
+	assert(Localizer.text("hiragana","plant_labels_on")=="ひょうじON" and Localizer.text("hiragana","plant_labels_off")=="ひょうじOFF")
+	assert(Localizer.text("en","plant_labels_on")=="Display ON" and Localizer.text("en","plant_labels_off")=="Display OFF")
 	var button_rect:Rect2=game.plant_label_visibility_button.get_rect()
-	assert(button_rect.position.x>=16.0 and button_rect.end.y<=1000.0 and button_rect.size.x<=130.0 and button_rect.size.y<=50.0,"label toggle is not compact or safely inset: %s"%button_rect)
+	assert(button_rect==Rect2(Vector2(18,952),Vector2(124,48)),"label toggle position or size changed: %s"%button_rect)
+	var on_style:=game.plant_label_visibility_button.get_theme_stylebox("normal") as StyleBoxFlat
+	var unrelated_style:=game.settings_button.get_theme_stylebox("normal") as StyleBoxFlat
+	assert(on_style and unrelated_style)
+	var on_luminance:=on_style.bg_color.get_luminance()
+	var unrelated_color:=unrelated_style.bg_color
 	game.opening_finished=true;game.opening_overlay.visible=false;game.intro_story_complete=true;game.habitat_awakened=true;game.habitat_tutorial_complete=true;game.seed_shop_open=true;game.puku_gauge_intro_complete=true
 	game.first_play_tutorial_active=false;game.puku_buyback_tutorial_active=false;game.first_seed_pod_reward_event_active=false;game.scripted_dialog_kind="";game.tutorial_dialog_kind="";game.current_mode="greenhouse";game.arrangement_scene_active=false;game.arrangement_transitioning=false;game.catalog_preview_mode_active=false
 	for overlay in [game.intro_overlay,game.result_overlay,game.play_overlay,game.shop_overlay,game.settings_overlay,game.encyclopedia_overlay,game.species_get_overlay,game.catalog_series_unlock_overlay,game.forest_gacha_ui,game.fusion_lab_ui,game.arrangement_ui,game.puku_puku_battle]:
@@ -100,15 +110,23 @@ func _test_plant_label_visibility_toggle(game)->void:
 	game._update_play_ui();game._update_labels()
 	assert(game.plant_label_visibility_button.visible and known.label.visible and new_plant.label.visible)
 	assert(known.label.text=="70.0 cm\n+0.80ぷくコイン" and new_plant.label.text.begins_with("NEW！\n150.0 cm\n"))
-	game._toggle_growing_plant_labels()
-	assert(not game.show_growing_plant_labels and game.plant_label_visibility_button.visible and game.plant_label_visibility_button.text=="UIを表示")
+	game.plant_label_visibility_button.pressed.emit()
+	assert(not game.show_growing_plant_labels and game.plant_label_visibility_button.visible and game.plant_label_visibility_button.text=="表示OFF")
+	var off_style:=game.plant_label_visibility_button.get_theme_stylebox("normal") as StyleBoxFlat
+	assert(off_style and off_style.bg_color.get_luminance()<on_luminance,"OFF state did not stay visibly darker than ON")
+	assert((game.settings_button.get_theme_stylebox("normal") as StyleBoxFlat).bg_color==unrelated_color,"label toggle styling leaked to another button")
+	for localized_off in [{"code":"hiragana","text":"ひょうじOFF"},{"code":"en","text":"Display OFF"},{"code":"ja","text":"表示OFF"}]:
+		game.language_code=str(localized_off.code);game._update_plant_label_visibility_button();assert(game.plant_label_visibility_button.text==str(localized_off.text))
+	game._update_play_ui();assert((game.plant_label_visibility_button.get_theme_stylebox("normal") as StyleBoxFlat).bg_color.get_luminance()<on_luminance,"OFF style only lasted for the press frame")
 	assert(not known.label.visible and not new_plant.label.visible and game.show_growing_puku_preview,"whole-label toggle changed the separate reward-preview setting")
 	assert(known.visible and known.screen_sprite.visible and new_plant.visible and new_plant.screen_sprite.visible,"hiding labels also hid plant artwork")
 	game._spawn_specific_plant("colorata");var hidden_spawn=game.plants.back();hidden_spawn.jelly_checks_enabled=false
 	assert(not hidden_spawn.label.visible,"a plant spawned while labels were hidden flashed its label before the next update")
 	known.fast_forward_to_diameter(100.0);new_plant.fast_forward_to_diameter(200.0);game._update_labels();assert(not known.label.visible and not new_plant.label.visible)
-	game._toggle_growing_plant_labels()
-	assert(game.show_growing_plant_labels and game.plant_label_visibility_button.text=="UIを隠す" and known.label.visible and new_plant.label.visible and hidden_spawn.label.visible)
+	game.plant_label_visibility_button.pressed.emit()
+	assert(game.show_growing_plant_labels and game.plant_label_visibility_button.text=="表示ON" and known.label.visible and new_plant.label.visible and hidden_spawn.label.visible)
+	assert((game.plant_label_visibility_button.get_theme_stylebox("normal") as StyleBoxFlat).bg_color.get_luminance()==on_luminance,"ON style did not return immediately with the state")
+	assert(game.plant_label_visibility_button.get_rect()==button_rect,"label toggle layout changed while switching state")
 	assert(known.label.text=="100.0 cm\n+3.75ぷくコイン" and new_plant.label.text.begins_with("NEW！\n200.0 cm\n"),"restored labels did not recalculate live values known=%s new=%s"%[known.label.text,new_plant.label.text])
 	game._change_growing_puku_preview(false);assert(game.show_growing_plant_labels and known.label.text=="100.0 cm" and new_plant.label.text=="NEW！\n200.0 cm")
 	game._toggle_growing_plant_labels();game._toggle_growing_plant_labels();assert(not game.show_growing_puku_preview and known.label.visible and known.label.text=="100.0 cm","whole-label toggle was not independent from reward-preview setting")

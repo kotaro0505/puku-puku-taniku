@@ -1888,7 +1888,7 @@ func _build_ui() -> void:
 	var mission_content:=VBoxContainer.new();mission_content.alignment=BoxContainer.ALIGNMENT_CENTER;mission_content.mouse_filter=Control.MOUSE_FILTER_IGNORE;mission_content.add_theme_constant_override("separation",1);mission_panel.add_child(mission_content)
 	mission_title_label=Label.new();mission_title_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;mission_title_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;mission_title_label.add_theme_font_size_override("font_size",15);mission_title_label.add_theme_color_override("font_color",Color("#f6cf69"));mission_content.add_child(mission_title_label)
 	mission_text_label=Label.new();mission_text_label.custom_minimum_size=Vector2(320,60);mission_text_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;mission_text_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;mission_text_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;mission_text_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;mission_text_label.add_theme_font_size_override("font_size",16);mission_text_label.add_theme_color_override("font_color",Color("#fff7dc"));mission_content.add_child(mission_text_label)
-	plant_label_visibility_button=Button.new();plant_label_visibility_button.name="PlantLabelVisibilityButton";plant_label_visibility_button.position=Vector2(18,952);plant_label_visibility_button.size=Vector2(124,48);plant_label_visibility_button.focus_mode=Control.FOCUS_NONE;plant_label_visibility_button.mouse_filter=Control.MOUSE_FILTER_STOP;_skin_button(plant_label_visibility_button,Color("#6f4932"),15);plant_label_visibility_button.pressed.connect(_toggle_growing_plant_labels);main_status_hud.add_child(plant_label_visibility_button)
+	plant_label_visibility_button=Button.new();plant_label_visibility_button.name="PlantLabelVisibilityButton";plant_label_visibility_button.position=Vector2(18,952);plant_label_visibility_button.size=Vector2(124,48);plant_label_visibility_button.focus_mode=Control.FOCUS_NONE;plant_label_visibility_button.mouse_filter=Control.MOUSE_FILTER_STOP;_skin_plant_label_visibility_button(plant_label_visibility_button);plant_label_visibility_button.pressed.connect(_toggle_growing_plant_labels);main_status_hud.add_child(plant_label_visibility_button)
 	for entry in [{"x":398,"t":"図鑑"},{"x":478,"t":"設定"}]:
 		var b:=Button.new(); b.text=entry.t; b.position=Vector2(entry.x,134); b.size=Vector2(73,55); _skin_button(b,Color("#fff0cf"),16); hud.add_child(b)
 		external_navigation_controls.append(b)
@@ -4703,7 +4703,7 @@ func _change_growing_puku_preview(enabled:bool)->void:
 	_update_labels();_save()
 
 func _plant_label_visibility_button_text()->String:
-	return Localizer.text(language_code,"plant_labels_hide" if show_growing_plant_labels else "plant_labels_show")
+	return Localizer.text(language_code,"plant_labels_on" if show_growing_plant_labels else "plant_labels_off")
 
 func _plant_label_visibility_button_should_show()->bool:
 	if not opening_finished or not _tutorial_fully_complete() or first_play_tutorial_active or puku_buyback_tutorial_active or first_seed_pod_reward_event_active:return false
@@ -4715,6 +4715,7 @@ func _plant_label_visibility_button_should_show()->bool:
 func _update_plant_label_visibility_button()->void:
 	if plant_label_visibility_button==null:return
 	plant_label_visibility_button.text=_plant_label_visibility_button_text()
+	_apply_plant_label_visibility_button_style()
 	plant_label_visibility_button.visible=_plant_label_visibility_button_should_show()
 
 func _toggle_growing_plant_labels()->void:
@@ -7796,6 +7797,30 @@ func _set_intro_speaker(speaker_id:String)->void:
 func _skin_button(b:Button,bg:Color,font_size:int)->void:
 	b.add_theme_font_size_override("font_size",font_size); b.add_theme_color_override("font_color",UI_BROWN if bg.get_luminance()>.55 else Color.WHITE); b.add_theme_color_override("font_hover_color",UI_BROWN); b.add_theme_stylebox_override("normal",_box(bg,bg.lightened(.22),20,3)); b.add_theme_stylebox_override("hover",_box(bg.lightened(.08),Color.WHITE,20,3)); b.add_theme_stylebox_override("pressed",_box(bg.darkened(.08),bg.lightened(.2),20,3))
 	if audio_manager and not b.pressed.is_connected(_play_ui_tap):b.pressed.connect(_play_ui_tap)
+
+func _skin_plant_label_visibility_button(button:Button)->void:
+	button.add_theme_font_size_override("font_size",15)
+	_apply_plant_label_visibility_button_style()
+	if audio_manager and not button.pressed.is_connected(_play_ui_tap):button.pressed.connect(_play_ui_tap)
+
+func _apply_plant_label_visibility_button_style()->void:
+	if plant_label_visibility_button==null:return
+	var button:=plant_label_visibility_button
+	var normal_bg:=Color("#f6d76f") if show_growing_plant_labels else Color("#51443d")
+	var hover_bg:=Color("#ffe589") if show_growing_plant_labels else Color("#5d4f47")
+	var pressed_bg:=Color("#dfb94e") if show_growing_plant_labels else Color("#443832")
+	var border:=Color("#fff3b0") if show_growing_plant_labels else Color("#796b63")
+	var font_color:=UI_BROWN if show_growing_plant_labels else Color("#c8beb7")
+	button.add_theme_color_override("font_color",font_color)
+	button.add_theme_color_override("font_hover_color",UI_BROWN if show_growing_plant_labels else Color("#ded4cc"))
+	button.add_theme_color_override("font_pressed_color",UI_BROWN if show_growing_plant_labels else Color("#c8beb7"))
+	button.add_theme_color_override("font_focus_color",font_color)
+	button.add_theme_color_override("font_disabled_color",font_color)
+	button.add_theme_stylebox_override("normal",_box(normal_bg,border,20,3))
+	button.add_theme_stylebox_override("hover",_box(hover_bg,border.lightened(.12),20,3))
+	button.add_theme_stylebox_override("pressed",_box(pressed_bg,border,20,3))
+	button.add_theme_stylebox_override("hover_pressed",_box(pressed_bg,border.lightened(.12),20,3))
+	button.add_theme_stylebox_override("disabled",_box(normal_bg,border,20,3))
 
 func _skin_story_continue_button(button:Button)->void:
 	StoryContinueButtonStyleClass.apply(button)
