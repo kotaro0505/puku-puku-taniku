@@ -10,9 +10,9 @@ func _ready() -> void:
 	game.story_progression_state["arrangement_intro_seen"] = true
 	game.discovered = {"colorata": true}
 	game.species_get_counts = {"colorata": 20}
-	game.owned_pots = {"shallow_terracotta": 20}
+	game.owned_pots = {"shallow_terracotta": 50}
 	game.saved_arrangements = []
-	for index in range(20):
+	for index in range(50):
 		game.saved_arrangements.append(game._normalize_arrangement({
 			"arrangement_id": "gallery_%02d" % index,
 			"name": "寄せ植え%d" % (index + 1),
@@ -23,20 +23,22 @@ func _ready() -> void:
 			"viewer_transform": {"x": 90.0, "y": -45.0, "scale": 2.0},
 			"share_background_id": "greenhouse" if index % 2 == 0 else "puku_members",
 		}))
+	var gallery_build_started_usec := Time.get_ticks_usec()
 	game._sync_arrangement_ui()
 	var ui = game.arrangement_ui
 	ui.open_home()
 	ui._open_saved_arrangements()
+	var gallery_build_msec := float(Time.get_ticks_usec() - gallery_build_started_usec) / 1000.0
 	await get_tree().process_frame
 	await get_tree().process_frame
 	assert(ui.viewer_gallery_mode and ui.saved_arrangements_page == ui.viewer_page)
-	assert(ui.saved_arrangements_tabs.get_child_count() == 20)
+	assert(ui.saved_arrangements_tabs.get_child_count() == 50 and gallery_build_msec < 500.0)
 	assert(ui.saved_arrangements_tab_scroll.horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_AUTO)
 	assert(ui.saved_arrangements_tab_scroll.vertical_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED)
 	assert(ui.saved_arrangements_tab_scroll.position.y + ui.saved_arrangements_tab_scroll.size.y <= ui.viewer_canvas.position.y)
-	assert(str(ui.current_arrangement.arrangement_id) == "gallery_19")
+	assert(str(ui.current_arrangement.arrangement_id) == "gallery_49")
 	assert(ui.viewer_artwork_root.position.is_zero_approx() and is_equal_approx(ui.viewer_artwork_root.scale.x, 1.0))
-	assert("✓" in (ui.saved_arrangements_tabs.get_child(19) as Button).text)
+	assert("✓" in (ui.saved_arrangements_tabs.get_child(49) as Button).text)
 	assert(ui.saved_arrangements_tab_scroll.scroll_horizontal > 0)
 	assert(ui.selected_saved_tab_button.position.x >= ui.saved_arrangements_tab_scroll.scroll_horizontal)
 	assert(ui.selected_saved_tab_button.position.x + ui.selected_saved_tab_button.size.x <= ui.saved_arrangements_tab_scroll.scroll_horizontal + ui.saved_arrangements_tab_scroll.size.x + 1.0)
@@ -52,8 +54,8 @@ func _ready() -> void:
 	ui._select_share_background("greenhouse")
 	assert(ui.viewer_artwork_root.position.is_equal_approx(Vector2(44.0, -21.0)))
 	assert(is_equal_approx(ui.viewer_artwork_root.scale.x, 1.4))
-	assert(str(game.saved_arrangements[19].share_background_id) == "greenhouse")
-	assert(not game.saved_arrangements[19].has("viewer_transform"))
+	assert(str(game.saved_arrangements[49].share_background_id) == "greenhouse")
+	assert(not game.saved_arrangements[49].has("viewer_transform"))
 
 	# Sharing receives only the dedicated share editor's framing without adding
 	# it to persistent state or modifying the ordinary viewer.
@@ -66,7 +68,7 @@ func _ready() -> void:
 	assert(captured.size() == 1)
 	var captured_transform: Dictionary = captured[0].viewer_transform
 	assert(Vector2(float(captured_transform.x), float(captured_transform.y)).is_equal_approx(Vector2(32.0, -18.0)) and is_equal_approx(float(captured_transform.scale), 1.3))
-	assert(not game.saved_arrangements[19].has("viewer_transform"))
+	assert(not game.saved_arrangements[49].has("viewer_transform"))
 	ui.set_share_state("", false)
 	ui._return_from_share_editor()
 	assert(ui.viewer_page.visible and ui.viewer_artwork_root.position.is_equal_approx(Vector2(44.0, -21.0)) and is_equal_approx(ui.viewer_artwork_root.scale.x, 1.4))
@@ -84,7 +86,7 @@ func _ready() -> void:
 	assert(str(ui.current_arrangement.share_background_id) == "greenhouse")
 	ui._return_from_viewer()
 	ui._open_saved_arrangements()
-	assert(str(ui.current_arrangement.arrangement_id) == "gallery_19")
+	assert(str(ui.current_arrangement.arrangement_id) == "gallery_49")
 	assert(ui.viewer_artwork_root.position.is_zero_approx() and is_equal_approx(ui.viewer_artwork_root.scale.x, 1.0))
 
 	# Legacy framing is accepted on input but discarded from normalized/new save data.
@@ -97,11 +99,11 @@ func _ready() -> void:
 		assert(saved_value is Dictionary and not saved_value.has("viewer_transform"))
 
 	# One work is still shown directly; zero works uses only the empty state.
-	ui.sync_state({"shallow_terracotta": 1}, [game.saved_arrangements[0]], 20)
+	ui.sync_state({"shallow_terracotta": 1}, [game.saved_arrangements[0]], 50)
 	ui._open_saved_arrangements()
 	assert(ui.saved_arrangements_tabs.get_child_count() == 1 and ui.viewer_canvas.visible)
 	assert(not _has_button_text(ui.saved_arrangements_page, "見る"))
-	ui.sync_state({"shallow_terracotta": 1}, [], 20)
+	ui.sync_state({"shallow_terracotta": 1}, [], 50)
 	assert(ui.saved_arrangements_empty.visible and not ui.viewer_canvas.visible)
 	assert(not ui.viewer_share_button.visible and not ui.viewer_dismantle_button.visible and not ui.share_editor_page.visible)
 
@@ -119,7 +121,7 @@ func _ready() -> void:
 	assert(game.saved_arrangements.size() == 2 and str(ui.current_arrangement.arrangement_id) == "remove_2")
 	assert(ui.viewer_artwork_root.position.is_zero_approx() and is_equal_approx(ui.viewer_artwork_root.scale.x, 1.0))
 	assert(game._pot_usage_count("shallow_terracotta") == 2 and game._pot_available_count("shallow_terracotta") == 18)
-	print("ARRANGEMENT_GALLERY_SMOKE_OK tabs=20 transient_share=true reset=true")
+	print("ARRANGEMENT_GALLERY_SMOKE_OK tabs=50 build_ms=", snappedf(gallery_build_msec, .001), " transient_share=true reset=true")
 	get_tree().quit()
 
 func _has_button_text(root: Node, text: String) -> bool:

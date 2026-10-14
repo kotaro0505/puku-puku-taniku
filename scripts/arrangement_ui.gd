@@ -18,6 +18,7 @@ const PotPlaceholderClass = preload("res://scripts/arrangement_pot_placeholder.g
 const ShareBackgroundsClass = preload("res://scripts/arrangement_share_backgrounds.gd")
 const ShareRendererClass = preload("res://scripts/arrangement_share_renderer.gd")
 const MAX_PLANTS_PER_ARRANGEMENT := 24
+const DEFAULT_SAVE_CAPACITY := 50
 const PLANT_CONTROL_SIZE := Vector2(150,150)
 const PLANT_SCALE_MIN := 0.45
 # This is only a technical guard against accidental infinite transforms.  It
@@ -56,7 +57,7 @@ var owned_catalogs:Dictionary={"base":true}
 var wallet_puku_points:=0
 var seed_shop_products:Array=[]
 var saved_arrangements:Array=[]
-var save_capacity:=20
+var save_capacity:=DEFAULT_SAVE_CAPACITY
 var pot_sales_stage:=0
 var pot_design_unlocks:Dictionary={}
 var pot_iap_products:Dictionary={}
@@ -576,9 +577,13 @@ func _build_home_page()->void:
 
 func _refresh_home()->void:
 	var capacity_full:=_at_save_capacity()
-	home_status.visible=capacity_full;home_status.text=GameLocalizer.text(language_code,"arrangement_save_limit_help") if capacity_full else ""
-	home_pot_scroll.position.y=268.0 if capacity_full else 208.0;home_pot_scroll.size.y=678.0 if capacity_full else 738.0
-	_refresh_pot_selection()
+	var available_pot_count:=_refresh_pot_selection()
+	var no_available_pots:=not capacity_full and available_pot_count==0
+	home_status.visible=capacity_full or no_available_pots
+	if capacity_full:home_status.text=GameLocalizer.text(language_code,"arrangement_save_limit_help")
+	elif no_available_pots:home_status.text=GameLocalizer.text(language_code,"arrangement_no_available_pots")
+	else:home_status.text=""
+	home_pot_scroll.position.y=268.0 if home_status.visible else 208.0;home_pot_scroll.size.y=678.0 if home_status.visible else 738.0
 
 func _open_saved_arrangements()->void:
 	viewer_gallery_mode=true;viewer_return_context="saved";selected_saved_arrangement_id="";selected_saved_arrangement_index=-1
@@ -666,21 +671,26 @@ func _apply_viewer_page_mode()->void:
 	if not has_work:
 		_close_share_background_panel()
 
-func _refresh_pot_selection()->void:
+func _refresh_pot_selection()->int:
 	_clear_children(pot_select_grid)
 	var capacity_full:=_at_save_capacity()
+	var displayed_count:=0
 	for pot_value in pot_catalog:
 		if not pot_value is Dictionary:continue
 		var pot:Dictionary=pot_value
 		if not _pot_sales_stage_unlocked(pot):continue
 		var pot_id:=str(pot.get("pot_id",""));var total:=_pot_total_count(pot_id)
 		if total<=0 or not _pot_design_unlocked(pot):continue
-		var available:=_pot_available_count(pot_id);var selectable:=not capacity_full and available>0
-		var card:=Button.new();card.custom_minimum_size=Vector2(248,230);_skin_button(card,Color("#f4e1bc") if selectable else Color("#c9b8a2"),15);_prepare_scroll_button(card);card.disabled=not selectable;pot_select_grid.add_child(card)
+		var available:=_pot_available_count(pot_id)
+		if available<=0:continue
+		var selectable:=not capacity_full
+		var card:=Button.new();card.set_meta("pot_id",pot_id);card.custom_minimum_size=Vector2(248,230);_skin_button(card,Color("#f4e1bc") if selectable else Color("#c9b8a2"),15);_prepare_scroll_button(card);card.disabled=not selectable;pot_select_grid.add_child(card)
 		var preview:=Control.new();preview.position=Vector2(14,10);preview.size=Vector2(220,150);preview.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(preview);_render_pot(preview,pot,true)
-		var availability_text:=GameLocalizer.text(language_code,"pot_available_count",[available]) if available>0 else GameLocalizer.text(language_code,"pot_all_in_use")
+		var availability_text:=GameLocalizer.text(language_code,"pot_available_count",[available])
 		var label:=Label.new();label.text=GameLocalizer.pot_name(language_code,pot)+"\n"+availability_text;label.position=Vector2(10,164);label.size=Vector2(228,56);label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.add_theme_font_size_override("font_size",16);label.add_theme_color_override("font_color",UI_BROWN);label.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(label)
 		card.pressed.connect(_select_editor_pot.bind(pot_id))
+		displayed_count+=1
+	return displayed_count
 
 func _select_editor_pot(pot_id:String)->void:
 	if _at_save_capacity():

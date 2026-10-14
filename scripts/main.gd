@@ -89,6 +89,7 @@ const PUKU_GAUGE_LARGE_REWARD_BATCH_UNITS := 8000
 const ENDLESS_AUTO_SOW_TUTORIAL_STEP := "endless_auto_sow_prompt_seen"
 const HABITAT_TIME_MULTIPLIERS := [1, 60, 3600, 21600, 86400]
 const DEFAULT_POT_ID := "shallow_terracotta"
+const ARRANGEMENT_SAVE_CAPACITY := ArrangementUIClass.DEFAULT_SAVE_CAPACITY
 const POT_PRICE_PUKU := 1
 const NORMAL_GERMINATION_COUNT := 12
 const VOLUME_GERMINATION_COUNT := 36
@@ -614,12 +615,13 @@ var catalog_cover_migration_dirty := false
 var collection_completion_migration_dirty := false
 var pot_inventory_migration_dirty := false
 var retired_content_migration_dirty := false
+var arrangement_capacity_migration_dirty := false
 var pot_catalog: Array = []
 var owned_pots: Dictionary = {DEFAULT_POT_ID:1}
 var pot_design_unlocks: Dictionary = {}
 var pot_unlock_iap_service
 var saved_arrangements: Array = []
-var arrangement_save_capacity := 20
+var arrangement_save_capacity := ARRANGEMENT_SAVE_CAPACITY
 var arrangement_ui
 var arrangement_navigation_hint
 var unlocked_species: Dictionary = {}
@@ -853,11 +855,11 @@ func _ready() -> void:
 	if not legacy_habitat_notification_ids_to_cancel.is_empty():
 		habitat_notification_service=HabitatNotificationServiceClass.new();add_child(habitat_notification_service)
 		habitat_notification_service.cancel_all(legacy_habitat_notification_ids_to_cancel);legacy_habitat_notification_ids_to_cancel.clear()
-	if best_spawn_unlocks_dirty or get_counts_migration_dirty or puku_balance_migration_dirty or catalog_cover_migration_dirty or collection_completion_migration_dirty or pot_inventory_migration_dirty or retired_content_migration_dirty or recovered_forest_encounters:
+	if best_spawn_unlocks_dirty or get_counts_migration_dirty or puku_balance_migration_dirty or catalog_cover_migration_dirty or collection_completion_migration_dirty or pot_inventory_migration_dirty or retired_content_migration_dirty or arrangement_capacity_migration_dirty or recovered_forest_encounters:
 		# A true cold start must reach the language choice before creating its
 		# first save.  The selected language then persists all initialized state.
 		if save_file_present_on_boot or language_selected:_save()
-		best_spawn_unlocks_dirty=false;get_counts_migration_dirty=false;puku_balance_migration_dirty=false;catalog_cover_migration_dirty=false;collection_completion_migration_dirty=false;pot_inventory_migration_dirty=false;retired_content_migration_dirty=false
+		best_spawn_unlocks_dirty=false;get_counts_migration_dirty=false;puku_balance_migration_dirty=false;catalog_cover_migration_dirty=false;collection_completion_migration_dirty=false;pot_inventory_migration_dirty=false;retired_content_migration_dirty=false;arrangement_capacity_migration_dirty=false
 	_build_world()
 	_build_ui()
 	if habitat_awakened and (habitat_wild_initialized or habitat_unlocked):_ensure_habitat_wild_state(Time.get_unix_time_from_system(),true)
@@ -1093,7 +1095,7 @@ func _load_save() -> void:
 	_cancel_puku_gauge_animations()
 	act3_first_battle_active=false
 	_reset_collection_complete_presentation(true)
-	legacy_habitat_migration_dirty=false;puku_balance_migration_dirty=false;catalog_cover_migration_dirty=false;collection_completion_migration_dirty=false;pot_inventory_migration_dirty=false;retired_content_migration_dirty=false;legacy_habitat_notification_ids_to_cancel.clear();panda_beacon_unread_log.clear()
+	legacy_habitat_migration_dirty=false;puku_balance_migration_dirty=false;catalog_cover_migration_dirty=false;collection_completion_migration_dirty=false;pot_inventory_migration_dirty=false;retired_content_migration_dirty=false;arrangement_capacity_migration_dirty=false;legacy_habitat_notification_ids_to_cancel.clear();panda_beacon_unread_log.clear()
 	puku_balance_units=0
 	normal_round_free_plays=0
 	catalog_cover_species={}
@@ -1149,7 +1151,10 @@ func _load_save() -> void:
 				puku_gauge_cm=fposmod(puku_gauge_cm,SEED_POD_GAUGE_TARGET_CM)
 			species_get_counts=value.get("species_get_counts",{});unlocked_series=value.get("unlocked_series",{INITIAL_SERIES_ID:true});catalog_cover_species=value.get("catalog_cover_species",{})
 			collection_complete_versions=_normalize_collection_complete_versions(value.get("collection_complete_versions",{}))
-			owned_pots=value.get("owned_pots",{DEFAULT_POT_ID:1});pot_design_unlocks=_normalize_pot_design_unlocks(value.get("pot_design_unlocks",{}));saved_arrangements=value.get("saved_arrangements",[]);arrangement_save_capacity=maxi(1,int(value.get("arrangement_save_capacity",20)))
+			owned_pots=value.get("owned_pots",{DEFAULT_POT_ID:1});pot_design_unlocks=_normalize_pot_design_unlocks(value.get("pot_design_unlocks",{}));saved_arrangements=value.get("saved_arrangements",[])
+			var saved_arrangement_capacity:=int(value.get("arrangement_save_capacity",ARRANGEMENT_SAVE_CAPACITY))
+			arrangement_save_capacity=ARRANGEMENT_SAVE_CAPACITY
+			arrangement_capacity_migration_dirty=not value.has("arrangement_save_capacity") or saved_arrangement_capacity!=ARRANGEMENT_SAVE_CAPACITY
 			if not value.has("owned_pots"):pot_inventory_migration_dirty=true
 			if not species_get_counts is Dictionary:species_get_counts={}
 			if not unlocked_series is Dictionary:unlocked_series={INITIAL_SERIES_ID:true}
@@ -4801,7 +4806,7 @@ func _reset_progression_state()->void:
 	original_catalog_complete_event_seen=false;habitat_tutorial_returned_to_greenhouse=false;jurejure_intro_complete=false;jurejure_enabled=false;jurejure_growth_stage=JureJureSystemClass.GROWTH_EARLY;jurejure_growth_event_mask=0;active_jurejure_event={};jurejure_next_check_unix=0.0;jurejure_cooldown_until_unix=0.0;jurejure_return_event_complete=false;jurejure_waiting_for_seed_pod_reward=false;jurejure_battle_count=0;jurejure_battle_win_count=0;jurejure_habitat_visit_point=Vector2(-1.0,-1.0);jurejure_pending_reward_species_id="";jurejure_pending_reward_is_new=false;jurejure_last_battle_result.clear();act3_first_battle_active=false;habitat_second_awakened=false;habitat_second_awakening_complete=false;jurejure_update_accumulator=0.0
 	first_seed_pod_reward_event_active=false;habitat_visit_id=0;jurejure_focused_habitat_visit_id=-1;act3_intro_eligible_visit_id=0;habitat_crisis_eligible_visit_id=0
 	if habitat_crisis_atmosphere:habitat_crisis_atmosphere.deactivate()
-	_cancel_puku_gauge_animations();puku_gauge_cm=0.0;puku_balance_units=0;show_growing_puku_preview=true;bests.clear();discovered.clear();species_get_counts.clear();catalog_cover_species.clear();unlocked_series={INITIAL_SERIES_ID:true};series_seed_inventory.clear();forest_gacha_draw_count=0;forest_gacha_encountered.clear();active_series_seed_id="";owned_pots={DEFAULT_POT_ID:1};saved_arrangements.clear();arrangement_save_capacity=20;greenhouse_available=_initial_greenhouse_state();unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;opening_story_complete=false;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;puku_gauge_intro_complete=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;mystery_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;mystery_seed_pack_unlocked=false;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;habitat_mystery_seeds_pending=0;mystery_seed_count=0;armadillo_research_total=0;armadillo_research_rewards.clear();armadillo_research_intro_seen=false;armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();result_deferred_species_queue.clear();pending_round_new_species_ids.clear();round_result_species_finalize_queue.clear();round_result_species_finalize_active=false;round_result_species_save_pending=false;shop_chatter_acquired_species.clear();species_get_queue.clear();play_share_record.clear();play_active=false;play_time_remaining=0.0;play_harvest_cm_total=0.0;play_puku_reward_units_total=0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;greenhouse_round_followup_started=false;_reset_endless_economy_stats();rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_time_multiplier=1;habitat_simulation_unix=Time.get_unix_time_from_system();habitat_debug_log.clear();habitat_scroll_tutorial_active=false;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_clear_habitat_items();_save();_update_currency_ui();_update_play_ui()
+	_cancel_puku_gauge_animations();puku_gauge_cm=0.0;puku_balance_units=0;show_growing_puku_preview=true;bests.clear();discovered.clear();species_get_counts.clear();catalog_cover_species.clear();unlocked_series={INITIAL_SERIES_ID:true};series_seed_inventory.clear();forest_gacha_draw_count=0;forest_gacha_encountered.clear();active_series_seed_id="";owned_pots={DEFAULT_POT_ID:1};saved_arrangements.clear();arrangement_save_capacity=ARRANGEMENT_SAVE_CAPACITY;greenhouse_available=_initial_greenhouse_state();unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;opening_story_complete=false;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;puku_gauge_intro_complete=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;mystery_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;mystery_seed_pack_unlocked=false;login_bonus_date="";habitat_seed_date="";habitat_seeds_collected=0;habitat_mystery_seeds_pending=0;mystery_seed_count=0;armadillo_research_total=0;armadillo_research_rewards.clear();armadillo_research_intro_seen=false;armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();result_deferred_species_queue.clear();pending_round_new_species_ids.clear();round_result_species_finalize_queue.clear();round_result_species_finalize_active=false;round_result_species_save_pending=false;shop_chatter_acquired_species.clear();species_get_queue.clear();play_share_record.clear();play_active=false;play_time_remaining=0.0;play_harvest_cm_total=0.0;play_puku_reward_units_total=0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;greenhouse_round_followup_started=false;_reset_endless_economy_stats();rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_time_multiplier=1;habitat_simulation_unix=Time.get_unix_time_from_system();habitat_debug_log.clear();habitat_scroll_tutorial_active=false;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_clear_habitat_items();_save();_update_currency_ui();_update_play_ui()
 	if growing_puku_preview_toggle:growing_puku_preview_toggle.set_pressed_no_signal(true);growing_puku_preview_toggle.text=_growing_puku_preview_setting_text()
 	normal_round_free_plays=0
 	normal_play_count=0;shop_visit_count=0;hidden_species_acquired.clear();tovar_next_play=TOVAR_FIRST_PLAY;tovar_attempt_count=0;tovar_event_active=false;tovar_harvested_this_play=false;armadillo_present=false;_save()

@@ -7,8 +7,10 @@ func _ready()->void:
 	game.discovered={"colorata":true,"laui":false};game.species_get_counts={"colorata":4};game.bests={"colorata":11.1};game.puku_points=12;game._sync_arrangement_ui();game._update_play_ui()
 	var ui=game.arrangement_ui
 	var localizer=load("res://scripts/game_localizer.gd")
+	assert(game.arrangement_save_capacity==50 and ui.save_capacity==50 and ui.MAX_PLANTS_PER_ARRANGEMENT==24)
 	for locale in ["ja","hiragana","en"]:
-		for key in ["pot_available_count","pot_all_in_use","pot_save_unavailable","pot_owned_total","pot_bought_count","pot_purchase_success","pot_purchase_owned_before","pot_purchase_owned_after","pot_locked_puku_price","arrangement_dismantle","arrangement_dismantle_confirm","arrangement_dismantle_confirm_button","arrangement_dismantle_cancel","arrangement_choose_pot_hint","arrangement_view_saved","arrangement_saved_title","arrangement_save_limit_help","share_action","share_editor_title","share_confirm_action","share_creating","share_failed","share_opening","share_background","share_background_greenhouse","share_background_puku_members","share_background_jurejure_gang","share_background_all_characters","share_background_selected","share_background_available_from_start","share_background_unlock_exploitation","share_background_unlock_story_clear","share_background_unlock_collection_complete"]:assert(localizer.text(locale,key)!=key)
+		for key in ["pot_available_count","pot_all_in_use","pot_save_unavailable","pot_owned_total","pot_bought_count","pot_purchase_success","pot_purchase_owned_before","pot_purchase_owned_after","pot_locked_puku_price","arrangement_dismantle","arrangement_dismantle_confirm","arrangement_dismantle_confirm_button","arrangement_dismantle_cancel","arrangement_choose_pot_hint","arrangement_view_saved","arrangement_saved_title","arrangement_save_limit_help","arrangement_no_available_pots","share_action","share_editor_title","share_confirm_action","share_creating","share_failed","share_opening","share_background","share_background_greenhouse","share_background_puku_members","share_background_jurejure_gang","share_background_all_characters","share_background_selected","share_background_available_from_start","share_background_unlock_exploitation","share_background_unlock_story_clear","share_background_unlock_collection_complete"]:assert(localizer.text(locale,key)!=key)
+	assert(localizer.text("ja","arrangement_no_available_pots")=="使用できる鉢がありません。おみせで鉢を購入するか、寄せ植えを解体してください。")
 	assert(localizer.text("ja","pot_purchase_success",["黒陶器鉢"])=="黒陶器鉢を購入しました！" and "購入できた" not in localizer.text("ja","pot_purchase_success",["黒陶器鉢"]))
 	assert(localizer.text("hiragana","pot_purchase_success",["くろとうきばち"])=="くろとうきばちを\nこうにゅうしました！" and localizer.text("en","pot_purchase_success",["Black Ceramic Pot"])=="Purchased Black Ceramic Pot!")
 	var share_backgrounds=load("res://scripts/arrangement_share_backgrounds.gd");var share_catalog:Array=share_backgrounds.catalog();assert(share_catalog.size()==4)
@@ -193,7 +195,7 @@ func _ready()->void:
 	ui._return_from_viewer();assert(ui.home_page.visible)
 	ui._open_saved_arrangements();assert(ui.saved_arrangements_page.visible and ui.viewer_gallery_mode and _has_label_text_containing(ui.saved_arrangements_page,"作った作品") and ui.saved_arrangements_tabs.get_child_count()==1 and ui.viewer_canvas.visible and ui.viewer_artwork_root.position.is_zero_approx() and is_equal_approx(ui.viewer_artwork_root.scale.x,1.0))
 	assert(not _has_button_text(ui.saved_arrangements_page,"見る") and ui.saved_arrangements_tab_scroll.horizontal_scroll_mode==ScrollContainer.SCROLL_MODE_AUTO and ui.saved_arrangements_tab_scroll.vertical_scroll_mode==ScrollContainer.SCROLL_MODE_DISABLED and "✓" in (ui.saved_arrangements_tabs.get_child(0) as Button).text)
-	ui._return_from_viewer();assert(ui.home_page.visible and ui.pot_select_grid.get_child_count()==1 and (ui.pot_select_grid.get_child(0) as Button).disabled and _has_label_text_containing(ui.pot_select_grid.get_child(0),"使用中（空きなし）") and not _has_button_text(ui.home_page,"編集"))
+	ui._return_from_viewer();assert(ui.home_page.visible and ui.pot_select_grid.get_child_count()==0 and ui.home_status.visible and ui.home_status.text==localizer.text("ja","arrangement_no_available_pots") and _has_button_text(ui.home_page,"作った作品を見る") and not _has_button_text(ui.home_page,"編集"))
 	# The grid remains visible at capacity, but even an otherwise available pot
 	# cannot bypass the guard and enter the editor.
 	var capacity_arrangements:Array=[]
@@ -205,7 +207,7 @@ func _ready()->void:
 	ui._open_saved_arrangements()
 	ui._show_dismantle_confirmation();assert(ui.dismantle_confirmation_overlay.visible);ui._hide_dismantle_confirmation();assert(game.saved_arrangements.size()==1)
 	ui._show_dismantle_confirmation();ui._confirm_dismantle();assert(game.saved_arrangements.is_empty() and ui.saved_arrangements_page.visible and not ui.dismantle_confirmation_overlay.visible and game._owned_pot_total("shallow_terracotta")==1 and game._pot_usage_count("shallow_terracotta")==0 and game._pot_available_count("shallow_terracotta")==1)
-	ui._return_from_saved_arrangements();assert(ui.home_page.visible)
+	ui._return_from_saved_arrangements();assert(ui.home_page.visible and ui.pot_select_grid.get_child_count()==1 and not (ui.pot_select_grid.get_child(0) as Button).disabled and _has_label_text_containing(ui.pot_select_grid.get_child(0),"使用可能 ×1"))
 	assert(game.species_get_counts==get_before and game.bests==best_before and game.discovered==discovered_before)
 	game.audio_manager.prepare_se("purchase");ui.open_pot_shop();game.audio_manager.se_enabled=true;game.audio_manager.last_se_key=""
 	var puku_before:int=game.puku_points;var classic_shop_card:Node=_pot_shop_card(ui,"classic_terracotta");var classic_card_instance_id:=classic_shop_card.get_instance_id();var initial_classic_buttons:=classic_shop_card.find_children("*","Button",true,false);var prepared_classic_feedback:=classic_shop_card.find_child("PotPurchaseFeedback",true,false) as Control;assert(initial_classic_buttons.size()==1 and prepared_classic_feedback!=null and not prepared_classic_feedback.visible)
@@ -265,6 +267,9 @@ func _ready()->void:
 	for classic_index in range(2):game._on_arrangement_save_requested({"arrangement_id":"classic_%d"%classic_index,"name":"鉢在庫テスト","pot_id":"classic_terracotta","created_at":"test","completed":true,"plants":[]})
 	assert(game._owned_pot_total("classic_terracotta")==2 and game._pot_usage_count("classic_terracotta")==2 and game._pot_available_count("classic_terracotta")==0)
 	game._on_arrangement_save_requested({"arrangement_id":"classic_blocked","name":"保存不可","pot_id":"classic_terracotta","created_at":"test","completed":true,"plants":[]});assert(game.saved_arrangements.size()==2 and not ui.save_request_accepted)
+	game._sync_arrangement_ui();ui.open_home();assert(_pot_select_card(ui,"classic_terracotta")==null)
+	game.puku_points+=1;game._on_pot_purchase_requested("classic_terracotta");await get_tree().process_frame;ui.open_home()
+	var available_classic_card:=_pot_select_card(ui,"classic_terracotta");assert(game._owned_pot_total("classic_terracotta")==3 and game._pot_available_count("classic_terracotta")==1 and available_classic_card!=null and _has_label_text_containing(available_classic_card,"使用可能 ×1"))
 	# Loading a legacy bool inventory preserves every existing arrangement by
 	# raising each total to at least that pot's completed-work usage count.
 	game.owned_pots={"shallow_terracotta":true,"black_ceramic":true,"white_ceramic":true}
@@ -276,7 +281,22 @@ func _ready()->void:
 	assert(game._pot_usage_count("black_ceramic")==3 and game._pot_available_count("black_ceramic")==0 and game._pot_usage_count("shallow_terracotta")==1 and typeof(game.owned_pots.get("black_ceramic"))==TYPE_INT)
 	for arrangement_value in game.saved_arrangements:assert(str(arrangement_value.pot_id)!="starter_terracotta")
 	game._save();var migrated_save=JSON.parse_string(FileAccess.get_file_as_string(game._active_save_path()));assert(migrated_save is Dictionary and typeof(migrated_save.owned_pots.black_ceramic)==TYPE_FLOAT and int(migrated_save.owned_pots.black_ceramic)==3)
-	print("ARRANGEMENT_SMOKE_OK pots=",game.pot_catalog.size()," saved=",game.saved_arrangements.size()," max_plants=",ui.MAX_PLANTS_PER_ARRANGEMENT)
+	# A legacy save's stored 20-work limit is upgraded without dropping any of
+	# its existing works, then persisted as the new 50-work limit.
+	game.owned_pots={"shallow_terracotta":51};game.saved_arrangements=[];game.arrangement_save_capacity=50
+	for legacy_capacity_index in range(20):game.saved_arrangements.append(game._normalize_arrangement({"arrangement_id":"legacy_capacity_%02d"%legacy_capacity_index,"name":"旧作品","pot_id":"shallow_terracotta","created_at":"test","completed":true,"plants":[]}))
+	game._save();var legacy_capacity_save=JSON.parse_string(FileAccess.get_file_as_string(game._active_save_path()));legacy_capacity_save["arrangement_save_capacity"]=20
+	var legacy_capacity_file:=FileAccess.open(game._active_save_path(),FileAccess.WRITE);legacy_capacity_file.store_string(JSON.stringify(legacy_capacity_save));legacy_capacity_file.close()
+	game.saved_arrangements=[];game.arrangement_save_capacity=1;game._load_save()
+	assert(game.arrangement_save_capacity==50 and game.saved_arrangements.size()==20 and game.arrangement_capacity_migration_dirty)
+	game._save();var upgraded_capacity_save=JSON.parse_string(FileAccess.get_file_as_string(game._active_save_path()));assert(int(upgraded_capacity_save.arrangement_save_capacity)==50 and upgraded_capacity_save.saved_arrangements.size()==20)
+	# The 50th work is accepted and only the 51st is rejected.
+	for capacity_index in range(game.saved_arrangements.size(),49):game.saved_arrangements.append(game._normalize_arrangement({"arrangement_id":"capacity_%02d"%capacity_index,"name":"上限確認","pot_id":"shallow_terracotta","created_at":"test","completed":true,"plants":[]}))
+	game._sync_arrangement_ui();game._on_arrangement_save_requested({"arrangement_id":"capacity_49","name":"50作品目","pot_id":"shallow_terracotta","created_at":"test","completed":true,"plants":[]})
+	assert(game.saved_arrangements.size()==50 and ui.save_request_accepted)
+	game._on_arrangement_save_requested({"arrangement_id":"capacity_50","name":"51作品目","pot_id":"shallow_terracotta","created_at":"test","completed":true,"plants":[]})
+	assert(game.saved_arrangements.size()==50 and not ui.save_request_accepted)
+	print("ARRANGEMENT_SMOKE_OK pots=",game.pot_catalog.size()," saved=",game.saved_arrangements.size()," capacity=",game.arrangement_save_capacity," max_plants=",ui.MAX_PLANTS_PER_ARRANGEMENT)
 	get_tree().quit()
 
 func _mouse_button(position:Vector2,pressed:bool)->InputEventMouseButton:
@@ -314,4 +334,9 @@ func _has_label_text_containing(root:Node,text:String)->bool:
 func _pot_shop_card(ui,pot_id:String)->Node:
 	for card in ui.shop_grid.get_children():
 		if card.has_meta("pot_id") and str(card.get_meta("pot_id"))==pot_id:return card
+	return null
+
+func _pot_select_card(ui,pot_id:String)->Button:
+	for card in ui.pot_select_grid.get_children():
+		if card is Button and card.has_meta("pot_id") and str(card.get_meta("pot_id"))==pot_id:return card
 	return null
