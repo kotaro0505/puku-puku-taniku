@@ -170,6 +170,7 @@ workflows:
           run_scene_smoke res://scripts/carnicolor_first_get_story_smoke.tscn CARNICOLOR_FIRST_GET_STORY_SMOKE_OK
           run_scene_smoke res://scripts/pot_unlock_iap_smoke.tscn POT_UNLOCK_IAP_SMOKE_OK
           run_scene_smoke res://scripts/puku_points_smoke.tscn PUKU_POINTS_SMOKE_OK
+          run_scene_smoke res://scripts/best_record_showcase_smoke.tscn BEST_RECORD_SHOWCASE_SMOKE_OK
           run_scene_smoke res://scripts/normal_round_smoke.tscn NORMAL_ROUND_SMOKE_OK
           run_scene_smoke res://scripts/story_guidance_smoke.tscn STORY_GUIDANCE_SMOKE_OK
           run_script_smoke res://scripts/dialog_portrait_layout_smoke.gd DIALOG_PORTRAIT_LAYOUT_SMOKE_OK

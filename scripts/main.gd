@@ -8,6 +8,7 @@ const JellyBalanceClass = preload("res://scripts/jelly_balance.gd")
 const ArrangementUIClass = preload("res://scripts/arrangement_ui.gd")
 const ArrangementShareBackgroundsClass = preload("res://scripts/arrangement_share_backgrounds.gd")
 const ArrangementNavigationHintClass = preload("res://scripts/arrangement_navigation_hint.gd")
+const BestRecordShowcaseClass = preload("res://scripts/best_record_showcase.gd")
 const PotUnlockIAPServiceClass = preload("res://scripts/pot_unlock_iap_service.gd")
 const CatalogPreviewDevClass = preload("res://scripts/catalog_preview_dev.gd")
 const ForestGachaSystemClass = preload("res://scripts/forest_gacha_system.gd")
@@ -317,6 +318,7 @@ var mission_text_label: Label
 var effects_layer: Control
 var best_panel: PanelContainer
 var best_label: Label
+var best_record_showcase
 var puku_gauge_label: Label
 var puku_gauge_area: Control
 var puku_gauge_meter: ProgressBar
@@ -1867,8 +1869,8 @@ func _build_ui() -> void:
 	# logo
 	var logo:=Label.new(); logo.name="MainLogo";logo.text=Localizer.text(language_code,"game_title"); logo.position=Vector2(16,34); logo.size=Vector2(180,105); logo.add_theme_font_size_override("font_size",31); logo.add_theme_color_override("font_color",Color("#fff2d3")); logo.add_theme_color_override("font_outline_color",UI_BROWN); logo.add_theme_constant_override("outline_size",8); logo.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;logo.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; main_status_hud.add_child(logo)
 	var ribbon:=Label.new(); ribbon.text=" PUKU PUKU TANIKU "; ribbon.position=Vector2(45,126); ribbon.add_theme_font_size_override("font_size",11); ribbon.add_theme_color_override("font_color",Color.WHITE); ribbon.add_theme_stylebox_override("normal",_box(Color("#d99a3c"),Color("#7b4a25"),12,2)); main_status_hud.add_child(ribbon)
-	best_panel=PanelContainer.new(); best_panel.position=Vector2(204,122); best_panel.size=Vector2(168,65); best_panel.theme=game_theme;best_panel.add_theme_stylebox_override("panel",_box(Color("#47261b"),Color("#f5c985"),16,2)); best_record_layer.add_child(best_panel)
-	best_label=Label.new();best_label.name="BestLabel";best_label.text="最高記録\n0.0 cm"; best_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; best_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; best_label.add_theme_font_size_override("font_size",17); best_label.add_theme_color_override("font_color",Color.WHITE); best_panel.add_child(best_label)
+	best_panel=PanelContainer.new(); best_panel.position=Vector2(204,122); best_panel.size=Vector2(168,65); best_panel.theme=game_theme;best_panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;best_panel.add_theme_stylebox_override("panel",_box(Color("#47261b"),Color("#f5c985"),16,2));best_panel.gui_input.connect(_on_best_panel_gui_input);best_record_layer.add_child(best_panel)
+	best_label=Label.new();best_label.name="BestLabel";best_label.text="最高記録\n0.0 cm"; best_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; best_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; best_label.add_theme_font_size_override("font_size",17); best_label.add_theme_color_override("font_color",Color.WHITE);best_label.mouse_filter=Control.MOUSE_FILTER_IGNORE; best_panel.add_child(best_label)
 	seed_pod_gauge_area=Control.new();seed_pod_gauge_area.name="SeedPodGaugeArea";seed_pod_gauge_area.position=Vector2(42,145);seed_pod_gauge_area.size=Vector2(158,47);seed_pod_gauge_area.mouse_filter=Control.MOUSE_FILTER_IGNORE;main_status_hud.add_child(seed_pod_gauge_area)
 	var pod_content:=VBoxContainer.new();pod_content.position=Vector2(13,0);pod_content.size=Vector2(132,47);pod_content.alignment=BoxContainer.ALIGNMENT_CENTER;pod_content.mouse_filter=Control.MOUSE_FILTER_IGNORE;pod_content.add_theme_constant_override("separation",2);seed_pod_gauge_area.add_child(pod_content)
 	seed_pod_gauge_label=Label.new();seed_pod_gauge_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;seed_pod_gauge_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;seed_pod_gauge_label.add_theme_font_size_override("font_size",14);seed_pod_gauge_label.add_theme_color_override("font_color",Color("#effff4"));seed_pod_gauge_label.add_theme_color_override("font_outline_color",Color("#183d2a"));seed_pod_gauge_label.add_theme_constant_override("outline_size",4);pod_content.add_child(seed_pod_gauge_label)
@@ -1916,6 +1918,7 @@ func _build_ui() -> void:
 	_build_arrangement_ui(hud)
 	_build_arrangement_navigation_hint(hud)
 	_build_result_overlay(hud)
+	_build_best_record_showcase(hud)
 	_build_settings(hud)
 	_build_research_catalog_reward(hud)
 	_build_forest_gacha_ui(hud)
@@ -2203,6 +2206,83 @@ func _build_arrangement_navigation_hint(hud:Control)->void:
 	arrangement_navigation_hint=ArrangementNavigationHintClass.new()
 	hud.add_child(arrangement_navigation_hint)
 	arrangement_navigation_hint.intro_finished.connect(_on_arrangement_swipe_intro_finished)
+
+func _build_best_record_showcase(hud:Control)->void:
+	best_record_showcase=BestRecordShowcaseClass.new()
+	hud.add_child(best_record_showcase)
+	best_record_showcase.close_requested.connect(_close_best_record_showcase)
+	best_record_showcase.share_requested.connect(_on_best_record_share_requested)
+
+func _best_record_showcase_can_open()->bool:
+	if best_panel==null or not best_panel.visible or play_active or current_mode not in ["greenhouse","habitat"]:return false
+	if not opening_finished or (opening_overlay and opening_overlay.visible) or _global_best_record().is_empty():return false
+	if arrangement_scene_active or arrangement_transitioning or catalog_preview_mode_active or greenhouse_area_drag_tracking:return false
+	if first_play_tutorial_active or puku_buyback_tutorial_active or first_seed_pod_reward_event_active or _old_seed_story_active():return false
+	if not scripted_dialog_kind.is_empty() or not tutorial_dialog_kind.is_empty() or habitat_lookaround_active or jurejure_intro_camera_active:return false
+	if collection_complete_overlay and collection_complete_overlay.visible:return false
+	if habitat_restoration_ui and habitat_restoration_ui.is_modal_visible():return false
+	if best_record_showcase and best_record_showcase.visible:return false
+	return _mission_foreground_safe()
+
+func _update_best_record_panel_interaction()->void:
+	if best_panel==null:return
+	var enabled:=_best_record_showcase_can_open()
+	best_panel.mouse_filter=Control.MOUSE_FILTER_STOP if enabled else Control.MOUSE_FILTER_IGNORE
+	best_panel.mouse_default_cursor_shape=Control.CURSOR_POINTING_HAND if enabled else Control.CURSOR_ARROW
+
+func _on_best_panel_gui_input(event:InputEvent)->void:
+	if not _best_record_showcase_can_open():return
+	var activate:=false
+	if event is InputEventScreenTouch:
+		activate=not event.pressed
+	elif event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT:
+		activate=not event.pressed
+	else:return
+	best_panel.accept_event()
+	if activate:_open_best_record_showcase()
+
+func _open_best_record_showcase()->void:
+	if not _best_record_showcase_can_open() or best_record_showcase==null:return
+	var record:=_global_best_record()
+	if record.is_empty():return
+	var entry:=_catalog_entry(str(record.get("species_id","")))
+	if entry.is_empty():return
+	pointer_down=false;greenhouse_drag_accumulator=0.0;greenhouse_drag_started=false;_cancel_greenhouse_area_drag(false)
+	var texture:=_species_texture(entry)
+	if texture==null:texture=CatalogImageLoader.placeholder_texture
+	best_record_showcase.open_record(entry,float(record.get("size",0.0)),texture,language_code)
+	var path:=_species_image_path(entry)
+	if CatalogImageLoader.is_external_path(path) and not CatalogImageLoader.is_cached(path):
+		CatalogImageLoader.request_texture(path,_on_best_record_showcase_texture_ready.bind(str(record.get("species_id","")),float(record.get("size",0.0))),true)
+	_update_play_ui()
+
+func _on_best_record_showcase_texture_ready(texture:Texture2D,species_id:String,size_cm:float)->void:
+	if texture==null or best_record_showcase==null or not best_record_showcase.visible:return
+	if str(best_record_showcase.current_record.get("species_id",""))!=species_id or not is_equal_approx(float(best_record_showcase.current_record.get("size",0.0)),size_cm):return
+	best_record_showcase.set_plant_texture(texture)
+
+func _close_best_record_showcase()->void:
+	if best_record_showcase==null:return
+	best_record_showcase.close_view();pointer_down=false;_update_play_ui()
+
+func _on_best_record_share_requested(record:Dictionary)->void:
+	if best_record_showcase==null or not best_record_showcase.visible or record.is_empty():return
+	var entry:=_catalog_entry(str(record.get("species_id","")))
+	if entry.is_empty() or not await _prepare_arrangement_share_textures({"plants":[record]}):
+		best_record_showcase.set_share_state(Localizer.text(language_code,"share_failed"),false)
+		return
+	var texture:=_species_texture(entry)
+	if texture==null:
+		best_record_showcase.set_share_state(Localizer.text(language_code,"share_failed"),false)
+		return
+	best_record_showcase.set_plant_texture(texture)
+	var output_path:="user://puku-best-record-%d-%03d.png"%[int(Time.get_unix_time_from_system()),Time.get_ticks_msec()%1000]
+	var image_path:String=await best_record_showcase.create_share_image(output_path)
+	if image_path.is_empty():
+		best_record_showcase.set_share_state(Localizer.text(language_code,"share_failed"),false)
+		return
+	var shared:=_open_native_share_or_fallback(image_path,"puku-best-record.png","best_record")
+	best_record_showcase.set_share_state(shared,false)
 
 func _sync_arrangement_ui()->void:
 	if arrangement_ui==null:return
@@ -4073,6 +4153,7 @@ func _apply_language_to_ui()->void:
 	if audio_note:audio_note.text=Localizer.text(language_code,"audio_note")
 	if growing_puku_preview_toggle:growing_puku_preview_toggle.text=_growing_puku_preview_setting_text()
 	_update_plant_label_visibility_button()
+	if best_record_showcase:best_record_showcase.set_language(language_code)
 	if intro_speaker_label:intro_speaker_label.text=Localizer.text(language_code,"story_speaker_panda")
 	if tutorial_speaker_label and not tutorial_speaker_id.is_empty():_set_tutorial_speaker(tutorial_speaker_id)
 	for code in language_buttons:
@@ -4984,7 +5065,8 @@ func _current_mission_text()->String:
 	return ""
 
 func _mission_foreground_safe()->bool:
-	return not ((opening_overlay and opening_overlay.visible) \
+	return not ((best_record_showcase and best_record_showcase.visible) \
+		or (opening_overlay and opening_overlay.visible) \
 		or (opening_story_overlay and opening_story_overlay.visible) \
 		or (habitat_awakening_overlay and habitat_awakening_overlay.visible) \
 		or (seed_pod_story_overlay and seed_pod_story_overlay.visible) \
@@ -5023,16 +5105,17 @@ func _update_play_ui()->void:
 	var preview_overlay_open:bool=catalog_preview_ui!=null and catalog_preview_ui.is_overlay_open()
 	var gacha_open:bool=(forest_gacha_ui!=null and forest_gacha_ui.visible) or (species_get_overlay!=null and species_get_overlay.visible) or (catalog_series_unlock_overlay!=null and catalog_series_unlock_overlay.visible) or (fusion_lab_ui!=null and fusion_lab_ui.visible)
 	var battle_open:bool=puku_puku_battle!=null and puku_puku_battle.visible
+	var best_record_showcase_open:bool=best_record_showcase!=null and best_record_showcase.visible
 	var habitat_modal_open:bool=battle_open or (habitat_plant_panel!=null and habitat_plant_panel.visible) or (habitat_dev_panel!=null and habitat_dev_panel.visible) or (story_dev_panel!=null and story_dev_panel.visible) or (habitat_awakening_overlay!=null and habitat_awakening_overlay.visible) or (seed_pod_story_overlay!=null and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay!=null and habitat_second_awakening_overlay.visible)
 	var conversation_navigation_suspended:bool=(intro_overlay!=null and intro_overlay.visible) or not scripted_dialog_kind.is_empty() or not tutorial_dialog_kind.is_empty()
-	var arrangement_navigation_suspended:bool=arrangement_scene_active or arrangement_transitioning or catalog_preview_mode_active or preview_overlay_open or gacha_open or habitat_modal_open or conversation_navigation_suspended or jurejure_intro_camera_active or habitat_lookaround_active
+	var arrangement_navigation_suspended:bool=arrangement_scene_active or arrangement_transitioning or catalog_preview_mode_active or preview_overlay_open or gacha_open or habitat_modal_open or conversation_navigation_suspended or best_record_showcase_open or jurejure_intro_camera_active or habitat_lookaround_active
 	var arrangement_hud_hidden:bool=arrangement_scene_active or arrangement_transitioning
 	var endless_owns_normal_flow:=_endless_normal_flow_owns_play_controls()
 	var normal_round_start_visible:=not endless_owns_normal_flow or _endless_greenhouse_auto_start_unlocked()
 	var external_navigation_available:=not play_active
-	if main_status_hud:main_status_hud.visible=not arrangement_hud_hidden and not battle_open
-	if labels_layer:labels_layer.visible=not arrangement_hud_hidden and not battle_open
-	if best_panel:best_panel.visible=not arrangement_hud_hidden and not battle_open and mystery_catalog_tutorial_complete and not _old_seed_story_active()
+	if main_status_hud:main_status_hud.visible=not arrangement_hud_hidden and not battle_open and not best_record_showcase_open
+	if labels_layer:labels_layer.visible=not arrangement_hud_hidden and not battle_open and not best_record_showcase_open
+	if best_panel:best_panel.visible=not arrangement_hud_hidden and not battle_open and not best_record_showcase_open and mystery_catalog_tutorial_complete and not _old_seed_story_active()
 	if puku_gauge_area:puku_gauge_area.visible=mystery_items_acquired
 	if seed_pod_gauge_area:seed_pod_gauge_area.visible=mystery_items_acquired and not _is_endless_greenhouse_enabled()
 	if trial_dev_gacha_button:trial_dev_gacha_button.visible=_is_endless_greenhouse_enabled() and _trial_dev_controls_enabled()
@@ -5062,6 +5145,7 @@ func _update_play_ui()->void:
 	if forest_gacha_button:forest_gacha_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _tutorial_fully_complete() and forest_gacha_unlocked and forest_gacha_intro_seen
 	if fusion_lab_button:fusion_lab_button.visible=not play_active and not arrangement_navigation_suspended and current_mode=="greenhouse" and _fusion_lab_available()
 	if shop_forest_gacha_button:shop_forest_gacha_button.visible=forest_gacha_unlocked and forest_gacha_intro_seen
+	_update_best_record_panel_interaction()
 	_update_plant_label_visibility_button()
 	if arrangement_navigation_hint:
 		arrangement_navigation_hint.update_hint(language_code,arrangement_scene_active,_arrangement_navigation_hint_safe())
@@ -5766,6 +5850,7 @@ func _on_native_share_failed(_message:="")->void:
 func _update_native_share_feedback(key:String)->void:
 	var message:=Localizer.text(language_code,key)
 	if native_share_context=="arrangement" and arrangement_ui:arrangement_ui.set_share_state(message,false)
+	elif native_share_context=="best_record" and best_record_showcase:best_record_showcase.set_share_state(message,false)
 	native_share_context=""
 
 func _play_shop_new_species_animations(species_ids:Array)->void:
@@ -8913,7 +8998,7 @@ func _update_labels()->void:
 func _greenhouse_area_navigation_available()->bool:
 	if not StoryProgressionClass.arrangement_is_unlocked(story_progression_state) or not _tutorial_fully_complete() or current_mode!="greenhouse" or play_active or catalog_preview_mode_active or arrangement_transitioning:return false
 	if arrangement_scene_active and arrangement_ui and (arrangement_ui.is_editor_active() or arrangement_ui.is_viewer_active()):return false
-	return not ((opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible) or jurejure_first_encounter_active or (puku_puku_battle and puku_puku_battle.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (story_dev_panel and story_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible))
+	return not ((best_record_showcase and best_record_showcase.visible) or (opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible) or jurejure_first_encounter_active or (puku_puku_battle and puku_puku_battle.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (story_dev_panel and story_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible))
 
 func _arrangement_navigation_hint_safe()->bool:
 	# Navigation availability covers gameplay overlays. The opening screen is a
@@ -8924,6 +9009,7 @@ func _arrangement_navigation_hint_safe()->bool:
 	return true
 
 func _unhandled_input(event:InputEvent)->void:
+	if best_record_showcase and best_record_showcase.visible:return
 	if arrangement_ui and arrangement_ui.is_viewer_active():
 		if greenhouse_area_drag_tracking:_cancel_greenhouse_area_drag()
 		return
@@ -8937,6 +9023,14 @@ func _plant_label_visibility_button_owns_pointer_event(event:InputEvent)->bool:
 	elif event is InputEventMouseButton or event is InputEventMouseMotion:screen_position=event.position
 	else:return false
 	return plant_label_visibility_button.get_global_rect().has_point(screen_position)
+
+func _best_record_panel_owns_pointer_event(event:InputEvent)->bool:
+	if best_panel==null or best_panel.mouse_filter!=Control.MOUSE_FILTER_STOP or not best_panel.visible or not best_panel.is_visible_in_tree():return false
+	var screen_position:=Vector2.ZERO
+	if event is InputEventScreenTouch or event is InputEventScreenDrag:screen_position=event.position
+	elif event is InputEventMouseButton or event is InputEventMouseMotion:screen_position=event.position
+	else:return false
+	return best_panel.get_global_rect().has_point(screen_position)
 
 func _on_arrangement_world_scroll_input(event:InputEvent)->void:
 	if arrangement_ui and (arrangement_ui.is_editor_active() or arrangement_ui.is_viewer_active()):
@@ -9007,6 +9101,10 @@ func _cancel_greenhouse_area_drag(update_ui:=true)->void:
 
 func _input(event:InputEvent)->void:
 	if audio_manager and (event is InputEventScreenTouch or event is InputEventMouseButton or event is InputEventKey):audio_manager.notify_user_gesture()
+	if best_record_showcase and best_record_showcase.visible:return
+	if _best_record_panel_owns_pointer_event(event):
+		if (event is InputEventScreenTouch and not event.pressed) or (event is InputEventMouseButton and not event.pressed):pointer_down=false
+		return
 	# `_input` runs before Godot dispatches the event to Controls. Exclude this
 	# gameplay-HUD button explicitly so a giant leaf behind it is never harvested
 	# by the same tap that toggles its label visibility.
@@ -9016,7 +9114,7 @@ func _input(event:InputEvent)->void:
 	if habitat_lookaround_active or jurejure_intro_camera_active:return
 	if habitat_restoration_ui and habitat_restoration_ui.is_modal_visible():return
 	if arrangement_scene_active or arrangement_transitioning:return
-	if (opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible) or (puku_puku_battle and puku_puku_battle.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible and not first_play_harvest_guide_active and not old_seed_harvest_guide_active) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (story_dev_panel and story_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (fusion_lab_ui and fusion_lab_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible):return
+	if (best_record_showcase and best_record_showcase.visible) or (opening_story_overlay and opening_story_overlay.visible) or (habitat_awakening_overlay and habitat_awakening_overlay.visible) or (seed_pod_story_overlay and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible) or (jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible) or (puku_puku_battle and puku_puku_battle.visible) or (tutorial_guide_overlay and tutorial_guide_overlay.visible and not first_play_harvest_guide_active and not old_seed_harvest_guide_active) or (intro_overlay and intro_overlay.visible) or (settings_overlay and settings_overlay.visible) or (jelly_dev_overlay and jelly_dev_overlay.visible) or (habitat_plant_panel and habitat_plant_panel.visible) or (habitat_dev_panel and habitat_dev_panel.visible) or (story_dev_panel and story_dev_panel.visible) or (forest_gacha_ui and forest_gacha_ui.visible) or (fusion_lab_ui and fusion_lab_ui.visible) or (species_get_overlay and species_get_overlay.visible) or (catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible) or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) or (encyclopedia_overlay and encyclopedia_overlay.visible) or (shop_overlay and shop_overlay.visible) or (result_overlay and result_overlay.visible) or (play_overlay and play_overlay.visible):return
 	if current_mode=="greenhouse" and not play_active and not catalog_preview_mode_active:return
 	if event is InputEventScreenTouch:
 		if event.pressed:
@@ -9362,8 +9460,18 @@ func _show_record(p)->void:
 
 func _update_best_ui()->void:
 	best_label.text=Localizer.text(language_code,"best_record",[_global_best_size()])
+	_update_best_record_panel_interaction()
 
 func _global_best_size()->float:
 	var top:=0.0
 	for value in bests.values():top=maxf(top,float(value))
 	return top
+
+func _global_best_record()->Dictionary:
+	var species_ids:Array=bests.keys();species_ids.sort()
+	var best_species_id:="";var best_size:=0.0
+	for species_id_value in species_ids:
+		var species_id:=str(species_id_value);var size_cm:=maxf(0.0,float(bests.get(species_id,0.0)))
+		if size_cm<=best_size or _catalog_entry(species_id).is_empty():continue
+		best_species_id=species_id;best_size=size_cm
+	return {} if best_species_id.is_empty() or best_size<=0.0 else {"species_id":best_species_id,"size":best_size}
