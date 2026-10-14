@@ -130,6 +130,7 @@ const VISUAL_SCALE_BASE := 0.18
 const VISUAL_SCALE_PER_CM := 0.058
 const SCREEN_SPACE_GIANT_REFERENCE_CM := 120.0
 const SCREEN_ALPHA_HIT_THRESHOLD := .08
+const SCREEN_ALPHA_PROFILE_SAMPLE_RESOLUTION := 192
 
 static var screen_growth_anchor_cache:Dictionary={}
 
@@ -252,7 +253,7 @@ func uses_giant_screen_transform()->bool:
 func _screen_growth_anchor_pixel()->Vector2:
 	if plant_sprite==null or plant_sprite.texture==null:return Vector2.ZERO
 	var texture_size:=plant_sprite.texture.get_size()
-	var fallback:=Vector2(texture_size.x*.5,texture_size.y)
+	var fallback:=texture_size*.5
 	var cache_key:="%s:%s"%[plant_sprite.texture.get_rid(),texture_size]
 	if screen_growth_anchor_cache.has(cache_key):return screen_growth_anchor_cache[cache_key]
 	var image:=screen_hit_image
@@ -260,22 +261,23 @@ func _screen_growth_anchor_pixel()->Vector2:
 	if image==null or image.is_empty():return fallback
 	var used:=image.get_used_rect()
 	if used.size.x<=0 or used.size.y<=0:return fallback
-	# Find the lowest meaningfully opaque pixel once per texture. Imported PNGs
-	# can retain RGB and 1-alpha fringe rows inside their transparent padding;
-	# anchoring those rows would magnify the padding until the leaf itself left the
-	# viewport. Keeping the actual bottom leaf pixel fixed preserves its soil root
-	# and still leaves an opaque, tappable pixel at arbitrarily large scales.
-	var center_x:=float(used.position.x)+float(used.size.x)*.5
-	var anchor:=fallback
-	for y in range(mini(used.end.y-1,image.get_height()-1),maxi(used.position.y,0)-1,-1):
-		var best_x:=-1;var best_alpha:=SCREEN_ALPHA_HIT_THRESHOLD
-		for x in range(maxi(used.position.x,0),mini(used.end.x,image.get_width())):
+	# The rosette's planted center is its opaque main body, not the lowest leaf-tip
+	# pixel. Use an alpha-weighted area centroid so transparent fringe pixels and
+	# isolated tips cannot pull the growth pivot away from the visible leaf mass.
+	# The centroid is evaluated only once per texture and sampled at a bounded
+	# resolution to avoid a frame hitch when a large imported image reaches 120 cm.
+	var longest_side:=maxi(used.size.x,used.size.y)
+	var sample_step:=maxi(1,ceili(float(longest_side)/float(SCREEN_ALPHA_PROFILE_SAMPLE_RESOLUTION)))
+	var weighted_position:=Vector2.ZERO
+	var total_weight:=0.0
+	for y in range(maxi(used.position.y,0),mini(used.end.y,image.get_height()),sample_step):
+		for x in range(maxi(used.position.x,0),mini(used.end.x,image.get_width()),sample_step):
 			var alpha:=image.get_pixel(x,y).a
-			if alpha>best_alpha+.0001 or (is_equal_approx(alpha,best_alpha) and best_x>=0 and absf(float(x)-center_x)<absf(float(best_x)-center_x)):
-				best_alpha=alpha;best_x=x
-		if best_x>=0:
-			anchor=Vector2(float(best_x)+.5,float(y)+.5)
-			break
+			if alpha<=SCREEN_ALPHA_HIT_THRESHOLD:continue
+			weighted_position+=Vector2(float(x)+.5,float(y)+.5)*alpha
+			total_weight+=alpha
+	var anchor:=Vector2(float(used.position.x)+float(used.size.x)*.5,float(used.position.y)+float(used.size.y)*.5)
+	if total_weight>0.0:anchor=weighted_position/total_weight
 	screen_growth_anchor_cache[cache_key]=anchor
 	return anchor
 
@@ -297,8 +299,8 @@ func _projected_texture_polygon(camera:Camera3D)->PackedVector2Array:
 	var reference_scale:=visual_scale_for_diameter(SCREEN_SPACE_GIANT_REFERENCE_CM)
 	if giant_transform:
 		# Freeze the 3D projection at the established 120 cm appearance. Growth
-		# beyond it is applied below in screen space around the projected root, so
-		# neither the quad center nor its top can cross the camera plane.
+		# beyond it is applied below in screen space, so neither the quad center nor
+		# its top can cross the camera plane.
 		var owner_scale:=global_transform.basis.get_scale()
 		var reference_local_position:=Vector3(plant_sprite.position.x,.10+reference_scale*.62,plant_sprite.position.z)
 		origin=global_transform*reference_local_position
@@ -319,6 +321,9 @@ func _projected_texture_polygon(camera:Camera3D)->PackedVector2Array:
 		var reference_axis_x:=(points[1]-points[0])/texture_size.x
 		var reference_axis_y:=(points[3]-points[0])/texture_size.y
 		var reference_transform:=Transform2D(reference_axis_x,reference_axis_y,points[0])
+		# The reference transform is rooted at this plant's unchanged world planting
+		# position. Keeping its alpha-mass center fixed makes the principal leaves
+		# expand in every direction instead of translating upward with a bottom tip.
 		var growth_anchor:=reference_transform*_screen_growth_anchor_pixel()
 		if is_nan(growth_anchor.x) or is_inf(growth_anchor.x) or is_nan(growth_anchor.y) or is_inf(growth_anchor.y):return PackedVector2Array()
 		var growth_ratio:=plant_sprite.scale.x/reference_scale
@@ -428,12 +433,17 @@ func screen_label_anchor(camera:Camera3D)->Vector2:
 	var reference_screen:=camera.unproject_position(reference_world)
 	if is_nan(reference_screen.x) or is_inf(reference_screen.x) or is_nan(reference_screen.y) or is_inf(reference_screen.y):return root_screen
 	if rendered_scale<=reference_scale:return reference_screen
-	# Continue the label's upward motion around the same fixed artwork base as the
-	# giant sprite. The UI clamp can then stop it at the top without any
-	# behind-camera projection sending it to the bottom.
-	var growth_anchor:=root_screen
-	if is_instance_valid(screen_sprite) and screen_texture_transform_valid:growth_anchor=screen_texture_transform*_screen_growth_anchor_pixel()
-	return growth_anchor+(reference_screen-growth_anchor)*(rendered_scale/reference_scale)
+	# Follow the actual upper edge of the screen-space artwork. Preserve the
+	# established label offset at exactly 120 cm, then let the UI clamp stop it at
+	# the viewport top. Scaling around the main body must never send the label down.
+	if is_instance_valid(screen_sprite) and screen_texture_transform_valid:
+		var growth_ratio:=rendered_scale/reference_scale
+		var growth_anchor:=screen_texture_transform*_screen_growth_anchor_pixel()
+		var used:=_screen_hit_used_rect()
+		var current_top:=screen_texture_transform*Vector2(_screen_growth_anchor_pixel().x,used.position.y)
+		var reference_top:=growth_anchor+(current_top-growth_anchor)/growth_ratio
+		return current_top+(reference_screen-reference_top)
+	return reference_screen
 
 func screen_visual_rect(camera:Camera3D)->Rect2:
 	var points:=_screen_visual_polygon(camera)
@@ -478,8 +488,8 @@ func _screen_point_hits_opaque_artwork(screen_point:Vector2,points:PackedVector2
 
 static func visual_scale_for_diameter(value_cm:float)->float:
 	# One linear physical-looking mapping for every size. The renderer switches to
-	# a root-anchored screen transform after 120 cm, so this can remain genuinely
-	# unbounded without pushing a 3D billboard through the camera.
+	# a planting-relative screen transform after 120 cm, so this can remain
+	# genuinely unbounded without pushing a 3D billboard through the camera.
 	var diameter:=maxf(1.6,value_cm)
 	return VISUAL_SCALE_BASE+(diameter-1.6)*VISUAL_SCALE_PER_CM
 

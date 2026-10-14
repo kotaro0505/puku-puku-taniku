@@ -22,7 +22,7 @@ func _ready()->void:
 	_test_save_and_legacy_load(game)
 	await _test_panda_rescue(game)
 	game._reset_progression_state();game.queue_free()
-	print("PUKU_POINTS_SMOKE_OK unit=1/1000 round_cost=1.00 direct_harvest=true giant=100..10000cm_linear_positions3_speeds1.6+10 reward1000+2000=true new_floor=.20 migration=points+legacy_gauge forest_cost=1 rescue=wallet_plus_1 combo=true fly_removed=true result_waits=true")
+	print("PUKU_POINTS_SMOKE_OK unit=1/1000 round_cost=1.00 direct_harvest=true giant=100,120,150,200,300,500,700,1000,1500,2000,10000cm_linear_rooted_species3_positions3_speeds1.6+10 reward1000+2000=true new_floor=.20 migration=points+legacy_gauge forest_cost=1 rescue=wallet_plus_1 combo=true fly_removed=true result_waits=true")
 	get_tree().quit()
 
 func _test_seed_pod_thresholds(game)->void:
@@ -95,39 +95,66 @@ func _opaque_hit_point(plant,camera:Camera3D,visible_rect:Rect2)->Vector2:
 
 func _test_giant_plant_display_and_hit(game)->void:
 	var viewport_rect:Rect2=game.get_viewport().get_visible_rect()
-	var sizes:Array[float]=[100.0,150.0,300.0,500.0,700.0,1000.0,1500.0,2000.0,10000.0]
+	var sizes:Array[float]=[100.0,120.0,150.0,200.0,300.0,500.0,700.0,1000.0,1500.0,2000.0,10000.0]
 	var positions:Array=[Vector3(0,.12,2.5),Vector3(0,.12,0),Vector3(0,.12,-2.5)]
+	var shape_species:Array[String]=["colorata","laui","yumekawa_milky_dream"]
 	for target_cm in sizes:
 		assert(is_equal_approx(SucculentClass.visual_scale_for_diameter(target_cm),.18+(target_cm-1.6)*.058),"visual scale stopped being linear at %.0fcm"%target_cm)
 	var scale_ratio:=SucculentClass.visual_scale_for_diameter(1000.0)/SucculentClass.visual_scale_for_diameter(500.0)
 	assert(scale_ratio>1.95 and scale_ratio<2.05,"500cm to 1000cm is not approximately 2x: %.4f"%scale_ratio)
 	assert(SucculentClass.visual_scale_for_diameter(2000.0)>SucculentClass.visual_scale_for_diameter(1000.0)*1.99,"2000cm visual scale stopped growing linearly")
 	assert(SucculentClass.visual_scale_for_diameter(10000.0)>SucculentClass.visual_scale_for_diameter(2000.0)*4.99,"10000cm visual scale introduced a practical cap")
-	game._clear_greenhouse_plants();game.current_mode="greenhouse";game.play_active=true;game.active_seed_type="normal";game.current_target_count=12;game.puku_gauge_intro_complete=true;game.show_growing_puku_preview=true;game.species_get_counts["colorata"]=1
-	game._spawn_specific_plant("colorata");var plant=game.plants.back();plant.jelly_checks_enabled=false
+	game._clear_greenhouse_plants();game.current_mode="greenhouse";game.play_active=true;game.active_seed_type="normal";game.current_target_count=12;game.puku_gauge_intro_complete=true;game.show_growing_puku_preview=true
 	var harvest_handler:=Callable(game,"_on_harvested")
+	var plant=null
+	for species_id in shape_species:
+		game.species_get_counts[species_id]=1;game._spawn_specific_plant(species_id);plant=game.plants.back();plant.jelly_checks_enabled=false
+		if plant.harvested.is_connected(harvest_handler):plant.harvested.disconnect(harvest_handler)
+		var used_rect:Rect2=plant._screen_hit_used_rect();var anchor_pixel:Vector2=plant._screen_growth_anchor_pixel()
+		assert(used_rect.has_point(anchor_pixel),"growth anchor left opaque bounds species=%s anchor=%s used=%s"%[species_id,anchor_pixel,used_rect])
+		assert(anchor_pixel.y<used_rect.position.y+used_rect.size.y*.80,"growth anchor still follows the bottom fringe species=%s anchor=%s used=%s"%[species_id,anchor_pixel,used_rect])
+		for growth_speed in [1.6,10.0]:
+			plant.growth_speed_multiplier=growth_speed
+			for position in positions:
+				plant.original_pos=position;plant.position=position
+				plant.fast_forward_to_diameter(120.0);plant.plant_sprite.position.x=0.0;plant.plant_sprite.rotation.z=0.0
+				var threshold_before:PackedVector2Array=plant._projected_texture_polygon(game.camera)
+				plant.fast_forward_to_diameter(120.01);plant.plant_sprite.position.x=0.0;plant.plant_sprite.rotation.z=0.0
+				var threshold_after:PackedVector2Array=plant._projected_texture_polygon(game.camera)
+				assert(threshold_before.size()==4 and threshold_after.size()==4,"120cm transition polygon was missing species=%s speed=%.1f pos=%s"%[species_id,growth_speed,position])
+				for corner in range(4):assert(threshold_before[corner].distance_to(threshold_after[corner])<.25,"artwork jumped at 120cm transition species=%s speed=%.1f pos=%s corner=%d before=%s after=%s"%[species_id,growth_speed,position,corner,threshold_before[corner],threshold_after[corner]])
+				var previous_extent:=0.0;var width_500:=0.0;var width_1000:=0.0;var reference_root:=Vector2.ZERO;var reference_main:=Vector2.ZERO;var reference_bottom_y:=-INF
+				for target_cm in sizes:
+					plant.state="growing";plant.fast_forward_to_diameter(target_cm)
+					# Isolate the growth transform from the deliberately tiny ambient sway
+					# while measuring the soil/root relationship at each exact checkpoint.
+					plant.plant_sprite.position.x=0.0;plant.plant_sprite.rotation.z=0.0;plant.sync_screen_visual(game.camera);game._update_labels()
+					var rect:Rect2=plant.screen_visual_rect(game.camera);var visible_rect:=rect.intersection(viewport_rect);var root_screen:Vector2=game.camera.unproject_position(plant.global_position);var main_screen:Vector2=plant.screen_texture_transform*anchor_pixel;var bottom_screen:Vector2=plant.screen_texture_transform*Vector2(anchor_pixel.x,used_rect.end.y)
+					assert(plant.screen_sprite!=null and plant.screen_sprite.visible and not plant.plant_sprite.visible,"plant did not use the screen compositor species=%s speed=%.1f pos=%s cm=%.0f"%[species_id,growth_speed,position,target_cm])
+					assert(plant.screen_sprite.polygon.size()>=3,"viewport-clipped giant artwork had no render polygon species=%s speed=%.1f pos=%s cm=%.0f"%[species_id,growth_speed,position,target_cm])
+					for rendered_point in plant.screen_sprite.polygon:assert(viewport_rect.grow(3.0).has_point(rendered_point),"giant render polygon escaped viewport clipping species=%s speed=%.1f pos=%s cm=%.0f point=%s"%[species_id,growth_speed,position,target_cm,rendered_point])
+					assert(plant.screen_depth(game.camera)>game.camera.near and viewport_rect.has_point(root_screen),"giant root crossed or left the camera view species=%s speed=%.1f pos=%s cm=%.0f"%[species_id,growth_speed,position,target_cm])
+					assert(rect.has_area() and visible_rect.has_area(),"giant artwork disappeared species=%s speed=%.1f pos=%s cm=%.0f rect=%s"%[species_id,growth_speed,position,target_cm,rect])
+					var extent:=maxf(rect.size.x,rect.size.y);assert(extent>previous_extent,"giant artwork stopped growing species=%s speed=%.1f pos=%s cm=%.0f extent=%.2f previous=%.2f"%[species_id,growth_speed,position,target_cm,extent,previous_extent]);previous_extent=extent
+					if is_equal_approx(target_cm,120.0):reference_root=root_screen;reference_main=main_screen;reference_bottom_y=bottom_screen.y
+					elif target_cm>120.0:
+						assert(root_screen.distance_to(reference_root)<.01,"soil planting point moved species=%s speed=%.1f pos=%s cm=%.0f root=%s reference=%s"%[species_id,growth_speed,position,target_cm,root_screen,reference_root])
+						assert(main_screen.distance_to(reference_main)<.05,"main leaf mass escaped upward species=%s speed=%.1f pos=%s cm=%.0f main=%s reference=%s"%[species_id,growth_speed,position,target_cm,main_screen,reference_main])
+						assert(bottom_screen.y>=reference_bottom_y-.05,"lower leaves floated away from soil species=%s speed=%.1f pos=%s cm=%.0f bottom=%.2f reference=%.2f"%[species_id,growth_speed,position,target_cm,bottom_screen.y,reference_bottom_y])
+					if is_equal_approx(target_cm,500.0):width_500=rect.size.x
+					if is_equal_approx(target_cm,1000.0):width_1000=rect.size.x
+					assert(plant.label.visible and plant.label.position.y<viewport_rect.get_center().y,"giant label disappeared or jumped downward species=%s speed=%.1f pos=%s cm=%.0f label=%s"%[species_id,growth_speed,position,target_cm,plant.label.position])
+					var tap_point:=_opaque_hit_point(plant,game.camera,visible_rect);var hit:Dictionary=plant.screen_hit_test(game.camera,tap_point)
+					assert(tap_point.x>-9999.0 and bool(hit.get("hit",false)) and bool(hit.get("opaque_artwork_hit",false)),"visible giant leaf was not alpha-hittable species=%s speed=%.1f pos=%s cm=%.0f tap=%s"%[species_id,growth_speed,position,target_cm,tap_point])
+					# Advance one real frame at each configured speed as well as checking the
+					# exact checkpoint, then harvest through the visible alpha-tested leaf.
+					plant.simulate(1.0/12.0 if growth_speed>=10.0 else 1.0/60.0);plant.sync_screen_visual(game.camera)
+					assert(plant.screen_sprite.visible and plant.screen_visual_rect(game.camera).intersection(viewport_rect).has_area(),"giant artwork failed after a live growth frame species=%s speed=%.1f pos=%s cm=%.0f"%[species_id,growth_speed,position,target_cm])
+					game._try_harvest(tap_point);assert(plant.state=="harvested","visible giant leaf did not harvest species=%s speed=%.1f pos=%s cm=%.0f"%[species_id,growth_speed,position,target_cm])
+				assert(width_500>0.0 and width_1000/width_500>1.95 and width_1000/width_500<2.05,"rendered 500cm to 1000cm ratio was not approximately 2x species=%s: %.4f"%[species_id,width_1000/width_500])
+		game._clear_greenhouse_plants();plant=null
+	game.species_get_counts["colorata"]=1;game._spawn_specific_plant("colorata");plant=game.plants.back();plant.jelly_checks_enabled=false
 	if plant.harvested.is_connected(harvest_handler):plant.harvested.disconnect(harvest_handler)
-	for growth_speed in [1.6,10.0]:
-		plant.growth_speed_multiplier=growth_speed
-		for position in positions:
-			plant.original_pos=position;plant.position=position
-			var previous_extent:=0.0;var width_500:=0.0;var width_1000:=0.0
-			for target_cm in sizes:
-				plant.state="growing";plant.fast_forward_to_diameter(target_cm);plant.simulate(1.0/12.0 if growth_speed>=10.0 else 1.0/60.0);game._update_labels()
-				var rect:Rect2=plant.screen_visual_rect(game.camera);var visible_rect:=rect.intersection(viewport_rect);var root_screen:Vector2=game.camera.unproject_position(plant.global_position)
-				assert(plant.screen_sprite!=null and plant.screen_sprite.visible and not plant.plant_sprite.visible,"plant did not use the screen compositor speed=%.1f pos=%s cm=%.0f"%[growth_speed,position,target_cm])
-				assert(plant.screen_sprite.polygon.size()>=3,"viewport-clipped giant artwork had no render polygon speed=%.1f pos=%s cm=%.0f"%[growth_speed,position,target_cm])
-				for rendered_point in plant.screen_sprite.polygon:assert(viewport_rect.grow(3.0).has_point(rendered_point),"giant render polygon escaped viewport clipping speed=%.1f pos=%s cm=%.0f point=%s"%[growth_speed,position,target_cm,rendered_point])
-				assert(plant.screen_depth(game.camera)>game.camera.near and viewport_rect.has_point(root_screen),"giant root crossed or left the camera view speed=%.1f pos=%s cm=%.0f"%[growth_speed,position,target_cm])
-				assert(rect.has_area() and visible_rect.has_area(),"giant artwork disappeared speed=%.1f pos=%s cm=%.0f rect=%s"%[growth_speed,position,target_cm,rect])
-				var extent:=maxf(rect.size.x,rect.size.y);assert(extent>previous_extent,"giant artwork stopped growing speed=%.1f pos=%s cm=%.0f extent=%.2f previous=%.2f"%[growth_speed,position,target_cm,extent,previous_extent]);previous_extent=extent
-				if is_equal_approx(target_cm,500.0):width_500=rect.size.x
-				if is_equal_approx(target_cm,1000.0):width_1000=rect.size.x
-				assert(plant.label.visible and plant.label.position.y<viewport_rect.get_center().y,"giant label disappeared or jumped downward speed=%.1f pos=%s cm=%.0f label=%s"%[growth_speed,position,target_cm,plant.label.position])
-				var tap_point:=_opaque_hit_point(plant,game.camera,visible_rect);var hit:Dictionary=plant.screen_hit_test(game.camera,tap_point)
-				assert(tap_point.x>-9999.0 and bool(hit.get("hit",false)) and bool(hit.get("opaque_artwork_hit",false)),"visible giant leaf was not alpha-hittable speed=%.1f pos=%s cm=%.0f tap=%s"%[growth_speed,position,target_cm,tap_point])
-				game._try_harvest(tap_point);assert(plant.state=="harvested","visible giant leaf did not harvest speed=%.1f pos=%s cm=%.0f"%[growth_speed,position,target_cm])
-			assert(width_500>0.0 and width_1000/width_500>1.95 and width_1000/width_500<2.05,"rendered 500cm to 1000cm ratio was not approximately 2x: %.4f"%(width_1000/width_500))
 	# Horizontal scrolling, harvesting and jelly must still control visibility.
 	plant.state="growing";plant.growth_speed_multiplier=1.6;plant.fast_forward_to_diameter(1000.0);plant.original_pos=Vector3(0,.12,0);plant.position=plant.original_pos;game._update_labels();assert(plant.label.visible)
 	var saved_original_pos:Vector3=plant.original_pos;var saved_position:Vector3=plant.position;plant.original_pos.x+=1000.0;plant.position.x+=1000.0;game._update_labels();assert(not game._plant_is_visible_for_label(plant,viewport_rect) and not plant.label.visible,"fully scrolled-off giant plant kept its label")
