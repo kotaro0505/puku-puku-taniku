@@ -94,14 +94,14 @@ func set_series_special_recipes(recipes: Array) -> void:
 			_register_series_special_recipe(raw_recipe)
 
 func fusion_series_for_entry(entry: Dictionary) -> String:
-	# Higher-tier fusion species participate only as explicitly named parents.
-	# Their display family is intentionally stored separately and must never act
-	# as the series side of a series-special recipe or enter the 66 basic matrix.
-	if int(entry.get("fusion_tier", 0)) > 0:
-		return ""
 	var explicit := str(entry.get("fusion_series", ""))
 	if not explicit.is_empty():
 		return explicit
+	# Advanced fusion species already carry the family they inherit in
+	# fusion_display_series.  It is also their base lineage when no dedicated
+	# species recipe exists, so they can fall back to the normal series matrix.
+	if int(entry.get("fusion_tier", 0)) > 0:
+		return str(entry.get("fusion_display_series", ""))
 	return default_fusion_series_for_catalog_series(str(entry.get("series_id", "")))
 
 func fusion_series_for_species(species_id: String) -> String:
@@ -122,13 +122,16 @@ func is_eligible_parent_species(species_id: String) -> bool:
 func resolve(parent_a_id: String, parent_b_id: String) -> Dictionary:
 	if parent_a_id.is_empty() or parent_b_id.is_empty():
 		return {}
-	var special_key := normalized_pair(parent_a_id, parent_b_id)
-	if special_recipes_by_pair.has(special_key):
-		return _resolution(special_recipes_by_pair[special_key])
 	var parent_a: Dictionary = species_by_id.get(parent_a_id, {})
 	var parent_b: Dictionary = species_by_id.get(parent_b_id, {})
 	if parent_a.is_empty() or parent_b.is_empty():
 		return {}
+	# Exact recipes remain the most specific rule.  This includes the existing
+	# top-tier recipes whose second parent is an original species.  For every
+	# other original pairing, the original fallback below applies.
+	var special_key := normalized_pair(parent_a_id, parent_b_id)
+	if special_recipes_by_pair.has(special_key):
+		return _resolution(special_recipes_by_pair[special_key])
 	var series_special := _resolve_series_special(parent_a_id, parent_b_id, parent_a, parent_b)
 	if not series_special.is_empty():
 		return series_special
