@@ -25,7 +25,7 @@ func _ready() -> void:
 	_test_mission_copy_and_progress(game)
 	_test_round_navigation_lock(game)
 	_test_new_gate(game)
-	_test_fantasy_six_candidate_contract(game)
+	_test_early_fantasy_candidate_contract(game)
 	_test_fusion_fantasy_count(game)
 	_test_crisis_exploitation_lockout(game)
 	await _test_round_completion_before_new_cards(game)
@@ -33,7 +33,7 @@ func _ready() -> void:
 	game._reset_progression_state()
 	game.queue_free()
 	await get_tree().process_frame
-	print("STORY_GUIDANCE_SMOKE_OK mission=single+live new_gate=first_encounter result=removed automatic_formal_get=ordered_multiple pending_duplicate=false nav=hidden arrangement=locked base=originals_only fantasy_six=four_series fusion_fantasy_count=display_series crisis=exploit_locked copy=updated dev_controls=all_builds")
+	print("STORY_GUIDANCE_SMOKE_OK mission=single+live new_gate=first_encounter result=removed automatic_formal_get=ordered_multiple pending_duplicate=false nav=hidden arrangement=locked base=originals_only early_fantasy=four_series fusion_fantasy_count=display_series crisis=exploit_locked copy=updated dev_controls=all_builds")
 	get_tree().quit()
 
 
@@ -256,7 +256,7 @@ func _test_new_gate(game: Node) -> void:
 	game.play_active = false
 
 
-func _test_fantasy_six_candidate_contract(game: Node) -> void:
+func _test_early_fantasy_candidate_contract(game: Node) -> void:
 	game.species_get_counts.clear()
 	game.story_progression_state["fantasy_unlocked"] = true
 	game.act2_unlocked = true
@@ -269,7 +269,7 @@ func _test_fantasy_six_candidate_contract(game: Node) -> void:
 			continue
 		var entry: Dictionary = entry_value
 		var display_series: String = str(game._catalog_display_series_id_for_entry(entry))
-		if display_series in game.FANTASY_SIX_REQUIRED_SERIES:
+		if display_series in game.EARLY_FANTASY_REQUIRED_SERIES:
 			if not required_entries.has(display_series):
 				required_entries[display_series] = entry
 			else:
@@ -277,15 +277,14 @@ func _test_fantasy_six_candidate_contract(game: Node) -> void:
 		elif outside_entry.is_empty():
 			outside_entry = entry
 	assert(required_entries.size() == 4 and extra_required.size() >= 2 and not outside_entry.is_empty())
-	for required_series in game.FANTASY_SIX_REQUIRED_SERIES:
-		assert(game._fantasy_six_new_candidate_allowed(required_entries[required_series]))
-	assert(not game._fantasy_six_new_candidate_allowed(outside_entry))
-	for required_series in game.FANTASY_SIX_REQUIRED_SERIES:
+	for required_series in game.EARLY_FANTASY_REQUIRED_SERIES:
+		assert(game._early_fantasy_new_candidate_allowed(required_entries[required_series]))
+	assert(not game._early_fantasy_new_candidate_allowed(outside_entry))
+	for required_series in game.EARLY_FANTASY_REQUIRED_SERIES:
 		var entry: Dictionary = required_entries[required_series]
 		game.species_get_counts[str(entry.get("species_id", ""))] = 1
-	assert(game._fantasy_six_required_series_complete())
-	game.species_get_counts[str(extra_required[0].get("species_id", ""))] = 1
-	game.species_get_counts[str(extra_required[1].get("species_id", ""))] = 1
+	assert(game._early_fantasy_required_series_complete())
+	assert(game._unique_fantasy_species_get_count()==4)
 	game.current_mode = "habitat"
 	var page_keys := ["fantasy_six_girl_1", "fantasy_six_armadillo", "fantasy_six_girl_2", "fantasy_six_armadillo_2", "fantasy_six_armadillo_3", "fantasy_six_armadillo_4"]
 	var speakers := ["girl", "armadillo", "girl", "armadillo", "armadillo", "armadillo"]
@@ -309,7 +308,7 @@ func _test_fantasy_six_candidate_contract(game: Node) -> void:
 		game.intro_overlay.visible = false
 	game._set_language("ja")
 	game.fantasy_realization_seen = true
-	assert(game._fantasy_six_new_candidate_allowed(outside_entry))
+	assert(game._early_fantasy_new_candidate_allowed(outside_entry))
 
 
 func _test_crisis_exploitation_lockout(game: Node) -> void:

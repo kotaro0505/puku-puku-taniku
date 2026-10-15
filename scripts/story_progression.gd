@@ -53,6 +53,11 @@ const RUNTIME_EVENT_IDS := [
 const ARRANGEMENT_UNLOCK_FANTASY_COUNT := 3
 const FOREST_GACHA_UNLOCK_FANTASY_COUNT := 8
 const FUSION_LAB_UNLOCK_FANTASY_COUNT := 12
+const EARLY_FANTASY_REQUIRED_SERIES_COUNT := 4
+# Completed normal 12-seed games before the guaranteed opportunity for the
+# next required series. Index 0 is the existing first-fantasy guarantee; the
+# remaining entries place the next opportunities in games 3, 5, and 6.
+const EARLY_FANTASY_GUARANTEE_COMPLETED_GAME_THRESHOLDS := [0, 2, 4, 5]
 
 static func act_stage(act2_unlocked:bool,act3_unlocked:bool,finale_complete:bool)->int:
 	if finale_complete:return ACT_FINALE
@@ -69,6 +74,13 @@ static func default_runtime_state() -> Dictionary:
 		"fantasy_unlocked": false,
 		"fantasy_new_guarantee_pending": false,
 		"fantasy_new_guarantee_consumed": false,
+		"early_fantasy_tracking_started": false,
+		"early_fantasy_completed_games": 0,
+		"early_fantasy_guarantee_pending": false,
+		"early_fantasy_active_species_id": "",
+		"early_fantasy_active_series_id": "",
+		"early_fantasy_reserved_species_id": "",
+		"early_fantasy_reserved_series_id": "",
 		"post_encounter_greenhouse_pending": false,
 		"post_encounter_greenhouse_seen": false,
 		"post_crisis_greenhouse_pending": false,
@@ -108,6 +120,9 @@ static func normalize_runtime_state(raw_state: Variant, migration: Dictionary = 
 	var had_fusion_lab_state := raw_dictionary.has("fusion_lab_unlocked") \
 			or raw_dictionary.has("fusion_lab_intro_pending") \
 			or raw_dictionary.has("fusion_lab_intro_seen")
+	var had_early_fantasy_state := raw_dictionary.has("early_fantasy_tracking_started") \
+			or raw_dictionary.has("early_fantasy_guarantee_pending") \
+			or raw_dictionary.has("early_fantasy_active_species_id")
 	var fantasy_get_count := maxi(0, int(migration.get("fantasy_get_count", 0)))
 	var forest_gacha_evidence := bool(migration.get("forest_gacha_evidence", false))
 	var forest_gacha_intro_seen := bool(migration.get("forest_gacha_intro_seen", false))
@@ -137,6 +152,22 @@ static func normalize_runtime_state(raw_state: Variant, migration: Dictionary = 
 	state["last_exploitation_concern_index"] = int(state.get("last_exploitation_concern_index", -1))
 	state["lifetime_harvest_count"] = maxi(0, int(state.get("lifetime_harvest_count", 0)))
 	state["lifetime_harvest_cm_total"] = maxf(0.0, float(state.get("lifetime_harvest_cm_total", 0.0)))
+	state["early_fantasy_completed_games"] = maxi(0, int(state.get("early_fantasy_completed_games", 0)))
+	state["early_fantasy_active_species_id"] = str(state.get("early_fantasy_active_species_id", ""))
+	state["early_fantasy_active_series_id"] = str(state.get("early_fantasy_active_series_id", ""))
+	state["early_fantasy_reserved_species_id"] = str(state.get("early_fantasy_reserved_species_id", ""))
+	state["early_fantasy_reserved_series_id"] = str(state.get("early_fantasy_reserved_series_id", ""))
+	# Plant nodes are not serialized. An in-flight guaranteed fantasy therefore
+	# returns to the one-slot pending reservation after a restart.
+	if not str(state.get("early_fantasy_active_species_id", "")).is_empty():
+		state["early_fantasy_guarantee_pending"] = true
+		state["early_fantasy_reserved_species_id"] = str(state.get("early_fantasy_active_species_id", ""))
+		state["early_fantasy_reserved_series_id"] = str(state.get("early_fantasy_active_series_id", ""))
+	state["early_fantasy_active_species_id"] = ""
+	state["early_fantasy_active_series_id"] = ""
+	if not bool(state.get("early_fantasy_guarantee_pending", false)):
+		state["early_fantasy_reserved_species_id"] = ""
+		state["early_fantasy_reserved_series_id"] = ""
 	var crisis_route := str(state.get("habitat_crisis_route", CRISIS_ROUTE_NONE))
 	if crisis_route not in [CRISIS_ROUTE_NONE, CRISIS_ROUTE_SAME_HABITAT, CRISIS_ROUTE_FORCE_TRAVEL]:
 		crisis_route = CRISIS_ROUTE_NONE
@@ -307,6 +338,35 @@ static func normalize_runtime_state(raw_state: Variant, migration: Dictionary = 
 	if HabitatRestorationClass.can_queue_join_home(
 			restoration, bool(state.get("post_crisis_greenhouse_seen", false))):
 		queue_story_event(state, EVENT_RESTORATION_JOIN_HOME)
+	if migration.has("fantasy_required_series_complete"):
+		var required_complete := bool(migration.get("fantasy_required_series_complete", false))
+		var realization_seen := bool(migration.get("fantasy_realization_seen", false))
+		var required_series_count := clampi(
+			int(migration.get("fantasy_required_series_get_count", 0)),
+			0,
+			EARLY_FANTASY_REQUIRED_SERIES_COUNT
+		)
+		if realization_seen:
+			consume_story_event(state, EVENT_FANTASY_SIX)
+			finish_early_fantasy_guarantees(state)
+		elif required_complete:
+			queue_story_event(state, EVENT_FANTASY_SIX)
+			cancel_early_fantasy_guarantee(state)
+		elif bool(state.get("fantasy_unlocked", false)):
+			begin_early_fantasy_tracking(state)
+			# Saves from before this state existed have no reliable unlock-relative
+			# round counter. Give their next missing series its already-earned
+			# opportunity immediately instead of making an established player wait.
+			if not had_early_fantasy_state:
+				var deadline_index := mini(
+					required_series_count,
+					EARLY_FANTASY_GUARANTEE_COMPLETED_GAME_THRESHOLDS.size() - 1
+				)
+				state["early_fantasy_completed_games"] = maxi(
+					int(state.get("early_fantasy_completed_games", 0)),
+					int(EARLY_FANTASY_GUARANTEE_COMPLETED_GAME_THRESHOLDS[deadline_index])
+				)
+			state["pending_story_events"].erase(EVENT_FANTASY_SIX)
 	return state
 
 
@@ -351,6 +411,114 @@ static func take_normal_play_guarantee(
 	return {}
 
 
+static func begin_early_fantasy_tracking(state: Dictionary) -> void:
+	if not bool(state.get("fantasy_unlocked", false)):
+		return
+	if bool(state.get("early_fantasy_tracking_started", false)):
+		return
+	state["early_fantasy_tracking_started"] = true
+	state["early_fantasy_completed_games"] = 0
+
+
+static func record_early_fantasy_game_completed(state: Dictionary) -> bool:
+	if not bool(state.get("fantasy_unlocked", false)) \
+			or not bool(state.get("early_fantasy_tracking_started", false)):
+		return false
+	state["early_fantasy_completed_games"] = maxi(
+		0, int(state.get("early_fantasy_completed_games", 0))
+	) + 1
+	return true
+
+
+static func early_fantasy_guarantee_due(state: Dictionary, required_series_get_count: int) -> bool:
+	var collected := clampi(required_series_get_count, 0, EARLY_FANTASY_REQUIRED_SERIES_COUNT)
+	if not bool(state.get("fantasy_unlocked", false)) \
+			or not bool(state.get("early_fantasy_tracking_started", false)) \
+			or collected >= EARLY_FANTASY_REQUIRED_SERIES_COUNT \
+			or has_early_fantasy_guarantee(state):
+		return false
+	var completed_games := maxi(0, int(state.get("early_fantasy_completed_games", 0)))
+	return completed_games >= int(EARLY_FANTASY_GUARANTEE_COMPLETED_GAME_THRESHOLDS[collected])
+
+
+static func has_early_fantasy_guarantee(state: Dictionary) -> bool:
+	return bool(state.get("early_fantasy_guarantee_pending", false)) \
+			or not str(state.get("early_fantasy_active_species_id", "")).is_empty()
+
+
+static func early_fantasy_guarantee_is_pending(state: Dictionary) -> bool:
+	return bool(state.get("early_fantasy_guarantee_pending", false))
+
+
+static func queue_early_fantasy_guarantee(
+		state: Dictionary, species_id := "", series_id := ""
+	) -> bool:
+	if not bool(state.get("fantasy_unlocked", false)) or has_early_fantasy_guarantee(state):
+		return false
+	state["early_fantasy_guarantee_pending"] = true
+	state["early_fantasy_reserved_species_id"] = species_id
+	state["early_fantasy_reserved_series_id"] = series_id
+	return true
+
+
+static func early_fantasy_candidate_hint(state: Dictionary) -> Dictionary:
+	if not early_fantasy_guarantee_is_pending(state):
+		return {}
+	return {
+		"species_id": str(state.get("early_fantasy_reserved_species_id", "")),
+		"series_id": str(state.get("early_fantasy_reserved_series_id", "")),
+	}
+
+
+static func consume_early_fantasy_guarantee(
+		state: Dictionary, species_id: String, series_id: String
+	) -> bool:
+	if not early_fantasy_guarantee_is_pending(state) or species_id.is_empty() or series_id.is_empty():
+		return false
+	state["early_fantasy_guarantee_pending"] = false
+	state["early_fantasy_reserved_species_id"] = ""
+	state["early_fantasy_reserved_series_id"] = ""
+	state["early_fantasy_active_species_id"] = species_id
+	state["early_fantasy_active_series_id"] = series_id
+	return true
+
+
+static func fail_early_fantasy_guarantee(state: Dictionary, species_id: String) -> bool:
+	if species_id.is_empty() or str(state.get("early_fantasy_active_species_id", "")) != species_id:
+		return false
+	state["early_fantasy_active_species_id"] = ""
+	state["early_fantasy_active_series_id"] = ""
+	state["early_fantasy_guarantee_pending"] = true
+	# A retry deliberately redraws both the missing series and the species. The
+	# player is never forced to repeat the exact plant that jellied.
+	state["early_fantasy_reserved_species_id"] = ""
+	state["early_fantasy_reserved_series_id"] = ""
+	return true
+
+
+static func complete_early_fantasy_guarantee(state: Dictionary, species_id: String) -> bool:
+	if species_id.is_empty() or str(state.get("early_fantasy_active_species_id", "")) != species_id:
+		return false
+	cancel_early_fantasy_guarantee(state)
+	return true
+
+
+static func cancel_early_fantasy_guarantee(state: Dictionary) -> void:
+	state["early_fantasy_guarantee_pending"] = false
+	state["early_fantasy_active_species_id"] = ""
+	state["early_fantasy_active_series_id"] = ""
+	state["early_fantasy_reserved_species_id"] = ""
+	state["early_fantasy_reserved_series_id"] = ""
+
+
+static func finish_early_fantasy_guarantees(state: Dictionary) -> void:
+	cancel_early_fantasy_guarantee(state)
+	state["early_fantasy_tracking_started"] = false
+	state["fantasy_new_guarantee_pending"] = false
+	if bool(state.get("fantasy_unlocked", false)):
+		state["fantasy_new_guarantee_consumed"] = true
+
+
 static func record_new_get(state: Dictionary, milestone: Dictionary) -> Dictionary:
 	var actions := {
 		"fantasy_unlocked_now": false,
@@ -364,6 +532,7 @@ static func record_new_get(state: Dictionary, milestone: Dictionary) -> Dictiona
 		state["fantasy_unlocked"] = true
 		state["fantasy_new_guarantee_pending"] = true
 		state["fantasy_new_guarantee_consumed"] = false
+		begin_early_fantasy_tracking(state)
 		actions["fantasy_unlocked_now"] = true
 	if not bool(milestone.get("is_fantasy", false)):
 		return actions
@@ -376,7 +545,8 @@ static func record_new_get(state: Dictionary, milestone: Dictionary) -> Dictiona
 		state["arrangement_intro_pending"] = true
 		queue_story_event(state, EVENT_ARRANGEMENT_INTRO)
 		actions["arrangement_intro_queued_now"] = true
-	if fantasy_count >= 6 and not bool(milestone.get("fantasy_six_seen", false)):
+	if bool(milestone.get("fantasy_required_series_complete", false)) \
+			and not bool(milestone.get("fantasy_six_seen", false)):
 		queue_story_event(state, EVENT_FANTASY_SIX)
 	if bool(state.get("fantasy_unlocked", false)) \
 			and fantasy_count >= FOREST_GACHA_UNLOCK_FANTASY_COUNT \

@@ -157,7 +157,7 @@ const FANTASY_SERIES_IDS := [
 	"gummy", "metal", "sweets", "glow", "jewel", "jelly", "stardust",
 	"stone", "sea", "yumekawa", "forest_amber", "neon"
 ]
-const FANTASY_SIX_REQUIRED_SERIES := ["jelly", "yumekawa", "stone", "jewel"]
+const EARLY_FANTASY_REQUIRED_SERIES := ["jelly", "yumekawa", "stone", "jewel"]
 const JUREJURE_STORY_GROUP := "jurejure"
 const JUREJURE_SERIES_ID := "jurejure"
 const SHOP_CHATTER_KEYS := [
@@ -1722,6 +1722,9 @@ func _migrate_three_act_progress(saved_progression_version:int,retired_secret_ga
 		"legacy":saved_progression_version<PROGRESSION_VERSION,
 		"act2_unlocked":act2_unlocked,
 		"fantasy_get_count":fantasy_count,
+		"fantasy_required_series_get_count":_early_fantasy_required_series_get_count(),
+		"fantasy_required_series_complete":_early_fantasy_required_series_complete(),
+		"fantasy_realization_seen":fantasy_realization_seen,
 		"arrangement_evidence":not saved_arrangements.is_empty(),
 		"forest_gacha_evidence":forest_gacha_unlocked or forest_gacha_draw_count>0,
 		"forest_gacha_intro_seen":forest_gacha_intro_seen,
@@ -1751,7 +1754,15 @@ func _migrate_three_act_progress(saved_progression_version:int,retired_secret_ga
 			StoryProgressionClass.complete_forest_gacha_intro(story_progression_state)
 	elif saved_progression_version<PROGRESSION_VERSION:
 		if fantasy_count>=1 and not fantasy_first_discovery_seen:StoryProgressionClass.queue_story_event(story_progression_state,StoryProgressionClass.EVENT_FANTASY_FIRST)
-		if fantasy_count>=6 and not fantasy_realization_seen:StoryProgressionClass.queue_story_event(story_progression_state,StoryProgressionClass.EVENT_FANTASY_SIX)
+		if _early_fantasy_required_series_complete() and not fantasy_realization_seen:StoryProgressionClass.queue_story_event(story_progression_state,StoryProgressionClass.EVENT_FANTASY_SIX)
+	if fantasy_realization_seen:
+		StoryProgressionClass.consume_story_event(story_progression_state,StoryProgressionClass.EVENT_FANTASY_SIX)
+		StoryProgressionClass.finish_early_fantasy_guarantees(story_progression_state)
+	elif _early_fantasy_required_series_complete():
+		StoryProgressionClass.queue_story_event(story_progression_state,StoryProgressionClass.EVENT_FANTASY_SIX)
+		StoryProgressionClass.cancel_early_fantasy_guarantee(story_progression_state)
+	else:
+		StoryProgressionClass.consume_story_event(story_progression_state,StoryProgressionClass.EVENT_FANTASY_SIX)
 	if act2_species_count>=24:
 		act3_unlocked=true
 		if not act3_intro_seen:act3_intro_pending=true
@@ -2567,7 +2578,7 @@ func _pot_design_unlocked(pot:Dictionary)->bool:
 
 func _current_pot_sales_stage()->int:
 	if act3_unlocked:return 2
-	if forest_gacha_unlocked or fantasy_realization_seen or _unique_fantasy_species_get_count()>=6:return 1
+	if forest_gacha_unlocked or _unique_fantasy_species_get_count()>=6:return 1
 	return 0
 
 func _normalize_pot_design_unlocks(value:Variant)->Dictionary:
@@ -2966,7 +2977,7 @@ func _finish_scripted_dialog()->void:
 		"arrangement_intro":
 			StoryProgressionClass.complete_arrangement_intro(story_progression_state);show_arrangement_swipe_intro=true
 		"fantasy_realization":
-			fantasy_realization_seen=true;StoryProgressionClass.consume_story_event(story_progression_state,StoryProgressionClass.EVENT_FANTASY_SIX)
+			fantasy_realization_seen=true;StoryProgressionClass.consume_story_event(story_progression_state,StoryProgressionClass.EVENT_FANTASY_SIX);StoryProgressionClass.finish_early_fantasy_guarantees(story_progression_state)
 		"fusion_lab_intro":
 			StoryProgressionClass.complete_fusion_lab_intro(story_progression_state)
 		"post_jurejure_encounter_home":
@@ -6532,32 +6543,40 @@ func _is_fantasy_species(entry:Dictionary)->bool:
 	if entry.is_empty():return false
 	# Story counts follow the page the player actually sees in the integrated
 	# catalog. This includes every fusion tier while keeping JureJure's separate
-	# eight-species progression out of the fantasy-only 1/6 milestones.
+	# eight-species progression out of the fantasy discovery milestones.
 	if _is_jurejure_species(entry):return false
 	return _catalog_display_series_id_for_entry(entry) in FANTASY_SERIES_IDS
 
-func _fantasy_six_missing_series()->Array[String]:
+func _early_fantasy_missing_series(include_pending_gets:=false)->Array[String]:
 	var found:Dictionary={}
 	for entry_value in catalog_species:
 		if not entry_value is Dictionary:continue
 		var entry:Dictionary=entry_value
 		if _species_get_count(str(entry.get("species_id","")))<=0:continue
 		var display_series:=_catalog_display_series_id_for_entry(entry)
-		if display_series in FANTASY_SIX_REQUIRED_SERIES:found[display_series]=true
+		if display_series in EARLY_FANTASY_REQUIRED_SERIES:found[display_series]=true
+	if include_pending_gets:
+		for species_id_value in pending_round_new_species_ids:
+			var pending_entry:=_catalog_entry(str(species_id_value))
+			var pending_series:=_catalog_display_series_id_for_entry(pending_entry)
+			if pending_series in EARLY_FANTASY_REQUIRED_SERIES:found[pending_series]=true
 	var missing:Array[String]=[]
-	for series_id in FANTASY_SIX_REQUIRED_SERIES:
+	for series_id in EARLY_FANTASY_REQUIRED_SERIES:
 		if not bool(found.get(series_id,false)):missing.append(series_id)
 	return missing
 
-func _fantasy_six_required_series_complete()->bool:
-	return _fantasy_six_missing_series().is_empty()
+func _early_fantasy_required_series_get_count(include_pending_gets:=false)->int:
+	return EARLY_FANTASY_REQUIRED_SERIES.size()-_early_fantasy_missing_series(include_pending_gets).size()
 
-func _fantasy_six_new_candidate_allowed(entry:Dictionary)->bool:
+func _early_fantasy_required_series_complete()->bool:
+	return _early_fantasy_missing_series().is_empty()
+
+func _early_fantasy_new_candidate_allowed(entry:Dictionary)->bool:
 	if _is_jurejure_species(entry):return false
 	if fantasy_realization_seen or not StoryProgressionClass.fantasy_is_unlocked(story_progression_state) or not _is_fantasy_species(entry):return true
 	var display_series:=_catalog_display_series_id_for_entry(entry)
-	if display_series not in FANTASY_SIX_REQUIRED_SERIES:return false
-	var missing:=_fantasy_six_missing_series()
+	if display_series not in EARLY_FANTASY_REQUIRED_SERIES:return false
+	var missing:=_early_fantasy_missing_series(true)
 	return missing.is_empty() or display_series in missing
 
 func _unique_fantasy_species_get_count()->int:
@@ -6621,12 +6640,14 @@ func _record_species_get(species_id:String,amount:int=1)->void:
 			"is_original":bool(entry.get("main_story_original",false)),
 			"is_fantasy":_is_fantasy_species(entry),
 			"fantasy_get_count":_unique_fantasy_species_get_count(),
+			"fantasy_required_series_complete":_early_fantasy_required_series_complete(),
 			"fantasy_first_seen":fantasy_first_discovery_seen,
 			"fantasy_six_seen":fantasy_realization_seen,
 			"forest_gacha_unlocked":forest_gacha_unlocked,
 			"forest_gacha_intro_seen":forest_gacha_intro_seen,
 		})
 		if bool(transition.get("fantasy_unlocked_now",false)):_apply_saved_unlocks()
+		if _early_fantasy_required_series_complete():StoryProgressionClass.cancel_early_fantasy_guarantee(story_progression_state)
 		StoryProgressionClass.record_restoration_new_get(story_progression_state,species_id,habitat_crisis_started)
 		call_deferred("_try_start_pending_story_event")
 	_refresh_narrative_species_progress()
@@ -7157,7 +7178,7 @@ func _start_arrangement_intro_event()->void:
 	],false)
 
 func _start_fantasy_realization_event()->void:
-	if fantasy_realization_seen or not act2_unlocked or _unique_fantasy_species_get_count()<6 or not _fantasy_six_required_series_complete():return
+	if fantasy_realization_seen or not act2_unlocked or not _early_fantasy_required_series_complete():return
 	_start_scripted_dialog("fantasy_realization",[
 		{"speaker":"girl","text":Localizer.text(language_code,"fantasy_six_girl_1")},
 		{"speaker":"armadillo","text":Localizer.text(language_code,"fantasy_six_armadillo")},
@@ -7947,6 +7968,7 @@ func _arrangement_pot_anchor_screen()->Vector2:
 func spawn_plant(force_golden := false,spawn_position:Variant=null) -> void:
 	var chosen:Dictionary
 	var endless_forced_new:=false
+	var early_fantasy_guaranteed_new:=false
 	var endless_carryover_advanced:=false
 	if active_seed_type=="old":
 		chosen=_catalog_entry(FIRST_STORY_SPECIES_ID)
@@ -7960,6 +7982,15 @@ func spawn_plant(force_golden := false,spawn_position:Variant=null) -> void:
 		if chosen.is_empty(): chosen = species[0]
 		forced_golden_done=true
 	elif not opening_species.is_empty():chosen=opening_species.pop_front()
+	elif active_seed_type=="normal" and jurejure_intro_complete and StoryProgressionClass.early_fantasy_guarantee_is_pending(story_progression_state):
+		chosen=_select_early_fantasy_guaranteed_candidate()
+		if not chosen.is_empty():
+			var early_series_id:=_catalog_display_series_id_for_entry(chosen)
+			early_fantasy_guaranteed_new=StoryProgressionClass.consume_early_fantasy_guarantee(story_progression_state,str(chosen.get("species_id","")),early_series_id)
+		else:
+			# Keep the durable reservation for the next seed if catalog eligibility
+			# is temporarily unavailable; normal play must never stall.
+			chosen=_select_normal_seed_species(-1.0,false)
 	elif _is_endless_normal_play() and not jurejure_intro_complete:
 		# A stale forced reservation from an older save must not leak a random NEW
 		# into the story before the gang's first encounter is complete.
@@ -7970,7 +8001,7 @@ func spawn_plant(force_golden := false,spawn_position:Variant=null) -> void:
 		if not endless_greenhouse.forced_new_pending:
 			var carryover_result:=_roll_endless_carryover_for_seed()
 			endless_carryover_advanced=bool(carryover_result.get("consumed",false))
-		if endless_greenhouse.forced_new_pending:
+		if chosen.is_empty() and endless_greenhouse.forced_new_pending:
 			chosen=_select_endless_forced_new_candidate()
 			if chosen.is_empty():
 				# Eligibility can legitimately disappear between a roll and sprout.
@@ -7979,19 +8010,19 @@ func spawn_plant(force_golden := false,spawn_position:Variant=null) -> void:
 				chosen=_select_normal_seed_species(-1.0,false)
 			else:
 				endless_forced_new=endless_greenhouse.consume_forced_new(str(chosen.get("species_id","")))
-		else:chosen=_select_species_for_seed(active_seed_type)
+		elif chosen.is_empty():chosen=_select_species_for_seed(active_seed_type)
 	else:chosen=_select_species_for_seed(active_seed_type)
 	var pos:Vector3=_find_spawn_position() if spawn_position==null else spawn_position
 	var label:=_plant_label(); labels_layer.add_child(label)
 	var p = SucculentClass.new()
 	var chosen_species_id:=str(chosen.get("species_id",""))
 	var new_species_candidate:=_species_get_count(chosen_species_id)<=0 and chosen_species_id not in pending_round_new_species_ids
-	if _is_endless_normal_play() and new_species_candidate:
+	if _is_endless_normal_play() and new_species_candidate and not early_fantasy_guaranteed_new:
 		# Any NEW that actually appears ends the current carryover chain,
 		# regardless of whether it came from the carryover roll or a story slot.
 		endless_greenhouse.clear_discovery_carryover()
 		if not endless_forced_new and endless_greenhouse.forced_new_pending:endless_greenhouse.cancel_forced_new_pending()
-	p.original_pos=pos; p.position=pos;p.set_meta("new_species_candidate",new_species_candidate);p.set_meta("endless_forced_new",endless_forced_new); world_root.add_child(p); p.setup(chosen,rng.randi(),label,null,false,_greenhouse_jelly_balance_for_spawn());p.attach_screen_visual(plant_screen_layer,camera);p.jelly_permission=Callable(self,"_allow_plant_jelly").bind(p)
+	p.original_pos=pos; p.position=pos;p.set_meta("new_species_candidate",new_species_candidate);p.set_meta("endless_forced_new",endless_forced_new);p.set_meta("early_fantasy_guarantee",early_fantasy_guaranteed_new); world_root.add_child(p); p.setup(chosen,rng.randi(),label,null,false,_greenhouse_jelly_balance_for_spawn());p.attach_screen_visual(plant_screen_layer,camera);p.jelly_permission=Callable(self,"_allow_plant_jelly").bind(p)
 	if active_seed_type=="old" and chosen_species_id==FIRST_STORY_SPECIES_ID and not first_colorata_confirmed:
 		p.growth_rate*=FIRST_STORY_COLORATA_GROWTH_MULTIPLIER
 		p.set_meta("first_story_growth_multiplier",FIRST_STORY_COLORATA_GROWTH_MULTIPLIER)
@@ -7999,7 +8030,7 @@ func spawn_plant(force_golden := false,spawn_position:Variant=null) -> void:
 	p.harvested.connect(_on_harvested); p.jellied.connect(_on_jellied)
 	plants.append(p)
 	_mark_first_play_tutorial_reserved_plant(p)
-	if endless_forced_new or endless_carryover_advanced or (_is_endless_normal_play() and new_species_candidate):_save()
+	if early_fantasy_guaranteed_new or endless_forced_new or endless_carryover_advanced or (_is_endless_normal_play() and new_species_candidate):_save()
 	if audio_manager:audio_manager.play_se("sprout",.28)
 
 func _spawn_greenhouse_seed(suppress_puku_effect:=false,requested_spawn_position:Variant=null)->bool:
@@ -8078,6 +8109,8 @@ func _complete_endless_virtual_batch()->void:
 		_refresh_seed_pack_unlocks()
 	_resolve_tovar_event_after_play()
 	_evaluate_unlock_rules("play_count",float(total_play_count))
+	if StoryProgressionClass.fantasy_is_unlocked(story_progression_state) and not fantasy_realization_seen and not _early_fantasy_missing_series(true).is_empty():
+		StoryProgressionClass.record_early_fantasy_game_completed(story_progression_state)
 	_prepare_story_spawn_guarantee()
 	_save();_update_play_ui();_log_endless_economy("virtual_batch")
 
@@ -8150,26 +8183,83 @@ func _weighted_species()->Dictionary:
 
 func _prepare_story_spawn_guarantee()->void:
 	if not jurejure_intro_complete:return
+	if fantasy_realization_seen or _early_fantasy_required_series_complete():
+		StoryProgressionClass.finish_early_fantasy_guarantees(story_progression_state)
 	var guaranteed:=StoryProgressionClass.take_normal_play_guarantee(
 		story_progression_state,
 		_story_spawn_guarantee_candidates(false),
 		_story_spawn_guarantee_candidates(true),
 		rng
 	)
-	if not guaranteed.is_empty():opening_species.append(guaranteed)
+	if not guaranteed.is_empty():
+		if _is_fantasy_species(guaranteed):
+			StoryProgressionClass.queue_early_fantasy_guarantee(story_progression_state,str(guaranteed.get("species_id","")),_catalog_display_series_id_for_entry(guaranteed))
+		else:opening_species.append(guaranteed)
+	_schedule_early_fantasy_guarantee_if_due()
+
+func _schedule_early_fantasy_guarantee_if_due()->bool:
+	if fantasy_realization_seen or _early_fantasy_required_series_complete():
+		StoryProgressionClass.cancel_early_fantasy_guarantee(story_progression_state)
+		return false
+	if not StoryProgressionClass.fantasy_is_unlocked(story_progression_state):return false
+	StoryProgressionClass.begin_early_fantasy_tracking(story_progression_state)
+	var collected_count:=_early_fantasy_required_series_get_count(true)
+	if not StoryProgressionClass.early_fantasy_guarantee_due(story_progression_state,collected_count):return false
+	return StoryProgressionClass.queue_early_fantasy_guarantee(story_progression_state)
+
+func _early_fantasy_guarantee_candidates_by_series()->Dictionary:
+	var grouped:Dictionary={}
+	if fantasy_realization_seen or not StoryProgressionClass.fantasy_is_unlocked(story_progression_state):return grouped
+	var missing:=_early_fantasy_missing_series(true)
+	for series_id in missing:grouped[series_id]=[]
+	for raw_entry in catalog_species:
+		if not raw_entry is Dictionary:continue
+		var entry:Dictionary=raw_entry;var species_id:=str(entry.get("species_id",""))
+		if species_id.is_empty() or species_id in pending_round_new_species_ids or _species_get_count(species_id)>0:continue
+		if _seed_new_species_blocked(species_id) or str(entry.get("rarity","")) in ["隠し原種","謎品種"]:continue
+		if not _is_fantasy_species(entry) or _is_jurejure_species(entry):continue
+		var display_series:=_catalog_display_series_id_for_entry(entry)
+		if display_series not in missing:continue
+		if not _species_is_in_unlocked_series(species_id) and not _normal_seed_locked_series_eligible(species_id):continue
+		var candidate:=entry.duplicate(true)
+		if not _species_is_in_unlocked_series(species_id):candidate["_deferred_series_get"]=true
+		(grouped[display_series] as Array).append(candidate)
+	return grouped
+
+func _select_early_fantasy_guaranteed_candidate()->Dictionary:
+	var grouped:=_early_fantasy_guarantee_candidates_by_series()
+	var available_series:Array[String]=[]
+	for series_id in EARLY_FANTASY_REQUIRED_SERIES:
+		if grouped.has(series_id) and not (grouped[series_id] as Array).is_empty():available_series.append(series_id)
+	if available_series.is_empty():return {}
+	var hint:=StoryProgressionClass.early_fantasy_candidate_hint(story_progression_state)
+	var hinted_species_id:=str(hint.get("species_id",""));var hinted_series_id:=str(hint.get("series_id",""))
+	if hinted_series_id in available_series:
+		var hinted_candidates:Array=grouped[hinted_series_id]
+		if not hinted_species_id.is_empty():
+			for hinted_candidate in hinted_candidates:
+				if str(hinted_candidate.get("species_id",""))==hinted_species_id:return hinted_candidate
+		return hinted_candidates[rng.randi_range(0,hinted_candidates.size()-1)]
+	var selected_series:=available_series[rng.randi_range(0,available_series.size()-1)]
+	var series_candidates:Array=grouped[selected_series]
+	return series_candidates[rng.randi_range(0,series_candidates.size()-1)]
 
 func _story_spawn_guarantee_candidates(want_fantasy:bool)->Array[Dictionary]:
+	if want_fantasy:
+		var balanced_candidates:Array[Dictionary]=[]
+		var grouped:=_early_fantasy_guarantee_candidates_by_series()
+		for series_id in EARLY_FANTASY_REQUIRED_SERIES:
+			if not grouped.has(series_id):continue
+			var series_candidates:Array=grouped[series_id]
+			if not series_candidates.is_empty():balanced_candidates.append(series_candidates[rng.randi_range(0,series_candidates.size()-1)])
+		return balanced_candidates
 	var candidates:Array[Dictionary]=[]
 	for raw_entry in catalog_species:
 		if not raw_entry is Dictionary:continue
 		var entry:Dictionary=raw_entry;var species_id:=str(entry.get("species_id",""))
 		if species_id.is_empty() or species_id in pending_round_new_species_ids or _species_get_count(species_id)>0:continue
 		if _seed_new_species_blocked(species_id) or str(entry.get("rarity","")) in ["隠し原種","謎品種"]:continue
-		if want_fantasy:
-			if not StoryProgressionClass.fantasy_is_unlocked(story_progression_state) or not _is_fantasy_species(entry) or _is_jurejure_species(entry):continue
-			if not _fantasy_six_new_candidate_allowed(entry):continue
-		else:
-			if not bool(entry.get("main_story_original",false)):continue
+		if not bool(entry.get("main_story_original",false)):continue
 		if not _species_is_in_unlocked_series(species_id) and not _normal_seed_locked_series_eligible(species_id):continue
 		var candidate:=entry.duplicate(true)
 		if not _species_is_in_unlocked_series(species_id):candidate["_deferred_series_get"]=true
@@ -8240,6 +8330,7 @@ func _normal_seed_selection_pools()->Dictionary:
 		if str(entry.get("rarity","")) in ["隠し原種","謎品種"]:continue
 		if _species_get_count(species_id)<=0:
 			if _seed_new_species_blocked(species_id):continue
+			if _is_fantasy_species(entry) and not _early_fantasy_new_candidate_allowed(entry):continue
 			if _species_is_in_unlocked_series(species_id):unlocked_new_candidates.append(entry)
 			elif _normal_seed_locked_series_eligible(species_id) and not bool(forest_gacha_encountered.get(species_id,false)):locked_new_candidates.append(entry)
 			continue
@@ -8282,11 +8373,14 @@ func _select_normal_seed_species(forced_category_roll:float=-1.0,allow_random_ne
 func _eligible_endless_forced_new_candidates()->Array[Dictionary]:
 	var pools:=_normal_seed_selection_pools()
 	var candidates:Array[Dictionary]=[]
+	var early_hint:=StoryProgressionClass.early_fantasy_candidate_hint(story_progression_state)
+	var early_reserved_species_id:=str(early_hint.get("species_id",""))
+	if early_reserved_species_id.is_empty():early_reserved_species_id=str(story_progression_state.get("early_fantasy_active_species_id",""))
 	for raw_candidate in (pools.get("unlocked_new",[]) as Array):
-		if raw_candidate is Dictionary and _fantasy_six_new_candidate_allowed(raw_candidate):candidates.append(raw_candidate)
+		if raw_candidate is Dictionary and str(raw_candidate.get("species_id",""))!=early_reserved_species_id and _early_fantasy_new_candidate_allowed(raw_candidate):candidates.append(raw_candidate)
 	for raw_candidate in (pools.get("locked_new",[]) as Array):
 		if not raw_candidate is Dictionary:continue
-		if not _fantasy_six_new_candidate_allowed(raw_candidate):continue
+		if str(raw_candidate.get("species_id",""))==early_reserved_species_id or not _early_fantasy_new_candidate_allowed(raw_candidate):continue
 		var candidate:Dictionary=raw_candidate.duplicate(true)
 		candidate["_deferred_series_get"]=true
 		candidates.append(candidate)
@@ -9379,6 +9473,7 @@ func _on_harvested(p)->void:
 	var story_old_seed:=_old_seed_story_active()
 	var deferred_tovar:=tovar_event_active and harvested_species_id==HIDDEN_TOVAR_ID
 	var endless_forced_new:=bool(p.get_meta("endless_forced_new",false))
+	var early_fantasy_guaranteed_new:=bool(p.get_meta("early_fantasy_guarantee",false))
 	var old:=float(bests.get(harvested_species_id,0.0));var is_record:bool=not deferred_tovar and not story_old_seed and harvested_diameter_cm>old
 	var already_pending_round_new:=harvested_species_id in pending_round_new_species_ids
 	var is_first_get_for_puku:=_species_get_count(harvested_species_id)<=0 and not already_pending_round_new
@@ -9419,6 +9514,7 @@ func _on_harvested(p)->void:
 		}
 	if not deferred_tovar:
 		_record_endless_discovery_settlement(true,harvested_diameter_cm)
+		if early_fantasy_guaranteed_new:StoryProgressionClass.complete_early_fantasy_guarantee(story_progression_state,harvested_species_id)
 		if defer_round_new:
 			# Formal GET, catalog progress, and story thresholds intentionally wait
 			# until every plant settles. Only the active forced slot is cleared;
@@ -9469,10 +9565,17 @@ func _is_terminal_first_tutorial_plant(plant)->bool:
 func _on_jellied(p)->void:
 	if is_instance_valid(p) and p.label and is_instance_valid(p.label):p.label.visible=false
 	if bool(p.get_meta("catalog_preview",false)):_on_catalog_preview_jellied(p);return
+	var early_guarantee_state_changed:=false
+	if play_active and active_seed_type=="normal" and bool(p.get_meta("early_fantasy_guarantee",false)):
+		var jellied_species_id:=str(p.data.get("species_id",""));var jellied_series_id:=_catalog_display_series_id_for_entry(p.data)
+		if jellied_series_id in _early_fantasy_missing_series(true):early_guarantee_state_changed=StoryProgressionClass.fail_early_fantasy_guarantee(story_progression_state,jellied_species_id)
+		else:early_guarantee_state_changed=StoryProgressionClass.complete_early_fantasy_guarantee(story_progression_state,jellied_species_id)
 	if _is_endless_normal_play():
 		endless_economy_jelly_count+=1
 		if bool(p.get_meta("endless_forced_new",false)):endless_greenhouse.fail_forced_new(str(p.data.get("species_id","")))
 		_record_endless_discovery_settlement(false,0.0)
+		_save()
+	elif early_guarantee_state_changed:
 		_save()
 	_maybe_activate_first_play_harvest_guide()
 	_show_float(p,Localizer.text(language_code,"jelly_float"),Color("#e7c9f0"))

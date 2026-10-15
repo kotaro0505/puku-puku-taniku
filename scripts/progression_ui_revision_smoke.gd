@@ -249,23 +249,12 @@ func _test_progression_thresholds() -> void:
 	assert(bool(state.get("arrangement_intro_pending", false)))
 	assert(StoryProgression.EVENT_ARRANGEMENT_INTRO in (state.get("pending_story_events", []) as Array))
 	StoryProgression.complete_arrangement_intro(state)
-	for count in range(4, 6):
-		StoryProgression.record_new_get(state, {
-			"act2_unlocked": true,
-			"is_original": false,
-			"is_fantasy": true,
-			"fantasy_get_count": count,
-			"fantasy_first_seen": true,
-			"fantasy_six_seen": false,
-			"forest_gacha_unlocked": false,
-			"forest_gacha_intro_seen": false,
-		})
-		assert(not bool(state.get("forest_gacha_unlock_pending", false)))
 	StoryProgression.record_new_get(state, {
 		"act2_unlocked": true,
 		"is_original": false,
 		"is_fantasy": true,
-		"fantasy_get_count": 6,
+		"fantasy_get_count": 4,
+		"fantasy_required_series_complete": true,
 		"fantasy_first_seen": true,
 		"fantasy_six_seen": false,
 		"forest_gacha_unlocked": false,
@@ -274,22 +263,25 @@ func _test_progression_thresholds() -> void:
 	assert(not bool(state.get("forest_gacha_unlock_pending", false)))
 	assert(StoryProgression.EVENT_FANTASY_SIX in (state.get("pending_story_events", []) as Array))
 	StoryProgression.consume_story_event(state, StoryProgression.EVENT_FANTASY_SIX)
-	StoryProgression.record_new_get(state, {
-		"act2_unlocked": true,
-		"is_original": false,
-		"is_fantasy": true,
-		"fantasy_get_count": 7,
-		"fantasy_first_seen": true,
-		"fantasy_six_seen": true,
-		"forest_gacha_unlocked": false,
-		"forest_gacha_intro_seen": false,
-	})
-	assert(not bool(state.get("forest_gacha_unlock_pending", false)))
+	for count in range(5, 8):
+		StoryProgression.record_new_get(state, {
+			"act2_unlocked": true,
+			"is_original": false,
+			"is_fantasy": true,
+			"fantasy_get_count": count,
+			"fantasy_required_series_complete": true,
+			"fantasy_first_seen": true,
+			"fantasy_six_seen": true,
+			"forest_gacha_unlocked": false,
+			"forest_gacha_intro_seen": false,
+		})
+		assert(not bool(state.get("forest_gacha_unlock_pending", false)))
 	StoryProgression.record_new_get(state, {
 		"act2_unlocked": true,
 		"is_original": false,
 		"is_fantasy": true,
 		"fantasy_get_count": 8,
+		"fantasy_required_series_complete": true,
 		"fantasy_first_seen": true,
 		"fantasy_six_seen": true,
 		"forest_gacha_unlocked": false,

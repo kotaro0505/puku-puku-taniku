@@ -38,6 +38,7 @@ func _ready() -> void:
 	_test_discovery_probability_and_set_state()
 	_test_per_spawn_new_switch_and_story_guarantee(game)
 	_test_uniform_forced_new_candidate_pool(game)
+	_test_early_fantasy_guarantee(game)
 	_test_localized_trial_tutorial(game)
 	game.rng.seed = 880031
 	await _test_endless_first_play_tutorial(game)
@@ -105,7 +106,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	_remove_test_file(NORMAL_PATH)
 	_remove_test_file(EXPERIMENT_PATH)
-	print("ENDLESS_GREENHOUSE_SMOKE_OK default_without_flags=true player_start=true round_seeds=12 round_cost=1 concurrent=5-8_dynamic refill_free=true harvest_direct=true wallet=fixed_point jelly_extra_penalty=false result=removed normal_jelly_rates=1/2.5/5/8 normal_growth=1.6 normal_kakuhen=true non_normal_jelly_rates=1/2/3/4 boundaries=5/10/15 new_roll=max_carryover_x0.4 jelly_new_roll=false discovery_curve=unchanged forced_new=true candidate_pool=uniform deferred_formal_get=true pending_duplicate=false first_get_floor=once virtual_batch=12 pause=true navigation=habitat+catalog+shop+gacha production_gacha=1puku+species_get fusion=1-2-3puku restoration_pending=true finite=true save_isolated=true")
+	print("ENDLESS_GREENHOUSE_SMOKE_OK default_without_flags=true player_start=true round_seeds=12 round_cost=1 concurrent=5-8_dynamic refill_free=true harvest_direct=true wallet=fixed_point jelly_extra_penalty=false result=removed normal_jelly_rates=1/2.5/5/8 normal_growth=1.6 normal_kakuhen=true non_normal_jelly_rates=1/2/3/4 boundaries=5/10/15 new_roll=max_carryover_x0.4 jelly_new_roll=false discovery_curve=unchanged forced_new=true candidate_pool=uniform early_fantasy=four_series+retry+save+games_1_3_5_6 carryover_independent=true deferred_formal_get=true pending_duplicate=false first_get_floor=once virtual_batch=12 pause=true navigation=habitat+catalog+shop+gacha production_gacha=1puku+species_get fusion=1-2-3puku restoration_pending=true finite=true save_isolated=true")
 	get_tree().quit()
 
 
@@ -329,6 +330,144 @@ func _test_uniform_forced_new_candidate_pool(game: Node) -> void:
 	assert(unlocked_ratio > 0.46 and unlocked_ratio < 0.54)
 	game.species_get_counts = saved_counts
 	game.story_progression_state = saved_story_state
+
+
+func _test_early_fantasy_guarantee(game: Node) -> void:
+	var saved_story_state:Dictionary=game.story_progression_state.duplicate(true)
+	var saved_counts:Dictionary=game.species_get_counts.duplicate(true)
+	var saved_discovered:Dictionary=game.discovered.duplicate(true)
+	var saved_greenhouse:Dictionary=game.greenhouse_available.duplicate(true)
+	var saved_unlocked_species:Dictionary=game.unlocked_species.duplicate(true)
+	var saved_unlocked_series:Dictionary=game.unlocked_series.duplicate(true)
+	var saved_fantasy_seen:bool=game.fantasy_realization_seen
+	var saved_play_active:bool=game.play_active
+	var saved_seed_type:String=game.active_seed_type
+	var saved_seeds_remaining:int=game.play_seeds_remaining
+	var saved_spawn_queue:int=game.play_spawn_queue
+	var saved_seed_animations:int=game.play_seed_animations_pending
+	var saved_target:int=game.play_concurrent_target
+	var saved_pending_round:Array[String]=game.pending_round_new_species_ids.duplicate()
+	var saved_opening:Array=game.opening_species.duplicate(true)
+	var saved_endless_state:Dictionary=game.endless_greenhouse.discovery_state_for_save()
+	game._clear_greenhouse_plants()
+	game.story_progression_state=StoryProgressionClass.default_runtime_state()
+	game.story_progression_state["fantasy_unlocked"]=true
+	game.story_progression_state["fantasy_new_guarantee_pending"]=true
+	StoryProgressionClass.begin_early_fantasy_tracking(game.story_progression_state)
+	game.fantasy_realization_seen=false
+	game.species_get_counts={"colorata":1}
+	game.discovered={"colorata":true}
+	game.greenhouse_available={"colorata":true}
+	game.unlocked_species=game.greenhouse_available.duplicate(true)
+	game.unlocked_series={"base":true}
+	game.pending_round_new_species_ids.clear()
+	game.opening_species.clear()
+	game.play_active=true
+	game.active_seed_type="normal"
+	game.play_seeds_remaining=0
+	game.play_spawn_queue=0
+	game.play_seed_animations_pending=0
+	game.play_concurrent_target=1
+	game.endless_greenhouse.reset_discovery_state()
+
+	# The existing one-time fantasy guarantee is consumed, not duplicated, and
+	# becomes the durable early-series slot used by normal seed spawning.
+	game._prepare_story_spawn_guarantee()
+	assert(not bool(game.story_progression_state.get("fantasy_new_guarantee_pending",true)))
+	assert(StoryProgressionClass.early_fantasy_guarantee_is_pending(game.story_progression_state))
+	assert(game.opening_species.is_empty())
+	game.story_progression_state["early_fantasy_reserved_species_id"]=""
+	game.story_progression_state["early_fantasy_reserved_series_id"]=""
+	var observed_series:Dictionary={};var observed_species:Dictionary={}
+	game.rng.seed=90210
+	for draw_seed in range(96):
+		var candidate:Dictionary=game._select_early_fantasy_guaranteed_candidate()
+		var candidate_series:String=str(game._catalog_display_series_id_for_entry(candidate))
+		assert(candidate_series in game.EARLY_FANTASY_REQUIRED_SERIES)
+		observed_series[candidate_series]=true
+		observed_species[str(candidate.get("species_id",""))]=true
+	assert(observed_series.size()==game.EARLY_FANTASY_REQUIRED_SERIES.size())
+	assert(observed_species.size()>game.EARLY_FANTASY_REQUIRED_SERIES.size())
+	var early_pools:Dictionary=game._normal_seed_selection_pools()
+	for pool_name in ["unlocked_new","locked_new"]:
+		for raw_candidate in early_pools.get(pool_name,[]):
+			if game._is_fantasy_species(raw_candidate):
+				assert(game._catalog_display_series_id_for_entry(raw_candidate) in game.EARLY_FANTASY_REQUIRED_SERIES)
+
+	# A story guarantee does not consume or reset the independent large-plant
+	# carryover. Jelly re-arms one slot, and the very next normal seed consumes it.
+	game.endless_greenhouse.discovery_carryover_chance=.65
+	game.spawn_plant(false,Vector3.ZERO)
+	var first=game.plants.back();var first_series:String=str(game._catalog_display_series_id_for_entry(first.data))
+	assert(bool(first.get_meta("early_fantasy_guarantee",false)))
+	assert(first_series in game.EARLY_FANTASY_REQUIRED_SERIES)
+	assert(is_equal_approx(game.endless_greenhouse.carryover_chance_for_next_seed(),.65))
+	game._on_jellied(first)
+	assert(StoryProgressionClass.early_fantasy_guarantee_is_pending(game.story_progression_state))
+	assert(str(game.story_progression_state.get("early_fantasy_active_species_id",""))=="")
+	game.spawn_plant(false,Vector3(.2,0.0,0.0))
+	var retry=game.plants.back()
+	assert(bool(retry.get_meta("early_fantasy_guarantee",false)))
+	assert(game._catalog_display_series_id_for_entry(retry.data) in game.EARLY_FANTASY_REQUIRED_SERIES)
+	game._on_jellied(retry)
+	assert(StoryProgressionClass.early_fantasy_guarantee_is_pending(game.story_progression_state))
+	assert(is_equal_approx(game.endless_greenhouse.carryover_chance_for_next_seed(),.65))
+
+	# Pending retries and in-flight guaranteed plants both survive serialization.
+	game._save()
+	var retry_payload=JSON.parse_string(FileAccess.get_file_as_string(EXPERIMENT_PATH))
+	assert(retry_payload is Dictionary)
+	var retry_state:Dictionary=StoryProgressionClass.normalize_runtime_state(retry_payload.get("story_progression_state",{}),{
+		"fantasy_required_series_get_count":0,
+		"fantasy_required_series_complete":false,
+		"fantasy_realization_seen":false,
+	})
+	assert(StoryProgressionClass.early_fantasy_guarantee_is_pending(retry_state))
+	game.spawn_plant(false,Vector3(.4,0.0,0.0))
+	var active=game.plants.back();var active_species_id:=str(active.data.get("species_id",""))
+	assert(bool(active.get_meta("early_fantasy_guarantee",false)))
+	game._save()
+	var active_payload=JSON.parse_string(FileAccess.get_file_as_string(EXPERIMENT_PATH))
+	var resumed_state:Dictionary=StoryProgressionClass.normalize_runtime_state(active_payload.get("story_progression_state",{}),{
+		"fantasy_required_series_get_count":0,
+		"fantasy_required_series_complete":false,
+		"fantasy_realization_seen":false,
+	})
+	assert(StoryProgressionClass.early_fantasy_guarantee_is_pending(resumed_state))
+	assert(str(StoryProgressionClass.early_fantasy_candidate_hint(resumed_state).get("species_id",""))==active_species_id)
+
+	# The minimum opportunities are game 1, game 3, game 5, and game 6. A slot
+	# never stacks with another pending/active guarantee.
+	var expected_thresholds:=[0,2,4,5]
+	for collected_count in range(4):
+		var deadline_state:=StoryProgressionClass.default_runtime_state()
+		deadline_state["fantasy_unlocked"]=true
+		StoryProgressionClass.begin_early_fantasy_tracking(deadline_state)
+		for completed_game in range(expected_thresholds[collected_count]):
+			assert(not StoryProgressionClass.early_fantasy_guarantee_due(deadline_state,collected_count))
+			assert(StoryProgressionClass.record_early_fantasy_game_completed(deadline_state))
+		assert(StoryProgressionClass.early_fantasy_guarantee_due(deadline_state,collected_count))
+		assert(StoryProgressionClass.queue_early_fantasy_guarantee(deadline_state))
+		assert(not StoryProgressionClass.queue_early_fantasy_guarantee(deadline_state))
+
+	game.play_active=false
+	game._clear_greenhouse_plants()
+	game.story_progression_state=saved_story_state
+	game.species_get_counts=saved_counts
+	game.discovered=saved_discovered
+	game.greenhouse_available=saved_greenhouse
+	game.unlocked_species=saved_unlocked_species
+	game.unlocked_series=saved_unlocked_series
+	game.fantasy_realization_seen=saved_fantasy_seen
+	game.active_seed_type=saved_seed_type
+	game.play_seeds_remaining=saved_seeds_remaining
+	game.play_spawn_queue=saved_spawn_queue
+	game.play_seed_animations_pending=saved_seed_animations
+	game.play_concurrent_target=saved_target
+	game.pending_round_new_species_ids=saved_pending_round
+	game.opening_species=saved_opening
+	game.endless_greenhouse.restore_discovery_state(saved_endless_state)
+	game.play_active=saved_play_active
 
 
 func _test_localized_trial_tutorial(game: Node) -> void:

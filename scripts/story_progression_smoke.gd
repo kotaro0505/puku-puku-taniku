@@ -12,11 +12,12 @@ func _ready() -> void:
 	await get_tree().process_frame
 	game.audio_manager.apply_settings({"bgm_enabled": false, "se_enabled": false})
 	_test_catalog_contract(game)
+	_test_early_fantasy_save_migration()
 	await _test_three_act_sequence(game)
 	_test_retired_unlock_conditions(game)
 	_test_legacy_three_act_migration(game)
 	game._reset_progression_state()
-	print("STORY_PROGRESSION_SMOKE_OK acts=3 first_battle=act2 original_guarantee=true fantasy_gate=original_get fantasy_guarantee=true arrangement_gate=3 forest_gate=8 fusion_gate=12 fantasy=1+6+24 safe_queue=true exploitation=act3 forced_first_battle=true resume=true reward_once=true second_battle=normal midpoint=4 crisis=8 post_crisis_home=once retired_secret=tombstone")
+	print("STORY_PROGRESSION_SMOKE_OK acts=3 first_battle=act2 original_guarantee=true fantasy_gate=original_get fantasy_guarantee=retrying_four_series arrangement_gate=3 realization_gate=required_four forest_gate=8 fusion_gate=12 fantasy=1+four-series+24 safe_queue=true exploitation=act3 forced_first_battle=true resume=true reward_once=true second_battle=normal midpoint=4 crisis=8 post_crisis_home=once retired_secret=tombstone")
 	get_tree().quit()
 
 
@@ -69,6 +70,41 @@ func _test_catalog_contract(game: Node) -> void:
 	for retired_stage_name in ["STAGE_ORIGINALS_5", "STAGE_SIZE_50", "STAGE_ORIGINALS_8", "STAGE_SIZE_100", "STAGE_ORIGINALS_12", "STAGE_SECOND_AWAKENING"]:
 		assert(not progression_source.contains(retired_stage_name))
 	assert(game.find_child("*Objective*", true, false) == null)
+
+
+func _test_early_fantasy_save_migration() -> void:
+	var old_state:=StoryProgressionClass.default_runtime_state()
+	old_state["fantasy_unlocked"]=true
+	for key in [
+		"early_fantasy_tracking_started",
+		"early_fantasy_completed_games",
+		"early_fantasy_guarantee_pending",
+		"early_fantasy_active_species_id",
+		"early_fantasy_active_series_id",
+		"early_fantasy_reserved_species_id",
+		"early_fantasy_reserved_series_id",
+	]:old_state.erase(key)
+	var resumed:=StoryProgressionClass.normalize_runtime_state(old_state,{
+		"fantasy_required_series_get_count":2,
+		"fantasy_required_series_complete":false,
+		"fantasy_realization_seen":false,
+	})
+	assert(bool(resumed.get("early_fantasy_tracking_started",false)))
+	assert(int(resumed.get("early_fantasy_completed_games",-1))==4)
+	assert(StoryProgressionClass.early_fantasy_guarantee_due(resumed,2))
+	var reached_four:=StoryProgressionClass.normalize_runtime_state(old_state,{
+		"fantasy_required_series_get_count":4,
+		"fantasy_required_series_complete":true,
+		"fantasy_realization_seen":false,
+	})
+	assert(StoryProgressionClass.peek_story_event(reached_four)==StoryProgressionClass.EVENT_FANTASY_SIX)
+	var already_seen:=StoryProgressionClass.normalize_runtime_state(reached_four,{
+		"fantasy_required_series_get_count":4,
+		"fantasy_required_series_complete":true,
+		"fantasy_realization_seen":true,
+	})
+	assert(StoryProgressionClass.peek_story_event(already_seen)!=StoryProgressionClass.EVENT_FANTASY_SIX)
+	assert(not StoryProgressionClass.has_early_fantasy_guarantee(already_seen))
 
 
 func _test_three_act_sequence(game: Node) -> void:
@@ -133,22 +169,23 @@ func _test_three_act_sequence(game: Node) -> void:
 	assert(bool(game.story_progression_state.get("fantasy_new_guarantee_pending", false)))
 	assert(not game.forest_gacha_unlocked)
 	game._prepare_story_spawn_guarantee()
-	assert(game.opening_species.size() == 1)
-	var guaranteed_fantasy: Dictionary = game.opening_species[0]
+	assert(game.opening_species.is_empty())
+	assert(StoryProgressionClass.early_fantasy_guarantee_is_pending(game.story_progression_state))
+	var guaranteed_fantasy: Dictionary = game._select_early_fantasy_guaranteed_candidate()
 	assert(game._is_fantasy_species(guaranteed_fantasy) and not game._is_jurejure_species(guaranteed_fantasy))
+	assert(game._catalog_display_series_id_for_entry(guaranteed_fantasy) in game.EARLY_FANTASY_REQUIRED_SERIES)
 	assert(game._species_get_count(str(guaranteed_fantasy.get("species_id", ""))) == 0)
-	game.opening_species.clear()
 
 	var fantasy_ids: Array[String] = []
 	for entry in game.catalog_species:
 		if game._is_fantasy_species(entry) and not game._is_jurejure_species(entry):
 			fantasy_ids.append(str(entry.get("species_id", "")))
 	assert(fantasy_ids.size() >= 24)
-	# Before fantasy_six, the live candidate rules guarantee one GET from each
+	# Before fantasy realization, the live candidate rules guarantee one GET from each
 	# line named by the dialogue. Mirror that legitimate acquisition order when
 	# this state-only test awards GETs directly.
 	var ordered_fantasy_ids: Array[String] = []
-	for required_series in game.FANTASY_SIX_REQUIRED_SERIES:
+	for required_series in game.EARLY_FANTASY_REQUIRED_SERIES:
 		for species_id in fantasy_ids:
 			if game._catalog_display_series_id_for_entry(game._catalog_entry(species_id)) == required_series:
 				ordered_fantasy_ids.append(species_id)
@@ -202,12 +239,9 @@ func _test_three_act_sequence(game: Node) -> void:
 		game.arrangement_navigation_hint.intro_tween.kill()
 	game.arrangement_navigation_hint._finish_intro()
 	await get_tree().process_frame
-	for index in range(3, 5):
-		game._record_species_get(fantasy_ids[index])
-		assert(not game.forest_gacha_unlocked)
-	assert(game._unique_fantasy_species_get_count() == 5)
+	assert(game._current_pot_sales_stage() == 0)
 	game.puku_puku_battle.visible = true
-	game._record_species_get(fantasy_ids[5])
+	game._record_species_get(fantasy_ids[3])
 	game._try_start_pending_story_event()
 	assert(game.scripted_dialog_kind.is_empty())
 	game.puku_puku_battle.visible = false
@@ -224,7 +258,17 @@ func _test_three_act_sequence(game: Node) -> void:
 	await get_tree().process_frame
 	assert(game.fantasy_realization_seen)
 	assert(not game.forest_gacha_unlocked and not game.forest_gacha_intro_seen)
+	assert(game._unique_fantasy_species_get_count() == 4)
+	assert(game._current_pot_sales_stage() == 0)
+	assert(not StoryProgressionClass.has_early_fantasy_guarantee(game.story_progression_state))
 	assert(game.scripted_dialog_kind.is_empty())
+	for index in range(4, 6):
+		game._record_species_get(fantasy_ids[index])
+		game._try_start_pending_story_event()
+		assert(game.scripted_dialog_kind.is_empty())
+		assert(not game.forest_gacha_unlocked)
+	assert(game._unique_fantasy_species_get_count() == 6)
+	assert(game._current_pot_sales_stage() == 1)
 	game._record_species_get(fantasy_ids[6])
 	game._try_start_pending_story_event()
 	assert(game._unique_fantasy_species_get_count() == 7)
