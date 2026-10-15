@@ -14,6 +14,11 @@ const LAMP_PANEL_POSITION := Vector2(93, 772)
 const RECOVERY_IMAGE_PATH := "res://assets/ending/restoration-recovery.jpg"
 const RECOVERY_IMAGE_FADE_SECONDS := 2.5
 const RECOVERY_NARRATION_FADE_SECONDS := 1.75
+const RECOVERY_CARD_POSITION := Vector2(40, 725)
+const RECOVERY_CARD_SIZE := Vector2(496, 255)
+const RECOVERY_BODY_MINIMUM_SIZE := Vector2(440, 145)
+const RECOVERY_CARD_BACKGROUND := Color(0.035, 0.055, 0.045, 0.88)
+const RECOVERY_CARD_BORDER := Color(0.78, 0.72, 0.52, 0.78)
 const FINAL_IMAGE_PATH := "res://assets/ending/restoration-finale.jpg"
 const ENDING_DARKEN_SECONDS := 1.1
 const ENDING_SLIDE_FADE_SECONDS := 0.8
@@ -36,10 +41,8 @@ var prompt_no: Button
 var ending_layer: Control
 var ending_background: TextureRect
 var ending_story_card: PanelContainer
-var ending_title: Label
 var ending_body: Label
 var ending_continue: Button
-var character_row: HBoxContainer
 var ending_sequence_layer: Control
 var ending_record_label: Label
 var ending_plant_content: Control
@@ -201,33 +204,22 @@ func _build_ending() -> void:
 	ending_layer.add_child(ending_background)
 	ending_story_card = PanelContainer.new()
 	ending_story_card.name = "StoryTextPanel"
-	ending_story_card.position = Vector2(38, 78)
-	ending_story_card.size = Vector2(500, 818)
-	ending_story_card.add_theme_stylebox_override("panel", _panel_style(Color(0.12, 0.18, 0.13, 0.84), Color("#f3df9d"), 30, 3))
+	ending_story_card.position = RECOVERY_CARD_POSITION
+	ending_story_card.size = RECOVERY_CARD_SIZE
+	ending_story_card.add_theme_stylebox_override("panel", _panel_style(RECOVERY_CARD_BACKGROUND, RECOVERY_CARD_BORDER, 24, 2))
 	ending_layer.add_child(ending_story_card)
 	var content := VBoxContainer.new()
 	content.alignment = BoxContainer.ALIGNMENT_CENTER
-	content.add_theme_constant_override("separation", 20)
+	content.add_theme_constant_override("separation", 12)
 	ending_story_card.add_child(content)
-	ending_title = Label.new()
-	ending_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	ending_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	ending_title.add_theme_font_size_override("font_size", 31)
-	ending_title.add_theme_color_override("font_color", Color("#fff3bd"))
-	content.add_child(ending_title)
 	ending_body = Label.new()
-	ending_body.custom_minimum_size = Vector2(440, 220)
+	ending_body.custom_minimum_size = RECOVERY_BODY_MINIMUM_SIZE
 	ending_body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ending_body.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	ending_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	ending_body.add_theme_font_size_override("font_size", 23)
+	ending_body.add_theme_font_size_override("font_size", 20)
 	ending_body.add_theme_color_override("font_color", Color.WHITE)
 	content.add_child(ending_body)
-	character_row = HBoxContainer.new()
-	character_row.custom_minimum_size = Vector2(440, 300)
-	character_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	character_row.add_theme_constant_override("separation", -12)
-	content.add_child(character_row)
 	ending_continue = Button.new()
 	ending_continue.name = "StoryContinueButton"
 	StoryContinueButtonStyleClass.apply(ending_continue)
@@ -437,7 +429,6 @@ func start_recovery_slides() -> void:
 	ending_story_card.visible = false
 	ending_body.modulate.a = 0.0
 	ending_continue.disabled = true
-	_clear_character_row()
 	ending_layer.visible = true
 	ending_layer.move_to_front()
 	_run_recovery_slide_intro(generation)
@@ -455,7 +446,6 @@ func _run_recovery_slide_intro(generation: int) -> void:
 
 
 func _show_slide() -> void:
-	ending_title.text = Localizer.text(language_code, "restoration_slide_title")
 	ending_body.text = Localizer.text(language_code, "restoration_slide_%d" % (slide_index + 1))
 	ending_continue.text = Localizer.text(language_code, "continue")
 
@@ -671,7 +661,6 @@ func _on_ending_return_pressed() -> void:
 	ending_return_button.disabled = true
 	thank_you_closed.emit()
 
-
 func fade_out_ending_sequence(duration_seconds := 1.2) -> void:
 	if not ending_sequence_layer.visible:
 		return
@@ -682,8 +671,4 @@ func fade_out_ending_sequence(duration_seconds := 1.2) -> void:
 	ending_sequence_layer.visible = false
 	ending_current_phase = ""
 	ending_current_index = -1
-
-
-func _clear_character_row() -> void:
-	for child in character_row.get_children():
-		child.queue_free()
+# Recovery narration intentionally has no title or character row.

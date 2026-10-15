@@ -129,6 +129,9 @@ func _test_story_overlay_continuation_buttons() -> void:
 	add_child(restoration)
 	await get_tree().process_frame
 	restoration.start_recovery_slides()
+	# The production card becomes visible after the image fade. This style test
+	# drives pages directly, so expose it before asking Containers for layout.
+	restoration.ending_story_card.visible = true
 	await get_tree().process_frame
 	var restoration_panel := restoration.find_child("StoryTextPanel", true, false) as Control
 	for locale in Localizer.SUPPORTED_LANGUAGES:
@@ -138,10 +141,11 @@ func _test_story_overlay_continuation_buttons() -> void:
 			restoration._show_slide()
 			await get_tree().process_frame
 			_assert_standard_continue_button(restoration.ending_continue, restoration_panel, restoration.ending_body, locale)
-	assert(restoration_panel.position.is_equal_approx(Vector2(38, 78)))
-	assert(restoration_panel.size.is_equal_approx(Vector2(500, 818)))
+	assert(restoration_panel.position.is_equal_approx(HabitatRestorationUIClass.RECOVERY_CARD_POSITION))
+	assert(restoration_panel.size.is_equal_approx(HabitatRestorationUIClass.RECOVERY_CARD_SIZE))
+	assert(restoration_panel.find_children("*", "Label", true, false).size() == 1)
 	var restoration_panel_style := restoration_panel.get_theme_stylebox("panel") as StyleBoxFlat
-	assert(restoration_panel_style != null and restoration_panel_style.bg_color.is_equal_approx(Color(0.12, 0.18, 0.13, 0.84)))
+	assert(restoration_panel_style != null and restoration_panel_style.bg_color.is_equal_approx(HabitatRestorationUIClass.RECOVERY_CARD_BACKGROUND))
 	restoration.queue_free()
 	await get_tree().process_frame
 

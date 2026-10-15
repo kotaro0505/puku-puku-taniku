@@ -6,6 +6,7 @@ const StoryProgressionClass = preload("res://scripts/story_progression.gd")
 const JureJureSystemClass = preload("res://scripts/jurejure_system.gd")
 const HabitatWildSystemClass = preload("res://scripts/habitat_wild_system.gd")
 const Localizer = preload("res://scripts/game_localizer.gd")
+const RECOVERY_SCREENSHOT_DIR := "res://artifacts/restoration-recovery-ui"
 
 
 func _ready() -> void:
@@ -14,7 +15,7 @@ func _ready() -> void:
 	_test_ending_asset_contract()
 	await _test_recovery_slide_presentation()
 	await _test_integrated_final_chapter()
-	print("HABITAT_RESTORATION_SMOKE_OK post_crisis=4 sow_gate=retired first_large_before_join=true queued_returns=true return_dialog=center+plant_visible normal_dialog=bottom joined_after_first=true lamps=5 threshold=100 returned=5 medals=5 recovery_image=1 recovery_narrations=3 recovery_input_lock=true finale=true epilogue=true ending_records=5 returned_recap=5 final_image=true ending_bgm=true post_ending_greenhouse_once=true lifetime_harvest=true save_resume=true")
+	print("HABITAT_RESTORATION_SMOKE_OK post_crisis=4 sow_gate=retired first_large_before_join=true queued_returns=true return_dialog=center+plant_visible normal_dialog=bottom joined_after_first=true lamps=5 threshold=100 returned=5 medals=5 recovery_image=1 recovery_narrations=3 recovery_title=removed recovery_card=bottom_compact recovery_languages=3 recovery_input_lock=true finale=true epilogue=true ending_records=5 returned_recap=5 final_image=true ending_bgm=true post_ending_greenhouse_once=true lifetime_harvest=true save_resume=true")
 	get_tree().quit()
 
 
@@ -184,6 +185,7 @@ func _test_localization_contract() -> void:
 		"restoration_product_by",
 	]
 	for language in ["ja", "hiragana", "en"]:
+		assert(Localizer.text(language, "restoration_slide_title") == "restoration_slide_title")
 		for key in keys:
 			var value := Localizer.text(language, key)
 			assert(not value.is_empty() and value != key)
@@ -237,7 +239,8 @@ func _test_recovery_slide_presentation() -> void:
 	assert(is_equal_approx(ui.ending_background.modulate.a, 1.0))
 	assert(is_equal_approx(ui.ending_body.modulate.a, 1.0))
 	assert(ui.ending_body.text == Localizer.text("ja", "restoration_slide_1"))
-	assert(ui.character_row.get_child_count() == 0)
+	_assert_recovery_slide_layout(ui, "ja", 0)
+	await _capture_recovery_slide(ui, 1)
 	var original_card_position: Vector2 = ui.ending_story_card.position
 	var original_card_size: Vector2 = ui.ending_story_card.size
 	var original_body_position: Vector2 = ui.ending_body.position
@@ -259,6 +262,16 @@ func _test_recovery_slide_presentation() -> void:
 		assert(ui.ending_background.position == fixed_background_position)
 		assert(ui.ending_background.size == fixed_background_size)
 		assert(is_equal_approx(ui.ending_background.modulate.a, 1.0))
+		_assert_recovery_slide_layout(ui, "ja", expected_index)
+		await _capture_recovery_slide(ui, expected_index + 1)
+
+	for locale in Localizer.SUPPORTED_LANGUAGES:
+		ui.set_language(locale)
+		for recovery_index in range(3):
+			ui.slide_index = recovery_index
+			ui._show_slide()
+			await get_tree().process_frame
+			_assert_recovery_slide_layout(ui, locale, recovery_index)
 
 	var background_events := 0
 	var narration_events := 0
@@ -279,6 +292,43 @@ func _test_recovery_slide_presentation() -> void:
 	assert(ui.recovery_slide_phase == "complete" and not ui.ending_layer.visible)
 	host.queue_free()
 	await get_tree().process_frame
+
+
+func _assert_recovery_slide_layout(ui: HabitatRestorationUI, locale: String, expected_index: int) -> void:
+	assert(ui.ending_story_card.position.is_equal_approx(HabitatRestorationUIClass.RECOVERY_CARD_POSITION))
+	assert(ui.ending_story_card.size.is_equal_approx(HabitatRestorationUIClass.RECOVERY_CARD_SIZE))
+	assert(ui.ending_story_card.position.y >= 700.0)
+	assert(ui.ending_story_card.position.y + ui.ending_story_card.size.y <= 1024.0)
+	assert(ui.ending_body.text == Localizer.text(locale, "restoration_slide_%d" % (expected_index + 1)))
+	assert(ui.ending_body.get_line_count() * ui.ending_body.get_line_height() <= ui.ending_body.size.y + 0.5, "recovery narration is clipped locale=%s page=%d lines=%d line_height=%d size=%s" % [locale, expected_index + 1, ui.ending_body.get_line_count(), ui.ending_body.get_line_height(), ui.ending_body.size])
+	var panel_rect := ui.ending_story_card.get_global_rect()
+	var body_rect := ui.ending_body.get_global_rect()
+	var button_rect := ui.ending_continue.get_global_rect()
+	assert(panel_rect.grow(0.5).encloses(body_rect))
+	assert(panel_rect.grow(0.5).encloses(button_rect))
+	assert(not body_rect.intersects(button_rect))
+	assert(button_rect.position.y - body_rect.end.y >= 11.5)
+	var labels := ui.ending_story_card.find_children("*", "Label", true, false)
+	assert(labels.size() == 1 and labels[0] == ui.ending_body, "recovery card must contain narration only; title/portrait space returned")
+	var panel_style := ui.ending_story_card.get_theme_stylebox("panel") as StyleBoxFlat
+	assert(panel_style != null)
+	assert(panel_style.bg_color.is_equal_approx(HabitatRestorationUIClass.RECOVERY_CARD_BACKGROUND))
+	assert(panel_style.border_color.is_equal_approx(HabitatRestorationUIClass.RECOVERY_CARD_BORDER))
+
+
+func _capture_recovery_slide(ui: HabitatRestorationUI, page_number: int) -> void:
+	var display_driver := DisplayServer.get_name()
+	var rendering_driver := RenderingServer.get_current_rendering_driver_name()
+	if display_driver == "headless" or rendering_driver == "dummy" or rendering_driver.is_empty():
+		return
+	assert(ui.ending_story_card.visible and ui.recovery_slide_phase == "await_continue")
+	var screenshot_dir_absolute := ProjectSettings.globalize_path(RECOVERY_SCREENSHOT_DIR)
+	assert(DirAccess.make_dir_recursive_absolute(screenshot_dir_absolute) == OK)
+	await get_tree().process_frame
+	RenderingServer.force_draw()
+	var image := get_viewport().get_texture().get_image()
+	assert(image != null and image.get_size() == Vector2i(576, 1024))
+	assert(image.save_png(screenshot_dir_absolute.path_join("page-%d.png" % page_number)) == OK)
 
 
 func _wait_for_recovery_slide_phase(ui: HabitatRestorationUI, phase: String) -> void:
