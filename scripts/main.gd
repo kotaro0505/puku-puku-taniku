@@ -7949,7 +7949,12 @@ func _update_greenhouse_pan()->void:
 		var soil_right:=camera.unproject_position(Vector3(1,.12,0))
 		var pixels_per_world:=soil_right.x-soil_center.x
 		if absf(pixels_per_world)>.001:
-			greenhouse_world_pan_x=(greenhouse_background_position_x-greenhouse_main_position_x)/pixels_per_world
+			# Cultivation scrolling originally moved every rooted Sprite3D by one
+			# shared world-space offset. That naturally gives nearby plants a little
+			# more screen travel than distant plants. Do not fold the arrangement-area
+			# transition into this value: that transition must remain a flat scene
+			# change, while normal greenhouse panning keeps its depth cue.
+			greenhouse_world_pan_x=greenhouse_pan_x/pixels_per_world
 
 func _arrangement_focus_transition_for_pan(pan_x:float)->float:
 	if greenhouse_backdrop==null or greenhouse_backdrop.texture==null:return 0.0
@@ -8512,16 +8517,21 @@ func _spawn_visual_assessment(candidate:Vector3)->Dictionary:
 
 func _spawn_fallback_is_better(candidate_assessment:Dictionary,candidate_clearance:float,current_assessment:Dictionary,current_clearance:float)->bool:
 	# If all visible soil is covered, first require a root that is behind every
-	# overlapping plant. Within that rear layer, minimize actual leaf coverage,
-	# then retain as much of the old root spacing as possible.
+	# overlapping plant. Within that rear layer, restore the established root
+	# spacing before comparing leaf coverage. The seed artwork is composited below
+	# those leaves, so sacrificing the planting distance merely to save one covered
+	# sample makes the grown plants look unnaturally bunched together.
 	var candidate_conflicts:=int(candidate_assessment.get("front_conflict_samples",0))
 	var current_conflicts:=int(current_assessment.get("front_conflict_samples",0))
 	if (candidate_conflicts==0)!=(current_conflicts==0):return candidate_conflicts==0
 	if candidate_conflicts!=current_conflicts:return candidate_conflicts<current_conflicts
+	var candidate_has_root_clearance:=candidate_clearance>=SPAWN_ROOT_CLEARANCE
+	var current_has_root_clearance:=current_clearance>=SPAWN_ROOT_CLEARANCE
+	if candidate_has_root_clearance!=current_has_root_clearance:return candidate_has_root_clearance
+	if not is_equal_approx(candidate_clearance,current_clearance):return candidate_clearance>current_clearance
 	var candidate_overlap:=int(candidate_assessment.get("overlap_samples",0))
 	var current_overlap:=int(current_assessment.get("overlap_samples",0))
 	if candidate_overlap!=current_overlap:return candidate_overlap<current_overlap
-	if not is_equal_approx(candidate_clearance,current_clearance):return candidate_clearance>current_clearance
 	return float(candidate_assessment.get("candidate_depth",-INF))>float(current_assessment.get("candidate_depth",-INF))
 
 func _spawn_center_inside_soil(candidate:Vector3)->bool:
@@ -9036,11 +9046,18 @@ func _resolve_crowding(_delta:float)->void:
 
 func _greenhouse_world_offset_for_position(world_position:Vector3)->float:
 	if camera==null:return greenhouse_world_pan_x
-	var screen_x:=camera.unproject_position(world_position).x
-	var screen_right_x:=camera.unproject_position(world_position+Vector3.RIGHT).x
+	# Normal left/right browsing uses the single world-space translation from the
+	# pre-master-scroll implementation. Perspective then supplies the restrained
+	# foreground/background motion difference that Sprite3D plants used to have.
+	# The separate arrangement transition remains screen-aligned so entering the
+	# table view does not shear the greenhouse composition.
+	var gameplay_position:=world_position+Vector3(greenhouse_world_pan_x,0,0)
+	var arrangement_screen_delta:=greenhouse_background_position_x-(greenhouse_main_position_x+greenhouse_pan_x)
+	if is_zero_approx(arrangement_screen_delta):return greenhouse_world_pan_x
+	var screen_x:=camera.unproject_position(gameplay_position).x
+	var screen_right_x:=camera.unproject_position(gameplay_position+Vector3.RIGHT).x
 	var pixels_per_world:=screen_right_x-screen_x
-	var background_delta:=greenhouse_background_position_x-greenhouse_main_position_x
-	return background_delta/pixels_per_world if absf(pixels_per_world)>.001 else greenhouse_world_pan_x
+	return greenhouse_world_pan_x+arrangement_screen_delta/pixels_per_world if absf(pixels_per_world)>.001 else greenhouse_world_pan_x
 
 func _plant_is_first_get_for_puku(plant)->bool:
 	if not is_instance_valid(plant):return false

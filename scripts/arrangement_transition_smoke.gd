@@ -33,6 +33,7 @@ func _ready()->void:
 	assert(absf((game.greenhouse_arrangement_position_x+game.ARRANGEMENT_TABLE_SOURCE_CENTER.x*backdrop_scale)-viewport_size.x*game.ARRANGEMENT_TABLE_SCREEN_TARGET_RATIO.x)<EPSILON)
 	var expected_arrangement_transition:float=game.greenhouse_arrangement_position_x-game.greenhouse_main_position_x
 	assert(absf(game._arrangement_focus_transition_for_pan(0.0)-expected_arrangement_transition)<EPSILON)
+	_test_cultivation_depth_parallax(game)
 
 	for ratio in [0.0,.25,.50,.75,1.0]:
 		game.arrangement_transition_x=expected_arrangement_transition*ratio;game._update_greenhouse_pan()
@@ -132,9 +133,76 @@ func _ready()->void:
 		await get_tree().process_frame;RenderingServer.force_draw()
 		var anchor_image:=get_viewport().get_texture().get_image()
 		assert(anchor_image!=null and anchor_image.save_png(screenshot_dir_absolute.path_join("100-arrangement-pot-anchor.png"))==OK)
+		game.arrangement_scene_active=false;game.arrangement_ui.visible=false;game.arrangement_transition_x=0.0;game._update_play_ui()
+		_spawn_visual_comparison_plants(game)
+		for pan_shot in [{"ratio":-.75,"name":"cultivation-pan-left.png"},{"ratio":0.0,"name":"cultivation-pan-center.png"},{"ratio":.75,"name":"cultivation-pan-right.png"}]:
+			game.greenhouse_pan_x=game.greenhouse_pan_limit*float(pan_shot.ratio);game.greenhouse_pan_target_x=game.greenhouse_pan_x;game._update_greenhouse_pan();game._resolve_crowding(0.0);game._sync_plant_screen_visuals();game._update_labels()
+			await get_tree().process_frame;RenderingServer.force_draw()
+			var pan_image:=get_viewport().get_texture().get_image()
+			assert(pan_image!=null and pan_image.save_png(screenshot_dir_absolute.path_join(str(pan_shot.name)))==OK)
+		game.greenhouse_pan_x=0.0;game.greenhouse_pan_target_x=0.0;game._update_greenhouse_pan()
 
 	print("ARRANGEMENT_TRANSITION_SMOKE_OK main_x=",game.greenhouse_main_position_x," arrangement_x=",game.greenhouse_arrangement_position_x," transition=",expected_arrangement_transition," soil=",game.SOIL_SOURCE_CENTER," table=",game.ARRANGEMENT_TABLE_SOURCE_CENTER," anchor=",expected_anchor)
 	get_tree().quit()
+
+func _test_cultivation_depth_parallax(game)->void:
+	# Before the master-scroll flattening, all Sprite3D roots received the same
+	# world-space pan. Perspective made a near root travel a little farther on
+	# screen than the soil-centre reference, and a distant root a little less.
+	game.arrangement_transition_x=0.0
+	game.greenhouse_pan_x=0.0;game.greenhouse_pan_target_x=0.0;game._update_greenhouse_pan()
+	var front:=Vector3(0,.12,2.5)
+	var center:=Vector3(0,.12,0)
+	var rear:=Vector3(0,.12,-2.5)
+	var front_before:float=game.camera.unproject_position(front).x
+	var center_before:float=game.camera.unproject_position(center).x
+	var rear_before:float=game.camera.unproject_position(rear).x
+	game.greenhouse_pan_x=game.greenhouse_pan_limit*.75;game.greenhouse_pan_target_x=game.greenhouse_pan_x;game._update_greenhouse_pan()
+	var front_offset:float=game._greenhouse_world_offset_for_position(front)
+	var center_offset:float=game._greenhouse_world_offset_for_position(center)
+	var rear_offset:float=game._greenhouse_world_offset_for_position(rear)
+	assert(absf(front_offset-center_offset)<.0001 and absf(rear_offset-center_offset)<.0001,"cultivation pan stopped using one rooted world-space offset front=%.5f center=%.5f rear=%.5f"%[front_offset,center_offset,rear_offset])
+	var front_delta:float=game.camera.unproject_position(front+Vector3(front_offset,0,0)).x-front_before
+	var center_delta:float=game.camera.unproject_position(center+Vector3(center_offset,0,0)).x-center_before
+	var rear_delta:float=game.camera.unproject_position(rear+Vector3(rear_offset,0,0)).x-rear_before
+	var background_delta:float=game.greenhouse_background_position_x-game.greenhouse_main_position_x
+	assert(absf(center_delta-background_delta)<EPSILON,"soil-centre root no longer tracks the greenhouse background center=%.3f background=%.3f"%[center_delta,background_delta])
+	assert(absf(front_delta)>absf(center_delta)+.5 and absf(center_delta)>absf(rear_delta)+.5,"depth motion was flattened front=%.3f center=%.3f rear=%.3f"%[front_delta,center_delta,rear_delta])
+	assert(absf(front_delta)<absf(background_delta)*1.40 and absf(rear_delta)>absf(background_delta)*.70,"restored depth cue became excessive front=%.3f background=%.3f rear=%.3f"%[front_delta,background_delta,rear_delta])
+	# Arrangement navigation is a scene transition, not cultivation parallax. It
+	# must still translate every already-panned root by exactly the backdrop delta.
+	var roots_before_transition:Array[float]=[]
+	for world_position in [front,center,rear]:
+		var before_offset:float=game._greenhouse_world_offset_for_position(world_position)
+		roots_before_transition.append(game.camera.unproject_position(world_position+Vector3(before_offset,0,0)).x)
+	var backdrop_before_transition:float=game.greenhouse_background_position_x
+	game.arrangement_transition_x=game._arrangement_focus_transition_for_pan(game.greenhouse_pan_x)*.35;game._update_greenhouse_pan()
+	var transition_delta:float=game.greenhouse_background_position_x-backdrop_before_transition
+	for index in range(3):
+		var world_position:Vector3=[front,center,rear][index]
+		var after_offset:float=game._greenhouse_world_offset_for_position(world_position)
+		var root_transition_delta:float=game.camera.unproject_position(world_position+Vector3(after_offset,0,0)).x-float(roots_before_transition[index])
+		assert(absf(root_transition_delta-transition_delta)<EPSILON,"arrangement transition inherited cultivation parallax index=%d root=%.3f backdrop=%.3f"%[index,root_transition_delta,transition_delta])
+	print("GREENHOUSE_DEPTH_PARALLAX_OK front=%.3f center=%.3f rear=%.3f world=%.5f"%[front_delta,center_delta,rear_delta,center_offset])
+	game.arrangement_transition_x=0.0;game.greenhouse_pan_x=0.0;game.greenhouse_pan_target_x=0.0;game._update_greenhouse_pan()
+
+func _spawn_visual_comparison_plants(game)->void:
+	game._clear_greenhouse_plants()
+	var samples:Array=[
+		{"species":"colorata","position":Vector3(-2.15,.12,2.45),"cm":60.0},
+		{"species":"laui","position":Vector3(.25,.12,2.05),"cm":40.0},
+		{"species":"yumekawa_milky_dream","position":Vector3(2.0,.12,1.15),"cm":80.0},
+		{"species":"colorata","position":Vector3(-.55,.12,.35),"cm":100.0},
+		{"species":"laui","position":Vector3(-2.25,.12,-.75),"cm":20.0},
+		{"species":"yumekawa_milky_dream","position":Vector3(.85,.12,-1.15),"cm":120.0},
+		{"species":"colorata","position":Vector3(2.15,.12,-2.25),"cm":5.0},
+		{"species":"laui","position":Vector3(-.1,.12,-2.55),"cm":150.0}
+	]
+	for sample in samples:
+		var species_id:=str(sample.species);game.species_get_counts[species_id]=1;game._spawn_specific_plant(species_id)
+		var plant=game.plants.back();plant.jelly_checks_enabled=false;plant.original_pos=sample.position;plant.position=sample.position;plant.fast_forward_to_diameter(float(sample.cm));plant.plant_sprite.position.x=0.0;plant.plant_sprite.rotation.z=0.0
+	game.show_growing_plant_labels=false
+	game._resolve_crowding(0.0);game._sync_plant_screen_visuals();game._update_labels()
 
 func _has_button_text(root:Node,text:String)->bool:
 	for node in root.find_children("*","Button",true,false):

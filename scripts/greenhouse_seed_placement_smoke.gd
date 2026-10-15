@@ -8,13 +8,14 @@ func _ready()->void:
 	_configure_greenhouse(game)
 	_test_empty_soil_beats_root_only_clearance(game)
 	_test_normal_refill_density(game)
+	_test_scrolled_seed_placement(game)
 	_test_growth_speed_independence(game)
 	await _test_harvest_and_jelly_refill(game)
 	await _test_fully_covered_soil_uses_rear_layer(game)
 	game._clear_greenhouse_plants()
 	game.queue_free()
 	await get_tree().process_frame
-	print("GREENHOUSE_SEED_PLACEMENT_SMOKE_OK alpha_visual_priority=true small_medium_5to8=true giant_fallback=behind speed=1x+10x harvest_refill=true jelly_refill=true soil_bounds=true")
+	print("GREENHOUSE_SEED_PLACEMENT_SMOKE_OK alpha_visual_priority=true root_spacing_priority=true small_medium_5to8=true scrolled_left+right=true giant_fallback=behind speed=1x+10x harvest_refill=true jelly_refill=true soil_bounds=true")
 	get_tree().quit()
 
 func _configure_greenhouse(game)->void:
@@ -110,6 +111,18 @@ func _test_normal_refill_density(game)->void:
 	game._sync_plant_screen_visuals()
 	assert(game.plants.size()==8,"normal 5-8 plant refill setup did not retain eight plants")
 
+func _test_scrolled_seed_placement(game)->void:
+	game._clear_greenhouse_plants();game.recent_vacated_slots.clear();game.pending_seed_positions.clear()
+	_spawn_at(game,"colorata",Vector3(-1.75,.12,2.15),40.0)
+	_spawn_at(game,"laui",Vector3(1.45,.12,.35),80.0)
+	_spawn_at(game,"yumekawa_milky_dream",Vector3(-.25,.12,-1.8),120.0)
+	for index in range(2):
+		var ratio:float=-.9 if index==0 else .9
+		game.greenhouse_pan_x=game.greenhouse_pan_limit*ratio;game.greenhouse_pan_target_x=game.greenhouse_pan_x;game._update_greenhouse_pan();game._resolve_crowding(0.0);game._sync_plant_screen_visuals()
+		var position_rng:=RandomNumberGenerator.new();position_rng.seed=71173+index
+		_assert_spawn_policy(game,game._find_spawn_position(position_rng),"scrolled_%s"%("left" if index==0 else "right"))
+	game.greenhouse_pan_x=0.0;game.greenhouse_pan_target_x=0.0;game._update_greenhouse_pan();game._resolve_crowding(0.0)
+
 func _test_growth_speed_independence(game)->void:
 	game._clear_greenhouse_plants();game.recent_vacated_slots.clear();game.pending_seed_positions.clear()
 	var slow=_spawn_at(game,"laui",Vector3(-1.45,.12,.8),120.0,1.0)
@@ -141,10 +154,24 @@ func _test_fully_covered_soil_uses_rear_layer(game)->void:
 	_spawn_at(game,"colorata",Vector3(-.3,.12,2.5),10000.0)
 	_spawn_at(game,"laui",Vector3(.3,.12,.4),10000.0)
 	game._sync_plant_screen_visuals()
-	var position_rng:=RandomNumberGenerator.new();position_rng.seed=987654
+	var seed_value:=987654
+	var expected_max_rear_clearance:=-1.0
+	var audit_rng:=RandomNumberGenerator.new();audit_rng.seed=seed_value
+	for _attempt in range(192):
+		var angle:=audit_rng.randf_range(0.0,TAU)
+		var radius:=sqrt(audit_rng.randf())
+		var candidate:=Vector3(cos(angle)*3.55*radius,.12,sin(angle)*3.15*radius)
+		if not game._spawn_center_inside_soil(candidate):continue
+		var candidate_assessment:Dictionary=game._spawn_visual_assessment(candidate)
+		if int(candidate_assessment.get("overlap_samples",0))>0 and int(candidate_assessment.get("front_conflict_samples",0))==0:
+			expected_max_rear_clearance=maxf(expected_max_rear_clearance,_root_clearance(game,candidate))
+	assert(expected_max_rear_clearance>0.0,"fully covered fallback audit found no rear-layer candidate")
+	var position_rng:=RandomNumberGenerator.new();position_rng.seed=seed_value
 	var chosen:Vector3=game._find_spawn_position(position_rng)
 	var assessment:=_assert_spawn_policy(game,chosen,"fully_covered")
 	assert(int(assessment.get("overlap_samples",0))>0,"fully covered fallback setup unexpectedly found empty soil assessment=%s"%assessment)
+	var chosen_clearance:=_root_clearance(game,chosen)
+	assert(chosen_clearance>=expected_max_rear_clearance-.0001,"covered fallback sacrificed natural root spacing chosen=%.4f best_rear=%.4f position=%s assessment=%s"%[chosen_clearance,expected_max_rear_clearance,chosen,assessment])
 	assert(int(assessment.get("seed_draw_order",0))<0,"fallback seed did not receive a draw order behind the plant artwork assessment=%s"%assessment)
 	game._animate_and_spawn_greenhouse_seed(chosen)
 	var seed_visual=game.plant_screen_layer.find_child("GreenhouseSeedAnimation",false,false)

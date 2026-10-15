@@ -18,6 +18,7 @@ func _ready()->void:
 	_test_fixed_point_and_harvest_curve(game)
 	await _test_sprite3d_render_alignment(game)
 	_test_giant_plant_display_and_hit(game)
+	_test_greenhouse_pan_depth_and_hit(game)
 	_test_live_harvest_preview(game)
 	_test_plant_label_visibility_toggle(game)
 	await _test_giant_harvest_reward(game)
@@ -28,7 +29,7 @@ func _ready()->void:
 	await _test_panda_rescue(game)
 	_test_max_size_record_is_silent(game)
 	game._reset_progression_state();game.queue_free()
-	print("PUKU_POINTS_SMOKE_OK unit=1/1000 round_cost=1.00 direct_harvest=true sprite3d_render_oracle="+sprite3d_render_oracle_status+" legacy_sprite3d_match=1.6,5,10,20,30,40,60,80,100,120cm giant=150,200,300,500,700,1000,1500,2000,10000cm_species3_positions3_speeds1.6+10 transition120=true label_toggle=localized_persistent_on_off+main_only_live_recalc max_record=silent_visual_preserved reward1000+2000=true new_floor=.20 migration=points+legacy_gauge forest_cost=1 rescue=wallet_plus_1 combo=true fly_removed=true result=removed automatic_get=true")
+	print("PUKU_POINTS_SMOKE_OK unit=1/1000 round_cost=1.00 direct_harvest=true sprite3d_render_oracle="+sprite3d_render_oracle_status+" legacy_sprite3d_match=1.6,5,10,20,30,40,60,80,100,120cm giant=150,200,300,500,700,1000,1500,2000,10000cm_species3_positions3_speeds1.6+10 transition120=true depth_pan=front_center_rear+tap60+150 label_toggle=localized_persistent_on_off+main_only_live_recalc max_record=silent_visual_preserved reward1000+2000=true new_floor=.20 migration=points+legacy_gauge forest_cost=1 rescue=wallet_plus_1 combo=true fly_removed=true result=removed automatic_get=true")
 	get_tree().quit()
 
 func _test_seed_pod_thresholds(game)->void:
@@ -308,9 +309,49 @@ func _test_sprite3d_render_alignment(game)->void:
 					offset_direction_checked=true
 		game._clear_greenhouse_plants()
 	assert(offset_direction_checked,"Sprite3D offset direction render check did not run")
-	sprite3d_render_oracle_status="pass_negative_offset_down_max_edge_%dpx"%sprite3d_render_max_edge_error_px
+	probe_sprite.visible=false;probe_polygon.visible=false
+	var overlap_difference_ratio:float=await _test_sprite3d_overlap_render_alignment(game,probe_viewport,probe_camera)
+	assert(overlap_difference_ratio<.05,"overlapping Polygon2D composition diverged from Sprite3D ratio=%.5f"%overlap_difference_ratio)
+	sprite3d_render_oracle_status="pass_negative_offset_down_max_edge_%dpx_overlap_diff_%.4f"%[sprite3d_render_max_edge_error_px,overlap_difference_ratio]
 	probe_viewport.queue_free();await get_tree().process_frame
 	game.play_active=false;game._clear_greenhouse_plants()
+
+func _test_sprite3d_overlap_render_alignment(game,probe_viewport:SubViewport,probe_camera:Camera3D)->float:
+	game._clear_greenhouse_plants()
+	var samples:Array=[
+		{"species":"laui","position":Vector3(-.65,.12,-1.35),"cm":40.0},
+		{"species":"yumekawa_milky_dream","position":Vector3(.55,.12,.35),"cm":50.0},
+		{"species":"colorata","position":Vector3(-.2,.12,2.2),"cm":30.0}
+	]
+	for sample in samples:
+		var species_id:=str(sample.species);game.species_get_counts[species_id]=1;game._spawn_specific_plant(species_id)
+		var plant=game.plants.back();plant.jelly_checks_enabled=false;plant.original_pos=sample.position;plant.position=sample.position;plant.fast_forward_to_diameter(float(sample.cm));plant.plant_sprite.position.x=0.0;plant.plant_sprite.rotation.z=0.0
+	game._sync_plant_screen_visuals();_copy_probe_camera(game.camera,probe_camera)
+	var sprites:Array[Sprite3D]=[]
+	var polygons:Array[Polygon2D]=[]
+	for plant in game.plants:
+		var sprite:=Sprite3D.new();probe_viewport.add_child(sprite);_copy_probe_sprite(plant.plant_sprite,sprite);sprites.append(sprite)
+		var polygon:=Polygon2D.new();probe_viewport.add_child(polygon);polygon.texture=plant.plant_sprite.texture;polygon.texture_filter=CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS;polygon.z_as_relative=false;polygon.z_index=plant.screen_draw_order()
+		var projected:PackedVector2Array=plant._projected_texture_polygon(game.camera);var texture_size:Vector2=plant.plant_sprite.texture.get_size()
+		polygon.polygon=projected;polygon.uv=PackedVector2Array([Vector2.ZERO,Vector2(texture_size.x,0.0),texture_size,Vector2(0.0,texture_size.y)]);polygon.visible=false;polygons.append(polygon)
+	var sprite_image:Image=await _capture_probe(probe_viewport)
+	for sprite in sprites:sprite.visible=false
+	for polygon in polygons:polygon.visible=true
+	var polygon_image:Image=await _capture_probe(probe_viewport)
+	var occupied_pixels:=0
+	var differing_pixels:=0
+	for y in range(sprite_image.get_height()):
+		for x in range(sprite_image.get_width()):
+			var sprite_color:=sprite_image.get_pixel(x,y);var polygon_color:=polygon_image.get_pixel(x,y)
+			if maxf(sprite_color.a,polygon_color.a)<=.02:continue
+			occupied_pixels+=1
+			var difference:=maxf(maxf(absf(sprite_color.r-polygon_color.r),absf(sprite_color.g-polygon_color.g)),maxf(absf(sprite_color.b-polygon_color.b),absf(sprite_color.a-polygon_color.a)))
+			if difference>.08:differing_pixels+=1
+	for sprite in sprites:sprite.free()
+	for polygon in polygons:polygon.free()
+	game._clear_greenhouse_plants()
+	assert(occupied_pixels>0,"overlap render oracle produced no pixels")
+	return float(differing_pixels)/float(occupied_pixels)
 
 func _test_giant_plant_display_and_hit(game)->void:
 	var viewport_rect:Rect2=game.get_viewport().get_visible_rect()
@@ -431,6 +472,33 @@ func _test_giant_harvest_reward(game)->void:
 		game._clear_greenhouse_plants();game._cancel_puku_gauge_animations()
 	game.play_active=false;game.play_seed_animations_pending=0;game._clear_greenhouse_plants();game._cancel_puku_gauge_animations();game.puku_gauge_animation_speed_scale=1.0
 	for result_panel in game.effects_layer.find_children("HarvestResult","",true,false):result_panel.free()
+
+func _test_greenhouse_pan_depth_and_hit(game)->void:
+	var viewport_rect:Rect2=game.get_viewport().get_visible_rect()
+	var positions:Array[Vector3]=[Vector3(0,.12,2.5),Vector3(0,.12,0),Vector3(0,.12,-2.5)]
+	var harvest_handler:=Callable(game,"_on_harvested")
+	for target_cm in [60.0,150.0]:
+		var screen_deltas:Array[float]=[]
+		for original_position in positions:
+			game._clear_greenhouse_plants();game.current_mode="greenhouse";game.play_active=true;game.active_seed_type="normal";game.current_target_count=12
+			game.greenhouse_pan_x=0.0;game.greenhouse_pan_target_x=0.0;game.arrangement_transition_x=0.0;game._update_greenhouse_pan()
+			game.species_get_counts["colorata"]=1;game._spawn_specific_plant("colorata");var plant=game.plants.back();plant.jelly_checks_enabled=false
+			if plant.harvested.is_connected(harvest_handler):plant.harvested.disconnect(harvest_handler)
+			plant.original_pos=original_position;plant.position=original_position;plant.fast_forward_to_diameter(target_cm);plant.plant_sprite.position.x=0.0;plant.plant_sprite.rotation.z=0.0
+			game._resolve_crowding(0.0);game._sync_plant_screen_visuals()
+			var root_before:Vector2=game.camera.unproject_position(plant.global_position)
+			game.greenhouse_pan_x=game.greenhouse_pan_limit*.65;game.greenhouse_pan_target_x=game.greenhouse_pan_x;game._update_greenhouse_pan();game._resolve_crowding(0.0);game._sync_plant_screen_visuals()
+			var root_after:Vector2=game.camera.unproject_position(plant.global_position)
+			screen_deltas.append(absf(root_after.x-root_before.x))
+			assert(absf(root_after.y-root_before.y)<.01,"horizontal pan moved the planted root vertically cm=%.0f pos=%s before=%s after=%s"%[target_cm,original_position,root_before,root_after])
+			var visible_rect:Rect2=plant.screen_visual_rect(game.camera).intersection(viewport_rect)
+			assert(visible_rect.has_area(),"panned plant disappeared cm=%.0f pos=%s"%[target_cm,original_position])
+			var tap_point:=_opaque_hit_point(plant,game.camera,visible_rect)
+			assert(tap_point.x>-9999.0 and bool(plant.screen_hit_test(game.camera,tap_point).get("opaque_artwork_hit",false)),"panned visible leaf lost its matching hit area cm=%.0f pos=%s"%[target_cm,original_position])
+			game._try_harvest(tap_point)
+			assert(plant.state=="harvested","panned visible leaf did not harvest cm=%.0f pos=%s"%[target_cm,original_position])
+		assert(screen_deltas[0]>screen_deltas[1]+.5 and screen_deltas[1]>screen_deltas[2]+.5,"front/centre/rear pan lost perspective cm=%.0f deltas=%s"%[target_cm,screen_deltas])
+	game.greenhouse_pan_x=0.0;game.greenhouse_pan_target_x=0.0;game.arrangement_transition_x=0.0;game._update_greenhouse_pan();game._clear_greenhouse_plants();game.play_active=false
 
 func _wait_for_puku_animation(game)->void:
 	for _i in range(240):
