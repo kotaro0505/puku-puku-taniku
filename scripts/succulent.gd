@@ -448,6 +448,28 @@ func screen_visual_rect(camera:Camera3D)->Rect2:
 	for point in points:visible_rect=visible_rect.expand(point)
 	return visible_rect
 
+func screen_opaque_sample_count(screen_points:PackedVector2Array)->int:
+	# Spawn placement runs many probes per candidate. Reuse the already-synced
+	# texture transform instead of rebuilding/clipping the visual polygon for
+	# every point, while still testing the real per-pixel alpha artwork.
+	if not screen_texture_transform_valid or plant_sprite==null or plant_sprite.texture==null:return 0
+	var image:=screen_hit_image
+	if image==null or image.is_empty():image=plant_sprite.texture.get_image();screen_hit_image=image
+	var used:=_screen_hit_used_rect()
+	if used.size.x<=0.0 or used.size.y<=0.0:return 0
+	var inverse_transform:=screen_texture_transform.affine_inverse()
+	var image_size:=Vector2i.ZERO if image==null or image.is_empty() else image.get_size()
+	var count:=0
+	for screen_point in screen_points:
+		var pixel:=inverse_transform*screen_point
+		if not used.has_point(pixel):continue
+		if image_size==Vector2i.ZERO:
+			count+=1
+			continue
+		var pixel_position:=Vector2i(clampi(floori(pixel.x),0,maxi(0,image_size.x-1)),clampi(floori(pixel.y),0,maxi(0,image_size.y-1)))
+		if image.get_pixelv(pixel_position).a>SCREEN_ALPHA_HIT_THRESHOLD:count+=1
+	return count
+
 func screen_hit_test(camera:Camera3D,screen_point:Vector2)->Dictionary:
 	# Sprite3D's billboard rotation is applied by the renderer and is not present
 	# in its Node3D transform. Reconstruct the rendered quad in the camera plane

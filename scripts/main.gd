@@ -108,6 +108,9 @@ const GREENHOUSE_MASTER_SOURCE_SIZE := Vector2(1448.0,1086.0)
 const SOIL_SOURCE_CENTER := Vector2(1060.0,600.0)
 const SOIL_SOURCE_RADII := Vector2(300.0,150.0)
 const SPAWN_SPRITE_MARGIN_SOURCE_PX := 40.0
+const SPAWN_ROOT_CLEARANCE := .82
+const SPAWN_VISUAL_CLEARANCE_RADIUS_PX := 14.0
+const SPAWN_DEPTH_EPSILON := .01
 const GREENHOUSE_DRAG_SCALE := 0.30
 const GREENHOUSE_DRAG_DEAD_ZONE := 3.0
 const GREENHOUSE_PAN_FOLLOW_SECONDS := 0.075
@@ -8007,8 +8010,19 @@ func _spawn_greenhouse_seed(suppress_puku_effect:=false,requested_spawn_position
 	return true
 
 func _animate_and_spawn_greenhouse_seed(spawn_position:Vector3)->void:
-	var seed:=UISymbolIcon.new();seed.symbol="seed";seed.icon_color=Color("#6b3f20");seed.size=Vector2(22,22);seed.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	_sync_plant_screen_visuals()
+	var visual_assessment:=_spawn_visual_assessment(spawn_position)
+	var seed:=UISymbolIcon.new();seed.name="GreenhouseSeedAnimation";seed.symbol="seed";seed.icon_color=Color("#6b3f20");seed.size=Vector2(22,22);seed.mouse_filter=Control.MOUSE_FILTER_IGNORE
 	var origin:=seed_bag_panel.global_position+Vector2(seed_bag_panel.size.x*.5,seed_bag_panel.size.y*.84)-Vector2(11,11);var displayed_spawn_position:=spawn_position+Vector3(_greenhouse_world_offset_for_position(spawn_position),0,0);var destination:=camera.unproject_position(displayed_spawn_position)-Vector2(11,11);seed.position=origin;effects_layer.add_child(seed)
+	if int(visual_assessment.get("overlap_samples",0))>0 and plant_screen_layer!=null:
+		# A visually covered fallback is planted behind the leaf art. Canvas layer 0
+		# remains above the greenhouse background, while a z below the overlapping
+		# plants prevents the seed from being painted on top of their leaves.
+		seed.reparent(plant_screen_layer,true)
+		seed.z_as_relative=false
+		seed.z_index=int(visual_assessment.get("seed_draw_order",-1))
+		seed.set_meta("visual_spawn_mode","behind")
+	else:seed.set_meta("visual_spawn_mode","empty_soil")
 	var midpoint:=Vector2(lerpf(origin.x,destination.x,.55),minf(origin.y,destination.y)-34.0)
 	var tween:=create_tween();tween.tween_property(seed,"position",midpoint,.14).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT);tween.tween_property(seed,"position",destination,.13).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	await tween.finished
@@ -8322,10 +8336,18 @@ func _seed_new_species_blocked(species_id:String)->bool:
 
 func _find_spawn_position(position_rng:RandomNumberGenerator=null,front_only:=false)->Vector3:
 	# Sample world positions, but accept them only after projecting into the
-	# scrolling background image's source-pixel coordinates.
+	# scrolling background image's source-pixel coordinates. Root spacing alone
+	# is not enough once an unbounded plant can cover distant soil on screen, so
+	# the real alpha-tested artwork is the first placement priority.
 	var spawn_rng:=position_rng if position_rng!=null else rng
-	var best := Vector3.ZERO
-	var best_clearance := -1.0
+	_sync_plant_screen_visuals()
+	var best_empty:=Vector3.ZERO
+	var best_empty_clearance:=-1.0
+	var has_empty:=false
+	var best_fallback:=Vector3.ZERO
+	var best_fallback_assessment:Dictionary={}
+	var best_fallback_clearance:=-1.0
+	var has_fallback:=false
 	for attempt in range(192):
 		var angle := spawn_rng.randf_range(0.0, TAU)
 		var radius := sqrt(spawn_rng.randf())
@@ -8339,14 +8361,74 @@ func _find_spawn_position(position_rng:RandomNumberGenerator=null,front_only:=fa
 			clearance=minf(clearance,candidate.distance_to(pending_position))
 		for old_pos in recent_vacated_slots:
 			clearance = minf(clearance, candidate.distance_to(old_pos) * .82)
-		if clearance > best_clearance:
-			best = candidate
-			best_clearance = clearance
-		# Normal seeds retain their existing first-safe-position behavior. The
-		# scripted NEW seed evaluates every front-side candidate so the clearest
-		# visible spot wins while its sampled position remains random.
-		if not front_only and clearance >= .82:return candidate
-	return best
+		var assessment:=_spawn_visual_assessment(candidate)
+		if int(assessment.get("overlap_samples",0))==0:
+			if not has_empty or clearance>best_empty_clearance:
+				best_empty=candidate;best_empty_clearance=clearance;has_empty=true
+			# Preserve the established random first-safe behavior when that position
+			# is also genuinely empty in the rendered view. The scripted front seed
+			# still evaluates the full sample set for its clearest visible location.
+			if not front_only and clearance>=SPAWN_ROOT_CLEARANCE:return candidate
+		elif not has_fallback or _spawn_fallback_is_better(assessment,clearance,best_fallback_assessment,best_fallback_clearance):
+			best_fallback=candidate;best_fallback_assessment=assessment;best_fallback_clearance=clearance;has_fallback=true
+	if has_empty:return best_empty
+	return best_fallback if has_fallback else Vector3.ZERO
+
+func _spawn_seed_screen_samples(candidate:Vector3)->PackedVector2Array:
+	var points:=PackedVector2Array()
+	if camera==null:return points
+	var displayed_world:=candidate+Vector3(_greenhouse_world_offset_for_position(candidate),0,0)
+	if camera.is_position_behind(displayed_world):return points
+	var center:=camera.unproject_position(displayed_world)
+	points.append(center)
+	# The inner ring covers the painted seed itself; the outer ring leaves a small
+	# visual breath around it so leaf edges do not appear to carry the seed.
+	for ring_ratio in [.5,1.0]:
+		for index in range(8):
+			var angle:=TAU*float(index)/8.0
+			points.append(center+Vector2(cos(angle),sin(angle))*SPAWN_VISUAL_CLEARANCE_RADIUS_PX*ring_ratio)
+	return points
+
+func _spawn_visual_assessment(candidate:Vector3)->Dictionary:
+	var samples:=_spawn_seed_screen_samples(candidate)
+	if camera==null or samples.is_empty():return {"overlap_samples":0,"overlap_plants":0,"front_conflict_samples":0,"behind_all_overlaps":false,"seed_draw_order":-1,"candidate_depth":INF}
+	var displayed_world:=candidate+Vector3(_greenhouse_world_offset_for_position(candidate),0,0)
+	var candidate_depth:=-camera.to_local(displayed_world).z
+	var overlap_samples:=0
+	var overlap_plants:=0
+	var front_conflict_samples:=0
+	var seed_draw_order:=0
+	var draw_order_set:=false
+	for plant in plants:
+		if not is_instance_valid(plant) or plant.state!="growing" or not plant.has_method("screen_opaque_sample_count"):continue
+		var plant_overlap:int=plant.screen_opaque_sample_count(samples)
+		if plant_overlap<=0:continue
+		overlap_samples+=plant_overlap;overlap_plants+=1
+		if candidate_depth<=float(plant.screen_depth(camera))+SPAWN_DEPTH_EPSILON:front_conflict_samples+=plant_overlap
+		var plant_draw_order:=int(plant.screen_draw_order())
+		if not draw_order_set or plant_draw_order<seed_draw_order:seed_draw_order=plant_draw_order;draw_order_set=true
+	return {
+		"overlap_samples":overlap_samples,
+		"overlap_plants":overlap_plants,
+		"front_conflict_samples":front_conflict_samples,
+		"behind_all_overlaps":overlap_plants>0 and front_conflict_samples==0,
+		"seed_draw_order":seed_draw_order-1 if draw_order_set else -1,
+		"candidate_depth":candidate_depth
+	}
+
+func _spawn_fallback_is_better(candidate_assessment:Dictionary,candidate_clearance:float,current_assessment:Dictionary,current_clearance:float)->bool:
+	# If all visible soil is covered, first require a root that is behind every
+	# overlapping plant. Within that rear layer, minimize actual leaf coverage,
+	# then retain as much of the old root spacing as possible.
+	var candidate_conflicts:=int(candidate_assessment.get("front_conflict_samples",0))
+	var current_conflicts:=int(current_assessment.get("front_conflict_samples",0))
+	if (candidate_conflicts==0)!=(current_conflicts==0):return candidate_conflicts==0
+	if candidate_conflicts!=current_conflicts:return candidate_conflicts<current_conflicts
+	var candidate_overlap:=int(candidate_assessment.get("overlap_samples",0))
+	var current_overlap:=int(current_assessment.get("overlap_samples",0))
+	if candidate_overlap!=current_overlap:return candidate_overlap<current_overlap
+	if not is_equal_approx(candidate_clearance,current_clearance):return candidate_clearance>current_clearance
+	return float(candidate_assessment.get("candidate_depth",-INF))>float(current_assessment.get("candidate_depth",-INF))
 
 func _spawn_center_inside_soil(candidate:Vector3)->bool:
 	if camera==null or greenhouse_backdrop==null or greenhouse_backdrop.texture==null:return false
