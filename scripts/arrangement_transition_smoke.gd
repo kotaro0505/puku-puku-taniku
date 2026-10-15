@@ -114,7 +114,13 @@ func _ready()->void:
 	var play_touch:=InputEventScreenTouch.new();play_touch.pressed=true;play_touch.position=Vector2(280,520);game._input(play_touch)
 	var play_drag:=InputEventScreenDrag.new();play_drag.position=Vector2(400,520);play_drag.relative=Vector2(120,0);game._input(play_drag)
 	var expected_pan:=clampf((120.0-game.GREENHOUSE_DRAG_DEAD_ZONE)*game.GREENHOUSE_DRAG_SCALE,-game.greenhouse_pan_limit,game.greenhouse_pan_limit)
+	var legacy_pan:=clampf((120.0-game.GREENHOUSE_DRAG_DEAD_ZONE)*.30,-game.greenhouse_pan_limit,game.greenhouse_pan_limit)
+	assert(is_equal_approx(game.GREENHOUSE_DRAG_SCALE,.40) and expected_pan>legacy_pan*1.32 and expected_pan<legacy_pan*1.34,"greenhouse drag response was not raised from 0.30 to 0.40 legacy=%.3f tuned=%.3f"%[legacy_pan,expected_pan])
 	assert(is_equal_approx(game.greenhouse_pan_target_x,expected_pan))
+	assert(game.greenhouse_pan_limit>77.0 and game.greenhouse_pan_limit<79.0,"greenhouse pan range changed unexpectedly limit=%.3f"%game.greenhouse_pan_limit)
+	game._update_greenhouse_pan_follow(1.0/60.0)
+	assert(game.greenhouse_pan_x>0.0 and game.greenhouse_pan_x<expected_pan,"greenhouse pan follow jumped instead of smoothing current=%.3f target=%.3f"%[game.greenhouse_pan_x,expected_pan])
+	print("GREENHOUSE_DRAG_TUNING_OK scale_before=.30 scale_after=%.2f same_drag_before=%.3f same_drag_after=%.3f limit=%.3f follow_frame=%.3f"%[game.GREENHOUSE_DRAG_SCALE,legacy_pan,expected_pan,game.greenhouse_pan_limit,game.greenhouse_pan_x])
 	game.play_active=false;game.pointer_down=false;game.greenhouse_pan_x=0.0;game.greenhouse_pan_target_x=0.0;game._update_greenhouse_pan();game._update_play_ui()
 
 	if DisplayServer.get_name()=="headless":print("GREENHOUSE_SCREENSHOTS_SKIPPED_DUMMY_RENDERER")
@@ -135,20 +141,38 @@ func _ready()->void:
 		assert(anchor_image!=null and anchor_image.save_png(screenshot_dir_absolute.path_join("100-arrangement-pot-anchor.png"))==OK)
 		game.arrangement_scene_active=false;game.arrangement_ui.visible=false;game.arrangement_transition_x=0.0;game._update_play_ui()
 		_spawn_visual_comparison_plants(game)
-		for pan_shot in [{"ratio":-.75,"name":"cultivation-pan-left.png"},{"ratio":0.0,"name":"cultivation-pan-center.png"},{"ratio":.75,"name":"cultivation-pan-right.png"}]:
-			game.greenhouse_pan_x=game.greenhouse_pan_limit*float(pan_shot.ratio);game.greenhouse_pan_target_x=game.greenhouse_pan_x;game._update_greenhouse_pan();game._resolve_crowding(0.0);game._sync_plant_screen_visuals();game._update_labels()
+		# Freeze the main loop so its normal per-frame crowding pass cannot replace
+		# the baseline transform between setup and screenshot capture.
+		game.set_process(false)
+		for pan_shot in [{"ratio":-.75,"side":"left"},{"ratio":0.0,"side":"center"},{"ratio":.75,"side":"right"}]:
+			game.greenhouse_pan_x=game.greenhouse_pan_limit*float(pan_shot.ratio);game.greenhouse_pan_target_x=game.greenhouse_pan_x;game._update_greenhouse_pan()
+			# Capture the previous common-world-offset projection with the exact same
+			# plant instances before applying the tuned foreground gain.
+			for comparison_plant in game.plants:
+				comparison_plant.position.x=comparison_plant.original_pos.x+game.greenhouse_world_pan_x
+				comparison_plant.position.z=comparison_plant.original_pos.z
+			game._sync_plant_screen_visuals();game._update_labels()
+			var baseline_front_root_x:float=game.camera.unproject_position(game.plants[0].global_position).x
 			await get_tree().process_frame;RenderingServer.force_draw()
-			var pan_image:=get_viewport().get_texture().get_image()
-			assert(pan_image!=null and pan_image.save_png(screenshot_dir_absolute.path_join(str(pan_shot.name)))==OK)
+			var baseline_image:=get_viewport().get_texture().get_image()
+			assert(baseline_image!=null and baseline_image.save_png(screenshot_dir_absolute.path_join("baseline-030-pan-%s.png"%str(pan_shot.side)))==OK)
+			game._resolve_crowding(0.0);game._sync_plant_screen_visuals();game._update_labels()
+			var tuned_front_root_x:float=game.camera.unproject_position(game.plants[0].global_position).x
+			if not is_zero_approx(float(pan_shot.ratio)):
+				assert(absf(tuned_front_root_x-baseline_front_root_x)>5.0,"visual comparison did not apply the foreground gain side=%s baseline=%.3f tuned=%.3f"%[str(pan_shot.side),baseline_front_root_x,tuned_front_root_x])
+				print("GREENHOUSE_SCREENSHOT_COMPARISON side=%s baseline_front_root=%.3f tuned_front_root=%.3f delta=%.3f"%[str(pan_shot.side),baseline_front_root_x,tuned_front_root_x,tuned_front_root_x-baseline_front_root_x])
+			await get_tree().process_frame;RenderingServer.force_draw()
+			var tuned_image:=get_viewport().get_texture().get_image()
+			assert(tuned_image!=null and tuned_image.save_png(screenshot_dir_absolute.path_join("tuned-040-pan-%s.png"%str(pan_shot.side)))==OK)
 		game.greenhouse_pan_x=0.0;game.greenhouse_pan_target_x=0.0;game._update_greenhouse_pan()
 
 	print("ARRANGEMENT_TRANSITION_SMOKE_OK main_x=",game.greenhouse_main_position_x," arrangement_x=",game.greenhouse_arrangement_position_x," transition=",expected_arrangement_transition," soil=",game.SOIL_SOURCE_CENTER," table=",game.ARRANGEMENT_TABLE_SOURCE_CENTER," anchor=",expected_anchor)
 	get_tree().quit()
 
 func _test_cultivation_depth_parallax(game)->void:
-	# Before the master-scroll flattening, all Sprite3D roots received the same
-	# world-space pan. Perspective made a near root travel a little farther on
-	# screen than the soil-centre reference, and a distant root a little less.
+	# The restored Sprite3D projection supplies the base depth cue. The tuned
+	# foreground gain may strengthen only the near side; centre/rear movement is
+	# compared independently with the unmodified common-world-offset baseline.
 	game.arrangement_transition_x=0.0
 	game.greenhouse_pan_x=0.0;game.greenhouse_pan_target_x=0.0;game._update_greenhouse_pan()
 	var front:=Vector3(0,.12,2.5)
@@ -161,14 +185,32 @@ func _test_cultivation_depth_parallax(game)->void:
 	var front_offset:float=game._greenhouse_world_offset_for_position(front)
 	var center_offset:float=game._greenhouse_world_offset_for_position(center)
 	var rear_offset:float=game._greenhouse_world_offset_for_position(rear)
-	assert(absf(front_offset-center_offset)<.0001 and absf(rear_offset-center_offset)<.0001,"cultivation pan stopped using one rooted world-space offset front=%.5f center=%.5f rear=%.5f"%[front_offset,center_offset,rear_offset])
+	var expected_front_ratio:float=1.0+float(game.GREENHOUSE_FOREGROUND_PAN_BOOST)*clampf(front.z/float(game.GREENHOUSE_FOREGROUND_PAN_DEPTH),0.0,1.0)
+	assert(absf(front_offset-game.greenhouse_world_pan_x*expected_front_ratio)<.0001,"foreground boost did not match the bounded depth gain front=%.5f base=%.5f ratio=%.5f"%[front_offset,game.greenhouse_world_pan_x,expected_front_ratio])
+	assert(absf(center_offset-game.greenhouse_world_pan_x)<.0001 and absf(rear_offset-game.greenhouse_world_pan_x)<.0001,"centre/rear world motion changed center=%.5f rear=%.5f base=%.5f"%[center_offset,rear_offset,game.greenhouse_world_pan_x])
 	var front_delta:float=game.camera.unproject_position(front+Vector3(front_offset,0,0)).x-front_before
 	var center_delta:float=game.camera.unproject_position(center+Vector3(center_offset,0,0)).x-center_before
 	var rear_delta:float=game.camera.unproject_position(rear+Vector3(rear_offset,0,0)).x-rear_before
+	var baseline_front_delta:float=game.camera.unproject_position(front+Vector3(game.greenhouse_world_pan_x,0,0)).x-front_before
+	var baseline_center_delta:float=game.camera.unproject_position(center+Vector3(game.greenhouse_world_pan_x,0,0)).x-center_before
+	var baseline_rear_delta:float=game.camera.unproject_position(rear+Vector3(game.greenhouse_world_pan_x,0,0)).x-rear_before
 	var background_delta:float=game.greenhouse_background_position_x-game.greenhouse_main_position_x
 	assert(absf(center_delta-background_delta)<EPSILON,"soil-centre root no longer tracks the greenhouse background center=%.3f background=%.3f"%[center_delta,background_delta])
+	var foreground_screen_gain:=absf(front_delta/baseline_front_delta)
+	assert(foreground_screen_gain>=1.10 and foreground_screen_gain<=1.15,"foreground screen gain left the requested 10-15%% band baseline=%.3f tuned=%.3f gain=%.3f"%[baseline_front_delta,front_delta,foreground_screen_gain])
+	assert(absf(center_delta-baseline_center_delta)<.01 and absf(rear_delta-baseline_rear_delta)<.01,"tuning changed centre/rear projection baseline_center=%.3f tuned_center=%.3f baseline_rear=%.3f tuned_rear=%.3f"%[baseline_center_delta,center_delta,baseline_rear_delta,rear_delta])
 	assert(absf(front_delta)>absf(center_delta)+.5 and absf(center_delta)>absf(rear_delta)+.5,"depth motion was flattened front=%.3f center=%.3f rear=%.3f"%[front_delta,center_delta,rear_delta])
-	assert(absf(front_delta)<absf(background_delta)*1.40 and absf(rear_delta)>absf(background_delta)*.70,"restored depth cue became excessive front=%.3f background=%.3f rear=%.3f"%[front_delta,background_delta,rear_delta])
+	assert(absf(front_delta)<absf(background_delta)*1.55 and absf(rear_delta)>absf(background_delta)*.70,"tuned depth cue became excessive front=%.3f background=%.3f rear=%.3f"%[front_delta,background_delta,rear_delta])
+	# Signed gain must be mirror-symmetric when the user pans the other way.
+	game.greenhouse_pan_x=-game.greenhouse_pan_limit*.75;game.greenhouse_pan_target_x=game.greenhouse_pan_x;game._update_greenhouse_pan()
+	var left_deltas:Array[float]=[]
+	for world_position in [front,center,rear]:
+		var left_offset:float=game._greenhouse_world_offset_for_position(world_position)
+		left_deltas.append(game.camera.unproject_position(world_position+Vector3(left_offset,0,0)).x-game.camera.unproject_position(world_position).x)
+	for index in range(3):
+		var right_delta:float=[front_delta,center_delta,rear_delta][index]
+		assert(right_delta*float(left_deltas[index])<0.0 and absf(absf(right_delta)-absf(float(left_deltas[index])))<.01,"left/right depth motion lost symmetry index=%d right=%.3f left=%.3f"%[index,right_delta,float(left_deltas[index])])
+	game.greenhouse_pan_x=game.greenhouse_pan_limit*.75;game.greenhouse_pan_target_x=game.greenhouse_pan_x;game._update_greenhouse_pan()
 	# Arrangement navigation is a scene transition, not cultivation parallax. It
 	# must still translate every already-panned root by exactly the backdrop delta.
 	var roots_before_transition:Array[float]=[]
@@ -183,7 +225,7 @@ func _test_cultivation_depth_parallax(game)->void:
 		var after_offset:float=game._greenhouse_world_offset_for_position(world_position)
 		var root_transition_delta:float=game.camera.unproject_position(world_position+Vector3(after_offset,0,0)).x-float(roots_before_transition[index])
 		assert(absf(root_transition_delta-transition_delta)<EPSILON,"arrangement transition inherited cultivation parallax index=%d root=%.3f backdrop=%.3f"%[index,root_transition_delta,transition_delta])
-	print("GREENHOUSE_DEPTH_PARALLAX_OK front=%.3f center=%.3f rear=%.3f world=%.5f"%[front_delta,center_delta,rear_delta,center_offset])
+	print("GREENHOUSE_DEPTH_PARALLAX_OK baseline_front=%.3f baseline_center=%.3f baseline_rear=%.3f tuned_front=%.3f tuned_center=%.3f tuned_rear=%.3f foreground_gain=%.3f world=%.5f"%[baseline_front_delta,baseline_center_delta,baseline_rear_delta,front_delta,center_delta,rear_delta,foreground_screen_gain,center_offset])
 	game.arrangement_transition_x=0.0;game.greenhouse_pan_x=0.0;game.greenhouse_pan_target_x=0.0;game._update_greenhouse_pan()
 
 func _spawn_visual_comparison_plants(game)->void:

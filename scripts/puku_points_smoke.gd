@@ -29,7 +29,7 @@ func _ready()->void:
 	await _test_panda_rescue(game)
 	_test_max_size_record_is_silent(game)
 	game._reset_progression_state();game.queue_free()
-	print("PUKU_POINTS_SMOKE_OK unit=1/1000 round_cost=1.00 direct_harvest=true sprite3d_render_oracle="+sprite3d_render_oracle_status+" legacy_sprite3d_match=1.6,5,10,20,30,40,60,80,100,120cm giant=150,200,300,500,700,1000,1500,2000,10000cm_species3_positions3_speeds1.6+10 transition120=true depth_pan=front_center_rear+tap60+150 label_toggle=localized_persistent_on_off+main_only_live_recalc max_record=silent_visual_preserved reward1000+2000=true new_floor=.20 migration=points+legacy_gauge forest_cost=1 rescue=wallet_plus_1 combo=true fly_removed=true result=removed automatic_get=true")
+	print("PUKU_POINTS_SMOKE_OK unit=1/1000 round_cost=1.00 direct_harvest=true sprite3d_render_oracle="+sprite3d_render_oracle_status+" legacy_sprite3d_match=1.6,5,10,20,30,40,60,80,100,120cm giant=150,200,300,500,700,1000,1500,2000,10000cm_species3_positions3_speeds1.6+10 transition120=true depth_pan=front_center_rear+left_center_right+tap60+120+150 label_toggle=localized_persistent_on_off+main_only_live_recalc max_record=silent_visual_preserved reward1000+2000=true new_floor=.20 migration=points+legacy_gauge forest_cost=1 rescue=wallet_plus_1 combo=true fly_removed=true result=removed automatic_get=true")
 	get_tree().quit()
 
 func _test_seed_pod_thresholds(game)->void:
@@ -477,27 +477,31 @@ func _test_greenhouse_pan_depth_and_hit(game)->void:
 	var viewport_rect:Rect2=game.get_viewport().get_visible_rect()
 	var positions:Array[Vector3]=[Vector3(0,.12,2.5),Vector3(0,.12,0),Vector3(0,.12,-2.5)]
 	var harvest_handler:=Callable(game,"_on_harvested")
-	for target_cm in [60.0,150.0]:
-		var screen_deltas:Array[float]=[]
-		for original_position in positions:
-			game._clear_greenhouse_plants();game.current_mode="greenhouse";game.play_active=true;game.active_seed_type="normal";game.current_target_count=12
-			game.greenhouse_pan_x=0.0;game.greenhouse_pan_target_x=0.0;game.arrangement_transition_x=0.0;game._update_greenhouse_pan()
-			game.species_get_counts["colorata"]=1;game._spawn_specific_plant("colorata");var plant=game.plants.back();plant.jelly_checks_enabled=false
-			if plant.harvested.is_connected(harvest_handler):plant.harvested.disconnect(harvest_handler)
-			plant.original_pos=original_position;plant.position=original_position;plant.fast_forward_to_diameter(target_cm);plant.plant_sprite.position.x=0.0;plant.plant_sprite.rotation.z=0.0
-			game._resolve_crowding(0.0);game._sync_plant_screen_visuals()
-			var root_before:Vector2=game.camera.unproject_position(plant.global_position)
-			game.greenhouse_pan_x=game.greenhouse_pan_limit*.65;game.greenhouse_pan_target_x=game.greenhouse_pan_x;game._update_greenhouse_pan();game._resolve_crowding(0.0);game._sync_plant_screen_visuals()
-			var root_after:Vector2=game.camera.unproject_position(plant.global_position)
-			screen_deltas.append(absf(root_after.x-root_before.x))
-			assert(absf(root_after.y-root_before.y)<.01,"horizontal pan moved the planted root vertically cm=%.0f pos=%s before=%s after=%s"%[target_cm,original_position,root_before,root_after])
-			var visible_rect:Rect2=plant.screen_visual_rect(game.camera).intersection(viewport_rect)
-			assert(visible_rect.has_area(),"panned plant disappeared cm=%.0f pos=%s"%[target_cm,original_position])
-			var tap_point:=_opaque_hit_point(plant,game.camera,visible_rect)
-			assert(tap_point.x>-9999.0 and bool(plant.screen_hit_test(game.camera,tap_point).get("opaque_artwork_hit",false)),"panned visible leaf lost its matching hit area cm=%.0f pos=%s"%[target_cm,original_position])
-			game._try_harvest(tap_point)
-			assert(plant.state=="harvested","panned visible leaf did not harvest cm=%.0f pos=%s"%[target_cm,original_position])
-		assert(screen_deltas[0]>screen_deltas[1]+.5 and screen_deltas[1]>screen_deltas[2]+.5,"front/centre/rear pan lost perspective cm=%.0f deltas=%s"%[target_cm,screen_deltas])
+	for target_cm in [60.0,120.0,150.0]:
+		for pan_ratio in [-.65,0.0,.65]:
+			var screen_deltas:Array[float]=[]
+			for original_position in positions:
+				game._clear_greenhouse_plants();game.current_mode="greenhouse";game.play_active=true;game.active_seed_type="normal";game.current_target_count=12
+				game.greenhouse_pan_x=0.0;game.greenhouse_pan_target_x=0.0;game.arrangement_transition_x=0.0;game._update_greenhouse_pan()
+				game.species_get_counts["colorata"]=1;game._spawn_specific_plant("colorata");var plant=game.plants.back();plant.jelly_checks_enabled=false
+				if plant.harvested.is_connected(harvest_handler):plant.harvested.disconnect(harvest_handler)
+				plant.original_pos=original_position;plant.position=original_position;plant.fast_forward_to_diameter(target_cm);plant.plant_sprite.position.x=0.0;plant.plant_sprite.rotation.z=0.0
+				game._resolve_crowding(0.0);game._sync_plant_screen_visuals()
+				var root_before:Vector2=game.camera.unproject_position(plant.global_position)
+				game.greenhouse_pan_x=game.greenhouse_pan_limit*float(pan_ratio);game.greenhouse_pan_target_x=game.greenhouse_pan_x;game._update_greenhouse_pan();game._resolve_crowding(0.0);game._sync_plant_screen_visuals()
+				var root_after:Vector2=game.camera.unproject_position(plant.global_position)
+				screen_deltas.append(absf(root_after.x-root_before.x))
+				assert(absf(root_after.y-root_before.y)<.01,"horizontal pan moved the planted root vertically cm=%.0f pan=%.2f pos=%s before=%s after=%s"%[target_cm,pan_ratio,original_position,root_before,root_after])
+				var visible_rect:Rect2=plant.screen_visual_rect(game.camera).intersection(viewport_rect)
+				assert(visible_rect.has_area(),"panned plant disappeared cm=%.0f pan=%.2f pos=%s"%[target_cm,pan_ratio,original_position])
+				var tap_point:=_opaque_hit_point(plant,game.camera,visible_rect)
+				assert(tap_point.x>-9999.0 and bool(plant.screen_hit_test(game.camera,tap_point).get("opaque_artwork_hit",false)),"panned visible leaf lost its matching hit area cm=%.0f pan=%.2f pos=%s"%[target_cm,pan_ratio,original_position])
+				game._try_harvest(tap_point)
+				assert(plant.state=="harvested","panned visible leaf did not harvest cm=%.0f pan=%.2f pos=%s"%[target_cm,pan_ratio,original_position])
+			if is_zero_approx(float(pan_ratio)):
+				assert(screen_deltas[0]<.01 and screen_deltas[1]<.01 and screen_deltas[2]<.01,"centred pan moved roots cm=%.0f deltas=%s"%[target_cm,screen_deltas])
+			else:
+				assert(screen_deltas[0]>screen_deltas[1]+.5 and screen_deltas[1]>screen_deltas[2]+.5,"front/centre/rear pan lost perspective cm=%.0f pan=%.2f deltas=%s"%[target_cm,pan_ratio,screen_deltas])
 	game.greenhouse_pan_x=0.0;game.greenhouse_pan_target_x=0.0;game.arrangement_transition_x=0.0;game._update_greenhouse_pan();game._clear_greenhouse_plants();game.play_active=false
 
 func _wait_for_puku_animation(game)->void:

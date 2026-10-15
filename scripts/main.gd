@@ -111,9 +111,11 @@ const SPAWN_SPRITE_MARGIN_SOURCE_PX := 40.0
 const SPAWN_ROOT_CLEARANCE := .82
 const SPAWN_VISUAL_CLEARANCE_RADIUS_PX := 14.0
 const SPAWN_DEPTH_EPSILON := .01
-const GREENHOUSE_DRAG_SCALE := 0.30
+const GREENHOUSE_DRAG_SCALE := 0.40
 const GREENHOUSE_DRAG_DEAD_ZONE := 3.0
 const GREENHOUSE_PAN_FOLLOW_SECONDS := 0.075
+const GREENHOUSE_FOREGROUND_PAN_BOOST := 0.15
+const GREENHOUSE_FOREGROUND_PAN_DEPTH := 3.15
 const ARRANGEMENT_TRANSITION_SECONDS := 0.28
 const GREENHOUSE_AREA_DRAG_DEAD_ZONE := 14.0
 const GREENHOUSE_AREA_DRAG_HORIZONTAL_BIAS := 1.15
@@ -9046,18 +9048,21 @@ func _resolve_crowding(_delta:float)->void:
 
 func _greenhouse_world_offset_for_position(world_position:Vector3)->float:
 	if camera==null:return greenhouse_world_pan_x
-	# Normal left/right browsing uses the single world-space translation from the
-	# pre-master-scroll implementation. Perspective then supplies the restrained
-	# foreground/background motion difference that Sprite3D plants used to have.
+	# Preserve the restored 3D projection and add only a shallow foreground gain:
+	# the soil-centre and rear roots keep their established motion, while roots at
+	# the nearest edge receive at most 15% more signed world travel. This remains
+	# symmetric in both pan directions and does not touch vertical/root placement.
+	var foreground_ratio:=clampf(world_position.z/GREENHOUSE_FOREGROUND_PAN_DEPTH,0.0,1.0)
+	var cultivation_world_pan:=greenhouse_world_pan_x*(1.0+GREENHOUSE_FOREGROUND_PAN_BOOST*foreground_ratio)
 	# The separate arrangement transition remains screen-aligned so entering the
-	# table view does not shear the greenhouse composition.
-	var gameplay_position:=world_position+Vector3(greenhouse_world_pan_x,0,0)
+	# table view moves every depth by the same screen distance.
+	var gameplay_position:=world_position+Vector3(cultivation_world_pan,0,0)
 	var arrangement_screen_delta:=greenhouse_background_position_x-(greenhouse_main_position_x+greenhouse_pan_x)
-	if is_zero_approx(arrangement_screen_delta):return greenhouse_world_pan_x
+	if is_zero_approx(arrangement_screen_delta):return cultivation_world_pan
 	var screen_x:=camera.unproject_position(gameplay_position).x
 	var screen_right_x:=camera.unproject_position(gameplay_position+Vector3.RIGHT).x
 	var pixels_per_world:=screen_right_x-screen_x
-	return greenhouse_world_pan_x+arrangement_screen_delta/pixels_per_world if absf(pixels_per_world)>.001 else greenhouse_world_pan_x
+	return cultivation_world_pan+arrangement_screen_delta/pixels_per_world if absf(pixels_per_world)>.001 else cultivation_world_pan
 
 func _plant_is_first_get_for_puku(plant)->bool:
 	if not is_instance_valid(plant):return false
