@@ -112,31 +112,78 @@ func _verify_non_normal_modes_keep_previous_balance()->void:
 	assert(not plant.kakuhen_enabled and plant.kakuhen_state==KakuhenSystemClass.STATE_NONE)
 	plant.free()
 
+
+func _verify_no_production_kakuhen_cues(root:Node)->void:
+	var pending:Array[Node]=[root]
+	while not pending.is_empty():
+		var node:Node=pending.pop_back()
+		var visible_text:=""
+		if node is Label or node is Button or node is RichTextLabel:
+			visible_text=str(node.text)
+		assert("確変" not in visible_text and "kakuhen" not in visible_text.to_lower())
+		for child in node.get_children():pending.append(child)
+
 func _verify_kakuhen_entry_statistics()->void:
+	_approx(KakuhenSystemClass.GERMINATION_VISIBLE_ACCELERATION_CHANCE,.12)
+	_approx(KakuhenSystemClass.GERMINATION_ANY_EVENT_CHANCE,.15)
+	_approx(KakuhenSystemClass.REENTRY_VISIBLE_ACCELERATION_CHANCE,.04)
+	_approx(KakuhenSystemClass.REENTRY_ANY_EVENT_CHANCE,.05)
+	assert(KakuhenSystemClass.germination_outcome(.095999)==KakuhenSystemClass.STATE_REAL_ACCELERATED)
+	assert(KakuhenSystemClass.germination_outcome(.096)==KakuhenSystemClass.STATE_REAL_HIDDEN)
+	assert(KakuhenSystemClass.germination_outcome(.125999)==KakuhenSystemClass.STATE_REAL_HIDDEN)
+	assert(KakuhenSystemClass.germination_outcome(.126)==KakuhenSystemClass.STATE_FAKE_ACCELERATED)
+	assert(KakuhenSystemClass.germination_outcome(.149999)==KakuhenSystemClass.STATE_FAKE_ACCELERATED)
+	assert(KakuhenSystemClass.germination_outcome(.15)==KakuhenSystemClass.STATE_NONE)
+	assert(KakuhenSystemClass.reentry_outcome(.031999)==KakuhenSystemClass.STATE_REAL_ACCELERATED)
+	assert(KakuhenSystemClass.reentry_outcome(.032)==KakuhenSystemClass.STATE_REAL_HIDDEN)
+	assert(KakuhenSystemClass.reentry_outcome(.041999)==KakuhenSystemClass.STATE_REAL_HIDDEN)
+	assert(KakuhenSystemClass.reentry_outcome(.042)==KakuhenSystemClass.STATE_FAKE_ACCELERATED)
+	assert(KakuhenSystemClass.reentry_outcome(.049999)==KakuhenSystemClass.STATE_FAKE_ACCELERATED)
+	assert(KakuhenSystemClass.reentry_outcome(.05)==KakuhenSystemClass.STATE_NONE)
 	var probe:=RandomNumberGenerator.new();probe.seed=20261013
-	var counts:={
+	var germination_counts:={
 		KakuhenSystemClass.STATE_REAL_ACCELERATED:0,
 		KakuhenSystemClass.STATE_REAL_HIDDEN:0,
 		KakuhenSystemClass.STATE_FAKE_ACCELERATED:0,
 		KakuhenSystemClass.STATE_NONE:0,
 	}
 	for _sample in range(KAKUHEN_ENTRY_SAMPLES):
-		var outcome:=KakuhenSystemClass.entry_outcome(probe.randf())
-		counts[outcome]=int(counts[outcome])+1
-	var real_count:=int(counts[KakuhenSystemClass.STATE_REAL_ACCELERATED])+int(counts[KakuhenSystemClass.STATE_REAL_HIDDEN])
-	var visible_acceleration_count:=int(counts[KakuhenSystemClass.STATE_REAL_ACCELERATED])+int(counts[KakuhenSystemClass.STATE_FAKE_ACCELERATED])
-	var observed_real:=float(real_count)/KAKUHEN_ENTRY_SAMPLES
-	var observed_real_accelerated_share:=float(counts[KakuhenSystemClass.STATE_REAL_ACCELERATED])/real_count
-	var observed_fake_visible_share:=float(counts[KakuhenSystemClass.STATE_FAKE_ACCELERATED])/visible_acceleration_count
-	assert(absf(observed_real-KakuhenSystemClass.REAL_ENTRY_CHANCE)<.00035)
-	assert(absf(observed_real_accelerated_share-.70)<.035)
-	assert(absf(observed_fake_visible_share-.20)<.035)
+		var outcome:=KakuhenSystemClass.germination_outcome(probe.randf())
+		germination_counts[outcome]=int(germination_counts[outcome])+1
+	probe.seed=20261015
+	var reentry_counts:=germination_counts.duplicate(true)
+	for key in reentry_counts:reentry_counts[key]=0
+	for _sample in range(KAKUHEN_ENTRY_SAMPLES):
+		var outcome:=KakuhenSystemClass.reentry_outcome(probe.randf())
+		reentry_counts[outcome]=int(reentry_counts[outcome])+1
+	var expected_germination:={KakuhenSystemClass.STATE_REAL_ACCELERATED:.096,KakuhenSystemClass.STATE_REAL_HIDDEN:.03,KakuhenSystemClass.STATE_FAKE_ACCELERATED:.024,KakuhenSystemClass.STATE_NONE:.85}
+	var expected_reentry:={KakuhenSystemClass.STATE_REAL_ACCELERATED:.032,KakuhenSystemClass.STATE_REAL_HIDDEN:.01,KakuhenSystemClass.STATE_FAKE_ACCELERATED:.008,KakuhenSystemClass.STATE_NONE:.95}
+	for state_name in expected_germination:
+		assert(absf(float(germination_counts[state_name])/KAKUHEN_ENTRY_SAMPLES-float(expected_germination[state_name]))<.0015)
+		assert(absf(float(reentry_counts[state_name])/KAKUHEN_ENTRY_SAMPLES-float(expected_reentry[state_name]))<.0015)
+	var germination_visible:=int(germination_counts[KakuhenSystemClass.STATE_REAL_ACCELERATED])+int(germination_counts[KakuhenSystemClass.STATE_FAKE_ACCELERATED])
+	var reentry_visible:=int(reentry_counts[KakuhenSystemClass.STATE_REAL_ACCELERATED])+int(reentry_counts[KakuhenSystemClass.STATE_FAKE_ACCELERATED])
+	assert(absf(float(germination_counts[KakuhenSystemClass.STATE_FAKE_ACCELERATED])/germination_visible-.20)<.015)
+	assert(absf(float(reentry_counts[KakuhenSystemClass.STATE_FAKE_ACCELERATED])/reentry_visible-.20)<.025)
 	var continued:=0;probe.seed=20261014
 	for _sample in range(KAKUHEN_CONTINUATION_SAMPLES):
 		if probe.randf()<KakuhenSystemClass.CONTINUE_CHANCE:continued+=1
 	var observed_continue:=float(continued)/KAKUHEN_CONTINUATION_SAMPLES
 	assert(absf(observed_continue-KakuhenSystemClass.CONTINUE_CHANCE)<.003)
-	print("KAKUHEN_ENTRY_STAT_PROFILE samples=",KAKUHEN_ENTRY_SAMPLES," counts=",counts," real_rate=",observed_real," real_accelerated_share=",observed_real_accelerated_share," fake_visible_share=",observed_fake_visible_share," continuation_samples=",KAKUHEN_CONTINUATION_SAMPLES," continuation_rate=",observed_continue)
+	var setup_probe:=_make_plant(20261016,_kakuhen_balance())
+	assert(setup_probe.kakuhen_germination_roll_count==1 and setup_probe.kakuhen_reentry_roll_count==0 and setup_probe.kakuhen_entry_roll_count==1)
+	_approx(setup_probe.kakuhen_next_boundary_age,5.0)
+	setup_probe.free()
+	print("KAKUHEN_ENTRY_STAT_PROFILE samples=",KAKUHEN_ENTRY_SAMPLES," germination=",germination_counts," reentry=",reentry_counts," continuation_samples=",KAKUHEN_CONTINUATION_SAMPLES," continuation_rate=",observed_continue)
+
+
+func _verify_kakuhen_jelly_modifiers()->void:
+	for age_and_rate in [[2.0,.01],[7.0,.025],[12.0,.05],[20.0,.08]]:
+		var age:=float(age_and_rate[0]);var expected:=float(age_and_rate[1])
+		_approx(SucculentClass.jelly_chance_per_second(age,FORMAL_RATES,KakuhenSystemClass.jelly_rate_multiplier(KakuhenSystemClass.STATE_NONE)),expected)
+		_approx(SucculentClass.jelly_chance_per_second(age,FORMAL_RATES,KakuhenSystemClass.jelly_rate_multiplier(KakuhenSystemClass.STATE_FAKE_ACCELERATED)),expected)
+		_approx(SucculentClass.jelly_chance_per_second(age,FORMAL_RATES,KakuhenSystemClass.jelly_rate_multiplier(KakuhenSystemClass.STATE_REAL_ACCELERATED)),expected*.5)
+		_approx(SucculentClass.jelly_chance_per_second(age,FORMAL_RATES,KakuhenSystemClass.jelly_rate_multiplier(KakuhenSystemClass.STATE_REAL_HIDDEN)),0.0)
 
 func _seed_for_continuations(draw_count:int)->int:
 	var probe:=RandomNumberGenerator.new()
@@ -154,14 +201,14 @@ func _seed_for_exit_then_real_entry()->int:
 	var probe:=RandomNumberGenerator.new()
 	for candidate_seed in range(500000):
 		probe.seed=candidate_seed
-		if probe.randf()>=KakuhenSystemClass.CONTINUE_CHANCE and probe.randf()<KakuhenSystemClass.REAL_ENTRY_CHANCE:return candidate_seed
+		if probe.randf()>=KakuhenSystemClass.CONTINUE_CHANCE and probe.randf()<KakuhenSystemClass.REENTRY_REAL_ACCELERATED_CHANCE:return candidate_seed
 	assert(false,"could not find exit/re-entry seed")
 	return 0
 
 func _prepare_forced_kakuhen_state(plant:Succulent,state_name:String)->void:
 	plant.age=0.0;plant.growth_time=0.0;plant.diameter_cm=1.6;plant.visual_scale=.18
 	plant.kakuhen_state=state_name;plant.kakuhen_next_boundary_age=KakuhenSystemClass.INTERVAL_SECONDS
-	plant.kakuhen_entry_roll_count=0;plant.kakuhen_continuation_roll_count=0;plant.kakuhen_boundary_count=0
+	plant.kakuhen_entry_roll_count=0;plant.kakuhen_germination_roll_count=0;plant.kakuhen_reentry_roll_count=0;plant.kakuhen_continuation_roll_count=0;plant.kakuhen_boundary_count=0
 
 func _verify_kakuhen_protection_continuation_and_reentry()->void:
 	var forced_rates:Array[float]=[1.0,1.0,1.0,1.0]
@@ -170,20 +217,40 @@ func _verify_kakuhen_protection_continuation_and_reentry()->void:
 	real_hidden.simulate(.1)
 	assert(real_hidden.state=="growing")
 	_approx(real_hidden.effective_growth_speed_multiplier(),1.6)
+	_approx(SucculentClass.jelly_probability_for_interval(0.0,1.0,forced_rates,KakuhenSystemClass.jelly_rate_multiplier(real_hidden.kakuhen_state)),0.0)
 	real_hidden.free()
 
-	var fake:=_make_plant(5102,_kakuhen_balance(forced_rates))
-	_prepare_forced_kakuhen_state(fake,KakuhenSystemClass.STATE_FAKE_ACCELERATED)
-	_approx(fake.effective_growth_speed_multiplier(),2.24)
-	fake.simulate(.1)
-	assert(fake.state=="jelly")
-	fake.free()
+	var real_accelerated:=_make_plant(5102,_kakuhen_balance(forced_rates))
+	_prepare_forced_kakuhen_state(real_accelerated,KakuhenSystemClass.STATE_REAL_ACCELERATED)
+	_approx(real_accelerated.effective_growth_speed_multiplier(),3.2)
+	_approx(SucculentClass.jelly_probability_for_interval(0.0,1.0,forced_rates,KakuhenSystemClass.jelly_rate_multiplier(real_accelerated.kakuhen_state)),.5)
+	real_accelerated.free()
+
+	var fake_jelly:=_make_plant(5105,_kakuhen_balance(forced_rates))
+	_prepare_forced_kakuhen_state(fake_jelly,KakuhenSystemClass.STATE_FAKE_ACCELERATED)
+	_approx(fake_jelly.effective_growth_speed_multiplier(),3.2)
+	fake_jelly.simulate(.1)
+	assert(fake_jelly.state=="jelly")
+	fake_jelly.free()
+
+	var fake_expiry:=_make_plant(5106,_kakuhen_balance())
+	_prepare_forced_kakuhen_state(fake_expiry,KakuhenSystemClass.STATE_FAKE_ACCELERATED)
+	fake_expiry.jelly_checks_enabled=false
+	fake_expiry.simulate(4.999)
+	assert(fake_expiry.kakuhen_state==KakuhenSystemClass.STATE_FAKE_ACCELERATED)
+	fake_expiry.simulate(.001)
+	assert(fake_expiry.kakuhen_state==KakuhenSystemClass.STATE_NONE and fake_expiry.kakuhen_reentry_roll_count==0)
+	fake_expiry.simulate(4.999)
+	assert(fake_expiry.kakuhen_reentry_roll_count==0)
+	fake_expiry.simulate(.001)
+	assert(fake_expiry.kakuhen_reentry_roll_count==1)
+	fake_expiry.free()
 
 	var long_chain:=_make_plant(5103,_kakuhen_balance())
 	_prepare_forced_kakuhen_state(long_chain,KakuhenSystemClass.STATE_REAL_HIDDEN)
 	long_chain.jelly_checks_enabled=false
 	long_chain.kakuhen_rng.seed=_seed_for_continuations(30)
-	long_chain.simulate(300.0)
+	long_chain.simulate(150.0)
 	assert(long_chain.state=="growing" and long_chain.kakuhen_state==KakuhenSystemClass.STATE_REAL_HIDDEN)
 	assert(long_chain.kakuhen_boundary_count==30 and long_chain.kakuhen_continuation_roll_count==30)
 	long_chain.free()
@@ -192,12 +259,12 @@ func _verify_kakuhen_protection_continuation_and_reentry()->void:
 	_prepare_forced_kakuhen_state(reentry,KakuhenSystemClass.STATE_REAL_HIDDEN)
 	reentry.jelly_checks_enabled=false
 	reentry.kakuhen_rng.seed=_seed_for_exit_then_real_entry()
-	reentry.simulate(10.0)
+	reentry.simulate(5.0)
 	assert(reentry.kakuhen_state==KakuhenSystemClass.STATE_NONE and reentry.kakuhen_entry_roll_count==0)
-	reentry.simulate(9.999)
+	reentry.simulate(4.999)
 	assert(reentry.kakuhen_state==KakuhenSystemClass.STATE_NONE and reentry.kakuhen_entry_roll_count==0)
 	reentry.simulate(.001)
-	assert(KakuhenSystemClass.is_real(reentry.kakuhen_state) and reentry.kakuhen_entry_roll_count==1)
+	assert(reentry.kakuhen_state==KakuhenSystemClass.STATE_REAL_ACCELERATED and reentry.kakuhen_entry_roll_count==1 and reentry.kakuhen_reentry_roll_count==1)
 	reentry.free()
 
 func _verify_growth_speed_changes_are_continuous()->void:
@@ -206,26 +273,34 @@ func _verify_growth_speed_changes_are_continuous()->void:
 	normal.jelly_checks_enabled=false;accelerated.jelly_checks_enabled=false
 	normal.simulate(3.0);accelerated.simulate(3.0)
 	var normal_before:=normal.diameter_cm;var accelerated_before:=accelerated.diameter_cm
+	var accelerated_position_before:=accelerated.position
 	accelerated.kakuhen_state=KakuhenSystemClass.STATE_REAL_ACCELERATED
-	_approx(accelerated.diameter_cm,accelerated_before)
+	_approx(accelerated.diameter_cm,accelerated_before);assert(accelerated.position==accelerated_position_before)
 	normal.simulate(1.0);accelerated.simulate(1.0)
 	var normal_increment:=normal.diameter_cm-normal_before
 	var accelerated_increment:=accelerated.diameter_cm-accelerated_before
 	_approx(accelerated_increment/normal_increment,KakuhenSystemClass.ACCELERATION_MULTIPLIER,.00001)
 	var before_exit:=accelerated.diameter_cm
+	var position_before_exit:=accelerated.position
 	accelerated.kakuhen_state=KakuhenSystemClass.STATE_NONE
-	_approx(accelerated.diameter_cm,before_exit)
+	_approx(accelerated.diameter_cm,before_exit);assert(accelerated.position==position_before_exit)
 	var growth_before:=accelerated.growth_time
 	accelerated.simulate(1.0)
 	var expected_growth:=accelerated._integrated_growth_multiplier(4.0,5.0)*accelerated.growth_speed_multiplier
 	_approx(accelerated.growth_time-growth_before,expected_growth,.00001)
+	var hidden:=_make_plant(6203,JellyBalanceClass.FORMAL);hidden.jelly_checks_enabled=false
+	hidden.kakuhen_state=KakuhenSystemClass.STATE_REAL_HIDDEN
+	_approx(hidden.effective_growth_speed_multiplier(),1.6)
+	var fake:=_make_plant(6204,JellyBalanceClass.FORMAL);fake.jelly_checks_enabled=false
+	fake.kakuhen_state=KakuhenSystemClass.STATE_FAKE_ACCELERATED
+	_approx(fake.effective_growth_speed_multiplier(),3.2)
 	var teleported:=_make_plant(6202,JellyBalanceClass.FORMAL)
 	teleported.fast_forward_to_diameter(500.0)
 	_approx(teleported.diameter_cm,500.0,.00001)
 	var teleport_before:=teleported.diameter_cm
 	teleported.simulate(.01)
 	assert(teleported.diameter_cm>teleport_before and teleported.diameter_cm-teleport_before<.1)
-	normal.free();accelerated.free();teleported.free()
+	normal.free();accelerated.free();hidden.free();fake.free();teleported.free()
 
 func _verify_kakuhen_boundaries_are_fps_independent()->void:
 	var one_frame:=_make_plant(7301,_kakuhen_balance())
@@ -239,8 +314,10 @@ func _verify_kakuhen_boundaries_are_fps_independent()->void:
 		_approx(stepped.age,one_frame.age,.0001)
 		_approx(stepped.diameter_cm,one_frame.diameter_cm,.001)
 		assert(stepped.kakuhen_state==one_frame.kakuhen_state)
-		assert(stepped.kakuhen_boundary_count==3 and stepped.kakuhen_boundary_count==one_frame.kakuhen_boundary_count)
+		assert(stepped.kakuhen_boundary_count==7 and stepped.kakuhen_boundary_count==one_frame.kakuhen_boundary_count)
 		assert(stepped.kakuhen_entry_roll_count==one_frame.kakuhen_entry_roll_count)
+		assert(stepped.kakuhen_germination_roll_count==one_frame.kakuhen_germination_roll_count)
+		assert(stepped.kakuhen_reentry_roll_count==one_frame.kakuhen_reentry_roll_count)
 		assert(stepped.kakuhen_continuation_roll_count==one_frame.kakuhen_continuation_roll_count)
 		stepped.free()
 	one_frame.free()
@@ -291,6 +368,7 @@ func _ready()->void:
 	_verify_new_plant_snapshot()
 	_verify_non_normal_modes_keep_previous_balance()
 	_verify_kakuhen_entry_statistics()
+	_verify_kakuhen_jelly_modifiers()
 	_verify_kakuhen_protection_continuation_and_reentry()
 	_verify_growth_speed_changes_are_continuous()
 	_verify_kakuhen_boundaries_are_fps_independent()
@@ -298,6 +376,7 @@ func _ready()->void:
 	add_child(game)
 	await get_tree().process_frame
 	await get_tree().process_frame
+	_verify_no_production_kakuhen_cues(game)
 	_verify_development_ui(game)
-	print("JELLY_DEV_SMOKE_OK normal_rates=1/2.5/5/8 normal_growth=1.6 non_normal_rates=1/2/3/4 non_normal_growth=1.0 kakuhen_entry=.5 real_mix=70/30 fake_visible=20 continuation=91 interval=10 fps=30/60/120 continuity=true independent=true reset=true")
+	print("JELLY_DEV_SMOKE_OK normal_rates=1/2.5/5/8 normal_growth=1.6 non_normal_rates=1/2/3/4 non_normal_growth=1.0 kakuhen_germination=9.6/3.0/2.4 reentry=3.2/1.0/.8 visible_real_fake=80/20 continuation=70 interval=5 accel=2x real_jelly=.5 hidden_jelly=0 fake_jelly=1 fps=30/60/120 continuity=true independent=true reset=true")
 	get_tree().quit()

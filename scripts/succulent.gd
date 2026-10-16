@@ -150,6 +150,8 @@ var kakuhen_enabled := false
 var kakuhen_state := KakuhenSystemClass.STATE_NONE
 var kakuhen_next_boundary_age := INF
 var kakuhen_entry_roll_count := 0
+var kakuhen_germination_roll_count := 0
+var kakuhen_reentry_roll_count := 0
 var kakuhen_continuation_roll_count := 0
 var kakuhen_boundary_count := 0
 var kakuhen_rng:=RandomNumberGenerator.new()
@@ -171,9 +173,9 @@ func setup(species: Dictionary, seed_value: int, screen_label: Label, _danger: L
 	var balance:=balance_override if not balance_override.is_empty() else JellyBalanceClass.NON_NORMAL
 	jelly_rates_per_second=JellyBalanceClass.rate_values(balance)
 	growth_speed_multiplier=float(balance.get("growth_speed",1.0));growth_rhythm_amplitude=float(balance.get("rhythm_amplitude",GROWTH_RHYTHM_AMPLITUDE))
-	kakuhen_enabled=bool(balance.get("kakuhen_enabled",false));kakuhen_state=KakuhenSystemClass.STATE_NONE;kakuhen_entry_roll_count=0;kakuhen_continuation_roll_count=0;kakuhen_boundary_count=0
+	kakuhen_enabled=bool(balance.get("kakuhen_enabled",false));kakuhen_state=KakuhenSystemClass.STATE_NONE;kakuhen_entry_roll_count=0;kakuhen_germination_roll_count=0;kakuhen_reentry_roll_count=0;kakuhen_continuation_roll_count=0;kakuhen_boundary_count=0
 	kakuhen_next_boundary_age=KakuhenSystemClass.INTERVAL_SECONDS if kakuhen_enabled else INF
-	if kakuhen_enabled:_roll_kakuhen_entry()
+	if kakuhen_enabled:_roll_kakuhen_entry(true)
 	growth_rhythm_period = rng.randf_range(16.0, 28.0)
 	growth_rhythm_phase = rng.randf_range(0.0, TAU)
 	label = screen_label
@@ -568,15 +570,22 @@ func _simulate_growth_segment(segment_seconds:float)->void:
 	diameter_cm=1.6+growth_time*GROWTH_CM_PER_SECOND*growth_rate
 	visual_scale=visual_scale_for_diameter(diameter_cm)
 	_update_visual(segment_seconds)
-	if jelly_checks_enabled and not KakuhenSystemClass.is_real(kakuhen_state):
-		var jelly_probability:=jelly_probability_for_interval(segment_start,segment_seconds,jelly_rates_per_second)
-		if jelly_rng.randf()<jelly_probability and (not jelly_permission.is_valid() or bool(jelly_permission.call())):jelly()
+	if jelly_checks_enabled:
+		var jelly_multiplier:=KakuhenSystemClass.jelly_rate_multiplier(kakuhen_state)
+		if jelly_multiplier>0.0:
+			var jelly_probability:=jelly_probability_for_interval(segment_start,segment_seconds,jelly_rates_per_second,jelly_multiplier)
+			if jelly_rng.randf()<jelly_probability and (not jelly_permission.is_valid() or bool(jelly_permission.call())):jelly()
 
 
-func _roll_kakuhen_entry()->void:
+func _roll_kakuhen_entry(germination:bool)->void:
 	if not kakuhen_enabled:return
 	kakuhen_entry_roll_count+=1
-	kakuhen_state=KakuhenSystemClass.entry_outcome(kakuhen_rng.randf())
+	if germination:
+		kakuhen_germination_roll_count+=1
+		kakuhen_state=KakuhenSystemClass.germination_outcome(kakuhen_rng.randf())
+	else:
+		kakuhen_reentry_roll_count+=1
+		kakuhen_state=KakuhenSystemClass.reentry_outcome(kakuhen_rng.randf())
 
 
 func _advance_kakuhen_boundary()->void:
@@ -584,15 +593,15 @@ func _advance_kakuhen_boundary()->void:
 	if KakuhenSystemClass.is_real(kakuhen_state):
 		kakuhen_continuation_roll_count+=1
 		if kakuhen_rng.randf()>=KakuhenSystemClass.CONTINUE_CHANCE:
-			# A real mode that ends cannot immediately enter again at this same
-			# boundary. STATE_NONE receives its next entry roll ten seconds later.
+			# An ended real mode spends the next full interval in normal state.
 			kakuhen_state=KakuhenSystemClass.STATE_NONE
 		return
 	if kakuhen_state==KakuhenSystemClass.STATE_FAKE_ACCELERATED:
-		# Fake acceleration expires after one interval. It may use that boundary as
-		# its next ordinary entry opportunity, as specified.
+		# Fake acceleration always expires after one interval, without an immediate
+		# re-entry roll. Its next opportunity is five normal seconds later.
 		kakuhen_state=KakuhenSystemClass.STATE_NONE
-	_roll_kakuhen_entry()
+		return
+	_roll_kakuhen_entry(false)
 
 func _integrated_growth_multiplier(start_time: float, end_time: float) -> float:
 	# Integrate 1 + amplitude*sin(omega*t+phase) exactly. The multiplier stays
@@ -612,7 +621,7 @@ static func jelly_stage_index(at_age:float)->int:
 	if at_age<15.0:return 2
 	return 3
 
-static func jelly_probability_for_interval(start_age:float,delta:float,rates_per_second:Array=[]) -> float:
+static func jelly_probability_for_interval(start_age:float,delta:float,rates_per_second:Array=[],rate_multiplier:=1.0) -> float:
 	# Each stage stores a probability per full second. Multiplying the survival
 	# factors for every crossed segment makes the result independent of frame rate.
 	if delta<=0.0:return 0.0
@@ -626,16 +635,16 @@ static func jelly_probability_for_interval(start_age:float,delta:float,rates_per
 		var stage_end:=float(JELLY_STAGE_ENDS[stage]) if stage<3 else end_age
 		var segment_end:=minf(end_age,stage_end)
 		var segment_seconds:=segment_end-cursor
-		var chance_per_second:=clampf(float(rates[stage]),0.0,1.0)
+		var chance_per_second:=clampf(float(rates[stage])*maxf(0.0,rate_multiplier),0.0,1.0)
 		if chance_per_second>=1.0:return 1.0
 		if chance_per_second>0.0:survival*=pow(1.0-chance_per_second,segment_seconds)
 		cursor=segment_end
 	return clampf(1.0-survival,0.0,1.0)
 
-static func jelly_chance_per_second(at_age:float,rates_per_second:Array=[]) -> float:
+static func jelly_chance_per_second(at_age:float,rates_per_second:Array=[],rate_multiplier:=1.0) -> float:
 	var rates:Array=JellyBalanceClass.rate_values(JellyBalanceClass.FORMAL) if rates_per_second.is_empty() else rates_per_second
 	if rates.size()<4:return 0.0
-	return clampf(float(rates[jelly_stage_index(maxf(0.0,at_age))]),0.0,1.0)
+	return clampf(float(rates[jelly_stage_index(maxf(0.0,at_age))])*maxf(0.0,rate_multiplier),0.0,1.0)
 
 func fast_forward_to_diameter(target_cm:float)->void:
 	var clamped_target_cm:=maxf(1.6,target_cm)
