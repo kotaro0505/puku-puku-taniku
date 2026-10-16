@@ -160,9 +160,27 @@ func _assert_standard_continue_button(button: Button, panel: Control, dialogue_t
 	assert(button.get_theme_color("font_color").is_equal_approx(StoryContinueButtonStyleClass.FONT_COLOR))
 	var normal := button.get_theme_stylebox("normal") as StyleBoxFlat
 	assert(normal != null and normal.bg_color.is_equal_approx(StoryContinueButtonStyleClass.BACKGROUND_COLOR))
+	assert(normal.border_color.is_equal_approx(StoryContinueButtonStyleClass.BORDER_COLOR))
 	assert(normal.border_width_left == StoryContinueButtonStyleClass.BORDER_WIDTH)
 	assert(normal.corner_radius_top_left == StoryContinueButtonStyleClass.CORNER_RADIUS)
 	assert(normal.shadow_size == 6 and normal.shadow_offset.is_equal_approx(Vector2(0, 3)))
+	var hover := button.get_theme_stylebox("hover") as StyleBoxFlat
+	var pressed := button.get_theme_stylebox("pressed") as StyleBoxFlat
+	var hover_pressed := button.get_theme_stylebox("hover_pressed") as StyleBoxFlat
+	var disabled := button.get_theme_stylebox("disabled") as StyleBoxFlat
+	assert(hover != null and hover.bg_color.is_equal_approx(StoryContinueButtonStyleClass.BACKGROUND_COLOR))
+	assert(pressed != null and pressed.bg_color.is_equal_approx(StoryContinueButtonStyleClass.PRESSED_BACKGROUND_COLOR))
+	assert(hover_pressed != null and hover_pressed.bg_color.is_equal_approx(StoryContinueButtonStyleClass.PRESSED_BACKGROUND_COLOR))
+	assert(disabled != null and disabled.bg_color.is_equal_approx(StoryContinueButtonStyleClass.BACKGROUND_COLOR))
+	for state_style in [hover, pressed, hover_pressed, disabled]:
+		assert(state_style.border_color.is_equal_approx(StoryContinueButtonStyleClass.BORDER_COLOR))
+		assert(state_style.border_width_left == StoryContinueButtonStyleClass.BORDER_WIDTH)
+	assert(button.get_theme_stylebox("focus") is StyleBoxEmpty)
+	assert(button.focus_mode == Control.FOCUS_ALL)
+	assert(button.action_mode == BaseButton.ACTION_MODE_BUTTON_RELEASE)
+	assert(not button.toggle_mode and not button.keep_pressed_outside)
+	for color_name in ["font_hover_color", "font_pressed_color", "font_hover_pressed_color", "font_focus_color", "font_disabled_color"]:
+		assert(button.get_theme_color(color_name).is_equal_approx(StoryContinueButtonStyleClass.FONT_COLOR))
 	var button_rect := button.get_global_rect()
 	assert(panel.get_global_rect().grow(0.5).encloses(button_rect))
 	if panel_bottom_aligned:
