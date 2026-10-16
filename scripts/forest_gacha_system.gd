@@ -1,6 +1,8 @@
 class_name ForestGachaSystem
 extends RefCounted
 
+const NEW_DRAW_RATE := 0.60
+
 var series_by_id:Dictionary={}
 var species_by_id:Dictionary={}
 var normal_series_ids:Dictionary={"base":true}
@@ -25,16 +27,32 @@ func configure(series_catalog:Array,species_catalog:Array,catalog_progression:Di
 func draw(unlocked_series:Dictionary,discovered:Dictionary,encountered:Dictionary,draw_rng:RandomNumberGenerator,creative_allowed:=true,jurejure_species_unlocked:Dictionary={})->Dictionary:
 	var series_candidates:=eligible_series(creative_allowed,jurejure_species_unlocked)
 	if series_candidates.is_empty():return {}
-	var series_entry:Dictionary=series_candidates[draw_rng.randi_range(0,series_candidates.size()-1)]
+	# Decide NEW versus duplicate before choosing the series/species.  Keeping a
+	# per-series pool preserves the gacha's even series weighting inside the
+	# selected category while making ownership -- not an encounter silhouette --
+	# the only definition of NEW.
+	var new_series_pools:Array[Dictionary]=[]
+	var duplicate_series_pools:Array[Dictionary]=[]
+	for candidate_series in series_candidates:
+		var candidate_series_id:=str(candidate_series.get("series_id",""))
+		var new_species:Array[Dictionary]=[]
+		var duplicate_species:Array[Dictionary]=[]
+		for candidate_species in eligible_species(candidate_series_id,creative_allowed,jurejure_species_unlocked):
+			var candidate_species_id:=str(candidate_species.get("species_id",""))
+			if bool(discovered.get(candidate_species_id,false)):duplicate_species.append(candidate_species)
+			else:new_species.append(candidate_species)
+		if not new_species.is_empty():new_series_pools.append({"series_entry":candidate_series,"species":new_species})
+		if not duplicate_species.is_empty():duplicate_series_pools.append({"series_entry":candidate_series,"species":duplicate_species})
+	var selected_pools:Array[Dictionary]
+	if new_series_pools.is_empty():selected_pools=duplicate_series_pools
+	elif duplicate_series_pools.is_empty():selected_pools=new_series_pools
+	else:selected_pools=new_series_pools if draw_rng.randf()<NEW_DRAW_RATE else duplicate_series_pools
+	if selected_pools.is_empty():return {}
+	var selected_pool:Dictionary=selected_pools[draw_rng.randi_range(0,selected_pools.size()-1)]
+	var series_entry:Dictionary=selected_pool.get("series_entry",{})
 	var series_id:=str(series_entry.get("series_id",""))
 	var series_was_unlocked:=str(series_entry.get("unlock_type","future"))=="default" or bool(unlocked_series.get(series_id,false))
-	var species_candidates:=eligible_species(series_id,creative_allowed,jurejure_species_unlocked)
-	var preferred:Array[Dictionary]=[]
-	for species_entry in species_candidates:
-		var species_id:=str(species_entry.get("species_id",""))
-		var already_seen:=bool(discovered.get(species_id,false)) if series_was_unlocked else bool(encountered.get(species_id,false))
-		if not already_seen:preferred.append(species_entry)
-	if not preferred.is_empty():species_candidates=preferred
+	var species_candidates:Array=selected_pool.get("species",[])
 	if species_candidates.is_empty():return {}
 	var species_entry:Dictionary=species_candidates[draw_rng.randi_range(0,species_candidates.size()-1)]
 	return {

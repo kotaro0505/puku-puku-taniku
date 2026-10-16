@@ -43,24 +43,22 @@ func _test_language_and_symbol_safety(game)->void:
 	assert(Localizer.text("ja","awakening_sow")=="たねがまだ少し残ってる。\nここにまいてみよう。")
 	assert(Localizer.text("ja","play_normal_seed_round")=="たねをまく\n1ぷくコイン消費")
 	assert(Localizer.text("ja","series_seed_remaining")=="シリーズのたね\n残り %d粒")
-	assert(Localizer.text("ja","seed_mystery_detail").begins_with("謎のたねパック"))
 	assert(Localizer.text("ja","post_ending_greenhouse_girl_4")=="これからも、いっぱいたねまこう！")
 	assert(Localizer.text("hiragana","post_ending_greenhouse_girl_4")=="これからも、いっぱい たね まこう！")
 	assert(Localizer.text("hiragana","awakening_sow").contains("まいて"))
 	assert(Localizer.text("hiragana","play_normal_seed_round")=="たねを まく\n1ぷくこいん しょうひ")
 	assert(Localizer.text("en","play_normal_seed_round")=="Plant seeds\nUse 1 Puku Coin")
 	var major_runtime_keys:=[
-		"habitat_intro_1","research_reward_title","shop_rescue_offer","shop_chatter_touch",
+		"habitat_intro_1","shop_rescue_offer","shop_chatter_touch",
 		"shop_season_new_year","old_page_intro_1","volume_intro_1","bustamante_gift","pinwheel_intro_1",
-		"armadillo_idle_1","research_intro_1","research_return_offer","restore_offer","restore_success",
-		"research_status_sprouted","research_status_first","research_milestone_catalog","research_milestone_species",
-		"research_transfer","audio_se_on","story_colorata_1","story_trio_1","awakening_memory","habitat_return_panda","initial_seed_stock_received","tutorial_normal_pre_sow","seed_pod_tutorial_received","forest_gacha_intro_system","fantasy_first_girl","fantasy_six_girl_2","act3_mouse_realizes","habitat_crisis_armadillo_1","jelly_float",
+		"armadillo_idle_1","restore_offer","restore_success",
+		"audio_se_on","story_colorata_1","story_trio_1","awakening_memory","habitat_return_panda","initial_seed_stock_received","tutorial_normal_pre_sow","seed_pod_tutorial_received","forest_gacha_intro_system","fantasy_first_girl","fantasy_six_girl_2","act3_mouse_realizes","habitat_crisis_armadillo_1","jelly_float",
 		"jurejure_after_encounter_panda","jurejure_after_encounter_armadillo","jurejure_exploit_mouse_treasure","habitat_exploit_start_panda","habitat_exploit_midpoint_panda","habitat_exploit_concern_girl",
 		"act3_exploitation_battle_intro_panda","act3_exploitation_battle_intro_mouse_2","jurejure_species_first_girl_2","habitat_crisis_girl","jurejure_exploit_touch_mouse_more","jurejure_exploit_touch_panda_tool","jurejure_exploit_touch_mouse_battle","jurejure_exploit_touch_peccary_more","jurejure_exploit_touch_girl_overwork","jurejure_exploit_touch_peccary_fine","jurejure_exploit_touch_skunk_price","jurejure_exploit_touch_armadillo_greed","jurejure_exploit_touch_skunk_obvious",
 		"habitat_exploit_visit_early_panda_1","habitat_exploit_visit_early_girl_1","habitat_exploit_visit_early_armadillo","habitat_exploit_visit_early_girl_2","habitat_exploit_visit_early_panda_2","habitat_exploit_visit_late_panda","habitat_exploit_visit_late_armadillo","habitat_exploit_visit_late_girl","habitat_exploit_midpoint_panda_1","habitat_exploit_midpoint_girl","habitat_exploit_midpoint_mouse_1","habitat_exploit_midpoint_peccary","habitat_exploit_midpoint_armadillo","habitat_exploit_midpoint_mouse_2","post_crisis_greenhouse_panda_1","post_crisis_greenhouse_armadillo","post_crisis_greenhouse_girl","post_crisis_greenhouse_panda_2"
 	]
-	var numeric_format_keys:=["research_status_first","research_transfer"]
-	var string_format_keys:=["restore_success","research_milestone_species","story_trio_1"]
+	var numeric_format_keys:=[]
+	var string_format_keys:=["restore_success","story_trio_1"]
 	for language in ["ja","hiragana","en"]:
 		assert(Localizer.normalize_language(language)==language)
 		for key in major_runtime_keys:

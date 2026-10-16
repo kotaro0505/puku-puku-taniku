@@ -53,8 +53,13 @@ func _test_catalog_and_runtime_retirement(game: Node) -> void:
 	assert(not game.has_method("_assign_mystery_route"))
 	assert(not game.has_method("_grant_mystery_route_reward"))
 	assert(not game.has_method("_start_mystery_route_dialog"))
+	for removed_method in ["_add_habitat_seed", "_collect_habitat_seed", "_accept_armadillo_research", "_claim_research_catalog_reward", "_mystery_seed_pack_unlocked"]:
+		assert(not game.has_method(removed_method))
 	assert(game.find_child("SecretGachaButton", true, false) == null)
 	assert(game.find_child("SecretGachaUI", true, false) == null)
+	assert(game.find_child("ResearchRewardTitle", true, false) == null)
+	assert(not game.shop_product_tabs.has("mystery"))
+	assert(game._select_species_for_seed("mystery").is_empty())
 	assert(game.forest_gacha_system != null)
 	assert(game.forest_gacha_ui != null)
 	assert(FileAccess.file_exists("res://assets/forest_gacha/temporary-dial.png"))
@@ -107,6 +112,18 @@ func _test_legacy_save_migration(game: Node) -> void:
 	legacy_payload["mystery_route_assignments"] = {"research_25": RETIRED_IDS[0]}
 	legacy_payload["mystery_route_completed"] = {"research_25": true}
 	legacy_payload["mystery_route_dialog_seen"] = {"research_25": true}
+	legacy_payload["habitat_mystery_seeds_pending"] = 3
+	legacy_payload["mystery_seed_count"] = 9
+	legacy_payload["armadillo_research_total"] = 45
+	legacy_payload["armadillo_research_rewards"] = {"8": true, "45": true}
+	legacy_payload["armadillo_research_intro_seen"] = true
+	legacy_payload["research_catalog_reward_pending"] = true
+	legacy_payload["mystery_seed_bags"] = 2
+	legacy_payload["mystery_seed_pack_unlocked"] = true
+	legacy_payload["habitat_seed_date"] = "2026-10-16"
+	legacy_payload["habitat_seeds_collected"] = 3
+	legacy_payload["mystery_items_acquired"] = true
+	legacy_payload["mystery_catalog_tutorial_complete"] = true
 	legacy_payload["story_progression_state"] = {
 		"version": 8,
 		"secret_gacha_install_seen": true,
@@ -117,6 +134,8 @@ func _test_legacy_save_migration(game: Node) -> void:
 		legacy_dictionary[RETIRED_IDS[0]] = 91.0 if dictionary_key == "bests" else true
 		legacy_dictionary["colorata"] = 42.0 if dictionary_key == "bests" else true
 		legacy_payload[dictionary_key] = legacy_dictionary
+	legacy_payload["discovered"]["golden_laui"] = true
+	legacy_payload["species_get_counts"]["golden_laui"] = 2
 	legacy_payload["catalog_cover_species"] = {"neon": RETIRED_IDS[0], "base": "colorata"}
 	legacy_payload["pending_habitat_species"] = [RETIRED_IDS[0], "colorata"]
 	legacy_payload["pending_round_new_species_ids"] = [RETIRED_IDS[1], "lutea"]
@@ -151,6 +170,8 @@ func _test_legacy_save_migration(game: Node) -> void:
 			assert(not state_dictionary.has(species_id))
 	assert(bool(game.discovered.get("colorata", false)))
 	assert(float(game.bests.get("colorata", 0.0)) == 42.0)
+	assert(bool(game.discovered.get("golden_laui", false)) and game._species_get_count("golden_laui") == 2)
+	assert(game.mystery_items_acquired and game.mystery_catalog_tutorial_complete)
 	assert(str(game.catalog_cover_species.get("base", "")) == "colorata")
 	assert(not game.catalog_cover_species.has("neon"))
 	assert(game.pending_habitat_species == ["colorata"])
@@ -173,8 +194,9 @@ func _test_legacy_save_migration(game: Node) -> void:
 	var migrated_payload = JSON.parse_string(FileAccess.get_file_as_string(save_path))
 	assert(migrated_payload is Dictionary)
 	assert(int(migrated_payload.get("retired_content_version", 0)) == game.RETIRED_CONTENT_VERSION)
-	for retired_key in ["secret_gacha_active", "secret_gacha_draws_remaining", "secret_gacha_last_roll_play_count", "mystery_route_assignments", "mystery_route_completed", "mystery_route_dialog_seen"]:
+	for retired_key in ["secret_gacha_active", "secret_gacha_draws_remaining", "secret_gacha_last_roll_play_count", "mystery_route_assignments", "mystery_route_completed", "mystery_route_dialog_seen", "habitat_mystery_seeds_pending", "mystery_seed_count", "armadillo_research_total", "armadillo_research_rewards", "armadillo_research_intro_seen", "research_catalog_reward_pending", "mystery_seed_bags", "mystery_seed_pack_unlocked", "habitat_seed_date", "habitat_seeds_collected"]:
 		assert(not migrated_payload.has(retired_key))
+	assert(bool(migrated_payload.get("mystery_items_acquired", false)) and bool(migrated_payload.get("mystery_catalog_tutorial_complete", false)))
 	var migrated_story: Dictionary = migrated_payload.get("story_progression_state", {})
 	assert(not migrated_story.has("secret_gacha_unlocked"))
 	assert(not migrated_story.has("secret_gacha_install_seen"))

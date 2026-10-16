@@ -189,7 +189,7 @@ func _test_catalog_and_recipes(game) -> void:
 		assert(Localizer.species_name("hiragana", entry) == str(entry.get("name_hiragana", "")))
 		assert(Localizer.species_name("en", entry) == str(entry.get("name_en", "")))
 		assert(bool(entry.get("fusion_only_until_discovered", false)))
-		assert(bool(entry.get("mystery_pack_eligible", false)))
+		assert(not entry.has("mystery_pack_eligible"))
 		var image_path := str(entry.get("image_path", ""))
 		assert(image_path == "res://assets/catalog/hybrid/%s.png" % species_id)
 		assert(FileAccess.file_exists(image_path) and ResourceLoader.exists(image_path))
@@ -805,7 +805,7 @@ func _test_game_flow(game) -> void:
 		known_ids[str(entry.get("species_id", ""))] = true
 	assert(known_ids.has(hybrid_id))
 	assert(game._seed_new_species_blocked("hyb_gummy_glow"))
-	assert(str(game._select_species_for_seed("mystery").get("species_id", "")) == hybrid_id)
+	assert(game._select_species_for_seed("mystery").is_empty())
 	var hybrid_resolution: Dictionary = game.fusion_system.resolve(hybrid_id, glow_id)
 	assert(str(hybrid_resolution.get("result_species_id", "")) == "hyb_gummy_glow")
 	game._save()

@@ -6,7 +6,7 @@ const ForestGachaSystemClass=preload("res://scripts/forest_gacha_system.gd")
 func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
-	game._reset_progression_state();game.opening_story_complete=true;game.intro_story_complete=true;game.first_colorata_confirmed=true;game.trio_originals_confirmed=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.habitat_arrival_started=true;game.habitat_awakened=true;game.habitat_awakening_event_complete=true;game.habitat_tutorial_started=true;game.habitat_tutorial_complete=true;game.seed_shop_open=true;game.panda_beacon_unlocked=true;game.panda_beacon_count=1;game.puku_gauge_intro_complete=true;game.total_play_count=3;game.puku_points=20;game.current_mode="greenhouse";game._update_play_ui()
+	game._reset_progression_state();game.opening_story_complete=true;game.intro_story_complete=true;game.first_colorata_confirmed=true;game.trio_originals_confirmed=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.habitat_arrival_started=true;game.habitat_awakened=true;game.habitat_awakening_event_complete=true;game.habitat_tutorial_started=true;game.habitat_tutorial_complete=true;game.seed_shop_open=true;game.panda_beacon_unlocked=true;game.panda_beacon_count=1;game.puku_gauge_intro_complete=true;game.total_play_count=3;game.puku_points=20;game.current_mode="greenhouse";game.story_progression_state["arrangement_unlocked"]=true;game.story_progression_state["arrangement_intro_seen"]=true;game._update_play_ui()
 	_test_assets_and_routes(game)
 	_test_removed_status_text(game)
 	_test_draw_rules(game)
@@ -14,13 +14,14 @@ func _ready()->void:
 	await _test_spin_capsule_and_reveal(game)
 	_test_encounter_save_and_unlock(game)
 	game._reset_progression_state();game.queue_free()
-	print("FOREST_GACHA_SMOKE_OK routes=2 series=uniform first_draw=all_eligible jurejure=pool_all_10 status_text=hidden cards=species_then_catalog encounter=save+autoregister checker=backed")
+	print("FOREST_GACHA_SMOKE_OK routes=2 series=uniform new=60 duplicate=40 fallbacks=2 jurejure=pool_all_10 status_text=hidden")
 	get_tree().quit()
 
 func _test_assets_and_routes(game)->void:
-	assert(game.forest_gacha_button!=null and game.forest_gacha_button.size==Vector2(153,67))
+	assert(game.forest_gacha_button!=null and game.forest_gacha_button.size==Vector2(153,55))
 	assert(is_equal_approx(game.forest_gacha_button.position.y,326.0))
 	assert(is_equal_approx(game.forest_gacha_button.position.y-(game.shop_button.position.y+game.shop_button.size.y),9.0))
+	assert(is_equal_approx(game.fusion_lab_button.position.y-(game.forest_gacha_button.position.y+game.forest_gacha_button.size.y),9.0))
 	assert(game.forest_gacha_button.text=="ガチャ" and "ぷく" not in game.forest_gacha_button.text)
 	assert(Localizer.text("ja","main_forest_gacha")=="ガチャ")
 	assert(game.FOREST_GACHA_SPIN_COST==1 and game.forest_gacha_ui.SPIN_COST_PUKU==1 and Localizer.text("ja","gacha_spin")=="1ぷくコインで回す")
@@ -83,9 +84,25 @@ func _test_draw_rules(game)->void:
 		var probe:=RandomNumberGenerator.new();probe.seed=seed_value
 		if str(game.forest_gacha_system.draw(unlocked,known,encountered,probe).get("source",""))=="locked":locked_available_on_first_draw=true;break
 	assert(locked_available_on_first_draw)
-	var all_known:Dictionary={};for species_entry in game.forest_gacha_system.eligible_species("base"):all_known[str(species_entry.species_id)]=true
-	all_known.erase("lutea");var preferred:Dictionary=game.forest_gacha_system.draw(unlocked,all_known,{},test_rng,false);assert(str(preferred.species_id)=="lutea")
+	_test_new_duplicate_draw_rate()
 	_test_uniform_ten_series_weights()
+
+func _test_new_duplicate_draw_rate()->void:
+	var system=ForestGachaSystemClass.new()
+	var series_catalog:Array=[{"series_id":"mix","display_name":"mix","unlock_type":"future","species_ids":["new_a","new_b","owned_a","owned_b"]}]
+	var species_catalog:Array=[{"species_id":"new_a"},{"species_id":"new_b"},{"species_id":"owned_a"},{"species_id":"owned_b"}]
+	system.configure(series_catalog,species_catalog,{"normal_series":[{"series_id":"mix"}]})
+	var discovered:Dictionary={"owned_a":true,"owned_b":true};var test_rng:=RandomNumberGenerator.new();test_rng.seed=20261016
+	var new_count:=0;var duplicate_count:=0
+	for sample_index in range(20000):
+		var result:Dictionary=system.draw({"mix":true},discovered,{},test_rng)
+		if bool(result.get("was_discovered",false)):duplicate_count+=1
+		else:new_count+=1
+	var new_ratio:=float(new_count)/20000.0
+	assert(new_ratio>.58 and new_ratio<.62 and new_count+duplicate_count==20000)
+	for sample_index in range(100):assert(not bool(system.draw({"mix":true},{},{},test_rng).get("was_discovered",true)))
+	var all_discovered:Dictionary={"new_a":true,"new_b":true,"owned_a":true,"owned_b":true}
+	for sample_index in range(100):assert(bool(system.draw({"mix":true},all_discovered,{},test_rng).get("was_discovered",false)))
 
 func _test_uniform_ten_series_weights()->void:
 	var system=ForestGachaSystemClass.new();var series_catalog:Array=[];var species_catalog:Array=[];var normal_series:Array=[]

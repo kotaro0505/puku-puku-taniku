@@ -5,7 +5,7 @@ func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
 	game._finish_opening();game.audio_manager.apply_settings({"bgm_enabled":false,"se_enabled":false});game.habitat_texture_mode=mode
-	game.intro_story_complete=true;game.habitat_unlocked=true;game.current_mode="greenhouse";game._clear_habitat_items();game.pending_habitat_species.clear();game.habitat_mystery_seeds_pending=0
+	game.intro_story_complete=true;game.habitat_unlocked=true;game.current_mode="greenhouse";game._clear_habitat_items();game.pending_habitat_species.clear()
 	game.discovered.clear();game.bests.clear()
 	for entry in game.catalog_species:
 		if str(entry.get("habitat_image_path",""))!="":game.discovered[str(entry.species_id)]=true;game.bests[str(entry.species_id)]=60.0

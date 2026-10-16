@@ -140,7 +140,6 @@ func _test_three_act_sequence(game: Node) -> void:
 	game.bests["colorata"] = 150.0
 	game.total_play_count = 20
 	game.formal_play_count = 20
-	game.armadillo_research_total = 30
 	game._update_main_story_progress(false)
 	assert(game.main_story_stage == StoryProgressionClass.ACT_1)
 	assert(not game.act2_unlocked and not game.forest_gacha_unlocked)
@@ -576,7 +575,6 @@ func _test_retired_unlock_conditions(game: Node) -> void:
 	game.total_play_count = 13
 	game.normal_play_count = 13
 	game.formal_play_count = 13
-	game.armadillo_research_total = 25
 	game._evaluate_unlock_rules("harvest_size", 100.0)
 	assert(not game._evaluate_best_spawn_unlocks())
 	game._queue_armadillo_progress_event()
@@ -617,7 +615,6 @@ func _test_legacy_three_act_migration(game: Node) -> void:
 	game.normal_seed_bags = 6
 	game.volume_seed_bags = 2
 	game.premium_seed_bags = 1
-	game.mystery_seed_bags = 3
 	game.bests = {"colorata": 100.0, "laui": 62.0}
 	game.discovered = {"colorata": true, "hyalina_san_luis_de_la_paz": true, "purpusorum": true, "pinwheel": true, "tovarensis_tovar": true, "transparent_succulent": true}
 	game.species_get_counts = {"transparent_succulent": 1}
@@ -647,6 +644,7 @@ func _test_legacy_three_act_migration(game: Node) -> void:
 	var payload = JSON.parse_string(FileAccess.get_file_as_string(active_save_path))
 	assert(payload is Dictionary)
 	payload["progression_version"] = 24
+	payload["mystery_seed_bags"] = 3
 	for key in ["act2_unlocked", "forest_gacha_unlocked", "forest_gacha_intro_seen", "fantasy_first_discovery_seen", "fantasy_realization_seen", "act3_unlocked", "act3_intro_pending", "act3_intro_seen", "jurejure_pool_unlocked", "jurejure_species_unlocked", "jurejure_species_first_seen", "habitat_crisis_pending", "habitat_crisis_started", "finale_complete"]:
 		payload.erase(key)
 	var legacy_story_state: Dictionary = payload.get("story_progression_state", {})
@@ -669,7 +667,7 @@ func _test_legacy_three_act_migration(game: Node) -> void:
 	assert(game._unique_act2_species_get_count() == 25)
 	assert(game.act3_unlocked and game.act3_intro_pending and not game.act3_intro_seen)
 	assert(game.scripted_dialog_kind.is_empty())
-	assert(game.normal_seed_bags == 6 and game.volume_seed_bags == 2 and game.premium_seed_bags == 1 and game.mystery_seed_bags == 3)
+	assert(game.normal_seed_bags == 6 and game.volume_seed_bags == 2 and game.premium_seed_bags == 1)
 	assert(bool(game.discovered.get("pinwheel", false)) and game._species_get_count("pinwheel") == 1)
 	assert(bool(game.discovered.get("transparent_succulent", false)) and game._species_get_count("transparent_succulent") == 1)
 	assert(bool(game.habitat_returned_species.get("laui", false)) and bool(game.habitat_returned_species.get("transparent_succulent", false)))

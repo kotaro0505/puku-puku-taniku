@@ -92,7 +92,7 @@ func _ready()->void:
 	game.arrangement_ui._open_viewer({"arrangement_id":"gesture_viewer","name":"完成作品","pot_id":"shallow_terracotta","completed":true,"plants":[]})
 	assert(game.arrangement_ui.is_viewer_active() and game.arrangement_ui.viewer_page.visible and not game._greenhouse_area_navigation_available() and not game.arrangement_ui.is_navigation_hint_safe())
 	var viewer_press:=InputEventScreenTouch.new();viewer_press.index=0;viewer_press.position=Vector2(520,450);viewer_press.pressed=true;game.arrangement_ui._on_viewer_world_scroll_input(viewer_press)
-	game._on_arrangement_world_scroll_input(viewer_press);assert(not game.greenhouse_area_drag_tracking and not game.arrangement_transitioning)
+	game._input(viewer_press);assert(not game.greenhouse_area_drag_tracking and not game.arrangement_transitioning)
 	var artwork_start:Vector2=game.arrangement_ui.viewer_artwork_root.position
 	var preview_artwork_scale:float=game.arrangement_ui.viewer_artwork_canvas.scale.x
 	var viewer_mouse_press:=InputEventMouseButton.new();viewer_mouse_press.button_index=MOUSE_BUTTON_LEFT;viewer_mouse_press.pressed=true;viewer_mouse_press.position=Vector2(260,300);game.arrangement_ui._on_viewer_canvas_gui_input(viewer_mouse_press)
@@ -100,6 +100,19 @@ func _ready()->void:
 	var viewer_mouse_release:=InputEventMouseButton.new();viewer_mouse_release.button_index=MOUSE_BUTTON_LEFT;viewer_mouse_release.pressed=false;viewer_mouse_release.position=viewer_motion.position;game.arrangement_ui._on_viewer_canvas_gui_input(viewer_mouse_release)
 	assert(game.arrangement_ui.viewer_page.visible and game.arrangement_ui.viewer_artwork_root.position.is_equal_approx(artwork_start+Vector2(40,30)/preview_artwork_scale) and not game.greenhouse_area_drag_tracking and not game.arrangement_transitioning)
 	game.arrangement_ui._return_from_viewer();assert(game.arrangement_ui.home_page.visible and game._greenhouse_area_navigation_available())
+	# The home-to-greenhouse gesture is observed at viewport level so the large
+	# vertical pot ScrollContainer cannot limit it to the bottom strip.  Verify
+	# top, center, pot-list, and bottom starts without consuming taps/verticals.
+	for swipe_start in [Vector2(90,105),Vector2(90,330),Vector2(90,690),Vector2(90,965)]:
+		var home_press:=InputEventScreenTouch.new();home_press.index=0;home_press.position=swipe_start;home_press.pressed=true;game._input(home_press)
+		assert(game.greenhouse_area_drag_tracking and game.greenhouse_area_drag_from_arrangement)
+		var home_drag:=InputEventScreenDrag.new();home_drag.index=0;home_drag.position=swipe_start+Vector2(-70,2);home_drag.relative=Vector2(-70,2);game._input(home_drag)
+		assert(game.greenhouse_area_drag_started and game.arrangement_transitioning)
+		game._cancel_greenhouse_area_drag(false);game.arrangement_transitioning=false;game.arrangement_transition_x=expected_arrangement_transition;game.arrangement_ui.visible=true;game.arrangement_ui.open_home();game._update_greenhouse_pan();game._update_play_ui()
+	var vertical_press:=InputEventScreenTouch.new();vertical_press.index=0;vertical_press.position=Vector2(288,500);vertical_press.pressed=true;game._input(vertical_press)
+	var vertical_drag:=InputEventScreenDrag.new();vertical_drag.index=0;vertical_drag.position=Vector2(291,580);vertical_drag.relative=Vector2(3,80);game._input(vertical_drag)
+	assert(not game.greenhouse_area_drag_tracking and not game.arrangement_transitioning and game.arrangement_ui.home_page.visible)
+	assert(game.arrangement_ui.home_pot_scroll.vertical_scroll_mode==ScrollContainer.SCROLL_MODE_AUTO and game.arrangement_ui.home_saved_button.pressed.get_connections().size()>0)
 
 	game._begin_greenhouse_area_drag(Vector2(520,450),true)
 	game._update_greenhouse_area_drag(Vector2(520-expected_arrangement_transition*.20,450))

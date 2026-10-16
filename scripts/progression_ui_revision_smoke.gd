@@ -140,13 +140,13 @@ func _test_shop_chatter_contract(game: Node) -> void:
 	assert(Localizer.text("ja", "shop_chatter_living_jewel") == "多肉はまさに生きる宝石だよね。")
 	assert(Localizer.text("ja", "shop_chatter_puku_help") == "もし、ぷくコインがなくなったら僕に声かけてよ！")
 	for locale in Localizer.SUPPORTED_LANGUAGES:
+		assert(not Localizer.text(locale, "shop_preparing_arrangement").is_empty())
 		for chatter_key in game.SHOP_CHATTER_KEYS:
 			assert(not Localizer.text(locale, chatter_key).is_empty())
 
 
 func _test_habitat_attention_glow(game: Node) -> void:
 	game.habitat_old_catalog_page_pending = false
-	game.habitat_mystery_seeds_pending = 3
 	game.jurejure_waiting_for_seed_pod_reward = true
 	game.story_progression_state["exploitation_started"] = false
 	game._update_habitat_button_glow()
