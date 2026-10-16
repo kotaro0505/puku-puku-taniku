@@ -176,17 +176,17 @@ const TEXT := {
 		"habitat_crisis_departure_panda": "……なんだか原生地の様子が気になる。ちょっと見に行こう！",
 		"restoration_jurejure_hurry": "モタモタしてないで早く多肉を持ってくるんだチュー！",
 		"jurejure_post_ending_mouse_sprout": "こら！そこ踏むなチュー！さっき芽が出たばっかりだチュー！",
-		"jurejure_post_ending_mouse_water": "水やりすぎるなチュー！多肉は甘やかしすぎ禁止だチュー！",
-		"jurejure_post_ending_mouse_patrol": "今日は異常なしチュー！……たぶんチュー！",
-		"jurejure_post_ending_peccary_patrol": "この辺はオレが見回ってるッペ！勝手に荒らすなッペ！",
-		"jurejure_post_ending_peccary_chateaubriand": "シャトーブリアンはまだ生えてこないッペ……。気長に待つッペ。",
+		"jurejure_post_ending_mouse_water": "怪しいやつがいないかパトロールしてるんだチュー！",
+		"jurejure_post_ending_mouse_patrol": "今日は異常なしチュー！",
+		"jurejure_post_ending_peccary_patrol": "シャトーブリアンの赤ちゃんが生えて来たッペ！",
+		"jurejure_post_ending_peccary_chateaubriand": "バーガー多肉はまだ生えてこないッペ……。気長に待つッペ。",
 		"jurejure_post_ending_peccary_growth": "このちっちゃいやつ、昨日より大きくなってるッペ！",
-		"jurejure_post_ending_skunk_value": "原生地の価値、前より上がってるッスカ！大事にするッス！",
-		"jurejure_post_ending_skunk_fee": "原生地保全協力金、今なら300円ッスカ！",
-		"jurejure_post_ending_skunk_land": "この土地、売ったらいくらになるんスカね……。いや、売らないッスカ！",
-		"jurejure_post_ending_mouse_restricted": "こっちは立入禁止だチュー！オレが決めたチュー！",
-		"jurejure_post_ending_peccary_sprouts": "今日は新しい芽を3つ見つけたッペ！オレの方が詳しいッペ！",
-		"jurejure_post_ending_skunk_club": "ジュレジュレ団自然保護部、会員募集中ッスカ！入会金は相談に乗るッス！",
+		"jurejure_post_ending_skunk_value": "あ、ジュレジュレ団に入る気になったんスカ？",
+		"jurejure_post_ending_skunk_fee": "原生地保全協力金、一口1000万円からッス！",
+		"jurejure_post_ending_skunk_land": "ダンボール生活も慣れたらクセになるッス！",
+		"jurejure_post_ending_mouse_restricted": "怪しいやつ！\nなんだ…アルマジロ君か。",
+		"jurejure_post_ending_peccary_sprouts": "お腹空いたッペ！",
+		"jurejure_post_ending_skunk_club": "原生地保護団体、ジュレジュレ団参上ッス！",
 		"jurejure_exploit_touch_mouse_more": "もっとすごいのを出させるチュー！",
 		"jurejure_exploit_touch_panda_tool": "原生地は道具じゃない！",
 		"jurejure_exploit_touch_mouse_battle": "邪魔するなら勝負だチュー！",
@@ -633,7 +633,7 @@ const TEXT := {
 		,"arrangement_default_name": "寄せ植え %d"
 		,"shop_rescue_offer": "たねなくなっちゃった？\n少し分けてあげるよ！"
 		,"shop_rescue_success": "はい、どうぞ！大事にまいてみてね。"
-		,"shop_puku_rescue_offer": "ぷくが足りないの？\nお店を手伝ってくれたら、1ぷくコイン渡すよ！"
+		,"shop_puku_rescue_offer": "ぷくコインが足りないの？\nお店を手伝ってくれたら、1ぷくコイン渡すよ！"
 		,"shop_puku_rescue_success": "お手伝いありがとう！\n1ぷくコインを受け取ってね。"
 		,"shop_help_action": "お手伝いする"
 		,"shop_chatter_today": "今日はどんな多肉に出会えるかな。"
@@ -665,9 +665,13 @@ const TEXT := {
 		,"pinwheel_intro_1": "古い資料を調べていたら、育て方の手がかりを見つけたんだ。"
 		,"pinwheel_intro_2": "ぼくたちのたねで試してみたら、また一株育てられたよ。"
 		,"pinwheel_intro_3": "図鑑で照合すると、ピンウィールという原種らしい。\nきみに託すよ。"
-		,"armadillo_idle_1": "また会えたね。ゆっくりしていって！"
-		,"armadillo_idle_2": "今日の多肉も元気そうだね。"
-		,"armadillo_idle_3": "土の匂いって落ち着くよね。"
+		,"armadillo_idle_1": "原生地にお還しした品種は原生地で\n自然に増えてるみたいだ。"
+		,"armadillo_idle_2": "原生地からもらった種のさやと図鑑、\n大切にしよう。"
+		,"armadillo_idle_3": "絶滅したはずの多肉植物が見れるなんて\nすごいことだよね。"
+		,"armadillo_idle_4": "新しく発見した品種はぼくが原生地に\nお還しておくからね。"
+		,"armadillo_idle_5_1": "多肉の葉をもいで土に挿しておくと\n根と芽が出て増えるんだ。"
+		,"armadillo_idle_5_2": "「葉挿し」って言うんだよ。"
+		,"catalog_first_new_armadillo": "新しく発見した品種はぼくが原生地に\nお還しておくからね。"
 		,"restore_offer": "この記録は、不思議な図鑑へ自動で反映されるよ。"
 		,"restore_shortage": "この記録は、不思議な図鑑へ自動で反映されるよ。"
 		,"restore_success": "復元できたよ！\nこれは『%s』のページだったんだ。\nまだ見つけていない品種も、影から少しずつ調べられそうだね。"
@@ -867,17 +871,17 @@ const TEXT := {
 		"habitat_crisis_departure_panda": "……なんだか げんせいちの ようすが きになる。ちょっと みに いこう！",
 		"restoration_jurejure_hurry": "もたもたしてないで はやく たにくを もってくるんだチュー！",
 		"jurejure_post_ending_mouse_sprout": "こら！そこ ふむなチュー！さっき めが でたばっかりだチュー！",
-		"jurejure_post_ending_mouse_water": "みず やりすぎるなチュー！たにくは あまやかしすぎ きんしだチュー！",
-		"jurejure_post_ending_mouse_patrol": "きょうは いじょうなしチュー！……たぶんチュー！",
-		"jurejure_post_ending_peccary_patrol": "このへんは おれが みまわってるッペ！かってに あらすなッペ！",
-		"jurejure_post_ending_peccary_chateaubriand": "しゃとーぶりあんは まだ はえてこないッペ……。きながに まつッペ。",
+		"jurejure_post_ending_mouse_water": "あやしい やつが いないか ぱとろーるしてるんだチュー！",
+		"jurejure_post_ending_mouse_patrol": "きょうは いじょうなしチュー！",
+		"jurejure_post_ending_peccary_patrol": "しゃとーぶりあんの あかちゃんが はえてきたッペ！",
+		"jurejure_post_ending_peccary_chateaubriand": "ばーがーたにくは まだ はえてこないッペ……。きながに まつッペ。",
 		"jurejure_post_ending_peccary_growth": "この ちっちゃいやつ、きのうより おおきくなってるッペ！",
-		"jurejure_post_ending_skunk_value": "げんせいちの かち、まえより あがってるッスカ！だいじに するッス！",
-		"jurejure_post_ending_skunk_fee": "げんせいち ほぜん きょうりょくきん、いまなら 300えんッスカ！",
-		"jurejure_post_ending_skunk_land": "この とち、うったら いくらに なるんスカね……。いや、うらないッスカ！",
-		"jurejure_post_ending_mouse_restricted": "こっちは たちいりきんしだチュー！おれが きめたチュー！",
-		"jurejure_post_ending_peccary_sprouts": "きょうは あたらしい めを 3つ みつけたッペ！おれの ほうが くわしいッペ！",
-		"jurejure_post_ending_skunk_club": "じゅれじゅれだん しぜんほごぶ、かいいん ぼしゅうちゅうッスカ！にゅうかいきんは そうだんに のるッス！",
+		"jurejure_post_ending_skunk_value": "あ、じゅれじゅれだんに はいる きに なったんスカ？",
+		"jurejure_post_ending_skunk_fee": "げんせいち ほぜん きょうりょくきん、ひとくち 1000まんえんからッス！",
+		"jurejure_post_ending_skunk_land": "だんぼーる せいかつも なれたら くせに なるッス！",
+		"jurejure_post_ending_mouse_restricted": "あやしい やつ！\nなんだ…あるまじろくんか。",
+		"jurejure_post_ending_peccary_sprouts": "おなか すいたッペ！",
+		"jurejure_post_ending_skunk_club": "げんせいち ほごだんたい、じゅれじゅれだん さんじょうッス！",
 		"jurejure_exploit_touch_mouse_more": "もっと すごいのを ださせるチュー！",
 		"jurejure_exploit_touch_panda_tool": "げんせいちは どうぐじゃ ない！",
 		"jurejure_exploit_touch_mouse_battle": "じゃまするなら しょうぶだチュー！",
@@ -1324,7 +1328,7 @@ const TEXT := {
 		,"arrangement_default_name": "よせうえ %d"
 		,"shop_rescue_offer": "たね なくなっちゃった？\nすこし わけてあげるよ！"
 		,"shop_rescue_success": "はい、どうぞ！だいじに まいてみてね。"
-		,"shop_puku_rescue_offer": "ぷくが たりないの？\nおみせを てつだってくれたら、1ぷくこいん わたすよ！"
+		,"shop_puku_rescue_offer": "ぷくこいんが たりないの？\nおみせを てつだってくれたら、1ぷくこいん わたすよ！"
 		,"shop_puku_rescue_success": "おてつだい ありがとう！\n1ぷくこいんを うけとってね。"
 		,"shop_help_action": "おてつだいする"
 		,"shop_chatter_today": "きょうは どんな たにくに であえるかな。"
@@ -1356,9 +1360,13 @@ const TEXT := {
 		,"pinwheel_intro_1": "ふるい しりょうを しらべていたら、そだてかたの てがかりを みつけたんだ。"
 		,"pinwheel_intro_2": "ぼくたちの たねで ためしたら、また ひとかぶ そだてられたよ。"
 		,"pinwheel_intro_3": "ずかんで しらべると、ぴんうぃーるという げんしゅらしい。\nきみに あずけるよ。"
-		,"armadillo_idle_1": "また あえたね。ゆっくり していって！"
-		,"armadillo_idle_2": "きょうの たにくも げんきそうだね。"
-		,"armadillo_idle_3": "つちの においって おちつくよね。"
+		,"armadillo_idle_1": "げんせいちに おかえしした ひんしゅは げんせいちで\nしぜんに ふえてるみたいだ。"
+		,"armadillo_idle_2": "げんせいちから もらった たねの さやと ずかん、\nたいせつに しよう。"
+		,"armadillo_idle_3": "ぜつめつしたはずの たにくしょくぶつが みれるなんて\nすごいことだよね。"
+		,"armadillo_idle_4": "あたらしく はっけんした ひんしゅは ぼくが げんせいちに\nおかえししておくからね。"
+		,"armadillo_idle_5_1": "たにくの はを もいで つちに さしておくと\nねと めが でて ふえるんだ。"
+		,"armadillo_idle_5_2": "「はざし」って いうんだよ。"
+		,"catalog_first_new_armadillo": "あたらしく はっけんした ひんしゅは ぼくが げんせいちに\nおかえししておくからね。"
 		,"restore_offer": "この きろくは、ふしぎな ずかんへ じどうで はんえいされるよ。"
 		,"restore_shortage": "この きろくは、ふしぎな ずかんへ じどうで はんえいされるよ。"
 		,"restore_success": "もとにもどせたよ！\nこれは『%s』の ぺーじだったんだ。\nまだ みつけていない ひんしゅも、かげから すこしずつ しらべられそうだね。"
@@ -1558,17 +1566,17 @@ const TEXT := {
 		"habitat_crisis_departure_panda": "...Something about the habitat is bothering me. Let's go take a look!",
 		"restoration_jurejure_hurry": "Quit dawdling and bring more succulents already, chuu!",
 		"jurejure_post_ending_mouse_sprout": "Hey! Don't step there, chuu! That sprout just came up, chuu!",
-		"jurejure_post_ending_mouse_water": "Don't overwater them, chuu! No spoiling succulents, chuu!",
-		"jurejure_post_ending_mouse_patrol": "No problems today, chuu! ...Probably, chuu!",
-		"jurejure_post_ending_peccary_patrol": "I'm patrolling this area, ppe! Don't mess it up, ppe!",
-		"jurejure_post_ending_peccary_chateaubriand": "The chateaubriand still hasn't grown back, ppe... I'll wait patiently, ppe.",
+		"jurejure_post_ending_mouse_water": "I'm patrolling for suspicious characters, chuu!",
+		"jurejure_post_ending_mouse_patrol": "No problems today, chuu!",
+		"jurejure_post_ending_peccary_patrol": "A baby Chateaubriand is growing, ppe!",
+		"jurejure_post_ending_peccary_chateaubriand": "The Burger succulent still hasn't grown back, ppe... I'll wait patiently, ppe.",
 		"jurejure_post_ending_peccary_growth": "This little one is bigger than yesterday, ppe!",
-		"jurejure_post_ending_skunk_value": "The habitat's worth more than ever, sska! We'll take good care of it, sska!",
-		"jurejure_post_ending_skunk_fee": "Habitat conservation fee—just 300 yen today, sska!",
-		"jurejure_post_ending_skunk_land": "I wonder what this land would sell for, sska... No, we're not selling it, sska!",
-		"jurejure_post_ending_mouse_restricted": "This area's off-limits, chuu! Because I said so, chuu!",
-		"jurejure_post_ending_peccary_sprouts": "I found three new sprouts today, ppe! I know this place best, ppe!",
-		"jurejure_post_ending_skunk_club": "The JureJure Nature Club is recruiting, sska! We can negotiate the membership fee, sska!",
+		"jurejure_post_ending_skunk_value": "Oh, have you decided to join the JureJure Gang, sska?",
+		"jurejure_post_ending_skunk_fee": "Habitat conservation contributions start at ten million yen per share, sska!",
+		"jurejure_post_ending_skunk_land": "Once you get used to living in a cardboard box, it's addictive, sska!",
+		"jurejure_post_ending_mouse_restricted": "A suspicious character!\nOh... it's just Armadillo.",
+		"jurejure_post_ending_peccary_sprouts": "I'm hungry, ppe!",
+		"jurejure_post_ending_skunk_club": "The habitat conservation group, the JureJure Gang, is here, sska!",
 		"jurejure_exploit_touch_mouse_more": "We'll make it produce something even better, chuu!",
 		"jurejure_exploit_touch_panda_tool": "The habitat isn't a tool!",
 		"jurejure_exploit_touch_mouse_battle": "If you interfere, then battle us, chuu!",
@@ -2015,7 +2023,7 @@ const TEXT := {
 		,"arrangement_default_name": "Arrangement %d"
 		,"shop_rescue_offer": "Run out of seeds?\nI'll share a set with you!"
 		,"shop_rescue_success": "Here you go! Plant them with care."
-		,"shop_puku_rescue_offer": "Short on Puku?\nHelp at the shop and I'll give you 1 Puku Coin!"
+		,"shop_puku_rescue_offer": "Short on Puku Coins?\nHelp at the shop and I'll give you 1 Puku Coin!"
 		,"shop_puku_rescue_success": "Thanks for helping!\nHere is 1 Puku Coin."
 		,"shop_help_action": "Help at the shop"
 		,"shop_chatter_today": "What kind of succulent will we meet today?"
@@ -2047,9 +2055,13 @@ const TEXT := {
 		,"pinwheel_intro_1": "I found a clue about growing them while studying some old records."
 		,"pinwheel_intro_2": "I tried it with our seeds, and another plant grew."
 		,"pinwheel_intro_3": "The catalog identifies it as an original species called Pinwheel.\nI want you to look after it."
-		,"armadillo_idle_1": "Good to see you again. Take your time!"
-		,"armadillo_idle_2": "Your succulents look healthy today."
-		,"armadillo_idle_3": "The smell of soil is so calming."
+		,"armadillo_idle_1": "The species we returned to the habitat seem to be\nreproducing naturally there."
+		,"armadillo_idle_2": "Let's treasure the seed pod and catalog\nwe received from the habitat."
+		,"armadillo_idle_3": "It's amazing to see succulents\nthat were thought to be extinct."
+		,"armadillo_idle_4": "I'll return every newly discovered species\nto the habitat for you."
+		,"armadillo_idle_5_1": "If you pull off a succulent leaf and place it in soil,\nit can grow roots and a new shoot."
+		,"armadillo_idle_5_2": "It's called “leaf propagation.”"
+		,"catalog_first_new_armadillo": "I'll return every newly discovered species\nto the habitat for you."
 		,"restore_offer": "This record will be added to the mysterious catalog automatically."
 		,"restore_shortage": "This record will be added to the mysterious catalog automatically."
 		,"restore_success": "Restoration complete!\nThis page belonged to %s.\nThe silhouettes may help us study species you have not found yet."

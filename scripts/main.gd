@@ -164,6 +164,13 @@ const SHOP_CHATTER_KEYS := [
 	"shop_chatter_today","shop_chatter_share","shop_chatter_welcome",
 	"shop_chatter_living_jewel","shop_chatter_puku_help"
 ]
+const ARMADILLO_SHOP_CHATTER_KEY_PAGES := [
+	["armadillo_idle_1"],
+	["armadillo_idle_2"],
+	["armadillo_idle_3"],
+	["armadillo_idle_4"],
+	["armadillo_idle_5_1", "armadillo_idle_5_2"],
+]
 const HABITAT_SAFE_PLANT_POINTS := [Vector2(70,400),Vector2(155,410),Vector2(245,400),Vector2(335,420),Vector2(430,405),Vector2(535,415),Vector2(705,430),Vector2(820,410),Vector2(920,395),Vector2(1025,420),Vector2(1130,400),Vector2(1220,415)]
 const UI_CREAM := Color("#fff1d2")
 const UI_BROWN := Color("#4a2618")
@@ -460,6 +467,7 @@ var shop_chatter_page_index := 0
 var shop_chatter_sequence_kind := ""
 var shop_chatter_sequence_speaker := "panda"
 var last_shop_chatter := ""
+var last_armadillo_shop_chatter_index := -1
 var rescue_reward_in_progress := false
 var rescue_reward_context := ""
 var intro_overlay: Control
@@ -555,6 +563,10 @@ var species_get_active_series_id:=""
 var species_get_active_species_id:=""
 var carnicolor_first_get_resume_context:=""
 var carnicolor_first_get_resume_series_id:=""
+var catalog_first_new_dialog_seen:=false
+var catalog_first_new_dialog_pending:=false
+var catalog_first_new_dialog_card_closed:=false
+var catalog_first_new_dialog_species_id:=""
 var catalog_series_unlock_overlay
 var catalog_series_unlock_active_id:=""
 var fusion_system
@@ -580,8 +592,6 @@ var audio_settings: Dictionary = {"bgm_enabled":true,"se_enabled":true,"bgm_volu
 var show_growing_puku_preview := true
 var growing_puku_preview_toggle: CheckButton
 var harvest_puku_reward_slopes:Array[float]=[]
-var habitat_glow_tween: Tween
-var habitat_sparkle: Control
 var rain_visual: Control
 var rain_drops: Array = []
 var result_overlay: Control
@@ -1103,6 +1113,10 @@ func _load_save() -> void:
 	carnicolor_first_get_dialog_pending=false
 	carnicolor_first_get_resume_context=""
 	carnicolor_first_get_resume_series_id=""
+	catalog_first_new_dialog_seen=false
+	catalog_first_new_dialog_pending=false
+	catalog_first_new_dialog_card_closed=false
+	catalog_first_new_dialog_species_id=""
 	save_file_present_on_boot=false
 	language_selected=false
 	pot_design_unlocks={}
@@ -1265,6 +1279,12 @@ func _load_save() -> void:
 				# first GET already happened, so never surprise those players with it.
 				carnicolor_first_get_dialog_seen=bool(discovered.get(CARNICOLOR_FIRST_GET_SPECIES_ID,false)) or _species_get_count(CARNICOLOR_FIRST_GET_SPECIES_ID)>0 or float(bests.get(CARNICOLOR_FIRST_GET_SPECIES_ID,0.0))>0.0
 				carnicolor_first_get_dialog_pending=false
+			catalog_first_new_dialog_seen=bool(value.get("catalog_first_new_dialog_seen",false))
+			catalog_first_new_dialog_pending=bool(value.get("catalog_first_new_dialog_pending",false)) and not catalog_first_new_dialog_seen
+			catalog_first_new_dialog_card_closed=bool(value.get("catalog_first_new_dialog_card_closed",false)) and catalog_first_new_dialog_pending
+			catalog_first_new_dialog_species_id=str(value.get("catalog_first_new_dialog_species_id","")) if catalog_first_new_dialog_pending else ""
+			if catalog_first_new_dialog_pending and (catalog_first_new_dialog_species_id.is_empty() or _catalog_entry(catalog_first_new_dialog_species_id).is_empty()):
+				catalog_first_new_dialog_pending=false;catalog_first_new_dialog_card_closed=false;catalog_first_new_dialog_species_id=""
 			var raw_pending_round_new:Variant=value.get("pending_round_new_species_ids",[])
 			if raw_pending_round_new is Array:
 				for raw_species_id in raw_pending_round_new:
@@ -1322,7 +1342,9 @@ func _save() -> void:
 		"total_play_count":total_play_count,"normal_play_count":normal_play_count,"formal_play_count":formal_play_count,"shop_visit_count":shop_visit_count,
 		"hidden_species_acquired":hidden_species_acquired,"tovar_next_play":tovar_next_play,"tovar_attempt_count":tovar_attempt_count,
 		"opening_story_complete":opening_story_complete,"intro_story_complete":intro_story_complete,"encyclopedia_unlocked":encyclopedia_unlocked,"habitat_unlocked":habitat_unlocked,"tutorial_steps":tutorial_steps,
-		"first_colorata_confirmed":first_colorata_confirmed,"trio_originals_confirmed":trio_originals_confirmed,"carnicolor_first_get_dialog_seen":carnicolor_first_get_dialog_seen,"carnicolor_first_get_dialog_pending":carnicolor_first_get_dialog_pending,"habitat_arrival_started":habitat_arrival_started,"habitat_awakened":habitat_awakened,"habitat_awakening_event_complete":habitat_awakening_event_complete,
+		"first_colorata_confirmed":first_colorata_confirmed,"trio_originals_confirmed":trio_originals_confirmed,"carnicolor_first_get_dialog_seen":carnicolor_first_get_dialog_seen,"carnicolor_first_get_dialog_pending":carnicolor_first_get_dialog_pending,
+		"catalog_first_new_dialog_seen":catalog_first_new_dialog_seen,"catalog_first_new_dialog_pending":catalog_first_new_dialog_pending,"catalog_first_new_dialog_card_closed":catalog_first_new_dialog_card_closed,"catalog_first_new_dialog_species_id":catalog_first_new_dialog_species_id,
+		"habitat_arrival_started":habitat_arrival_started,"habitat_awakened":habitat_awakened,"habitat_awakening_event_complete":habitat_awakening_event_complete,
 		"seed_shop_open":seed_shop_open,"mystery_items_acquired":mystery_items_acquired,"mystery_catalog_tutorial_complete":mystery_catalog_tutorial_complete,"habitat_returned_species":habitat_returned_species,"special_series_explanation_seen":special_series_explanation_seen,"main_story_stage":main_story_stage,"main_story_complete":main_story_complete,"main_story_completion_seen":main_story_completion_seen,
 		"normal_play_tutorial_complete":normal_play_tutorial_complete,"seed_pod_gauge_discovery_complete":seed_pod_gauge_discovery_complete,"seed_pod_first_reward_seen":seed_pod_first_reward_seen,"initial_seed_stock_notice_complete":initial_seed_stock_notice_complete,"puku_buyback_tutorial_complete":puku_buyback_tutorial_complete,
 		"original_catalog_complete_event_seen":original_catalog_complete_event_seen,"habitat_tutorial_returned_to_greenhouse":habitat_tutorial_returned_to_greenhouse,
@@ -2750,6 +2772,16 @@ func _pick_shop_chatter()->String:
 	candidates.erase(last_shop_chatter)
 	var chosen:=str(candidates[rng.randi_range(0,candidates.size()-1)]);last_shop_chatter=chosen;return chosen
 
+func _pick_armadillo_shop_chatter_pages()->Array[String]:
+	var candidate_indices:Array[int]=[]
+	for index in range(ARMADILLO_SHOP_CHATTER_KEY_PAGES.size()):
+		if index!=last_armadillo_shop_chatter_index or ARMADILLO_SHOP_CHATTER_KEY_PAGES.size()==1:candidate_indices.append(index)
+	var chosen_index:=candidate_indices[rng.randi_range(0,candidate_indices.size()-1)]
+	last_armadillo_shop_chatter_index=chosen_index
+	var localized_pages:Array[String]=[]
+	for key in ARMADILLO_SHOP_CHATTER_KEY_PAGES[chosen_index]:localized_pages.append(Localizer.text(language_code,str(key)))
+	return localized_pages
+
 func _is_japan_region()->bool:
 	var locale:=TranslationServer.get_locale().replace("-","_").to_lower()
 	return locale=="ja" or locale.begins_with("ja_") or locale.ends_with("_jp")
@@ -2941,6 +2973,8 @@ func _finish_scripted_dialog()->void:
 			first_colorata_confirmed=true;start_trio_event=true
 		"carnicolor_first_get":
 			carnicolor_first_get_dialog_seen=true;carnicolor_first_get_dialog_pending=false
+		"catalog_first_new":
+			catalog_first_new_dialog_seen=true;catalog_first_new_dialog_pending=false;catalog_first_new_dialog_card_closed=false;catalog_first_new_dialog_species_id=""
 		"trio_originals":
 			trio_originals_confirmed=true;habitat_unlocked=true;guide_habitat=true
 		"mystery_catalog_prompt":
@@ -4597,6 +4631,9 @@ func _on_species_get_overlay_closed(context:String)->void:
 	_get_close_profile_begin_from_overlay(context)
 	var closed_species_id:=species_get_active_species_id
 	_mark_collection_complete_get_card_seen(closed_species_id)
+	if catalog_first_new_dialog_pending and closed_species_id==catalog_first_new_dialog_species_id:
+		catalog_first_new_dialog_card_closed=true
+		_save()
 	_get_close_profile_mark("collection_seen_end")
 	species_get_active_context=""
 	species_get_active_species_id=""
@@ -4628,6 +4665,25 @@ func _resume_after_carnicolor_first_get_dialog()->void:
 	if not resume_series_id.is_empty() and resume_series_id in catalog_series_unlock_notice_queue:
 		if _show_catalog_series_unlock_notice(resume_series_id,resume_context):return
 	_continue_after_species_get_card(resume_context)
+
+func _catalog_first_new_dialog_can_be_armed()->bool:
+	return not catalog_first_new_dialog_seen and not catalog_first_new_dialog_pending \
+		and mystery_items_acquired and mystery_catalog_tutorial_complete and encyclopedia_unlocked \
+		and active_seed_type=="normal"
+
+func _arm_catalog_first_new_dialog(species_id:String)->void:
+	if species_id.is_empty() or not _catalog_first_new_dialog_can_be_armed():return
+	catalog_first_new_dialog_pending=true
+	catalog_first_new_dialog_card_closed=false
+	catalog_first_new_dialog_species_id=species_id
+	_save()
+
+func _start_catalog_first_new_dialog()->bool:
+	if catalog_first_new_dialog_seen or not catalog_first_new_dialog_pending or not catalog_first_new_dialog_card_closed:return false
+	_start_scripted_dialog("catalog_first_new",[
+		{"speaker":"armadillo","text":Localizer.text(language_code,"catalog_first_new_armadillo")}
+	],false)
+	return true
 
 func _on_catalog_series_unlock_overlay_closed(context:String)->void:
 	catalog_series_unlock_active_id=""
@@ -4742,6 +4798,7 @@ func _reset_progression_state()->void:
 	if fusion_lab_ui:fusion_lab_ui.close_lab()
 	if catalog_series_unlock_overlay:catalog_series_unlock_overlay.reset_overlay()
 	catalog_series_unlock_active_id="";species_get_active_series_id="";species_get_active_species_id="";carnicolor_first_get_resume_context="";carnicolor_first_get_resume_series_id=""
+	catalog_first_new_dialog_seen=false;catalog_first_new_dialog_pending=false;catalog_first_new_dialog_card_closed=false;catalog_first_new_dialog_species_id=""
 	endless_greenhouse.reset_discovery_state()
 	pending_restoration_snapshot.clear()
 	if habitat_restoration_ui:habitat_restoration_ui.reset_view()
@@ -5081,7 +5138,6 @@ func _update_play_ui()->void:
 		var restoration_state:=_restoration_state()
 		habitat_restoration_ui.update_lamps(HabitatRestorationClass.returned_count(restoration_state),HabitatRestorationClass.should_show_progress(restoration_state) and restoration_hud_safe)
 	_update_mission_ui()
-	_update_habitat_button_glow()
 	play_timer_label.text=Localizer.text(language_code,"series_seed_remaining" if active_seed_type.begins_with("series:") else "seed_remaining",[play_seeds_remaining]) if play_timer_label.visible else ""
 	var held:Array[String]=[]
 	if old_seed_bags>0:held.append(Localizer.text(language_code,"bags_held",[Localizer.text(language_code,"old_seed_name"),old_seed_bags]))
@@ -5122,8 +5178,7 @@ func _on_armadillo_tapped()->void:
 	if act2_unlocked and old_catalog_pages>0 and not _next_restorable_hidden_series().is_empty():
 		_start_hidden_catalog_restoration()
 	else:
-		var lines:=[Localizer.text(language_code,"armadillo_idle_1"),Localizer.text(language_code,"armadillo_idle_2"),Localizer.text(language_code,"armadillo_idle_3")]
-		_show_shop_chatter(lines[rng.randi_range(0,lines.size()-1)],false,"normal","armadillo")
+		_start_shop_chatter_sequence("armadillo_idle",_pick_armadillo_shop_chatter_pages(),"armadillo")
 
 func _grant_old_catalog_page(amount:int=1,show_intro:=true,series_id:="")->void:
 	if amount<=0:return
@@ -5567,6 +5622,7 @@ func _play_result_new_species_animations()->void:
 		for species_id_value in registered_queue:
 			var registered_species_id:=str(species_id_value)
 			var registered_context:="first_colorata" if total_play_count==1 and registered_species_id==FIRST_STORY_SPECIES_ID else "main_result"
+			if registered_context=="main_result":_arm_catalog_first_new_dialog(registered_species_id)
 			_queue_species_get_by_id(registered_species_id,true,registered_context)
 		if registered_queue.is_empty():call_deferred("_try_start_pending_story_event")
 		return
@@ -5605,7 +5661,12 @@ func _show_next_round_result_species()->void:
 	var is_new:=bool(queued.get("is_new",_species_get_count(species_id)<=0))
 	if formalize:
 		is_new=_species_get_count(species_id)<=0
-		if is_new:_register_species_discovery(species_id,true)
+		if is_new:
+			_register_species_discovery(species_id,true)
+			# Arm the one-time follow-up only after the normal-round GET is
+			# formally registered.  Its save then persists both the ownership and
+			# the pending dialogue as one recoverable state.
+			_arm_catalog_first_new_dialog(species_id)
 		if species_id in pending_round_new_species_ids:
 			pending_round_new_species_ids.erase(species_id);round_result_species_save_pending=true
 		if not is_new:
@@ -6667,6 +6728,11 @@ func _try_start_pending_story_event()->void:
 	if _collection_completion_pending() and not _collection_complete_get_card_seen():
 		call_deferred("_queue_species_get_by_id",_collection_completion_last_species_id(),true,"collection_complete_recovery")
 		return
+	if catalog_first_new_dialog_pending and not catalog_first_new_dialog_seen:
+		if not catalog_first_new_dialog_card_closed:
+			call_deferred("_queue_species_get_by_id",catalog_first_new_dialog_species_id,true,"catalog_first_new_recovery")
+			return
+		if _start_catalog_first_new_dialog():return
 	if _try_start_post_ending_greenhouse_dialog():return
 	if _try_start_catalog_series_unlock_notice():return
 	if not catalog_series_unlock_notice_queue.is_empty():return
@@ -7619,7 +7685,6 @@ func _update_habitat_ui()->void:
 		habitat_status_label.visible=false
 		habitat_status_label.text=""
 	if mode_button and current_mode=="greenhouse":mode_button.text=Localizer.text(language_code,"main_habitat")
-	_update_habitat_button_glow()
 
 func _roll_rain_event()->void:
 	# Post-awakening rain bonus gameplay was retired. Story rain is rendered by
@@ -7656,22 +7721,6 @@ func _habitat_new_species_candidates()->Array[Dictionary]:
 
 func _roll_habitat_new_species()->String:
 	return ""
-
-func _update_habitat_button_glow()->void:
-	if not mode_button:return
-	# Mystery seeds are ordinary habitat scenery and no longer summon the player.
-	# A catalog page or the gang's actual presence still deserves attention.
-	var has_pending:=current_mode=="greenhouse" and (habitat_old_catalog_page_pending or _should_show_jurejure_group())
-	if bool(mode_button.get_meta("habitat_glow_active",false))==has_pending:return
-	mode_button.set_meta("habitat_glow_active",has_pending)
-	if habitat_glow_tween and habitat_glow_tween.is_valid():habitat_glow_tween.kill()
-	habitat_glow_tween=null
-	mode_button.self_modulate=Color.WHITE
-	if habitat_sparkle and is_instance_valid(habitat_sparkle):habitat_sparkle.queue_free()
-	if not has_pending:return
-	habitat_sparkle=UISymbolIcon.new();habitat_sparkle.symbol="sparkle";habitat_sparkle.icon_color=Color("#fff2a1");habitat_sparkle.position=Vector2(5,-9);habitat_sparkle.size=Vector2(26,26);habitat_sparkle.mouse_filter=Control.MOUSE_FILTER_IGNORE;mode_button.add_child(habitat_sparkle)
-	var glow_color:=Color(1.2,1.12,.72,1)
-	habitat_glow_tween=create_tween().set_loops();habitat_glow_tween.tween_property(mode_button,"self_modulate",glow_color,.75).set_trans(Tween.TRANS_SINE);habitat_glow_tween.parallel().tween_property(habitat_sparkle,"position:x",72.0,.75).set_trans(Tween.TRANS_SINE);habitat_glow_tween.parallel().tween_property(habitat_sparkle,"modulate:a",.25,.75);habitat_glow_tween.tween_property(mode_button,"self_modulate",Color.WHITE,.75);habitat_glow_tween.parallel().tween_property(habitat_sparkle,"position:x",5.0,.01);habitat_glow_tween.parallel().tween_property(habitat_sparkle,"modulate:a",1.0,.01);habitat_glow_tween.tween_interval(1.25)
 
 func _open_species_detail(entry:Dictionary)->void:
 	if collection_complete_presentation_active:return

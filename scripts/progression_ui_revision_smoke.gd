@@ -16,12 +16,12 @@ func _ready() -> void:
 	_test_language_ui_geometry(game)
 	_test_top_hud_and_speaker_geometry(game)
 	_test_shop_chatter_contract(game)
-	_test_habitat_attention_glow(game)
+	_test_habitat_button_stays_plain(game)
 	_test_arrangement_gate_and_direction(game)
 	_test_progression_thresholds()
 	_test_phase_bgm_policy(game)
 	game._reset_progression_state()
-	print("PROGRESSION_UI_REVISION_SMOKE_OK copy=updated language_ui=fixed shop_chatter=5 glow=gang_only arrangement=3+swipe forest=8 fusion=12 bgm=phase-aware migration=preserved")
+	print("PROGRESSION_UI_REVISION_SMOKE_OK copy=updated language_ui=fixed panda_chatter=5 armadillo_chatter=5 habitat_button=always_plain arrangement=3+swipe forest=8 fusion=12 bgm=phase-aware migration=preserved")
 	get_tree().quit()
 
 
@@ -139,35 +139,81 @@ func _test_shop_chatter_contract(game: Node) -> void:
 	assert(Localizer.text("ja", "shop_chatter_welcome") == "いらっしゃい！")
 	assert(Localizer.text("ja", "shop_chatter_living_jewel") == "多肉はまさに生きる宝石だよね。")
 	assert(Localizer.text("ja", "shop_chatter_puku_help") == "もし、ぷくコインがなくなったら僕に声かけてよ！")
+	assert(Localizer.text("ja", "shop_puku_rescue_offer") == "ぷくコインが足りないの？\nお店を手伝ってくれたら、1ぷくコイン渡すよ！")
+	assert(Localizer.text("ja", "shop_puku_rescue_success") == "お手伝いありがとう！\n1ぷくコインを受け取ってね。")
+	var expected_armadillo_pages := [
+		["原生地にお還しした品種は原生地で\n自然に増えてるみたいだ。"],
+		["原生地からもらった種のさやと図鑑、\n大切にしよう。"],
+		["絶滅したはずの多肉植物が見れるなんて\nすごいことだよね。"],
+		["新しく発見した品種はぼくが原生地に\nお還しておくからね。"],
+		["多肉の葉をもいで土に挿しておくと\n根と芽が出て増えるんだ。", "「葉挿し」って言うんだよ。"],
+	]
+	assert(game.ARMADILLO_SHOP_CHATTER_KEY_PAGES.size() == 5)
+	for pattern_index in range(game.ARMADILLO_SHOP_CHATTER_KEY_PAGES.size()):
+		var localized_pages: Array[String] = []
+		for key in game.ARMADILLO_SHOP_CHATTER_KEY_PAGES[pattern_index]:localized_pages.append(Localizer.text("ja", str(key)))
+		assert(localized_pages == expected_armadillo_pages[pattern_index])
+	var previous_armadillo_index := -1
+	for sample_index in range(30):
+		var pages: Array[String] = game._pick_armadillo_shop_chatter_pages()
+		assert(not pages.is_empty())
+		assert(game.last_armadillo_shop_chatter_index != previous_armadillo_index)
+		previous_armadillo_index = game.last_armadillo_shop_chatter_index
+	game.last_armadillo_shop_chatter_index = -1
 	for locale in Localizer.SUPPORTED_LANGUAGES:
 		assert(not Localizer.text(locale, "shop_preparing_arrangement").is_empty())
+		assert(not Localizer.text(locale, "shop_puku_rescue_offer").is_empty())
+		assert(not Localizer.text(locale, "shop_puku_rescue_success").is_empty())
+		assert(not Localizer.text(locale, "catalog_first_new_armadillo").is_empty())
 		for chatter_key in game.SHOP_CHATTER_KEYS:
 			assert(not Localizer.text(locale, chatter_key).is_empty())
+		for armadillo_pattern in game.ARMADILLO_SHOP_CHATTER_KEY_PAGES:
+			for chatter_key in armadillo_pattern:assert(not Localizer.text(locale, str(chatter_key)).is_empty())
 
 
-func _test_habitat_attention_glow(game: Node) -> void:
+func _test_habitat_button_stays_plain(game: Node) -> void:
+	assert(not game.has_method("_update_habitat_button_glow"))
+	var normal_modulate: Color = game.mode_button.self_modulate
+	var normal_child_count: int = game.mode_button.get_child_count()
+	assert(normal_modulate.is_equal_approx(Color.WHITE))
+	assert(not game.mode_button.has_meta("habitat_glow_active"))
+
+	# Normal greenhouse state.
 	game.habitat_old_catalog_page_pending = false
 	game.jurejure_waiting_for_seed_pod_reward = true
 	game.story_progression_state["exploitation_started"] = false
-	game._update_habitat_button_glow()
-	assert(not bool(game.mode_button.get_meta("habitat_glow_active", false)))
+	game._update_play_ui()
+	_assert_habitat_button_plain(game, normal_modulate, normal_child_count)
 
+	# An old catalog page waiting in the habitat must not alter the button.
 	game.habitat_old_catalog_page_pending = true
-	game._update_habitat_button_glow()
-	assert(bool(game.mode_button.get_meta("habitat_glow_active", false)))
+	game._update_play_ui()
+	_assert_habitat_button_plain(game, normal_modulate, normal_child_count)
 	game.habitat_old_catalog_page_pending = false
-	game._update_habitat_button_glow()
-	assert(not bool(game.mode_button.get_meta("habitat_glow_active", false)))
 
+	# The Jurejure gang's presence must not alter the button either.
 	game.jurejure_waiting_for_seed_pod_reward = false
 	assert(game._should_show_jurejure_group())
-	game._update_habitat_button_glow()
-	assert(bool(game.mode_button.get_meta("habitat_glow_active", false)))
+	game._update_habitat_ui()
+	_assert_habitat_button_plain(game, normal_modulate, normal_child_count)
+
+	# Navigation remains intact in both directions.
+	game.jurejure_waiting_for_seed_pod_reward = true
+	game._toggle_mode()
+	assert(game.current_mode == "habitat")
+	game._toggle_mode()
+	assert(game.current_mode == "greenhouse")
+	_assert_habitat_button_plain(game, normal_modulate, normal_child_count)
+
+
+func _assert_habitat_button_plain(game: Node, expected_modulate: Color, expected_child_count: int) -> void:
+	assert(game.mode_button.self_modulate.is_equal_approx(expected_modulate))
+	assert(game.mode_button.get_child_count() == expected_child_count)
+	assert(not game.mode_button.has_meta("habitat_glow_active"))
 
 
 func _test_arrangement_gate_and_direction(game: Node) -> void:
 	game.jurejure_waiting_for_seed_pod_reward = true
-	game._update_habitat_button_glow()
 	assert(not StoryProgression.arrangement_is_unlocked(game.story_progression_state))
 	assert(not game._greenhouse_area_navigation_available())
 	assert(game.arrangement_button == null)

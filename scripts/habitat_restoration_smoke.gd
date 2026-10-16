@@ -192,6 +192,31 @@ func _test_localization_contract() -> void:
 	assert(Localizer.text("ja", "restoration_slide_1") == "それからも、みんなは何度も原生地へ通い、多肉たちを植え続けました。")
 	assert(Localizer.text("ja", "restoration_slide_2") == "原生地には少しずつ、多肉植物が戻って来ました。")
 	assert(Localizer.text("ja", "restoration_slide_3") == "色々な多肉植物が見たい。\n\nみんなの願いは、いつしか祈りとなっていたのです。")
+	var expected_post_ending := {
+		"jurejure_post_ending_mouse_sprout": "こら！そこ踏むなチュー！さっき芽が出たばっかりだチュー！",
+		"jurejure_post_ending_mouse_water": "怪しいやつがいないかパトロールしてるんだチュー！",
+		"jurejure_post_ending_mouse_patrol": "今日は異常なしチュー！",
+		"jurejure_post_ending_mouse_restricted": "怪しいやつ！\nなんだ…アルマジロ君か。",
+		"jurejure_post_ending_peccary_patrol": "シャトーブリアンの赤ちゃんが生えて来たッペ！",
+		"jurejure_post_ending_peccary_chateaubriand": "バーガー多肉はまだ生えてこないッペ……。気長に待つッペ。",
+		"jurejure_post_ending_peccary_growth": "このちっちゃいやつ、昨日より大きくなってるッペ！",
+		"jurejure_post_ending_peccary_sprouts": "お腹空いたッペ！",
+		"jurejure_post_ending_skunk_value": "あ、ジュレジュレ団に入る気になったんスカ？",
+		"jurejure_post_ending_skunk_fee": "原生地保全協力金、一口1000万円からッス！",
+		"jurejure_post_ending_skunk_land": "ダンボール生活も慣れたらクセになるッス！",
+		"jurejure_post_ending_skunk_club": "原生地保護団体、ジュレジュレ団参上ッス！",
+	}
+	assert(JureJureSystemClass.POST_ENDING_DIALOG_PATTERNS.size() == 12)
+	var speaker_counts := {"mouse": 0, "peccary": 0, "skunk": 0}
+	for pattern in JureJureSystemClass.POST_ENDING_DIALOG_PATTERNS:
+		assert(pattern.size() == 1)
+		var page: Dictionary = pattern[0]
+		var speaker := str(page.get("speaker", ""))
+		var text_key := str(page.get("text_key", ""))
+		assert(speaker_counts.has(speaker) and expected_post_ending.has(text_key))
+		speaker_counts[speaker] += 1
+		assert(Localizer.text("ja", text_key) == expected_post_ending[text_key])
+	assert(speaker_counts == {"mouse": 4, "peccary": 4, "skunk": 4})
 
 
 func _test_ending_asset_contract() -> void:
