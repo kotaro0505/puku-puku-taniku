@@ -246,13 +246,14 @@ func _test_three_act_sequence(game: Node) -> void:
 	game.puku_puku_battle.visible = false
 	game._try_start_pending_story_event()
 	assert(game.scripted_dialog_kind == "fantasy_realization")
-	assert(game.scripted_dialog_pages.size() == 6)
+	assert(game.scripted_dialog_pages.size() == 7)
 	assert("想像したものが、多肉になってる？" in str(game.scripted_dialog_pages[2].get("text", "")))
-	for page_index in range(3, 6):
+	for page_index in range(3, 7):
 		assert(str(game.scripted_dialog_pages[page_index].get("speaker", "")) == "armadillo")
 	assert(str(game.scripted_dialog_pages[3].get("text", "")) == "そうかもしれない…")
-	assert(str(game.scripted_dialog_pages[4].get("text", "")) == "それと、大きな株を収穫するほど、新しい品種が出るような気がするよ")
+	assert(str(game.scripted_dialog_pages[4].get("text", "")) == "もしかして、あの原生地には、ぼくたちの想像を多肉に変える力があるのかもしれないね。")
 	assert(str(game.scripted_dialog_pages[5].get("text", "")) == "本当に不思議だ…")
+	assert(str(game.scripted_dialog_pages[6].get("text", "")) == "それと、大きな株を収穫するほど、新しい品種が出るような気がするよ")
 	_finish_dialog(game)
 	await get_tree().process_frame
 	assert(game.fantasy_realization_seen)

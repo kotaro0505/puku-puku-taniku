@@ -25,7 +25,7 @@ func _ready() -> void:
 	_test_mission_copy_and_progress(game)
 	_test_round_navigation_lock(game)
 	_test_new_gate(game)
-	_test_early_fantasy_candidate_contract(game)
+	await _test_early_fantasy_candidate_contract(game)
 	_test_fusion_fantasy_count(game)
 	_test_crisis_exploitation_lockout(game)
 	await _test_round_completion_before_new_cards(game)
@@ -33,7 +33,7 @@ func _ready() -> void:
 	game._reset_progression_state()
 	game.queue_free()
 	await get_tree().process_frame
-	print("STORY_GUIDANCE_SMOKE_OK mission=single+live new_gate=first_encounter result=removed automatic_formal_get=ordered_multiple pending_duplicate=false nav=hidden arrangement=locked base=originals_only early_fantasy=four_series fusion_fantasy_count=display_series crisis=exploit_locked copy=updated dev_controls=all_builds")
+	print("STORY_GUIDANCE_SMOKE_OK mission=single+live new_gate=first_encounter result=removed automatic_formal_get=ordered_multiple pending_duplicate=false nav=hidden arrangement=locked base=originals_only early_fantasy=four_series realization=7_pages_3_locales fusion_fantasy_count=display_series crisis=exploit_locked copy=updated dev_controls=all_builds")
 	get_tree().quit()
 
 
@@ -286,25 +286,30 @@ func _test_early_fantasy_candidate_contract(game: Node) -> void:
 	assert(game._early_fantasy_required_series_complete())
 	assert(game._unique_fantasy_species_get_count()==4)
 	game.current_mode = "habitat"
-	var page_keys := ["fantasy_six_girl_1", "fantasy_six_armadillo", "fantasy_six_girl_2", "fantasy_six_armadillo_2", "fantasy_six_armadillo_3", "fantasy_six_armadillo_4"]
-	var speakers := ["girl", "armadillo", "girl", "armadillo", "armadillo", "armadillo"]
-	var expected_tail := {
-		"ja": ["そうかもしれない…", "それと、大きな株を収穫するほど、新しい品種が出るような気がするよ", "本当に不思議だ…"],
-		"hiragana": ["そうかもしれない…", "それと、おおきな かぶを しゅうかくするほど、あたらしい ひんしゅが でるような きがするよ", "ほんとうに ふしぎだ…"],
-		"en": ["Maybe you're right...", "And it feels like the bigger the plant you harvest, the more likely a new variety is to appear.", "It's really strange..."],
+	var page_keys := ["fantasy_six_girl_1", "fantasy_six_armadillo", "fantasy_six_girl_2", "fantasy_six_armadillo_2", "fantasy_six_armadillo_3", "fantasy_six_armadillo_4", "fantasy_six_armadillo_5"]
+	var speakers := ["girl", "armadillo", "girl", "armadillo", "armadillo", "armadillo", "armadillo"]
+	var expected_pages := {
+		"ja": ["ゼリーに、ゆめふわ……私が好きなものばっかり。", "石に宝石……僕が集めてるものと同じだ。", "……もしかして、私たちが想像したものが、多肉になってる？", "そうかもしれない…", "もしかして、あの原生地には、ぼくたちの想像を多肉に変える力があるのかもしれないね。", "本当に不思議だ…", "それと、大きな株を収穫するほど、新しい品種が出るような気がするよ"],
+		"hiragana": ["ぜりーに、ゆめふわ……わたしが すきなもの ばっかり。", "いしに ほうせき……ぼくが あつめてるものと おなじだ。", "……もしかして、わたしたちが そうぞうしたものが、たにくに なってる？", "そうかもしれない…", "もしかして、あの げんせいちには、ぼくたちの そうぞうを たにくに かえる ちからが あるのかもしれないね。", "ほんとうに ふしぎだ…", "それと、おおきな かぶを しゅうかくするほど、あたらしい ひんしゅが でるような きがするよ"],
+		"en": ["Jelly and dreamy colors... They are all things I love.", "Stone and jewels... just like the things I collect.", "...Could the things we imagine be turning into succulents?", "Maybe you're right...", "Maybe that habitat has the power to turn what we imagine into succulents.", "It's really strange...", "And it feels like the bigger the plant you harvest, the more likely a new variety is to appear."],
 	}
 	for test_language in ["ja", "hiragana", "en"]:
 		game._set_language(test_language)
 		game._start_fantasy_realization_event()
 		assert(game.scripted_dialog_kind == "fantasy_realization")
-		assert(game.scripted_dialog_pages.size() == 6)
+		assert(game.scripted_dialog_pages.size() == 7)
 		for page_index in range(page_keys.size()):
 			assert(str(game.scripted_dialog_pages[page_index].get("speaker", "")) == speakers[page_index])
 			assert(str(game.scripted_dialog_pages[page_index].get("text", "")) == Localizer.text(test_language, page_keys[page_index]))
-		for tail_index in range(3):
-			assert(Localizer.text(test_language, page_keys[tail_index + 3]) == expected_tail[test_language][tail_index])
+			assert(Localizer.text(test_language, page_keys[page_index]) == expected_pages[test_language][page_index])
+			if page_index > 0:
+				game._advance_scripted_dialog()
+			await get_tree().process_frame
+			assert(game.intro_dialogue_label.text == expected_pages[test_language][page_index])
+			assert(game.intro_dialogue_label.get_visible_line_count() == game.intro_dialogue_label.get_line_count(), "fantasy realization text clipped locale=%s page=%d" % [test_language, page_index + 1])
 		game.scripted_dialog_kind = ""
 		game.scripted_dialog_pages.clear()
+		game.scripted_dialog_index = -1
 		game.intro_overlay.visible = false
 	game._set_language("ja")
 	game.fantasy_realization_seen = true

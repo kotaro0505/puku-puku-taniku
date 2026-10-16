@@ -7118,7 +7118,8 @@ func _start_fantasy_realization_event()->void:
 		{"speaker":"girl","text":Localizer.text(language_code,"fantasy_six_girl_2")},
 		{"speaker":"armadillo","text":Localizer.text(language_code,"fantasy_six_armadillo_2")},
 		{"speaker":"armadillo","text":Localizer.text(language_code,"fantasy_six_armadillo_3")},
-		{"speaker":"armadillo","text":Localizer.text(language_code,"fantasy_six_armadillo_4")}
+		{"speaker":"armadillo","text":Localizer.text(language_code,"fantasy_six_armadillo_4")},
+		{"speaker":"armadillo","text":Localizer.text(language_code,"fantasy_six_armadillo_5")}
 	],false)
 
 func _start_exploitation_midpoint_event()->void:
