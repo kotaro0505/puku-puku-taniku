@@ -8,13 +8,14 @@ func _ready()->void:
 	await get_tree().process_frame;await get_tree().process_frame
 	game._reset_progression_state();game.opening_story_complete=true;game.intro_story_complete=true;game.first_colorata_confirmed=true;game.trio_originals_confirmed=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.habitat_arrival_started=true;game.habitat_awakened=true;game.habitat_awakening_event_complete=true;game.habitat_tutorial_started=true;game.habitat_tutorial_complete=true;game.seed_shop_open=true;game.panda_beacon_unlocked=true;game.panda_beacon_count=1;game.puku_gauge_intro_complete=true;game.total_play_count=3;game.puku_points=20;game.current_mode="greenhouse";game.story_progression_state["arrangement_unlocked"]=true;game.story_progression_state["arrangement_intro_seen"]=true;game._update_play_ui()
 	_test_assets_and_routes(game)
+	await _test_get_card_decoration(game)
 	_test_removed_status_text(game)
 	_test_draw_rules(game)
 	_test_jurejure_species_gate(game)
 	await _test_spin_capsule_and_reveal(game)
 	_test_encounter_save_and_unlock(game)
 	game._reset_progression_state();game.queue_free()
-	print("FOREST_GACHA_SMOKE_OK routes=2 series=uniform new=60 duplicate=40 fallbacks=2 jurejure=pool_all_10 status_text=hidden")
+	print("FOREST_GACHA_SMOKE_OK routes=2 series=uniform new=60 duplicate=40 fallbacks=2 jurejure=pool_all_10 card=new_gold+duplicate_ivory_no_glow+reusable status_text=hidden")
 	get_tree().quit()
 
 func _test_assets_and_routes(game)->void:
@@ -47,6 +48,37 @@ func _test_assets_and_routes(game)->void:
 	assert(game.forest_gacha_intro_seen and game.forest_gacha_button.visible and shop_route.visible)
 	game._open_shop();assert(game.shop_overlay.visible);shop_route.pressed.emit();assert(game.forest_gacha_ui.visible and not game.shop_overlay.visible);game._close_forest_gacha()
 	game._open_forest_gacha();assert(game.forest_gacha_ui.visible);game._close_forest_gacha()
+
+func _test_get_card_decoration(game)->void:
+	var overlay=game.species_get_overlay
+	var entry:Dictionary=game._catalog_entry("colorata")
+	var texture:=game._species_texture(entry) as Texture2D
+	assert(texture!=null)
+	var cases:=[
+		{"context":"forest_gacha","is_new":false,"duplicate":true},
+		{"context":"forest_gacha","is_new":true,"duplicate":false},
+		{"context":"forest_gacha","is_new":false,"duplicate":true},
+		{"context":"round_result_new","is_new":false,"duplicate":false},
+	]
+	for case_value in cases:
+		var case:Dictionary=case_value
+		overlay.show_species(entry,texture,bool(case.is_new),str(case.context),"ja","原種")
+		var duplicate:=bool(case.duplicate)
+		var card_style:=overlay.card.get_theme_stylebox("panel") as StyleBoxFlat
+		var frame_style:=overlay.image_frame.get_theme_stylebox("panel") as StyleBoxFlat
+		assert(overlay.duplicate_gacha_decoration_active==duplicate)
+		if duplicate:
+			assert(card_style.border_color.is_equal_approx(overlay.DUPLICATE_GACHA_IVORY))
+			assert(frame_style.border_color.is_equal_approx(Color(overlay.DUPLICATE_GACHA_IVORY,.82)))
+			assert(card_style.shadow_size==0 and frame_style.shadow_size==0)
+			assert(is_zero_approx(overlay.flash.color.a) and not overlay.badge_label.visible)
+		else:
+			assert(card_style.border_color.is_equal_approx(overlay.GOLD_BORDER))
+			assert(card_style.shadow_size==24 and frame_style.shadow_size==22)
+			assert(overlay.flash.color.a>.9)
+			assert(overlay.badge_label.visible==bool(case.is_new))
+		assert(await _wait_until(func()->bool:return not overlay.busy,1000))
+		overlay.visible=false;overlay.result_image.texture=null
 
 func _test_removed_status_text(game)->void:
 	var ui=game.forest_gacha_ui
@@ -160,12 +192,14 @@ func _test_spin_capsule_and_reveal(game)->void:
 	for test_language in ["ja","hiragana","en"]:assert(Localizer.text(test_language,"gacha_selecting") not in game.forest_gacha_ui.hint_label.text)
 	assert(await _wait_until(func()->bool:return game.forest_gacha_ui.capsule_ready,2500))
 	assert(game.puku_points==4 and game.forest_gacha_draw_count==1 and game.forest_gacha_ui.capsule_ready and game.forest_gacha_ui.capsule.visible and absf(game.forest_gacha_ui.dial_texture.rotation)>1.0)
+	var first_was_discovered:=bool(game.forest_gacha_ui.pending_result.get("was_discovered",false))
 	var species_id:=str(game.forest_gacha_ui.pending_result.get("species_id",""));var series_id:=str(game.forest_gacha_ui.pending_result.get("series_id",""));assert(not species_id.is_empty() and series_id!="base" and bool(game.discovered.get(species_id,false)) and bool(game.greenhouse_available.get(species_id,false)))
 	assert(series_id in game.catalog_series_unlock_notice_queue and not game.catalog_series_unlock_overlay.visible)
 	game.gacha_capsule_profile_enabled=true;game.gacha_capsule_profile_total_msec=-1
 	game.forest_gacha_ui._reveal_result()
 	assert(game.forest_gacha_ui.busy and game.forest_gacha_ui.capsule.visible and game.forest_gacha_ui.capsule_open_burst.visible and not game.species_get_overlay.visible)
 	assert(await _wait_until(func()->bool:return game.species_get_overlay.visible,900));assert(not game.catalog_series_unlock_overlay.visible and game.species_get_overlay.result_image.texture!=null and game.species_get_overlay.name_label.text==str(game._catalog_entry(species_id).get("name_ja","")))
+	assert(game.species_get_overlay.duplicate_gacha_decoration_active==first_was_discovered and game.species_get_overlay.badge_label.visible!=first_was_discovered)
 	assert(await _wait_until(func()->bool:return game.gacha_capsule_profile_total_msec>=0,900))
 	assert(game.forest_gacha_ui.last_capsule_first_visual_latency_msec>=0 and game.forest_gacha_ui.last_capsule_first_visual_latency_msec<100 and game.gacha_capsule_profile_total_msec<200)
 	assert(game.gacha_capsule_profile_started_with_placeholder and not game.forest_gacha_ui.capsule.visible and not game.forest_gacha_ui.capsule_open_burst.visible)
@@ -185,9 +219,11 @@ func _test_spin_capsule_and_reveal(game)->void:
 		game.forest_gacha_ui._request_spin();game.forest_gacha_ui._request_spin()
 		assert(await _wait_until(func()->bool:return game.forest_gacha_ui.capsule_ready,2500))
 		assert(game.puku_points==4-run_index and game.forest_gacha_draw_count==run_index+1)
+		var was_discovered:=bool(game.forest_gacha_ui.pending_result.get("was_discovered",false))
 		game.gacha_capsule_profile_total_msec=-1
 		game.forest_gacha_ui._reveal_result();game.forest_gacha_ui._reveal_result()
 		assert(await _wait_until(func()->bool:return game.species_get_overlay.visible,900))
+		assert(game.species_get_overlay.duplicate_gacha_decoration_active==was_discovered and game.species_get_overlay.badge_label.visible!=was_discovered)
 		assert(await _wait_until(func()->bool:return game.gacha_capsule_profile_total_msec>=0,900))
 		assert(game.forest_gacha_ui.last_capsule_first_visual_latency_msec>=0 and game.forest_gacha_ui.last_capsule_first_visual_latency_msec<100 and game.gacha_capsule_profile_total_msec<200)
 		assert(game.gacha_capsule_profile_started_with_placeholder)

@@ -13,7 +13,7 @@ func _ready() -> void:
 	game.audio_manager.apply_settings({"bgm_enabled": false, "se_enabled": false})
 	_prepare_safe_greenhouse(game)
 	_test_localized_copy()
-	_test_language_ui_geometry(game)
+	await _test_language_ui_geometry(game)
 	_test_top_hud_and_speaker_geometry(game)
 	_test_shop_chatter_contract(game)
 	_test_habitat_button_stays_plain(game)
@@ -101,8 +101,20 @@ func _test_language_ui_geometry(game: Node) -> void:
 	var original_play_rect := Rect2(game.play_open_button.position, game.play_open_button.size)
 	for locale in Localizer.SUPPORTED_LANGUAGES:
 		game._set_language(locale)
+		await get_tree().process_frame
 		assert(Rect2(settings_panel.position, settings_panel.size) == original_panel_rect)
 		assert(Rect2(game.play_open_button.position, game.play_open_button.size) == original_play_rect)
+		var expected_font_size:int=16 if locale=="ja" else (13 if locale=="hiragana" else 11)
+		for button_data in [
+			{"button":game.encyclopedia_icon_button,"position":Vector2(398,134)},
+			{"button":game.settings_button,"position":Vector2(478,134)},
+		]:
+			var button:=button_data.button as Button
+			assert(Rect2(button.position,button.size)==Rect2(button_data.position,Vector2(73,55)),"top navigation expanded in %s: %s"%[locale,Rect2(button.position,button.size)])
+			assert(button.clip_text and button.text_overrun_behavior==TextServer.OVERRUN_NO_TRIMMING)
+			assert(button.get_theme_font_size("font_size")==expected_font_size)
+			var text_width:=button.get_theme_font("font").get_string_size(button.text,HORIZONTAL_ALIGNMENT_LEFT,-1,expected_font_size).x
+			assert(text_width<=button.size.x-8.0,"top navigation text does not fit in %s: %s width=%.2f"%[locale,button.text,text_width])
 		assert(game.settings_title_label.custom_minimum_size.x == 420.0)
 		assert(game.settings_language_heading.custom_minimum_size.x == 420.0)
 		for language_button_value in game.language_buttons.values():
@@ -169,6 +181,14 @@ func _test_shop_chatter_contract(game: Node) -> void:
 			assert(not Localizer.text(locale, chatter_key).is_empty())
 		for armadillo_pattern in game.ARMADILLO_SHOP_CHATTER_KEY_PAGES:
 			for chatter_key in armadillo_pattern:assert(not Localizer.text(locale, str(chatter_key)).is_empty())
+		game.language_code=locale
+		game._show_shop_chatter(Localizer.text(locale,"shop_puku_rescue_offer"),true)
+		assert(game.shop_chatter_bubble.position==Vector2(78,86) and game.shop_chatter_bubble.size==Vector2(420,250))
+		assert(is_equal_approx(game.shop_chatter_bubble.position.x+game.shop_chatter_bubble.size.x*.5,288.0))
+		assert(game.shop_chatter_label.horizontal_alignment==HORIZONTAL_ALIGNMENT_CENTER)
+		assert(game.shop_chatter_action_button.visible and game.shop_chatter_action_button.custom_minimum_size.x<=game.shop_chatter_bubble.size.x)
+		game._hide_shop_chatter(true)
+	game.language_code="ja";game._apply_language_to_ui()
 
 
 func _test_habitat_button_stays_plain(game: Node) -> void:

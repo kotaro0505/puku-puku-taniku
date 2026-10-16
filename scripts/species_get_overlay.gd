@@ -4,6 +4,8 @@ extends Control
 signal closed(context:String)
 
 const Localizer=preload("res://scripts/game_localizer.gd")
+const GOLD_BORDER:=Color("#efc65e")
+const DUPLICATE_GACHA_IVORY:=Color("#f2e9d8")
 
 var result_image:TextureRect
 var badge_label:Label
@@ -11,7 +13,9 @@ var name_label:Label
 var series_label:Label
 var hint_label:Label
 var card:PanelContainer
+var image_frame:PanelContainer
 var flash:ColorRect
+var duplicate_gacha_decoration_active:=false
 var current_context:=""
 var current_language:="ja"
 var busy:=false
@@ -27,19 +31,36 @@ func _ready()->void:
 	name="SpeciesGetOverlay";set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);mouse_filter=Control.MOUSE_FILTER_STOP;visible=false;z_index=900
 	var dim:=ColorRect.new();dim.color=Color(0.018,.012,.03,.86);dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);dim.mouse_filter=Control.MOUSE_FILTER_STOP;add_child(dim)
 	flash=ColorRect.new();flash.color=Color(1.0,.94,.62,0.0);flash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);flash.mouse_filter=Control.MOUSE_FILTER_IGNORE;add_child(flash)
-	card=PanelContainer.new();card.position=Vector2(34,112);card.size=Vector2(508,770);card.pivot_offset=card.size*.5;var style:=StyleBoxFlat.new();style.bg_color=Color(.10,.055,.12,.97);style.border_color=Color("#efc65e");style.set_border_width_all(4);style.set_corner_radius_all(34);style.shadow_color=Color(1.0,.63,.18,.28);style.shadow_size=24;card.add_theme_stylebox_override("panel",style);add_child(card)
+	card=PanelContainer.new();card.position=Vector2(34,112);card.size=Vector2(508,770);card.pivot_offset=card.size*.5;add_child(card)
 	var content:=VBoxContainer.new();content.name="SpeciesGetContent";content.alignment=BoxContainer.ALIGNMENT_BEGIN;content.add_theme_constant_override("separation",8);content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);content.offset_left=28;content.offset_top=24;content.offset_right=-28;content.offset_bottom=-24;card.add_child(content)
 	var top_spacer:=Control.new();top_spacer.custom_minimum_size=Vector2(430,38);top_spacer.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.add_child(top_spacer)
 	var badge_slot:=Control.new();badge_slot.name="BadgeSlot";badge_slot.custom_minimum_size=Vector2(430,64);badge_slot.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.add_child(badge_slot)
 	badge_label=Label.new();badge_label.name="BadgeLabel";badge_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);badge_label.offset_top=-30;badge_label.offset_bottom=-30;badge_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;badge_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;badge_label.add_theme_font_size_override("font_size",46);badge_label.add_theme_color_override("font_color",Color("#fff06a"));badge_label.add_theme_color_override("font_outline_color",Color("#8a2c4b"));badge_label.add_theme_constant_override("outline_size",8);badge_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;badge_slot.add_child(badge_label)
-	var glow:=PanelContainer.new();glow.custom_minimum_size=Vector2(420,430);var glow_style:=StyleBoxFlat.new();glow_style.bg_color=Color(1,.91,.63,.06);glow_style.border_color=Color(1,.86,.42,.68);glow_style.set_border_width_all(3);glow_style.set_corner_radius_all(34);glow_style.shadow_color=Color(1,.55,.26,.35);glow_style.shadow_size=22;glow.add_theme_stylebox_override("panel",glow_style);content.add_child(glow)
-	result_image=TextureRect.new();result_image.name="SpeciesImage";result_image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;result_image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;result_image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);result_image.offset_left=18;result_image.offset_top=18;result_image.offset_right=-18;result_image.offset_bottom=-18;result_image.mouse_filter=Control.MOUSE_FILTER_IGNORE;glow.add_child(result_image)
+	image_frame=PanelContainer.new();image_frame.name="SpeciesImageFrame";image_frame.custom_minimum_size=Vector2(420,430);content.add_child(image_frame)
+	result_image=TextureRect.new();result_image.name="SpeciesImage";result_image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;result_image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;result_image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);result_image.offset_left=18;result_image.offset_top=18;result_image.offset_right=-18;result_image.offset_bottom=-18;result_image.mouse_filter=Control.MOUSE_FILTER_IGNORE;image_frame.add_child(result_image)
 	name_label=Label.new();name_label.custom_minimum_size=Vector2(430,64);name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;name_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;name_label.add_theme_font_size_override("font_size",30);name_label.add_theme_color_override("font_color",Color("#fff4dc"));name_label.add_theme_color_override("font_outline_color",Color("#3a1724"));name_label.add_theme_constant_override("outline_size",6);content.add_child(name_label)
 	series_label=Label.new();series_label.name="CatalogPageName";series_label.custom_minimum_size=Vector2(430,32);series_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;series_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;series_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;series_label.add_theme_font_size_override("font_size",19);series_label.add_theme_color_override("font_color",Color("#e6ca90"));series_label.add_theme_color_override("font_outline_color",Color("#3a1724"));series_label.add_theme_constant_override("outline_size",3);series_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.add_child(series_label)
 	hint_label=Label.new();hint_label.custom_minimum_size=Vector2(430,44);hint_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;hint_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;hint_label.add_theme_font_size_override("font_size",17);hint_label.add_theme_color_override("font_color",Color("#ead8c0"));content.add_child(hint_label)
+	_apply_card_decoration(false)
+
+func _apply_card_decoration(duplicate_gacha:bool)->void:
+	duplicate_gacha_decoration_active=duplicate_gacha
+	var card_style:=StyleBoxFlat.new();card_style.bg_color=Color(.10,.055,.12,.97);card_style.border_color=DUPLICATE_GACHA_IVORY if duplicate_gacha else GOLD_BORDER;card_style.set_border_width_all(4);card_style.set_corner_radius_all(34)
+	var frame_style:=StyleBoxFlat.new();frame_style.set_border_width_all(3);frame_style.set_corner_radius_all(34)
+	if duplicate_gacha:
+		card_style.shadow_color=Color(0,0,0,0);card_style.shadow_size=0
+		frame_style.bg_color=Color(.95,.91,.85,.035);frame_style.border_color=Color(DUPLICATE_GACHA_IVORY,.82);frame_style.shadow_color=Color(0,0,0,0);frame_style.shadow_size=0
+		flash.color=Color(0,0,0,0)
+	else:
+		card_style.shadow_color=Color(1.0,.63,.18,.28);card_style.shadow_size=24
+		frame_style.bg_color=Color(1,.91,.63,.06);frame_style.border_color=Color(1,.86,.42,.68);frame_style.shadow_color=Color(1,.55,.26,.35);frame_style.shadow_size=22
+		flash.color=Color(1.0,.94,.62,0.0)
+	card.add_theme_stylebox_override("panel",card_style);image_frame.add_theme_stylebox_override("panel",frame_style)
 
 func show_species(entry:Dictionary,texture:Texture2D,is_new:bool,context:String,language:String,catalog_page_name:String)->void:
 	current_context=context;current_language=Localizer.normalize_language(language);visible=true;busy=true
+	var duplicate_gacha:=context=="forest_gacha" and not is_new
+	_apply_card_decoration(duplicate_gacha)
 	var story_catalog_card:=context=="first_colorata_catalog" or context.begins_with("scripted_dialog_card:")
 	# A late Web image callback from the previous card must never repopulate this
 	# reusable TextureRect. main.gd assigns the new request identity afterwards.
@@ -49,7 +70,7 @@ func show_species(entry:Dictionary,texture:Texture2D,is_new:bool,context:String,
 	badge_label.visible=is_new;badge_label.text=Localizer.text(current_language,"original_catalog_new" if story_catalog_card else "new") if is_new else ""
 	name_label.text=Localizer.species_name(current_language,entry);series_label.text=catalog_page_name.strip_edges();series_label.visible=not series_label.text.is_empty()
 	hint_label.text=Localizer.text(current_language,"tap_to_close")
-	card.scale=Vector2(.56,.56);card.rotation=-.035;flash.color.a=.94
+	card.scale=Vector2(.56,.56);card.rotation=-.035;flash.color.a=0.0 if duplicate_gacha else .94
 	# Forest Gacha already has a dial and capsule lead-in. Its result card settles
 	# sooner so the opening reaction feels continuous without changing other GETs.
 	var scale_seconds:=.28 if context=="forest_gacha" else .44

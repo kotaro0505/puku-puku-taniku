@@ -16,6 +16,7 @@ func _ready()->void:
 	_test_seed_pod_thresholds(game)
 	game.endless_greenhouse.configure(true)
 	_test_fixed_point_and_harvest_curve(game)
+	_test_harvest_result_presentation(game)
 	await _test_sprite3d_render_alignment(game)
 	_test_giant_plant_display_and_hit(game)
 	_test_greenhouse_pan_depth_and_hit(game)
@@ -29,7 +30,7 @@ func _ready()->void:
 	await _test_panda_rescue(game)
 	_test_max_size_record_is_silent(game)
 	game._reset_progression_state();game.queue_free()
-	print("PUKU_POINTS_SMOKE_OK unit=1/1000 round_cost=1.00 direct_harvest=true sprite3d_render_oracle="+sprite3d_render_oracle_status+" legacy_sprite3d_match=1.6,5,10,20,30,40,60,80,100,120cm giant=150,200,300,500,700,1000,1500,2000,10000cm_species3_positions3_speeds1.6+10 transition120=true depth_pan=front_center_rear+left_center_right+tap60+120+150 label_toggle=localized_persistent_on_off+main_only_live_recalc max_record=silent_visual_preserved reward1000+2000=true new_floor=.20 migration=points+legacy_gauge forest_cost=1 rescue=wallet_plus_1 combo=true fly_removed=true result=removed automatic_get=true")
+	print("PUKU_POINTS_SMOKE_OK unit=1/1000 round_cost=1.00 direct_harvest=true harvest_hold=1.40+stackable sprite3d_render_oracle="+sprite3d_render_oracle_status+" legacy_sprite3d_match=1.6,5,10,20,30,40,60,80,100,120cm giant=150,200,300,500,700,1000,1500,2000,10000cm_species3_positions3_speeds1.6+10 transition120=true depth_pan=front_center_rear+left_center_right+tap60+120+150 label_toggle=localized_persistent_on_off+main_only_live_recalc max_record=silent_visual_preserved reward1000+2000=true new_floor=.20 migration=points+legacy_gauge forest_cost=1 rescue=wallet_plus_1 combo=true fly_removed=true result=removed automatic_get=true")
 	get_tree().quit()
 
 func _test_seed_pod_thresholds(game)->void:
@@ -75,6 +76,22 @@ func _test_fixed_point_and_harvest_curve(game)->void:
 	game.puku_balance_units=100;assert(game._change_puku_balance(-200,"test",false,false)==-100 and game.puku_balance_units==0)
 	assert(game._puku_whole_count(4300)==4 and game._puku_fraction_units(4300)==300)
 	assert(game._format_puku_units(2700)=="2.70")
+
+func _test_harvest_result_presentation(game)->void:
+	assert(is_equal_approx(game.HARVEST_RESULT_HOLD_SECONDS,1.40))
+	game._clear_greenhouse_plants();game._spawn_specific_plant("colorata")
+	var plant=game.plants.back();plant.jelly_checks_enabled=false;plant.diameter_cm=40.0
+	game._show_harvest_result(plant,230);game._show_harvest_result(plant,230)
+	var panels:Array[Node]=[]
+	for child in game.effects_layer.get_children():
+		if child is PanelContainer and child.has_meta("hold_seconds"):panels.append(child)
+	assert(panels.size()==2,"consecutive harvest result cards did not coexist: %d"%panels.size())
+	for panel_value in panels:
+		var panel:=panel_value as PanelContainer
+		assert(panel.mouse_filter==Control.MOUSE_FILTER_IGNORE)
+		assert(is_equal_approx(float(panel.get_meta("hold_seconds",0.0)),1.40))
+		panel.free()
+	game._clear_greenhouse_plants()
 
 func _test_live_harvest_preview(game)->void:
 	assert(game.growing_puku_preview_toggle and game.growing_puku_preview_toggle.button_pressed and game.growing_puku_preview_toggle.text=="育成中のぷくコイン表示　ON")
