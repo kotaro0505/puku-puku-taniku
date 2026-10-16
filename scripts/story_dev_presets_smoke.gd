@@ -309,6 +309,7 @@ func _test_restoration_and_101cm_presets() -> void:
 
 func _test_ending_presets() -> void:
 	var game = await _new_game()
+	game.habitat_restoration_ui.ending_sequence_time_scale = 0.005
 	var result: Dictionary = game._apply_story_dev_preset(StoryDevPresetsClass.ENDING_READY)
 	assert(bool(result.get("ok", false)))
 	assert(HabitatRestorationClass.returned_count(game._restoration_state()) == 5)
@@ -319,10 +320,13 @@ func _test_ending_presets() -> void:
 		await get_tree().create_timer(.02).timeout
 	assert(game.habitat_restoration_ui.ending_layer.visible)
 	assert(game.habitat_restoration_ui.slide_index == 0)
-	game.habitat_restoration_ui._advance_ending()
-	game.habitat_restoration_ui._advance_ending()
-	game.habitat_restoration_ui._advance_ending()
-	await get_tree().create_timer(1.0).timeout
+	for expected_slide_index in range(3):
+		await _wait_for_recovery_continue(game.habitat_restoration_ui)
+		assert(game.habitat_restoration_ui.slide_index == expected_slide_index)
+		game.habitat_restoration_ui._advance_ending()
+	var final_dialog_deadline_msec := Time.get_ticks_msec() + 3000
+	while game.scripted_dialog_kind != "restoration_final" and Time.get_ticks_msec() < final_dialog_deadline_msec:
+		await get_tree().create_timer(.02).timeout
 	assert(game.scripted_dialog_kind == "restoration_final")
 	_finish_dialog(game)
 	await get_tree().process_frame
@@ -365,3 +369,10 @@ func _test_ending_presets() -> void:
 func _finish_dialog(game) -> void:
 	while not game.scripted_dialog_kind.is_empty():
 		game._advance_scripted_dialog()
+
+
+func _wait_for_recovery_continue(ui) -> void:
+	var deadline_msec := Time.get_ticks_msec() + 3000
+	while ui.recovery_slide_phase != "await_continue" and Time.get_ticks_msec() < deadline_msec:
+		await get_tree().create_timer(.01).timeout
+	assert(ui.recovery_slide_phase == "await_continue", "recovery narration did not finish fading: phase=%s slide=%s" % [ui.recovery_slide_phase, ui.slide_index])

@@ -59,7 +59,30 @@ func _ready()->void:
 	game._on_shop_panda_tapped();assert(not game.shop_chatter_bubble.visible and game.shop_chatter_label.text==first_chatter)
 	game._on_shop_panda_tapped();assert(game.shop_chatter_bubble.visible and game.shop_chatter_label.text!=first_chatter)
 	var dismiss:=InputEventMouseButton.new();dismiss.button_index=MOUSE_BUTTON_LEFT;dismiss.pressed=true;game._on_shop_chatter_gui_input(dismiss);assert(not game.shop_chatter_bubble.visible)
-	game.puku_points=0;game.old_seed_bags=0;game.normal_seed_bags=0;game.volume_seed_bags=1;game.premium_seed_bags=0;assert(not game._shop_rescue_needed());game.volume_seed_bags=0;game.play_active=true;assert(not game._shop_rescue_needed());game.play_active=false;assert(game._shop_rescue_needed());game._on_shop_panda_tapped();assert(game.shop_chatter_action_button.visible and game.shop_chatter_bubble.position==Vector2(22,86) and "広告" not in game.shop_chatter_label.text);game._on_shop_background_gui_input(dismiss);assert(game.shop_chatter_bubble.visible);game.rescue_reward_in_progress=true;game._on_rescue_reward_ad_completed(false);assert(game.normal_seed_bags==0 and game.shop_chatter_bubble.visible and not game.rescue_reward_in_progress);game._request_rescue_reward_ad();await get_tree().create_timer(.8).timeout;assert(game.normal_seed_bags==1 and not game.rescue_reward_in_progress);game._on_rescue_reward_ad_completed(true);assert(game.normal_seed_bags==1);game._close_shop();game.puku_points=1
+	game.puku_points=0;game.old_seed_bags=0;game.normal_seed_bags=0;game.volume_seed_bags=1;game.premium_seed_bags=0
+	assert(not game._shop_rescue_needed(),"playable volume seeds must suppress shop rescue")
+	game.volume_seed_bags=0;game.play_active=true
+	assert(not game._shop_rescue_needed(),"an active round must suppress shop rescue")
+	game.play_active=false
+	assert(game._shop_rescue_needed(),"an idle player without playable seeds must receive shop rescue")
+	game._on_shop_panda_tapped()
+	assert(game.shop_chatter_action_button.visible,"shop rescue must expose its action button")
+	assert(game.shop_chatter_bubble.size==Vector2(420,250),"shop rescue bubble size changed unexpectedly")
+	assert(game.shop_chatter_bubble.position.is_equal_approx(Vector2(78,86)),"shop rescue bubble must remain horizontally centered; actual=%s"%game.shop_chatter_bubble.position)
+	assert(is_equal_approx(game.shop_chatter_bubble.position.x+game.shop_chatter_bubble.size.x*.5,288.0),"shop rescue bubble center must match the 576px viewport center")
+	assert("広告" not in game.shop_chatter_label.text,"shop rescue copy must describe help rather than advertising")
+	game._on_shop_background_gui_input(dismiss)
+	assert(game.shop_chatter_bubble.visible,"background taps must not dismiss an actionable rescue offer")
+	game.rescue_reward_in_progress=true;game._on_rescue_reward_ad_completed(false)
+	assert(game.normal_seed_bags==0,"an unsuccessful rescue must not grant seeds")
+	assert(game.shop_chatter_bubble.visible,"an unsuccessful rescue must keep the offer visible")
+	assert(not game.rescue_reward_in_progress,"an unsuccessful rescue must clear its in-progress state")
+	game._request_rescue_reward_ad();await get_tree().create_timer(.8).timeout
+	assert(game.normal_seed_bags==1,"a successful rescue must grant exactly one normal seed bag")
+	assert(not game.rescue_reward_in_progress,"a successful rescue must clear its in-progress state")
+	game._on_rescue_reward_ad_completed(true)
+	assert(game.normal_seed_bags==1,"a duplicate completion callback must not grant a second seed bag")
+	game._close_shop();game.puku_points=1
 	assert(game.plants.is_empty() and not game.play_active)
 	assert(game.play_open_button.visible and not game.play_overlay.visible)
 	game._open_play_modal();assert(game.play_overlay.visible);game._close_play_modal();assert(not game.play_overlay.visible)
