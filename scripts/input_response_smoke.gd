@@ -209,7 +209,7 @@ func _test_gacha_response(game: Node) -> int:
 	var capsule_became_ready:=await _wait_until(func() -> bool: return ui.capsule_ready, 900)
 	assert(capsule_became_ready)
 	assert(game.last_forest_gacha_persist_started_msec >= ui.spin_first_visual_msec)
-	assert(game.puku_points == 4 and game.forest_gacha_draw_count == 1)
+	assert(game.puku_points == 2 and game.forest_gacha_draw_count == 1)
 	ui.close_gacha()
 	return ui.last_spin_visual_latency_msec
 

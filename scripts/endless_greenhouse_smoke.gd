@@ -106,7 +106,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	_remove_test_file(NORMAL_PATH)
 	_remove_test_file(EXPERIMENT_PATH)
-	print("ENDLESS_GREENHOUSE_SMOKE_OK default_without_flags=true player_start=true round_seeds=12 round_cost=1 concurrent=5-8_dynamic refill_free=true harvest_direct=true wallet=fixed_point jelly_extra_penalty=false result=removed normal_jelly_rates=1/2.5/5/8 normal_growth=1.6 normal_kakuhen=true non_normal_jelly_rates=1/2/3/4 boundaries=5/10/15 new_roll=max_carryover_x0.4 jelly_new_roll=false discovery_curve=unchanged forced_new=true candidate_pool=uniform early_fantasy=four_series+retry+save+games_1_3_5_6 carryover_independent=true deferred_formal_get=true pending_duplicate=false first_get_floor=once virtual_batch=12 pause=true navigation=habitat+catalog+shop+gacha production_gacha=1puku+species_get fusion=1-2-3puku restoration_pending=true finite=true save_isolated=true")
+	print("ENDLESS_GREENHOUSE_SMOKE_OK default_without_flags=true player_start=true round_seeds=12 round_cost=1 concurrent=5-8_dynamic refill_free=true harvest_direct=true wallet=fixed_point jelly_extra_penalty=false result=removed normal_jelly_rates=1/2.5/5/8 normal_growth=1.6 normal_kakuhen=true non_normal_jelly_rates=1/2/3/4 boundaries=5/10/15 new_roll=max_carryover_x0.4 jelly_new_roll=false discovery_curve=unchanged forced_new=true candidate_pool=uniform early_fantasy=four_series+retry+save+games_1_3_5_6 carryover_independent=true deferred_formal_get=true pending_duplicate=false first_get_floor=once virtual_batch=12 pause=true navigation=habitat+catalog+shop+gacha production_gacha=3puku+species_get fusion=1-2-3puku restoration_pending=true finite=true save_isolated=true")
 	get_tree().quit()
 
 

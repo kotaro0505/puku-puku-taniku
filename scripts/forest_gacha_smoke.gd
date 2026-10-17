@@ -8,14 +8,16 @@ func _ready()->void:
 	await get_tree().process_frame;await get_tree().process_frame
 	game._reset_progression_state();game.opening_story_complete=true;game.intro_story_complete=true;game.first_colorata_confirmed=true;game.trio_originals_confirmed=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.habitat_arrival_started=true;game.habitat_awakened=true;game.habitat_awakening_event_complete=true;game.habitat_tutorial_started=true;game.habitat_tutorial_complete=true;game.seed_shop_open=true;game.panda_beacon_unlocked=true;game.panda_beacon_count=1;game.puku_gauge_intro_complete=true;game.total_play_count=3;game.puku_points=20;game.current_mode="greenhouse";game.story_progression_state["arrangement_unlocked"]=true;game.story_progression_state["arrangement_intro_seen"]=true;game._update_play_ui()
 	_test_assets_and_routes(game)
+	_test_price_and_localization(game)
 	await _test_get_card_decoration(game)
 	_test_removed_status_text(game)
 	_test_draw_rules(game)
 	_test_jurejure_species_gate(game)
 	await _test_spin_capsule_and_reveal(game)
+	_test_repeated_price_debit(game)
 	_test_encounter_save_and_unlock(game)
 	game._reset_progression_state();game.queue_free()
-	print("FOREST_GACHA_SMOKE_OK routes=2 series=uniform new=60 duplicate=40 fallbacks=2 jurejure=pool_all_10 card=new_gold+duplicate_ivory_no_glow+reusable status_text=hidden")
+	print("FOREST_GACHA_SMOKE_OK price=3 wallet=2_blocked+3_allowed+115_to_1 preview=10_to_7 routes=2 series=uniform new=60 duplicate=40 fallbacks=2 jurejure=pool_all_10 card=new_gold+duplicate_ivory_no_glow+reusable status_text=hidden")
 	get_tree().quit()
 
 func _test_assets_and_routes(game)->void:
@@ -25,7 +27,6 @@ func _test_assets_and_routes(game)->void:
 	assert(is_equal_approx(game.fusion_lab_button.position.y-(game.forest_gacha_button.position.y+game.forest_gacha_button.size.y),9.0))
 	assert(game.forest_gacha_button.text=="ガチャ" and "ぷく" not in game.forest_gacha_button.text)
 	assert(Localizer.text("ja","main_forest_gacha")=="ガチャ")
-	assert(game.FOREST_GACHA_SPIN_COST==1 and game.forest_gacha_ui.SPIN_COST_PUKU==1 and Localizer.text("ja","gacha_spin")=="1ぷくコインで回す")
 	assert(Localizer.text("hiragana","main_forest_gacha")=="がちゃ")
 	assert(Localizer.text("en","main_forest_gacha")=="Gacha")
 	assert(Localizer.text("ja","forest_gacha")=="ガチャ" and Localizer.text("ja","shop_category_gacha")=="ガチャ")
@@ -48,6 +49,30 @@ func _test_assets_and_routes(game)->void:
 	assert(game.forest_gacha_intro_seen and game.forest_gacha_button.visible and shop_route.visible)
 	game._open_shop();assert(game.shop_overlay.visible);shop_route.pressed.emit();assert(game.forest_gacha_ui.visible and not game.shop_overlay.visible);game._close_forest_gacha()
 	game._open_forest_gacha();assert(game.forest_gacha_ui.visible);game._close_forest_gacha()
+
+func _test_price_and_localization(game)->void:
+	var ui=game.forest_gacha_ui
+	assert(game.FOREST_GACHA_SPIN_COST==3)
+	assert(ui.SPIN_COST_PUKU==3)
+	var expected_text:={
+		"ja":"3ぷくコインで回す",
+		"hiragana":"3ぷくこいんでまわす",
+		"en":"Spin for 3 Puku Coins",
+	}
+	for test_language in expected_text:
+		ui.set_language(str(test_language))
+		assert(Localizer.text(str(test_language),"gacha_spin")==str(expected_text[test_language]))
+		assert(ui.spin_button.text==str(expected_text[test_language]))
+		assert(ui.spin_button.position==Vector2(148,910) and ui.spin_button.size==Vector2(280,72))
+		var font:Font=ui.spin_button.get_theme_font("font")
+		var font_size:int=ui.spin_button.get_theme_font_size("font_size")
+		var text_width:float=font.get_string_size(ui.spin_button.text,HORIZONTAL_ALIGNMENT_LEFT,-1,font_size).x
+		assert(text_width<=ui.spin_button.size.x-24.0,"gacha spin label clips in %s width=%.2f available=%.2f"%[test_language,text_width,ui.spin_button.size.x-24.0])
+	ui.set_language("ja")
+	ui.set_wallet(2,0);assert(ui.spin_button.disabled and ui.dial_hit_area.disabled)
+	ui.set_wallet(3,0);assert(not ui.spin_button.disabled and not ui.dial_hit_area.disabled)
+	ui.set_wallet(115,0);assert(not ui.spin_button.disabled and not ui.dial_hit_area.disabled)
+	ui.set_wallet(20,0)
 
 func _test_get_card_decoration(game)->void:
 	var overlay=game.species_get_overlay
@@ -174,7 +199,7 @@ func _test_jurejure_species_gate(game)->void:
 	assert(seen_jurejure.size()>1)
 
 func _test_spin_capsule_and_reveal(game)->void:
-	game.puku_points=5;game.forest_gacha_draw_count=0;game.forest_gacha_encountered.clear();game.discovered={"colorata":true};game.greenhouse_available={"colorata":true};game.unlocked_species=game.greenhouse_available.duplicate(true);game.unlocked_series={"base":true};game.story_progression_state["fantasy_unlocked"]=true;game.story_progression_state["pending_story_events"]=[];game.fantasy_first_discovery_seen=true;game.fantasy_realization_seen=true;game._apply_saved_unlocks();game.forest_gacha_ui.animation_time_scale=1.0
+	game.puku_points=9;game.forest_gacha_draw_count=0;game.forest_gacha_encountered.clear();game.discovered={"colorata":true};game.greenhouse_available={"colorata":true};game.unlocked_species=game.greenhouse_available.duplicate(true);game.unlocked_series={"base":true};game.story_progression_state["fantasy_unlocked"]=true;game.story_progression_state["pending_story_events"]=[];game.fantasy_first_discovery_seen=true;game.fantasy_realization_seen=true;game._apply_saved_unlocks();game.forest_gacha_ui.animation_time_scale=1.0
 	var locked_seed:=-1
 	for seed_value in range(1,100):
 		var probe:=RandomNumberGenerator.new();probe.seed=seed_value
@@ -191,7 +216,8 @@ func _test_spin_capsule_and_reveal(game)->void:
 	assert(game.forest_gacha_ui.last_spin_visual_latency_msec>=0 and game.forest_gacha_ui.last_spin_visual_latency_msec<100)
 	for test_language in ["ja","hiragana","en"]:assert(Localizer.text(test_language,"gacha_selecting") not in game.forest_gacha_ui.hint_label.text)
 	assert(await _wait_until(func()->bool:return game.forest_gacha_ui.capsule_ready,2500))
-	assert(game.puku_points==4 and game.forest_gacha_draw_count==1 and game.forest_gacha_ui.capsule_ready and game.forest_gacha_ui.capsule.visible and absf(game.forest_gacha_ui.dial_texture.rotation)>1.0)
+	assert(game.puku_balance_units==6000 and game.puku_points==6 and game.forest_gacha_draw_count==1 and game.forest_gacha_ui.capsule_ready and game.forest_gacha_ui.capsule.visible and absf(game.forest_gacha_ui.dial_texture.rotation)>1.0)
+	var first_balance_after_spin_units:int=game.puku_balance_units
 	var first_was_discovered:=bool(game.forest_gacha_ui.pending_result.get("was_discovered",false))
 	var species_id:=str(game.forest_gacha_ui.pending_result.get("species_id",""));var series_id:=str(game.forest_gacha_ui.pending_result.get("series_id",""));assert(not species_id.is_empty() and series_id!="base" and bool(game.discovered.get(species_id,false)) and bool(game.greenhouse_available.get(species_id,false)))
 	assert(series_id in game.catalog_series_unlock_notice_queue and not game.catalog_series_unlock_overlay.visible)
@@ -211,14 +237,15 @@ func _test_spin_capsule_and_reveal(game)->void:
 	assert(str(game.catalog_cover_species.get(series_id,""))==species_id)
 	assert(game.catalog_series_unlock_overlay.cover_image.texture!=null and game.catalog_series_unlock_overlay.cover_image.texture.resource_path==str(game._catalog_entry(species_id).get("image_path","")))
 	game.catalog_series_unlock_overlay.busy=false;await game.catalog_series_unlock_overlay.close_overlay();await get_tree().process_frame
-	assert(not game.catalog_series_unlock_overlay.visible and not game.forest_gacha_ui.busy)
+	assert(not game.catalog_series_unlock_overlay.visible and not game.forest_gacha_ui.busy and game.puku_balance_units==first_balance_after_spin_units)
 	# Measure all three consecutive openings at production animation speed. Each
 	# second call verifies that duplicate spin/reveal input still cannot charge or
 	# open twice.
 	for run_index in range(1,3):
 		game.forest_gacha_ui._request_spin();game.forest_gacha_ui._request_spin()
 		assert(await _wait_until(func()->bool:return game.forest_gacha_ui.capsule_ready,2500))
-		assert(game.puku_points==4-run_index and game.forest_gacha_draw_count==run_index+1)
+		var expected_balance_units:int=(6-run_index*3)*int(game.PUKU_UNITS_PER_PUKU)
+		assert(game.puku_balance_units==expected_balance_units and game.puku_points==6-run_index*3 and game.forest_gacha_draw_count==run_index+1)
 		var was_discovered:=bool(game.forest_gacha_ui.pending_result.get("was_discovered",false))
 		game.gacha_capsule_profile_total_msec=-1
 		game.forest_gacha_ui._reveal_result();game.forest_gacha_ui._reveal_result()
@@ -232,11 +259,34 @@ func _test_spin_capsule_and_reveal(game)->void:
 		assert(await _wait_until(func()->bool:return not game.species_get_overlay.busy,900));await game.species_get_overlay.close_overlay();await get_tree().process_frame
 		if game.catalog_series_unlock_overlay.visible:
 			game.catalog_series_unlock_overlay.busy=false;await game.catalog_series_unlock_overlay.close_overlay();await get_tree().process_frame
-		assert(not game.species_get_overlay.visible and not game.forest_gacha_ui.busy)
+		assert(not game.species_get_overlay.visible and not game.forest_gacha_ui.busy and game.puku_balance_units==expected_balance_units)
 	assert(profile_totals.size()==3)
+	assert(game.puku_points==0 and game.forest_gacha_ui.spin_button.disabled and game.forest_gacha_ui.dial_hit_area.disabled)
 	print("GACHA_CAPSULE_SMOKE normal_speed run1_ms=",profile_totals[0]," run2_ms=",profile_totals[1]," run3_ms=",profile_totals[2])
 	game._close_forest_gacha()
-	game.puku_balance_units=999;var previous_count:int=game.forest_gacha_draw_count;game._open_forest_gacha();game._spin_forest_gacha();assert(game.forest_gacha_draw_count==previous_count and game.puku_balance_units==999);game._close_forest_gacha()
+	game.puku_balance_units=2000;var previous_count:int=game.forest_gacha_draw_count;game._open_forest_gacha();assert(game.forest_gacha_ui.spin_button.disabled);game._spin_forest_gacha();assert(game.forest_gacha_draw_count==previous_count and game.puku_balance_units==2000 and game.forest_gacha_pending_commit.is_empty());game._close_forest_gacha()
+
+func _test_repeated_price_debit(game)->void:
+	game.forest_gacha_pending_commit.clear();game.puku_points=115;game.forest_gacha_draw_count=0
+	game.forest_gacha_ui.open_gacha(game.puku_points,game.forest_gacha_draw_count)
+	for draw_index in range(38):
+		var before_units:int=game.puku_balance_units
+		game.forest_gacha_pending_commit={"mode":"live","result":{"species_id":"colorata"},"unlocked_series_id":"","next_draw":draw_index+1}
+		game._on_forest_gacha_spin_animation_completed()
+		assert(game.puku_balance_units==before_units-3*game.PUKU_UNITS_PER_PUKU)
+		assert(game.forest_gacha_draw_count==draw_index+1 and game.forest_gacha_pending_commit.is_empty())
+	assert(game.puku_balance_units==game.PUKU_UNITS_PER_PUKU and game.puku_points==1 and game.forest_gacha_draw_count==38)
+	assert(game.forest_gacha_ui.spin_button.disabled and game.forest_gacha_ui.dial_hit_area.disabled)
+	var count_before_blocked:int=game.forest_gacha_draw_count
+	game._spin_forest_gacha()
+	assert(game.puku_balance_units==game.PUKU_UNITS_PER_PUKU and game.forest_gacha_draw_count==count_before_blocked and game.forest_gacha_pending_commit.is_empty())
+	game.forest_gacha_ui.close_gacha()
+	game.forest_gacha_preview_puku_points=10;game.forest_gacha_preview_draw_count=0
+	game.forest_gacha_ui.open_gacha(game.forest_gacha_preview_puku_points,game.forest_gacha_preview_draw_count)
+	game.forest_gacha_pending_commit={"mode":"preview","result":{"species_id":"colorata"},"unlocked_series_id":"","next_draw":1}
+	game._on_forest_gacha_spin_animation_completed()
+	assert(game.forest_gacha_preview_puku_points==7 and game.forest_gacha_preview_draw_count==1 and game.forest_gacha_ui.current_puku_points==7)
+	game.forest_gacha_ui.close_gacha()
 
 func _test_encounter_save_and_unlock(game)->void:
 	var target_id:="gummy_peach_milk";game.unlocked_series.erase("gummy");game.discovered.erase(target_id);game.greenhouse_available.erase(target_id);game.unlocked_species.erase(target_id);game.forest_gacha_encountered={target_id:true};game.forest_gacha_draw_count=9;game.act2_unlocked=true;game.forest_gacha_unlocked=true;game.forest_gacha_intro_seen=true;game._save();game.forest_gacha_encountered.clear();game.forest_gacha_draw_count=0;game.act2_unlocked=false;game.forest_gacha_unlocked=false;game.forest_gacha_intro_seen=false;game._load_save();assert(game.forest_gacha_draw_count==9 and bool(game.forest_gacha_encountered.get(target_id,false)) and not bool(game.discovered.get(target_id,false)))
