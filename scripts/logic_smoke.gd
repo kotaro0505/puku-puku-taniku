@@ -54,6 +54,7 @@ func _ready()->void:
 	for player in game.audio_manager.bgm_players:habitat_players+=1 if player.playing and player.stream==habitat_stream else 0
 	assert(game.current_mode=="habitat" and game.audio_manager.current_bgm_key=="habitat" and habitat_players<=1 and habitat_stream is AudioStreamOggVorbis and habitat_stream.loop and game.audio_manager.bgm_players[game.audio_manager.active_bgm].get_playback_position()<1.0);game._toggle_mode();assert(game.current_mode=="greenhouse" and game.audio_manager.current_bgm_key=="greenhouse");game._set_intro_speaker("panda");assert(game.intro_panda_portrait.visible and (game.intro_panda_portrait.texture as AtlasTexture).atlas.resource_path=="res://assets/panda-clerk.png");game.intro_overlay.visible=false;game.shop_overlay.visible=false;game.tutorial_dialog_kind="";game._update_play_ui()
 	game._open_shop();game._hide_shop_chatter(true);game._on_shop_panda_tapped();var first_chatter:String=game.shop_chatter_label.text
+	var normal_chatter_y:float=float(game.shop_chatter_bubble.position.y)
 	assert(game.shop_chatter_bubble.visible and game.shop_chatter_portrait.visible)
 	assert((game.shop_chatter_portrait.texture as AtlasTexture).atlas.resource_path=="res://assets/panda-clerk.png" and not game.shop_chatter_action_button.visible)
 	game._on_shop_panda_tapped();assert(not game.shop_chatter_bubble.visible and game.shop_chatter_label.text==first_chatter)
@@ -68,7 +69,8 @@ func _ready()->void:
 	game._on_shop_panda_tapped()
 	assert(game.shop_chatter_action_button.visible,"shop rescue must expose its action button")
 	assert(game.shop_chatter_bubble.size==Vector2(420,250),"shop rescue bubble size changed unexpectedly")
-	assert(game.shop_chatter_bubble.position.is_equal_approx(Vector2(78,86)),"shop rescue bubble must remain horizontally centered; actual=%s"%game.shop_chatter_bubble.position)
+	assert(game.shop_chatter_bubble.position.is_equal_approx(Vector2(78,276)),"shop rescue bubble must match the normal chatter height and remain horizontally centered; actual=%s"%game.shop_chatter_bubble.position)
+	assert(is_equal_approx(game.shop_chatter_bubble.position.y,normal_chatter_y),"shop rescue bubble must use the same vertical position as normal panda chatter")
 	assert(is_equal_approx(game.shop_chatter_bubble.position.x+game.shop_chatter_bubble.size.x*.5,288.0),"shop rescue bubble center must match the 576px viewport center")
 	assert("広告" not in game.shop_chatter_label.text,"shop rescue copy must describe help rather than advertising")
 	game._on_shop_background_gui_input(dismiss)

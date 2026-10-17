@@ -2239,6 +2239,7 @@ func _build_arrangement_ui(hud:Control)->void:
 	arrangement_ui.catalog_purchase_requested.connect(_on_catalog_purchase_requested)
 	arrangement_ui.seed_purchase_requested.connect(_buy_seed_bag)
 	arrangement_ui.completion_confetti_requested.connect(_on_arrangement_completion_confetti_requested)
+	arrangement_ui.navigation_hint_safety_changed.connect(_refresh_arrangement_navigation_hint)
 	_sync_arrangement_ui()
 
 func _build_arrangement_navigation_hint(hud:Control)->void:
@@ -2710,7 +2711,7 @@ func _show_shop_chatter(message:String,is_rescue:bool,dialog_mode:="normal",spea
 			if not shop_chatter_acquired_species.has(str(species_id)):shop_chatter_acquired_species.append(str(species_id))
 	shop_chatter_bubble.modulate=Color.WHITE;shop_chatter_bubble.visible=true;shop_chatter_label.text=message;_set_shop_speaker(str(speaker_id))
 	if is_rescue:
-		shop_chatter_bubble.size=Vector2(420,250);shop_chatter_bubble.position=Vector2((576.0-shop_chatter_bubble.size.x)*.5,86)
+		shop_chatter_bubble.size=Vector2(420,250);shop_chatter_bubble.position=Vector2((576.0-shop_chatter_bubble.size.x)*.5,276)
 	elif dialog_mode in ["catalog_restore_offer","catalog_restore_result"]:
 		shop_chatter_bubble.position=Vector2(22,86);shop_chatter_bubble.size=Vector2(420,250)
 	else:
@@ -9139,6 +9140,10 @@ func _arrangement_navigation_hint_safe()->bool:
 	if not _greenhouse_area_navigation_available():return false
 	if arrangement_scene_active:return arrangement_ui!=null and arrangement_ui.is_navigation_hint_safe()
 	return true
+
+func _refresh_arrangement_navigation_hint()->void:
+	if arrangement_navigation_hint:
+		arrangement_navigation_hint.update_hint(language_code,arrangement_scene_active,_arrangement_navigation_hint_safe())
 
 func _unhandled_input(event:InputEvent)->void:
 	if best_record_showcase and best_record_showcase.visible:return

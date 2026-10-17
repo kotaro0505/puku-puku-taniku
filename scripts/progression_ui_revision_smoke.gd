@@ -183,8 +183,9 @@ func _test_shop_chatter_contract(game: Node) -> void:
 			for chatter_key in armadillo_pattern:assert(not Localizer.text(locale, str(chatter_key)).is_empty())
 		game.language_code=locale
 		game._show_shop_chatter(Localizer.text(locale,"shop_puku_rescue_offer"),true)
-		assert(game.shop_chatter_bubble.position==Vector2(78,86) and game.shop_chatter_bubble.size==Vector2(420,250))
+		assert(game.shop_chatter_bubble.position==Vector2(78,276) and game.shop_chatter_bubble.size==Vector2(420,250))
 		assert(is_equal_approx(game.shop_chatter_bubble.position.x+game.shop_chatter_bubble.size.x*.5,288.0))
+		assert(game.shop_chatter_bubble.position.x>=0.0 and game.shop_chatter_bubble.position.y>=0.0 and game.shop_chatter_bubble.position.x+game.shop_chatter_bubble.size.x<=576.0 and game.shop_chatter_bubble.position.y+game.shop_chatter_bubble.size.y<=1024.0)
 		assert(game.shop_chatter_label.horizontal_alignment==HORIZONTAL_ALIGNMENT_CENTER)
 		assert(game.shop_chatter_action_button.visible and game.shop_chatter_action_button.custom_minimum_size.x<=game.shop_chatter_bubble.size.x)
 		game._hide_shop_chatter(true)

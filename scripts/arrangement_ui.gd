@@ -13,6 +13,7 @@ signal catalog_purchase_requested(series_id:String)
 signal seed_purchase_requested(seed_type:String)
 signal world_scroll_input(event:InputEvent)
 signal completion_confetti_requested(layer:Control)
+signal navigation_hint_safety_changed
 
 const PotPlaceholderClass = preload("res://scripts/arrangement_pot_placeholder.gd")
 const ShareBackgroundsClass = preload("res://scripts/arrangement_share_backgrounds.gd")
@@ -461,6 +462,7 @@ func _show_page(page:Control)->void:
 	if page!=share_editor_page:_close_share_background_panel()
 	for candidate in [home_page,editor_page,picker_page,viewer_page,share_editor_page,shop_page,catalog_shop_page,seed_shop_page]:
 		if candidate:candidate.visible=candidate==page
+	navigation_hint_safety_changed.emit()
 
 func is_editor_active()->bool:
 	return visible and editor_page!=null and editor_page.visible
@@ -1275,7 +1277,7 @@ func _build_viewer_page()->void:
 	viewer_artwork_root=Control.new();viewer_artwork_root.name="ViewerArtworkRoot";viewer_artwork_root.size=ShareRendererClass.VIEWER_CANVAS_SIZE;viewer_artwork_root.mouse_filter=Control.MOUSE_FILTER_IGNORE;viewer_artwork_canvas.add_child(viewer_artwork_root)
 	viewer_pot_layer=Control.new();viewer_pot_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);viewer_pot_layer.mouse_filter=Control.MOUSE_FILTER_IGNORE;viewer_artwork_root.add_child(viewer_pot_layer)
 	viewer_plant_layer=Control.new();viewer_plant_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);viewer_plant_layer.z_index=PLANT_LAYER_Z;viewer_plant_layer.mouse_filter=Control.MOUSE_FILTER_IGNORE;viewer_artwork_root.add_child(viewer_plant_layer)
-	viewer_share_button=_button(GameLocalizer.text(language_code,"share_action"),Vector2(28,790),Vector2(248,58),Color("#d7aa64"),18);viewer_share_button.z_index=500;_mark_localized(viewer_share_button,"share_action");viewer_share_button.pressed.connect(_open_share_editor);viewer_page.add_child(viewer_share_button)
+	viewer_share_button=_button(GameLocalizer.text(language_code,"share_action"),Vector2(154,790),Vector2(268,58),Color("#d7aa64"),18);viewer_share_button.z_index=500;_mark_localized(viewer_share_button,"share_action");viewer_share_button.pressed.connect(_open_share_editor);viewer_page.add_child(viewer_share_button)
 	viewer_dismantle_button=_button(GameLocalizer.text(language_code,"arrangement_dismantle"),Vector2(154,892),Vector2(268,58),Color("#b87962"),18);viewer_dismantle_button.z_index=500;_mark_localized(viewer_dismantle_button,"arrangement_dismantle");viewer_dismantle_button.pressed.connect(_show_dismantle_confirmation);viewer_page.add_child(viewer_dismantle_button)
 	_apply_viewer_page_mode()
 

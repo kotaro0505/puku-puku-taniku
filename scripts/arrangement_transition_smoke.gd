@@ -8,7 +8,7 @@ func _ready()->void:
 	await get_tree().process_frame;await get_tree().process_frame
 	game._reset_progression_state();game.story_progression_state["arrangement_unlocked"]=true;game.story_progression_state["arrangement_intro_seen"]=true;game.intro_story_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.habitat_awakened=true;game.habitat_awakening_event_complete=true;game.habitat_tutorial_complete=true;game.seed_shop_open=true;game.panda_beacon_unlocked=true;game.puku_gauge_intro_complete=true;game.total_play_count=3;game.formal_play_count=3
 	game._sync_arrangement_ui()
-	game.opening_overlay.visible=false;game.intro_overlay.visible=false;game.result_overlay.visible=false;game.shop_overlay.visible=false;game.settings_overlay.visible=false;game.encyclopedia_overlay.visible=false;game.play_overlay.visible=false
+	game.opening_finished=true;game.opening_overlay.visible=false;game.intro_overlay.visible=false;game.result_overlay.visible=false;game.shop_overlay.visible=false;game.settings_overlay.visible=false;game.encyclopedia_overlay.visible=false;game.play_overlay.visible=false
 	game.greenhouse_pan_x=0.0;game.greenhouse_pan_target_x=0.0;game.arrangement_transition_x=0.0;game.arrangement_transition_target_x=0.0
 	game._update_play_ui();game._update_greenhouse_pan()
 
@@ -83,14 +83,24 @@ func _ready()->void:
 	var holder_anchor:Vector2=game.arrangement_ui.editor_canvas.position+pot_holder.position+Vector2(pot_holder.size.x*.5,pot_holder.size.y*.94)
 	var lowered_anchor:=expected_anchor+Vector2(0,game.arrangement_ui.POT_VERTICAL_OFFSET)
 	assert(game.arrangement_ui.POT_VERTICAL_OFFSET>0.0 and holder_anchor.distance_to(lowered_anchor)<EPSILON)
-	assert(game.arrangement_ui.is_editor_active() and not game._greenhouse_area_navigation_available())
+	assert(game.arrangement_ui.is_editor_active() and not game._greenhouse_area_navigation_available() and not game.arrangement_navigation_hint.visible)
+	game.arrangement_ui._open_species_picker()
+	assert(game.arrangement_ui.picker_page.visible and not game.arrangement_navigation_hint.visible)
+	game.arrangement_ui._return_to_editor()
+	assert(game.arrangement_ui.is_editor_active() and not game.arrangement_navigation_hint.visible)
 	game._begin_greenhouse_area_drag(Vector2(520,450),true)
 	game._update_greenhouse_area_drag(Vector2(300,450))
 	assert(not game.greenhouse_area_drag_tracking and not game.arrangement_transitioning)
 	game.arrangement_ui._return_home_from_editor()
-	assert(not game.arrangement_ui.is_editor_active() and game._greenhouse_area_navigation_available())
+	assert(not game.arrangement_ui.is_editor_active() and game._greenhouse_area_navigation_available() and game.arrangement_navigation_hint.visible)
 	game.arrangement_ui._open_viewer({"arrangement_id":"gesture_viewer","name":"完成作品","pot_id":"shallow_terracotta","completed":true,"plants":[]})
-	assert(game.arrangement_ui.is_viewer_active() and game.arrangement_ui.viewer_page.visible and not game._greenhouse_area_navigation_available() and not game.arrangement_ui.is_navigation_hint_safe())
+	assert(game.arrangement_ui.is_viewer_active() and game.arrangement_ui.viewer_page.visible and not game._greenhouse_area_navigation_available() and not game.arrangement_ui.is_navigation_hint_safe() and not game.arrangement_navigation_hint.visible)
+	assert(game.arrangement_ui.viewer_share_button.position==Vector2(154,790) and game.arrangement_ui.viewer_share_button.size==Vector2(268,58) and game.arrangement_ui.viewer_share_button.position.x==game.arrangement_ui.viewer_dismantle_button.position.x and game.arrangement_ui.viewer_share_button.size==game.arrangement_ui.viewer_dismantle_button.size)
+	assert(game.arrangement_ui.viewer_share_button.pressed.get_connections().size()>0 and game.arrangement_ui.viewer_dismantle_button.pressed.get_connections().size()>0)
+	game.arrangement_ui.viewer_share_button.pressed.emit()
+	assert(game.arrangement_ui.is_share_editor_active() and not game.arrangement_navigation_hint.visible)
+	game.arrangement_ui._return_from_share_editor()
+	assert(game.arrangement_ui.viewer_page.visible and not game.arrangement_navigation_hint.visible)
 	var viewer_press:=InputEventScreenTouch.new();viewer_press.index=0;viewer_press.position=Vector2(520,450);viewer_press.pressed=true;game.arrangement_ui._on_viewer_world_scroll_input(viewer_press)
 	game._input(viewer_press);assert(not game.greenhouse_area_drag_tracking and not game.arrangement_transitioning)
 	var artwork_start:Vector2=game.arrangement_ui.viewer_artwork_root.position
@@ -99,7 +109,7 @@ func _ready()->void:
 	var viewer_motion:=InputEventMouseMotion.new();viewer_motion.position=Vector2(300,330);game.arrangement_ui._on_viewer_canvas_gui_input(viewer_motion)
 	var viewer_mouse_release:=InputEventMouseButton.new();viewer_mouse_release.button_index=MOUSE_BUTTON_LEFT;viewer_mouse_release.pressed=false;viewer_mouse_release.position=viewer_motion.position;game.arrangement_ui._on_viewer_canvas_gui_input(viewer_mouse_release)
 	assert(game.arrangement_ui.viewer_page.visible and game.arrangement_ui.viewer_artwork_root.position.is_equal_approx(artwork_start+Vector2(40,30)/preview_artwork_scale) and not game.greenhouse_area_drag_tracking and not game.arrangement_transitioning)
-	game.arrangement_ui._return_from_viewer();assert(game.arrangement_ui.home_page.visible and game._greenhouse_area_navigation_available())
+	game.arrangement_ui._return_from_viewer();assert(game.arrangement_ui.home_page.visible and game._greenhouse_area_navigation_available() and game.arrangement_navigation_hint.visible)
 	# The home-to-greenhouse gesture is observed at viewport level so the large
 	# vertical pot ScrollContainer cannot limit it to the bottom strip.  Verify
 	# top, center, pot-list, and bottom starts without consuming taps/verticals.
