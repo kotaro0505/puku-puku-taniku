@@ -23,6 +23,7 @@ func _ready() -> void:
 	_hide_foreground(game)
 	_test_base_catalog_contract(game)
 	_test_mission_copy_and_progress(game)
+	await _test_progress_hud_boot_and_get_card_lifecycle(game)
 	_test_round_navigation_lock(game)
 	_test_new_gate(game)
 	await _test_early_fantasy_candidate_contract(game)
@@ -33,7 +34,7 @@ func _ready() -> void:
 	game._reset_progression_state()
 	game.queue_free()
 	await get_tree().process_frame
-	print("STORY_GUIDANCE_SMOKE_OK mission=single+live new_gate=first_encounter result=removed automatic_formal_get=ordered_multiple pending_duplicate=false nav=hidden arrangement=locked base=originals_only early_fantasy=four_series realization=7_pages_3_locales fusion_fantasy_count=display_series crisis=exploit_locked copy=updated dev_controls=all_builds")
+	print("STORY_GUIDANCE_SMOKE_OK mission=single+live+boot_3_phases progress_hud=get_card_hidden+restored+no_chain_flash new_gate=first_encounter result=removed automatic_formal_get=ordered_multiple pending_duplicate=false nav=hidden arrangement=locked base=originals_only early_fantasy=four_series realization=7_pages_3_locales fusion_fantasy_count=display_series crisis=exploit_locked copy=updated dev_controls=all_builds")
 	get_tree().quit()
 
 
@@ -194,6 +195,181 @@ func _test_mission_copy_and_progress(game: Node) -> void:
 	HabitatRestorationClass.complete_return_event(restoration, 1)
 	HabitatRestorationClass.complete_join_habitat(restoration)
 	assert(game._current_mission_text() == "100cm以上の多肉を5株、原生地へ還そう！　1/5")
+
+
+func _test_progress_hud_boot_and_get_card_lifecycle(game: Node) -> void:
+	_hide_foreground(game)
+	game.language_selected = true
+	game.opening_story_complete = true
+	game.intro_story_complete = true
+	game.habitat_tutorial_complete = true
+	game.mystery_items_acquired = true
+	game.mystery_catalog_tutorial_complete = true
+	game.normal_play_tutorial_complete = true
+	game.total_play_count = 2
+	game.current_mode = "greenhouse"
+	game.play_active = false
+	game.arrangement_scene_active = false
+	game.arrangement_transitioning = false
+	# Keep unrelated pending story work inert while exercising the title-close
+	# refresh that a loaded save uses on a cold start.
+	game.collection_complete_presentation_active = true
+
+	var original_ids: Array[String] = []
+	var fantasy_ids: Array[String] = []
+	var jurejure_ids: Array[String] = []
+	for entry_value in game.catalog_species:
+		if not entry_value is Dictionary:
+			continue
+		if bool(entry_value.get("main_story_original", false)):
+			original_ids.append(str(entry_value.get("species_id", "")))
+		elif game._is_jurejure_species(entry_value):
+			jurejure_ids.append(str(entry_value.get("species_id", "")))
+		elif game._is_fantasy_species(entry_value):
+			fantasy_ids.append(str(entry_value.get("species_id", "")))
+	assert(original_ids.size() >= 8 and fantasy_ids.size() >= 5 and jurejure_ids.size() >= 3)
+
+	# Loaded Act II save: the 24-species mission appears immediately after the
+	# title closes, without requiring a greenhouse round.
+	game.species_get_counts.clear()
+	for index in range(8):game.species_get_counts[original_ids[index]] = 1
+	for index in range(5):game.species_get_counts[fantasy_ids[index]] = 1
+	game.story_progression_state = StoryProgressionClass.default_runtime_state()
+	game.act2_unlocked = true
+	game.act3_unlocked = false
+	game.act3_intro_seen = false
+	game.habitat_crisis_pending = false
+	game.habitat_crisis_started = false
+	for locale in Localizer.SUPPORTED_LANGUAGES:
+		await _assert_loaded_mission_after_title_close(game, locale, Localizer.text(locale, "mission_fantasy_species", [13]))
+
+	# Loaded exploitation save: the JureJure collection mission and its saved
+	# count are present on the first greenhouse frame.
+	game.species_get_counts.clear()
+	for index in range(3):game.species_get_counts[jurejure_ids[index]] = 1
+	game.story_progression_state = StoryProgressionClass.default_runtime_state()
+	game.story_progression_state["exploitation_started"] = true
+	game.act2_unlocked = true
+	game.act3_unlocked = true
+	game.act3_intro_seen = true
+	game.habitat_crisis_pending = false
+	game.habitat_crisis_started = false
+	for locale in Localizer.SUPPORTED_LANGUAGES:
+		await _assert_loaded_mission_after_title_close(game, locale, Localizer.text(locale, "mission_jurejure_species", [3]))
+
+	# Loaded restoration save: both the mission text and the saved lamp count
+	# are restored at title close in every language.
+	game.species_get_counts.clear()
+	game.story_progression_state = StoryProgressionClass.default_runtime_state()
+	game.story_progression_state["exploitation_started"] = true
+	game.story_progression_state["post_crisis_greenhouse_seen"] = true
+	game.act3_unlocked = true
+	game.act3_intro_seen = true
+	game.habitat_crisis_pending = false
+	game.habitat_crisis_started = true
+	var restoration := _restoration_with_returned_count(2)
+	game.story_progression_state["restoration"] = restoration
+	for locale in Localizer.SUPPORTED_LANGUAGES:
+		await _assert_loaded_mission_after_title_close(game, locale, Localizer.text(locale, "mission_return_large", [2]))
+		assert(game.habitat_restoration_ui.lamp_panel.visible)
+		_assert_lit_restoration_lamps(game, 2)
+
+	# The progress widget preserves all saved values at 0/5, mid-progress, and
+	# 5/5. Completion hides mission copy as before, but never mutates the lamps.
+	game.language_code = "ja"
+	for returned_count in [0, 2, 5]:
+		restoration = _restoration_with_returned_count(returned_count)
+		game.story_progression_state["restoration"] = restoration
+		game._refresh_progress_hud()
+		assert(game.habitat_restoration_ui.lamp_panel.visible)
+		_assert_lit_restoration_lamps(game, returned_count)
+		assert(game.mission_panel.visible == (returned_count < HabitatRestorationClass.REQUIRED_RETURNED_PLANTS))
+
+	# A GET card must suppress the complete restoration panel, despite that
+	# panel's higher z-index, then restore it after the final card closes.
+	restoration = _restoration_with_returned_count(2)
+	game.story_progression_state["restoration"] = restoration
+	game._refresh_progress_hud()
+	assert(game.mission_panel.visible and game.habitat_restoration_ui.lamp_panel.visible)
+	game._queue_species_get(game._catalog_entry(original_ids[0]), true, "progress_hud_single", true)
+	assert(game.species_get_overlay.visible)
+	assert(not game.mission_panel.visible and not game.habitat_restoration_ui.lamp_panel.visible)
+	await _close_species_get_for_progress_test(game)
+	assert(game.mission_panel.visible and game.habitat_restoration_ui.lamp_panel.visible)
+	_assert_lit_restoration_lamps(game, 2)
+
+	# Consecutive cards keep the panel hidden across the inter-card render frame.
+	game._queue_species_get(game._catalog_entry(original_ids[0]), true, "progress_hud_chain_1", true)
+	game._queue_species_get(game._catalog_entry(original_ids[1]), true, "progress_hud_chain_2")
+	assert(game.species_get_overlay.visible and not game.habitat_restoration_ui.lamp_panel.visible)
+	game.species_get_overlay.busy = false
+	game.species_get_overlay.close_overlay()
+	var second_card_opened := false
+	for _frame in range(180):
+		await get_tree().process_frame
+		if not game.species_get_overlay.visible:
+			assert(not game.habitat_restoration_ui.lamp_panel.visible, "restoration panel flashed between consecutive GET cards")
+		if game.species_get_overlay.visible and game.species_get_active_context == "progress_hud_chain_2":
+			second_card_opened = true
+			break
+	assert(second_card_opened)
+	assert(not game.mission_panel.visible and not game.habitat_restoration_ui.lamp_panel.visible)
+	await _close_species_get_for_progress_test(game)
+	assert(game.mission_panel.visible and game.habitat_restoration_ui.lamp_panel.visible)
+	_assert_lit_restoration_lamps(game, 2)
+
+	game.collection_complete_presentation_active = false
+	game.language_code = "ja"
+	game._apply_language_to_ui()
+
+
+func _assert_loaded_mission_after_title_close(game: Node, locale: String, expected_text: String) -> void:
+	game.language_code = locale
+	game.opening_finished = false
+	game.opening_overlay.visible = true
+	game.opening_prompt_tween = null
+	game._refresh_progress_hud()
+	assert(not game.mission_panel.visible)
+	game._finish_opening()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert(game.opening_finished and not game.opening_overlay.visible)
+	assert(game.mission_panel.visible, "loaded mission missing after title close locale=%s expected=%s" % [locale, expected_text])
+	assert(game.mission_text_label.text == expected_text)
+
+
+func _restoration_with_returned_count(count: int) -> Dictionary:
+	var restoration := HabitatRestorationClass.default_state()
+	restoration["started"] = true
+	restoration["large_plant_mission_started"] = true
+	var species_ids := ["colorata", "laui", "lutea", "shaviana", "affinis"]
+	for index in range(count):
+		assert(HabitatRestorationClass.add_returned_plant(restoration, {
+			"species_id": species_ids[index],
+			"display_name": species_ids[index],
+			"diameter_cm": 100.0 + float(index) * 10.0,
+			"visual_scale": 7.0,
+			"rarity": "normal",
+			"gold_star_count": 0,
+		}) == index + 1)
+	return restoration
+
+
+func _assert_lit_restoration_lamps(game: Node, expected_count: int) -> void:
+	for index in range(game.habitat_restoration_ui.lamp_labels.size()):
+		assert(game.habitat_restoration_ui.lamp_labels[index].text == ("●" if index < expected_count else "○"))
+
+
+func _close_species_get_for_progress_test(game: Node) -> void:
+	game.species_get_overlay.busy = false
+	game.species_get_overlay.close_overlay()
+	for _frame in range(180):
+		if not game.species_get_overlay.visible:
+			break
+		await get_tree().process_frame
+	assert(not game.species_get_overlay.visible)
+	await get_tree().process_frame
+	await get_tree().process_frame
 
 
 func _test_round_navigation_lock(game: Node) -> void:

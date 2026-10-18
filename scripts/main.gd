@@ -995,6 +995,10 @@ func _continue_after_opening()->void:
 		audio_manager.play_bgm("greenhouse")
 		if total_play_count==0 and not bool(tutorial_steps.get("play_open_guide",false)):call_deferred("_show_tutorial_guide","play_open")
 		else:call_deferred("_try_start_pending_story_event")
+	# The boot-time UI pass runs while the title still covers the greenhouse.
+	# Refresh after the queued foreground action so a resumed mission appears as
+	# soon as the title closes, while conversations/tutorials still suppress it.
+	call_deferred("_refresh_progress_hud")
 
 func _load_species() -> void:
 	var raw := FileAccess.get_file_as_string("res://data/species-v2.json")
@@ -4564,6 +4568,10 @@ func _show_next_species_get()->void:
 	if first_colorata_reveal:_old_colorata_profile_mark("get_card_show_start")
 	var catalog_page_name:=_species_get_catalog_page_name(entry,language_code)
 	species_get_overlay.show_species(entry,texture if texture!=null else CatalogImageLoader.placeholder_texture,bool(queued.get("is_new",true)),species_get_active_context,language_code,catalog_page_name)
+	# Habitat restoration uses a higher canvas order than the shared GET card.
+	# Hide both progress displays in the same frame that the card becomes visible
+	# so no title, green panel, or lamp can flash over the reveal.
+	_refresh_progress_hud()
 	if forest_gacha_reveal:
 		gacha_capsule_profile_started_with_placeholder=species_get_overlay.result_image.texture==CatalogImageLoader.placeholder_texture
 		if forest_gacha_ui:forest_gacha_ui.complete_capsule_reveal_transition()
@@ -4713,10 +4721,18 @@ func _on_species_get_overlay_closed(context:String)->void:
 	species_get_active_species_id=""
 	var closed_series_id:=species_get_active_series_id
 	species_get_active_series_id=""
-	if closed_species_id==CARNICOLOR_FIRST_GET_SPECIES_ID and _start_carnicolor_first_get_dialog(context,closed_series_id):return
+	if closed_species_id==CARNICOLOR_FIRST_GET_SPECIES_ID and _start_carnicolor_first_get_dialog(context,closed_series_id):
+		call_deferred("_refresh_progress_hud")
+		return
 	if not closed_series_id.is_empty() and closed_series_id in catalog_series_unlock_notice_queue:
-		if _show_catalog_series_unlock_notice(closed_series_id,context):return
+		if _show_catalog_series_unlock_notice(closed_series_id,context):
+			call_deferred("_refresh_progress_hud")
+			return
 	_continue_after_species_get_card(context)
+	# Follow-up cards/dialogues are queued above. Refresh after them so a card
+	# sequence never exposes the restoration lamps for a single frame, while the
+	# final close restores the HUD immediately when no foreground remains.
+	call_deferred("_refresh_progress_hud")
 
 func _carnicolor_first_get_dialog_pages(for_language:String)->Array[Dictionary]:
 	return [
@@ -5199,7 +5215,9 @@ func _mission_foreground_safe()->bool:
 		or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) \
 		or (arrangement_ui and arrangement_ui.visible) \
 		or (puku_puku_battle and puku_puku_battle.visible) \
-		or (habitat_restoration_ui and habitat_restoration_ui.is_modal_visible()))
+		or (habitat_restoration_ui and habitat_restoration_ui.is_modal_visible()) \
+		or not species_get_active_context.is_empty() \
+		or not species_get_queue.is_empty())
 
 func _update_mission_ui()->void:
 	if mission_panel==null:return
@@ -5209,6 +5227,32 @@ func _update_mission_ui()->void:
 	var hiragana_fantasy_mission:=language_code=="hiragana" and mission_text==Localizer.text(language_code,"mission_fantasy_species",[mini(24,_unique_act2_species_get_count())])
 	mission_text_label.add_theme_font_size_override("font_size",15 if hiragana_fantasy_mission else 16)
 	mission_panel.visible=not play_active and not mission_text.is_empty() and _mission_foreground_safe() and not arrangement_scene_active and not arrangement_transitioning
+
+func _restoration_progress_hud_safe()->bool:
+	var preview_overlay_open:bool=catalog_preview_ui!=null and catalog_preview_ui.is_overlay_open()
+	var gacha_open:bool=(forest_gacha_ui!=null and forest_gacha_ui.visible) or (species_get_overlay!=null and species_get_overlay.visible) or (catalog_series_unlock_overlay!=null and catalog_series_unlock_overlay.visible) or (fusion_lab_ui!=null and fusion_lab_ui.visible)
+	var battle_open:bool=puku_puku_battle!=null and puku_puku_battle.visible
+	var best_record_showcase_open:bool=best_record_showcase!=null and best_record_showcase.visible
+	var habitat_modal_open:bool=battle_open or (habitat_plant_panel!=null and habitat_plant_panel.visible) or (habitat_dev_panel!=null and habitat_dev_panel.visible) or (story_dev_panel!=null and story_dev_panel.visible) or (habitat_awakening_overlay!=null and habitat_awakening_overlay.visible) or (seed_pod_story_overlay!=null and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay!=null and habitat_second_awakening_overlay.visible)
+	var conversation_navigation_suspended:bool=(intro_overlay!=null and intro_overlay.visible) or not scripted_dialog_kind.is_empty() or not tutorial_dialog_kind.is_empty()
+	var arrangement_navigation_suspended:bool=arrangement_scene_active or arrangement_transitioning or catalog_preview_mode_active or preview_overlay_open or gacha_open or habitat_modal_open or conversation_navigation_suspended or best_record_showcase_open or jurejure_intro_camera_active or habitat_lookaround_active
+	return current_mode=="greenhouse" and not arrangement_navigation_suspended and not arrangement_scene_active \
+		and (opening_overlay==null or not opening_overlay.visible) \
+		and (opening_story_overlay==null or not opening_story_overlay.visible) \
+		and (intro_overlay==null or not intro_overlay.visible) \
+		and (result_overlay==null or not result_overlay.visible) \
+		and (shop_overlay==null or not shop_overlay.visible) \
+		and (encyclopedia_overlay==null or not encyclopedia_overlay.visible) \
+		and (settings_overlay==null or not settings_overlay.visible) \
+		and (play_overlay==null or not play_overlay.visible) \
+		and species_get_active_context.is_empty() \
+		and species_get_queue.is_empty()
+
+func _refresh_progress_hud()->void:
+	_update_mission_ui()
+	if habitat_restoration_ui==null:return
+	var restoration_state:=_restoration_state()
+	habitat_restoration_ui.update_lamps(HabitatRestorationClass.returned_count(restoration_state),HabitatRestorationClass.should_show_progress(restoration_state) and _restoration_progress_hud_safe())
 
 func _update_play_ui()->void:
 	if not play_overlay:return
@@ -5259,11 +5303,7 @@ func _update_play_ui()->void:
 	_update_plant_label_visibility_button()
 	if arrangement_navigation_hint:
 		arrangement_navigation_hint.update_hint(language_code,arrangement_scene_active,_arrangement_navigation_hint_safe())
-	if habitat_restoration_ui:
-		var restoration_hud_safe:=current_mode=="greenhouse" and not arrangement_navigation_suspended and not arrangement_scene_active and (not opening_overlay or not opening_overlay.visible) and (not opening_story_overlay or not opening_story_overlay.visible) and (not intro_overlay or not intro_overlay.visible) and (not result_overlay or not result_overlay.visible) and (not shop_overlay or not shop_overlay.visible) and (not encyclopedia_overlay or not encyclopedia_overlay.visible) and (not settings_overlay or not settings_overlay.visible) and (not play_overlay or not play_overlay.visible)
-		var restoration_state:=_restoration_state()
-		habitat_restoration_ui.update_lamps(HabitatRestorationClass.returned_count(restoration_state),HabitatRestorationClass.should_show_progress(restoration_state) and restoration_hud_safe)
-	_update_mission_ui()
+	_refresh_progress_hud()
 	play_timer_label.text=Localizer.text(language_code,"series_seed_remaining" if active_seed_type.begins_with("series:") else "seed_remaining",[play_seeds_remaining]) if play_timer_label.visible else ""
 	var held:Array[String]=[]
 	if old_seed_bags>0:held.append(Localizer.text(language_code,"bags_held",[Localizer.text(language_code,"old_seed_name"),old_seed_bags]))
