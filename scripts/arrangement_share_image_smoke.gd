@@ -101,7 +101,10 @@ func _ready() -> void:
 	var vertical_layout := ShareRenderer.background_layout(vertical_texture.get_size(), Vector2(0.5, 0.5))
 	assert((vertical_layout.position as Vector2).is_zero_approx() and (vertical_layout.scaled_size as Vector2).is_equal_approx(Vector2(1080.0, 1920.0)))
 	var greenhouse_entry := ShareBackgrounds.entry("greenhouse")
+	assert(str(greenhouse_entry.texture_path) == "res://assets/arrangement/greenhouse-arrangement-area.jpg")
+	assert(str(greenhouse_entry.texture_path) != "res://assets/greenhouse-master-horizontal.png")
 	var greenhouse_texture := load(str(greenhouse_entry.texture_path)) as Texture2D
+	assert(greenhouse_texture.get_size() == Vector2(960.0, 1280.0))
 	var greenhouse_layout := ShareRenderer.background_layout(greenhouse_texture.get_size(), greenhouse_entry.focus)
 	assert(float(greenhouse_layout.scale) > 0.0 and (greenhouse_layout.scaled_size as Vector2).x >= 1080.0 and (greenhouse_layout.scaled_size as Vector2).y >= 1920.0)
 	assert((greenhouse_layout.crop_origin as Vector2).x >= 0.0 and (greenhouse_layout.crop_origin as Vector2).x <= (greenhouse_layout.scaled_size as Vector2).x - 1080.0)

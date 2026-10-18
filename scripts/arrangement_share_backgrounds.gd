@@ -9,7 +9,7 @@ const DEFAULT_ID := "greenhouse"
 const CATALOG := [
 	{
 		"id": "greenhouse",
-		"texture_path": "res://assets/greenhouse-master-horizontal.png",
+		"texture_path": "res://assets/arrangement/greenhouse-arrangement-area.jpg",
 		"name_key": "share_background_greenhouse",
 		"unlock_condition": "always",
 		"unlock_text_key": "share_background_available_from_start",

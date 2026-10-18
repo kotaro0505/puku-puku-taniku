@@ -21,7 +21,8 @@ func _ready()->void:
 	for background_value in share_catalog:
 		var background:Dictionary=background_value;share_ids.append(str(background.id));assert(ResourceLoader.exists(str(background.texture_path)) and background.has("name_key") and background.has("unlock_condition") and background.has("crop_mode") and background.get("focus") is Vector2 and background.get("artwork_rect") is Rect2)
 	assert(share_ids==["greenhouse","puku_members","jurejure_gang","all_characters"] and not share_ids.has("collection_complete"))
-	assert(str(share_catalog[0].texture_path)=="res://assets/greenhouse-master-horizontal.png" and str(share_catalog[0].crop_mode)=="cover")
+	assert(str(share_catalog[0].texture_path)=="res://assets/arrangement/greenhouse-arrangement-area.jpg" and str(share_catalog[0].crop_mode)=="cover")
+	var greenhouse_share_image:Image=(load(str(share_catalog[0].texture_path)) as Texture2D).get_image();assert(greenhouse_share_image.get_size()==Vector2i(960,1280))
 	for background in share_catalog.slice(1):
 		var background_image:Image=(load(str(background.texture_path)) as Texture2D).get_image();assert(background_image.get_size()==Vector2i(720,1280) and str(background.crop_mode)=="native_9_16")
 	var initial_share_unlocks:Dictionary=game._share_background_unlock_states();assert(bool(initial_share_unlocks.greenhouse) and bool(initial_share_unlocks.puku_members) and not bool(initial_share_unlocks.jurejure_gang) and not bool(initial_share_unlocks.all_characters))
