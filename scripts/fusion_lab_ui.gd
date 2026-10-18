@@ -17,14 +17,6 @@ const ENERGY_PARTICLES_PER_WAVE := 8
 const ENERGY_PARTICLE_TRAVEL_SECONDS := 0.42
 const ENERGY_PARTICLE_FADE_SECONDS := 0.18
 const ENERGY_PARTICLE_STAGGER_SECONDS := 0.035
-const ALWAYS_HIDDEN_TIER1_PREVIEW_IDS := {
-	"fus1_jelly_bomb": true,
-	"fus1_pukupuku_planet": true,
-	"fus1_kaleidoscope": true,
-	"fus1_deep_sea_aquarium": true,
-	"fus1_amber_forest": true,
-	"fus1_fruit_terrine": true,
-}
 const SERIES_LABELS := {
 	"ja": {
 		"base": "原種", "neon": "ネオン", "jurejure": "ジュレジュレ団",
@@ -448,16 +440,14 @@ func refresh_selection(parent_a_id: String, parent_b_id: String, result: Diction
 		result_status_label.text = Localizer.text(language, "fusion_result_hint")
 		fuse_button.disabled = true
 	else:
-		result_name_label.text = Localizer.text(language, "fusion_result_unknown") if should_hide_result_name_in_preview(result_entry) else Localizer.species_name(language, result_entry)
+		result_name_label.text = Localizer.text(language, "fusion_result_unknown") if should_hide_result_name_in_preview(result_entry, get_counts) else Localizer.species_name(language, result_entry)
 		result_status_label.text = Localizer.text(language, "fusion_result_new" if is_new else "fusion_result_known")
 		result_image.material = silhouette_material if is_new else null
 		fuse_button.disabled = fusion_processing or not is_new
 
-static func should_hide_result_name_in_preview(result_entry: Dictionary) -> bool:
-	var fusion_tier := int(result_entry.get("fusion_tier", 0))
-	if fusion_tier >= 2:
-		return true
-	return fusion_tier == 1 and ALWAYS_HIDDEN_TIER1_PREVIEW_IDS.has(str(result_entry.get("species_id", "")))
+static func should_hide_result_name_in_preview(result_entry: Dictionary, species_get_history: Dictionary) -> bool:
+	var species_id := str(result_entry.get("species_id", ""))
+	return species_id.is_empty() or int(species_get_history.get(species_id, 0)) <= 0
 
 func set_result_texture(texture: Texture2D) -> void:
 	if result_image:
