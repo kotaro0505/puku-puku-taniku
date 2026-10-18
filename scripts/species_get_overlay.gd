@@ -4,6 +4,7 @@ extends Control
 signal closed(context:String)
 
 const Localizer=preload("res://scripts/game_localizer.gd")
+const SpeciesStarRarityClass=preload("res://scripts/species_star_rarity.gd")
 const GOLD_BORDER:=Color("#efc65e")
 const DUPLICATE_GACHA_IVORY:=Color("#f2e9d8")
 
@@ -11,6 +12,7 @@ var result_image:TextureRect
 var badge_label:Label
 var name_label:Label
 var series_label:Label
+var star_label:Label
 var hint_label:Label
 var card:PanelContainer
 var image_frame:PanelContainer
@@ -33,13 +35,14 @@ func _ready()->void:
 	flash=ColorRect.new();flash.color=Color(1.0,.94,.62,0.0);flash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);flash.mouse_filter=Control.MOUSE_FILTER_IGNORE;add_child(flash)
 	card=PanelContainer.new();card.position=Vector2(34,112);card.size=Vector2(508,770);card.pivot_offset=card.size*.5;add_child(card)
 	var content:=VBoxContainer.new();content.name="SpeciesGetContent";content.alignment=BoxContainer.ALIGNMENT_BEGIN;content.add_theme_constant_override("separation",8);content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);content.offset_left=28;content.offset_top=24;content.offset_right=-28;content.offset_bottom=-24;card.add_child(content)
-	var top_spacer:=Control.new();top_spacer.custom_minimum_size=Vector2(430,38);top_spacer.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.add_child(top_spacer)
+	var top_spacer:=Control.new();top_spacer.custom_minimum_size=Vector2(430,30);top_spacer.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.add_child(top_spacer)
 	var badge_slot:=Control.new();badge_slot.name="BadgeSlot";badge_slot.custom_minimum_size=Vector2(430,64);badge_slot.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.add_child(badge_slot)
 	badge_label=Label.new();badge_label.name="BadgeLabel";badge_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);badge_label.offset_top=-30;badge_label.offset_bottom=-30;badge_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;badge_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;badge_label.add_theme_font_size_override("font_size",46);badge_label.add_theme_color_override("font_color",Color("#fff06a"));badge_label.add_theme_color_override("font_outline_color",Color("#8a2c4b"));badge_label.add_theme_constant_override("outline_size",8);badge_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;badge_slot.add_child(badge_label)
-	image_frame=PanelContainer.new();image_frame.name="SpeciesImageFrame";image_frame.custom_minimum_size=Vector2(420,430);content.add_child(image_frame)
+	image_frame=PanelContainer.new();image_frame.name="SpeciesImageFrame";image_frame.custom_minimum_size=Vector2(420,405);content.add_child(image_frame)
 	result_image=TextureRect.new();result_image.name="SpeciesImage";result_image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;result_image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;result_image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);result_image.offset_left=18;result_image.offset_top=18;result_image.offset_right=-18;result_image.offset_bottom=-18;result_image.mouse_filter=Control.MOUSE_FILTER_IGNORE;image_frame.add_child(result_image)
 	name_label=Label.new();name_label.custom_minimum_size=Vector2(430,64);name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;name_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;name_label.add_theme_font_size_override("font_size",30);name_label.add_theme_color_override("font_color",Color("#fff4dc"));name_label.add_theme_color_override("font_outline_color",Color("#3a1724"));name_label.add_theme_constant_override("outline_size",6);content.add_child(name_label)
 	series_label=Label.new();series_label.name="CatalogPageName";series_label.custom_minimum_size=Vector2(430,32);series_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;series_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;series_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;series_label.add_theme_font_size_override("font_size",19);series_label.add_theme_color_override("font_color",Color("#e6ca90"));series_label.add_theme_color_override("font_outline_color",Color("#3a1724"));series_label.add_theme_constant_override("outline_size",3);series_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.add_child(series_label)
+	star_label=Label.new();star_label.name="SpeciesStars";star_label.custom_minimum_size=Vector2(430,30);star_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;star_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;star_label.add_theme_font_size_override("font_size",22);star_label.add_theme_color_override("font_color",SpeciesStarRarityClass.STAR_COLOR);star_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.add_child(star_label)
 	hint_label=Label.new();hint_label.custom_minimum_size=Vector2(430,44);hint_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;hint_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;hint_label.add_theme_font_size_override("font_size",17);hint_label.add_theme_color_override("font_color",Color("#ead8c0"));content.add_child(hint_label)
 	_apply_card_decoration(false)
 
@@ -69,6 +72,7 @@ func show_species(entry:Dictionary,texture:Texture2D,is_new:bool,context:String,
 	result_image.texture=texture
 	badge_label.visible=is_new;badge_label.text=Localizer.text(current_language,"original_catalog_new" if story_catalog_card else "new") if is_new else ""
 	name_label.text=Localizer.species_name(current_language,entry);series_label.text=catalog_page_name.strip_edges();series_label.visible=not series_label.text.is_empty()
+	star_label.text=SpeciesStarRarityClass.star_text(entry);star_label.visible=not star_label.text.is_empty()
 	hint_label.text=Localizer.text(current_language,"tap_to_close")
 	card.scale=Vector2(.56,.56);card.rotation=-.035;flash.color.a=0.0 if duplicate_gacha else .94
 	# Forest Gacha already has a dial and capsule lead-in. Its result card settles

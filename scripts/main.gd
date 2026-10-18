@@ -14,6 +14,7 @@ const CatalogPreviewDevClass = preload("res://scripts/catalog_preview_dev.gd")
 const ForestGachaSystemClass = preload("res://scripts/forest_gacha_system.gd")
 const ForestGachaUIClass = preload("res://scripts/forest_gacha_ui.gd")
 const SpeciesGetOverlayClass = preload("res://scripts/species_get_overlay.gd")
+const SpeciesStarRarityClass = preload("res://scripts/species_star_rarity.gd")
 const CatalogSeriesUnlockOverlayClass = preload("res://scripts/catalog_series_unlock_overlay.gd")
 const FusionSystemClass = preload("res://scripts/fusion_system.gd")
 const FusionLabUIClass = preload("res://scripts/fusion_lab_ui.gd")
@@ -143,11 +144,13 @@ const CATALOG_BUTTON_POSITION := Vector2(398.0,134.0)
 const SETTINGS_BUTTON_POSITION := Vector2(478.0,134.0)
 const NORMAL_SEED_UNLOCKED_NEW_RATE := 0.03
 const NORMAL_SEED_LOCKED_NEW_RATE := 0.01
-const NORMAL_SEED_NO_STAR_RATE := 0.81
-const NORMAL_SEED_ONE_STAR_RATE := 0.10
-const NORMAL_SEED_TWO_STAR_RATE := 0.05
-const NORMAL_SEED_ONE_STAR_START := 0.85
-const NORMAL_SEED_TWO_STAR_START := 0.95
+const NORMAL_SEED_TWO_STAR_RATE := 0.005
+const NORMAL_SEED_THREE_STAR_RATE := 0.001
+const NORMAL_SEED_FOUR_STAR_RATE := 0.0003
+const NORMAL_SEED_FUSION_TOTAL_RATE := NORMAL_SEED_TWO_STAR_RATE+NORMAL_SEED_THREE_STAR_RATE+NORMAL_SEED_FOUR_STAR_RATE
+const BATTLE_TWO_STAR_REWARD_RATE := 0.05
+const BATTLE_THREE_STAR_REWARD_RATE := 0.01
+const BATTLE_FOUR_STAR_REWARD_RATE := 0.003
 const SEED_PACK_CONFIG := {
 	"normal":{"count":12,"rare":0.10,"super":0.05,"new":NORMAL_SEED_UNLOCKED_NEW_RATE+NORMAL_SEED_LOCKED_NEW_RATE},
 	"volume":{"count":36,"rare":0.10,"super":0.05,"new":0.03},
@@ -316,6 +319,8 @@ var jurejure_battle_win_count := 0
 var jurejure_habitat_visit_point := Vector2(-1.0,-1.0)
 var jurejure_pending_reward_species_id := ""
 var jurejure_pending_reward_is_new := false
+var jurejure_pending_fusion_reward_species_id := ""
+var jurejure_pending_fusion_reward_is_new := false
 var jurejure_last_battle_result: Dictionary = {}
 var act3_first_battle_active := false
 var habitat_second_awakened := false
@@ -1053,20 +1058,7 @@ func _load_series_data() -> void:
 	species_picker_series_catalog=_build_species_picker_series_catalog()
 
 func _load_collection_rarity()->void:
-	var by_id:Dictionary={}
-	for entry_value in catalog_species:
-		if entry_value is Dictionary:
-			var entry:Dictionary=entry_value;entry["gold_star_count"]=0;entry["collection_rarity"]="normal";by_id[str(entry.get("species_id",""))]=entry
-	var parsed=JSON.parse_string(FileAccess.get_file_as_string("res://data/collection-rarity.json"))
-	if not parsed is Dictionary:return
-	for series_id_value in parsed:
-		var rule=parsed[series_id_value]
-		if not rule is Dictionary:continue
-		var two_star_id:=str(rule.get("two_star",""))
-		if by_id.has(two_star_id):by_id[two_star_id]["gold_star_count"]=2;by_id[two_star_id]["collection_rarity"]="super_rare"
-		for one_star_value in rule.get("one_star",[]):
-			var one_star_id:=str(one_star_value)
-			if by_id.has(one_star_id):by_id[one_star_id]["gold_star_count"]=1;by_id[one_star_id]["collection_rarity"]="super_rare"
+	SpeciesStarRarityClass.apply_to_catalog(catalog_species)
 
 func _load_pot_data()->void:
 	pot_catalog.clear()
@@ -1127,6 +1119,8 @@ func _load_save() -> void:
 	collection_complete_catalog_ready_before_fade_in=false
 	jurejure_pending_reward_species_id=""
 	jurejure_pending_reward_is_new=false
+	jurejure_pending_fusion_reward_species_id=""
+	jurejure_pending_fusion_reward_is_new=false
 	pending_round_new_species_ids.clear()
 	round_result_species_finalize_queue.clear()
 	round_result_species_finalize_active=false
@@ -3064,7 +3058,7 @@ func _finish_scripted_dialog()->void:
 		"jurejure_post_ending":
 			show_jurejure_choice=true
 		"jurejure_battle_win":
-			queue_jurejure_reward=not jurejure_pending_reward_species_id.is_empty()
+			queue_jurejure_reward=not jurejure_pending_reward_species_id.is_empty() or not jurejure_pending_fusion_reward_species_id.is_empty()
 		"jurejure_growth_mid":
 			jurejure_growth_event_mask|=1
 		"jurejure_growth_late":
@@ -3136,7 +3130,11 @@ func _finish_scripted_dialog()->void:
 	elif start_act3_first_battle and puku_puku_battle:call_deferred("_start_act3_first_puku_puku_battle")
 	elif show_jurejure_choice and puku_puku_battle:call_deferred("_show_jurejure_battle_choice")
 	elif queue_jurejure_reward:
-		var reward_species_id:=jurejure_pending_reward_species_id;var reward_is_new:=jurejure_pending_reward_is_new;jurejure_pending_reward_species_id="";jurejure_pending_reward_is_new=false;call_deferred("_queue_species_get_by_id",reward_species_id,reward_is_new,"jurejure_battle")
+		var reward_species_id:=jurejure_pending_reward_species_id;var reward_is_new:=jurejure_pending_reward_is_new
+		var fusion_reward_species_id:=jurejure_pending_fusion_reward_species_id;var fusion_reward_is_new:=jurejure_pending_fusion_reward_is_new
+		jurejure_pending_reward_species_id="";jurejure_pending_reward_is_new=false;jurejure_pending_fusion_reward_species_id="";jurejure_pending_fusion_reward_is_new=false
+		if not reward_species_id.is_empty():call_deferred("_queue_species_get_by_id",reward_species_id,reward_is_new,"jurejure_battle")
+		if not fusion_reward_species_id.is_empty():call_deferred("_queue_species_get_by_id",fusion_reward_species_id,fusion_reward_is_new,"jurejure_battle_fusion_bonus")
 	elif show_arrangement_swipe_intro:call_deferred("_play_arrangement_swipe_intro")
 	else:call_deferred("_try_start_pending_story_event")
 	if open_catalog:
@@ -4462,7 +4460,7 @@ func _spin_forest_gacha()->void:
 		if not _trial_dev_controls_enabled():forest_gacha_ui.cancel_spin_feedback();return
 		if forest_gacha_preview_puku_points<FOREST_GACHA_SPIN_COST:forest_gacha_ui.cancel_spin_feedback();return
 		var preview_next:=forest_gacha_preview_draw_count+1
-		var preview_result:Dictionary=forest_gacha_system.draw({INITIAL_SERIES_ID:true},forest_gacha_preview_discovered,forest_gacha_preview_encountered,forest_gacha_rng)
+		var preview_result:Dictionary=forest_gacha_system.draw({INITIAL_SERIES_ID:true},forest_gacha_preview_discovered,forest_gacha_preview_encountered,forest_gacha_rng,false,{},_random_fusion_source_unlocks())
 		if preview_result.is_empty():forest_gacha_ui.cancel_spin_feedback();return
 		if str(preview_result.get("source",""))=="locked":preview_result["source"]="unlocked"
 		forest_gacha_pending_commit={"mode":"preview","result":preview_result.duplicate(true),"unlocked_series_id":"","next_draw":preview_next};last_forest_gacha_persist_started_msec=-1
@@ -4470,7 +4468,7 @@ func _spin_forest_gacha()->void:
 	if forest_gacha_trial_dev_mode:
 		if not _trial_dev_controls_enabled():forest_gacha_ui.cancel_spin_feedback();return
 		var trial_next:=forest_gacha_draw_count+1
-		var trial_result:Dictionary=forest_gacha_system.draw(unlocked_series,discovered,forest_gacha_encountered,forest_gacha_rng,StoryProgressionClass.fantasy_is_unlocked(story_progression_state),jurejure_species_unlocked)
+		var trial_result:Dictionary=forest_gacha_system.draw(unlocked_series,discovered,forest_gacha_encountered,forest_gacha_rng,StoryProgressionClass.fantasy_is_unlocked(story_progression_state),jurejure_species_unlocked,_random_fusion_source_unlocks())
 		if trial_result.is_empty():forest_gacha_ui.cancel_spin_feedback();return
 		var trial_unlocked_series_id:=""
 		if str(trial_result.get("source",""))=="locked":
@@ -4481,7 +4479,7 @@ func _spin_forest_gacha()->void:
 	if not _can_afford_puku_units(forest_cost_units):
 		forest_gacha_ui.cancel_spin_feedback();forest_gacha_ui.set_wallet(puku_points,forest_gacha_draw_count);return
 	var next_draw:=forest_gacha_draw_count+1
-	var result:Dictionary=forest_gacha_system.draw(unlocked_series,discovered,forest_gacha_encountered,forest_gacha_rng,StoryProgressionClass.fantasy_is_unlocked(story_progression_state),jurejure_species_unlocked)
+	var result:Dictionary=forest_gacha_system.draw(unlocked_series,discovered,forest_gacha_encountered,forest_gacha_rng,StoryProgressionClass.fantasy_is_unlocked(story_progression_state),jurejure_species_unlocked,_random_fusion_source_unlocks())
 	if result.is_empty():forest_gacha_ui.cancel_spin_feedback();return
 	var unlocked_series_id:=""
 	if str(result.get("source",""))=="locked":
@@ -4901,7 +4899,7 @@ func _reset_progression_state()->void:
 	first_old_seed_harvest_checkpoint_saved=false
 	first_colorata_confirmed=false;first_old_seed_stage=FIRST_OLD_SEED_STAGE_NOT_RECEIVED;first_old_seed_recovery_dirty=false;trio_originals_confirmed=false;carnicolor_first_get_dialog_seen=false;carnicolor_first_get_dialog_pending=false;habitat_arrival_started=false;habitat_awakened=false;habitat_awakening_event_complete=false;seed_shop_open=false;mystery_items_acquired=false;mystery_catalog_tutorial_complete=false;normal_play_tutorial_complete=false;seed_pod_gauge_discovery_complete=false;seed_pod_first_reward_seen=false;initial_seed_stock_notice_complete=false;puku_buyback_tutorial_complete=false;puku_buyback_tutorial_active=false;puku_buyback_tutorial_index=0;habitat_returned_species.clear();special_series_explanation_seen=false;pending_special_series_explanation=false;main_story_stage=StoryProgressionClass.ACT_1;main_story_complete=false;main_story_completion_seen=false;catalog_series_unlock_notice_queue.clear();catalog_series_unlock_notice_ready.clear()
 	act2_unlocked=false;story_progression_state=StoryProgressionClass.default_runtime_state();forest_gacha_unlocked=false;forest_gacha_intro_seen=false;fantasy_first_discovery_seen=false;fantasy_realization_seen=false;act3_unlocked=false;act3_intro_pending=false;act3_intro_seen=false;jurejure_pool_unlocked=false;jurejure_species_unlocked.clear();jurejure_species_first_seen=false;habitat_crisis_pending=false;habitat_crisis_started=false;finale_complete=false;habitat_return_dialog_seen=false
-	original_catalog_complete_event_seen=false;habitat_tutorial_returned_to_greenhouse=false;jurejure_intro_complete=false;jurejure_enabled=false;jurejure_growth_stage=JureJureSystemClass.GROWTH_EARLY;jurejure_growth_event_mask=0;active_jurejure_event={};jurejure_next_check_unix=0.0;jurejure_cooldown_until_unix=0.0;jurejure_return_event_complete=false;jurejure_waiting_for_seed_pod_reward=false;jurejure_battle_count=0;jurejure_battle_win_count=0;jurejure_habitat_visit_point=Vector2(-1.0,-1.0);jurejure_pending_reward_species_id="";jurejure_pending_reward_is_new=false;jurejure_last_battle_result.clear();act3_first_battle_active=false;habitat_second_awakened=false;habitat_second_awakening_complete=false;jurejure_update_accumulator=0.0
+	original_catalog_complete_event_seen=false;habitat_tutorial_returned_to_greenhouse=false;jurejure_intro_complete=false;jurejure_enabled=false;jurejure_growth_stage=JureJureSystemClass.GROWTH_EARLY;jurejure_growth_event_mask=0;active_jurejure_event={};jurejure_next_check_unix=0.0;jurejure_cooldown_until_unix=0.0;jurejure_return_event_complete=false;jurejure_waiting_for_seed_pod_reward=false;jurejure_battle_count=0;jurejure_battle_win_count=0;jurejure_habitat_visit_point=Vector2(-1.0,-1.0);jurejure_pending_reward_species_id="";jurejure_pending_reward_is_new=false;jurejure_pending_fusion_reward_species_id="";jurejure_pending_fusion_reward_is_new=false;jurejure_last_battle_result.clear();act3_first_battle_active=false;habitat_second_awakened=false;habitat_second_awakening_complete=false;jurejure_update_accumulator=0.0
 	first_seed_pod_reward_event_active=false;habitat_visit_id=0;jurejure_focused_habitat_visit_id=-1;act3_intro_eligible_visit_id=0;habitat_crisis_eligible_visit_id=0
 	if habitat_crisis_atmosphere:habitat_crisis_atmosphere.deactivate()
 	_cancel_puku_gauge_animations();puku_gauge_cm=0.0;puku_balance_units=0;show_growing_puku_preview=true;bests.clear();discovered.clear();species_get_counts.clear();catalog_cover_species.clear();unlocked_series={INITIAL_SERIES_ID:true};series_seed_inventory.clear();forest_gacha_draw_count=0;forest_gacha_encountered.clear();active_series_seed_id="";owned_pots={DEFAULT_POT_ID:1};saved_arrangements.clear();arrangement_save_capacity=ARRANGEMENT_SAVE_CAPACITY;greenhouse_available=_initial_greenhouse_state();unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;opening_story_complete=false;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;puku_gauge_intro_complete=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;login_bonus_date="";armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();result_deferred_species_queue.clear();pending_round_new_species_ids.clear();round_result_species_finalize_queue.clear();round_result_species_finalize_active=false;round_result_species_save_pending=false;shop_chatter_acquired_species.clear();species_get_queue.clear();play_share_record.clear();play_active=false;play_time_remaining=0.0;play_harvest_cm_total=0.0;play_puku_reward_units_total=0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;greenhouse_round_followup_started=false;_reset_endless_economy_stats();rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_time_multiplier=1;habitat_simulation_unix=Time.get_unix_time_from_system();habitat_debug_log.clear();habitat_scroll_tutorial_active=false;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_clear_habitat_items();_save();_update_currency_ui();_update_play_ui()
@@ -6773,6 +6771,13 @@ func _species_available_in_current_era(entry:Dictionary)->bool:
 	# pre-awakening acquisition route.
 	return bool(discovered.get(str(entry.get("species_id","")),false))
 
+func _random_fusion_source_unlocks()->Dictionary:
+	return {
+		2:StoryProgressionClass.fantasy_is_unlocked(story_progression_state),
+		3:StoryProgressionClass.fusion_lab_is_unlocked(story_progression_state),
+		4:act3_unlocked,
+	}
+
 func _register_species_discovery(species_id:String,count_get:=true,check_collection_complete:=true)->bool:
 	var profile_first_colorata:=old_colorata_profile_active and species_id==FIRST_STORY_SPECIES_ID and count_get
 	if profile_first_colorata:_old_colorata_profile_mark("registration_lookup_start")
@@ -7525,7 +7530,8 @@ func _refresh_encyclopedia_cards()->void:
 		image_frame.add_child(image);encyclopedia_card_images.append(image);encyclopedia_card_entries.append(entry)
 		var name_label:=Label.new();name_label.text=Localizer.species_name(language_code,entry) if identity_visible else "？？？";name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name_label.add_theme_font_size_override("font_size",18);name_label.add_theme_color_override("font_color",UI_BROWN);content.add_child(name_label)
 		var best_label_card:=Label.new();var card_best:=float(bests.get(species_id,0.0));best_label_card.text=(Localizer.text(language_code,"self_best",[card_best]) if card_best>0.0 else Localizer.text(language_code,"self_best_none")) if found else Localizer.text(language_code,"undiscovered");best_label_card.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;best_label_card.add_theme_font_size_override("font_size",14);best_label_card.add_theme_color_override("font_color",Color("#79543a"));content.add_child(best_label_card)
-		var get_label_card:=Label.new();get_label_card.text="GET %d"%_species_get_count(species_id) if found else "GET 0";get_label_card.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;get_label_card.add_theme_font_size_override("font_size",13);get_label_card.add_theme_color_override("font_color",Color("#98602e"));content.add_child(get_label_card)
+		var get_label_card:=Label.new();get_label_card.name="SpeciesCardGetCount";get_label_card.text="GET %d"%_species_get_count(species_id) if found else "GET 0";get_label_card.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;get_label_card.add_theme_font_size_override("font_size",13);get_label_card.add_theme_color_override("font_color",Color("#98602e"));content.add_child(get_label_card)
+		var star_label_card:=_species_star_label(entry,_species_get_count(species_id)>0,17,"SpeciesCardStars");content.add_child(star_label_card)
 		if found:card.pressed.connect(_open_species_detail.bind(entry))
 	call_deferred("_update_encyclopedia_visible_textures")
 
@@ -7925,6 +7931,13 @@ func _open_species_detail(entry:Dictionary)->void:
 	var name_label:=Label.new();name_label.name="SpeciesName";name_label.text=Localizer.species_name(language_code,entry) if found or _catalog_identity_visible_before_get(entry) else "？？？";name_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name_label.add_theme_font_size_override("font_size",31);name_label.add_theme_color_override("font_color",UI_BROWN);content.add_child(name_label)
 	var best_detail:=Label.new();best_detail.name="SpeciesBest";var best_cm:=float(bests.get(species_id,0.0));best_detail.text=Localizer.text(language_code,"self_best",[best_cm]) if found and best_cm>0.0 else Localizer.text(language_code,"self_best_none");best_detail.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;best_detail.add_theme_font_size_override("font_size",23);best_detail.add_theme_color_override("font_color",Color("#98602e"));content.add_child(best_detail)
 	var get_detail:=Label.new();get_detail.name="SpeciesGetCount";get_detail.text="GET %d"%_species_get_count(species_id) if found else "GET 0";get_detail.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;get_detail.add_theme_font_size_override("font_size",20);get_detail.add_theme_color_override("font_color",Color("#7f5a3d"));content.add_child(get_detail)
+	var star_detail:=_species_star_label(entry,_species_get_count(species_id)>0,24,"SpeciesDetailStars");content.add_child(star_detail)
+
+func _species_star_label(entry:Dictionary,identity_visible:bool,font_size:int,node_name:String)->Label:
+	var label:=Label.new();label.name=node_name;label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	label.text=SpeciesStarRarityClass.star_text(entry) if identity_visible else ""
+	label.visible=not label.text.is_empty();label.add_theme_font_size_override("font_size",font_size);label.add_theme_color_override("font_color",SpeciesStarRarityClass.STAR_COLOR)
+	return label
 
 func _box(bg: Color, border: Color, radius: int, width: int) -> StyleBoxFlat:
 	var s:=StyleBoxFlat.new(); s.bg_color=bg; s.border_color=border
@@ -8375,6 +8388,11 @@ func _select_species_for_seed(seed_type:String,forced_category_roll:float=-1.0)-
 	var normal_pool:Array=[];var rare_pool:Array=[];var super_pool:Array=[];var any_pool:Array=[]
 	for entry in catalog_species:
 		if not _species_available_in_current_era(entry):continue
+		# Fusion species are never promoted into a legacy seed-pack pool after
+		# acquisition. Ordinary play can draw them only through the explicit
+		# 2/3/4-star windows in _select_normal_seed_species; five-star stays
+		# fusion-only under every seed-pack path.
+		if SpeciesStarRarityClass.is_fusion_species(entry):continue
 		var species_id:=str(entry.get("species_id",""))
 		var is_found:=_species_get_count(species_id)>0
 		# Route-only species stay exclusive to their dedicated acquisition route,
@@ -8414,14 +8432,20 @@ func _select_species_for_seed(seed_type:String,forced_category_roll:float=-1.0)-
 func _normal_seed_selection_pools()->Dictionary:
 	var unlocked_new_candidates:Array=[]
 	var locked_new_candidates:Array=[]
-	var known_by_stars:Array=[[],[],[]]
-	var all_known:Array=[]
+	var normal_known:Array=[]
+	var fusion_by_stars:Dictionary={2:[],3:[],4:[]}
+	var fusion_unlocks:=_random_fusion_source_unlocks()
 	for entry in catalog_species:
-		if not _species_available_in_current_era(entry):continue
 		var species_id:=str(entry.get("species_id",""))
 		if species_id.is_empty() or species_id in pending_round_new_species_ids:continue
-		# Legacy rarity is consulted only for the established exclusion rule. The
-		# normal-seed rarity category itself comes exclusively from gold_star_count.
+		var stars:=SpeciesStarRarityClass.stars_for(entry)
+		if stars>=2:
+			if stars<=4 and SpeciesStarRarityClass.random_source_unlocked(stars,fusion_unlocks):
+				(fusion_by_stars[stars] as Array).append(entry)
+			continue
+		if not _species_available_in_current_era(entry):continue
+		# Legacy rarity remains only as a route exclusion. It never determines the
+		# new star rank or probability.
 		if str(entry.get("rarity","")) in ["隠し原種","謎品種"]:continue
 		if _species_get_count(species_id)<=0:
 			if _seed_new_species_blocked(species_id):continue
@@ -8430,40 +8454,50 @@ func _normal_seed_selection_pools()->Dictionary:
 			elif _normal_seed_locked_series_eligible(species_id) and not bool(forest_gacha_encountered.get(species_id,false)):locked_new_candidates.append(entry)
 			continue
 		if not bool(greenhouse_available.get(species_id,false)):continue
-		var stars:=clampi(int(entry.get("gold_star_count",0)),0,2)
-		known_by_stars[stars].append(entry)
-		all_known.append(entry)
+		normal_known.append(entry)
 	return {
 		"unlocked_new":unlocked_new_candidates,
 		"locked_new":locked_new_candidates,
-		"known_by_stars":known_by_stars,
-		"all_known":all_known,
+		"normal_known":normal_known,
+		"all_known":normal_known,
+		"fusion_by_stars":fusion_by_stars,
 	}
 
 func _select_normal_seed_species(forced_category_roll:float=-1.0,allow_random_new:=true)->Dictionary:
 	var pools:=_normal_seed_selection_pools()
 	var unlocked_new_candidates:Array=pools.get("unlocked_new",[])
 	var locked_new_candidates:Array=pools.get("locked_new",[])
-	var known_by_stars:Array=pools.get("known_by_stars",[[],[],[]])
-	var all_known:Array=pools.get("all_known",[])
+	var normal_known:Array=pools.get("normal_known",[])
+	var fusion_by_stars:Dictionary=pools.get("fusion_by_stars",{})
 	var category_roll:=rng.randf() if forced_category_roll<0.0 else clampf(forced_category_roll,0.0,.999999)
-	if allow_random_new and category_roll<NORMAL_SEED_UNLOCKED_NEW_RATE:
+	var fusion_stars:=_normal_seed_fusion_rank_for_roll(category_roll)
+	if fusion_stars>0:
+		var fusion_pool:Array=fusion_by_stars.get(fusion_stars,[])
+		if not fusion_pool.is_empty():return fusion_pool[rng.randi_range(0,fusion_pool.size()-1)]
+		# A locked/empty fusion rank becomes an ordinary known plant. It must not
+		# inflate another fusion rank or the established NEW guarantees.
+		return _uniform_normal_seed_fallback(normal_known)
+	# The fusion windows occupy the first 0.63% of the one-seed roll. The old
+	# unlocked/locked NEW guarantees keep their exact absolute 3% and 1% windows
+	# immediately afterwards; the rest is a uniform zero/one-star normal draw.
+	var normal_roll:=category_roll-NORMAL_SEED_FUSION_TOTAL_RATE
+	if allow_random_new and normal_roll<NORMAL_SEED_UNLOCKED_NEW_RATE:
 		if not unlocked_new_candidates.is_empty():return unlocked_new_candidates[rng.randi_range(0,unlocked_new_candidates.size()-1)]
-		return _uniform_normal_seed_fallback(all_known)
-	if allow_random_new and category_roll<NORMAL_SEED_UNLOCKED_NEW_RATE+NORMAL_SEED_LOCKED_NEW_RATE:
+		return _uniform_normal_seed_fallback(normal_known)
+	if allow_random_new and normal_roll<NORMAL_SEED_UNLOCKED_NEW_RATE+NORMAL_SEED_LOCKED_NEW_RATE:
 		if not locked_new_candidates.is_empty():
 			var locked_choice:Dictionary=locked_new_candidates[rng.randi_range(0,locked_new_candidates.size()-1)].duplicate(true)
 			locked_choice["_deferred_series_get"]=true
 			return locked_choice
-		return _uniform_normal_seed_fallback(all_known)
-	var target_stars:=0
-	# Explicit cumulative boundaries avoid floating-point addition moving the
-	# exact 85% and 95% category edges.
-	if category_roll>=NORMAL_SEED_TWO_STAR_START:target_stars=2
-	elif category_roll>=NORMAL_SEED_ONE_STAR_START:target_stars=1
-	var target_pool:Array=known_by_stars[target_stars]
-	if target_pool.is_empty():return _uniform_normal_seed_fallback(all_known)
-	return target_pool[rng.randi_range(0,target_pool.size()-1)]
+		return _uniform_normal_seed_fallback(normal_known)
+	return _uniform_normal_seed_fallback(normal_known)
+
+func _normal_seed_fusion_rank_for_roll(roll:float)->int:
+	var normalized:=clampf(roll,0.0,.999999)
+	if normalized<NORMAL_SEED_TWO_STAR_RATE:return 2
+	if normalized<NORMAL_SEED_TWO_STAR_RATE+NORMAL_SEED_THREE_STAR_RATE:return 3
+	if normalized<NORMAL_SEED_FUSION_TOTAL_RATE:return 4
+	return 0
 
 func _eligible_endless_forced_new_candidates()->Array[Dictionary]:
 	var pools:=_normal_seed_selection_pools()
@@ -8778,7 +8812,7 @@ func _start_puku_puku_battle(link_opponent_harvest_to_player:=false)->void:
 		_play_current_area_bgm()
 		_update_play_ui();return
 	act3_first_battle_active=link_opponent_harvest_to_player
-	jurejure_last_battle_result.clear();jurejure_pending_reward_species_id="";jurejure_pending_reward_is_new=false
+	jurejure_last_battle_result.clear();jurejure_pending_reward_species_id="";jurejure_pending_reward_is_new=false;jurejure_pending_fusion_reward_species_id="";jurejure_pending_fusion_reward_is_new=false
 	if audio_manager:audio_manager.play_bgm("puku_battle")
 	puku_puku_battle.start_battle(entries,textures,language_code,0,link_opponent_harvest_to_player);_update_play_ui()
 
@@ -8833,6 +8867,29 @@ func _grant_jurejure_battle_reward()->String:
 	_register_species_discovery(species_id,true);_apply_saved_unlocks();_sync_arrangement_ui()
 	return species_id
 
+func _grant_random_fusion_battle_reward(forced_roll:float=-1.0)->String:
+	var roll:=rng.randf() if forced_roll<0.0 else clampf(forced_roll,0.0,.999999)
+	var stars:=_battle_fusion_reward_rank_for_roll(roll)
+	if stars==0 or not SpeciesStarRarityClass.random_source_unlocked(stars,_random_fusion_source_unlocks()):return ""
+	var candidates:Array[Dictionary]=[]
+	for entry_value in catalog_species:
+		if entry_value is Dictionary and SpeciesStarRarityClass.stars_for(entry_value)==stars:candidates.append(entry_value)
+	if candidates.is_empty():return ""
+	var chosen:Dictionary=candidates[rng.randi_range(0,candidates.size()-1)]
+	var species_id:=str(chosen.get("species_id",""))
+	jurejure_pending_fusion_reward_is_new=_species_get_count(species_id)<=0
+	_register_species_discovery(species_id,true);_apply_saved_unlocks();_sync_arrangement_ui()
+	return species_id
+
+func _battle_fusion_reward_rank_for_roll(roll:float)->int:
+	var normalized:=clampf(roll,0.0,.999999)
+	if normalized<BATTLE_TWO_STAR_REWARD_RATE:return 2
+	# Use exact cumulative edges so 0.060 and 0.063 cannot drift into the
+	# preceding bucket through binary floating-point addition.
+	if normalized<0.060:return 3
+	if normalized<0.063:return 4
+	return 0
+
 func _apply_jurejure_battle_loss(forced_puku_roll:int=-1)->Dictionary:
 	if _is_post_ending_jurejure_battle():return {"puku_lost":0,"puku_penalty_roll":0,"friendly":true}
 	# randi_range includes both endpoints, so each integer amount has the same
@@ -8853,6 +8910,8 @@ func _on_puku_puku_battle_resolved(result:Dictionary)->void:
 		if act3_first_battle_active:StoryProgressionClass.complete_act3_first_battle(story_progression_state)
 		jurejure_battle_win_count+=1;jurejure_waiting_for_seed_pod_reward=not StoryProgressionClass.exploitation_is_started(story_progression_state)
 		jurejure_pending_reward_species_id=_grant_jurejure_battle_reward()
+		jurejure_pending_fusion_reward_species_id=_grant_random_fusion_battle_reward()
+		jurejure_last_battle_result["fusion_bonus_species_id"]=jurejure_pending_fusion_reward_species_id
 	else:
 		var penalty:=_apply_jurejure_battle_loss()
 		for key in penalty:jurejure_last_battle_result[key]=penalty[key]

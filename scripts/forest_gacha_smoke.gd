@@ -12,12 +12,13 @@ func _ready()->void:
 	await _test_get_card_decoration(game)
 	_test_removed_status_text(game)
 	_test_draw_rules(game)
+	_test_star_rank_draw_distribution()
 	_test_jurejure_species_gate(game)
 	await _test_spin_capsule_and_reveal(game)
 	_test_repeated_price_debit(game)
 	_test_encounter_save_and_unlock(game)
 	game._reset_progression_state();game.queue_free()
-	print("FOREST_GACHA_SMOKE_OK price=3 wallet=2_blocked+3_allowed+115_to_1 preview=10_to_7 routes=2 series=uniform new=60 duplicate=40 fallbacks=2 jurejure=pool_all_10 card=new_gold+duplicate_ivory_no_glow+reusable status_text=hidden")
+	print("FOREST_GACHA_SMOKE_OK price=3 ranks=95+4+0.8+0.2+0 five_star=never normal_species=uniform rank_new=60 duplicate=40 empty_rank=no_upper_transfer wallet=2_blocked+3_allowed+115_to_1 card=new_gold+duplicate_ivory_no_glow+stars")
 	get_tree().quit()
 
 func _test_assets_and_routes(game)->void:
@@ -147,7 +148,7 @@ func _test_draw_rules(game)->void:
 func _test_new_duplicate_draw_rate()->void:
 	var system=ForestGachaSystemClass.new()
 	var series_catalog:Array=[{"series_id":"mix","display_name":"mix","unlock_type":"future","species_ids":["new_a","new_b","owned_a","owned_b"]}]
-	var species_catalog:Array=[{"species_id":"new_a"},{"species_id":"new_b"},{"species_id":"owned_a"},{"species_id":"owned_b"}]
+	var species_catalog:Array=[{"species_id":"new_a","series_id":"mix"},{"species_id":"new_b","series_id":"mix"},{"species_id":"owned_a","series_id":"mix"},{"species_id":"owned_b","series_id":"mix"}]
 	system.configure(series_catalog,species_catalog,{"normal_series":[{"series_id":"mix"}]})
 	var discovered:Dictionary={"owned_a":true,"owned_b":true};var test_rng:=RandomNumberGenerator.new();test_rng.seed=20261016
 	var new_count:=0;var duplicate_count:=0
@@ -166,7 +167,7 @@ func _test_uniform_ten_series_weights()->void:
 	for index in range(10):
 		var series_id:="uniform_%02d"%index;var species_id:="uniform_species_%02d"%index
 		series_catalog.append({"series_id":series_id,"display_name":series_id,"unlock_type":"future","species_ids":[species_id]})
-		species_catalog.append({"species_id":species_id,"rarity":"common"})
+		species_catalog.append({"species_id":species_id,"series_id":series_id,"rarity":"common"})
 		normal_series.append({"series_id":series_id})
 	system.configure(series_catalog,species_catalog,{"normal_series":normal_series})
 	var pool:Array[Dictionary]=system.eligible_series();assert(pool.size()==10)
@@ -178,6 +179,86 @@ func _test_uniform_ten_series_weights()->void:
 	for series_entry in pool:
 		var ratio:=float(counts.get(str(series_entry.get("series_id","")),0))/30000.0
 		assert(ratio>.085 and ratio<.115)
+
+func _test_star_rank_draw_distribution()->void:
+	var system=ForestGachaSystemClass.new()
+	assert(system._roll_star_rank(.0)==0)
+	assert(system._roll_star_rank(.949999)==0)
+	assert(system._roll_star_rank(.950)==2)
+	assert(system._roll_star_rank(.989999)==2)
+	assert(system._roll_star_rank(.990)==3)
+	assert(system._roll_star_rank(.997999)==3)
+	assert(system._roll_star_rank(.998)==4)
+	assert(system._roll_star_rank(.999999)==4)
+	var series_catalog:Array=[
+		{"series_id":"normal","display_name":"normal","unlock_type":"default","species_ids":["n0a","n0b","n1a","n1b"]},
+		{"series_id":"hybrid","display_name":"hybrid","unlock_type":"future","species_ids":["r2n","r2d"]},
+		{"series_id":"fusion_tier1","display_name":"tier1","unlock_type":"future","species_ids":["r3n","r3d"]},
+		{"series_id":"fusion_tier2","display_name":"tier2","unlock_type":"future","species_ids":["r4n","r4d"]},
+		{"series_id":"fusion_tier3","display_name":"tier3","unlock_type":"future","species_ids":["r5n"]},
+	]
+	var species_catalog:Array=[
+		{"species_id":"n0a","series_id":"normal","star_rating":0},{"species_id":"n0b","series_id":"normal","star_rating":0},
+		{"species_id":"n1a","series_id":"normal","star_rating":1},{"species_id":"n1b","series_id":"normal","star_rating":1},
+		{"species_id":"r2n","series_id":"hybrid","star_rating":2},{"species_id":"r2d","series_id":"hybrid","star_rating":2},
+		{"species_id":"r3n","series_id":"fusion_tier1","star_rating":3},{"species_id":"r3d","series_id":"fusion_tier1","star_rating":3},
+		{"species_id":"r4n","series_id":"fusion_tier2","star_rating":4},{"species_id":"r4d","series_id":"fusion_tier2","star_rating":4},
+		{"species_id":"r5n","series_id":"fusion_tier3","star_rating":5},
+	]
+	system.configure(series_catalog,species_catalog,{"normal_series":[{"series_id":"normal"}]})
+	var unlocks:Dictionary={2:true,3:true,4:true};var unlocked_series:Dictionary={"normal":true}
+	var test_rng:=RandomNumberGenerator.new();test_rng.seed=20261018
+	var counts:Dictionary={0:0,2:0,3:0,4:0,5:0}
+	for sample_index in range(1000000):
+		var stars:int=system._roll_star_rank(test_rng.randf());counts[stars]=int(counts.get(stars,0))+1
+	assert(_ratio(int(counts[0]),1000000)>.948 and _ratio(int(counts[0]),1000000)<.952)
+	assert(_ratio(int(counts[2]),1000000)>.039 and _ratio(int(counts[2]),1000000)<.041)
+	assert(_ratio(int(counts[3]),1000000)>.0075 and _ratio(int(counts[3]),1000000)<.0085)
+	assert(_ratio(int(counts[4]),1000000)>.0017 and _ratio(int(counts[4]),1000000)<.0023)
+	assert(int(counts[5])==0)
+	# All four ordinary species share the same 95% pool. Star 1 never changes an
+	# individual species' chance.
+	var species_counts:Dictionary={};test_rng.seed=202610181
+	for sample_index in range(40000):
+		var result:Dictionary=system.draw(unlocked_series,{}, {},test_rng,true,{},unlocks,.5)
+		var species_id:=str(result.get("species_id",""));species_counts[species_id]=int(species_counts.get(species_id,0))+1
+	for species_id in ["n0a","n0b","n1a","n1b"]:
+		var ratio:=_ratio(int(species_counts.get(species_id,0)),40000)
+		assert(ratio>.24 and ratio<.26,"ordinary gacha species not uniform: %s=%f"%[species_id,ratio])
+	assert(not species_counts.has("r5n"))
+	# NEW 60/duplicate 40 is applied after the rank roll, independently inside
+	# every populated rank.
+	var discovered:Dictionary={"n0b":true,"n1b":true,"r2d":true,"r3d":true,"r4d":true,"r5n":true}
+	var forced_rolls:Dictionary={0:.5,2:.96,3:.995,4:.999};test_rng.seed=20261019
+	for stars_value in [0,2,3,4]:
+		var new_count:=0
+		for sample_index in range(20000):
+			var result:Dictionary=system.draw(unlocked_series,discovered,{},test_rng,true,{},unlocks,float(forced_rolls[stars_value]))
+			var result_stars:=int(result.get("star_rating",-1))
+			assert(result_stars<=1 if stars_value==0 else result_stars==stars_value)
+			if not bool(result.get("was_discovered",false)):new_count+=1
+		var new_ratio:=_ratio(new_count,20000)
+		assert(new_ratio>.54 and new_ratio<.66,"rank-local NEW ratio stars=%d ratio=%f"%[stars_value,new_ratio])
+	# Completing every ordinary and fusion candidate changes only NEW/duplicate
+	# selection; it never raises a higher rank.
+	var all_discovered:Dictionary={}
+	for entry in species_catalog:all_discovered[str(entry.get("species_id",""))]=true
+	for stars_value in [0,2,3,4]:
+		for sample_index in range(100):
+			var result:Dictionary=system.draw(unlocked_series,all_discovered,{},test_rng,true,{},unlocks,float(forced_rolls[stars_value]))
+			var result_stars:=int(result.get("star_rating",-1))
+			assert(bool(result.get("was_discovered",false)) and (result_stars<=1 if stars_value==0 else result_stars==stars_value))
+	# If rank 3 has no eligible candidate, its 0.8% falls back to normal. It does
+	# not get transferred to rank 4.
+	var missing_rank3_unlocks:Dictionary={2:true,3:false,4:true};test_rng.seed=20261021
+	for sample_index in range(1000):
+		var missing_result:Dictionary=system.draw(unlocked_series,{}, {},test_rng,true,{},missing_rank3_unlocks,.995)
+		assert(int(missing_result.get("star_rating",-1))<=1)
+		var four_result:Dictionary=system.draw(unlocked_series,{}, {},test_rng,true,{},missing_rank3_unlocks,.999)
+		assert(int(four_result.get("star_rating",-1))==4)
+
+func _ratio(count:int,total:int)->float:
+	return float(count)/float(total)
 
 func _test_jurejure_species_gate(game)->void:
 	var jurejure_entries:Array[Dictionary]=game._series_species_entries("jurejure")

@@ -644,6 +644,7 @@ func _assert_transparent_catalog_image(image_path: String, expected_size: Vector
 
 func _test_game_flow(game) -> void:
 	game._reset_progression_state()
+	game.story_progression_state["fantasy_unlocked"] = true
 	game.story_progression_state["fusion_lab_unlocked"] = true
 	game.story_progression_state["fusion_lab_intro_seen"] = true
 	game.opening_story_complete = true
@@ -803,7 +804,8 @@ func _test_game_flow(game) -> void:
 	var known_ids: Dictionary = {}
 	for entry in normal_pools.get("all_known", []):
 		known_ids[str(entry.get("species_id", ""))] = true
-	assert(known_ids.has(hybrid_id))
+	assert(not known_ids.has(hybrid_id))
+	assert((normal_pools.get("fusion_by_stars", {}).get(2, []) as Array).any(func(entry: Dictionary) -> bool: return str(entry.get("species_id", "")) == hybrid_id))
 	assert(game._seed_new_species_blocked("hyb_gummy_glow"))
 	assert(game._select_species_for_seed("mystery").is_empty())
 	var hybrid_resolution: Dictionary = game.fusion_system.resolve(hybrid_id, glow_id)
@@ -970,7 +972,8 @@ func _test_tier1_game_flow(game) -> void:
 	game._request_species_texture(game._catalog_entry(result_id), known_image, true)
 	assert(known_image.texture != null and known_image.material == null)
 	var normal_pools: Dictionary = game._normal_seed_selection_pools()
-	assert((normal_pools.get("all_known", []) as Array).any(func(entry: Dictionary) -> bool: return str(entry.get("species_id", "")) == result_id))
+	assert(not (normal_pools.get("all_known", []) as Array).any(func(entry: Dictionary) -> bool: return str(entry.get("species_id", "")) == result_id))
+	assert((normal_pools.get("fusion_by_stars", {}).get(3, []) as Array).any(func(entry: Dictionary) -> bool: return str(entry.get("species_id", "")) == result_id))
 	assert(game._seed_new_species_blocked("fus1_pukupuku_planet"))
 	game._save()
 	game.discovered.erase(result_id)
@@ -984,6 +987,7 @@ func _test_tier1_game_flow(game) -> void:
 
 func _test_tier2_game_flow(game) -> void:
 	game._reset_progression_state()
+	game.act3_unlocked = true
 	game.story_progression_state["fusion_lab_unlocked"] = true
 	game.story_progression_state["fusion_lab_intro_seen"] = true
 	game.fusion_lab_ui.close_lab()
@@ -1064,7 +1068,8 @@ func _test_tier2_game_flow(game) -> void:
 	game._request_species_texture(game._catalog_entry(result_id), known_image, true)
 	assert(known_image.texture != null and known_image.material == null)
 	var normal_pools: Dictionary = game._normal_seed_selection_pools()
-	assert((normal_pools.get("all_known", []) as Array).any(func(entry: Dictionary) -> bool: return str(entry.get("species_id", "")) == result_id))
+	assert(not (normal_pools.get("all_known", []) as Array).any(func(entry: Dictionary) -> bool: return str(entry.get("species_id", "")) == result_id))
+	assert((normal_pools.get("fusion_by_stars", {}).get(4, []) as Array).any(func(entry: Dictionary) -> bool: return str(entry.get("species_id", "")) == result_id))
 	assert(game._seed_new_species_blocked("fus2_abyss_glass"))
 	game._save()
 	game.discovered.erase(result_id)
@@ -1079,6 +1084,7 @@ func _test_tier2_game_flow(game) -> void:
 
 func _test_terminal_tier2_discovery_flow(game) -> void:
 	game._reset_progression_state()
+	game.act3_unlocked = true
 	game.opening_story_complete = true
 	game.intro_story_complete = true
 	game.habitat_awakened = true
@@ -1103,11 +1109,15 @@ func _test_terminal_tier2_discovery_flow(game) -> void:
 	var normal_pool_ids: Array[String] = []
 	for entry in game._normal_seed_selection_pools().get("all_known", []):
 		normal_pool_ids.append(str(entry.get("species_id", "")))
+	var four_star_pool_ids: Array[String] = []
+	for entry in game._normal_seed_selection_pools().get("fusion_by_stars", {}).get(4, []):
+		four_star_pool_ids.append(str(entry.get("species_id", "")))
 	var eligible_parent_ids: Array[String] = []
 	for entry in game.fusion_system.eligible_parents(game.species_get_counts):
 		eligible_parent_ids.append(str(entry.get("species_id", "")))
 	for result_id in result_ids:
-		assert(result_id in normal_pool_ids)
+		assert(result_id not in normal_pool_ids)
+		assert(result_id in four_star_pool_ids)
 		assert(result_id in eligible_parent_ids)
 	game._save()
 	for result_id in result_ids:

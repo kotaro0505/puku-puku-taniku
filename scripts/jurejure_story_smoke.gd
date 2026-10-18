@@ -240,6 +240,9 @@ func _test_battle_win_and_respawn(game: Node) -> void:
 	assert(game.puku_puku_battle.player_spawned == 6 and game.puku_puku_battle.opponent_spawned == 6)
 	assert(game.puku_puku_battle.battle_layer.get_node_or_null("BattleBackground") is TextureRect)
 
+	# Keep this legacy victory-flow scenario on the ordinary reward path. The
+	# fusion-bonus path has its own fixed-roll coverage in species_rarity_smoke.
+	game.rng.seed = 20261018
 	game.puku_puku_battle.debug_force_result(420.0, 180.0)
 	await get_tree().process_frame
 	assert(game.audio_manager.current_bgm_key == "puku_battle")

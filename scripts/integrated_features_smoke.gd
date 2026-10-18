@@ -11,28 +11,29 @@ func _ready()->void:
 	_test_one_time_gift_arrangement_and_share(game)
 	_test_removed_mystery_pod()
 	game._reset_progression_state();game.queue_free();await get_tree().process_frame
-	print("INTEGRATED_FEATURES_SMOKE_OK selection_metadata=1x2+2x1 player_rarity_ui=removed localization=3 gift=once arrangement=free-scale result_share=removed arrangement_share=preserved mystery_pod=removed")
+	print("INTEGRATED_FEATURES_SMOKE_OK star_rarity=64+64+66+22+21+5 flat_symbol_ui=true localization=3 gift=once arrangement=free-scale result_share=removed arrangement_share=preserved mystery_pod=removed")
 	get_tree().quit()
 
 func _test_catalog_and_collection_rarity(game)->void:
 	assert(game._series_entry("common").is_empty() and game._series_species_entries("common").is_empty())
 	assert(Localizer.series_name("ja",game._series_entry("base"))=="原種")
 	assert(game._series_species_entries("base").size()==12)
-	var rarity_data=JSON.parse_string(FileAccess.get_file_as_string("res://data/collection-rarity.json"));assert(rarity_data is Dictionary)
-	for series_value in game.series_catalog:
-		if not series_value is Dictionary:continue
-		var series:Dictionary=series_value;var ids:Array=series.get("species_ids",[]);var series_id:=str(series.get("series_id",""))
-		if series_id in ["base", "hybrid", "fusion_tier1", "fusion_tier2", "fusion_tier3"]:continue
-		if ids.size()<3:continue
-		assert(rarity_data.has(series_id))
-		var two_star:=0;var one_star:=0
-		for entry in game._series_species_entries(series_id):
-			var stars:=int(entry.get("gold_star_count",0));two_star+=1 if stars==2 else 0;one_star+=1 if stars==1 else 0
-			assert(stars in [0,1,2])
-		assert(two_star==1 and one_star==2)
-	# Collection rarity is metadata only; it must not overwrite spawn rarity.
+	assert(not FileAccess.file_exists("res://data/collection-rarity.json"))
+	assert(game.catalog_species.size()==242)
+	var star_counts:Dictionary={0:0,1:0,2:0,3:0,4:0,5:0}
+	for entry_value in game.catalog_species:
+		assert(entry_value is Dictionary)
+		var entry:Dictionary=entry_value
+		var stars:=int(entry.get("star_rating",-1))
+		assert(stars>=0 and stars<=5)
+		assert(int(entry.get("gold_star_count",-1))==stars)
+		star_counts[stars]=int(star_counts.get(stars,0))+1
+	assert(star_counts=={0:64,1:64,2:66,3:22,4:21,5:5})
+	assert(int(game._catalog_entry("colorata").get("star_rating",-1))==0)
+	assert(int(game._catalog_entry("lutea").get("star_rating",-1))==1)
+	# The former spawn-rarity field remains internal story/route data only and is
+	# not overwritten by the new player-facing star rank.
 	assert(str(game._catalog_entry("golden_laui").get("rarity",""))=="スーパーレア")
-	assert(int(game._catalog_entry("golden_laui").get("gold_star_count",0))==2)
 
 func _test_language_and_symbol_safety(game)->void:
 	var japanese_texts:Dictionary=Localizer.TEXT.get("ja",{})
@@ -76,8 +77,8 @@ func _test_language_and_symbol_safety(game)->void:
 	game._set_language("ja")
 	for path in ["res://scripts/main.gd","res://scripts/arrangement_ui.gd","res://scripts/forest_gacha_ui.gd","res://scripts/species_get_overlay.gd"]:
 		var source:=FileAccess.get_file_as_string(path)
-		for forbidden in [String.chr(0x2B50),String.chr(0x2605),String.chr(0x2606),String.chr(0x2665),String.chr(0x2764)]:assert(not source.contains(forbidden))
-	assert(FileAccess.file_exists("res://scripts/ui_symbol_icon.gd") and not FileAccess.file_exists("res://scripts/star_rating.gd"))
+		for forbidden in [String.chr(0x2B50),String.chr(0x2606),String.chr(0x2665),String.chr(0x2764)]:assert(not source.contains(forbidden))
+	assert(FileAccess.file_exists("res://scripts/ui_symbol_icon.gd") and FileAccess.file_exists("res://scripts/species_star_rarity.gd"))
 	var main_source:=FileAccess.get_file_as_string("res://scripts/main.gd")
 	var get_overlay_source:=FileAccess.get_file_as_string("res://scripts/species_get_overlay.gd")
 	assert(main_source.contains("たねをまく") and main_source.contains("使用たね"))
@@ -87,8 +88,9 @@ func _test_language_and_symbol_safety(game)->void:
 		for localized_text in Localizer.TEXT[locale].values():
 			assert(not str(localized_text).contains(sow_kanji) and not str(localized_text).contains(sow_alt_kanji),"Sowing text must stay in hiragana")
 	assert(not main_source.contains(sow_kanji) and not main_source.contains(sow_alt_kanji))
-	assert(not main_source.contains("StarRating") and not main_source.contains("GoldStars") and not main_source.contains('Localizer.text(language_code,"super_rare")'))
-	assert(not get_overlay_source.contains("StarRating") and not get_overlay_source.contains("rarity_label") and not get_overlay_source.contains("star_rating"))
+	assert(not main_source.contains("GoldStars") and not main_source.contains('Localizer.text(language_code,"super_rare")'))
+	assert(get_overlay_source.contains("SpeciesStarRarityClass") and get_overlay_source.contains('star_label.name="SpeciesStars"'))
+	assert(not get_overlay_source.contains("rarity_label"))
 
 func _test_one_time_gift_arrangement_and_share(game)->void:
 	var points_before:int=game.puku_points;var bags_before:int=game.normal_seed_bags

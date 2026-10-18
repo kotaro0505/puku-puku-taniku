@@ -153,7 +153,7 @@ static func normalize_state(raw_state: Variant, migration: Dictionary = {}) -> D
 				"diameter_cm": diameter_cm,
 				"visual_scale": maxf(0.01, float(value.get("visual_scale", 1.0))),
 				"rarity": str(value.get("rarity", "")),
-				"gold_star_count": clampi(int(value.get("gold_star_count", 0)), 0, 2),
+				"gold_star_count": clampi(int(value.get("gold_star_count", 0)), 0, 5),
 				"slot": returned.size(),
 			})
 	state["returned_plants"] = returned
@@ -174,7 +174,7 @@ static func normalize_state(raw_state: Variant, migration: Dictionary = {}) -> D
 				"diameter_cm": diameter_cm,
 				"visual_scale": maxf(0.01, float(value.get("visual_scale", 1.0))),
 				"rarity": str(value.get("rarity", "")),
-				"gold_star_count": clampi(int(value.get("gold_star_count", 0)), 0, 2),
+				"gold_star_count": clampi(int(value.get("gold_star_count", 0)), 0, 5),
 			})
 	state["pending_return_snapshots"] = pending_snapshots
 	# v1 could keep only the latest stage. v2 keeps every stage reached during a
@@ -343,7 +343,7 @@ static func queue_pending_return_snapshot(state: Dictionary, snapshot: Dictionar
 		"diameter_cm": float(snapshot.get("diameter_cm", MIN_RETURN_DIAMETER_CM)),
 		"visual_scale": maxf(0.01, float(snapshot.get("visual_scale", 1.0))),
 		"rarity": str(snapshot.get("rarity", "")),
-		"gold_star_count": clampi(int(snapshot.get("gold_star_count", 0)), 0, 2),
+		"gold_star_count": clampi(int(snapshot.get("gold_star_count", 0)), 0, 5),
 	})
 	state["pending_return_snapshots"] = pending
 	return true
@@ -375,7 +375,7 @@ static func _store_returned_plant(state: Dictionary, snapshot: Dictionary) -> in
 		"diameter_cm": float(snapshot.get("diameter_cm", MIN_RETURN_DIAMETER_CM)),
 		"visual_scale": maxf(0.01, float(snapshot.get("visual_scale", 1.0))),
 		"rarity": str(snapshot.get("rarity", "")),
-		"gold_star_count": clampi(int(snapshot.get("gold_star_count", 0)), 0, 2),
+		"gold_star_count": clampi(int(snapshot.get("gold_star_count", 0)), 0, 5),
 		"slot": returned.size(),
 	}
 	returned.append(stored)
