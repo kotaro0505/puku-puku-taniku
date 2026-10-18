@@ -4840,7 +4840,7 @@ func _continue_after_species_get_card(context:String)->void:
 func _immediate_get_story_transition_pending()->bool:
 	if habitat_crisis_pending or act3_intro_pending and not act3_intro_seen:return true
 	var event_id:=StoryProgressionClass.peek_story_event(story_progression_state)
-	if event_id in [StoryProgressionClass.EVENT_FANTASY_FIRST,StoryProgressionClass.EVENT_FANTASY_SIX]:return true
+	if event_id in [StoryProgressionClass.EVENT_FANTASY_FIRST,StoryProgressionClass.EVENT_FANTASY_SIX,StoryProgressionClass.EVENT_FUSION_LAB_INTRO]:return true
 	return _unique_jurejure_species_get_count()>=1 and not jurejure_species_first_seen
 
 func _change_audio_enabled(enabled:bool,is_bgm:bool)->void:
@@ -7048,7 +7048,7 @@ func _try_start_pending_story_event()->void:
 		_start_fantasy_realization_event()
 	elif current_mode=="greenhouse" and queued_story_event==StoryProgressionClass.EVENT_FOREST_GACHA_INTRO:
 		_start_forest_gacha_intro_event()
-	elif current_mode=="greenhouse" and queued_story_event==StoryProgressionClass.EVENT_FUSION_LAB_INTRO:
+	elif queued_story_event==StoryProgressionClass.EVENT_FUSION_LAB_INTRO:
 		_start_fusion_lab_intro_event()
 	elif current_mode=="greenhouse" and forest_gacha_unlocked and not forest_gacha_intro_seen:
 		_start_forest_gacha_intro_event()
@@ -7349,7 +7349,7 @@ func _start_forest_gacha_intro_event()->void:
 	],false)
 
 func _start_fusion_lab_intro_event()->void:
-	if current_mode!="greenhouse" or not StoryProgressionClass.fusion_lab_intro_is_pending(story_progression_state):return
+	if current_mode not in ["greenhouse","habitat"] or not StoryProgressionClass.fusion_lab_intro_is_pending(story_progression_state):return
 	_start_scripted_dialog("fusion_lab_intro",[
 		{"speaker":"armadillo","text":Localizer.text(language_code,"fusion_lab_intro_armadillo_1")},
 		{"speaker":"girl","text":Localizer.text(language_code,"fusion_lab_intro_girl_1")},

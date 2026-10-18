@@ -17,7 +17,7 @@ func _ready() -> void:
 	_test_retired_unlock_conditions(game)
 	_test_legacy_three_act_migration(game)
 	game._reset_progression_state()
-	print("STORY_PROGRESSION_SMOKE_OK acts=3 first_battle=act2 original_guarantee=true fantasy_gate=original_get fantasy_guarantee=retrying_four_series arrangement_gate=3 realization_gate=required_four forest_gate=8 fusion_gate=12 fantasy=1+four-series+24 safe_queue=true exploitation=act3 forced_first_battle=true resume=true reward_once=true second_battle=normal midpoint=4 crisis=8 post_crisis_home=once retired_secret=tombstone")
+	print("STORY_PROGRESSION_SMOKE_OK acts=3 first_battle=act2 original_guarantee=true fantasy_gate=original_get fantasy_guarantee=retrying_four_series arrangement_gate=3 realization_gate=required_four forest_gate=8 fusion_gate=12 fusion_cross_area=true fantasy=1+four-series+24 safe_queue=true exploitation=act3 forced_first_battle=true resume=true reward_once=true second_battle=normal midpoint=4 crisis=8 post_crisis_home=once retired_secret=tombstone")
 	get_tree().quit()
 
 
@@ -288,10 +288,47 @@ func _test_three_act_sequence(game: Node) -> void:
 		assert(game.scripted_dialog_kind.is_empty())
 		assert(not StoryProgressionClass.fusion_lab_is_unlocked(game.story_progression_state))
 	assert(game._unique_fantasy_species_get_count() == 11)
+	# The twelfth GET can happen under a card or another foreground. Persist the
+	# pending event first to cover a cold restart before it is allowed to start.
+	game.species_get_overlay.visible = true
 	game._record_species_get(fantasy_ids[11])
 	game._try_start_pending_story_event()
 	assert(game._unique_fantasy_species_get_count() == 12)
+	assert(game.scripted_dialog_kind.is_empty())
+	assert(StoryProgressionClass.fusion_lab_intro_is_pending(game.story_progression_state))
+	assert(not StoryProgressionClass.fusion_lab_is_unlocked(game.story_progression_state))
+	game._save()
+	game.story_progression_state = StoryProgressionClass.default_runtime_state()
+	game._load_save()
+	assert(StoryProgressionClass.fusion_lab_intro_is_pending(game.story_progression_state))
+	assert(not StoryProgressionClass.fusion_lab_is_unlocked(game.story_progression_state))
+
+	# Closing the GET card hands off immediately in the greenhouse. Cancel only
+	# this test presentation (without completing it) so the same durable pending
+	# event can also exercise the habitat path below.
+	game.species_get_overlay.visible = false
+	game._continue_after_species_get_card("")
+	await get_tree().process_frame
 	assert(game.scripted_dialog_kind == "fusion_lab_intro")
+	assert(game.current_mode == "greenhouse")
+	game.scripted_dialog_kind = ""
+	game.scripted_dialog_pages.clear()
+	game.scripted_dialog_index = -1
+	game.intro_overlay.visible = false
+	assert(StoryProgressionClass.fusion_lab_intro_is_pending(game.story_progression_state))
+
+	# A different story dialogue keeps priority. Its normal completion callback
+	# then starts the still-pending lab introduction in the habitat, without a
+	# forced return to the greenhouse.
+	game.current_mode = "habitat"
+	game._apply_mode()
+	game._start_scripted_dialog("fusion_lab_timing_blocker", [{"speaker":"panda", "text":"timing test"}], false)
+	game._try_start_pending_story_event()
+	assert(game.scripted_dialog_kind == "fusion_lab_timing_blocker")
+	_finish_dialog(game)
+	await get_tree().process_frame
+	assert(game.scripted_dialog_kind == "fusion_lab_intro")
+	assert(game.current_mode == "habitat")
 	assert(game.scripted_dialog_pages.size() == 6)
 	assert(not StoryProgressionClass.fusion_lab_is_unlocked(game.story_progression_state))
 	var fusion_intro_speakers := ["armadillo", "girl", "armadillo", "armadillo", "girl", "armadillo"]
@@ -308,9 +345,18 @@ func _test_three_act_sequence(game: Node) -> void:
 		assert(str(game.scripted_dialog_pages[page_index].get("text", "")) == fusion_intro_texts[page_index])
 	_finish_dialog(game)
 	await get_tree().process_frame
+	assert(game.current_mode == "habitat")
 	assert(StoryProgressionClass.fusion_lab_is_unlocked(game.story_progression_state))
 	assert(bool(game.story_progression_state.get("fusion_lab_intro_seen", false)))
 	assert(game._fusion_lab_available())
+	game._try_start_pending_story_event()
+	assert(game.scripted_dialog_kind.is_empty())
+	game._update_play_ui()
+	assert(not game.fusion_lab_button.visible)
+	game.current_mode = "greenhouse"
+	game._apply_mode()
+	game._update_play_ui()
+	assert(game.fusion_lab_button.visible)
 	# The completed one-time event and its access survive a real save reload.
 	game.story_progression_state = StoryProgressionClass.default_runtime_state()
 	game._load_save()
