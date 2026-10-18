@@ -1,6 +1,7 @@
 extends Node
 
 const SpeciesStarRarityClass=preload("res://scripts/species_star_rarity.gd")
+const BattleClass=preload("res://scripts/puku_puku_battle.gd")
 const BATTLE_SAMPLE_COUNT:=1000000
 
 func _ready()->void:
@@ -12,7 +13,7 @@ func _ready()->void:
 	await _test_get_card_star_layout(game)
 	_test_battle_bonus(game)
 	game.queue_free();await get_tree().process_frame
-	print("SPECIES_RARITY_SMOKE_OK assignment=64+64+66+22+21+5 catalog=list+detail get_card=flat_gold battle=5+1+0.3 five_star=fusion_only")
+	print("SPECIES_RARITY_SMOKE_OK assignment=64+64+66+22+21+5 catalog=list+detail get_card=flat_gold battle=L1:5+1+0.3,L2:10+3+1,L3:15+6+2 five_star=fusion_only")
 	get_tree().quit()
 
 func _test_complete_assignment(game:Node)->void:
@@ -110,14 +111,45 @@ func _test_battle_bonus(game:Node)->void:
 	assert(game._battle_fusion_reward_rank_for_roll(.06)==4)
 	assert(game._battle_fusion_reward_rank_for_roll(.062999)==4)
 	assert(game._battle_fusion_reward_rank_for_roll(.063)==0)
-	var test_rng:=RandomNumberGenerator.new();test_rng.seed=20261022
-	var counts:Dictionary={0:0,2:0,3:0,4:0,5:0}
-	for sample_index in range(BATTLE_SAMPLE_COUNT):
-		var stars:int=int(game._battle_fusion_reward_rank_for_roll(test_rng.randf()));counts[stars]=int(counts.get(stars,0))+1
-	assert(_ratio(int(counts[2]))>.049 and _ratio(int(counts[2]))<.051)
-	assert(_ratio(int(counts[3]))>.0095 and _ratio(int(counts[3]))<.0105)
-	assert(_ratio(int(counts[4]))>.0027 and _ratio(int(counts[4]))<.0033)
-	assert(int(counts[5])==0)
+	assert(game._battle_fusion_reward_rank_for_roll(.099999,BattleClass.DIFFICULTY_STRONG)==2)
+	assert(game._battle_fusion_reward_rank_for_roll(.10,BattleClass.DIFFICULTY_STRONG)==3)
+	assert(game._battle_fusion_reward_rank_for_roll(.129999,BattleClass.DIFFICULTY_STRONG)==3)
+	assert(game._battle_fusion_reward_rank_for_roll(.13,BattleClass.DIFFICULTY_STRONG)==4)
+	assert(game._battle_fusion_reward_rank_for_roll(.139999,BattleClass.DIFFICULTY_STRONG)==4)
+	assert(game._battle_fusion_reward_rank_for_roll(.14,BattleClass.DIFFICULTY_STRONG)==0)
+	assert(game._battle_fusion_reward_rank_for_roll(.149999,BattleClass.DIFFICULTY_STRONGEST)==2)
+	assert(game._battle_fusion_reward_rank_for_roll(.15,BattleClass.DIFFICULTY_STRONGEST)==3)
+	assert(game._battle_fusion_reward_rank_for_roll(.209999,BattleClass.DIFFICULTY_STRONGEST)==3)
+	assert(game._battle_fusion_reward_rank_for_roll(.21,BattleClass.DIFFICULTY_STRONGEST)==4)
+	assert(game._battle_fusion_reward_rank_for_roll(.229999,BattleClass.DIFFICULTY_STRONGEST)==4)
+	assert(game._battle_fusion_reward_rank_for_roll(.23,BattleClass.DIFFICULTY_STRONGEST)==0)
+	var expected_rates:={
+		BattleClass.DIFFICULTY_NORMAL:{2:.05,3:.01,4:.003},
+		BattleClass.DIFFICULTY_STRONG:{2:.10,3:.03,4:.01},
+		BattleClass.DIFFICULTY_STRONGEST:{2:.15,3:.06,4:.02}
+	}
+	for difficulty in expected_rates:
+		var test_rng:=RandomNumberGenerator.new();test_rng.seed=20261022+int(difficulty)*100
+		var counts:Dictionary={0:0,2:0,3:0,4:0,5:0}
+		for sample_index in range(BATTLE_SAMPLE_COUNT):
+			var stars:int=int(game._battle_fusion_reward_rank_for_roll(test_rng.randf(),int(difficulty)));counts[stars]=int(counts.get(stars,0))+1
+		for stars in [2,3,4]:
+			assert(absf(_ratio(int(counts[stars]))-float(expected_rates[difficulty][stars]))<.001)
+		assert(int(counts[5])==0)
+	game.story_progression_state["exploitation_started"]=false
+	var restoration:Dictionary=game._restoration_state();restoration["ending_seen"]=false;restoration["ending_phase"]="";game.story_progression_state["restoration"]=restoration
+	assert(game._jurejure_battle_difficulty_phase()==BattleClass.PHASE_EARLY)
+	assert(game._draw_jurejure_battle_difficulty(.69)==BattleClass.DIFFICULTY_NORMAL)
+	assert(game._draw_jurejure_battle_difficulty(.71)==BattleClass.DIFFICULTY_STRONG)
+	game.story_progression_state["exploitation_started"]=true
+	assert(game._jurejure_battle_difficulty_phase()==BattleClass.PHASE_EXPLOITATION)
+	assert(game._draw_jurejure_battle_difficulty(.49)==BattleClass.DIFFICULTY_NORMAL)
+	assert(game._draw_jurejure_battle_difficulty(.51)==BattleClass.DIFFICULTY_STRONG)
+	restoration=game._restoration_state();restoration["ending_seen"]=true;restoration["ending_phase"]="complete";game.story_progression_state["restoration"]=restoration
+	assert(game._jurejure_battle_difficulty_phase()==BattleClass.PHASE_POST_ENDING)
+	assert(game._draw_jurejure_battle_difficulty(.39)==BattleClass.DIFFICULTY_NORMAL)
+	assert(game._draw_jurejure_battle_difficulty(.41)==BattleClass.DIFFICULTY_STRONG)
+	assert(game._draw_jurejure_battle_difficulty(.71)==BattleClass.DIFFICULTY_STRONGEST)
 	game.story_progression_state["fantasy_unlocked"]=false;game.story_progression_state["fusion_lab_unlocked"]=false;game.act3_unlocked=false
 	assert(game._grant_random_fusion_battle_reward(.01).is_empty())
 	game.story_progression_state["fantasy_unlocked"]=true
@@ -133,7 +165,7 @@ func _test_battle_bonus(game:Node)->void:
 	game.act3_unlocked=true
 	var four_star_id:String=str(game._grant_random_fusion_battle_reward(.061))
 	assert(not four_star_id.is_empty() and SpeciesStarRarityClass.stars_for(game._catalog_entry(four_star_id))==4)
-	assert(game._grant_random_fusion_battle_reward(.5).is_empty())
+	assert(game._grant_random_fusion_battle_reward(.5,BattleClass.DIFFICULTY_STRONGEST).is_empty())
 
 func _ratio(count:int)->float:
 	return float(count)/float(BATTLE_SAMPLE_COUNT)

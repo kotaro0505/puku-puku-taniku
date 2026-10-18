@@ -325,6 +325,7 @@ var jurejure_pending_fusion_reward_species_id := ""
 var jurejure_pending_fusion_reward_is_new := false
 var jurejure_last_battle_result: Dictionary = {}
 var act3_first_battle_active := false
+var active_jurejure_battle_difficulty := PukuPukuBattleClass.DIFFICULTY_NORMAL
 var habitat_second_awakened := false
 var habitat_second_awakening_complete := false
 var jurejure_update_accumulator := 0.0
@@ -1110,6 +1111,7 @@ func _setup_pot_unlock_iap()->void:
 func _load_save() -> void:
 	_cancel_puku_gauge_animations()
 	act3_first_battle_active=false
+	active_jurejure_battle_difficulty=PukuPukuBattleClass.DIFFICULTY_NORMAL
 	_reset_collection_complete_presentation(true)
 	legacy_habitat_migration_dirty=false;puku_balance_migration_dirty=false;catalog_cover_migration_dirty=false;collection_completion_migration_dirty=false;pot_inventory_migration_dirty=false;retired_content_migration_dirty=false;arrangement_capacity_migration_dirty=false;first_old_seed_recovery_dirty=false;first_old_seed_harvest_checkpoint_saved=false;legacy_habitat_notification_ids_to_cancel.clear();panda_beacon_unread_log.clear()
 	first_old_seed_stage=FIRST_OLD_SEED_STAGE_NOT_RECEIVED
@@ -4955,7 +4957,7 @@ func _reset_progression_state()->void:
 	first_old_seed_harvest_checkpoint_saved=false
 	first_colorata_confirmed=false;first_old_seed_stage=FIRST_OLD_SEED_STAGE_NOT_RECEIVED;first_old_seed_recovery_dirty=false;trio_originals_confirmed=false;carnicolor_first_get_dialog_seen=false;carnicolor_first_get_dialog_pending=false;habitat_arrival_started=false;habitat_awakened=false;habitat_awakening_event_complete=false;seed_shop_open=false;mystery_items_acquired=false;mystery_catalog_tutorial_complete=false;normal_play_tutorial_complete=false;post_tutorial_normal_games_completed=0;post_tutorial_habitat_guidance_completed_game_count=0;post_tutorial_habitat_visited=false;normal_round_started_after_tutorial=false;seed_pod_gauge_discovery_complete=false;seed_pod_first_reward_seen=false;initial_seed_stock_notice_complete=false;puku_buyback_tutorial_complete=false;puku_buyback_tutorial_active=false;puku_buyback_tutorial_index=0;habitat_returned_species.clear();special_series_explanation_seen=false;pending_special_series_explanation=false;main_story_stage=StoryProgressionClass.ACT_1;main_story_complete=false;main_story_completion_seen=false;catalog_series_unlock_notice_queue.clear();catalog_series_unlock_notice_ready.clear()
 	act2_unlocked=false;story_progression_state=StoryProgressionClass.default_runtime_state();forest_gacha_unlocked=false;forest_gacha_intro_seen=false;fantasy_first_discovery_seen=false;fantasy_realization_seen=false;act3_unlocked=false;act3_intro_pending=false;act3_intro_seen=false;jurejure_pool_unlocked=false;jurejure_species_unlocked.clear();jurejure_species_first_seen=false;habitat_crisis_pending=false;habitat_crisis_started=false;finale_complete=false;habitat_return_dialog_seen=false
-	original_catalog_complete_event_seen=false;habitat_tutorial_returned_to_greenhouse=false;jurejure_intro_complete=false;jurejure_enabled=false;jurejure_growth_stage=JureJureSystemClass.GROWTH_EARLY;jurejure_growth_event_mask=0;active_jurejure_event={};jurejure_next_check_unix=0.0;jurejure_cooldown_until_unix=0.0;jurejure_return_event_complete=false;jurejure_waiting_for_seed_pod_reward=false;jurejure_battle_count=0;jurejure_battle_win_count=0;jurejure_habitat_visit_point=Vector2(-1.0,-1.0);jurejure_pending_reward_species_id="";jurejure_pending_reward_is_new=false;jurejure_pending_fusion_reward_species_id="";jurejure_pending_fusion_reward_is_new=false;jurejure_last_battle_result.clear();act3_first_battle_active=false;habitat_second_awakened=false;habitat_second_awakening_complete=false;jurejure_update_accumulator=0.0
+	original_catalog_complete_event_seen=false;habitat_tutorial_returned_to_greenhouse=false;jurejure_intro_complete=false;jurejure_enabled=false;jurejure_growth_stage=JureJureSystemClass.GROWTH_EARLY;jurejure_growth_event_mask=0;active_jurejure_event={};jurejure_next_check_unix=0.0;jurejure_cooldown_until_unix=0.0;jurejure_return_event_complete=false;jurejure_waiting_for_seed_pod_reward=false;jurejure_battle_count=0;jurejure_battle_win_count=0;jurejure_habitat_visit_point=Vector2(-1.0,-1.0);jurejure_pending_reward_species_id="";jurejure_pending_reward_is_new=false;jurejure_pending_fusion_reward_species_id="";jurejure_pending_fusion_reward_is_new=false;jurejure_last_battle_result.clear();act3_first_battle_active=false;active_jurejure_battle_difficulty=PukuPukuBattleClass.DIFFICULTY_NORMAL;habitat_second_awakened=false;habitat_second_awakening_complete=false;jurejure_update_accumulator=0.0
 	first_seed_pod_reward_event_active=false;habitat_visit_id=0;jurejure_focused_habitat_visit_id=-1;act3_intro_eligible_visit_id=0;habitat_crisis_eligible_visit_id=0
 	if habitat_crisis_atmosphere:habitat_crisis_atmosphere.deactivate()
 	_cancel_puku_gauge_animations();puku_gauge_cm=0.0;puku_balance_units=0;show_growing_puku_preview=true;bests.clear();discovered.clear();species_get_counts.clear();catalog_cover_species.clear();unlocked_series={INITIAL_SERIES_ID:true};series_seed_inventory.clear();forest_gacha_draw_count=0;forest_gacha_encountered.clear();active_series_seed_id="";owned_pots={DEFAULT_POT_ID:1};saved_arrangements.clear();arrangement_save_capacity=ARRANGEMENT_SAVE_CAPACITY;greenhouse_available=_initial_greenhouse_state();unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;opening_story_complete=false;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;puku_gauge_intro_complete=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;login_bonus_date="";armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();result_deferred_species_queue.clear();pending_round_new_species_ids.clear();round_result_species_finalize_queue.clear();round_result_species_finalize_active=false;round_result_species_save_pending=false;shop_chatter_acquired_species.clear();species_get_queue.clear();play_share_record.clear();play_active=false;play_time_remaining=0.0;play_harvest_cm_total=0.0;play_puku_reward_units_total=0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;greenhouse_round_followup_started=false;_reset_endless_economy_stats();rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_time_multiplier=1;habitat_simulation_unix=Time.get_unix_time_from_system();habitat_debug_log.clear();habitat_scroll_tutorial_active=false;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_clear_habitat_items();_save();_update_currency_ui();_update_play_ui()
@@ -8905,10 +8907,12 @@ func _on_jurejure_group_pressed()->void:
 func _show_jurejure_battle_choice()->void:
 	if puku_puku_battle==null:return
 	act3_first_battle_active=false
+	active_jurejure_battle_difficulty=PukuPukuBattleClass.DIFFICULTY_NORMAL
 	puku_puku_battle.show_choice(language_code);_update_play_ui()
 
 func _on_jurejure_battle_declined()->void:
 	act3_first_battle_active=false
+	active_jurejure_battle_difficulty=PukuPukuBattleClass.DIFFICULTY_NORMAL
 	_play_current_area_bgm()
 	_update_play_ui()
 
@@ -8943,13 +8947,24 @@ func _start_puku_puku_battle(link_opponent_harvest_to_player:=false)->void:
 	var entries:=_jurejure_battle_species_entries();var textures:=_jurejure_battle_textures(entries)
 	if entries.is_empty() or textures.is_empty():
 		act3_first_battle_active=false
+		active_jurejure_battle_difficulty=PukuPukuBattleClass.DIFFICULTY_NORMAL
 		puku_puku_battle.visible=false
 		_play_current_area_bgm()
 		_update_play_ui();return
 	act3_first_battle_active=link_opponent_harvest_to_player
+	active_jurejure_battle_difficulty=PukuPukuBattleClass.DIFFICULTY_NORMAL if link_opponent_harvest_to_player else _draw_jurejure_battle_difficulty()
 	jurejure_last_battle_result.clear();jurejure_pending_reward_species_id="";jurejure_pending_reward_is_new=false;jurejure_pending_fusion_reward_species_id="";jurejure_pending_fusion_reward_is_new=false
 	if audio_manager:audio_manager.play_bgm("puku_battle")
-	puku_puku_battle.start_battle(entries,textures,language_code,0,link_opponent_harvest_to_player);_update_play_ui()
+	puku_puku_battle.start_battle(entries,textures,language_code,0,link_opponent_harvest_to_player,active_jurejure_battle_difficulty);_update_play_ui()
+
+func _jurejure_battle_difficulty_phase()->String:
+	if _is_post_ending_jurejure_battle():return PukuPukuBattleClass.PHASE_POST_ENDING
+	if StoryProgressionClass.exploitation_is_started(story_progression_state):return PukuPukuBattleClass.PHASE_EXPLOITATION
+	return PukuPukuBattleClass.PHASE_EARLY
+
+func _draw_jurejure_battle_difficulty(forced_roll:float=-1.0)->int:
+	var roll:=rng.randf() if forced_roll<0.0 else clampf(forced_roll,0.0,.999999)
+	return PukuPukuBattleClass.difficulty_for_phase_roll(_jurejure_battle_difficulty_phase(),roll)
 
 func _jurejure_reward_candidates()->Array[Dictionary]:
 	if _is_post_ending_jurejure_battle():return _post_ending_normal_reward_candidates()
@@ -9002,9 +9017,9 @@ func _grant_jurejure_battle_reward()->String:
 	_register_species_discovery(species_id,true);_apply_saved_unlocks();_sync_arrangement_ui()
 	return species_id
 
-func _grant_random_fusion_battle_reward(forced_roll:float=-1.0)->String:
+func _grant_random_fusion_battle_reward(forced_roll:float=-1.0,difficulty:int=PukuPukuBattleClass.DIFFICULTY_NORMAL)->String:
 	var roll:=rng.randf() if forced_roll<0.0 else clampf(forced_roll,0.0,.999999)
-	var stars:=_battle_fusion_reward_rank_for_roll(roll)
+	var stars:=_battle_fusion_reward_rank_for_roll(roll,difficulty)
 	if stars==0 or not SpeciesStarRarityClass.random_source_unlocked(stars,_random_fusion_source_unlocks()):return ""
 	var candidates:Array[Dictionary]=[]
 	for entry_value in catalog_species:
@@ -9016,14 +9031,8 @@ func _grant_random_fusion_battle_reward(forced_roll:float=-1.0)->String:
 	_register_species_discovery(species_id,true);_apply_saved_unlocks();_sync_arrangement_ui()
 	return species_id
 
-func _battle_fusion_reward_rank_for_roll(roll:float)->int:
-	var normalized:=clampf(roll,0.0,.999999)
-	if normalized<BATTLE_TWO_STAR_REWARD_RATE:return 2
-	# Use exact cumulative edges so 0.060 and 0.063 cannot drift into the
-	# preceding bucket through binary floating-point addition.
-	if normalized<0.060:return 3
-	if normalized<0.063:return 4
-	return 0
+func _battle_fusion_reward_rank_for_roll(roll:float,difficulty:int=PukuPukuBattleClass.DIFFICULTY_NORMAL)->int:
+	return PukuPukuBattleClass.fusion_reward_rank_for_roll(roll,difficulty)
 
 func _apply_jurejure_battle_loss(forced_puku_roll:int=-1)->Dictionary:
 	if _is_post_ending_jurejure_battle():return {"puku_lost":0,"puku_penalty_roll":0,"friendly":true}
@@ -9040,12 +9049,13 @@ func _on_puku_puku_battle_resolved(result:Dictionary)->void:
 	if not jurejure_last_battle_result.is_empty():return
 	var first_resolved_battle:=jurejure_battle_count==0
 	var post_ending_battle:=_is_post_ending_jurejure_battle()
+	active_jurejure_battle_difficulty=clampi(int(result.get("difficulty",active_jurejure_battle_difficulty)),PukuPukuBattleClass.DIFFICULTY_NORMAL,PukuPukuBattleClass.DIFFICULTY_STRONGEST)
 	jurejure_battle_count+=1;jurejure_last_battle_result=result.duplicate(true)
 	if bool(result.get("won",false)):
 		if act3_first_battle_active:StoryProgressionClass.complete_act3_first_battle(story_progression_state)
 		jurejure_battle_win_count+=1;jurejure_waiting_for_seed_pod_reward=not StoryProgressionClass.exploitation_is_started(story_progression_state)
 		jurejure_pending_reward_species_id=_grant_jurejure_battle_reward()
-		jurejure_pending_fusion_reward_species_id=_grant_random_fusion_battle_reward()
+		jurejure_pending_fusion_reward_species_id=_grant_random_fusion_battle_reward(-1.0,active_jurejure_battle_difficulty)
 		jurejure_last_battle_result["fusion_bonus_species_id"]=jurejure_pending_fusion_reward_species_id
 	else:
 		var penalty:=_apply_jurejure_battle_loss()
@@ -9057,6 +9067,7 @@ func _on_puku_puku_battle_resolved(result:Dictionary)->void:
 
 func _on_puku_puku_battle_return_requested()->void:
 	act3_first_battle_active=false
+	active_jurejure_battle_difficulty=PukuPukuBattleClass.DIFFICULTY_NORMAL
 	current_mode="habitat";_apply_mode();_update_play_ui()
 	if bool(jurejure_last_battle_result.get("won",false)):
 		var win_key:="jurejure_battle_win_mouse" if not jurejure_pending_reward_species_id.is_empty() else "jurejure_battle_win_no_reward"

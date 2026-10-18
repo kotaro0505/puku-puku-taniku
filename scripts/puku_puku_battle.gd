@@ -8,6 +8,7 @@ signal return_requested
 
 const Localizer = preload("res://scripts/game_localizer.gd")
 const SucculentClass = preload("res://scripts/succulent.gd")
+const StandardStoryDialoguePanelClass = preload("res://scripts/standard_story_dialogue_panel.gd")
 const BACKGROUND_PATH := "res://assets/jurejure/puku-puku-battle-background.jpg"
 const PLANTS_PER_SIDE := 12
 const MAX_ACTIVE_PER_SIDE := 6
@@ -45,6 +46,28 @@ const SCORE_LABEL_RIGHT_MARGIN := 20.0
 const SCORE_LABEL_FIELD_TOP_GAP := 170.0
 const OPPONENT_SCORE_RAISE := 16.0
 const RESULT_PANEL_POSITION := Vector2(78, 268)
+const DIFFICULTY_NORMAL := 1
+const DIFFICULTY_STRONG := 2
+const DIFFICULTY_STRONGEST := 3
+const PHASE_EARLY := "early"
+const PHASE_EXPLOITATION := "exploitation"
+const PHASE_POST_ENDING := "post_ending"
+const STRONG_DIALOGUE_KEYS := [
+	"jurejure_battle_strong_mouse",
+	"jurejure_battle_strong_peccary",
+	"jurejure_battle_strong_skunk"
+]
+const STRONG_DIALOGUE_SPEAKERS := ["mouse", "peccary", "skunk"]
+const STRONGEST_DIALOGUE_KEYS := [
+	"jurejure_battle_strongest_trio_1",
+	"jurejure_battle_strongest_trio_2",
+	"jurejure_battle_strongest_trio_3"
+]
+const FUSION_REWARD_CUMULATIVE_EDGES := {
+	DIFFICULTY_NORMAL: [0.05, 0.060, 0.063],
+	DIFFICULTY_STRONG: [0.10, 0.130, 0.140],
+	DIFFICULTY_STRONGEST: [0.15, 0.210, 0.230]
+}
 
 var language_code := "ja"
 var choice_layer: Control
@@ -59,6 +82,14 @@ var player_score_label: Label
 var result_panel: PanelContainer
 var result_label: Label
 var return_button: Button
+var opening_dialogue_layer: Control
+var opening_dialogue_panel: PanelContainer
+var opening_portrait_slot: Control
+var opening_portrait: TextureRect
+var opening_trio_portraits: Control
+var opening_speaker_label: Label
+var opening_dialogue_label: Label
+var opening_continue_button: Button
 var battle_active := false
 var player_score := 0.0
 var opponent_score := 0.0
@@ -76,6 +107,8 @@ var player_points: Array[Vector2] = []
 var rng := RandomNumberGenerator.new()
 var player_linked_opponent_harvest := false
 var linked_opponent_harvest_count := 0
+var battle_difficulty := DIFFICULTY_NORMAL
+var opening_dialogue_index := -1
 
 
 func _ready() -> void:
@@ -194,7 +227,52 @@ func _build_ui() -> void:
 	return_button.pressed.connect(_return_to_habitat)
 	result_content.add_child(return_button)
 	result_panel.visible = false
+	_build_opening_dialogue()
 	battle_layer.visible = false
+
+
+func _build_opening_dialogue() -> void:
+	opening_dialogue_layer = Control.new()
+	opening_dialogue_layer.name = "BattleOpeningDialogue"
+	opening_dialogue_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	opening_dialogue_layer.mouse_filter = Control.MOUSE_FILTER_STOP
+	opening_dialogue_layer.z_index = 500
+	battle_layer.add_child(opening_dialogue_layer)
+	var dim := ColorRect.new()
+	dim.color = Color(0.04, 0.025, 0.015, 0.18)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	opening_dialogue_layer.add_child(dim)
+	var standard_dialogue = StandardStoryDialoguePanelClass.new()
+	opening_dialogue_panel = standard_dialogue
+	opening_dialogue_panel.position = StandardStoryDialoguePanelClass.DEFAULT_POSITION
+	opening_dialogue_layer.add_child(opening_dialogue_panel)
+	opening_portrait_slot = standard_dialogue.portrait_slot
+	opening_portrait = standard_dialogue.speaker_portrait
+	opening_speaker_label = standard_dialogue.speaker_label
+	opening_dialogue_label = standard_dialogue.dialogue_label
+	opening_continue_button = standard_dialogue.continue_button
+	opening_continue_button.pressed.connect(_close_opening_dialogue)
+	opening_trio_portraits = Control.new()
+	opening_trio_portraits.name = "JureJureTrioPortraits"
+	opening_trio_portraits.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	opening_trio_portraits.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	opening_portrait_slot.add_child(opening_trio_portraits)
+	for trio_entry in [
+		{"speaker": "skunk", "x": 0.0},
+		{"speaker": "mouse", "x": 70.0},
+		{"speaker": "peccary", "x": 140.0}
+	]:
+		var trio_portrait := TextureRect.new()
+		trio_portrait.name = "Trio%s" % str(trio_entry.speaker).capitalize()
+		trio_portrait.position = Vector2(float(trio_entry.x), 42.0)
+		trio_portrait.size = Vector2(70, 150)
+		trio_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		trio_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		trio_portrait.texture = _jurejure_portrait_texture(str(trio_entry.speaker))
+		trio_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		opening_trio_portraits.add_child(trio_portrait)
+	opening_dialogue_layer.visible = false
 
 
 func show_choice(language: String) -> void:
@@ -211,10 +289,13 @@ func show_choice(language: String) -> void:
 	move_to_front()
 
 
-func start_battle(entries: Array[Dictionary], textures: Dictionary, language: String, random_seed: int = 0, link_opponent_harvest_to_player: bool = false) -> void:
+func start_battle(entries: Array[Dictionary], textures: Dictionary, language: String, random_seed: int = 0, link_opponent_harvest_to_player: bool = false, difficulty: int = DIFFICULTY_NORMAL) -> void:
 	language_code = Localizer.normalize_language(language)
 	_clear_units()
 	player_linked_opponent_harvest = link_opponent_harvest_to_player
+	# The mandatory first Act III battle keeps its established linked-harvest
+	# behavior and is deliberately excluded from difficulty and opening dialogue.
+	battle_difficulty = DIFFICULTY_NORMAL if link_opponent_harvest_to_player else clampi(difficulty, DIFFICULTY_NORMAL, DIFFICULTY_STRONGEST)
 	if random_seed == 0:
 		rng.randomize()
 	else:
@@ -239,13 +320,15 @@ func start_battle(entries: Array[Dictionary], textures: Dictionary, language: St
 	sow_button.text = Localizer.text(language_code, "jurejure_battle_sow")
 	sow_button.disabled = false
 	sow_button.modulate = Color.WHITE
-	sow_button.visible = true
+	sow_button.visible = battle_difficulty == DIFFICULTY_NORMAL
 	if pending_entries.is_empty():
 		battle_phase = "invalid"
 		sow_button.visible = false
 		return
 	_update_scores()
 	move_to_front()
+	if battle_difficulty > DIFFICULTY_NORMAL:
+		_show_opening_dialogue()
 
 
 func _on_sow_pressed() -> void:
@@ -376,7 +459,7 @@ func _create_unit(opponent: bool, point_index: int, entries: Array[Dictionary], 
 	logic.name = ("Opponent" if opponent else "Player") + "Logic%02d" % point_index
 	logic_root.add_child(logic)
 	logic.setup(entry, logic_seed, null, null, true)
-	var harvest_plan := ai_harvest_plan(rng.randf(), rng.randf()) if opponent else {"style": "player", "age": -1.0}
+	var harvest_plan := ai_harvest_plan_for_difficulty(rng.randf(), rng.randf(), battle_difficulty) if opponent else {"style": "player", "age": -1.0}
 	var unit := {
 		"node": button,
 		"size_label": size_label,
@@ -431,6 +514,75 @@ static func ai_harvest_plan(style_roll: float, timing_roll: float) -> Dictionary
 	if style_roll < 0.88:
 		return {"style": "greedy", "age": lerpf(11.5, 14.5, timing)}
 	return {"style": "reckless", "age": lerpf(16.5, 22.0, timing)}
+
+
+static func ai_harvest_plan_for_difficulty(style_roll: float, timing_roll: float, difficulty: int) -> Dictionary:
+	# Level 1 delegates to the original policy verbatim. Levels 2 and 3 keep the
+	# same growth and jelly simulation, but put progressively more decisions in
+	# efficient later harvest windows. These weights were calibrated by fixed-seed
+	# simulation against the live Succulent simulation rather than score scaling.
+	if difficulty <= DIFFICULTY_NORMAL:
+		return ai_harvest_plan(style_roll, timing_roll)
+	var style := clampf(style_roll, 0.0, 1.0)
+	var timing := clampf(timing_roll, 0.0, 1.0)
+	if difficulty == DIFFICULTY_STRONG:
+		if style < 0.12:
+			return {"style": "cautious", "age": lerpf(4.0, 5.2, timing)}
+		if style < 0.48:
+			return {"style": "steady", "age": lerpf(7.0, 9.2, timing)}
+		if style < 0.84:
+			return {"style": "greedy", "age": lerpf(12.0, 15.5, timing)}
+		return {"style": "tactical", "age": lerpf(18.0, 23.0, timing)}
+	if style < 0.06:
+		return {"style": "cautious", "age": lerpf(4.0, 5.2, timing)}
+	if style < 0.28:
+		return {"style": "steady", "age": lerpf(8.0, 10.0, timing)}
+	if style < 0.83:
+		return {"style": "greedy", "age": lerpf(13.0, 17.0, timing)}
+	return {"style": "tactical", "age": lerpf(20.0, 27.0, timing)}
+
+
+static func difficulty_for_phase_roll(phase: String, roll: float) -> int:
+	var normalized := clampf(roll, 0.0, 0.999999)
+	match phase:
+		PHASE_POST_ENDING:
+			if normalized < 0.40:
+				return DIFFICULTY_NORMAL
+			if normalized < 0.70:
+				return DIFFICULTY_STRONG
+			return DIFFICULTY_STRONGEST
+		PHASE_EXPLOITATION:
+			return DIFFICULTY_NORMAL if normalized < 0.50 else DIFFICULTY_STRONG
+		_:
+			return DIFFICULTY_NORMAL if normalized < 0.70 else DIFFICULTY_STRONG
+
+
+static func opening_dialogue_index_for_roll(roll: float) -> int:
+	return mini(2, floori(clampf(roll, 0.0, 0.999999) * 3.0))
+
+
+static func opening_dialogue_data(difficulty: int, index: int) -> Dictionary:
+	var safe_index := clampi(index, 0, 2)
+	if difficulty == DIFFICULTY_STRONG:
+		return {"speaker": STRONG_DIALOGUE_SPEAKERS[safe_index], "key": STRONG_DIALOGUE_KEYS[safe_index]}
+	if difficulty == DIFFICULTY_STRONGEST:
+		return {"speaker": "trio", "key": STRONGEST_DIALOGUE_KEYS[safe_index]}
+	return {}
+
+
+static func fusion_reward_rank_for_roll(roll: float, difficulty: int) -> int:
+	var normalized := clampf(roll, 0.0, 0.999999)
+	var safe_difficulty := clampi(difficulty, DIFFICULTY_NORMAL, DIFFICULTY_STRONGEST)
+	# Explicit cumulative edges keep exact bucket boundaries stable despite
+	# binary floating-point addition (for example 0.10 + 0.03).
+	var edges: Array = FUSION_REWARD_CUMULATIVE_EDGES[safe_difficulty]
+	if normalized < float(edges[0]):
+		return 2
+	if normalized < float(edges[1]):
+		return 3
+	if normalized < float(edges[2]):
+		return 4
+	return 0
 
 
 func _process(delta: float) -> void:
@@ -642,7 +794,8 @@ func _complete_battle() -> void:
 	battle_resolved.emit({
 		"won": won,
 		"player_score": player_score,
-		"opponent_score": opponent_score
+		"opponent_score": opponent_score,
+		"difficulty": battle_difficulty
 	})
 
 
@@ -675,6 +828,8 @@ func _clear_units() -> void:
 	battle_phase = "idle"
 	if sow_button != null:
 		sow_button.visible = false
+	if opening_dialogue_layer != null:
+		opening_dialogue_layer.visible = false
 	_clear_seed_markers()
 	for field in [opponent_field, player_field]:
 		if field == null:
@@ -687,12 +842,73 @@ func _clear_units() -> void:
 	units.clear()
 	player_linked_opponent_harvest = false
 	linked_opponent_harvest_count = 0
+	battle_difficulty = DIFFICULTY_NORMAL
+	opening_dialogue_index = -1
 	player_spawned = 0
 	opponent_spawned = 0
 	pending_entries.clear()
 	pending_textures.clear()
 	opponent_points.clear()
 	player_points.clear()
+
+
+func _show_opening_dialogue() -> void:
+	opening_dialogue_index = opening_dialogue_index_for_roll(rng.randf())
+	var data := opening_dialogue_data(battle_difficulty, opening_dialogue_index)
+	if data.is_empty():
+		return
+	battle_phase = "opening_dialogue"
+	battle_active = false
+	sow_button.visible = false
+	sow_button.disabled = true
+	var speaker := str(data.get("speaker", ""))
+	var trio := speaker == "trio"
+	opening_portrait_slot.custom_minimum_size = Vector2(210, 205) if trio else Vector2(132, 205)
+	opening_speaker_label.size.x = 210.0 if trio else 132.0
+	opening_speaker_label.add_theme_font_size_override("font_size", 15 if trio else 17)
+	opening_dialogue_label.custom_minimum_size.x = 250.0 if trio else 300.0
+	opening_portrait.texture = null if trio else _jurejure_portrait_texture(speaker)
+	opening_portrait.visible = not trio and opening_portrait.texture != null
+	opening_trio_portraits.visible = trio
+	opening_speaker_label.text = Localizer.text(language_code, "jurejure_gang_name" if trio else "jurejure_%s_name" % speaker)
+	opening_dialogue_label.text = Localizer.text(language_code, str(data.get("key", "")))
+	opening_continue_button.text = Localizer.text(language_code, "continue")
+	opening_dialogue_layer.visible = true
+	opening_dialogue_layer.move_to_front()
+
+
+func _close_opening_dialogue() -> void:
+	if battle_phase != "opening_dialogue":
+		return
+	opening_dialogue_layer.visible = false
+	battle_phase = "awaiting_sow"
+	sow_button.disabled = false
+	sow_button.modulate = Color.WHITE
+	sow_button.visible = true
+
+
+func _jurejure_portrait_texture(speaker_id: String) -> Texture2D:
+	var source: Texture2D
+	var normalized_region := Rect2()
+	match speaker_id:
+		"skunk":
+			source = load("res://assets/jurejure/skunk.png") as Texture2D
+			normalized_region = Rect2(0.0, 0.057, 0.82, 0.656)
+		"mouse":
+			source = load("res://assets/jurejure/mouse.png") as Texture2D
+			normalized_region = Rect2(0.089, 0.0, 0.822, 0.642)
+		"peccary":
+			source = load("res://assets/jurejure/peccary.png") as Texture2D
+			normalized_region = Rect2(0.16, 0.014, 0.802, 0.642)
+		_:
+			return null
+	if source == null:
+		return null
+	var texture_size := source.get_size()
+	var portrait := AtlasTexture.new()
+	portrait.atlas = source
+	portrait.region = Rect2(normalized_region.position * texture_size, normalized_region.size * texture_size)
+	return portrait
 
 
 static func display_size_for_diameter(diameter_cm: float) -> float:

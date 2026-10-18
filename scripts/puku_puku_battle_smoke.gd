@@ -3,6 +3,7 @@ extends Node
 const BattleClass = preload("res://scripts/puku_puku_battle.gd")
 const SucculentClass = preload("res://scripts/succulent.gd")
 const JellyBalanceClass = preload("res://scripts/jelly_balance.gd")
+const Localizer = preload("res://scripts/game_localizer.gd")
 
 const SAMPLE_SPECIES := {
 	"species_id": "colorata",
@@ -11,10 +12,12 @@ const SAMPLE_SPECIES := {
 	"visual_variant": "colorata",
 	"colors": ["7f9f91", "d35f6f"]
 }
-const SAMPLE_COUNT := 600
+const SAMPLE_COUNT := 6000
+const DISTRIBUTION_SAMPLE_COUNT := 300000
 const SIMULATION_STEP := 1.0 / 30.0
 const OPPONENT_RIGHT_CHARACTER_MAJOR_RECT := Rect2(360, 142, 190, 150)
 const PLAYER_RIGHT_CHARACTER_MAJOR_RECT := Rect2(382, 590, 170, 150)
+const EXPECTED_DIALOGUE_PANEL_SIZE := Vector2(496, 255)
 
 
 func _ready() -> void:
@@ -42,6 +45,9 @@ func _ready() -> void:
 		_verify_soil_points(layout_probe._generate_side_points(false), false)
 		_verify_soil_points(layout_probe._generate_side_points(true), true)
 	layout_probe.queue_free()
+	await _verify_difficulty_opening_dialogue(texture)
+	_verify_difficulty_and_dialogue_distributions()
+	var reward_rates := _verify_fusion_reward_distributions()
 
 	# The dedicated screen starts on two empty dirt fields. No plant or score is
 	# created until the player explicitly sows the battle seeds.
@@ -98,20 +104,35 @@ func _ready() -> void:
 	_verify_jelly_precedes_ai_harvest(battle)
 	await _verify_sequential_refill(texture)
 
-	var ai_stats := _simulate_ai_population(73000)
-	var same_policy_reference := _simulate_ai_population(73000)
-	assert(int(ai_stats.jellied) > 0)
-	assert(int(ai_stats.harvested) + int(ai_stats.jellied) == SAMPLE_COUNT)
-	assert(is_equal_approx(float(ai_stats.jelly_rate), float(same_policy_reference.jelly_rate)))
-	assert(is_equal_approx(float(ai_stats.average_harvest_cm), float(same_policy_reference.average_harvest_cm)))
-	assert(is_equal_approx(float(ai_stats.average_score), float(same_policy_reference.average_score)))
+	var normal_stats := _simulate_ai_population(73000, BattleClass.DIFFICULTY_NORMAL)
+	var strong_stats := _simulate_ai_population(73000, BattleClass.DIFFICULTY_STRONG)
+	var strongest_stats := _simulate_ai_population(73000, BattleClass.DIFFICULTY_STRONGEST)
+	assert(int(normal_stats.jellied) > 0)
+	assert(int(normal_stats.harvested) + int(normal_stats.jellied) == SAMPLE_COUNT)
+	var strong_ratio := float(strong_stats.average_score) / float(normal_stats.average_score)
+	var strongest_ratio := float(strongest_stats.average_score) / float(normal_stats.average_score)
+	assert(strong_ratio >= 1.12 and strong_ratio <= 1.18)
+	assert(strongest_ratio >= 1.27 and strongest_ratio <= 1.33)
+	assert(float(strongest_stats.average_score) > float(strong_stats.average_score))
 
 	print(
 		"PUKU_PUKU_BATTLE_SMOKE_OK sow=manual active=6v6 total=12v12 refill=true random_soil=true shared_growth=true shared_jelly=true " +
-		"ai_jelly_rate=%.3f ai_average_harvest_cm=%.3f ai_average_score=%.3f condition_delta=0.000 main_scale_visual=true unclipped_plants=true alpha_hit=true frontmost_z=true" % [
-			float(ai_stats.jelly_rate),
-			float(ai_stats.average_harvest_cm),
-			float(ai_stats.average_score)
+		"ai_normal=%.3f ai_strong=%.3f(+%.2f%%) ai_strongest=%.3f(+%.2f%%) samples=%d phase_odds=70/30,50/50,40/30/30 dialogue=uniform battle_intro=paused trio=3 reward_L1=%.4f/%.4f/%.4f reward_L2=%.4f/%.4f/%.4f reward_L3=%.4f/%.4f/%.4f five_star=0 condition_delta=0.000 main_scale_visual=true unclipped_plants=true alpha_hit=true frontmost_z=true" % [
+			float(normal_stats.average_score),
+			float(strong_stats.average_score),
+			(strong_ratio - 1.0) * 100.0,
+			float(strongest_stats.average_score),
+			(strongest_ratio - 1.0) * 100.0,
+			SAMPLE_COUNT * 3,
+			float(reward_rates[BattleClass.DIFFICULTY_NORMAL][2]),
+			float(reward_rates[BattleClass.DIFFICULTY_NORMAL][3]),
+			float(reward_rates[BattleClass.DIFFICULTY_NORMAL][4]),
+			float(reward_rates[BattleClass.DIFFICULTY_STRONG][2]),
+			float(reward_rates[BattleClass.DIFFICULTY_STRONG][3]),
+			float(reward_rates[BattleClass.DIFFICULTY_STRONG][4]),
+			float(reward_rates[BattleClass.DIFFICULTY_STRONGEST][2]),
+			float(reward_rates[BattleClass.DIFFICULTY_STRONGEST][3]),
+			float(reward_rates[BattleClass.DIFFICULTY_STRONGEST][4])
 		]
 	)
 	get_tree().quit()
@@ -312,7 +333,7 @@ func _verify_jelly_precedes_ai_harvest(battle: Control) -> void:
 	assert(is_zero_approx(float(resolved.get("score", -1.0))))
 
 
-func _simulate_ai_population(seed_offset: int) -> Dictionary:
+func _simulate_ai_population(seed_offset: int, difficulty: int) -> Dictionary:
 	var jellied := 0
 	var harvested := 0
 	var harvest_total := 0.0
@@ -323,7 +344,7 @@ func _simulate_ai_population(seed_offset: int) -> Dictionary:
 		plant.setup(SAMPLE_SPECIES, plant_seed, null, null, true)
 		var plan_rng := RandomNumberGenerator.new()
 		plan_rng.seed = plant_seed + 900000
-		var plan := BattleClass.ai_harvest_plan(plan_rng.randf(),plan_rng.randf())
+		var plan := BattleClass.ai_harvest_plan_for_difficulty(plan_rng.randf(), plan_rng.randf(), difficulty)
 		while plant.state == "growing" and plant.age < 90.0:
 			# This ordering is identical to the live battle: shared jelly simulation
 			# first, then (only if still alive) the AI harvest decision.
@@ -343,6 +364,135 @@ func _simulate_ai_population(seed_offset: int) -> Dictionary:
 		"average_harvest_cm": harvest_total / maxf(1.0, float(harvested)),
 		"average_score": score_total / float(SAMPLE_COUNT)
 	}
+
+
+func _verify_difficulty_opening_dialogue(texture: Texture2D) -> void:
+	for style_roll in [0.0, 0.239999, 0.24, 0.619999, 0.62, 0.879999, 0.88, 0.999999]:
+		for timing_roll in [0.0, 0.37, 1.0]:
+			assert(BattleClass.ai_harvest_plan(style_roll, timing_roll) == BattleClass.ai_harvest_plan_for_difficulty(style_roll, timing_roll, BattleClass.DIFFICULTY_NORMAL))
+	var probe := BattleClass.new()
+	add_child(probe)
+	await get_tree().process_frame
+	for locale in ["ja", "hiragana", "en"]:
+		probe.start_battle([SAMPLE_SPECIES], {"colorata": texture}, locale, 404040, false, BattleClass.DIFFICULTY_STRONG)
+		assert(probe.battle_layer.visible and (probe.battle_layer.get_node("BattleBackground") as TextureRect).visible)
+		assert(probe.battle_phase == "opening_dialogue" and not probe.battle_active)
+		assert(probe.opening_dialogue_layer.visible and not probe.sow_button.visible and probe.sow_button.disabled)
+		assert(probe.units.is_empty())
+		var data := BattleClass.opening_dialogue_data(BattleClass.DIFFICULTY_STRONG, probe.opening_dialogue_index)
+		assert(not data.is_empty() and str(data.speaker) in BattleClass.STRONG_DIALOGUE_SPEAKERS)
+		assert(probe.opening_dialogue_label.text == Localizer.text(locale, str(data.key)))
+		assert(probe.opening_portrait.visible and not probe.opening_trio_portraits.visible)
+		probe._process(20.0)
+		assert(probe.units.is_empty() and probe.battle_phase == "opening_dialogue")
+		probe._close_opening_dialogue()
+		assert(probe.battle_phase == "awaiting_sow" and not probe.battle_active)
+		assert(not probe.opening_dialogue_layer.visible and probe.sow_button.visible and not probe.sow_button.disabled)
+	probe.start_battle([SAMPLE_SPECIES], {"colorata": texture}, "ja", 505050, false, BattleClass.DIFFICULTY_STRONGEST)
+	await get_tree().process_frame
+	assert(probe.battle_phase == "opening_dialogue" and probe.opening_trio_portraits.visible and not probe.opening_portrait.visible)
+	assert(probe.opening_speaker_label.text == Localizer.text("ja", "jurejure_gang_name"))
+	assert(probe.opening_speaker_label.text == "ジュレジュレ団（3人）")
+	assert(probe.opening_speaker_label.get_theme_font_size("font_size") == 15)
+	assert(probe.opening_trio_portraits.get_child_count() == 3)
+	var panel_rect := probe.opening_dialogue_panel.get_global_rect()
+	assert(panel_rect.size == EXPECTED_DIALOGUE_PANEL_SIZE)
+	assert(panel_rect.encloses(probe.opening_dialogue_label.get_global_rect()))
+	assert(panel_rect.encloses(probe.opening_continue_button.get_global_rect()))
+	for first_index in range(3):
+		var first := probe.opening_trio_portraits.get_child(first_index) as TextureRect
+		assert(first.texture != null)
+		assert(Rect2(Vector2.ZERO, probe.opening_portrait_slot.custom_minimum_size).encloses(Rect2(first.position, first.size)))
+		for second_index in range(first_index):
+			var second := probe.opening_trio_portraits.get_child(second_index) as TextureRect
+			assert(not Rect2(first.position, first.size).intersects(Rect2(second.position, second.size)))
+	probe._close_opening_dialogue()
+	# Even if a caller passes a higher level, the linked mandatory Act III battle
+	# must remain the original normal, immediate-start special battle.
+	probe.start_battle([SAMPLE_SPECIES], {"colorata": texture}, "ja", 606060, true, BattleClass.DIFFICULTY_STRONGEST)
+	assert(probe.battle_difficulty == BattleClass.DIFFICULTY_NORMAL)
+	assert(probe.battle_phase == "awaiting_sow" and not probe.opening_dialogue_layer.visible and probe.sow_button.visible)
+	probe.queue_free()
+	await get_tree().process_frame
+
+
+func _verify_difficulty_and_dialogue_distributions() -> void:
+	assert(BattleClass.difficulty_for_phase_roll(BattleClass.PHASE_EARLY, 0.699999) == BattleClass.DIFFICULTY_NORMAL)
+	assert(BattleClass.difficulty_for_phase_roll(BattleClass.PHASE_EARLY, 0.70) == BattleClass.DIFFICULTY_STRONG)
+	assert(BattleClass.difficulty_for_phase_roll(BattleClass.PHASE_EXPLOITATION, 0.499999) == BattleClass.DIFFICULTY_NORMAL)
+	assert(BattleClass.difficulty_for_phase_roll(BattleClass.PHASE_EXPLOITATION, 0.50) == BattleClass.DIFFICULTY_STRONG)
+	assert(BattleClass.difficulty_for_phase_roll(BattleClass.PHASE_POST_ENDING, 0.399999) == BattleClass.DIFFICULTY_NORMAL)
+	assert(BattleClass.difficulty_for_phase_roll(BattleClass.PHASE_POST_ENDING, 0.40) == BattleClass.DIFFICULTY_STRONG)
+	assert(BattleClass.difficulty_for_phase_roll(BattleClass.PHASE_POST_ENDING, 0.70) == BattleClass.DIFFICULTY_STRONGEST)
+	var test_rng := RandomNumberGenerator.new()
+	test_rng.seed = 20261019
+	var phase_counts := {
+		BattleClass.PHASE_EARLY: [0, 0, 0, 0],
+		BattleClass.PHASE_EXPLOITATION: [0, 0, 0, 0],
+		BattleClass.PHASE_POST_ENDING: [0, 0, 0, 0]
+	}
+	var dialogue_counts := [0, 0, 0]
+	for sample_index in range(DISTRIBUTION_SAMPLE_COUNT):
+		for phase in phase_counts:
+			var difficulty := BattleClass.difficulty_for_phase_roll(str(phase), test_rng.randf())
+			phase_counts[phase][difficulty] += 1
+		dialogue_counts[BattleClass.opening_dialogue_index_for_roll(test_rng.randf())] += 1
+	_assert_ratio(phase_counts[BattleClass.PHASE_EARLY][1], DISTRIBUTION_SAMPLE_COUNT, 0.70, 0.004)
+	_assert_ratio(phase_counts[BattleClass.PHASE_EARLY][2], DISTRIBUTION_SAMPLE_COUNT, 0.30, 0.004)
+	assert(phase_counts[BattleClass.PHASE_EARLY][3] == 0)
+	_assert_ratio(phase_counts[BattleClass.PHASE_EXPLOITATION][1], DISTRIBUTION_SAMPLE_COUNT, 0.50, 0.004)
+	_assert_ratio(phase_counts[BattleClass.PHASE_EXPLOITATION][2], DISTRIBUTION_SAMPLE_COUNT, 0.50, 0.004)
+	assert(phase_counts[BattleClass.PHASE_EXPLOITATION][3] == 0)
+	_assert_ratio(phase_counts[BattleClass.PHASE_POST_ENDING][1], DISTRIBUTION_SAMPLE_COUNT, 0.40, 0.004)
+	_assert_ratio(phase_counts[BattleClass.PHASE_POST_ENDING][2], DISTRIBUTION_SAMPLE_COUNT, 0.30, 0.004)
+	_assert_ratio(phase_counts[BattleClass.PHASE_POST_ENDING][3], DISTRIBUTION_SAMPLE_COUNT, 0.30, 0.004)
+	for count in dialogue_counts:
+		_assert_ratio(count, DISTRIBUTION_SAMPLE_COUNT, 1.0 / 3.0, 0.004)
+	assert(Localizer.text("ja", "jurejure_battle_strongest_trio_1") == "ジュレジュレ団は、\n永久に不滅チュー！")
+	for difficulty in [BattleClass.DIFFICULTY_STRONG, BattleClass.DIFFICULTY_STRONGEST]:
+		for dialogue_index in range(3):
+			var data := BattleClass.opening_dialogue_data(difficulty, dialogue_index)
+			for locale in ["ja", "hiragana", "en"]:
+				assert(not Localizer.text(locale, str(data.key)).is_empty())
+
+
+func _verify_fusion_reward_distributions() -> Dictionary:
+	var expected_rates := {
+		BattleClass.DIFFICULTY_NORMAL: {2: 0.05, 3: 0.01, 4: 0.003},
+		BattleClass.DIFFICULTY_STRONG: {2: 0.10, 3: 0.03, 4: 0.01},
+		BattleClass.DIFFICULTY_STRONGEST: {2: 0.15, 3: 0.06, 4: 0.02}
+	}
+	var measured := {}
+	assert(BattleClass.fusion_reward_rank_for_roll(0.049999, BattleClass.DIFFICULTY_NORMAL) == 2)
+	assert(BattleClass.fusion_reward_rank_for_roll(0.05, BattleClass.DIFFICULTY_NORMAL) == 3)
+	assert(BattleClass.fusion_reward_rank_for_roll(0.06, BattleClass.DIFFICULTY_NORMAL) == 4)
+	assert(BattleClass.fusion_reward_rank_for_roll(0.063, BattleClass.DIFFICULTY_NORMAL) == 0)
+	assert(BattleClass.fusion_reward_rank_for_roll(0.10, BattleClass.DIFFICULTY_STRONG) == 3)
+	assert(BattleClass.fusion_reward_rank_for_roll(0.13, BattleClass.DIFFICULTY_STRONG) == 4)
+	assert(BattleClass.fusion_reward_rank_for_roll(0.14, BattleClass.DIFFICULTY_STRONG) == 0)
+	assert(BattleClass.fusion_reward_rank_for_roll(0.15, BattleClass.DIFFICULTY_STRONGEST) == 3)
+	assert(BattleClass.fusion_reward_rank_for_roll(0.21, BattleClass.DIFFICULTY_STRONGEST) == 4)
+	assert(BattleClass.fusion_reward_rank_for_roll(0.23, BattleClass.DIFFICULTY_STRONGEST) == 0)
+	for difficulty in expected_rates:
+		var reward_rng := RandomNumberGenerator.new()
+		reward_rng.seed = 20261020 + int(difficulty) * 100
+		var counts := {0: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+		for sample_index in range(DISTRIBUTION_SAMPLE_COUNT):
+			var stars := BattleClass.fusion_reward_rank_for_roll(reward_rng.randf(), int(difficulty))
+			counts[stars] = int(counts[stars]) + 1
+		for stars in [2, 3, 4]:
+			_assert_ratio(int(counts[stars]), DISTRIBUTION_SAMPLE_COUNT, float(expected_rates[difficulty][stars]), 0.0015)
+		assert(int(counts[5]) == 0)
+		measured[difficulty] = {
+			2: float(counts[2]) / float(DISTRIBUTION_SAMPLE_COUNT),
+			3: float(counts[3]) / float(DISTRIBUTION_SAMPLE_COUNT),
+			4: float(counts[4]) / float(DISTRIBUTION_SAMPLE_COUNT)
+		}
+	return measured
+
+
+func _assert_ratio(count: int, total: int, expected: float, tolerance: float) -> void:
+	assert(absf(float(count) / float(total) - expected) <= tolerance)
 
 
 func _marker_count(battle: Control) -> int:
