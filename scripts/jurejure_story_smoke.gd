@@ -425,9 +425,19 @@ func _test_creative_gate(game: Node) -> void:
 	assert(game._is_jurejure_species(official_entry) and not game._is_fantasy_species(official_entry))
 	assert(not game._species_available_in_current_era(official_entry))
 	assert(not game._register_species_discovery(JUREJURE_SPECIES_IDS[0], true))
+	# The same species becomes a valid formal GET only after the internal Act III
+	# collection phase begins; this route also opens the existing pool so future
+	# ownership/use behaves exactly like a battle reward.
+	game.act3_unlocked = true
+	game.act3_intro_seen = true
+	StoryProgressionClass.begin_exploitation(game.story_progression_state, 0)
+	assert(game._jurejure_collection_draw_active())
+	assert(game._register_species_discovery(JUREJURE_SPECIES_IDS[0], true))
+	assert(game.jurejure_pool_unlocked and game._species_get_count(JUREJURE_SPECIES_IDS[0]) == 1)
+	assert(game._jurejure_collection_draw_active())
 	game.act3_intro_seen = true
 	var candidates: Array[Dictionary] = game._jurejure_reward_candidates()
-	assert(candidates.size() == 10)
+	assert(candidates.size() == 9)
 	for entry in candidates:
 		assert(str(entry.get("species_id", "")) in JUREJURE_SPECIES_IDS)
 	game.act3_intro_seen = false
@@ -570,10 +580,12 @@ func _test_jurejure_crisis_threshold(game: Node) -> void:
 	# acquisition flow is covered above and must not pre-empt this dialogue.
 	game.jurejure_species_first_seen = true
 	assert(StoryProgressionClass.exploitation_is_started(game.story_progression_state))
+	assert(game._jurejure_collection_draw_active())
 	assert(game._unlock_jurejure_pool())
 	for index in range(3):
 		game._register_species_discovery(JUREJURE_SPECIES_IDS[index], true)
 	assert(game._unique_jurejure_species_get_count() == 3)
+	assert(game._jurejure_collection_draw_active())
 	assert(not game.habitat_crisis_pending and not game.habitat_crisis_started)
 	game.jurejure_waiting_for_seed_pod_reward = true
 	assert(game._should_show_jurejure_group())
@@ -641,6 +653,7 @@ func _test_jurejure_crisis_threshold(game: Node) -> void:
 	# Four unique GETs schedule the one-off midpoint, but rain remains off.
 	game._register_species_discovery(JUREJURE_SPECIES_IDS[3], true)
 	assert(game._unique_jurejure_species_get_count() == 4)
+	assert(game._jurejure_collection_draw_active())
 	assert(bool(game.story_progression_state.get("exploitation_midpoint_pending", false)))
 	assert(not game.habitat_crisis_pending and not game.habitat_crisis_started)
 	await get_tree().process_frame
@@ -664,6 +677,7 @@ func _test_jurejure_crisis_threshold(game: Node) -> void:
 	for index in range(4, 7):
 		game._register_species_discovery(JUREJURE_SPECIES_IDS[index], true)
 	assert(game._unique_jurejure_species_get_count() == 7)
+	assert(game._jurejure_collection_draw_active())
 	assert(not game.habitat_crisis_pending and not game.habitat_crisis_started)
 	# Mirror the safe boundary of a real habitat battle: while its full-screen UI
 	# is open the deferred story check cannot pre-empt the reward card. Closing
@@ -671,8 +685,18 @@ func _test_jurejure_crisis_threshold(game: Node) -> void:
 	game.puku_puku_battle.visible = true
 	game._register_species_discovery(JUREJURE_SPECIES_IDS[7], true)
 	assert(game._unique_jurejure_species_get_count() == 8)
+	assert(not game._jurejure_collection_draw_active())
 	assert(game.habitat_crisis_pending and not game.habitat_crisis_started)
 	assert(StoryProgressionClass.habitat_crisis_route(game.story_progression_state) == StoryProgressionClass.CRISIS_ROUTE_SAME_HABITAT)
+	game._save()
+	var reloaded_game = load("res://main.tscn").instantiate()
+	add_child(reloaded_game)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert(reloaded_game._unique_jurejure_species_get_count() == 8)
+	assert(not reloaded_game._jurejure_collection_draw_active())
+	reloaded_game.queue_free()
+	await get_tree().process_frame
 	await get_tree().process_frame
 	assert(not game.habitat_crisis_started)
 	game.puku_puku_battle.visible = false

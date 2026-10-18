@@ -14,8 +14,9 @@ func _ready()->void:
 	_test_uniform_normal_species(game)
 	_test_fusion_acquisition_does_not_leak(game)
 	_test_route_exclusions_and_spawn_weight(game)
+	_test_jurejure_collection_new_selection(game)
 	game.free();await get_tree().process_frame
-	print("NORMAL_SEED_DISTRIBUTION_SMOKE_OK normal=uniform_0+1 fusion=0.5+0.1+0.03 five_star=0 guarantees=3+1 unlocks=2+3+4")
+	print("NORMAL_SEED_DISTRIBUTION_SMOKE_OK normal=uniform_0+1 fusion=0.5+0.1+0.03 five_star=0 guarantees=3+1 jure_new_share=50 unlocks=2+3+4")
 	get_tree().quit()
 
 func _prepare_full_random_unlocks(game:Node)->void:
@@ -136,3 +137,67 @@ func _test_route_exclusions_and_spawn_weight(game:Node)->void:
 	game.discovered["colorata"]=true
 	var after_get:float=game._normal_spawn_weight(entry)
 	assert(is_equal_approx(before_get,.35) and is_equal_approx(after_get,before_get))
+
+func _test_jurejure_collection_new_selection(game:Node)->void:
+	var jure_entries:Array[Dictionary]=game._series_species_entries("jurejure")
+	assert(jure_entries.size()==10 and is_equal_approx(game.JUREJURE_COLLECTION_NORMAL_NEW_SHARE,.5))
+	for entry in jure_entries:
+		var species_id:=str(entry.get("species_id",""))
+		game.discovered.erase(species_id);game.species_get_counts.erase(species_id)
+		game.greenhouse_available.erase(species_id);game.unlocked_species.erase(species_id)
+	game.jurejure_pool_unlocked=false;game.jurejure_species_unlocked.clear();game.unlocked_series.erase("jurejure")
+	game.forest_gacha_encountered.clear()
+	game.story_progression_state["exploitation_started"]=false;game.habitat_crisis_pending=false;game.habitat_crisis_started=false
+	assert(not game._jurejure_collection_draw_active() and game._jurejure_collection_new_candidates().is_empty())
+	game.story_progression_state["exploitation_started"]=true
+	assert(game._jurejure_collection_draw_active() and game._jurejure_collection_new_candidates().size()==10)
+	game.habitat_crisis_pending=true;assert(not game._jurejure_collection_draw_active());game.habitat_crisis_pending=false
+	game.habitat_crisis_started=true;assert(not game._jurejure_collection_draw_active());game.habitat_crisis_started=false
+	# Both legacy normal-NEW windows use the same post-NEW 50% selector while
+	# their original absolute 3% and 1% windows remain untouched.
+	var featured_unlocked:Dictionary=game._select_normal_seed_species(.0063,true,.1)
+	assert(game._is_jurejure_species(featured_unlocked) and not bool(featured_unlocked.get("_deferred_series_get",false)))
+	var ordinary_unlocked:Dictionary=game._select_normal_seed_species(.0063,true,.9)
+	assert(str(ordinary_unlocked.get("species_id",""))=="shaviana")
+	var featured_locked:Dictionary=game._select_normal_seed_species(.0363,true,.1)
+	assert(game._is_jurejure_species(featured_locked) and not bool(featured_locked.get("_deferred_series_get",false)))
+	var ordinary_locked:Dictionary=game._select_normal_seed_species(.0363,true,.9)
+	assert(str(ordinary_locked.get("species_id",""))=="gummy_peach_milk" and bool(ordinary_locked.get("_deferred_series_get",false)))
+	assert(game._select_collection_phase_new_candidate([],false,.9).is_empty())
+	assert(game._is_jurejure_species(game._select_collection_phase_new_candidate([],false,.1)))
+	# Fixed RNG verifies that a successful carryover NEW is split 50/50 after,
+	# rather than before, its existing chance roll.
+	var probability_rng:=RandomNumberGenerator.new();probability_rng.seed=2026101803;var probability_featured_count:=0
+	for sample_index in range(NORMAL_SAMPLE_COUNT):
+		if game._jurejure_collection_roll_selects_feature(probability_rng.randf()):probability_featured_count+=1
+	var probability_ratio:=float(probability_featured_count)/NORMAL_SAMPLE_COUNT
+	assert(probability_ratio>.499 and probability_ratio<.501,"normal NEW feature threshold ratio=%f"%probability_ratio)
+	print("JUREJURE_NORMAL_NEW_DISTRIBUTION samples=%d featured=%.4f"%[NORMAL_SAMPLE_COUNT,probability_ratio])
+	var sample_count:=5000;var featured_count:=0;var ordinary_count:=0;var featured_ids:Dictionary={};game.rng.seed=2026101804
+	for entry in jure_entries:featured_ids[str(entry.get("species_id",""))]=true
+	var jure_counts:Dictionary={}
+	for sample_index in range(sample_count):
+		var selected:Dictionary=game._select_endless_forced_new_candidate(game.rng.randf())
+		var species_id:=str(selected.get("species_id",""))
+		if featured_ids.has(species_id):
+			featured_count+=1;jure_counts[species_id]=int(jure_counts.get(species_id,0))+1
+		else:ordinary_count+=1
+	var featured_ratio:=float(featured_count)/sample_count
+	assert(featured_ratio>.48 and featured_ratio<.52,"normal NEW JureJure ratio=%f"%featured_ratio)
+	assert(featured_count+ordinary_count==sample_count)
+	for species_id in featured_ids:
+		var candidate_ratio:=float(jure_counts.get(species_id,0))/featured_count
+		assert(candidate_ratio>.075 and candidate_ratio<.125,"normal JureJure candidates not uniform: %s=%f"%[species_id,candidate_ratio])
+	# A harvested-but-unconfirmed result and a live NEW plant are both excluded,
+	# preventing duplicate NEW labels inside one round.
+	var pending_id:=str(jure_entries[0].get("species_id",""));game.pending_round_new_species_ids.append(pending_id)
+	assert(game._jurejure_collection_new_candidates().all(func(entry:Dictionary)->bool:return str(entry.get("species_id",""))!=pending_id))
+	game.pending_round_new_species_ids.erase(pending_id)
+	var active_id:=str(jure_entries[1].get("species_id",""));var active_plant=load("res://scripts/succulent.gd").new()
+	active_plant.data=game._catalog_entry(active_id);active_plant.set_meta("new_species_candidate",true);game.plants.append(active_plant)
+	assert(game._jurejure_collection_new_candidates().all(func(entry:Dictionary)->bool:return str(entry.get("species_id",""))!=active_id))
+	game.plants.erase(active_plant);active_plant.free()
+	# The eighth owned species, crisis transition, or a pre-Act-III save disables
+	# the route immediately without a separate UI refresh.
+	for index in range(8):game.species_get_counts[str(jure_entries[index].get("species_id",""))]=1
+	assert(not game._jurejure_collection_draw_active() and game._jurejure_collection_new_candidates().is_empty())

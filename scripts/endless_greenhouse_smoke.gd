@@ -276,9 +276,9 @@ func _test_discovery_probability_and_set_state() -> void:
 func _test_per_spawn_new_switch_and_story_guarantee(game: Node) -> void:
 	var candidates: Array = game._eligible_endless_forced_new_candidates()
 	assert(not candidates.is_empty())
-	var finite_roll: Dictionary = game._select_normal_seed_species(0.0, true)
+	var finite_roll: Dictionary = game._select_normal_seed_species(game.NORMAL_SEED_FUSION_TOTAL_RATE, true)
 	assert(game._species_get_count(str(finite_roll.get("species_id", ""))) == 0)
-	var endless_roll: Dictionary = game._select_normal_seed_species(0.0, false)
+	var endless_roll: Dictionary = game._select_normal_seed_species(game.NORMAL_SEED_FUSION_TOTAL_RATE, false)
 	assert(game._species_get_count(str(endless_roll.get("species_id", ""))) > 0)
 
 	# Explicit story guarantees stay ahead of the ENDLESS random selection path.
@@ -1293,7 +1293,7 @@ func _test_finite_mode_unchanged(game: Node) -> void:
 	game._open_play_modal()
 	assert(game.play_overlay.visible and game.normal_play_button.visible and game.volume_play_button.visible)
 	game._close_play_modal()
-	var finite_new_roll: Dictionary = game._select_normal_seed_species(0.0, true)
+	var finite_new_roll: Dictionary = game._select_normal_seed_species(game.NORMAL_SEED_FUSION_TOTAL_RATE, true)
 	assert(game._species_get_count(str(finite_new_roll.get("species_id", ""))) == 0)
 	game._start_greenhouse_play("normal")
 	assert(game.play_active and game.normal_seed_bags == 0)

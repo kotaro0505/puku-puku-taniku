@@ -13,12 +13,13 @@ func _ready()->void:
 	_test_removed_status_text(game)
 	_test_draw_rules(game)
 	_test_star_rank_draw_distribution()
+	_test_jurejure_collection_distribution()
 	_test_jurejure_species_gate(game)
 	await _test_spin_capsule_and_reveal(game)
 	_test_repeated_price_debit(game)
 	_test_encounter_save_and_unlock(game)
 	game._reset_progression_state();game.queue_free()
-	print("FOREST_GACHA_SMOKE_OK price=3 ranks=95+4+0.8+0.2+0 five_star=never normal_species=uniform rank_new=60 duplicate=40 empty_rank=no_upper_transfer wallet=2_blocked+3_allowed+115_to_1 card=new_gold+duplicate_ivory_no_glow+stars")
+	print("FOREST_GACHA_SMOKE_OK price=3 ranks=95+4+0.8+0.2+0 five_star=never normal_species=uniform rank_new=60 duplicate=40 jure_mission=25+35+40 empty_rank=no_upper_transfer wallet=2_blocked+3_allowed+115_to_1 card=new_gold+duplicate_ivory_no_glow+stars")
 	get_tree().quit()
 
 func _test_assets_and_routes(game)->void:
@@ -259,6 +260,79 @@ func _test_star_rank_draw_distribution()->void:
 
 func _ratio(count:int,total:int)->float:
 	return float(count)/float(total)
+
+func _test_jurejure_collection_distribution()->void:
+	var system=ForestGachaSystemClass.new()
+	var series_catalog:Array=[
+		{"series_id":"normal","display_name":"normal","unlock_type":"default","species_ids":["other_new_a","other_new_b","owned_a","owned_b"]},
+		{"series_id":"jurejure","display_name":"jurejure","unlock_type":"future","species_ids":["jure_a","jure_b","jure_c","jure_d"]},
+		{"series_id":"hybrid","display_name":"hybrid","unlock_type":"future","species_ids":["r2n","r2d"]},
+		{"series_id":"fusion_tier1","display_name":"tier1","unlock_type":"future","species_ids":["r3n","r3d"]},
+		{"series_id":"fusion_tier2","display_name":"tier2","unlock_type":"future","species_ids":["r4n","r4d"]},
+	]
+	var species_catalog:Array=[
+		{"species_id":"other_new_a","series_id":"normal","star_rating":0},{"species_id":"other_new_b","series_id":"normal","star_rating":1},
+		{"species_id":"owned_a","series_id":"normal","star_rating":0},{"species_id":"owned_b","series_id":"normal","star_rating":1},
+		{"species_id":"jure_a","series_id":"jurejure","story_group":"jurejure","star_rating":0},
+		{"species_id":"jure_b","series_id":"jurejure","story_group":"jurejure","star_rating":0},
+		{"species_id":"jure_c","series_id":"jurejure","story_group":"jurejure","star_rating":1},
+		{"species_id":"jure_d","series_id":"jurejure","story_group":"jurejure","star_rating":1},
+		{"species_id":"r2n","series_id":"hybrid","star_rating":2},{"species_id":"r2d","series_id":"hybrid","star_rating":2},
+		{"species_id":"r3n","series_id":"fusion_tier1","star_rating":3},{"species_id":"r3d","series_id":"fusion_tier1","star_rating":3},
+		{"species_id":"r4n","series_id":"fusion_tier2","star_rating":4},{"species_id":"r4d","series_id":"fusion_tier2","star_rating":4},
+	]
+	system.configure(series_catalog,species_catalog,{"normal_series":[{"series_id":"normal"}]})
+	assert(is_equal_approx(system.JUREJURE_NEW_TOTAL_RATE,.25))
+	assert(is_equal_approx(system.JUREJURE_NEW_RATE_WITHIN_NORMAL_RANK,.25/.95))
+	var featured:Array[String]=["jure_a","jure_b","jure_c","jure_d"]
+	var discovered:Dictionary={"owned_a":true,"owned_b":true,"r2d":true,"r3d":true,"r4d":true}
+	var unlocks:Dictionary={2:true,3:true,4:true};var test_rng:=RandomNumberGenerator.new();test_rng.seed=2026101801
+	var sample_count:=200000;var jure_new_count:=0;var other_new_count:=0;var duplicate_count:=0
+	var ranks:Dictionary={0:0,2:0,3:0,4:0};var jure_counts:Dictionary={}
+	for sample_index in range(sample_count):
+		var result:Dictionary=system.draw({"normal":true},discovered,{},test_rng,true,{},unlocks,-1.0,featured,true)
+		var species_id:=str(result.get("species_id",""));var stars:=int(result.get("star_rating",-1))
+		var rank_key:=0 if stars<=1 else stars;ranks[rank_key]=int(ranks.get(rank_key,0))+1
+		if species_id in featured:
+			jure_new_count+=1;jure_counts[species_id]=int(jure_counts.get(species_id,0))+1
+		elif bool(result.get("was_discovered",false)):duplicate_count+=1
+		else:other_new_count+=1
+	var jure_ratio:=_ratio(jure_new_count,sample_count);var other_new_ratio:=_ratio(other_new_count,sample_count);var duplicate_ratio:=_ratio(duplicate_count,sample_count)
+	assert(jure_ratio>.245 and jure_ratio<.255,"mission JureJure ratio=%f"%jure_ratio)
+	assert(other_new_ratio>.345 and other_new_ratio<.355,"mission other NEW ratio=%f"%other_new_ratio)
+	assert(duplicate_ratio>.395 and duplicate_ratio<.405,"mission duplicate ratio=%f"%duplicate_ratio)
+	assert(absf(jure_ratio+other_new_ratio-.60)<.006)
+	assert(_ratio(int(ranks[0]),sample_count)>.947 and _ratio(int(ranks[0]),sample_count)<.953)
+	assert(_ratio(int(ranks[2]),sample_count)>.038 and _ratio(int(ranks[2]),sample_count)<.042)
+	assert(_ratio(int(ranks[3]),sample_count)>.0068 and _ratio(int(ranks[3]),sample_count)<.0092)
+	assert(_ratio(int(ranks[4]),sample_count)>.0014 and _ratio(int(ranks[4]),sample_count)<.0026)
+	print("JUREJURE_GACHA_DISTRIBUTION samples=%d jure_new=%.4f other_new=%.4f duplicate=%.4f ranks=%.4f/%.4f/%.4f/%.4f"%[sample_count,jure_ratio,other_new_ratio,duplicate_ratio,_ratio(int(ranks[0]),sample_count),_ratio(int(ranks[2]),sample_count),_ratio(int(ranks[3]),sample_count),_ratio(int(ranks[4]),sample_count)])
+	for species_id in featured:
+		var individual_ratio:=_ratio(int(jure_counts.get(species_id,0)),jure_new_count)
+		assert(individual_ratio>.24 and individual_ratio<.26,"featured candidates must be uniform: %s=%f"%[species_id,individual_ratio])
+	# Boundary rolls prove the 25% feature is an inner slice of rank 0, not an
+	# extra NEW chance, and can never consume a fusion-rank roll.
+	var boundary_rng:=RandomNumberGenerator.new();boundary_rng.seed=42
+	assert(str(system.draw({"normal":true},discovered,{},boundary_rng,true,{},unlocks,.5,featured,false,.0).get("species_id","")) not in featured)
+	assert(str(system.draw({"normal":true},discovered,{},boundary_rng,true,{},unlocks,.5,featured,true,.0).get("species_id","")) in featured)
+	assert(str(system.draw({"normal":true},discovered,{},boundary_rng,true,{},unlocks,.5,featured,true,.3).get("species_id","")).begins_with("other_new"))
+	assert(bool(system.draw({"normal":true},discovered,{},boundary_rng,true,{},unlocks,.5,featured,true,.9).get("was_discovered",false)))
+	assert(int(system.draw({"normal":true},discovered,{},boundary_rng,true,{},unlocks,.96,featured,true,.0).get("star_rating",-1))==2)
+	var unlocked_jurejure:Dictionary={};for species_id in featured:unlocked_jurejure[species_id]=true
+	assert(str(system.draw({"normal":true,"jurejure":true},discovered,{},boundary_rng,true,unlocked_jurejure,unlocks,.5,[],true,.0).get("species_id","")) not in featured)
+	var inactive_a:=RandomNumberGenerator.new();var inactive_b:=RandomNumberGenerator.new();inactive_a.seed=301;inactive_b.seed=301
+	var inactive_with_ids:Dictionary=system.draw({"normal":true,"jurejure":true},discovered,{},inactive_a,true,unlocked_jurejure,unlocks,.5,featured,false,.0)
+	var inactive_without_ids:Dictionary=system.draw({"normal":true,"jurejure":true},discovered,{},inactive_b,true,unlocked_jurejure,unlocks,.5,[],false,.0)
+	assert(str(inactive_with_ids.get("species_id",""))==str(inactive_without_ids.get("species_id","")))
+	var remaining_featured:Array[String]=["jure_b","jure_c","jure_d"]
+	for sample_index in range(100):
+		var pending_safe:Dictionary=system.draw({"normal":true,"jurejure":true},discovered,{},boundary_rng,true,unlocked_jurejure,unlocks,.5,remaining_featured,true,.3)
+		assert(str(pending_safe.get("species_id",""))!="jure_a")
+	# With no mission candidates, the established rank-local 60/40 draw is used.
+	var no_feature_new:=0;test_rng.seed=2026101802
+	for sample_index in range(30000):
+		if not bool(system.draw({"normal":true},discovered,{},test_rng,true,{},unlocks,.5,[]).get("was_discovered",false)):no_feature_new+=1
+	assert(_ratio(no_feature_new,30000)>.59 and _ratio(no_feature_new,30000)<.61)
 
 func _test_jurejure_species_gate(game)->void:
 	var jurejure_entries:Array[Dictionary]=game._series_species_entries("jurejure")

@@ -176,6 +176,7 @@ const FANTASY_SERIES_IDS := [
 const EARLY_FANTASY_REQUIRED_SERIES := ["jelly", "yumekawa", "stone", "jewel"]
 const JUREJURE_STORY_GROUP := "jurejure"
 const JUREJURE_SERIES_ID := "jurejure"
+const JUREJURE_COLLECTION_NORMAL_NEW_SHARE := 0.50
 const SHOP_CHATTER_KEYS := [
 	"shop_chatter_today","shop_chatter_share","shop_chatter_welcome",
 	"shop_chatter_living_jewel","shop_chatter_puku_help"
@@ -4468,7 +4469,8 @@ func _spin_forest_gacha()->void:
 	if forest_gacha_trial_dev_mode:
 		if not _trial_dev_controls_enabled():forest_gacha_ui.cancel_spin_feedback();return
 		var trial_next:=forest_gacha_draw_count+1
-		var trial_result:Dictionary=forest_gacha_system.draw(unlocked_series,discovered,forest_gacha_encountered,forest_gacha_rng,StoryProgressionClass.fantasy_is_unlocked(story_progression_state),jurejure_species_unlocked,_random_fusion_source_unlocks())
+		var trial_collection_draw_active:=_jurejure_collection_draw_active()
+		var trial_result:Dictionary=forest_gacha_system.draw(unlocked_series,discovered,forest_gacha_encountered,forest_gacha_rng,StoryProgressionClass.fantasy_is_unlocked(story_progression_state),jurejure_species_unlocked,_random_fusion_source_unlocks(),-1.0,_jurejure_collection_new_candidate_ids(),trial_collection_draw_active)
 		if trial_result.is_empty():forest_gacha_ui.cancel_spin_feedback();return
 		var trial_unlocked_series_id:=""
 		if str(trial_result.get("source",""))=="locked":
@@ -4479,7 +4481,8 @@ func _spin_forest_gacha()->void:
 	if not _can_afford_puku_units(forest_cost_units):
 		forest_gacha_ui.cancel_spin_feedback();forest_gacha_ui.set_wallet(puku_points,forest_gacha_draw_count);return
 	var next_draw:=forest_gacha_draw_count+1
-	var result:Dictionary=forest_gacha_system.draw(unlocked_series,discovered,forest_gacha_encountered,forest_gacha_rng,StoryProgressionClass.fantasy_is_unlocked(story_progression_state),jurejure_species_unlocked,_random_fusion_source_unlocks())
+	var collection_draw_active:=_jurejure_collection_draw_active()
+	var result:Dictionary=forest_gacha_system.draw(unlocked_series,discovered,forest_gacha_encountered,forest_gacha_rng,StoryProgressionClass.fantasy_is_unlocked(story_progression_state),jurejure_species_unlocked,_random_fusion_source_unlocks(),-1.0,_jurejure_collection_new_candidate_ids(),collection_draw_active)
 	if result.is_empty():forest_gacha_ui.cancel_spin_feedback();return
 	var unlocked_series_id:=""
 	if str(result.get("source",""))=="locked":
@@ -6712,6 +6715,68 @@ func _unique_jurejure_species_get_count()->int:
 		if entry_value is Dictionary and _is_jurejure_species(entry_value) and _species_get_count(str(entry_value.get("species_id","")))>0:count+=1
 	return count
 
+func _jurejure_collection_draw_active()->bool:
+	# The draw phase follows durable story state, never the visibility of the
+	# mission widget.  Count is checked directly so the eighth formal GET turns
+	# the feature off in the same registration call, before another draw.
+	return StoryProgressionClass.exploitation_is_started(story_progression_state) \
+		and not habitat_crisis_pending and not habitat_crisis_started \
+		and _unique_jurejure_species_get_count()<8
+
+func _round_unconfirmed_new_species_ids()->Dictionary:
+	var reserved:Dictionary={}
+	for species_id_value in pending_round_new_species_ids:
+		var pending_species_id:=str(species_id_value)
+		if not pending_species_id.is_empty():reserved[pending_species_id]=true
+	for plant in plants:
+		if not is_instance_valid(plant) or not bool(plant.get_meta("new_species_candidate",false)):continue
+		var plant_species_id:=str(plant.data.get("species_id",""))
+		if not plant_species_id.is_empty() and _species_get_count(plant_species_id)<=0:reserved[plant_species_id]=true
+	return reserved
+
+func _jurejure_collection_new_candidates()->Array[Dictionary]:
+	var candidates:Array[Dictionary]=[]
+	if not _jurejure_collection_draw_active():return candidates
+	var reserved:=_round_unconfirmed_new_species_ids()
+	for entry_value in catalog_species:
+		if not entry_value is Dictionary:continue
+		var entry:Dictionary=entry_value;var species_id:=str(entry.get("species_id",""))
+		if species_id.is_empty() or not _is_jurejure_species(entry):continue
+		if _species_get_count(species_id)>0 or bool(discovered.get(species_id,false)) or reserved.has(species_id):continue
+		candidates.append(entry)
+	return candidates
+
+func _jurejure_collection_new_candidate_ids()->Array[String]:
+	var result:Array[String]=[]
+	for entry in _jurejure_collection_new_candidates():result.append(str(entry.get("species_id","")))
+	return result
+
+func _jurejure_collection_roll_selects_feature(roll:float)->bool:
+	return clampf(roll,0.0,.999999)<JUREJURE_COLLECTION_NORMAL_NEW_SHARE
+
+func _select_collection_phase_new_candidate(default_candidates:Array,mark_default_deferred:=false,forced_special_roll:float=-1.0)->Dictionary:
+	var ordinary_candidates:Array[Dictionary]=[]
+	var collection_draw_active:=_jurejure_collection_draw_active()
+	for raw_candidate in default_candidates:
+		if not raw_candidate is Dictionary:continue
+		var candidate:Dictionary=raw_candidate
+		# During the mission all unowned gang species belong exclusively to the
+		# explicit 50% branch.  This prevents the remaining legacy branch from
+		# silently raising the requested share after the battle pool is unlocked.
+		if collection_draw_active and _is_jurejure_species(candidate):continue
+		ordinary_candidates.append(candidate)
+	var featured:=_jurejure_collection_new_candidates()
+	if not featured.is_empty():
+		var special_roll:=rng.randf() if forced_special_roll<0.0 else clampf(forced_special_roll,0.0,.999999)
+		if _jurejure_collection_roll_selects_feature(special_roll):
+			return featured[rng.randi_range(0,featured.size()-1)]
+	if ordinary_candidates.is_empty():return {}
+	var selected:Dictionary=ordinary_candidates[rng.randi_range(0,ordinary_candidates.size()-1)]
+	if mark_default_deferred:
+		selected=selected.duplicate(true)
+		selected["_deferred_series_get"]=true
+	return selected
+
 func _refresh_narrative_species_progress()->void:
 	var act2_species_count:=_unique_act2_species_get_count()
 	if act2_species_count>=24 and not act3_unlocked:
@@ -6783,7 +6848,11 @@ func _register_species_discovery(species_id:String,count_get:=true,check_collect
 	if profile_first_colorata:_old_colorata_profile_mark("registration_lookup_start")
 	var entry:=_catalog_entry(species_id)
 	if entry.is_empty():return false
-	if _is_jurejure_species(entry) and not _is_jurejure_species_unlocked(species_id):return false
+	if _is_jurejure_species(entry) and not _is_jurejure_species_unlocked(species_id):
+		# The collection mission is the only non-battle route allowed to open the
+		# existing gang pool.  Outside it the historical acquisition gate remains.
+		if not _jurejure_collection_draw_active():return false
+		_unlock_jurejure_pool()
 	var series_id:=_series_id_for_species(species_id)
 	var series_entry:=_series_entry(series_id)
 	var series_page_was_unlocked:=not series_entry.is_empty() and _is_series_unlocked(series_entry)
@@ -8463,7 +8532,7 @@ func _normal_seed_selection_pools()->Dictionary:
 		"fusion_by_stars":fusion_by_stars,
 	}
 
-func _select_normal_seed_species(forced_category_roll:float=-1.0,allow_random_new:=true)->Dictionary:
+func _select_normal_seed_species(forced_category_roll:float=-1.0,allow_random_new:=true,forced_jurejure_roll:float=-1.0)->Dictionary:
 	var pools:=_normal_seed_selection_pools()
 	var unlocked_new_candidates:Array=pools.get("unlocked_new",[])
 	var locked_new_candidates:Array=pools.get("locked_new",[])
@@ -8482,13 +8551,12 @@ func _select_normal_seed_species(forced_category_roll:float=-1.0,allow_random_ne
 	# immediately afterwards; the rest is a uniform zero/one-star normal draw.
 	var normal_roll:=category_roll-NORMAL_SEED_FUSION_TOTAL_RATE
 	if allow_random_new and normal_roll<NORMAL_SEED_UNLOCKED_NEW_RATE:
-		if not unlocked_new_candidates.is_empty():return unlocked_new_candidates[rng.randi_range(0,unlocked_new_candidates.size()-1)]
+		var unlocked_choice:=_select_collection_phase_new_candidate(unlocked_new_candidates,false,forced_jurejure_roll)
+		if not unlocked_choice.is_empty():return unlocked_choice
 		return _uniform_normal_seed_fallback(normal_known)
 	if allow_random_new and normal_roll<NORMAL_SEED_UNLOCKED_NEW_RATE+NORMAL_SEED_LOCKED_NEW_RATE:
-		if not locked_new_candidates.is_empty():
-			var locked_choice:Dictionary=locked_new_candidates[rng.randi_range(0,locked_new_candidates.size()-1)].duplicate(true)
-			locked_choice["_deferred_series_get"]=true
-			return locked_choice
+		var locked_choice:=_select_collection_phase_new_candidate(locked_new_candidates,true,forced_jurejure_roll)
+		if not locked_choice.is_empty():return locked_choice
 		return _uniform_normal_seed_fallback(normal_known)
 	return _uniform_normal_seed_fallback(normal_known)
 
@@ -8513,16 +8581,26 @@ func _eligible_endless_forced_new_candidates()->Array[Dictionary]:
 		var candidate:Dictionary=raw_candidate.duplicate(true)
 		candidate["_deferred_series_get"]=true
 		candidates.append(candidate)
+	# Before the first battle pool unlock, the mission route still needs a real
+	# NEW candidate so the existing carryover roll is not suppressed.  Selection
+	# remains 50/50 in _select_endless_forced_new_candidate().
+	var included_ids:Dictionary={}
+	for existing_candidate in candidates:included_ids[str(existing_candidate.get("species_id",""))]=true
+	for jurejure_candidate in _jurejure_collection_new_candidates():
+		var jurejure_id:=str(jurejure_candidate.get("species_id",""))
+		if not included_ids.has(jurejure_id):
+			candidates.append(jurejure_candidate)
+			included_ids[jurejure_id]=true
 	return candidates
 
-func _select_endless_forced_new_candidate()->Dictionary:
+func _select_endless_forced_new_candidate(forced_jurejure_roll:float=-1.0)->Dictionary:
 	var candidates:=_eligible_endless_forced_new_candidates()
 	var reserved_id:=endless_greenhouse.forced_new_candidate_hint()
 	if not reserved_id.is_empty():
 		for candidate in candidates:
 			if str(candidate.get("species_id",""))==reserved_id:return candidate
 	if candidates.is_empty():return {}
-	return candidates[rng.randi_range(0,candidates.size()-1)]
+	return _select_collection_phase_new_candidate(candidates,false,forced_jurejure_roll)
 
 func _uniform_normal_seed_fallback(all_known:Array)->Dictionary:
 	if all_known.is_empty():return _catalog_entry(FIRST_STORY_SPECIES_ID)
