@@ -57,6 +57,12 @@ const INITIAL_SERIES_ID := "base"
 const ORIGINAL_SERIES_ID := "base"
 const FIRST_STORY_SPECIES_ID := "colorata"
 const FIRST_STORY_COLORATA_GROWTH_MULTIPLIER := 1.3
+const FIRST_OLD_SEED_STAGE_NOT_RECEIVED := "not_received"
+const FIRST_OLD_SEED_STAGE_READY := "ready"
+const FIRST_OLD_SEED_STAGE_GROWING := "growing"
+const FIRST_OLD_SEED_STAGE_HARVESTED := "harvested"
+const FIRST_OLD_SEED_STAGE_CARD_CLOSED := "card_closed"
+const FIRST_OLD_SEED_STAGE_CONFIRMED := "confirmed"
 const PANDA_STORY_SPECIES_ID := "affinis"
 const ARMADILLO_STORY_SPECIES_ID := "shaviana"
 const CARNICOLOR_FIRST_GET_SPECIES_ID := "juliana"
@@ -261,6 +267,7 @@ var tovar_harvested_this_play := false
 var intro_story_complete := false
 var opening_story_complete := false
 var first_colorata_confirmed := false
+var first_old_seed_stage := FIRST_OLD_SEED_STAGE_NOT_RECEIVED
 var trio_originals_confirmed := false
 var carnicolor_first_get_dialog_seen := false
 var carnicolor_first_get_dialog_pending := false
@@ -624,6 +631,8 @@ var collection_completion_migration_dirty := false
 var pot_inventory_migration_dirty := false
 var retired_content_migration_dirty := false
 var arrangement_capacity_migration_dirty := false
+var first_old_seed_recovery_dirty := false
+var first_old_seed_harvest_checkpoint_saved := false
 var pot_catalog: Array = []
 var owned_pots: Dictionary = {DEFAULT_POT_ID:1}
 var pot_design_unlocks: Dictionary = {}
@@ -858,11 +867,11 @@ func _ready() -> void:
 	if not legacy_habitat_notification_ids_to_cancel.is_empty():
 		habitat_notification_service=HabitatNotificationServiceClass.new();add_child(habitat_notification_service)
 		habitat_notification_service.cancel_all(legacy_habitat_notification_ids_to_cancel);legacy_habitat_notification_ids_to_cancel.clear()
-	if best_spawn_unlocks_dirty or get_counts_migration_dirty or puku_balance_migration_dirty or catalog_cover_migration_dirty or collection_completion_migration_dirty or pot_inventory_migration_dirty or retired_content_migration_dirty or arrangement_capacity_migration_dirty or recovered_forest_encounters:
+	if best_spawn_unlocks_dirty or get_counts_migration_dirty or puku_balance_migration_dirty or catalog_cover_migration_dirty or collection_completion_migration_dirty or pot_inventory_migration_dirty or retired_content_migration_dirty or arrangement_capacity_migration_dirty or first_old_seed_recovery_dirty or recovered_forest_encounters:
 		# A true cold start must reach the language choice before creating its
 		# first save.  The selected language then persists all initialized state.
 		if save_file_present_on_boot or language_selected:_save()
-		best_spawn_unlocks_dirty=false;get_counts_migration_dirty=false;puku_balance_migration_dirty=false;catalog_cover_migration_dirty=false;collection_completion_migration_dirty=false;pot_inventory_migration_dirty=false;retired_content_migration_dirty=false;arrangement_capacity_migration_dirty=false
+		best_spawn_unlocks_dirty=false;get_counts_migration_dirty=false;puku_balance_migration_dirty=false;catalog_cover_migration_dirty=false;collection_completion_migration_dirty=false;pot_inventory_migration_dirty=false;retired_content_migration_dirty=false;arrangement_capacity_migration_dirty=false;first_old_seed_recovery_dirty=false
 	_build_world()
 	_build_ui()
 	if habitat_awakened and (habitat_wild_initialized or habitat_unlocked):_ensure_habitat_wild_state(Time.get_unix_time_from_system(),true)
@@ -1098,7 +1107,8 @@ func _load_save() -> void:
 	_cancel_puku_gauge_animations()
 	act3_first_battle_active=false
 	_reset_collection_complete_presentation(true)
-	legacy_habitat_migration_dirty=false;puku_balance_migration_dirty=false;catalog_cover_migration_dirty=false;collection_completion_migration_dirty=false;pot_inventory_migration_dirty=false;retired_content_migration_dirty=false;arrangement_capacity_migration_dirty=false;legacy_habitat_notification_ids_to_cancel.clear();panda_beacon_unread_log.clear()
+	legacy_habitat_migration_dirty=false;puku_balance_migration_dirty=false;catalog_cover_migration_dirty=false;collection_completion_migration_dirty=false;pot_inventory_migration_dirty=false;retired_content_migration_dirty=false;arrangement_capacity_migration_dirty=false;first_old_seed_recovery_dirty=false;first_old_seed_harvest_checkpoint_saved=false;legacy_habitat_notification_ids_to_cancel.clear();panda_beacon_unread_log.clear()
+	first_old_seed_stage=FIRST_OLD_SEED_STAGE_NOT_RECEIVED
 	puku_balance_units=0
 	normal_round_free_plays=0
 	catalog_cover_species={}
@@ -1182,7 +1192,7 @@ func _load_save() -> void:
 			if _reconcile_pot_inventory_with_arrangements():pot_inventory_migration_dirty=true
 			intro_story_complete=bool(value.get("intro_story_complete",false));opening_story_complete=bool(value.get("opening_story_complete",intro_story_complete));total_play_count=int(value.get("total_play_count",0));completed_unlock_conditions=value.get("completed_unlock_conditions",{});pending_habitat_species=value.get("pending_habitat_species",[]);audio_settings=value.get("audio_settings",audio_settings);show_growing_puku_preview=bool(value.get("show_growing_puku_preview",true))
 			encyclopedia_unlocked=bool(value.get("encyclopedia_unlocked",intro_story_complete and total_play_count>=1));habitat_unlocked=bool(value.get("habitat_unlocked",intro_story_complete and total_play_count>=3));tutorial_steps=value.get("tutorial_steps",{});old_seed_bags=int(value.get("old_seed_bags",0));puku_gauge_intro_complete=bool(value.get("puku_gauge_intro_complete",value.get("buyback_unlocked",total_play_count>=4)));first_tutorial_species_id=str(value.get("first_tutorial_species_id",""))
-			first_colorata_confirmed=bool(value.get("first_colorata_confirmed",false));trio_originals_confirmed=bool(value.get("trio_originals_confirmed",false));habitat_arrival_started=bool(value.get("habitat_arrival_started",false));habitat_awakened=bool(value.get("habitat_awakened",false));habitat_awakening_event_complete=bool(value.get("habitat_awakening_event_complete",habitat_awakened));seed_shop_open=bool(value.get("seed_shop_open",false));mystery_items_acquired=bool(value.get("mystery_items_acquired",false));mystery_catalog_tutorial_complete=bool(value.get("mystery_catalog_tutorial_complete",false));habitat_returned_species=value.get("habitat_returned_species",{});special_series_explanation_seen=bool(value.get("special_series_explanation_seen",false));main_story_stage=clampi(int(value.get("main_story_stage",StoryProgressionClass.ACT_1)),StoryProgressionClass.LEGACY_STAGE_MIN,StoryProgressionClass.LEGACY_STAGE_MAX);main_story_complete=bool(value.get("main_story_complete",false));main_story_completion_seen=bool(value.get("main_story_completion_seen",main_story_complete))
+			first_colorata_confirmed=bool(value.get("first_colorata_confirmed",false));first_old_seed_stage=_normalized_first_old_seed_stage(str(value.get("first_old_seed_stage","")));trio_originals_confirmed=bool(value.get("trio_originals_confirmed",false));habitat_arrival_started=bool(value.get("habitat_arrival_started",false));habitat_awakened=bool(value.get("habitat_awakened",false));habitat_awakening_event_complete=bool(value.get("habitat_awakening_event_complete",habitat_awakened));seed_shop_open=bool(value.get("seed_shop_open",false));mystery_items_acquired=bool(value.get("mystery_items_acquired",false));mystery_catalog_tutorial_complete=bool(value.get("mystery_catalog_tutorial_complete",false));habitat_returned_species=value.get("habitat_returned_species",{});special_series_explanation_seen=bool(value.get("special_series_explanation_seen",false));main_story_stage=clampi(int(value.get("main_story_stage",StoryProgressionClass.ACT_1)),StoryProgressionClass.LEGACY_STAGE_MIN,StoryProgressionClass.LEGACY_STAGE_MAX);main_story_complete=bool(value.get("main_story_complete",false));main_story_completion_seen=bool(value.get("main_story_completion_seen",main_story_complete))
 			var legacy_tutorials_complete:=saved_progression_version<PROGRESSION_VERSION and (mystery_items_acquired or bool(value.get("habitat_tutorial_complete",false)) or habitat_awakened)
 			normal_play_tutorial_complete=bool(value.get("normal_play_tutorial_complete",legacy_tutorials_complete));seed_pod_gauge_discovery_complete=bool(value.get("seed_pod_gauge_discovery_complete",legacy_tutorials_complete));seed_pod_first_reward_seen=bool(value.get("seed_pod_first_reward_seen",legacy_tutorials_complete));initial_seed_stock_notice_complete=bool(value.get("initial_seed_stock_notice_complete",legacy_tutorials_complete));puku_buyback_tutorial_complete=bool(value.get("puku_buyback_tutorial_complete",legacy_tutorials_complete))
 			original_catalog_complete_event_seen=bool(value.get("original_catalog_complete_event_seen",false));habitat_tutorial_returned_to_greenhouse=bool(value.get("habitat_tutorial_returned_to_greenhouse",false))
@@ -1307,6 +1317,7 @@ func _load_save() -> void:
 			_migrate_story_progress(saved_progression_version)
 			_migrate_three_act_progress(saved_progression_version,retired_secret_gacha_evidence)
 			_migrate_habitat_settlement()
+			if _reconcile_first_old_seed_restart_state(value.has("first_old_seed_stage")):first_old_seed_recovery_dirty=true
 			active_jurejure_event={}
 			if saved_progression_version<14:
 				habitat_tutorial_started=habitat_unlocked
@@ -1348,7 +1359,7 @@ func _save() -> void:
 		"total_play_count":total_play_count,"normal_play_count":normal_play_count,"formal_play_count":formal_play_count,"shop_visit_count":shop_visit_count,
 		"hidden_species_acquired":hidden_species_acquired,"tovar_next_play":tovar_next_play,"tovar_attempt_count":tovar_attempt_count,
 		"opening_story_complete":opening_story_complete,"intro_story_complete":intro_story_complete,"encyclopedia_unlocked":encyclopedia_unlocked,"habitat_unlocked":habitat_unlocked,"tutorial_steps":tutorial_steps,
-		"first_colorata_confirmed":first_colorata_confirmed,"trio_originals_confirmed":trio_originals_confirmed,"carnicolor_first_get_dialog_seen":carnicolor_first_get_dialog_seen,"carnicolor_first_get_dialog_pending":carnicolor_first_get_dialog_pending,
+		"first_colorata_confirmed":first_colorata_confirmed,"first_old_seed_stage":first_old_seed_stage,"trio_originals_confirmed":trio_originals_confirmed,"carnicolor_first_get_dialog_seen":carnicolor_first_get_dialog_seen,"carnicolor_first_get_dialog_pending":carnicolor_first_get_dialog_pending,
 		"catalog_first_new_dialog_seen":catalog_first_new_dialog_seen,"catalog_first_new_dialog_pending":catalog_first_new_dialog_pending,"catalog_first_new_dialog_card_closed":catalog_first_new_dialog_card_closed,"catalog_first_new_dialog_species_id":catalog_first_new_dialog_species_id,
 		"habitat_arrival_started":habitat_arrival_started,"habitat_awakened":habitat_awakened,"habitat_awakening_event_complete":habitat_awakening_event_complete,
 		"seed_shop_open":seed_shop_open,"mystery_items_acquired":mystery_items_acquired,"mystery_catalog_tutorial_complete":mystery_catalog_tutorial_complete,"habitat_returned_species":habitat_returned_species,"special_series_explanation_seen":special_series_explanation_seen,"main_story_stage":main_story_stage,"main_story_complete":main_story_complete,"main_story_completion_seen":main_story_completion_seen,
@@ -2915,7 +2926,7 @@ func _advance_intro_story()->void:
 			intro_dialogue_label.add_theme_font_size_override("font_size",29);intro_dialogue_label.add_theme_color_override("font_color",Color("#b66d20"));intro_continue_button.text=Localizer.text(language_code,"continue");intro_continue_button.visible=true;intro_fullscreen_continue_button.visible=true
 			_show_intro_gift_effect()
 		_:
-			intro_story_complete=true;old_seed_bags=1;login_bonus_date=Time.get_date_string_from_system();intro_overlay.visible=false;intro_fullscreen_continue_button.visible=false;shop_overlay.visible=false;intro_speaker_label.visible=true;intro_dialogue_label.add_theme_font_size_override("font_size",20);intro_dialogue_label.add_theme_color_override("font_color",UI_BROWN);intro_continue_button.visible=true;intro_continue_button.text=Localizer.text(language_code,"continue");_save();_update_main_story_progress(false);_update_play_ui();audio_manager.play_bgm("greenhouse");_show_tutorial_guide("play_open")
+			intro_story_complete=true;first_old_seed_stage=FIRST_OLD_SEED_STAGE_READY;old_seed_bags=1;login_bonus_date=Time.get_date_string_from_system();intro_overlay.visible=false;intro_fullscreen_continue_button.visible=false;shop_overlay.visible=false;intro_speaker_label.visible=true;intro_dialogue_label.add_theme_font_size_override("font_size",20);intro_dialogue_label.add_theme_color_override("font_color",UI_BROWN);intro_continue_button.visible=true;intro_continue_button.text=Localizer.text(language_code,"continue");_save();_update_main_story_progress(false);_update_play_ui();audio_manager.play_bgm("greenhouse");_show_tutorial_guide("play_open")
 
 func _start_scripted_dialog(kind:String,pages:Array,shop_context:=false)->void:
 	scripted_dialog_kind=kind;scripted_dialog_pages.clear();scripted_dialog_index=-1;scripted_dialog_shop_context=shop_context
@@ -2979,7 +2990,7 @@ func _finish_scripted_dialog()->void:
 		story_progression_state["restoration"]=restoration
 	match finished_kind:
 		"first_colorata_discovery":
-			first_colorata_confirmed=true;start_trio_event=true
+			first_colorata_confirmed=true;first_old_seed_stage=FIRST_OLD_SEED_STAGE_CONFIRMED;start_trio_event=true
 		"carnicolor_first_get":
 			carnicolor_first_get_dialog_seen=true;carnicolor_first_get_dialog_pending=false
 		"catalog_first_new":
@@ -4689,6 +4700,9 @@ func _on_species_get_overlay_closed(context:String)->void:
 	_get_close_profile_begin_from_overlay(context)
 	var closed_species_id:=species_get_active_species_id
 	_mark_collection_complete_get_card_seen(closed_species_id)
+	if context=="first_colorata" and closed_species_id==FIRST_STORY_SPECIES_ID and not first_colorata_confirmed:
+		first_old_seed_stage=FIRST_OLD_SEED_STAGE_CARD_CLOSED
+		_save()
 	if catalog_first_new_dialog_pending and closed_species_id==catalog_first_new_dialog_species_id:
 		catalog_first_new_dialog_card_closed=true
 		_save()
@@ -4866,7 +4880,8 @@ func _reset_progression_state()->void:
 	JellyBalanceClass.reset_formal();dev_jelly_test_active=false
 	rain_completion_count=0;best_100_achieved=false;shop_selected_seed_type="normal"
 	first_tutorial_species_id="";habitat_wild_plants.clear();habitat_wild_initialized=false;habitat_wild_next_spawn_unix=0.0;habitat_tutorial_started=false;habitat_tutorial_complete=false;habitat_tutorial_species_id="";original_catalog_gifted=false;panda_beacon_unlocked=false;panda_beacon_count=0;panda_beacon_unread_log.clear();first_habitat_gift_claimed=false;armadillo_intro_event_3_completed=false;armadillo_series_event_7_completed=false;pending_armadillo_story_event="";armadillo_gift_series_id="";armadillo_gift_species_id="";scripted_dialog_kind="";scripted_dialog_pages.clear();scripted_dialog_index=-1
-	first_colorata_confirmed=false;trio_originals_confirmed=false;carnicolor_first_get_dialog_seen=false;carnicolor_first_get_dialog_pending=false;habitat_arrival_started=false;habitat_awakened=false;habitat_awakening_event_complete=false;seed_shop_open=false;mystery_items_acquired=false;mystery_catalog_tutorial_complete=false;normal_play_tutorial_complete=false;seed_pod_gauge_discovery_complete=false;seed_pod_first_reward_seen=false;initial_seed_stock_notice_complete=false;puku_buyback_tutorial_complete=false;puku_buyback_tutorial_active=false;puku_buyback_tutorial_index=0;habitat_returned_species.clear();special_series_explanation_seen=false;pending_special_series_explanation=false;main_story_stage=StoryProgressionClass.ACT_1;main_story_complete=false;main_story_completion_seen=false;catalog_series_unlock_notice_queue.clear();catalog_series_unlock_notice_ready.clear()
+	first_old_seed_harvest_checkpoint_saved=false
+	first_colorata_confirmed=false;first_old_seed_stage=FIRST_OLD_SEED_STAGE_NOT_RECEIVED;first_old_seed_recovery_dirty=false;trio_originals_confirmed=false;carnicolor_first_get_dialog_seen=false;carnicolor_first_get_dialog_pending=false;habitat_arrival_started=false;habitat_awakened=false;habitat_awakening_event_complete=false;seed_shop_open=false;mystery_items_acquired=false;mystery_catalog_tutorial_complete=false;normal_play_tutorial_complete=false;seed_pod_gauge_discovery_complete=false;seed_pod_first_reward_seen=false;initial_seed_stock_notice_complete=false;puku_buyback_tutorial_complete=false;puku_buyback_tutorial_active=false;puku_buyback_tutorial_index=0;habitat_returned_species.clear();special_series_explanation_seen=false;pending_special_series_explanation=false;main_story_stage=StoryProgressionClass.ACT_1;main_story_complete=false;main_story_completion_seen=false;catalog_series_unlock_notice_queue.clear();catalog_series_unlock_notice_ready.clear()
 	act2_unlocked=false;story_progression_state=StoryProgressionClass.default_runtime_state();forest_gacha_unlocked=false;forest_gacha_intro_seen=false;fantasy_first_discovery_seen=false;fantasy_realization_seen=false;act3_unlocked=false;act3_intro_pending=false;act3_intro_seen=false;jurejure_pool_unlocked=false;jurejure_species_unlocked.clear();jurejure_species_first_seen=false;habitat_crisis_pending=false;habitat_crisis_started=false;finale_complete=false;habitat_return_dialog_seen=false
 	original_catalog_complete_event_seen=false;habitat_tutorial_returned_to_greenhouse=false;jurejure_intro_complete=false;jurejure_enabled=false;jurejure_growth_stage=JureJureSystemClass.GROWTH_EARLY;jurejure_growth_event_mask=0;active_jurejure_event={};jurejure_next_check_unix=0.0;jurejure_cooldown_until_unix=0.0;jurejure_return_event_complete=false;jurejure_waiting_for_seed_pod_reward=false;jurejure_battle_count=0;jurejure_battle_win_count=0;jurejure_habitat_visit_point=Vector2(-1.0,-1.0);jurejure_pending_reward_species_id="";jurejure_pending_reward_is_new=false;jurejure_last_battle_result.clear();act3_first_battle_active=false;habitat_second_awakened=false;habitat_second_awakening_complete=false;jurejure_update_accumulator=0.0
 	first_seed_pod_reward_event_active=false;habitat_visit_id=0;jurejure_focused_habitat_visit_id=-1;act3_intro_eligible_visit_id=0;habitat_crisis_eligible_visit_id=0
@@ -4913,8 +4928,51 @@ func _open_play_modal()->void:
 		return
 	play_modal_open=true;_update_play_ui()
 
+func _normalized_first_old_seed_stage(value:String)->String:
+	if value in [FIRST_OLD_SEED_STAGE_NOT_RECEIVED,FIRST_OLD_SEED_STAGE_READY,FIRST_OLD_SEED_STAGE_GROWING,FIRST_OLD_SEED_STAGE_HARVESTED,FIRST_OLD_SEED_STAGE_CARD_CLOSED,FIRST_OLD_SEED_STAGE_CONFIRMED]:return value
+	return ""
+
+func _first_colorata_acquisition_recorded()->bool:
+	return _species_get_count(FIRST_STORY_SPECIES_ID)>0 or bool(discovered.get(FIRST_STORY_SPECIES_ID,false)) or float(bests.get(FIRST_STORY_SPECIES_ID,0.0))>0.0
+
+func _legacy_first_old_seed_retry_eligible()->bool:
+	return intro_story_complete and total_play_count==0 and not first_colorata_confirmed and not _first_colorata_acquisition_recorded() and not trio_originals_confirmed and not encyclopedia_unlocked and not habitat_unlocked and not mystery_items_acquired and not first_habitat_gift_claimed and not _normal_seed_play_available()
+
+func _reconcile_first_old_seed_restart_state(stage_was_saved:bool)->bool:
+	var changed:=false
+	var acquired:=_first_colorata_acquisition_recorded()
+	var desired_stage:=first_old_seed_stage
+	if first_colorata_confirmed:
+		desired_stage=FIRST_OLD_SEED_STAGE_CONFIRMED
+	elif acquired or total_play_count>0:
+		desired_stage=FIRST_OLD_SEED_STAGE_CARD_CLOSED if first_old_seed_stage==FIRST_OLD_SEED_STAGE_CARD_CLOSED else FIRST_OLD_SEED_STAGE_HARVESTED
+		# Plant nodes are runtime-only. A persisted harvest therefore also settles
+		# the one-plant prologue round before its GET/card follow-up resumes.
+		if total_play_count<1:
+			total_play_count=1
+			changed=true
+	elif intro_story_complete and ((stage_was_saved and first_old_seed_stage in [FIRST_OLD_SEED_STAGE_READY,FIRST_OLD_SEED_STAGE_GROWING]) or (not stage_was_saved and _legacy_first_old_seed_retry_eligible())):
+		desired_stage=FIRST_OLD_SEED_STAGE_READY
+		# An interrupted growing plant cannot be reconstructed, so return exactly
+		# the consumed tutorial seed. Never increment an already restored bag.
+		if old_seed_bags<1:
+			old_seed_bags=1
+			changed=true
+	else:
+		desired_stage=FIRST_OLD_SEED_STAGE_NOT_RECEIVED
+	if desired_stage!=first_old_seed_stage:
+		first_old_seed_stage=desired_stage
+		changed=true
+	return changed
+
+func _first_colorata_get_card_recovery_pending()->bool:
+	return not first_colorata_confirmed and first_old_seed_stage==FIRST_OLD_SEED_STAGE_HARVESTED and _first_colorata_acquisition_recorded()
+
+func _first_colorata_dialog_recovery_pending()->bool:
+	return not first_colorata_confirmed and first_old_seed_stage==FIRST_OLD_SEED_STAGE_CARD_CLOSED and _first_colorata_acquisition_recorded()
+
 func _first_old_seed_play_pending()->bool:
-	return intro_story_complete and total_play_count==0 and old_seed_bags>0 and not _has_any_playable_seed_stock()
+	return intro_story_complete and not first_colorata_confirmed and first_old_seed_stage==FIRST_OLD_SEED_STAGE_READY and total_play_count==0 and old_seed_bags>0 and not _has_any_playable_seed_stock()
 
 func _close_play_modal()->void:
 	play_modal_open=false;_update_play_ui()
@@ -4937,6 +4995,7 @@ func _start_greenhouse_play(seed_type:String)->void:
 	elif seed_type=="old":
 		if old_seed_bags<1:return
 		old_seed_bags-=1;current_target_count=OLD_SEED_GERMINATION_COUNT
+		if not first_colorata_confirmed and total_play_count==0:first_old_seed_stage=FIRST_OLD_SEED_STAGE_GROWING
 	elif seed_type=="volume":
 		if not _volume_seed_unlocked() or volume_seed_bags<1:return
 		volume_seed_bags-=1;current_target_count=VOLUME_GERMINATION_COUNT
@@ -4953,7 +5012,7 @@ func _start_greenhouse_play(seed_type:String)->void:
 		if not _is_endless_greenhouse_enabled():normal_seed_bags-=1
 		current_target_count=NORMAL_GERMINATION_COUNT
 	if seed_type=="old" and total_play_count==0:_ensure_first_tutorial_species()
-	active_seed_type=seed_type;old_seed_reaction_stage=0;old_seed_harvest_guide_active=false;tutorial_harvest_plant=null;play_time_remaining=0.0;play_active=true;play_modal_open=false;play_harvest_cm_total=0.0;play_puku_reward_units_total=0;play_harvest_count=0;play_max_size=0.0;play_previous_global_best=_global_best_size();play_updated_global_best=false;play_share_record.clear();play_notable_species.clear();play_hidden_species_unlocked="";result_new_species_queue.clear();result_deferred_species_queue.clear();round_result_species_finalize_queue.clear();round_result_species_finalize_active=false;round_result_species_save_pending=false;opening_species.clear();play_seeds_remaining=current_target_count;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=_initial_greenhouse_concurrent_target(seed_type);greenhouse_finish_attempt_count=0;greenhouse_finish_completed_count=0;greenhouse_finish_last_block_reason="";greenhouse_finish_last_snapshot.clear();greenhouse_round_followup_started=false;_clear_greenhouse_plants();_reset_endless_economy_stats()
+	active_seed_type=seed_type;old_seed_reaction_stage=0;old_seed_harvest_guide_active=false;tutorial_harvest_plant=null;play_time_remaining=0.0;play_active=true;play_modal_open=false;play_harvest_cm_total=0.0;play_puku_reward_units_total=0;play_harvest_count=0;play_max_size=0.0;play_previous_global_best=_global_best_size();play_updated_global_best=false;play_share_record.clear();play_notable_species.clear();play_hidden_species_unlocked="";result_new_species_queue.clear();result_deferred_species_queue.clear();round_result_species_finalize_queue.clear();round_result_species_finalize_active=false;round_result_species_save_pending=false;opening_species.clear();play_seeds_remaining=current_target_count;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=_initial_greenhouse_concurrent_target(seed_type);greenhouse_finish_attempt_count=0;greenhouse_finish_completed_count=0;greenhouse_finish_last_block_reason="";greenhouse_finish_last_snapshot.clear();greenhouse_round_followup_started=false;first_old_seed_harvest_checkpoint_saved=false;_clear_greenhouse_plants();_reset_endless_economy_stats()
 	if seed_type=="normal" and _is_endless_greenhouse_enabled():
 		endless_greenhouse.begin_play()
 		if puku_gauge_intro_complete:
@@ -5004,9 +5063,16 @@ func _finish_greenhouse_play()->void:
 	if total_play_count==1:
 		if first_tutorial_species_id.is_empty():_ensure_first_tutorial_species()
 		_register_species_discovery(first_tutorial_species_id,false);greenhouse_available[first_tutorial_species_id]=true;unlocked_species=greenhouse_available.duplicate(true);_apply_saved_unlocks();unlocked_series[INITIAL_SERIES_ID]=true
+		if first_old_seed_stage==FIRST_OLD_SEED_STAGE_GROWING and _first_colorata_acquisition_recorded():first_old_seed_stage=FIRST_OLD_SEED_STAGE_HARVESTED
 	_evaluate_unlock_rules("play_count",float(total_play_count))
 	if completed_endless_round:_log_endless_economy("round_complete")
-	_clear_greenhouse_plants();_save();_update_play_ui();_continue_after_greenhouse_round()
+	# The first Colorata harvest is checkpointed before its plant is removed so a
+	# process kill cannot erase the earned GET. Avoid serializing that same state a
+	# second time here; closing the GET card persists the completed round count.
+	var old_seed_harvest_already_checkpointed:=active_seed_type=="old" and first_old_seed_harvest_checkpoint_saved
+	_clear_greenhouse_plants()
+	if not old_seed_harvest_already_checkpointed:_save()
+	_update_play_ui();_continue_after_greenhouse_round()
 	if old_colorata_profile_active:_old_colorata_profile_mark("round_finish_end")
 
 func _greenhouse_finish_block_reason()->String:
@@ -6777,6 +6843,12 @@ func _try_start_pending_story_event()->void:
 	if round_result_species_finalize_active or not round_result_species_finalize_queue.is_empty():return
 	if not pending_round_new_species_ids.is_empty():
 		call_deferred("_play_result_new_species_animations")
+		return
+	if _first_colorata_get_card_recovery_pending():
+		call_deferred("_queue_species_get_by_id",FIRST_STORY_SPECIES_ID,true,"first_colorata")
+		return
+	if _first_colorata_dialog_recovery_pending():
+		call_deferred("_start_first_colorata_discovery_event")
 		return
 	if carnicolor_first_get_dialog_pending and not carnicolor_first_get_dialog_seen:
 		# Recover an interrupted first GET by restoring the required NEW card first;
@@ -9515,6 +9587,7 @@ func _on_harvested(p)->void:
 			if profiled_old_colorata:_old_colorata_profile_mark("registration_start")
 			_register_species_discovery(harvested_species_id,true,not story_old_seed)
 			result_new_species_queue.append(harvested_species_id)
+			if story_old_seed and harvested_species_id==FIRST_STORY_SPECIES_ID:first_old_seed_stage=FIRST_OLD_SEED_STAGE_HARVESTED
 			if profiled_old_colorata:_old_colorata_profile_mark("registration_end")
 		elif not already_pending_round_new:
 			_register_species_discovery(harvested_species_id,true)
@@ -9545,7 +9618,11 @@ func _on_harvested(p)->void:
 		var restoration:=_restoration_state()
 		if HabitatRestorationClass.queue_pending_return_snapshot(restoration,restoration_snapshot):
 			story_progression_state["restoration"]=restoration;_update_play_ui()
-	if not story_old_seed:_save()
+	if not story_old_seed:
+		_save()
+	elif first_old_seed_stage==FIRST_OLD_SEED_STAGE_HARVESTED:
+		_save()
+		first_old_seed_harvest_checkpoint_saved=true
 	_update_best_ui();_update_currency_ui();harvest_commit_count+=1
 	if is_instance_valid(p):p.set_meta("harvest_state_committed",true);_cleanup_later(p,.68)
 

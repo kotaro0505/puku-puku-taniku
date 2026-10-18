@@ -164,6 +164,7 @@ workflows:
           run_scene_smoke res://scripts/shop_fix_smoke.tscn SHOP_FIX_SMOKE_OK
           run_scene_smoke res://scripts/tutorial_rain_ui_smoke.tscn TUTORIAL_RAIN_UI_SMOKE_OK
           run_scene_smoke res://scripts/first_play_tutorial_smoke.tscn FIRST_PLAY_TUTORIAL_SMOKE_OK
+          run_scene_smoke res://scripts/first_old_seed_restart_smoke.tscn FIRST_OLD_SEED_RESTART_SMOKE_OK
           run_scene_smoke res://scripts/story_dev_presets_smoke.tscn STORY_DEV_PRESETS_SMOKE_OK
           run_scene_smoke res://scripts/catalog_cover_species_smoke.tscn CATALOG_COVER_SPECIES_SMOKE_OK
           run_scene_smoke res://scripts/collection_complete_smoke.tscn COLLECTION_COMPLETE_SMOKE_OK

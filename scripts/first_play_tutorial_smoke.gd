@@ -44,6 +44,7 @@ func _ready() -> void:
 	assert(game.intro_dialogue_label.horizontal_alignment == HORIZONTAL_ALIGNMENT_CENTER)
 	game.intro_continue_button.pressed.emit()
 	assert(game.intro_story_complete and game.old_seed_bags == 1)
+	assert(game.first_old_seed_stage == game.FIRST_OLD_SEED_STAGE_READY)
 	assert(game.OLD_SEED_GERMINATION_COUNT == 1)
 	assert(game.tutorial_guide_overlay.visible and str(game.tutorial_guide_button.get_meta("target", "")) == "play_open")
 	assert(game._first_old_seed_play_pending())
@@ -54,6 +55,7 @@ func _ready() -> void:
 	assert(game.play_open_button.text == Localizer.text("ja", "play_first_old_seed"))
 	game._complete_tutorial_guide()
 	assert(game.play_active and not game.play_overlay.visible)
+	assert(game.old_seed_bags == 0 and game.first_old_seed_stage == game.FIRST_OLD_SEED_STAGE_GROWING)
 	await get_tree().create_timer(0.45).timeout
 	game.set_process(false)
 	assert(game.play_active and not game.first_play_tutorial_active)
@@ -114,12 +116,14 @@ func _ready() -> void:
 	assert(not game.bests.has(FIRST_SPECIES_ID))
 	assert(bool(game.discovered.get(FIRST_SPECIES_ID, false)))
 	assert(not game.first_colorata_confirmed)
+	assert(game.first_old_seed_stage == game.FIRST_OLD_SEED_STAGE_HARVESTED)
 	assert(game.species_get_overlay.visible)
 	assert(game.species_get_overlay.badge_label.visible and game.species_get_overlay.badge_label.text == Localizer.text("ja", "new"))
 	assert(game.species_get_overlay.name_label.text == Localizer.species_name("ja", game._catalog_entry(FIRST_SPECIES_ID)))
 	assert(game.species_get_overlay.series_label.text == "原種")
 	game.species_get_overlay.close_overlay()
 	await get_tree().create_timer(0.2).timeout
+	assert(game.first_old_seed_stage == game.FIRST_OLD_SEED_STAGE_CARD_CLOSED)
 	assert(game.scripted_dialog_kind == "first_colorata_discovery")
 	assert(game.scripted_dialog_pages.size() == 3)
 	assert([game.scripted_dialog_pages[0].speaker, game.scripted_dialog_pages[1].speaker, game.scripted_dialog_pages[2].speaker] == ["panda", "armadillo", "panda"])
@@ -138,6 +142,7 @@ func _ready() -> void:
 		game._advance_scripted_dialog()
 	await get_tree().process_frame
 	assert(game.first_colorata_confirmed and not game.encyclopedia_unlocked)
+	assert(game.first_old_seed_stage == game.FIRST_OLD_SEED_STAGE_CONFIRMED)
 	assert(not game.best_panel.visible)
 	assert(bool(game.unlocked_series.get("base", false)) and not game.encyclopedia_overlay.visible)
 	assert(game.scripted_dialog_kind == "trio_originals")
