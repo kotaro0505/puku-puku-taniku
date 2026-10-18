@@ -395,7 +395,7 @@ const TEXT := {
 		"share_prompt": "タニ友に自慢しよう！",
 		"share_record": "自己最高記録！",
 		"share_harvest": "%.1fcmの%sを収穫！",
-		"share_fallback": "共有画像を保存しました",
+		"share_fallback": "共有できませんでした。もう一度お試しください。",
 		"language_heading": "ことば",
 		"language_saved": "ことばの設定を保存しました",
 		"narration": ""
@@ -455,14 +455,15 @@ const TEXT := {
 		,"result_max": "最大サイズ　%.1fcm"
 		,"result_none": "今回はまだありません"
 		,"result_registered": "%sを図鑑登録！"
-		,"share_creating": "共有画像を作っています…"
-		,"share_failed": "共有画像を作れませんでした"
+		,"share_creating": "共有画像を準備しています…"
+		,"share_failed": "共有できませんでした。もう一度お試しください。"
 		,"share_opened": "共有画面を開きました"
 		,"share_opening": "共有画面を開いています…"
 		,"share_complete": "共有しました"
-		,"share_canceled": "共有をキャンセルしました"
-		,"share_native_failed": "共有画面を開けませんでした"
-		,"share_web_opened": "共有画面を開きました（非対応ブラウザでは画像を保存します）"
+		,"share_canceled": ""
+		,"share_native_failed": "共有できませんでした。もう一度お試しください。"
+		,"share_web_opened": "共有画面を開いています…"
+		,"share_downloaded": "共有画像をダウンロードしました"
 		,"encyclopedia_title": "ぷくぷく図鑑"
 		,"collection_complete_title": "図鑑 COMPLETE！"
 		,"collection_complete_message": "すべての多肉植物を見つけました！"
@@ -1092,7 +1093,7 @@ const TEXT := {
 		"share_prompt": "たにともに じまんしよう！",
 		"share_record": "こじこべすと！",
 		"share_harvest": "%.1fせんちの%sを しゅうかく！",
-		"share_fallback": "きょうゆうがぞうを ほぞんしました",
+		"share_fallback": "きょうゆう できませんでした。もういちど ためしてください。",
 		"language_heading": "ことば",
 		"language_saved": "ことばの せっていを ほぞんしました",
 		"narration": ""
@@ -1152,14 +1153,15 @@ const TEXT := {
 		,"result_max": "いちばん おおきい もの　%.1fせんち"
 		,"result_none": "こんかいは まだ ありません"
 		,"result_registered": "%sを ずかんに とうろく！"
-		,"share_creating": "きょうゆうがぞうを つくっています…"
-		,"share_failed": "きょうゆうがぞうを つくれませんでした"
+		,"share_creating": "きょうゆうがぞうを じゅんびしています…"
+		,"share_failed": "きょうゆう できませんでした。もういちど ためしてください。"
 		,"share_opened": "きょうゆうがめんを ひらきました"
 		,"share_opening": "きょうゆうがめんを ひらいています…"
 		,"share_complete": "きょうゆうしました"
-		,"share_canceled": "きょうゆうを やめました"
-		,"share_native_failed": "きょうゆうがめんを ひらけませんでした"
-		,"share_web_opened": "きょうゆうがめんを ひらきました（つかえない ときは がぞうを ほぞんします）"
+		,"share_canceled": ""
+		,"share_native_failed": "きょうゆう できませんでした。もういちど ためしてください。"
+		,"share_web_opened": "きょうゆうがめんを ひらいています…"
+		,"share_downloaded": "きょうゆうがぞうを だうんろーどしました"
 		,"encyclopedia_title": "ぷくぷくずかん"
 		,"collection_complete_title": "ずかん COMPLETE！"
 		,"collection_complete_message": "すべての たにくしょくぶつを\nみつけました！"
@@ -1789,7 +1791,7 @@ const TEXT := {
 		"share_prompt": "Show your succulent friends!",
 		"share_record": "NEW PERSONAL BEST!",
 		"share_harvest": "Harvested a %.1f cm %s!",
-		"share_fallback": "The share image was saved",
+		"share_fallback": "Couldn't share. Please try again.",
 		"language_heading": "Language",
 		"language_saved": "Language setting saved",
 		"narration": ""
@@ -1849,14 +1851,15 @@ const TEXT := {
 		,"result_max": "Largest size %.1f cm"
 		,"result_none": "Nothing yet this time"
 		,"result_registered": "Added %s to the catalog!"
-		,"share_creating": "Creating your share image…"
-		,"share_failed": "The share image could not be created"
+		,"share_creating": "Preparing your share image…"
+		,"share_failed": "Couldn't share. Please try again."
 		,"share_opened": "Opened the share sheet"
 		,"share_opening": "Opening the share sheet…"
 		,"share_complete": "Shared"
-		,"share_canceled": "Sharing canceled"
-		,"share_native_failed": "Could not open the share sheet"
-		,"share_web_opened": "Opened sharing; unsupported browsers will download the image"
+		,"share_canceled": ""
+		,"share_native_failed": "Couldn't share. Please try again."
+		,"share_web_opened": "Opening the share sheet…"
+		,"share_downloaded": "Downloaded the share image"
 		,"encyclopedia_title": "Puku Puku Catalog"
 		,"collection_complete_title": "CATALOG COMPLETE!"
 		,"collection_complete_message": "You found every succulent!"

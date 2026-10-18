@@ -130,6 +130,7 @@ const ARRANGEMENT_TABLE_SOURCE_CENTER := Vector2(340.0,760.0)
 const ARRANGEMENT_TABLE_SCREEN_TARGET_RATIO := Vector2(0.50,760.0/1086.0)
 const ARRANGEMENT_POT_ANCHOR := Vector2(0.50,760.0/1086.0)
 const ARRANGEMENT_SHARE_TEXTURE_TIMEOUT_MSEC := 8000
+const WEB_SHARE_RESULT_TIMEOUT_MSEC := 120000
 const HABITAT_DRAG_SCALE := 0.055
 const HABITAT_LOOKAROUND_DURATION_SECONDS := 8.0
 const HABITAT_ARRIVAL_LOOKAROUND_DURATION_SECONDS := 4.0
@@ -738,6 +739,7 @@ var last_harvest_presented_latency_msec := -1
 var harvest_commit_count := 0
 var play_share_record:Dictionary={}
 var native_share_context:=""
+var web_share_request_token:=""
 var play_notable_species: Dictionary = {}
 var play_hidden_species_unlocked := ""
 var current_target_count := NORMAL_GERMINATION_COUNT
@@ -2333,7 +2335,7 @@ func _on_best_record_share_requested(record:Dictionary)->void:
 		best_record_showcase.set_share_state(Localizer.text(language_code,"share_failed"),false)
 		return
 	var shared:=_open_native_share_or_fallback(image_path,"puku-best-record.png","best_record")
-	best_record_showcase.set_share_state(shared,false)
+	best_record_showcase.set_share_state(shared,native_share_context=="best_record")
 
 func _sync_arrangement_ui()->void:
 	if arrangement_ui==null:return
@@ -2468,7 +2470,7 @@ func _on_arrangement_share_requested(arrangement:Dictionary)->void:
 	var image_path:String=await _create_arrangement_share_image(arrangement)
 	if image_path.is_empty():arrangement_ui.set_share_state(Localizer.text(language_code,"share_failed"),false);return
 	var shared:=_open_native_share_or_fallback(image_path,image_path.get_file(),"arrangement")
-	arrangement_ui.set_share_state(shared,false)
+	arrangement_ui.set_share_state(shared,native_share_context=="arrangement")
 
 func _create_arrangement_share_image(arrangement:Dictionary,output_path_override:String="")->String:
 	if arrangement_ui==null or arrangement.is_empty():return ""
@@ -5833,44 +5835,60 @@ func _open_native_share_or_fallback(image_path:String,download_filename:String="
 	if safe_filename.is_empty():safe_filename=image_path.get_file()
 	if safe_filename.is_empty():safe_filename="puku-share.png"
 	var share_subject:=Localizer.text(language_code,"viewer_title") if share_context=="arrangement" else Localizer.text(language_code,"share_record")
+	if not native_share_context.is_empty():
+		push_warning("Share request ignored while another share request is active")
+		return Localizer.text(language_code,"share_native_failed")
 	if Engine.has_singleton("SharePlugin"):
 		var share_plugin=Engine.get_singleton("SharePlugin")
 		_connect_native_share_bridge(share_plugin)
-		native_share_context=share_context
-		if share_plugin and share_plugin.has_method("share_image"):
-			share_plugin.call(
-				"share_image",
-				absolute_path,
-				Localizer.text(language_code,"game_title"),
-				share_subject,
-				Localizer.text(language_code,"share_prompt")
-			)
+		if share_plugin and share_plugin.has_method("share"):
+			native_share_context=share_context
+			var share_result=share_plugin.call("share",{
+				"title":Localizer.text(language_code,"game_title"),
+				"subject":share_subject,
+				"content":Localizer.text(language_code,"share_prompt"),
+				"file_path":absolute_path,
+				"mime_type":"image/png"
+			})
+			if typeof(share_result)==TYPE_INT and int(share_result)!=OK:
+				push_warning("SharePlugin rejected the share request with error %d"%int(share_result))
+				native_share_context=""
+				return Localizer.text(language_code,"share_native_failed")
 			return Localizer.text(language_code,"share_opening")
-		if share_plugin and share_plugin.has_method("share_file"):
-			share_plugin.call(
-				"share_file",
-				absolute_path,
-				"image/png",
-				Localizer.text(language_code,"game_title"),
-				share_subject,
-				Localizer.text(language_code,"share_prompt")
-			)
-			return Localizer.text(language_code,"share_opening")
-	for singleton_name in ["PukuNativeShare","Share"]:
-		if not Engine.has_singleton(singleton_name):continue
-		var native_share=Engine.get_singleton(singleton_name)
-		if native_share and native_share.has_method("share_file"):
-			native_share.call("share_file",absolute_path,"image/png",Localizer.text(language_code,"game_title"))
-			return Localizer.text(language_code,"share_opening")
+		push_warning("SharePlugin singleton is present but does not expose share(Dictionary)")
 	if OS.has_feature("web"):
 		var bytes:=FileAccess.get_file_as_bytes(image_path);var encoded:=Marshalls.raw_to_base64(bytes)
-		JavaScriptBridge.eval(_web_share_file_script(encoded,safe_filename,Localizer.text(language_code,"game_title")),true)
-		return Localizer.text(language_code,"share_web_opened")
-	OS.shell_open(absolute_path)
-	return "%s: %s"%[Localizer.text(language_code,"share_fallback"),absolute_path]
+		var token:="puku_share_%d_%d"%[Time.get_unix_time_from_system(),Time.get_ticks_msec()]
+		native_share_context=share_context
+		web_share_request_token=token
+		JavaScriptBridge.eval(_web_share_file_script(encoded,safe_filename,Localizer.text(language_code,"game_title"),token),true)
+		_await_web_share_result(token)
+		return Localizer.text(language_code,"share_opening")
+	push_warning("Native sharing is unavailable; generated image remains at %s"%absolute_path)
+	return Localizer.text(language_code,"share_native_failed")
 
-func _web_share_file_script(encoded:String,filename:String,title:String)->String:
-	return """(()=>{const b=atob(%s),a=new Uint8Array(b.length);for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i);const f=new File([a],%s,{type:'image/png'});const save=()=>{const u=URL.createObjectURL(f),x=document.createElement('a');x.href=u;x.download=f.name;x.click();setTimeout(()=>URL.revokeObjectURL(u),1000)};if(navigator.share&&navigator.canShare&&navigator.canShare({files:[f]})){navigator.share({title:%s,files:[f]}).catch(save)}else save();return true})()"""%[JSON.stringify(encoded),JSON.stringify(filename),JSON.stringify(title)]
+func _web_share_file_script(encoded:String,filename:String,title:String,token:String="puku_share_test")->String:
+	return """(()=>{const token=%s;window.__pukuShareResults=window.__pukuShareResults||{};window.__pukuShareResults[token]='pending';try{const b=atob(%s),a=new Uint8Array(b.length);for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i);const f=new File([a],%s,{type:'image/png'});const finish=(status)=>{window.__pukuShareResults[token]=status};const save=()=>{const u=URL.createObjectURL(f),x=document.createElement('a');x.href=u;x.download=f.name;document.body.appendChild(x);x.click();x.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);finish('downloaded')};if(navigator.share&&navigator.canShare&&navigator.canShare({files:[f]})){navigator.share({title:%s,files:[f]}).then(()=>finish('shared')).catch((error)=>finish(error&&error.name==='AbortError'?'canceled':'failed'))}else save()}catch(error){window.__pukuShareResults[token]='failed'}return token})()"""%[JSON.stringify(token),JSON.stringify(encoded),JSON.stringify(filename),JSON.stringify(title)]
+
+func _await_web_share_result(token:String)->void:
+	var deadline:=Time.get_ticks_msec()+WEB_SHARE_RESULT_TIMEOUT_MSEC
+	while Time.get_ticks_msec()<deadline and web_share_request_token==token and not native_share_context.is_empty():
+		await get_tree().create_timer(.1).timeout
+		var expression:="(()=>{const r=window.__pukuShareResults&&window.__pukuShareResults[%s];return typeof r==='string'?r:''})()"%JSON.stringify(token)
+		var result=JavaScriptBridge.eval(expression,true)
+		if typeof(result)!=TYPE_STRING or str(result).is_empty() or str(result)=="pending":continue
+		JavaScriptBridge.eval("(()=>{if(window.__pukuShareResults)delete window.__pukuShareResults[%s]})()"%JSON.stringify(token),true)
+		if web_share_request_token!=token:return
+		web_share_request_token=""
+		match str(result):
+			"shared":_update_native_share_feedback("share_complete")
+			"downloaded":_update_native_share_feedback("share_downloaded")
+			"canceled":_update_native_share_feedback("share_canceled")
+			_:_update_native_share_feedback("share_native_failed")
+		return
+	if web_share_request_token==token:
+		web_share_request_token=""
+		_update_native_share_feedback("share_native_failed")
 
 func _connect_native_share_bridge(share_plugin:Object)->void:
 	if share_plugin==null:return
@@ -5896,6 +5914,7 @@ func _update_native_share_feedback(key:String)->void:
 	if native_share_context=="arrangement" and arrangement_ui:arrangement_ui.set_share_state(message,false)
 	elif native_share_context=="best_record" and best_record_showcase:best_record_showcase.set_share_state(message,false)
 	native_share_context=""
+	web_share_request_token=""
 
 func _play_shop_new_species_animations(species_ids:Array)->void:
 	for species_id_value in species_ids:

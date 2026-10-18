@@ -113,13 +113,29 @@ func _ready() -> void:
 	assert(JSON.stringify(arrangement) == state_before and game.owned_pots == inventory_before)
 	var old_arrangement: Dictionary = game._normalize_arrangement({"arrangement_id": "old_share", "name": "旧作品", "pot_id": "shallow_terracotta", "plants": []})
 	assert(str(old_arrangement.share_background_id) == "greenhouse")
-	var web_script: String = game._web_share_file_script("YQ==", "puku-arrangement.png", Localizer.text("ja", "game_title"))
+	var web_script: String = game._web_share_file_script("YQ==", "puku-arrangement.png", Localizer.text("ja", "game_title"), "share_smoke_token")
 	assert(web_script.contains("navigator.share") and web_script.contains("navigator.canShare") and web_script.contains("x.download=f.name") and web_script.contains("puku-arrangement.png"))
+	assert(web_script.contains(".then(()=>finish('shared'))") and web_script.contains("AbortError") and web_script.contains("finish('downloaded')"))
+	assert(not web_script.contains(".catch(save)"))
 	assert(web_script.contains("ぷくぷく！たにくらいふ"))
 	var main_source := FileAccess.get_file_as_string("res://scripts/main.gd")
 	assert(main_source.contains('_open_native_share_or_fallback(image_path,image_path.get_file(),"arrangement")'))
-	assert(main_source.contains('has_method("share_image")') and main_source.contains('has_method("share_file")'))
+	assert(main_source.contains('has_method("share")') and main_source.contains('share_plugin.call("share",{'))
+	for key in ['"title"', '"subject"', '"content"', '"file_path"', '"mime_type"']:
+		assert(main_source.contains(key))
+	assert(not main_source.contains('has_method("share_image")') and not main_source.contains('OS.shell_open(absolute_path)'))
+	assert(not main_source.contains('return "%s: %s"'))
 	assert(FileAccess.get_file_as_string("res://export_presets.cfg").contains("plugins/SharePlugin=true"))
+	for button in [ui.viewer_share_background_button, ui.share_editor_share_button]:
+		var normal := button.get_theme_stylebox("normal") as StyleBoxFlat
+		var hover := button.get_theme_stylebox("hover") as StyleBoxFlat
+		var pressed := button.get_theme_stylebox("pressed") as StyleBoxFlat
+		var hover_pressed := button.get_theme_stylebox("hover_pressed") as StyleBoxFlat
+		assert(normal != null and hover != null and pressed != null and hover_pressed != null)
+		assert(normal.border_color == hover.border_color and normal.border_color == pressed.border_color and normal.border_color == hover_pressed.border_color)
+		assert(normal.get_border_width(SIDE_LEFT) == 3 and hover.get_border_width(SIDE_LEFT) == 3 and pressed.get_border_width(SIDE_LEFT) == 3 and hover_pressed.get_border_width(SIDE_LEFT) == 3)
+		assert(normal.corner_radius_top_left == 18 and hover.corner_radius_top_left == 18 and pressed.corner_radius_top_left == 18 and hover_pressed.corner_radius_top_left == 18)
+		assert(button.get_theme_stylebox("focus") is StyleBoxEmpty)
 	ui._open_share_background_panel()
 	assert(ui.share_background_panel.visible and ui.share_editor_share_button.disabled and not ui.viewer_share_button.disabled)
 	ui._select_share_background("puku_members")
@@ -137,7 +153,20 @@ func _ready() -> void:
 	var captured_transform: Dictionary = captured_requests[0].viewer_transform
 	assert(is_equal_approx(float(captured_transform.x), 21.0) and is_equal_approx(float(captured_transform.y), 13.0) and is_equal_approx(float(captured_transform.scale), 1.1))
 	assert(not game.saved_arrangements[0].has("viewer_transform"))
-	ui.set_share_state(Localizer.text(game.language_code, "share_opening"), false)
+	game.native_share_context = "arrangement"
+	ui.set_share_state(Localizer.text(game.language_code, "share_opening"), true)
+	game._on_native_share_canceled()
+	assert(game.native_share_context.is_empty() and not ui.viewer_share_in_progress and not ui.share_editor_status.visible)
+	game.native_share_context = "arrangement"
+	ui.set_share_state(Localizer.text(game.language_code, "share_opening"), true)
+	game._on_native_share_failed("share smoke")
+	assert(game.native_share_context.is_empty() and not ui.viewer_share_in_progress and ui.share_editor_status.text == Localizer.text(game.language_code, "share_native_failed"))
+	assert(not ui.share_editor_status.text.contains("/var/mobile/") and not ui.share_editor_status.text.contains("user://"))
+	game.native_share_context = "arrangement"
+	ui.set_share_state(Localizer.text(game.language_code, "share_opening"), true)
+	game._on_native_share_completed("activity")
+	assert(game.native_share_context.is_empty() and not ui.viewer_share_in_progress and ui.share_editor_status.text == Localizer.text(game.language_code, "share_complete"))
+	ui.set_share_state("", false)
 	assert(not ui.viewer_share_in_progress and not ui.share_editor_share_button.disabled and not ui.viewer_share_background_button.disabled)
 	var saved_state_before_back := JSON.stringify(game.saved_arrangements[0])
 	share_back_button.pressed.emit()

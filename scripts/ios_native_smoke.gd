@@ -16,6 +16,14 @@ func _ready() -> void:
 	assert(FileAccess.file_exists("res://ios/plugins/SharePlugin.debug.xcframework/ios-arm64/SharePlugin.a"))
 	assert(FileAccess.file_exists("res://ios/plugins/SharePlugin.release.xcframework/ios-arm64/SharePlugin.a"))
 	assert(FileAccess.get_file_as_string("res://export_presets.cfg").contains("plugins/SharePlugin=true"))
+	var share_plugin_descriptor:=FileAccess.get_file_as_string("res://ios/plugins/SharePlugin.gdip")
+	assert(share_plugin_descriptor.contains('name="SharePlugin"'))
+	assert(share_plugin_descriptor.contains('initialization="share_plugin_init"'))
+	assert(share_plugin_descriptor.contains('system=["Foundation.framework", "AudioToolbox.framework", "UIKit.framework"]'))
+	var share_plugin_binary:=FileAccess.get_file_as_bytes("res://ios/plugins/SharePlugin.release.xcframework/ios-arm64/SharePlugin.a")
+	for symbol in ["SharePlugin::share", "share_plugin_init", "share_completed", "share_canceled", "share_failed", "UIActivityViewController"]:
+		assert(_binary_contains_ascii(share_plugin_binary,symbol),symbol)
+	assert(not _binary_contains_ascii(share_plugin_binary,"share_image") and not _binary_contains_ascii(share_plugin_binary,"share_file"))
 	assert(FileAccess.file_exists("res://ios/plugins/NotificationSchedulerPlugin.gdip"))
 	assert(FileAccess.file_exists("res://ios/plugins/NotificationSchedulerPlugin.release.xcframework/ios-arm64/NotificationSchedulerPlugin.a"))
 	assert(FileAccess.get_file_as_string("res://export_presets.cfg").contains("plugins/NotificationSchedulerPlugin=true"))
@@ -52,15 +60,21 @@ func _ready() -> void:
 	assert(codemagic_source.contains("git log -1 --oneline"))
 	assert(codemagic_source.contains('application/min_ios_version="15.6"'))
 	assert(codemagic_source.contains("GODOT_IOS_DEPLOYMENT_TARGET_OK"))
+	assert(codemagic_source.contains("SharePlugin::share") and codemagic_source.contains("UIActivityViewController"))
 	assert(FileAccess.get_file_as_string("res://project.godot").contains("res://addons/NotificationSchedulerPlugin/plugin.cfg"))
 	var main_source:=FileAccess.get_file_as_string("res://scripts/main.gd")
 	assert(main_source.contains('Engine.has_singleton("SharePlugin")'))
-	assert(main_source.contains('has_method("share_image")'))
-	assert(main_source.contains('"share_image",'))
+	assert(main_source.contains('has_method("share")'))
+	assert(main_source.contains('share_plugin.call("share",{'))
+	assert(main_source.contains('"file_path":absolute_path'))
+	assert(main_source.contains('"mime_type":"image/png"'))
 	assert(main_source.contains('_open_native_share_or_fallback(image_path,image_path.get_file(),"arrangement")'))
 	assert(main_source.contains("_create_arrangement_share_image"))
-	assert(not main_source.contains('has_method("share")'))
+	assert(not main_source.contains('has_method("share_image")') and not main_source.contains('has_method("share_file")'))
+	assert(not main_source.contains('OS.shell_open(absolute_path)') and not main_source.contains('return "%s: %s"'))
 	assert(main_source.contains("navigator.share"))
+	assert(main_source.contains("error.name==='AbortError'?'canceled':'failed'"))
+	assert(not main_source.contains(".catch(save)"))
 	var notification_source:=FileAccess.get_file_as_string("res://scripts/habitat_notification_service.gd")
 	assert(notification_source.contains('const PLUGIN_SINGLETON_NAME := "NotificationSchedulerPlugin"'))
 	assert(notification_source.contains("Engine.has_singleton(PLUGIN_SINGLETON_NAME)"))
@@ -140,3 +154,14 @@ func _ready() -> void:
 	game.free()
 	await get_tree().process_frame
 	get_tree().quit()
+
+func _binary_contains_ascii(bytes:PackedByteArray,text:String)->bool:
+	var needle:=text.to_ascii_buffer()
+	if needle.is_empty() or bytes.size()<needle.size():return false
+	for start in range(bytes.size()-needle.size()+1):
+		if bytes[start]!=needle[0]:continue
+		var matches:=true
+		for offset in range(needle.size()):
+			if bytes[start+offset]!=needle[offset]:matches=false;break
+		if matches:return true
+	return false

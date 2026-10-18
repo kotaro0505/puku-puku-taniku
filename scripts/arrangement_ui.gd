@@ -1797,7 +1797,21 @@ func _button(text_value:String,position_value:Vector2,size_value:Vector2,color:C
 	var button:=Button.new();button.text=text_value;button.position=position_value;button.size=size_value;button.custom_minimum_size=size_value;button.focus_mode=Control.FOCUS_NONE;_skin_button(button,color,font_size);return button
 
 func _skin_button(button:Button,bg:Color,font_size:int)->void:
-	button.add_theme_font_size_override("font_size",font_size);button.add_theme_color_override("font_color",UI_BROWN if bg.get_luminance()>.55 else Color.WHITE);button.add_theme_color_override("font_disabled_color",Color("#c9b7a3"));button.add_theme_stylebox_override("normal",_box(bg,bg.lightened(.18),18,3));button.add_theme_stylebox_override("hover",_box(bg.lightened(.07),Color.WHITE,18,3));button.add_theme_stylebox_override("pressed",_box(bg.darkened(.08),bg.lightened(.18),18,3));button.add_theme_stylebox_override("disabled",_box(bg.darkened(.32),bg.darkened(.18),18,2))
+	var font_color:=UI_BROWN if bg.get_luminance()>.55 else Color.WHITE
+	var border_color:=bg.lightened(.18)
+	button.add_theme_font_size_override("font_size",font_size)
+	button.add_theme_color_override("font_color",font_color)
+	button.add_theme_color_override("font_hover_color",font_color)
+	button.add_theme_color_override("font_pressed_color",font_color)
+	button.add_theme_color_override("font_hover_pressed_color",font_color)
+	button.add_theme_color_override("font_focus_color",font_color)
+	button.add_theme_color_override("font_disabled_color",Color("#c9b7a3"))
+	button.add_theme_stylebox_override("normal",_box(bg,border_color,18,3))
+	button.add_theme_stylebox_override("hover",_box(bg.lightened(.07),border_color,18,3))
+	button.add_theme_stylebox_override("pressed",_box(bg.darkened(.08),border_color,18,3))
+	button.add_theme_stylebox_override("hover_pressed",_box(bg.darkened(.08),border_color,18,3))
+	button.add_theme_stylebox_override("disabled",_box(bg.darkened(.32),border_color,18,3))
+	button.add_theme_stylebox_override("focus",StyleBoxEmpty.new())
 
 func _style_overlay_label(label:Label,color:=UI_CREAM,outline_size:=5)->void:
 	label.add_theme_color_override("font_color",color);label.add_theme_color_override("font_outline_color",Color(0.12,.055,.025,.92));label.add_theme_constant_override("outline_size",outline_size);label.add_theme_color_override("font_shadow_color",Color(0.0,0.0,0.0,.52));label.add_theme_constant_override("shadow_offset_x",1);label.add_theme_constant_override("shadow_offset_y",2)

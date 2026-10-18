@@ -102,7 +102,7 @@ func _test_one_time_gift_arrangement_and_share(game)->void:
 	assert(game.result_overlay.find_child("ResultCloseButton",true,false)==null and game.result_overlay.find_child("ResultTitle",true,false)==null)
 	assert(game.arrangement_ui.viewer_share_button and game.arrangement_ui.viewer_share_button.pressed.get_connections().size()>0)
 	var main_source:=FileAccess.get_file_as_string("res://scripts/main.gd")
-	assert(main_source.contains('Engine.has_singleton("SharePlugin")') and main_source.contains('has_method("share_image")') and main_source.contains("navigator.share") and main_source.contains("_create_arrangement_share_image") and main_source.contains("_queue_species_get"))
+	assert(main_source.contains('Engine.has_singleton("SharePlugin")') and main_source.contains('has_method("share")') and main_source.contains('share_plugin.call("share",{') and main_source.contains("navigator.share") and main_source.contains("_create_arrangement_share_image") and main_source.contains("_queue_species_get"))
 	assert(not main_source.contains('pressed.connect(_share_personal_best)') and not main_source.contains('name="ResultCloseButton"'))
 	assert(not main_source.contains("原種として図鑑に登録したよ"))
 

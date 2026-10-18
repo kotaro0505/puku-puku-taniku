@@ -57,6 +57,15 @@ workflows:
           test -f ios/plugins/NotificationSchedulerPlugin.gdip
           test -f ios/plugins/SharePlugin.release.xcframework/ios-arm64/SharePlugin.a
           test -f ios/plugins/NotificationSchedulerPlugin.release.xcframework/ios-arm64/NotificationSchedulerPlugin.a
+          grep -Fq 'initialization="share_plugin_init"' ios/plugins/SharePlugin.gdip
+          SHARE_PLUGIN_STRINGS="$(mktemp)"
+          strings ios/plugins/SharePlugin.release.xcframework/ios-arm64/SharePlugin.a > "$SHARE_PLUGIN_STRINGS"
+          grep -Fq 'SharePlugin::share' "$SHARE_PLUGIN_STRINGS"
+          grep -Fq 'UIActivityViewController' "$SHARE_PLUGIN_STRINGS"
+          grep -Fq 'share_completed' "$SHARE_PLUGIN_STRINGS"
+          grep -Fq 'share_canceled' "$SHARE_PLUGIN_STRINGS"
+          grep -Fq 'share_failed' "$SHARE_PLUGIN_STRINGS"
+          rm -f "$SHARE_PLUGIN_STRINGS"
           test -f scripts/ci/build_storekit2_plugin.sh
           grep -Fq 'core/variant/type_info.h' scripts/ci/build_storekit2_plugin.sh
           grep -Fq 'VARIANT_ENUM_CAST' scripts/ci/build_storekit2_plugin.sh
