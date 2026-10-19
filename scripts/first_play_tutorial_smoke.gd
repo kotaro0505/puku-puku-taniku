@@ -331,11 +331,13 @@ func _ready() -> void:
 	_assert_visible_tutorial_continue(game,"ja","armadillo")
 	var initially_spawned_count: int = game.endless_economy_seed_count
 	var remaining_before_forced_jelly: int = game.play_seeds_remaining
+	game.audio_manager.last_se_key = "forced_jelly_silence_probe"
 	game.tutorial_continue_button.pressed.emit()
 	await get_tree().process_frame
 	assert(not game.first_play_tutorial_sequence_complete)
 	assert(game.first_play_tutorial_phase == "jelly_observe")
 	assert(game.endless_economy_jelly_count == 1)
+	assert(game.audio_manager.last_se_key == "forced_jelly_silence_probe", "forced tutorial jelly must not play a sound effect")
 	assert(game.endless_economy_seed_count == initially_spawned_count)
 	assert(game.play_seeds_remaining == remaining_before_forced_jelly)
 	assert(not is_instance_valid(game.first_play_tutorial_forced_jelly_plant) or game.first_play_tutorial_forced_jelly_plant.state == "jelly")

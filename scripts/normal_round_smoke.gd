@@ -45,7 +45,11 @@ func _ready()->void:
 	# eight. The refill counts queued drops and active seed animations, so the
 	# scheduled population reaches eight without ever exceeding it.
 	game.rng.seed=target_eight_seed
+	game.audio_manager.se_enabled=true
+	game.audio_manager.last_se_key="normal_jelly_silence_probe"
 	game.plants[0].jelly()
+	assert(game.audio_manager.last_se_key=="normal_jelly_silence_probe","normal-play jelly must not play a sound effect")
+	game.audio_manager.se_enabled=false
 	await get_tree().process_frame
 	assert(game.play_concurrent_target==8)
 	assert(_planned_population(game)==8)

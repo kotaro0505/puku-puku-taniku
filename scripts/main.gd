@@ -9968,7 +9968,6 @@ func _on_jellied(p)->void:
 		_save()
 	_maybe_activate_first_play_harvest_guide()
 	_show_float(p,Localizer.text(language_code,"jelly_float"),Color("#e7c9f0"))
-	audio_manager.play_se("jelly",.38)
 	var tw:=create_tween();tw.tween_property(p,"scale",Vector3(p.scale.x*1.05,p.scale.y*.46,p.scale.z*1.05),.28).set_trans(Tween.TRANS_BOUNCE);tw.tween_interval(.25);tw.tween_property(p,"scale",Vector3.ONE*0.01,.38)
 	_cleanup_later(p,1.0)
 
