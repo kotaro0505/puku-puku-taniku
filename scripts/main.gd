@@ -4635,11 +4635,12 @@ func _show_next_species_get()->void:
 	if species_get_active_series_id in catalog_series_unlock_notice_queue:catalog_series_unlock_notice_ready[species_get_active_series_id]=true
 	var forest_gacha_reveal:=species_get_active_context=="forest_gacha"
 	var first_colorata_reveal:=species_get_active_context=="first_colorata" and species_get_active_species_id==FIRST_STORY_SPECIES_ID and old_colorata_profile_active
+	var is_new:=bool(queued.get("is_new",true))
 	var texture:=CatalogImageLoader.placeholder_texture if forest_gacha_reveal else _species_texture(entry)
 	if forest_gacha_reveal:_gacha_capsule_profile_mark("get_card_show_start")
 	if first_colorata_reveal:_old_colorata_profile_mark("get_card_show_start")
 	var catalog_page_name:=_species_get_catalog_page_name(entry,language_code)
-	species_get_overlay.show_species(entry,texture if texture!=null else CatalogImageLoader.placeholder_texture,bool(queued.get("is_new",true)),species_get_active_context,language_code,catalog_page_name)
+	species_get_overlay.show_species(entry,texture if texture!=null else CatalogImageLoader.placeholder_texture,is_new,species_get_active_context,language_code,catalog_page_name)
 	# Habitat restoration uses a higher canvas order than the shared GET card.
 	# Hide both progress displays in the same frame that the card becomes visible
 	# so no title, green panel, or lamp can flash over the reveal.
@@ -4651,7 +4652,7 @@ func _show_next_species_get()->void:
 	else:
 		_request_species_texture(entry,species_get_overlay.result_image,true)
 		if first_colorata_reveal:call_deferred("_finish_old_colorata_profile_after_rendered_frame",old_colorata_profile_run_id)
-	if audio_manager:audio_manager.play_se("new_species",.9)
+	if audio_manager:audio_manager.play_se("new_species_card" if is_new else "new_species",.9)
 
 func _gacha_capsule_profile_requested()->bool:
 	if gacha_capsule_profile_enabled:return true
