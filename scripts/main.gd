@@ -3573,7 +3573,7 @@ func _claim_first_habitat_gift_once()->void:
 	if first_habitat_gift_claimed:return
 	first_habitat_gift_claimed=true
 	if not _is_endless_greenhouse_enabled():normal_seed_bags+=1
-	_save();_update_currency_ui();_update_play_ui();audio_manager.play_se("daily",.62)
+	_save();_update_currency_ui();_update_play_ui()
 
 func _start_puku_gauge_intro_after_greenhouse_frame()->void:
 	await get_tree().process_frame
