@@ -196,6 +196,9 @@ func _test_localization_contract() -> void:
 	assert(Localizer.text("ja", "restoration_slide_1") == "それからも、みんなは何度も原生地へ通い、多肉たちを植え続けました。")
 	assert(Localizer.text("ja", "restoration_slide_2") == "原生地には少しずつ、多肉植物が戻って来ました。")
 	assert(Localizer.text("ja", "restoration_slide_3") == "色々な多肉植物が見たい。\n\nみんなの願いは、\n\nいつしか祈りとなっていました。")
+	assert(Localizer.text("ja", "restoration_record_size", [220]) == "収穫した多肉の累計サイズ\n\n220cm")
+	assert(Localizer.text("hiragana", "restoration_record_size", [220]) == "しゅうかくした たにくの るいけいさいず\n\n220せんち")
+	assert(Localizer.text("en", "restoration_record_size", [220]) == "Total size harvested\n\n220 cm")
 	var expected_post_ending := {
 		"jurejure_post_ending_mouse_sprout": "こら！そこ踏むなチュー！さっき芽が出たばっかりだチュー！",
 		"jurejure_post_ending_mouse_water": "怪しいやつがいないかパトロールしてるんだチュー！",
@@ -701,7 +704,7 @@ func _test_integrated_final_chapter() -> void:
 		elif str(event.get("kind", "")) == "plant": plant_events.append(event)
 	assert(record_events.size() == 5)
 	assert(str((record_events[0].get("payload", {}) as Dictionary).get("text", "")).contains("2株"))
-	assert(str((record_events[1].get("payload", {}) as Dictionary).get("text", "")).contains("220cm"))
+	assert(str((record_events[1].get("payload", {}) as Dictionary).get("text", "")) == "収穫した多肉の累計サイズ\n\n220cm")
 	assert(str((record_events[2].get("payload", {}) as Dictionary).get("text", "")).contains("2種"))
 	assert(str((record_events[3].get("payload", {}) as Dictionary).get("text", "")).contains("7回"))
 	assert(str((record_events[4].get("payload", {}) as Dictionary).get("text", "")).contains("4回"))
