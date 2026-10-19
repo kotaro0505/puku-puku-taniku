@@ -82,7 +82,7 @@ func _test_post_first_normal_tutorial_preset() -> void:
 	assert(not game.play_active and not game.play_modal_open and not game.result_overlay.visible)
 	assert(not game.first_play_tutorial_active and not game.tutorial_guide_overlay.visible)
 	assert(game.normal_play_tutorial_complete)
-	assert(bool(game.tutorial_steps.get("first_normal_cost_notice_seen", false)))
+	assert(not game.tutorial_steps.has("first_normal_cost_notice_seen"))
 	assert(game.total_play_count == 2 and game.formal_play_count == 1 and game.normal_play_count == 1)
 	var tutorial_species_id := str(game.tutorial_steps.get("first_normal_tutorial_species_id", ""))
 	var tutorial_entry: Dictionary = game._catalog_entry(tutorial_species_id)

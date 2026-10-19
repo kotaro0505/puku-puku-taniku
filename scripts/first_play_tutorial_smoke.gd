@@ -272,12 +272,11 @@ func _ready() -> void:
 	assert(game.scripted_dialog_kind.is_empty())
 	assert(str(game.tutorial_guide_button.get_meta("target", "")) == "play_open_normal")
 	assert(game.tutorial_guide_overlay.visible)
-	assert(game.tutorial_cost_note_panel.visible)
-	assert(game.tutorial_cost_note_label.text == "1ぷくコインを消費します")
-	assert(bool(game.tutorial_steps.get("first_normal_cost_notice_seen", false)))
+	assert(game.tutorial_guide_overlay.find_child("FirstNormalCostNote",true,false)==null)
+	assert(game.tutorial_guide_button.text=="たねをまく\n1ぷくコイン消費")
+	assert(not game.tutorial_steps.has("first_normal_cost_notice_seen"))
 	var puku_before_round: int = game.puku_balance_units
 	game._complete_tutorial_guide()
-	assert(not game.tutorial_cost_note_panel.visible)
 	assert(game._should_simulate_endless_greenhouse(), "formal round remained blocked: intro=%s play_overlay=%s result=%s tutorial=%s scripted=%s" % [game.intro_overlay.visible, game.play_overlay.visible, game.result_overlay.visible, game.tutorial_guide_overlay.visible, game.scripted_dialog_kind])
 	await get_tree().create_timer(.45).timeout
 	assert(game.play_active and game.first_play_tutorial_active and game.normal_seed_bags==0 and game.current_target_count==12)
@@ -473,7 +472,7 @@ func _ready() -> void:
 
 	assert(Localizer.text("ja","puku_buyback_1") == "そうだ！育てた多肉は\nうちのお店で買い取るよ！")
 	assert(Localizer.text("ja","puku_buyback_2") == "大きい株ほど\n高く買い取るからね！")
-	print("FIRST_PLAY_TUTORIAL_SMOKE_OK old_colorata_growth=1.3 normal_growth=1.6 normal_kakuhen=true cost_note=once trio_cards=catalog_only pre_sow=true start_guide=play_open_normal tutorial_continue=9_pages_visible tutorial_speakers=8_correct+system_none button+fullscreen_single_step=true operation_prompt_continue=false forced_jelly=true reserved_original_new=true reserved_front_random=true observed_3s=true automatic_GET=true act2_guarantee_untouched=true total=12 settled=1_harvest+11_jelly result=removed")
+	print("FIRST_PLAY_TUTORIAL_SMOKE_OK old_colorata_growth=1.3 normal_growth=1.6 normal_kakuhen=true cost_note=removed button_cost_copy=preserved trio_cards=catalog_only pre_sow=true start_guide=play_open_normal tutorial_continue=9_pages_visible tutorial_speakers=8_correct+system_none button+fullscreen_single_step=true operation_prompt_continue=false forced_jelly=true reserved_original_new=true reserved_front_random=true observed_3s=true automatic_GET=true act2_guarantee_untouched=true total=12 settled=1_harvest+11_jelly result=removed")
 	get_tree().quit()
 
 

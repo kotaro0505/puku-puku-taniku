@@ -523,8 +523,6 @@ var tutorial_panda_portrait: TextureRect
 var tutorial_speaker_label: Label
 var tutorial_speaker_id := ""
 var tutorial_dialog_panel: PanelContainer
-var tutorial_cost_note_panel: PanelContainer
-var tutorial_cost_note_label: Label
 var tutorial_habitat_item: Dictionary = {}
 var tutorial_harvest_plant: Node
 var first_play_tutorial_active := false
@@ -3625,8 +3623,6 @@ void fragment(){
 	tutorial_guide_message=Label.new();tutorial_guide_message.custom_minimum_size=Vector2(330,96);tutorial_guide_message.size_flags_horizontal=Control.SIZE_EXPAND_FILL;tutorial_guide_message.size_flags_vertical=Control.SIZE_EXPAND_FILL;tutorial_guide_message.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;tutorial_guide_message.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;tutorial_guide_message.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;tutorial_guide_message.add_theme_font_size_override("font_size",22);tutorial_guide_message.add_theme_color_override("font_color",UI_BROWN);tutorial_guide_message.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_content.add_child(tutorial_guide_message)
 	tutorial_continue_button=Button.new();tutorial_continue_button.name="StoryContinueButton";tutorial_continue_button.text=Localizer.text(language_code,"continue");_skin_story_continue_button(tutorial_continue_button);tutorial_continue_button.pressed.connect(_advance_visible_tutorial_dialog);tutorial_continue_button.visible=false;tutorial_content.add_child(tutorial_continue_button)
 	tutorial_continue_bottom_spacer=Control.new();tutorial_continue_bottom_spacer.custom_minimum_size=Vector2(0,10);tutorial_continue_bottom_spacer.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_continue_bottom_spacer.visible=false;tutorial_content.add_child(tutorial_continue_bottom_spacer)
-	tutorial_cost_note_panel=PanelContainer.new();tutorial_cost_note_panel.name="FirstNormalCostNote";tutorial_cost_note_panel.position=Vector2(118,418);tutorial_cost_note_panel.size=Vector2(340,64);tutorial_cost_note_panel.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_cost_note_panel.add_theme_stylebox_override("panel",_box(Color("#fff4cd"),Color("#d28a2d"),16,3));tutorial_cost_note_panel.visible=false;tutorial_guide_overlay.add_child(tutorial_cost_note_panel)
-	tutorial_cost_note_label=Label.new();tutorial_cost_note_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;tutorial_cost_note_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;tutorial_cost_note_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;tutorial_cost_note_label.add_theme_font_size_override("font_size",18);tutorial_cost_note_label.add_theme_color_override("font_color",UI_BROWN);tutorial_cost_note_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;tutorial_cost_note_panel.add_child(tutorial_cost_note_label)
 
 func _mirror_habitat_tutorial_button(source:Button)->void:
 	# Habitat is intentionally not pulsed: it must remain the exact same runtime
@@ -3667,16 +3663,10 @@ func _show_tutorial_guide(target:String)->void:
 	for connection in tutorial_guide_button.pressed.get_connections():tutorial_guide_button.pressed.disconnect(connection.callable)
 	tutorial_guide_button.pressed.connect(_complete_tutorial_guide)
 	tutorial_guide_overlay.visible=true
-	if target=="play_open_normal" and not bool(tutorial_steps.get("first_normal_cost_notice_seen",false)):
-		tutorial_cost_note_label.text=Localizer.text(language_code,"first_normal_cost_notice")
-		tutorial_cost_note_panel.visible=true
-		tutorial_steps["first_normal_cost_notice_seen"]=true
-		_save()
 	if target!="habitat":_start_tutorial_target_pulse(tutorial_guide_button,Color(1.25,1.18,.7,1))
 
 func _prepare_standard_tutorial_guide()->void:
 	tutorial_guide_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_shade.mouse_filter=Control.MOUSE_FILTER_STOP;tutorial_guide_shade.material=null;tutorial_guide_shade.color=Color(0.05,0.035,0.025,.72)
-	if tutorial_cost_note_panel:tutorial_cost_note_panel.visible=false
 	if tutorial_continue_button:tutorial_continue_button.visible=false
 	if tutorial_continue_bottom_spacer:tutorial_continue_bottom_spacer.visible=false
 	_set_tutorial_speaker("")
@@ -3696,7 +3686,6 @@ func _complete_tutorial_guide()->void:
 	if tutorial_highlight_tween and tutorial_highlight_tween.is_valid():tutorial_highlight_tween.kill()
 	tutorial_highlight_tween=null;tutorial_guide_button.self_modulate=Color.WHITE;tutorial_guide_button.scale=Vector2.ONE
 	var target:=str(tutorial_guide_button.get_meta("target",""));tutorial_guide_overlay.visible=false
-	if tutorial_cost_note_panel:tutorial_cost_note_panel.visible=false
 	tutorial_steps[target+"_guide"]=true;_save()
 	if target=="encyclopedia":
 		_open_encyclopedia()
@@ -3851,7 +3840,6 @@ func _activate_first_play_tutorial_new_harvest_guide()->void:
 func _hide_first_play_tutorial_overlay()->void:
 	if tutorial_guide_overlay==null:return
 	tutorial_guide_overlay.visible=false;tutorial_dialog_panel.visible=false;tutorial_guide_button.visible=false;tutorial_continue_button.visible=false;tutorial_continue_bottom_spacer.visible=false;tutorial_guide_shade.material=null
-	if tutorial_cost_note_panel:tutorial_cost_note_panel.visible=false
 	_set_tutorial_speaker("")
 	_set_tutorial_dialog_system_style(false)
 	first_play_harvest_spotlight_material.set_shader_parameter("focus_ellipse",false)
@@ -4248,7 +4236,6 @@ func _set_language(value:String)->void:
 func _apply_language_to_ui()->void:
 	_refresh_opening_prompt()
 	if puku_gauge_label:puku_gauge_label.text=Localizer.text(language_code,"puku_gauge")
-	if tutorial_cost_note_label:tutorial_cost_note_label.text=Localizer.text(language_code,"first_normal_cost_notice")
 	if play_open_button:play_open_button.text=Localizer.text(language_code,"main_play")
 	if shop_button:shop_button.text=Localizer.text(language_code,"main_shop")
 	if arrangement_button:arrangement_button.text=Localizer.text(language_code,"main_arrangement")
