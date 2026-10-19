@@ -407,6 +407,37 @@ func _verify_difficulty_opening_dialogue(texture: Texture2D) -> void:
 			var second := probe.opening_trio_portraits.get_child(second_index) as TextureRect
 			assert(not Rect2(first.position, first.size).intersects(Rect2(second.position, second.size)))
 	probe._close_opening_dialogue()
+	# Drive real opening UI creation repeatedly until every level-2 and level-3
+	# line has appeared. This verifies all six text/portrait combinations rather
+	# than only the static localization table.
+	for difficulty in [BattleClass.DIFFICULTY_STRONG, BattleClass.DIFFICULTY_STRONGEST]:
+		var seen_indices: Dictionary = {}
+		for seed_value in range(700000, 700512):
+			probe.start_battle([SAMPLE_SPECIES], {"colorata": texture}, "ja", seed_value, false, difficulty)
+			assert(probe.battle_phase == "opening_dialogue" and not probe.battle_active)
+			var dialogue_index: int = probe.opening_dialogue_index
+			var dialogue_data := BattleClass.opening_dialogue_data(difficulty, dialogue_index)
+			assert(probe.opening_dialogue_label.text == Localizer.text("ja", str(dialogue_data.get("key", ""))))
+			assert(probe.opening_speaker_label.text == Localizer.text("ja", "jurejure_gang_name" if difficulty == BattleClass.DIFFICULTY_STRONGEST else "jurejure_%s_name" % str(dialogue_data.get("speaker", ""))))
+			if difficulty == BattleClass.DIFFICULTY_STRONG:
+				assert(probe.opening_portrait.visible and not probe.opening_trio_portraits.visible)
+				var portrait_texture := probe.opening_portrait.texture as AtlasTexture
+				assert(portrait_texture != null and portrait_texture.atlas != null)
+				assert(portrait_texture.atlas.resource_path.ends_with("/%s.png" % str(dialogue_data.get("speaker", ""))))
+			else:
+				assert(not probe.opening_portrait.visible and probe.opening_trio_portraits.visible)
+				assert(probe.opening_trio_portraits.get_child_count() == 3)
+				for trio_portrait_value in probe.opening_trio_portraits.get_children():
+					var trio_portrait := trio_portrait_value as TextureRect
+					assert(trio_portrait != null and trio_portrait.visible and trio_portrait.texture != null)
+			probe._process(20.0)
+			assert(probe.units.is_empty() and probe.battle_phase == "opening_dialogue")
+			seen_indices[dialogue_index] = true
+			probe._close_opening_dialogue()
+			assert(probe.battle_phase == "awaiting_sow" and probe.sow_button.visible)
+			if seen_indices.size() == 3:
+				break
+		assert(seen_indices.size() == 3)
 	# Even if a caller passes a higher level, the linked mandatory Act III battle
 	# must remain the original normal, immediate-start special battle.
 	probe.start_battle([SAMPLE_SPECIES], {"colorata": texture}, "ja", 606060, true, BattleClass.DIFFICULTY_STRONGEST)

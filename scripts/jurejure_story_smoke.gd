@@ -4,6 +4,7 @@ const JureJureSystemClass = preload("res://scripts/jurejure_system.gd")
 const StoryProgressionClass = preload("res://scripts/story_progression.gd")
 const HabitatRestorationClass = preload("res://scripts/habitat_restoration.gd")
 const Localizer = preload("res://scripts/game_localizer.gd")
+const BattleClass = preload("res://scripts/puku_puku_battle.gd")
 const JUREJURE_SPECIES_IDS: Array[String] = [
 	"jurejure_pure_gold", "jurejure_guilty_burger", "jurejure_motemote",
 	"jurejure_compressed_cash", "jurejure_chateaubriand", "jurejure_crown",
@@ -30,8 +31,9 @@ func _ready() -> void:
 	_test_first_loss_unlocks_act_two(game)
 	await _test_save_compatibility(game)
 	_test_post_ending_friendly_battle(game)
+	await _test_post_ending_strongest_battle_entry(game)
 	game._reset_progression_state()
-	print("JUREJURE_STORY_SMOKE_OK group=three_close composition=all_6_points_above_dialog first_encounter=camera+bgm home_warning=once battle=active6_total12 act2_only=true exploitation=act3+forced_first+normal_repeat+permanent midpoint=4+camera crisis=8 exploit_dialog=three-pattern-nonrepeat retired_secret=tombstone pool_unlock=all_10 ownership=exact reward=random post_ending=friendly+normal_pool+known_not_new save_fresh=true")
+	print("JUREJURE_STORY_SMOKE_OK group=three_close composition=all_6_points_above_dialog first_encounter=camera+bgm home_warning=once battle=strong_intro_then_active6_total12 strongest_main_entry=true act2_only=true exploitation=act3+forced_first+normal_repeat+permanent midpoint=4+camera crisis=8 exploit_dialog=three-pattern-nonrepeat retired_secret=tombstone pool_unlock=all_10 ownership=exact reward=random post_ending=friendly+normal_pool+known_not_new save_fresh=true")
 	get_tree().quit()
 
 
@@ -216,15 +218,33 @@ func _test_battle_win_and_respawn(game: Node) -> void:
 	for entry in game._jurejure_reward_candidates():
 		pre_reward_ids.append(str(entry.get("species_id", "")))
 	assert("affinis" in pre_reward_ids and "shaviana" in pre_reward_ids)
+	# Exercise the real Main -> battle start path with a deterministic level-2
+	# draw. A normal battle may now pause on its opening dialogue before sowing.
+	game.rng.seed = _rng_seed_for_roll_range(0.70, 1.0)
 	game.puku_puku_battle._accept_battle()
 	await get_tree().process_frame
 	assert(game.audio_manager.current_bgm_key == "puku_battle")
 	assert(game.puku_puku_battle.visible and not game.puku_puku_battle.battle_active)
-	assert(game.puku_puku_battle.battle_phase == "awaiting_sow")
+	assert(game.active_jurejure_battle_difficulty == BattleClass.DIFFICULTY_STRONG)
+	assert(game.puku_puku_battle.battle_difficulty == BattleClass.DIFFICULTY_STRONG)
+	assert(game.puku_puku_battle.battle_phase == "opening_dialogue")
+	assert(game.puku_puku_battle.opening_dialogue_layer.visible)
+	assert(not game.puku_puku_battle.sow_button.visible and game.puku_puku_battle.sow_button.disabled)
 	assert(game.puku_puku_battle.units.is_empty())
-	assert(game.puku_puku_battle.sow_button.visible)
 	assert(is_equal_approx(game.puku_puku_battle.player_score, 0.0))
 	assert(is_equal_approx(game.puku_puku_battle.opponent_score, 0.0))
+	var opening_data: Dictionary = BattleClass.opening_dialogue_data(
+		BattleClass.DIFFICULTY_STRONG,
+		game.puku_puku_battle.opening_dialogue_index
+	)
+	assert(str(opening_data.get("speaker", "")) in BattleClass.STRONG_DIALOGUE_SPEAKERS)
+	assert(game.puku_puku_battle.opening_dialogue_label.text == Localizer.text("ja", str(opening_data.get("key", ""))))
+	assert(game.puku_puku_battle.opening_portrait.visible and not game.puku_puku_battle.opening_trio_portraits.visible)
+	game.puku_puku_battle._process(20.0)
+	assert(game.puku_puku_battle.units.is_empty() and game.puku_puku_battle.battle_phase == "opening_dialogue")
+	game.puku_puku_battle._close_opening_dialogue()
+	assert(game.puku_puku_battle.battle_phase == "awaiting_sow")
+	assert(game.puku_puku_battle.sow_button.visible and not game.puku_puku_battle.sow_button.disabled)
 	game.puku_puku_battle.debug_sow_immediately()
 	assert(game.puku_puku_battle.battle_active)
 	assert(game.puku_puku_battle.battle_phase == "growing")
@@ -862,6 +882,49 @@ func _test_post_ending_friendly_battle(game: Node) -> void:
 	assert(bool(penalty.get("friendly", false)))
 	assert(int(penalty.get("puku_penalty_roll", -1)) == 0 and int(penalty.get("puku_lost", -1)) == 0)
 	assert(game.puku_balance_units == puku_before and game.habitat_wild_plants == habitat_before)
+
+
+func _test_post_ending_strongest_battle_entry(game: Node) -> void:
+	_prepare_act_one(game)
+	game.jurejure_intro_complete = true
+	game.jurejure_enabled = true
+	var restoration: Dictionary = HabitatRestorationClass.default_state()
+	HabitatRestorationClass.complete_ending(restoration)
+	game.story_progression_state["restoration"] = restoration
+	game.finale_complete = true
+	assert(game._jurejure_battle_difficulty_phase() == BattleClass.PHASE_POST_ENDING)
+	game._show_jurejure_battle_choice()
+	game.rng.seed = _rng_seed_for_roll_range(0.70, 1.0)
+	game.puku_puku_battle._accept_battle()
+	await get_tree().process_frame
+	assert(game.active_jurejure_battle_difficulty == BattleClass.DIFFICULTY_STRONGEST)
+	assert(game.puku_puku_battle.battle_difficulty == BattleClass.DIFFICULTY_STRONGEST)
+	assert(game.puku_puku_battle.battle_phase == "opening_dialogue" and not game.puku_puku_battle.battle_active)
+	assert(game.puku_puku_battle.opening_dialogue_layer.visible)
+	assert(game.puku_puku_battle.opening_trio_portraits.visible and not game.puku_puku_battle.opening_portrait.visible)
+	assert(game.puku_puku_battle.opening_trio_portraits.get_child_count() == 3)
+	assert(game.puku_puku_battle.opening_speaker_label.text == Localizer.text("ja", "jurejure_gang_name"))
+	for portrait_value in game.puku_puku_battle.opening_trio_portraits.get_children():
+		var portrait := portrait_value as TextureRect
+		assert(portrait != null and portrait.visible and portrait.texture != null)
+	game.puku_puku_battle._process(20.0)
+	assert(game.puku_puku_battle.units.is_empty() and game.puku_puku_battle.battle_phase == "opening_dialogue")
+	game.puku_puku_battle._close_opening_dialogue()
+	assert(game.puku_puku_battle.battle_phase == "awaiting_sow")
+	assert(game.puku_puku_battle.sow_button.visible and not game.puku_puku_battle.sow_button.disabled)
+	game.puku_puku_battle._clear_units()
+	game.puku_puku_battle.visible = false
+
+
+func _rng_seed_for_roll_range(minimum: float, maximum: float) -> int:
+	var probe := RandomNumberGenerator.new()
+	for seed_value in range(1, 100000):
+		probe.seed = seed_value
+		var roll := probe.randf()
+		if roll >= minimum and roll < maximum:
+			return seed_value
+	assert(false, "No deterministic RNG seed found for requested range")
+	return 1
 
 
 func _group_item(game: Node) -> Dictionary:
