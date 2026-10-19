@@ -19,17 +19,17 @@ const ENERGY_PARTICLE_FADE_SECONDS := 0.18
 const ENERGY_PARTICLE_STAGGER_SECONDS := 0.035
 const SERIES_LABELS := {
 	"ja": {
-		"base": "原種", "neon": "ネオン多肉", "jurejure": "ジュレジュレ団多肉",
+		"base": "原種", "jurejure": "ジュレジュレ団多肉",
 		"gummy": "グミ多肉", "metal": "金属多肉", "sweets": "スイーツ多肉", "glow": "蓄光多肉", "jewel": "宝石多肉",
 		"jure": "ジュレジュレ団多肉", "stone": "ストーン多肉", "sea": "海多肉", "yumekawa": "ゆめふわ多肉", "forest_amber": "森と琥珀多肉", "jelly": "ゼリー多肉",
 	},
 	"hiragana": {
-		"base": "げんしゅ", "neon": "ねおん", "jurejure": "じゅれじゅれだん",
+		"base": "げんしゅ", "jurejure": "じゅれじゅれだん",
 		"gummy": "ぐみ", "metal": "きんぞく", "sweets": "すいーつ", "glow": "ちっこう", "jewel": "ほうせき",
 		"jure": "じゅれじゅれだん", "stone": "すとーん", "sea": "うみ", "yumekawa": "ゆめふわ", "forest_amber": "もりと こはく", "jelly": "ぜりー",
 	},
 	"en": {
-		"base": "Original Species", "neon": "Neon", "jurejure": "JureJure Gang",
+		"base": "Original Species", "jurejure": "JureJure Gang",
 		"gummy": "Gummy", "metal": "Metal", "sweets": "Sweets", "glow": "Glow", "jewel": "Jewel",
 		"jure": "JureJure Gang", "stone": "Stone", "sea": "Sea", "yumekawa": "Dreamy", "forest_amber": "Forest & Amber", "jelly": "Jelly",
 	},

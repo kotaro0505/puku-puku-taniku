@@ -13,10 +13,5 @@
 	{"series_id":"forest_amber"},
 	{"series_id":"jurejure"}
   ],
-  "hidden_series": [
-    {
-      "series_id":"neon",
-      "old_page_spawn":{"enabled":false,"chance":0.002,"condition":{"type":"formal_play_count","value":40}}
-    }
-  ]
+  "hidden_series": []
 }

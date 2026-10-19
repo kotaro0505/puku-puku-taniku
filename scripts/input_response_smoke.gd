@@ -137,6 +137,12 @@ func _test_get_card_response(game: Node) -> Dictionary:
 	assert(game.round_result_species_save_pending and game._species_get_count(ids[0]) == 1)
 	assert(await _wait_until(func() -> bool: return not overlay.busy, 900))
 	_tap_get_overlay(overlay)
+	# The first Lutea card is followed by its one-time story before the next
+	# queued GET card. Keep the response test on the real production ordering.
+	assert(await _wait_until(func() -> bool: return game.scripted_dialog_kind=="lutea_first_get",900))
+	while not game.scripted_dialog_kind.is_empty():
+		game._advance_scripted_dialog()
+		await get_tree().process_frame
 	assert(await _wait_until(func() -> bool: return overlay.visible and game.species_get_active_species_id == ids[1], 900))
 	assert(game.round_result_species_save_pending and game._species_get_count(ids[1]) == 1)
 	assert(await _wait_until(func() -> bool: return not overlay.busy, 900))

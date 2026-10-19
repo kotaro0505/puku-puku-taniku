@@ -50,7 +50,7 @@ const TRIAL_DEV_CONTROLS_ENABLED := true
 # deliberately governed by the same release gate instead of a second switch.
 const DEVELOPMENT_CATALOG_PREVIEW_ENABLED := TRIAL_DEV_CONTROLS_ENABLED
 const PROGRESSION_VERSION := 28
-const RETIRED_CONTENT_VERSION := 2
+const RETIRED_CONTENT_VERSION := 3
 const NORMAL_SAVE_PATH := EndlessGreenhouseExperimentClass.NORMAL_SAVE_PATH
 const ENDLESS_EXPERIMENT_SAVE_PATH := EndlessGreenhouseExperimentClass.EXPERIMENT_SAVE_PATH
 const LEGACY_HABITAT_REGENERATION_VERSION := 17
@@ -172,7 +172,7 @@ const BEST_UNLOCK_PURPUSORUM_SPECIES_COUNT := 3
 const TOVAR_FIRST_PLAY := 6
 const FANTASY_SERIES_IDS := [
 	"gummy", "metal", "sweets", "glow", "jewel", "jelly", "stardust",
-	"stone", "sea", "yumekawa", "forest_amber", "neon"
+	"stone", "sea", "yumekawa", "forest_amber"
 ]
 const EARLY_FANTASY_REQUIRED_SERIES := ["jelly", "yumekawa", "stone", "jewel"]
 const JUREJURE_STORY_GROUP := "jurejure"
@@ -1350,7 +1350,7 @@ func _load_save() -> void:
 					greenhouse_available.erase(story_catalog_id);unlocked_species.erase(story_catalog_id)
 			for hidden_id in [HIDDEN_PINWHEEL_ID,HIDDEN_TOVAR_ID,HIDDEN_BUSTAMANTE_ID]:
 				if bool(discovered.get(hidden_id,false)):hidden_species_acquired[hidden_id]=true
-			if _sanitize_retired_special_species_progress():retired_content_migration_dirty=true
+			if _sanitize_retired_catalog_progress():retired_content_migration_dirty=true
 			_sanitize_removed_common_progress()
 			_migrate_story_progress(saved_progression_version)
 			_migrate_three_act_progress(saved_progression_version,retired_secret_gacha_evidence)
@@ -1663,47 +1663,56 @@ func _sanitize_removed_common_progress()->void:
 		if not StoryProgressionClass.is_removed_species(str(species_id)):clean_pending.append(str(species_id))
 	pending_habitat_species=clean_pending
 
-func _sanitize_retired_special_species_progress()->bool:
-	# The six retired prototype rewards may occur in old development saves. Drop
-	# only their references; every unrelated plant, currency and story flag stays.
+func _sanitize_retired_catalog_progress()->bool:
+	# Retired prototype rewards and the removed Neon page can occur in old saves.
+	# Drop only those exact references; unrelated plants, currency and story stay.
 	var changed:=false
 	var species_dictionaries:Array[Dictionary]=[
 		bests,discovered,species_get_counts,greenhouse_available,unlocked_species,
 		forest_gacha_encountered,hidden_species_acquired,habitat_returned_species,
 	]
-	for species_id in StoryProgressionClass.RETIRED_SPECIAL_BASE_SPECIES_IDS:
+	for species_id in StoryProgressionClass.RETIRED_CATALOG_SPECIES_IDS:
 		for state_dictionary in species_dictionaries:
 			if state_dictionary.has(species_id):state_dictionary.erase(species_id);changed=true
+	for series_id in StoryProgressionClass.RETIRED_NEON_SERIES_IDS:
+		for series_dictionary in [unlocked_series,series_seed_inventory,old_catalog_page_inventory,completed_unlock_conditions]:
+			if series_dictionary.has(series_id):series_dictionary.erase(series_id);changed=true
+		if catalog_cover_species.has(series_id):catalog_cover_species.erase(series_id);changed=true
+		if active_series_seed_id==series_id:active_series_seed_id="";changed=true
+		if armadillo_gift_series_id==series_id:armadillo_gift_series_id="";changed=true
+		if habitat_old_catalog_page_series_id==series_id:
+			habitat_old_catalog_page_series_id="";habitat_old_catalog_page_pending=false;changed=true
+	_sync_old_catalog_page_count()
 	for series_id_value in catalog_cover_species.keys():
-		if StoryProgressionClass.is_retired_special_base_species(str(catalog_cover_species.get(series_id_value,""))):
+		if StoryProgressionClass.is_retired_catalog_species(str(catalog_cover_species.get(series_id_value,""))):
 			catalog_cover_species.erase(series_id_value);changed=true
 	var clean_pending:Array=[]
 	for species_id_value in pending_habitat_species:
 		var species_id:=str(species_id_value)
-		if StoryProgressionClass.is_retired_special_base_species(species_id):changed=true
+		if StoryProgressionClass.is_retired_catalog_species(species_id):changed=true
 		elif species_id not in clean_pending:clean_pending.append(species_id)
 	pending_habitat_species=clean_pending
 	var clean_pending_round:Array[String]=[]
 	for species_id_value in pending_round_new_species_ids:
 		var species_id:=str(species_id_value)
-		if StoryProgressionClass.is_retired_special_base_species(species_id):changed=true
+		if StoryProgressionClass.is_retired_catalog_species(species_id):changed=true
 		elif species_id not in clean_pending_round:clean_pending_round.append(species_id)
 	pending_round_new_species_ids=clean_pending_round
 	var clean_result_new:Array[String]=[]
 	for species_id_value in result_new_species_queue:
 		var species_id:=str(species_id_value)
-		if StoryProgressionClass.is_retired_special_base_species(species_id):changed=true
+		if StoryProgressionClass.is_retired_catalog_species(species_id):changed=true
 		elif species_id not in clean_result_new:clean_result_new.append(species_id)
 	result_new_species_queue=clean_result_new
 	var clean_result_deferred:Array[String]=[]
 	for species_id_value in result_deferred_species_queue:
 		var species_id:=str(species_id_value)
-		if StoryProgressionClass.is_retired_special_base_species(species_id):changed=true
+		if StoryProgressionClass.is_retired_catalog_species(species_id):changed=true
 		elif species_id not in clean_result_deferred:clean_result_deferred.append(species_id)
 	result_deferred_species_queue=clean_result_deferred
 	for property_name in ["first_tutorial_species_id","habitat_tutorial_species_id","armadillo_gift_species_id"]:
 		var species_id:=str(get(property_name))
-		if StoryProgressionClass.is_retired_special_base_species(species_id):set(property_name,"");changed=true
+		if StoryProgressionClass.is_retired_catalog_species(species_id):set(property_name,"");changed=true
 	return changed
 
 func _migrate_story_progress(saved_progression_version:int)->void:
@@ -2720,7 +2729,7 @@ func _arrangement_contains_retired_species(source:Dictionary)->bool:
 	var source_plants:Variant=source.get("plants",[])
 	if not source_plants is Array:return false
 	for plant_value in source_plants:
-		if plant_value is Dictionary and StoryProgressionClass.is_retired_special_base_species(str(plant_value.get("species_id",""))):return true
+		if plant_value is Dictionary and StoryProgressionClass.is_retired_catalog_species(str(plant_value.get("species_id",""))):return true
 	return false
 
 func _normalize_arrangement(source:Dictionary)->Dictionary:

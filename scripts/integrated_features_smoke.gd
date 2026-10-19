@@ -11,7 +11,7 @@ func _ready()->void:
 	_test_one_time_gift_arrangement_and_share(game)
 	_test_removed_mystery_pod()
 	game._reset_progression_state();game.queue_free();await get_tree().process_frame
-	print("INTEGRATED_FEATURES_SMOKE_OK star_rarity=64+64+66+22+21+5 flat_symbol_ui=true localization=3 gift=once arrangement=free-scale result_share=removed arrangement_share=preserved mystery_pod=removed")
+	print("INTEGRATED_FEATURES_SMOKE_OK star_rarity=63+62+66+22+21+5 flat_symbol_ui=true localization=3 gift=once arrangement=free-scale result_share=removed arrangement_share=preserved mystery_pod=removed")
 	get_tree().quit()
 
 func _test_catalog_and_collection_rarity(game)->void:
@@ -19,7 +19,7 @@ func _test_catalog_and_collection_rarity(game)->void:
 	assert(Localizer.series_name("ja",game._series_entry("base"))=="原種")
 	assert(game._series_species_entries("base").size()==12)
 	assert(not FileAccess.file_exists("res://data/collection-rarity.json"))
-	assert(game.catalog_species.size()==242)
+	assert(game.catalog_species.size()==239)
 	var star_counts:Dictionary={0:0,1:0,2:0,3:0,4:0,5:0}
 	for entry_value in game.catalog_species:
 		assert(entry_value is Dictionary)
@@ -28,7 +28,7 @@ func _test_catalog_and_collection_rarity(game)->void:
 		assert(stars>=0 and stars<=5)
 		assert(int(entry.get("gold_star_count",-1))==stars)
 		star_counts[stars]=int(star_counts.get(stars,0))+1
-	assert(star_counts=={0:64,1:64,2:66,3:22,4:21,5:5})
+	assert(star_counts=={0:63,1:62,2:66,3:22,4:21,5:5})
 	assert(int(game._catalog_entry("colorata").get("star_rating",-1))==0)
 	assert(int(game._catalog_entry("lutea").get("star_rating",-1))==1)
 	# The former spawn-rarity field remains internal story/route data only and is

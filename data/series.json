@@ -178,20 +178,6 @@
     "sort_order": 70
   },
   {
-    "series_id": "neon",
-    "display_name": "ネオン多肉",
-    "subtitle": "闇に浮かぶ秘密の光",
-    "description": "冷たい光を秘める、ひっそりと現れる隠れシリーズです。",
-    "cover_image_path": "",
-    "species_ids": ["neon_cyan_rosette","neon_magenta_spike","neon_lime_cluster"],
-    "field_id": "neon_field",
-    "unlock_type": "future",
-    "catalog_purchase_enabled": false,
-    "unlock_condition": {"display_text": "初GETで自動記録"},
-    "iap_product_id": "",
-    "sort_order": 80
-  },
-  {
     "series_id": "stone",
     "display_name": "ストーン多肉",
     "subtitle": "大地の模様をまとう石肌の多肉",

@@ -810,6 +810,18 @@ const RETIRED_SPECIAL_BASE_SPECIES_IDS := [
 	"yumefuwa_jelly", "peach_jelly_succulent"
 ]
 
+# Tombstones for the removed Neon catalog page. They remain here only so saves
+# created before the page was retired can be loaded and cleaned safely.
+const RETIRED_NEON_SERIES_IDS := ["neon"]
+const RETIRED_NEON_SPECIES_IDS := [
+	"neon_cyan_rosette", "neon_magenta_spike", "neon_lime_cluster"
+]
+const RETIRED_CATALOG_SPECIES_IDS := [
+	"glow_colorata", "metal_laui", "seaglass_veria", "amber_agavoides",
+	"yumefuwa_jelly", "peach_jelly_succulent",
+	"neon_cyan_rosette", "neon_magenta_spike", "neon_lime_cluster"
+]
+
 const MAIN_STORY_ORIGINAL_IDS := [
 	"colorata", "lutea", "hyalina_san_luis_de_la_paz", "purpusorum",
 	"shaviana", "pinwheel", "juliana", "affinis", "laui", "kannte",
@@ -832,3 +844,7 @@ static func is_removed_species(species_id: String) -> bool:
 
 static func is_retired_special_base_species(species_id: String) -> bool:
 	return species_id in RETIRED_SPECIAL_BASE_SPECIES_IDS
+
+
+static func is_retired_catalog_species(species_id: String) -> bool:
+	return species_id in RETIRED_CATALOG_SPECIES_IDS

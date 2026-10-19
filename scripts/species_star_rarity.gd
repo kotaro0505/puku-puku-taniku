@@ -1,9 +1,9 @@
 class_name SpeciesStarRarity
 extends RefCounted
 
-# The 128 non-fusion catalog species are split once, by species ID, into two
-# equal groups.  Keeping the IDs here makes the assignment stable across
-# sessions, save files, catalog sorting, and future data-file reordering.
+# Non-fusion catalog stars are assigned once by species ID. Keeping the IDs
+# here makes the assignment stable across sessions, save files, catalog sorting,
+# data-file reordering, and content retirement without re-ranking other species.
 const NORMAL_ONE_STAR_IDS := {
 	"lutea":true,
 	"purpusorum":true,
@@ -32,8 +32,6 @@ const NORMAL_ONE_STAR_IDS := {
 	"metal_gunmetal_rosette":true,
 	"metal_silver_branch":true,
 	"metal_sage_silver":true,
-	"neon_cyan_rosette":true,
-	"neon_lime_cluster":true,
 	"forest_amber_capsules":true,
 	"forest_amber_moss_orbs":true,
 	"forest_amber_moss_fingers":true,

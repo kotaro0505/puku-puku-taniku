@@ -4,14 +4,15 @@ func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
 	game._reset_progression_state();game.opening_story_complete=true;game.intro_story_complete=true;game.first_colorata_confirmed=true;game.trio_originals_confirmed=true;game.mystery_items_acquired=true;game.mystery_catalog_tutorial_complete=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.habitat_arrival_started=true;game.habitat_awakened=true;game.habitat_awakening_event_complete=true;game.habitat_tutorial_started=true;game.habitat_tutorial_complete=true;game.seed_shop_open=true;game.panda_beacon_unlocked=true;game.panda_beacon_count=1;game.puku_gauge_intro_complete=true
-	assert(game.series_catalog.size()==18)
-	var expected_ids:=["base","metal","jewel","jelly","sweets","gummy","stardust","glow","neon","stone","sea","yumekawa","forest_amber"]
+	assert(game.series_catalog.size()==17)
+	var expected_ids:=["base","metal","jewel","jelly","sweets","gummy","stardust","glow","stone","sea","yumekawa","forest_amber"]
 	for index in range(expected_ids.size()):
 		var series_entry:Dictionary=game.series_catalog[index]
 		assert(str(series_entry.get("series_id",""))==expected_ids[index])
 		for required_key in ["series_id","display_name","subtitle","description","cover_image_path","species_ids","field_id","unlock_type","unlock_condition","iap_product_id","sort_order"]:assert(series_entry.has(required_key))
 	assert(game._series_entry("common").is_empty() and game._series_species_entries("common").is_empty())
-	var base:Dictionary=game._series_entry("base");assert(game._is_series_unlocked(base));assert(str(base.get("display_name",""))=="原種" and game._series_species_entries("base").size()==12 and game.catalog_species.size()==242)
+	var base:Dictionary=game._series_entry("base");assert(game._is_series_unlocked(base));assert(str(base.get("display_name",""))=="原種" and game._series_species_entries("base").size()==12 and game.catalog_species.size()==239)
+	assert(game._series_entry("neon").is_empty() and game._series_species_entries("neon").is_empty())
 	var hybrid:Dictionary=game._series_entry("hybrid");assert(hybrid.species_ids.size()==66 and not game._is_series_unlocked(hybrid) and not game._can_browse_series(hybrid))
 	var fusion_tier1:Dictionary=game._series_entry("fusion_tier1");assert(fusion_tier1.species_ids.size()==22 and not game._is_series_unlocked(fusion_tier1) and not game._can_browse_series(fusion_tier1))
 	var fusion_tier2:Dictionary=game._series_entry("fusion_tier2");assert(fusion_tier2.species_ids.size()==21 and not game._is_series_unlocked(fusion_tier2) and not game._can_browse_series(fusion_tier2) and str(fusion_tier2.get("display_name",""))=="上位特殊配合多肉")
@@ -65,7 +66,6 @@ func _ready()->void:
 		if str(future_id) in ["metal","jewel","jelly","sweets","stone","sea","yumekawa","forest_amber"]:assert(future_entry.species_ids.size()==10 and not game._can_browse_series(future_entry) and bool(future_entry.get("preview_catalog_when_locked",false)))
 		elif str(future_id)=="gummy":assert(future_entry.species_ids.size()==8 and not game._can_browse_series(future_entry) and bool(future_entry.get("preview_catalog_when_locked",false)))
 		elif str(future_id)=="glow":assert(future_entry.species_ids.size()==12 and not game._can_browse_series(future_entry) and bool(future_entry.get("preview_catalog_when_locked",false)))
-		elif str(future_id)=="neon":assert(future_entry.species_ids.size()==3 and game._is_hidden_series("neon") and not game._can_browse_series(future_entry) and not game._catalog_purchase_enabled(future_entry))
 		else:assert(future_entry.species_ids.is_empty())
 	var gummy_ids:Dictionary={}
 	for gummy_entry in game._series_species_entries("gummy"):

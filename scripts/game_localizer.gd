@@ -2175,7 +2175,7 @@ const HIRAGANA_POT_NAMES := {
 const HIRAGANA_SERIES_NAMES := {
 	"base":"げんしゅ", "metal":"きんぞくたにく",
 	"jewel":"ほうせきたにく", "jelly":"ぜりー", "sweets":"すいーつたにく", "gummy":"ぐみたにく",
-	"stardust":"ほしくずたにく", "glow":"ちっこうたにく", "neon":"ねおんたにく",
+	"stardust":"ほしくずたにく", "glow":"ちっこうたにく",
 	"stone":"すとーん", "sea":"うみ", "yumekawa":"ゆめふわ", "forest_amber":"もりと こはく", "jurejure":"じゅれじゅれだんたにく", "hybrid":"はいごうたにく", "fusion_tier1":"とくしゅはいごう", "fusion_tier2":"じょういとくしゅはいごう", "fusion_tier3":"さいじょういとくしゅはいごう"
 }
 

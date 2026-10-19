@@ -10,6 +10,11 @@ const RETIRED_IDS := [
 	"yumefuwa_jelly",
 	"peach_jelly_succulent",
 ]
+const RETIRED_NEON_IDS := [
+	"neon_cyan_rosette",
+	"neon_magenta_spike",
+	"neon_lime_cluster",
+]
 const PROTECTED_IDS := ["transparent_succulent", "golden_laui", "golden_kannte"]
 const RETIRED_IMAGE_PATHS := [
 	"assets/plants/mystery-glow-colorata.png",
@@ -38,15 +43,17 @@ func _ready() -> void:
 	_test_legacy_save_migration(game)
 	_test_export_exclusions_and_source_retention()
 	game._reset_progression_state()
-	print("RETIRED_FEATURES_SMOKE_OK secret_runtime=absent secret_tombstone=progression retired_species=6 legacy_state=sanitized arrangements=preserved pots=preserved protected=3 forest=active exports=web+ios")
+	print("RETIRED_FEATURES_SMOKE_OK secret_runtime=absent secret_tombstone=progression retired_species=9 retired_series=neon legacy_state=sanitized arrangements=preserved pots=preserved protected=3 forest=active exports=web+ios")
 	get_tree().quit()
 
 
 func _test_catalog_and_runtime_retirement(game: Node) -> void:
-	assert(game.catalog_species.size() == 242)
-	for species_id in RETIRED_IDS:
+	assert(game.catalog_species.size() == 239)
+	for species_id in RETIRED_IDS + RETIRED_NEON_IDS:
 		assert(game._catalog_entry(species_id).is_empty())
 		assert(species_id not in game._collection_complete_species_ids())
+	assert(game._series_entry("neon").is_empty())
+	assert(not game._is_normal_series("neon") and not game._is_hidden_series("neon"))
 	for species_id in PROTECTED_IDS:
 		assert(not game._catalog_entry(species_id).is_empty())
 	assert(not game.has_method("_mystery_route_candidates"))
@@ -131,30 +138,45 @@ func _test_legacy_save_migration(game: Node) -> void:
 	}
 	for dictionary_key in ["bests", "discovered", "species_get_counts", "greenhouse_available", "unlocked_species", "forest_gacha_encountered", "hidden_species_acquired", "habitat_returned_species"]:
 		var legacy_dictionary: Dictionary = legacy_payload.get(dictionary_key, {})
-		legacy_dictionary[RETIRED_IDS[0]] = 91.0 if dictionary_key == "bests" else true
+		for retired_species_id in RETIRED_IDS + RETIRED_NEON_IDS:
+			legacy_dictionary[retired_species_id] = 91.0 if dictionary_key == "bests" else true
 		legacy_dictionary["colorata"] = 42.0 if dictionary_key == "bests" else true
 		legacy_payload[dictionary_key] = legacy_dictionary
 	legacy_payload["discovered"]["golden_laui"] = true
 	legacy_payload["species_get_counts"]["golden_laui"] = 2
-	legacy_payload["catalog_cover_species"] = {"neon": RETIRED_IDS[0], "base": "colorata"}
-	legacy_payload["pending_habitat_species"] = [RETIRED_IDS[0], "colorata"]
-	legacy_payload["pending_round_new_species_ids"] = [RETIRED_IDS[1], "lutea"]
+	legacy_payload["catalog_cover_species"] = {"neon": RETIRED_NEON_IDS[0], "base": "colorata"}
+	legacy_payload["pending_habitat_species"] = [RETIRED_IDS[0], RETIRED_NEON_IDS[0], "colorata"]
+	legacy_payload["pending_round_new_species_ids"] = [RETIRED_IDS[1], RETIRED_NEON_IDS[1], "lutea"]
 	legacy_payload["first_tutorial_species_id"] = RETIRED_IDS[2]
 	legacy_payload["habitat_tutorial_species_id"] = RETIRED_IDS[3]
-	legacy_payload["armadillo_gift_species_id"] = RETIRED_IDS[4]
+	legacy_payload["armadillo_gift_series_id"] = "neon"
+	legacy_payload["armadillo_gift_species_id"] = RETIRED_NEON_IDS[2]
+	legacy_payload["unlocked_series"]["neon"] = true
+	legacy_payload["series_seed_inventory"] = {"neon": 4, "gummy": 2}
+	legacy_payload["completed_unlock_conditions"]["neon"] = true
+	legacy_payload["old_catalog_pages"] = 2
+	legacy_payload["old_catalog_page_inventory"] = {"neon": 2}
+	legacy_payload["habitat_old_catalog_page_pending"] = true
+	legacy_payload["habitat_old_catalog_page_series_id"] = "neon"
+	var habitat_now := Time.get_unix_time_from_system()
+	legacy_payload["habitat_wild_plants"] = [
+		_habitat_plant("retired_neon_wild", RETIRED_NEON_IDS[0], habitat_now),
+		_habitat_plant("preserved_colorata_wild", "colorata", habitat_now),
+	]
+	legacy_payload["habitat_wild_initialized"] = true
 	legacy_payload["owned_pots"] = {"shallow_terracotta": 3}
 	legacy_payload["saved_arrangements"] = [
 		{
 			"arrangement_id": "legacy_mixed",
 			"name": "mixed",
 			"pot_id": "shallow_terracotta",
-			"plants": [_plant(RETIRED_IDS[0], 100.0), _plant("colorata", 200.0)],
+			"plants": [_plant(RETIRED_IDS[0], 100.0), _plant(RETIRED_NEON_IDS[0], 150.0), _plant("colorata", 200.0)],
 		},
 		{
 			"arrangement_id": "legacy_retired_only",
 			"name": "empty-safe",
 			"pot_id": "shallow_terracotta",
-			"plants": [_plant(RETIRED_IDS[5], 300.0)],
+			"plants": [_plant(RETIRED_NEON_IDS[2], 300.0)],
 		},
 	]
 	var file := FileAccess.open(save_path, FileAccess.WRITE)
@@ -165,7 +187,7 @@ func _test_legacy_save_migration(game: Node) -> void:
 	game._load_save()
 	assert(game.retired_content_migration_dirty)
 	assert(game.puku_balance_units == 777)
-	for species_id in RETIRED_IDS:
+	for species_id in RETIRED_IDS + RETIRED_NEON_IDS:
 		for state_dictionary in [game.bests, game.discovered, game.species_get_counts, game.greenhouse_available, game.unlocked_species, game.forest_gacha_encountered, game.hidden_species_acquired, game.habitat_returned_species]:
 			assert(not state_dictionary.has(species_id))
 	assert(bool(game.discovered.get("colorata", false)))
@@ -174,11 +196,18 @@ func _test_legacy_save_migration(game: Node) -> void:
 	assert(game.mystery_items_acquired and game.mystery_catalog_tutorial_complete)
 	assert(str(game.catalog_cover_species.get("base", "")) == "colorata")
 	assert(not game.catalog_cover_species.has("neon"))
+	assert(not game.unlocked_series.has("neon"))
+	assert(not game.series_seed_inventory.has("neon") and int(game.series_seed_inventory.get("gummy",0))==2)
+	assert(not game.completed_unlock_conditions.has("neon"))
+	assert(game.old_catalog_pages==0 and not game.old_catalog_page_inventory.has("neon"))
+	assert(not game.habitat_old_catalog_page_pending and game.habitat_old_catalog_page_series_id.is_empty())
+	assert(game.habitat_wild_plants.size()==1 and str(game.habitat_wild_plants[0].get("species_id",""))=="colorata")
 	assert(game.pending_habitat_species == ["colorata"])
 	assert(game.pending_round_new_species_ids == ["lutea"])
 	assert(game.first_tutorial_species_id.is_empty())
 	assert(game.habitat_tutorial_species_id.is_empty())
 	assert(game.armadillo_gift_species_id.is_empty())
+	assert(game.armadillo_gift_series_id.is_empty())
 	assert(game.saved_arrangements.size() == 2)
 	assert(str(game.saved_arrangements[0].get("pot_id", "")) == "shallow_terracotta")
 	assert(game.saved_arrangements[0].get("plants", []).size() == 1)
@@ -196,6 +225,16 @@ func _test_legacy_save_migration(game: Node) -> void:
 	assert(int(migrated_payload.get("retired_content_version", 0)) == game.RETIRED_CONTENT_VERSION)
 	for retired_key in ["secret_gacha_active", "secret_gacha_draws_remaining", "secret_gacha_last_roll_play_count", "mystery_route_assignments", "mystery_route_completed", "mystery_route_dialog_seen", "habitat_mystery_seeds_pending", "mystery_seed_count", "armadillo_research_total", "armadillo_research_rewards", "armadillo_research_intro_seen", "research_catalog_reward_pending", "mystery_seed_bags", "mystery_seed_pack_unlocked", "habitat_seed_date", "habitat_seeds_collected"]:
 		assert(not migrated_payload.has(retired_key))
+	for retired_species_id in RETIRED_IDS + RETIRED_NEON_IDS:
+		for dictionary_key in ["bests", "discovered", "species_get_counts", "greenhouse_available", "unlocked_species", "forest_gacha_encountered", "hidden_species_acquired", "habitat_returned_species"]:
+			assert(not (migrated_payload.get(dictionary_key,{}) as Dictionary).has(retired_species_id))
+	assert(not (migrated_payload.get("unlocked_series",{}) as Dictionary).has("neon"))
+	assert(not (migrated_payload.get("series_seed_inventory",{}) as Dictionary).has("neon"))
+	assert(not (migrated_payload.get("old_catalog_page_inventory",{}) as Dictionary).has("neon"))
+	assert(not bool(migrated_payload.get("habitat_old_catalog_page_pending",false)))
+	assert(str(migrated_payload.get("habitat_old_catalog_page_series_id","")).is_empty())
+	for habitat_plant_value in migrated_payload.get("habitat_wild_plants",[]):
+		assert(str(habitat_plant_value.get("species_id",""))!="neon_cyan_rosette")
 	assert(bool(migrated_payload.get("mystery_items_acquired", false)) and bool(migrated_payload.get("mystery_catalog_tutorial_complete", false)))
 	var migrated_story: Dictionary = migrated_payload.get("story_progression_state", {})
 	assert(not migrated_story.has("secret_gacha_unlocked"))
@@ -222,3 +261,16 @@ func _test_export_exclusions_and_source_retention() -> void:
 
 func _plant(species_id: String, x: float) -> Dictionary:
 	return {"species_id": species_id, "x": x, "y": 250.0, "scale": 1.0, "rotation": 0.0, "z_index": 0}
+
+
+func _habitat_plant(individual_id:String,species_id:String,now_unix:float)->Dictionary:
+	return {
+		"individual_id":individual_id,"species_id":species_id,"diameter_cm":12.0,
+		"growth_state":"growing","jellied":false,"jellied_unix":0.0,
+		"jelly_immune":false,"jelly_elapsed_seconds":0.0,"jelly_hazard_accumulated":0.0,
+		"jelly_threshold":999999.0,"jelly_risk_curve":1.0,"mature_diameter_cm":30.0,
+		"jelly_eligible_since_unix":0.0,"tutorial":false,"base_growth_rate":1.0,
+		"spawned_unix":now_unix,"last_updated_unix":now_unix,
+		"habitat_timing_version":3,"panorama_x":300.0,"panorama_y":410.0,
+		"position_validated":true,
+	}

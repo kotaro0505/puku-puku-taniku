@@ -14,12 +14,12 @@ func _ready()->void:
 	await _test_get_card_star_layout(game)
 	_test_battle_bonus(game)
 	game.queue_free();await get_tree().process_frame
-	print("SPECIES_RARITY_SMOKE_OK assignment=64+64+66+22+21+5 catalog=list+detail get_card=flat_gold battle=L1:5+1+0.3,L2:10+3+1,L3:15+6+2 main_phase_odds=70/30/0,50/50/0,40/30/30 five_star=fusion_only")
+	print("SPECIES_RARITY_SMOKE_OK assignment=63+62+66+22+21+5 catalog=list+detail get_card=flat_gold battle=L1:5+1+0.3,L2:10+3+1,L3:15+6+2 main_phase_odds=70/30/0,50/50/0,40/30/30 five_star=fusion_only")
 	get_tree().quit()
 
 func _test_complete_assignment(game:Node)->void:
-	assert(game.catalog_species.size()==242)
-	assert(SpeciesStarRarityClass.NORMAL_ONE_STAR_IDS.size()==64)
+	assert(game.catalog_species.size()==239)
+	assert(SpeciesStarRarityClass.NORMAL_ONE_STAR_IDS.size()==62)
 	var counts:Dictionary={0:0,1:0,2:0,3:0,4:0,5:0};var ids:Dictionary={}
 	for entry_value in game.catalog_species:
 		assert(entry_value is Dictionary)
@@ -28,7 +28,7 @@ func _test_complete_assignment(game:Node)->void:
 		assert(int(entry.get("star_rating",-1))==stars and int(entry.get("gold_star_count",-1))==stars)
 		counts[stars]=int(counts.get(stars,0))+1
 		if stars==5:assert(str(entry.get("series_id",""))=="fusion_tier3")
-	assert(counts=={0:64,1:64,2:66,3:22,4:21,5:5})
+	assert(counts=={0:63,1:62,2:66,3:22,4:21,5:5})
 
 func _test_catalog_star_layout(game:Node)->void:
 	var entries:Array[Dictionary]=game._series_species_entries("fusion_tier3")

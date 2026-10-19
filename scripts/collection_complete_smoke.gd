@@ -3,7 +3,7 @@ extends Node
 const Localizer = preload("res://scripts/game_localizer.gd")
 const StoryDevPresetsClass = preload("res://scripts/story_dev_presets.gd")
 
-const TARGET_COUNT := 239
+const TARGET_COUNT := 236
 const FINAL_SPECIES_ID := "hyb_jelly_jelly"
 const FUSION_PARENT_ID := "jelly_grape"
 const ROUTE_SAMPLES := [
@@ -26,7 +26,7 @@ func _ready() -> void:
 	await _test_unseen_presentation_recovery(game)
 	# Leave the shared smoke-test save small and neutral for the following scene.
 	game._reset_progression_state()
-	print("COLLECTION_COMPLETE_SMOKE_OK target=239 unique=true get_card_first=true hidden_prep=true silhouette=true complete_overlay=true localized=true save_history=true unseen_resume=true fusion_return=true")
+	print("COLLECTION_COMPLETE_SMOKE_OK catalog=239 target=236 unique=true get_card_first=true hidden_prep=true silhouette=true complete_overlay=true localized=true save_history=true unseen_resume=true fusion_return=true")
 	get_tree().quit()
 
 
@@ -41,10 +41,11 @@ func _test_target_definition(game) -> void:
 		assert(unique_ids.has(required_id))
 	# Active hidden species remain outside the page denominator. Retired special
 	# species must likewise never leak back into a completion target.
-	for unlisted_id in ["golden_laui", "golden_kannte", "transparent_succulent", "glow_colorata", "metal_laui", "seaglass_veria", "amber_agavoides", "yumefuwa_jelly", "peach_jelly_succulent"]:
+	for unlisted_id in ["golden_laui", "golden_kannte", "transparent_succulent", "glow_colorata", "metal_laui", "seaglass_veria", "amber_agavoides", "yumefuwa_jelly", "peach_jelly_succulent", "neon_cyan_rosette", "neon_magenta_spike", "neon_lime_cluster"]:
 		assert(not unique_ids.has(unlisted_id))
-	for retired_id in ["glow_colorata", "metal_laui", "seaglass_veria", "amber_agavoides", "yumefuwa_jelly", "peach_jelly_succulent"]:
+	for retired_id in ["glow_colorata", "metal_laui", "seaglass_veria", "amber_agavoides", "yumefuwa_jelly", "peach_jelly_succulent", "neon_cyan_rosette", "neon_magenta_spike", "neon_lime_cluster"]:
 		assert(game._catalog_entry(retired_id).is_empty())
+	assert(game._series_entry("neon").is_empty())
 	assert(Localizer.text("ja", "collection_complete_title") == "図鑑 COMPLETE！")
 	assert(Localizer.text("ja", "collection_complete_message") == "すべての多肉植物を見つけました！")
 	assert(Localizer.text("hiragana", "collection_complete_title") == "ずかん COMPLETE！")

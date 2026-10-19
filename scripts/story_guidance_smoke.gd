@@ -563,6 +563,13 @@ func _test_round_completion_before_new_cards(game: Node) -> void:
 	while game.species_get_overlay.visible:
 		await get_tree().process_frame
 	await get_tree().process_frame
+	# Lutea's one-time first-GET story now owns the interval between its card and
+	# the next queued card. Verify that ordering without skipping the story.
+	if game.scripted_dialog_kind=="lutea_first_get":
+		while not game.scripted_dialog_kind.is_empty():
+			game._advance_scripted_dialog()
+			await get_tree().process_frame
+		await get_tree().process_frame
 	assert(game._species_get_count("shaviana") == 1 and bool(game.discovered.get("shaviana", false)))
 	assert("shaviana" not in game.pending_round_new_species_ids)
 	assert(game.species_get_overlay.visible and game.species_get_active_context == "round_result_new")
