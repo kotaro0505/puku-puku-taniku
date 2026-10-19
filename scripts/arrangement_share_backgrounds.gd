@@ -9,12 +9,14 @@ const DEFAULT_ID := "greenhouse"
 const CATALOG := [
 	{
 		"id": "greenhouse",
-		"texture_path": "res://assets/arrangement/greenhouse-arrangement-area.jpg",
+		# Match the live arrangement area: the same greenhouse master image,
+		# focused on the table center used by main.gd.
+		"texture_path": "res://assets/greenhouse-master-horizontal.png",
 		"name_key": "share_background_greenhouse",
 		"unlock_condition": "always",
 		"unlock_text_key": "share_background_available_from_start",
 		"crop_mode": "cover",
-		"focus": Vector2(0.47, 0.70),
+		"focus": Vector2(340.0 / 1448.0, 760.0 / 1086.0),
 		"artwork_rect": Rect2(0.05, 0.38, 0.90, 0.60),
 	},
 	{

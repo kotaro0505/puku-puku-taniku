@@ -101,13 +101,25 @@ func _ready() -> void:
 	var vertical_layout := ShareRenderer.background_layout(vertical_texture.get_size(), Vector2(0.5, 0.5))
 	assert((vertical_layout.position as Vector2).is_zero_approx() and (vertical_layout.scaled_size as Vector2).is_equal_approx(Vector2(1080.0, 1920.0)))
 	var greenhouse_entry := ShareBackgrounds.entry("greenhouse")
-	assert(str(greenhouse_entry.texture_path) == "res://assets/arrangement/greenhouse-arrangement-area.jpg")
-	assert(str(greenhouse_entry.texture_path) != "res://assets/greenhouse-master-horizontal.png")
+	assert(str(greenhouse_entry.texture_path) == game.GREENHOUSE_MASTER_PATH)
+	assert((greenhouse_entry.focus as Vector2).is_equal_approx(game.ARRANGEMENT_TABLE_SOURCE_CENTER / game.GREENHOUSE_MASTER_SOURCE_SIZE))
 	var greenhouse_texture := load(str(greenhouse_entry.texture_path)) as Texture2D
-	assert(greenhouse_texture.get_size() == Vector2(960.0, 1280.0))
+	assert(greenhouse_texture.get_size() == game.GREENHOUSE_MASTER_SOURCE_SIZE)
 	var greenhouse_layout := ShareRenderer.background_layout(greenhouse_texture.get_size(), greenhouse_entry.focus)
 	assert(float(greenhouse_layout.scale) > 0.0 and (greenhouse_layout.scaled_size as Vector2).x >= 1080.0 and (greenhouse_layout.scaled_size as Vector2).y >= 1920.0)
 	assert((greenhouse_layout.crop_origin as Vector2).x >= 0.0 and (greenhouse_layout.crop_origin as Vector2).x <= (greenhouse_layout.scaled_size as Vector2).x - 1080.0)
+	# At the 576x1024 game reference size, the live arrangement scene and the
+	# 1080x1920 share output have the same aspect ratio. Their source crop must
+	# therefore be identical, not merely use the same texture.
+	var reference_viewport := Vector2(576.0, 1024.0)
+	var live_scale: float = reference_viewport.y / game.GREENHOUSE_MASTER_SOURCE_SIZE.y
+	var live_position_x: float = reference_viewport.x * game.ARRANGEMENT_TABLE_SCREEN_TARGET_RATIO.x - game.ARRANGEMENT_TABLE_SOURCE_CENTER.x * live_scale
+	var live_source_origin := Vector2(-live_position_x / live_scale, 0.0)
+	var live_source_size := reference_viewport / live_scale
+	var share_source_origin: Vector2 = (greenhouse_layout.crop_origin as Vector2) / float(greenhouse_layout.scale)
+	var share_source_size := Vector2(ShareRenderer.OUTPUT_SIZE) / float(greenhouse_layout.scale)
+	assert(share_source_origin.distance_to(live_source_origin) < 0.001)
+	assert(share_source_size.distance_to(live_source_size) < 0.001)
 	var default_snapshot := arrangement.duplicate(true)
 	default_snapshot["viewer_transform"] = {"x": 0.0, "y": 0.0, "scale": 1.0}
 	var default_path := "%s/greenhouse-default-transform.png" % output_directory
