@@ -108,7 +108,7 @@ func _ready() -> void:
 	await _test_tier3_game_flow(game)
 	game._reset_progression_state()
 	game.queue_free()
-	print("FUSION_SYSTEM_SMOKE_OK hybrid_lab_name=true attached_background=720x1280 result_heading_removed=true instruction_cards_separated=true symmetric_margins=true top_close_removed=true main_back=close picker_back=main processing_exit_guard=true energy_speed_unchanged=true energy_emission_3x=true fusion_series=11 basic_species=66 basic_recipes=66 tier1_species=22 tier1_special=22 tier2_species=21 tier2_exact=16 tier2_terminal=10 tier2_series=5 tier3_species=5 tier3_exact=5 cost_schedule=1/3/7/12 total_cost=339 transparent_images=114 jelly_catalog=24 picker_touch_contract=true unordered=true originals=fallback exact_then_series_special=priority advanced_series_fallback=true all_eligible_pairs=defined preview_name=GET_history_all_114 preview_resolution_independent=true parents=GET_only terminal_results=true cost=atomic silhouette=species_specific double_submit=blocked known_result=disabled return_after_GET=lab seeds=after_GET languages=3")
+	print("FUSION_SYSTEM_SMOKE_OK hybrid_lab_name=true attached_background=720x1280 result_heading_removed=true instruction_cards_separated=true symmetric_margins=true top_close_removed=true main_back=close picker_back=main processing_exit_guard=true energy_speed_unchanged=true energy_emission_3x=true fusion_series=11 basic_species=66 basic_recipes=66 tier1_species=22 tier1_special=22 tier2_species=21 tier2_exact=16 tier2_terminal=10 tier2_series=5 tier3_species=5 tier3_exact=5 cost_schedule=1/3/7/12 total_cost=339 transparent_images=114 jelly_catalog=24 picker_touch_contract=true unordered=true originals=fallback exact_then_series_special=priority advanced_series_fallback=true all_eligible_pairs=defined preview_name=unobtained_visible_82_hidden_32+GET_history_all_114 preview_resolution_independent=true parents=GET_only terminal_results=true cost=atomic silhouette=species_specific double_submit=blocked known_result=disabled return_after_GET=lab seeds=after_GET languages=3")
 	get_tree().quit()
 
 func _test_hybrid_lab_presentation(game) -> void:
@@ -266,12 +266,24 @@ func _test_fusion_cost_schedule(game) -> void:
 	assert(total_cost == 339)
 
 func _test_preview_name_rules(game) -> void:
+	var hidden_tier1_ids := {
+		"fus1_jelly_bomb": true,
+		"fus1_pukupuku_planet": true,
+		"fus1_kaleidoscope": true,
+		"fus1_deep_sea_aquarium": true,
+		"fus1_amber_forest": true,
+		"fus1_fruit_terrine": true,
+	}
 	var result_series_counts := {
 		"hybrid": 0,
 		"fusion_tier1": 0,
 		"fusion_tier2": 0,
 		"fusion_tier3": 0,
 	}
+	var unobtained_visible_count := 0
+	var unobtained_hidden_count := 0
+	var obtained_visible_count := 0
+	var observed_hidden_tier1_ids := {}
 	for entry_value in game.catalog_species:
 		if not entry_value is Dictionary:
 			continue
@@ -282,39 +294,55 @@ func _test_preview_name_rules(game) -> void:
 		var species_id := str(entry.get("species_id", ""))
 		assert(not species_id.is_empty())
 		result_series_counts[series_id] = int(result_series_counts[series_id]) + 1
-		assert(_preview_name_hidden(entry, {}))
+		var expected_hidden_while_unobtained := series_id in ["fusion_tier2", "fusion_tier3"] or (series_id == "fusion_tier1" and hidden_tier1_ids.has(species_id))
+		assert(_preview_name_hidden(entry, {}) == expected_hidden_while_unobtained)
+		if expected_hidden_while_unobtained:
+			unobtained_hidden_count += 1
+			if series_id == "fusion_tier1":
+				observed_hidden_tier1_ids[species_id] = true
+		else:
+			unobtained_visible_count += 1
 		var obtained_history: Dictionary = {}
 		obtained_history[species_id] = 1
 		assert(not _preview_name_hidden(entry, obtained_history))
+		obtained_visible_count += 1
 		obtained_history[species_id] = 0
-		assert(_preview_name_hidden(entry, obtained_history))
+		assert(_preview_name_hidden(entry, obtained_history) == expected_hidden_while_unobtained)
 	assert(result_series_counts == {"hybrid": 66, "fusion_tier1": 22, "fusion_tier2": 21, "fusion_tier3": 5})
+	assert(observed_hidden_tier1_ids == hidden_tier1_ids)
+	assert(unobtained_visible_count == 82 and unobtained_hidden_count == 32)
+	assert(obtained_visible_count == 114)
 
 	var ui = game.fusion_lab_ui
 	var original_get_counts: Dictionary = ui.get_counts.duplicate(true)
 	var stage_samples := [
-		["gummy_peach_milk", "metal_silver_rosette", "hyb_gummy_metal"],
-		["hyb_gummy_jelly", "hyb_gummy_gummy", "fus1_jelly_bomb"],
-		["fus1_rainbow_bubble", "fus1_moon_clock", "fus2_moonbow"],
-		["fus2_sunset_stone", "colorata", "fus3_heart_of_magma"],
+		["gummy_peach_milk", "metal_silver_rosette", "hyb_gummy_metal", false],
+		["hyb_gummy_jelly", "hyb_gummy_gummy", "fus1_jelly_bomb", true],
+		["hyb_gummy_sea", "hyb_glow_jewel", "fus1_rainbow_bubble", false],
+		["fus1_rainbow_bubble", "fus1_moon_clock", "fus2_moonbow", true],
+		["fus2_sunset_stone", "colorata", "fus3_heart_of_magma", true],
 	]
 	for sample_value in stage_samples:
 		var sample: Array = sample_value
 		var parent_a_id := str(sample[0])
 		var parent_b_id := str(sample[1])
 		var result_species_id := str(sample[2])
+		var expected_hidden_while_unobtained := bool(sample[3])
 		var resolution: Dictionary = game.fusion_system.resolve(parent_a_id, parent_b_id)
 		var result_entry: Dictionary = resolution.get("result_entry", {})
 		assert(str(resolution.get("result_species_id", "")) == result_species_id and not result_entry.is_empty())
 		ui.get_counts.erase(result_species_id)
 		ui.refresh_selection(parent_a_id, parent_b_id, resolution, true)
 		assert(not ui.fuse_button.disabled)
+		assert(ui.result_image.material == ui.silhouette_material)
 		for locale in ["ja", "hiragana", "en"]:
 			ui.set_language(locale)
-			assert(ui.result_name_label.text == Localizer.text(locale, "fusion_result_unknown"))
+			var expected_preview_name := Localizer.text(locale, "fusion_result_unknown") if expected_hidden_while_unobtained else Localizer.species_name(locale, result_entry)
+			assert(ui.result_name_label.text == expected_preview_name)
 		ui.get_counts[result_species_id] = 1
 		ui.refresh_selection(parent_a_id, parent_b_id, resolution, false)
 		assert(ui.fuse_button.disabled)
+		assert(ui.result_image.material == null)
 		for locale in ["ja", "hiragana", "en"]:
 			ui.set_language(locale)
 			assert(ui.result_name_label.text == Localizer.species_name(locale, result_entry))
@@ -697,7 +725,7 @@ func _test_game_flow(game) -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	assert(str(game.fusion_lab_ui.current_result.get("result_species_id", "")) == hybrid_id)
-	assert(game.fusion_lab_ui.result_name_label.text == Localizer.text("ja", "fusion_result_unknown"))
+	assert(game.fusion_lab_ui.result_name_label.text == Localizer.species_name("ja", game._catalog_entry(hybrid_id)))
 	assert(game.fusion_lab_ui.result_image.texture != null)
 	assert(game.fusion_lab_ui.result_image.material == game.fusion_lab_ui.silhouette_material)
 	assert(str(game.fusion_lab_ui.result_image.get_meta("catalog_loaded_path", "")) == str(game._catalog_entry(hybrid_id).get("image_path", "")))
@@ -929,7 +957,7 @@ func _test_tier1_game_flow(game) -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	assert(str(game.fusion_lab_ui.current_result.get("result_species_id", "")) == result_id)
-	assert(game.fusion_lab_ui.result_name_label.text == Localizer.text("ja", "fusion_result_unknown"))
+	assert(game.fusion_lab_ui.result_name_label.text == Localizer.species_name("ja", game._catalog_entry(result_id)))
 	assert(game.fusion_lab_ui.fusion_cost_label.text == "3ぷくコイン")
 	assert(game.fusion_lab_ui.result_image.texture != null)
 	assert(game.fusion_lab_ui.result_image.material == game.fusion_lab_ui.silhouette_material)

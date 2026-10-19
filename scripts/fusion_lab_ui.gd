@@ -17,6 +17,14 @@ const ENERGY_PARTICLES_PER_WAVE := 8
 const ENERGY_PARTICLE_TRAVEL_SECONDS := 0.42
 const ENERGY_PARTICLE_FADE_SECONDS := 0.18
 const ENERGY_PARTICLE_STAGGER_SECONDS := 0.035
+const HIDDEN_WHILE_UNOBTAINED_TIER1_PREVIEW_IDS := {
+	"fus1_jelly_bomb": true,
+	"fus1_pukupuku_planet": true,
+	"fus1_kaleidoscope": true,
+	"fus1_deep_sea_aquarium": true,
+	"fus1_amber_forest": true,
+	"fus1_fruit_terrine": true,
+}
 const SERIES_LABELS := {
 	"ja": {
 		"base": "原種", "jurejure": "ジュレジュレ団多肉",
@@ -447,7 +455,14 @@ func refresh_selection(parent_a_id: String, parent_b_id: String, result: Diction
 
 static func should_hide_result_name_in_preview(result_entry: Dictionary, species_get_history: Dictionary) -> bool:
 	var species_id := str(result_entry.get("species_id", ""))
-	return species_id.is_empty() or int(species_get_history.get(species_id, 0)) <= 0
+	if species_id.is_empty():
+		return true
+	if int(species_get_history.get(species_id, 0)) > 0:
+		return false
+	var fusion_tier := int(result_entry.get("fusion_tier", 0))
+	if fusion_tier >= 2:
+		return true
+	return fusion_tier == 1 and HIDDEN_WHILE_UNOBTAINED_TIER1_PREVIEW_IDS.has(species_id)
 
 func set_result_texture(texture: Texture2D) -> void:
 	if result_image:
