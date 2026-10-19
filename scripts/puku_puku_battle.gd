@@ -259,14 +259,15 @@ func _build_opening_dialogue() -> void:
 	opening_trio_portraits.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	opening_portrait_slot.add_child(opening_trio_portraits)
 	for trio_entry in [
-		{"speaker": "skunk", "x": 0.0},
-		{"speaker": "mouse", "x": 70.0},
-		{"speaker": "peccary", "x": 140.0}
+		{"speaker": "skunk", "x": 0.0, "z": 0},
+		{"speaker": "mouse", "x": 55.0, "z": 1},
+		{"speaker": "peccary", "x": 110.0, "z": 0}
 	]:
 		var trio_portrait := TextureRect.new()
 		trio_portrait.name = "Trio%s" % str(trio_entry.speaker).capitalize()
 		trio_portrait.position = Vector2(float(trio_entry.x), 42.0)
-		trio_portrait.size = Vector2(70, 150)
+		trio_portrait.size = Vector2(100, 150)
+		trio_portrait.z_index = int(trio_entry.z)
 		trio_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		trio_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		trio_portrait.texture = _jurejure_portrait_texture(str(trio_entry.speaker))

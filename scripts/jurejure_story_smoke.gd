@@ -904,9 +904,14 @@ func _test_post_ending_strongest_battle_entry(game: Node) -> void:
 	assert(game.puku_puku_battle.opening_trio_portraits.visible and not game.puku_puku_battle.opening_portrait.visible)
 	assert(game.puku_puku_battle.opening_trio_portraits.get_child_count() == 3)
 	assert(game.puku_puku_battle.opening_speaker_label.text == Localizer.text("ja", "jurejure_gang_name"))
-	for portrait_value in game.puku_puku_battle.opening_trio_portraits.get_children():
-		var portrait := portrait_value as TextureRect
-		assert(portrait != null and portrait.visible and portrait.texture != null)
+	assert(game.puku_puku_battle.opening_speaker_label.text == "ジュレジュレ団")
+	var skunk := game.puku_puku_battle.opening_trio_portraits.get_node("TrioSkunk") as TextureRect
+	var mouse := game.puku_puku_battle.opening_trio_portraits.get_node("TrioMouse") as TextureRect
+	var peccary := game.puku_puku_battle.opening_trio_portraits.get_node("TrioPeccary") as TextureRect
+	assert(skunk != null and skunk.texture != null and skunk.position.x < mouse.position.x)
+	assert(mouse != null and mouse.texture != null and mouse.position.x < peccary.position.x)
+	assert(peccary != null and peccary.texture != null)
+	assert(mouse.z_index > skunk.z_index and mouse.z_index > peccary.z_index)
 	game.puku_puku_battle._process(20.0)
 	assert(game.puku_puku_battle.units.is_empty() and game.puku_puku_battle.battle_phase == "opening_dialogue")
 	game.puku_puku_battle._close_opening_dialogue()

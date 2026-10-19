@@ -392,20 +392,13 @@ func _verify_difficulty_opening_dialogue(texture: Texture2D) -> void:
 	await get_tree().process_frame
 	assert(probe.battle_phase == "opening_dialogue" and probe.opening_trio_portraits.visible and not probe.opening_portrait.visible)
 	assert(probe.opening_speaker_label.text == Localizer.text("ja", "jurejure_gang_name"))
-	assert(probe.opening_speaker_label.text == "ジュレジュレ団（3人）")
+	assert(probe.opening_speaker_label.text == "ジュレジュレ団")
 	assert(probe.opening_speaker_label.get_theme_font_size("font_size") == 15)
-	assert(probe.opening_trio_portraits.get_child_count() == 3)
+	_assert_jurejure_trio_layout(probe)
 	var panel_rect := probe.opening_dialogue_panel.get_global_rect()
 	assert(panel_rect.size == EXPECTED_DIALOGUE_PANEL_SIZE)
 	assert(panel_rect.encloses(probe.opening_dialogue_label.get_global_rect()))
 	assert(panel_rect.encloses(probe.opening_continue_button.get_global_rect()))
-	for first_index in range(3):
-		var first := probe.opening_trio_portraits.get_child(first_index) as TextureRect
-		assert(first.texture != null)
-		assert(Rect2(Vector2.ZERO, probe.opening_portrait_slot.custom_minimum_size).encloses(Rect2(first.position, first.size)))
-		for second_index in range(first_index):
-			var second := probe.opening_trio_portraits.get_child(second_index) as TextureRect
-			assert(not Rect2(first.position, first.size).intersects(Rect2(second.position, second.size)))
 	probe._close_opening_dialogue()
 	# Drive real opening UI creation repeatedly until every level-2 and level-3
 	# line has appeared. This verifies all six text/portrait combinations rather
@@ -426,10 +419,7 @@ func _verify_difficulty_opening_dialogue(texture: Texture2D) -> void:
 				assert(portrait_texture.atlas.resource_path.ends_with("/%s.png" % str(dialogue_data.get("speaker", ""))))
 			else:
 				assert(not probe.opening_portrait.visible and probe.opening_trio_portraits.visible)
-				assert(probe.opening_trio_portraits.get_child_count() == 3)
-				for trio_portrait_value in probe.opening_trio_portraits.get_children():
-					var trio_portrait := trio_portrait_value as TextureRect
-					assert(trio_portrait != null and trio_portrait.visible and trio_portrait.texture != null)
+				_assert_jurejure_trio_layout(probe)
 			probe._process(20.0)
 			assert(probe.units.is_empty() and probe.battle_phase == "opening_dialogue")
 			seen_indices[dialogue_index] = true
@@ -445,6 +435,34 @@ func _verify_difficulty_opening_dialogue(texture: Texture2D) -> void:
 	assert(probe.battle_phase == "awaiting_sow" and not probe.opening_dialogue_layer.visible and probe.sow_button.visible)
 	probe.queue_free()
 	await get_tree().process_frame
+
+
+func _assert_jurejure_trio_layout(probe: Node) -> void:
+	assert(probe.opening_trio_portraits.get_child_count() == 3)
+	var expected := {
+		"TrioSkunk": {"position": Vector2(0, 42), "z": 0, "asset": "/skunk.png"},
+		"TrioMouse": {"position": Vector2(55, 42), "z": 1, "asset": "/mouse.png"},
+		"TrioPeccary": {"position": Vector2(110, 42), "z": 0, "asset": "/peccary.png"}
+	}
+	var slot_rect := Rect2(Vector2.ZERO, probe.opening_portrait_slot.custom_minimum_size)
+	for portrait_name in expected:
+		var portrait := probe.opening_trio_portraits.get_node(portrait_name) as TextureRect
+		assert(portrait != null and portrait.visible)
+		assert(portrait.position == expected[portrait_name].position)
+		assert(portrait.size == Vector2(100, 150))
+		assert(portrait.z_index == int(expected[portrait_name].z))
+		assert(portrait.stretch_mode == TextureRect.STRETCH_KEEP_ASPECT_CENTERED)
+		assert(slot_rect.encloses(Rect2(portrait.position, portrait.size)))
+		var portrait_texture := portrait.texture as AtlasTexture
+		assert(portrait_texture != null and portrait_texture.atlas != null)
+		assert(portrait_texture.atlas.resource_path.ends_with(str(expected[portrait_name].asset)))
+	var skunk := probe.opening_trio_portraits.get_node("TrioSkunk") as TextureRect
+	var mouse := probe.opening_trio_portraits.get_node("TrioMouse") as TextureRect
+	var peccary := probe.opening_trio_portraits.get_node("TrioPeccary") as TextureRect
+	assert(skunk.position.x < mouse.position.x and mouse.position.x < peccary.position.x)
+	assert(Rect2(skunk.position, skunk.size).intersects(Rect2(mouse.position, mouse.size)))
+	assert(Rect2(mouse.position, mouse.size).intersects(Rect2(peccary.position, peccary.size)))
+	assert(mouse.z_index > skunk.z_index and mouse.z_index > peccary.z_index)
 
 
 func _verify_difficulty_and_dialogue_distributions() -> void:
@@ -480,6 +498,9 @@ func _verify_difficulty_and_dialogue_distributions() -> void:
 	for count in dialogue_counts:
 		_assert_ratio(count, DISTRIBUTION_SAMPLE_COUNT, 1.0 / 3.0, 0.004)
 	assert(Localizer.text("ja", "jurejure_battle_strongest_trio_1") == "ジュレジュレ団は、\n永久に不滅チュー！")
+	assert(Localizer.text("ja", "jurejure_gang_name") == "ジュレジュレ団")
+	assert(Localizer.text("hiragana", "jurejure_gang_name") == "じゅれじゅれだん")
+	assert(Localizer.text("en", "jurejure_gang_name") == "JureJure Gang")
 	for difficulty in [BattleClass.DIFFICULTY_STRONG, BattleClass.DIFFICULTY_STRONGEST]:
 		for dialogue_index in range(3):
 			var data := BattleClass.opening_dialogue_data(difficulty, dialogue_index)
