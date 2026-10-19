@@ -1,7 +1,7 @@
 extends Node
 
 const Localizer = preload("res://scripts/game_localizer.gd")
-const FIRST_NEW_ID := "lutea"
+const FIRST_NEW_ID := "purpusorum"
 const SECOND_NEW_ID := "laui"
 
 

@@ -67,6 +67,7 @@ const FIRST_OLD_SEED_STAGE_CONFIRMED := "confirmed"
 const PANDA_STORY_SPECIES_ID := "affinis"
 const ARMADILLO_STORY_SPECIES_ID := "shaviana"
 const CARNICOLOR_FIRST_GET_SPECIES_ID := "juliana"
+const LUTEA_FIRST_GET_SPECIES_ID := "lutea"
 const FOREST_GACHA_SPIN_COST := 3
 const TRIAL_DEV_GACHA_WALLET := 9999
 const LEGACY_COMBINED_GAUGE_TARGET_CM := 600.0
@@ -277,6 +278,8 @@ var first_old_seed_stage := FIRST_OLD_SEED_STAGE_NOT_RECEIVED
 var trio_originals_confirmed := false
 var carnicolor_first_get_dialog_seen := false
 var carnicolor_first_get_dialog_pending := false
+var lutea_first_get_dialog_seen := false
+var lutea_first_get_dialog_pending := false
 var habitat_arrival_started := false
 var habitat_awakened := false
 var habitat_awakening_event_complete := false
@@ -589,6 +592,8 @@ var species_get_active_series_id:=""
 var species_get_active_species_id:=""
 var carnicolor_first_get_resume_context:=""
 var carnicolor_first_get_resume_series_id:=""
+var lutea_first_get_resume_context:=""
+var lutea_first_get_resume_series_id:=""
 var catalog_first_new_dialog_seen:=false
 var catalog_first_new_dialog_pending:=false
 var catalog_first_new_dialog_card_closed:=false
@@ -1137,6 +1142,10 @@ func _load_save() -> void:
 	carnicolor_first_get_dialog_pending=false
 	carnicolor_first_get_resume_context=""
 	carnicolor_first_get_resume_series_id=""
+	lutea_first_get_dialog_seen=false
+	lutea_first_get_dialog_pending=false
+	lutea_first_get_resume_context=""
+	lutea_first_get_resume_series_id=""
 	catalog_first_new_dialog_seen=false
 	catalog_first_new_dialog_pending=false
 	catalog_first_new_dialog_card_closed=false
@@ -1316,6 +1325,14 @@ func _load_save() -> void:
 				# first GET already happened, so never surprise those players with it.
 				carnicolor_first_get_dialog_seen=bool(discovered.get(CARNICOLOR_FIRST_GET_SPECIES_ID,false)) or _species_get_count(CARNICOLOR_FIRST_GET_SPECIES_ID)>0 or float(bests.get(CARNICOLOR_FIRST_GET_SPECIES_ID,0.0))>0.0
 				carnicolor_first_get_dialog_pending=false
+			if value.has("lutea_first_get_dialog_seen") or value.has("lutea_first_get_dialog_pending"):
+				lutea_first_get_dialog_seen=bool(value.get("lutea_first_get_dialog_seen",false))
+				lutea_first_get_dialog_pending=bool(value.get("lutea_first_get_dialog_pending",false)) and not lutea_first_get_dialog_seen
+			else:
+				# Do not retroactively show the event to players who acquired Lutea before
+				# this save flag existed.
+				lutea_first_get_dialog_seen=bool(discovered.get(LUTEA_FIRST_GET_SPECIES_ID,false)) or _species_get_count(LUTEA_FIRST_GET_SPECIES_ID)>0 or float(bests.get(LUTEA_FIRST_GET_SPECIES_ID,0.0))>0.0
+				lutea_first_get_dialog_pending=false
 			catalog_first_new_dialog_seen=bool(value.get("catalog_first_new_dialog_seen",false))
 			catalog_first_new_dialog_pending=bool(value.get("catalog_first_new_dialog_pending",false)) and not catalog_first_new_dialog_seen
 			catalog_first_new_dialog_card_closed=bool(value.get("catalog_first_new_dialog_card_closed",false)) and catalog_first_new_dialog_pending
@@ -1380,7 +1397,7 @@ func _save() -> void:
 		"total_play_count":total_play_count,"normal_play_count":normal_play_count,"formal_play_count":formal_play_count,"shop_visit_count":shop_visit_count,
 		"hidden_species_acquired":hidden_species_acquired,"tovar_next_play":tovar_next_play,"tovar_attempt_count":tovar_attempt_count,
 		"opening_story_complete":opening_story_complete,"intro_story_complete":intro_story_complete,"encyclopedia_unlocked":encyclopedia_unlocked,"habitat_unlocked":habitat_unlocked,"tutorial_steps":tutorial_steps,
-		"first_colorata_confirmed":first_colorata_confirmed,"first_old_seed_stage":first_old_seed_stage,"trio_originals_confirmed":trio_originals_confirmed,"carnicolor_first_get_dialog_seen":carnicolor_first_get_dialog_seen,"carnicolor_first_get_dialog_pending":carnicolor_first_get_dialog_pending,
+		"first_colorata_confirmed":first_colorata_confirmed,"first_old_seed_stage":first_old_seed_stage,"trio_originals_confirmed":trio_originals_confirmed,"carnicolor_first_get_dialog_seen":carnicolor_first_get_dialog_seen,"carnicolor_first_get_dialog_pending":carnicolor_first_get_dialog_pending,"lutea_first_get_dialog_seen":lutea_first_get_dialog_seen,"lutea_first_get_dialog_pending":lutea_first_get_dialog_pending,
 		"catalog_first_new_dialog_seen":catalog_first_new_dialog_seen,"catalog_first_new_dialog_pending":catalog_first_new_dialog_pending,"catalog_first_new_dialog_card_closed":catalog_first_new_dialog_card_closed,"catalog_first_new_dialog_species_id":catalog_first_new_dialog_species_id,
 		"habitat_arrival_started":habitat_arrival_started,"habitat_awakened":habitat_awakened,"habitat_awakening_event_complete":habitat_awakening_event_complete,
 		"seed_shop_open":seed_shop_open,"mystery_items_acquired":mystery_items_acquired,"mystery_catalog_tutorial_complete":mystery_catalog_tutorial_complete,"habitat_returned_species":habitat_returned_species,"special_series_explanation_seen":special_series_explanation_seen,"main_story_stage":main_story_stage,"main_story_complete":main_story_complete,"main_story_completion_seen":main_story_completion_seen,
@@ -3014,6 +3031,8 @@ func _finish_scripted_dialog()->void:
 			first_colorata_confirmed=true;first_old_seed_stage=FIRST_OLD_SEED_STAGE_CONFIRMED;start_trio_event=true
 		"carnicolor_first_get":
 			carnicolor_first_get_dialog_seen=true;carnicolor_first_get_dialog_pending=false
+		"lutea_first_get":
+			lutea_first_get_dialog_seen=true;lutea_first_get_dialog_pending=false
 		"catalog_first_new":
 			catalog_first_new_dialog_seen=true;catalog_first_new_dialog_pending=false;catalog_first_new_dialog_card_closed=false;catalog_first_new_dialog_species_id=""
 		"post_tutorial_habitat_guidance":
@@ -3119,6 +3138,7 @@ func _finish_scripted_dialog()->void:
 			_play_current_area_bgm()
 	_update_play_ui()
 	if finished_kind=="carnicolor_first_get":call_deferred("_resume_after_carnicolor_first_get_dialog")
+	elif finished_kind=="lutea_first_get":call_deferred("_resume_after_lutea_first_get_dialog")
 	elif finish_collection_complete:call_deferred("_finish_collection_complete_presentation")
 	elif start_habitat_crisis_travel:call_deferred("_transition_to_habitat_crisis")
 	elif begin_restoration_join_habitat:call_deferred("_transition_to_restoration_habitat","join",0)
@@ -4780,6 +4800,9 @@ func _on_species_get_overlay_closed(context:String)->void:
 	if closed_species_id==CARNICOLOR_FIRST_GET_SPECIES_ID and _start_carnicolor_first_get_dialog(context,closed_series_id):
 		call_deferred("_refresh_progress_hud")
 		return
+	if closed_species_id==LUTEA_FIRST_GET_SPECIES_ID and _start_lutea_first_get_dialog(context,closed_series_id):
+		call_deferred("_refresh_progress_hud")
+		return
 	if not closed_series_id.is_empty() and closed_series_id in catalog_series_unlock_notice_queue:
 		if _show_catalog_series_unlock_notice(closed_series_id,context):
 			call_deferred("_refresh_progress_hud")
@@ -4808,6 +4831,30 @@ func _resume_after_carnicolor_first_get_dialog()->void:
 	var resume_series_id:=carnicolor_first_get_resume_series_id
 	carnicolor_first_get_resume_context=""
 	carnicolor_first_get_resume_series_id=""
+	if not resume_series_id.is_empty() and resume_series_id in catalog_series_unlock_notice_queue:
+		if _show_catalog_series_unlock_notice(resume_series_id,resume_context):return
+	_continue_after_species_get_card(resume_context)
+
+func _lutea_first_get_dialog_pages(for_language:String)->Array[Dictionary]:
+	return [
+		{"speaker":"armadillo","text":Localizer.text(for_language,"lutea_first_get_armadillo_1")},
+		{"speaker":"girl","text":Localizer.text(for_language,"lutea_first_get_girl_1")},
+		{"speaker":"armadillo","text":Localizer.text(for_language,"lutea_first_get_armadillo_2")},
+		{"speaker":"girl","text":Localizer.text(for_language,"lutea_first_get_girl_2")}
+	]
+
+func _start_lutea_first_get_dialog(resume_context:String,resume_series_id:String)->bool:
+	if lutea_first_get_dialog_seen or not lutea_first_get_dialog_pending or not scripted_dialog_kind.is_empty():return false
+	lutea_first_get_resume_context=resume_context
+	lutea_first_get_resume_series_id=resume_series_id
+	_start_scripted_dialog("lutea_first_get",_lutea_first_get_dialog_pages(language_code),false)
+	return true
+
+func _resume_after_lutea_first_get_dialog()->void:
+	var resume_context:=lutea_first_get_resume_context
+	var resume_series_id:=lutea_first_get_resume_series_id
+	lutea_first_get_resume_context=""
+	lutea_first_get_resume_series_id=""
 	if not resume_series_id.is_empty() and resume_series_id in catalog_series_unlock_notice_queue:
 		if _show_catalog_series_unlock_notice(resume_series_id,resume_context):return
 	_continue_after_species_get_card(resume_context)
@@ -4943,7 +4990,7 @@ func _reset_progression_state()->void:
 	fusion_parent_a_id="";fusion_parent_b_id="";fusion_in_progress=false;fusion_return_pending=false
 	if fusion_lab_ui:fusion_lab_ui.close_lab()
 	if catalog_series_unlock_overlay:catalog_series_unlock_overlay.reset_overlay()
-	catalog_series_unlock_active_id="";species_get_active_series_id="";species_get_active_species_id="";carnicolor_first_get_resume_context="";carnicolor_first_get_resume_series_id=""
+	catalog_series_unlock_active_id="";species_get_active_series_id="";species_get_active_species_id="";carnicolor_first_get_resume_context="";carnicolor_first_get_resume_series_id="";lutea_first_get_resume_context="";lutea_first_get_resume_series_id=""
 	catalog_first_new_dialog_seen=false;catalog_first_new_dialog_pending=false;catalog_first_new_dialog_card_closed=false;catalog_first_new_dialog_species_id=""
 	endless_greenhouse.reset_discovery_state()
 	pending_restoration_snapshot.clear()
@@ -4955,7 +5002,7 @@ func _reset_progression_state()->void:
 	rain_completion_count=0;best_100_achieved=false;shop_selected_seed_type="normal"
 	first_tutorial_species_id="";habitat_wild_plants.clear();habitat_wild_initialized=false;habitat_wild_next_spawn_unix=0.0;habitat_tutorial_started=false;habitat_tutorial_complete=false;habitat_tutorial_species_id="";original_catalog_gifted=false;panda_beacon_unlocked=false;panda_beacon_count=0;panda_beacon_unread_log.clear();first_habitat_gift_claimed=false;armadillo_intro_event_3_completed=false;armadillo_series_event_7_completed=false;pending_armadillo_story_event="";armadillo_gift_series_id="";armadillo_gift_species_id="";scripted_dialog_kind="";scripted_dialog_pages.clear();scripted_dialog_index=-1
 	first_old_seed_harvest_checkpoint_saved=false
-	first_colorata_confirmed=false;first_old_seed_stage=FIRST_OLD_SEED_STAGE_NOT_RECEIVED;first_old_seed_recovery_dirty=false;trio_originals_confirmed=false;carnicolor_first_get_dialog_seen=false;carnicolor_first_get_dialog_pending=false;habitat_arrival_started=false;habitat_awakened=false;habitat_awakening_event_complete=false;seed_shop_open=false;mystery_items_acquired=false;mystery_catalog_tutorial_complete=false;normal_play_tutorial_complete=false;post_tutorial_normal_games_completed=0;post_tutorial_habitat_guidance_completed_game_count=0;post_tutorial_habitat_visited=false;normal_round_started_after_tutorial=false;seed_pod_gauge_discovery_complete=false;seed_pod_first_reward_seen=false;initial_seed_stock_notice_complete=false;puku_buyback_tutorial_complete=false;puku_buyback_tutorial_active=false;puku_buyback_tutorial_index=0;habitat_returned_species.clear();special_series_explanation_seen=false;pending_special_series_explanation=false;main_story_stage=StoryProgressionClass.ACT_1;main_story_complete=false;main_story_completion_seen=false;catalog_series_unlock_notice_queue.clear();catalog_series_unlock_notice_ready.clear()
+	first_colorata_confirmed=false;first_old_seed_stage=FIRST_OLD_SEED_STAGE_NOT_RECEIVED;first_old_seed_recovery_dirty=false;trio_originals_confirmed=false;carnicolor_first_get_dialog_seen=false;carnicolor_first_get_dialog_pending=false;lutea_first_get_dialog_seen=false;lutea_first_get_dialog_pending=false;habitat_arrival_started=false;habitat_awakened=false;habitat_awakening_event_complete=false;seed_shop_open=false;mystery_items_acquired=false;mystery_catalog_tutorial_complete=false;normal_play_tutorial_complete=false;post_tutorial_normal_games_completed=0;post_tutorial_habitat_guidance_completed_game_count=0;post_tutorial_habitat_visited=false;normal_round_started_after_tutorial=false;seed_pod_gauge_discovery_complete=false;seed_pod_first_reward_seen=false;initial_seed_stock_notice_complete=false;puku_buyback_tutorial_complete=false;puku_buyback_tutorial_active=false;puku_buyback_tutorial_index=0;habitat_returned_species.clear();special_series_explanation_seen=false;pending_special_series_explanation=false;main_story_stage=StoryProgressionClass.ACT_1;main_story_complete=false;main_story_completion_seen=false;catalog_series_unlock_notice_queue.clear();catalog_series_unlock_notice_ready.clear()
 	act2_unlocked=false;story_progression_state=StoryProgressionClass.default_runtime_state();forest_gacha_unlocked=false;forest_gacha_intro_seen=false;fantasy_first_discovery_seen=false;fantasy_realization_seen=false;act3_unlocked=false;act3_intro_pending=false;act3_intro_seen=false;jurejure_pool_unlocked=false;jurejure_species_unlocked.clear();jurejure_species_first_seen=false;habitat_crisis_pending=false;habitat_crisis_started=false;finale_complete=false;habitat_return_dialog_seen=false
 	original_catalog_complete_event_seen=false;habitat_tutorial_returned_to_greenhouse=false;jurejure_intro_complete=false;jurejure_enabled=false;jurejure_growth_stage=JureJureSystemClass.GROWTH_EARLY;jurejure_growth_event_mask=0;active_jurejure_event={};jurejure_next_check_unix=0.0;jurejure_cooldown_until_unix=0.0;jurejure_return_event_complete=false;jurejure_waiting_for_seed_pod_reward=false;jurejure_battle_count=0;jurejure_battle_win_count=0;jurejure_habitat_visit_point=Vector2(-1.0,-1.0);jurejure_pending_reward_species_id="";jurejure_pending_reward_is_new=false;jurejure_pending_fusion_reward_species_id="";jurejure_pending_fusion_reward_is_new=false;jurejure_last_battle_result.clear();act3_first_battle_active=false;active_jurejure_battle_difficulty=PukuPukuBattleClass.DIFFICULTY_NORMAL;habitat_second_awakened=false;habitat_second_awakening_complete=false;jurejure_update_accumulator=0.0
 	first_seed_pod_reward_event_active=false;habitat_visit_id=0;jurejure_focused_habitat_visit_id=-1;act3_intro_eligible_visit_id=0;habitat_crisis_eligible_visit_id=0
@@ -6918,6 +6965,8 @@ func _register_species_discovery(species_id:String,count_get:=true,check_collect
 	greenhouse_available[species_id]=true;unlocked_species[species_id]=true
 	if first_get and species_id==CARNICOLOR_FIRST_GET_SPECIES_ID and not carnicolor_first_get_dialog_seen:
 		carnicolor_first_get_dialog_pending=true
+	if first_get and species_id==LUTEA_FIRST_GET_SPECIES_ID and not lutea_first_get_dialog_seen:
+		lutea_first_get_dialog_pending=true
 	if profile_first_colorata:_old_colorata_profile_mark("registration_record_get_start")
 	if count_get:_record_species_get(species_id)
 	if profile_first_colorata:_old_colorata_profile_mark("registration_record_get_end")
@@ -7044,6 +7093,11 @@ func _try_start_pending_story_event()->void:
 		# Recover an interrupted first GET by restoring the required NEW card first;
 		# the dedicated dialogue is still started only by that card's close handler.
 		call_deferred("_queue_species_get_by_id",CARNICOLOR_FIRST_GET_SPECIES_ID,true,"carnicolor_first_get_recovery")
+		return
+	if lutea_first_get_dialog_pending and not lutea_first_get_dialog_seen:
+		# Use the same card-first recovery as the Carnicolor event. This also keeps
+		# queued GET cards and story transitions in their original order.
+		call_deferred("_queue_species_get_by_id",LUTEA_FIRST_GET_SPECIES_ID,true,"lutea_first_get_recovery")
 		return
 	if _collection_completion_pending() and not _collection_complete_get_card_seen():
 		call_deferred("_queue_species_get_by_id",_collection_completion_last_species_id(),true,"collection_complete_recovery")
