@@ -127,11 +127,13 @@ func _ready() -> void:
 	assert(game.scripted_dialog_kind == "first_colorata_discovery")
 	assert(game.scripted_dialog_pages.size() == 3)
 	assert([game.scripted_dialog_pages[0].speaker, game.scripted_dialog_pages[1].speaker, game.scripted_dialog_pages[2].speaker] == ["panda", "armadillo", "panda"])
-	assert([game.scripted_dialog_pages[0].text, game.scripted_dialog_pages[1].text, game.scripted_dialog_pages[2].text] == ["本当に多肉植物のたねだったなんて！", "この本によると、これは『コロラータ』っていう種類らしいよ！", "すごい。世界に多肉植物が帰って来てくれたんだ……！"])
+	assert([game.scripted_dialog_pages[0].text, game.scripted_dialog_pages[1].text, game.scripted_dialog_pages[2].text] == ["本当に\n多肉植物のたねだったなんて！", "この本によると、これは『コロラータ』っていう種類らしいよ！", "すごい。世界に多肉植物が帰って来てくれたんだ……！"])
+	assert(game.intro_dialogue_label.text == "本当に\n多肉植物のたねだったなんて！")
+	assert(game.intro_dialogue_label.get_line_count() == 2 and game.intro_dialogue_label.get_visible_line_count() == 2)
 	var discovery_text := ""
 	for page in game.scripted_dialog_pages:
 		discovery_text += str(page.get("text", ""))
-	assert("本当に多肉植物のたねだったなんて" in discovery_text)
+	assert("本当に\n多肉植物のたねだったなんて" in discovery_text)
 	assert("世界に多肉植物が帰って来てくれたんだ" in discovery_text)
 	assert("本当に育った" not in discovery_text and "図鑑に描いてある植物" not in discovery_text)
 	assert(Localizer.species_name("ja", game._catalog_entry(FIRST_SPECIES_ID)) in discovery_text)

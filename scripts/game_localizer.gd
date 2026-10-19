@@ -52,7 +52,7 @@ const TEXT := {
 		"old_seed_reaction_trio": "多肉植物だ！！",
 		"old_seed_reaction_girl": "信じられない！",
 		"old_seed_reaction_growth": "どんどん大きくなるよ！",
-		"story_colorata_1": "本当に多肉植物のたねだったなんて！",
+		"story_colorata_1": "本当に\n多肉植物のたねだったなんて！",
 		"story_colorata_2": "この本によると、これは『%s』っていう種類らしいよ！",
 		"story_colorata_3": "すごい。世界に多肉植物が帰って来てくれたんだ……！",
 		"story_trio_1": "聞いて！ 僕がまいたたねも育ったんだ！\nこの本によると『%s』っていうみたい。",
