@@ -19,9 +19,9 @@ const ENERGY_PARTICLE_FADE_SECONDS := 0.18
 const ENERGY_PARTICLE_STAGGER_SECONDS := 0.035
 const SERIES_LABELS := {
 	"ja": {
-		"base": "原種", "neon": "ネオン", "jurejure": "ジュレジュレ団",
-		"gummy": "グミ", "metal": "金属", "sweets": "スイーツ", "glow": "蓄光", "jewel": "宝石",
-		"jure": "ジュレジュレ団", "stone": "ストーン", "sea": "海", "yumekawa": "ゆめふわ", "forest_amber": "森と琥珀", "jelly": "ゼリー",
+		"base": "原種", "neon": "ネオン多肉", "jurejure": "ジュレジュレ団多肉",
+		"gummy": "グミ多肉", "metal": "金属多肉", "sweets": "スイーツ多肉", "glow": "蓄光多肉", "jewel": "宝石多肉",
+		"jure": "ジュレジュレ団多肉", "stone": "ストーン多肉", "sea": "海多肉", "yumekawa": "ゆめふわ多肉", "forest_amber": "森と琥珀多肉", "jelly": "ゼリー多肉",
 	},
 	"hiragana": {
 		"base": "げんしゅ", "neon": "ねおん", "jurejure": "じゅれじゅれだん",
@@ -542,8 +542,7 @@ func _parent_button_text(slot: int, species_id: String) -> String:
 		return "%s\n%s" % [Localizer.text(language, slot_key), Localizer.text(language, "fusion_choose")]
 	var entry: Dictionary = candidate_by_id[species_id]
 	var series := str(entry.get("fusion_display_series", entry.get("fusion_series", "")))
-	var series_names: Dictionary = SERIES_LABELS.get(language, SERIES_LABELS["ja"])
-	return "%s\n%s\n[%s]" % [Localizer.text(language, slot_key), Localizer.species_name(language, entry), str(series_names.get(series, series))]
+	return "%s\n%s\n[%s]" % [Localizer.text(language, slot_key), Localizer.species_name(language, entry), _series_label_for_id(series)]
 
 func _refresh_parent_card(slot: int, species_id: String) -> void:
 	var image := parent_a_image if slot == 0 else parent_b_image
@@ -609,8 +608,12 @@ func _series_has_candidates(series_id: String) -> bool:
 	return false
 
 func _series_label_for_id(series_id: String) -> String:
+	var display_series_id := "jurejure" if series_id == "jure" else series_id
+	for raw_series in picker_series_catalog:
+		if raw_series is Dictionary and str(raw_series.get("series_id", "")) == display_series_id:
+			return Localizer.series_name(language, raw_series)
 	var series_names: Dictionary = SERIES_LABELS.get(language, SERIES_LABELS["ja"])
-	return str(series_names.get(series_id, series_id.replace("_", " ").capitalize()))
+	return str(series_names.get(display_series_id, series_names.get(series_id, display_series_id.replace("_", " ").capitalize())))
 
 func _refresh_picker_filters(reset_selection: bool = false) -> void:
 	if picker_filter == null:

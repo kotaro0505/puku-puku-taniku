@@ -28,7 +28,7 @@ func _ready() -> void:
 
 	var series: Dictionary = game._series_entry("sea")
 	assert(not series.is_empty())
-	assert(str(series.get("display_name", "")) == "海")
+	assert(str(series.get("display_name", "")) == "海多肉")
 	assert(series.get("species_ids", []) == SEA_IDS)
 	assert(not bool(series.get("catalog_purchase_enabled", false)))
 	assert(bool(series.get("preview_catalog_when_locked", false)))

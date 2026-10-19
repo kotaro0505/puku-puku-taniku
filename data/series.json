@@ -67,7 +67,7 @@
   },
   {
     "series_id": "jelly",
-    "display_name": "ゼリー",
+    "display_name": "ゼリー多肉",
     "subtitle": "ぷるんと透き通る彩り",
     "description": "果実やソーダの色を映した、みずみずしく透き通るゼリー多肉のシリーズです。",
     "cover_image_path": "res://assets/catalog/jelly/jelly-grape.png",
@@ -193,7 +193,7 @@
   },
   {
     "series_id": "stone",
-    "display_name": "ストーン",
+    "display_name": "ストーン多肉",
     "subtitle": "大地の模様をまとう石肌の多肉",
     "description": "溶岩、砂岩、黒曜石など、大地が育んだ石の色と模様を葉に宿す多肉たちです。",
     "cover_image_path": "res://assets/catalog/stone/stone-black-lava-rosette.png",
@@ -219,7 +219,7 @@
   },
   {
     "series_id": "sea",
-    "display_name": "海",
+    "display_name": "海多肉",
     "subtitle": "波と珊瑚のきらめきを宿す多肉",
     "description": "澄んだ海水、珊瑚、砂浜、真珠の色と輝きを透明な葉に閉じ込めた、爽やかな海の多肉たちです。",
     "cover_image_path": "res://assets/catalog/sea/sea-coralline-drops.png",
@@ -245,7 +245,7 @@
   },
   {
     "series_id": "yumekawa",
-    "display_name": "ゆめふわ",
+    "display_name": "ゆめふわ多肉",
     "subtitle": "夢色の光をまとう、ふんわり多肉",
     "description": "桃色、水色、薄紫の夢色グラデーションと星のきらめきをまとった、やさしく幻想的な多肉たちです。",
     "cover_image_path": "res://assets/catalog/yumekawa/yumekawa-milky-dream.png",
@@ -271,7 +271,7 @@
   },
   {
     "series_id": "forest_amber",
-    "display_name": "森と琥珀",
+    "display_name": "森と琥珀多肉",
     "subtitle": "琥珀に眠る小さな森",
     "description": "森の記憶や小さな生きものを、透き通る琥珀の葉に閉じ込めた多肉たちです。",
     "cover_image_path": "res://assets/catalog/forest-amber/forest-amber-insect-rosette.png",
@@ -405,7 +405,7 @@
   },
   {
     "series_id": "fusion_tier1",
-    "display_name": "特殊配合",
+    "display_name": "特殊配合多肉",
     "subtitle": "二段目の特別な組み合わせから生まれる多肉",
     "description": "決められた配合種同士を掛け合わせて誕生した、特殊配合の多肉を記録するページです。",
     "cover_image_path": "res://assets/catalog/fusion_tier1/fus1_rainbow_bubble.png",
@@ -443,7 +443,7 @@
   },
   {
     "series_id": "fusion_tier2",
-    "display_name": "上位特殊配合",
+    "display_name": "上位特殊配合多肉",
     "subtitle": "さらに特殊な組み合わせから生まれる多肉",
     "description": "特殊配合をさらに掛け合わせて誕生した、上位配合の多肉を記録するページです。",
     "cover_image_path": "res://assets/catalog/fusion_tier2/fus2_moonbow.png",
@@ -480,7 +480,7 @@
   },
   {
     "series_id": "fusion_tier3",
-    "display_name": "最上位特殊配合",
+    "display_name": "最上位特殊配合多肉",
     "subtitle": "上位配合と原種から生まれる多肉",
     "description": "上位配合種と特定の原種を掛け合わせて誕生した、多肉を記録するページです。",
     "cover_image_path": "res://assets/catalog/fusion_tier3/fus3_black_hole.png",

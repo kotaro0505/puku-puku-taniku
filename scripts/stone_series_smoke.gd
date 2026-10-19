@@ -26,7 +26,7 @@ func _ready() -> void:
 	var stone_series: Dictionary = game._series_entry("stone")
 	assert(not stone_series.is_empty())
 	assert(stone_series.get("species_ids", []) == STONE_IDS)
-	assert(str(stone_series.get("display_name", "")) == "ストーン")
+	assert(str(stone_series.get("display_name", "")) == "ストーン多肉")
 	assert(not bool(stone_series.get("catalog_purchase_enabled", false)))
 	assert(bool(stone_series.get("preview_catalog_when_locked", false)))
 	assert(game._is_normal_series("stone") and not game._is_hidden_series("stone"))

@@ -158,9 +158,13 @@ func _test_hybrid_lab_presentation(game) -> void:
 	assert(is_equal_approx(FusionLabUIClass.ENERGY_PARTICLE_TRAVEL_SECONDS, 0.42))
 	assert(is_equal_approx(FusionLabUIClass.ENERGY_PARTICLE_FADE_SECONDS, 0.18))
 	assert(is_equal_approx(FusionLabUIClass.ENERGY_PARTICLE_STAGGER_SECONDS, 0.035))
-	assert(str(FusionLabUIClass.SERIES_LABELS["ja"].get("jelly", "")) == "ゼリー")
+	assert(str(FusionLabUIClass.SERIES_LABELS["ja"].get("jelly", "")) == "ゼリー多肉")
 	assert(str(FusionLabUIClass.SERIES_LABELS["hiragana"].get("jelly", "")) == "ぜりー")
 	assert(str(FusionLabUIClass.SERIES_LABELS["en"].get("jelly", "")) == "Jelly")
+	game.fusion_lab_ui.picker_series_catalog = game.series_catalog
+	game.fusion_lab_ui.language = "ja"
+	assert(game.fusion_lab_ui._series_label_for_id("jelly") == "ゼリー多肉")
+	assert(game.fusion_lab_ui._series_label_for_id("jure") == "ジュレジュレ団多肉")
 
 func _test_catalog_and_recipes(game) -> void:
 	var hybrid_entries: Array[Dictionary] = []
