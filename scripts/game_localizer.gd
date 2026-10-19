@@ -278,7 +278,7 @@ const TEXT := {
 		"restoration_return_5_girl": "これで5株目だよ。",
 		"restoration_slide_1": "それからも、みんなは何度も原生地へ通い、多肉たちを植え続けました。",
 		"restoration_slide_2": "原生地には少しずつ、多肉植物が戻って来ました。",
-		"restoration_slide_3": "色々な多肉植物が見たい。\n\nみんなの願いは、いつしか祈りとなっていたのです。",
+		"restoration_slide_3": "色々な多肉植物が見たい。\n\nみんなの願いは、\n\nいつしか祈りとなっていました。",
 		"restoration_final_girl_1": "戻ったね……。",
 		"restoration_final_armadillo": "うん。みんなで育てて、みんなで返したんだ。",
 		"restoration_final_panda": "よかったあ……。",

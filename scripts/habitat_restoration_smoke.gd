@@ -195,7 +195,7 @@ func _test_localization_contract() -> void:
 	assert(Localizer.text("en", "restoration_join_panda_no") == "I'm not sure about that, though...")
 	assert(Localizer.text("ja", "restoration_slide_1") == "それからも、みんなは何度も原生地へ通い、多肉たちを植え続けました。")
 	assert(Localizer.text("ja", "restoration_slide_2") == "原生地には少しずつ、多肉植物が戻って来ました。")
-	assert(Localizer.text("ja", "restoration_slide_3") == "色々な多肉植物が見たい。\n\nみんなの願いは、いつしか祈りとなっていたのです。")
+	assert(Localizer.text("ja", "restoration_slide_3") == "色々な多肉植物が見たい。\n\nみんなの願いは、\n\nいつしか祈りとなっていました。")
 	var expected_post_ending := {
 		"jurejure_post_ending_mouse_sprout": "こら！そこ踏むなチュー！さっき芽が出たばっかりだチュー！",
 		"jurejure_post_ending_mouse_water": "怪しいやつがいないかパトロールしてるんだチュー！",
