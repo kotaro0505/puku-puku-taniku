@@ -140,6 +140,7 @@ func _test_localization_contract() -> void:
 		"mission_return_large",
 		"restoration_join_home_armadillo",
 		"restoration_join_mouse_hurry",
+		"restoration_join_panda_no",
 		"habitat_crisis_departure_panda",
 		"restoration_jurejure_hurry",
 		"jurejure_post_ending_mouse_sprout",
@@ -189,6 +190,9 @@ func _test_localization_contract() -> void:
 		for key in keys:
 			var value := Localizer.text(language, key)
 			assert(not value.is_empty() and value != key)
+	assert(Localizer.text("ja", "restoration_join_panda_no") == "それは分からないけど…。")
+	assert(Localizer.text("hiragana", "restoration_join_panda_no") == "それは わからないけど…。")
+	assert(Localizer.text("en", "restoration_join_panda_no") == "I'm not sure about that, though...")
 	assert(Localizer.text("ja", "restoration_slide_1") == "それからも、みんなは何度も原生地へ通い、多肉たちを植え続けました。")
 	assert(Localizer.text("ja", "restoration_slide_2") == "原生地には少しずつ、多肉植物が戻って来ました。")
 	assert(Localizer.text("ja", "restoration_slide_3") == "色々な多肉植物が見たい。\n\nみんなの願いは、いつしか祈りとなっていたのです。")
@@ -513,6 +517,8 @@ func _test_integrated_final_chapter() -> void:
 	assert(game.intro_dialog_panel.position == Vector2(40, 725))
 	assert(game.scripted_dialog_pages.size() == 19)
 	assert(str(game.scripted_dialog_pages[0].get("text", "")).begins_with("はぁー"))
+	assert(str(game.scripted_dialog_pages[13].get("speaker", "")) == "panda")
+	assert(str(game.scripted_dialog_pages[13].get("text", "")) == "それは分からないけど…。")
 	assert("早くするんだチュー" in str(game.scripted_dialog_pages[18].get("text", "")))
 	_finish_dialog(game)
 	await get_tree().process_frame
