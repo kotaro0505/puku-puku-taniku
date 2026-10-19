@@ -358,6 +358,7 @@ func _test_battle_loss(game: Node) -> void:
 	assert(game.scripted_dialog_kind == "jurejure_battle_loss")
 	assert(game.intro_dialog_panel.position == Vector2(40, 725))
 	_assert_jurejure_group_above_dialog(game, (_group_item(game).get("group_node") as Node3D))
+	assert(str(game.scripted_dialog_pages[0].get("text", "")) == Localizer.text("ja", "jurejure_battle_loss_mouse"))
 	assert(str(game.scripted_dialog_pages[1].get("text", "")) == Localizer.text("ja", "jurejure_battle_loss_penalty", [puku_lost]))
 	_finish_dialog(game)
 	await get_tree().process_frame
@@ -389,9 +390,12 @@ func _test_battle_loss_coin_boundaries(game: Node) -> void:
 		assert(int(penalty.get("puku_lost", -1)) == roll)
 		assert(game.puku_balance_units == 10375 - roll * game.PUKU_UNITS_PER_PUKU)
 		assert(game._puku_fraction_units() == 375)
-	assert(Localizer.text("ja", "jurejure_battle_loss_penalty", [3]) == "ジュレジュレ団に3ぷくコインを取られた！")
-	assert(Localizer.text("hiragana", "jurejure_battle_loss_penalty", [3]) == "じゅれじゅれだんに3ぷくこいんを とられた！")
-	assert(Localizer.text("en", "jurejure_battle_loss_penalty", [3]) == "The JureJure Gang took 3 Puku Coins!")
+	assert(Localizer.text("ja", "jurejure_battle_loss_mouse") == "へへーん！まだまだ甘いチュー！")
+	assert(Localizer.text("hiragana", "jurejure_battle_loss_mouse") == "へへーん！まだまだ あまいチュー！")
+	assert(Localizer.text("en", "jurejure_battle_loss_mouse") == "Heh-heh! You've still got a long way to go, chuu!")
+	assert(Localizer.text("ja", "jurejure_battle_loss_penalty", [3]) == "3ぷくコインが減ってしまった！")
+	assert(Localizer.text("hiragana", "jurejure_battle_loss_penalty", [3]) == "3ぷくこいんが へってしまった！")
+	assert(Localizer.text("en", "jurejure_battle_loss_penalty", [3]) == "You lost 3 Puku Coins!")
 	game._cancel_puku_gauge_animations()
 
 
