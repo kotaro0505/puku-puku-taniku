@@ -11,6 +11,12 @@ const JUREJURE_SPECIES_IDS: Array[String] = [
 	"jurejure_luxury_watch", "jurejure_luxury_cruise_ship",
 	"jurejure_pool_mansion", "jurejure_supercar"
 ]
+const JUREJURE_FUSION_SPECIES_IDS: Array[String] = [
+	"hyb_sweets_jure", "hyb_jewel_jure", "hyb_jure_jure",
+	"hyb_jure_stone", "hyb_jure_sea", "hyb_jure_yumekawa",
+	"fus1_bonus_time", "fus1_on_vacation", "fus2_moon_resort",
+	"fus3_black_hole"
+]
 
 
 func _ready() -> void:
@@ -26,6 +32,8 @@ func _ready() -> void:
 	_test_act_one_stays_hostile(game)
 	_test_creative_gate(game)
 	await _test_act_three_reward_flow(game)
+	_test_jurejure_collection_catalog_membership(game)
+	await _test_jurejure_fusion_lab_crisis_timing(game)
 	await _test_jurejure_crisis_threshold(game)
 	await _test_external_crisis_transition(game)
 	_test_first_loss_unlocks_act_two(game)
@@ -33,7 +41,7 @@ func _ready() -> void:
 	_test_post_ending_friendly_battle(game)
 	await _test_post_ending_strongest_battle_entry(game)
 	game._reset_progression_state()
-	print("JUREJURE_STORY_SMOKE_OK group=three_close composition=all_6_points_above_dialog first_encounter=camera+bgm home_warning=once battle=strong_intro_then_active6_total12 strongest_main_entry=true act2_only=true exploitation=act3+forced_first+normal_repeat+permanent midpoint=4+camera crisis=8 exploit_dialog=three-pattern-nonrepeat retired_secret=tombstone pool_unlock=all_10 ownership=exact reward=random post_ending=friendly+normal_pool+known_not_new save_fresh=true")
+	print("JUREJURE_STORY_SMOKE_OK group=three_close composition=all_6_points_above_dialog first_encounter=camera+bgm home_warning=once battle=strong_intro_then_active6_total12 strongest_main_entry=true act2_only=true exploitation=act3+forced_first+normal_repeat+permanent collection=10_normal+10_fusion midpoint=4+camera crisis=8 fusion_card_order=safe exploit_dialog=three-pattern-nonrepeat retired_secret=tombstone pool_unlock=all_10 ownership=exact reward=random post_ending=friendly+normal_pool+known_not_new save_fresh=true")
 	get_tree().quit()
 
 
@@ -490,6 +498,147 @@ func _prepare_act_three_reward(game: Node) -> void:
 	assert(game.audio_manager.current_bgm_key == "jurejure")
 
 
+func _test_jurejure_collection_catalog_membership(game: Node) -> void:
+	_prepare_act_three_reward(game)
+	game.species_get_counts.clear()
+	var collection_ids: Array[String] = []
+	for entry_value in game.catalog_species:
+		if not entry_value is Dictionary:
+			continue
+		var entry: Dictionary = entry_value
+		if game._is_jurejure_collection_species(entry):
+			collection_ids.append(str(entry.get("species_id", "")))
+	assert(collection_ids.size() == 20)
+	for species_id in JUREJURE_SPECIES_IDS:
+		var normal_entry: Dictionary = game._catalog_entry(species_id)
+		assert(game._is_jurejure_species(normal_entry))
+		assert(game._is_jurejure_collection_species(normal_entry))
+		assert(species_id in collection_ids)
+	for species_id in JUREJURE_FUSION_SPECIES_IDS:
+		var fusion_entry: Dictionary = game._catalog_entry(species_id)
+		assert(game._catalog_entry_is_fusion(fusion_entry))
+		assert(not game._is_jurejure_species(fusion_entry))
+		assert(game._is_jurejure_collection_species(fusion_entry))
+		assert(species_id in collection_ids)
+
+	# Four ordinary and four fusion species satisfy the eight-species mission.
+	# Additional copies remain one unique species, and a fusion merely using a
+	# JureJure parent stays excluded when its catalog page belongs elsewhere.
+	for index in range(4):
+		game.species_get_counts[JUREJURE_SPECIES_IDS[index]] = 1
+		game.species_get_counts[JUREJURE_FUSION_SPECIES_IDS[index]] = 1
+	assert(game._unique_jurejure_species_get_count() == 8)
+	game.species_get_counts[JUREJURE_FUSION_SPECIES_IDS[0]] = 4
+	assert(game._unique_jurejure_species_get_count() == 8)
+	var other_page_fusion_id := "hyb_gummy_jure"
+	assert(game._catalog_display_series_id_for_entry(game._catalog_entry(other_page_fusion_id)) == "gummy")
+	assert(not game._is_jurejure_collection_species(game._catalog_entry(other_page_fusion_id)))
+	game.species_get_counts[other_page_fusion_id] = 1
+	assert(game._unique_jurejure_species_get_count() == 8)
+
+
+func _test_jurejure_fusion_lab_crisis_timing(game: Node) -> void:
+	_prepare_act_three_reward(game)
+	game.story_progression_state["fusion_lab_unlocked"] = true
+	game.story_progression_state["fusion_lab_intro_seen"] = true
+	game.story_progression_state["fusion_lab_intro_pending"] = false
+	game.jurejure_species_first_seen = true
+	game._unlock_jurejure_pool()
+	for index in range(3):
+		var species_id := JUREJURE_SPECIES_IDS[index]
+		game.species_get_counts[species_id] = 1
+		game.discovered[species_id] = true
+		game.greenhouse_available[species_id] = true
+		game.unlocked_species[species_id] = true
+	var sweets_parent_id := "sweets_strawberry_shortcake"
+	var jewel_parent_id := "jewel_sapphire_star"
+	for parent_id in [sweets_parent_id, jewel_parent_id]:
+		game.species_get_counts[parent_id] = 1
+		game.discovered[parent_id] = true
+		game.greenhouse_available[parent_id] = true
+		game.unlocked_species[parent_id] = true
+	game.current_mode = "greenhouse"
+	game._apply_saved_unlocks()
+	game._apply_mode()
+	game._open_fusion_lab()
+	assert(game.fusion_lab_ui.visible)
+	var jure_parent_id := JUREJURE_SPECIES_IDS[0]
+	var midpoint_result_id := "hyb_sweets_jure"
+	game._on_fusion_parent_selected(0, sweets_parent_id)
+	game._on_fusion_parent_selected(1, jure_parent_id)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert(str(game.fusion_lab_ui.current_result.get("result_species_id", "")) == midpoint_result_id)
+	game.puku_points = 10
+	game._perform_fusion(sweets_parent_id, jure_parent_id)
+	assert(game.fusion_in_progress)
+	assert(game._species_get_count(midpoint_result_id) == 1)
+	assert(game._unique_jurejure_species_get_count() == 4)
+	assert(game._jurejure_collection_draw_active())
+	assert(bool(game.story_progression_state.get("exploitation_midpoint_pending", false)))
+	assert(not game.habitat_crisis_pending and not game.habitat_crisis_started)
+	assert(game.scripted_dialog_kind.is_empty() and not game.species_get_overlay.visible)
+	await get_tree().create_timer(3.1).timeout
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert(not game.fusion_in_progress)
+	assert(game.species_get_overlay.visible)
+	assert(game.species_get_active_context == "fusion_lab")
+	assert(game.species_get_active_species_id == midpoint_result_id)
+	assert(game.scripted_dialog_kind.is_empty() and not game.habitat_crisis_started)
+	while game.species_get_overlay.busy:
+		await get_tree().process_frame
+	game.species_get_overlay.close_overlay()
+	while game.species_get_overlay.visible:
+		await get_tree().process_frame
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert(game.fusion_lab_ui.visible and game.scripted_dialog_kind.is_empty())
+
+	# The midpoint dialogue is habitat-only. Mark that already-verified story as
+	# complete, then make a second fusion the eighth GET and verify its immediate
+	# card-first crisis transition from the greenhouse.
+	StoryProgressionClass.complete_exploitation_midpoint(game.story_progression_state)
+	for index in range(3, 6):
+		var species_id := JUREJURE_SPECIES_IDS[index]
+		game.species_get_counts[species_id] = 1
+		game.discovered[species_id] = true
+		game.greenhouse_available[species_id] = true
+		game.unlocked_species[species_id] = true
+	assert(game._unique_jurejure_species_get_count() == 7)
+	var crisis_result_id := "hyb_jewel_jure"
+	game._on_fusion_parent_selected(0, jewel_parent_id)
+	game._on_fusion_parent_selected(1, jure_parent_id)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert(str(game.fusion_lab_ui.current_result.get("result_species_id", "")) == crisis_result_id)
+	game._perform_fusion(jewel_parent_id, jure_parent_id)
+	assert(game.fusion_in_progress)
+	assert(game._species_get_count(crisis_result_id) == 1)
+	assert(game._unique_jurejure_species_get_count() == 8)
+	assert(not game._jurejure_collection_draw_active())
+	assert(game.habitat_crisis_pending and not game.habitat_crisis_started)
+	assert(game.scripted_dialog_kind.is_empty() and not game.species_get_overlay.visible)
+	await get_tree().create_timer(3.1).timeout
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert(not game.fusion_in_progress)
+	assert(game.species_get_overlay.visible)
+	assert(game.species_get_active_context == "fusion_lab")
+	assert(game.species_get_active_species_id == crisis_result_id)
+	assert(game.scripted_dialog_kind.is_empty() and not game.habitat_crisis_started)
+	while game.species_get_overlay.busy:
+		await get_tree().process_frame
+	game.species_get_overlay.close_overlay()
+	while game.species_get_overlay.visible:
+		await get_tree().process_frame
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert(not game.species_get_overlay.visible and not game.fusion_lab_ui.visible)
+	assert(game.scripted_dialog_kind == "habitat_crisis_departure")
+	assert(not game.habitat_crisis_started)
+
+
 func _test_act_three_reward_flow(game: Node) -> void:
 	# Repeated fresh candidate sets must exercise more than one branch of the
 	# real grant function; Pure Gold is neither fixed nor preferred.
@@ -670,9 +819,11 @@ func _test_jurejure_crisis_threshold(game: Node) -> void:
 	assert(game.puku_puku_battle.visible and game.puku_puku_battle.choice_layer.visible)
 	game.puku_puku_battle._decline_battle()
 
-	# Four unique GETs schedule the one-off midpoint, but rain remains off.
-	game._register_species_discovery(JUREJURE_SPECIES_IDS[3], true)
+	# Three ordinary GETs plus one fusion catalogued on the JureJure page schedule
+	# the one-off midpoint, but rain remains off.
+	game._register_species_discovery(JUREJURE_FUSION_SPECIES_IDS[0], true)
 	assert(game._unique_jurejure_species_get_count() == 4)
+	assert(game._current_mission_text() == Localizer.text("ja", "mission_jurejure_species", [4]))
 	assert(game._jurejure_collection_draw_active())
 	assert(bool(game.story_progression_state.get("exploitation_midpoint_pending", false)))
 	assert(not game.habitat_crisis_pending and not game.habitat_crisis_started)
@@ -694,16 +845,17 @@ func _test_jurejure_crisis_threshold(game: Node) -> void:
 	assert(game.find_child("SecretGachaButton", true, false) == null)
 	assert(not game.habitat_crisis_started)
 
-	for index in range(4, 7):
+	for index in range(3, 6):
 		game._register_species_discovery(JUREJURE_SPECIES_IDS[index], true)
 	assert(game._unique_jurejure_species_get_count() == 7)
+	assert(game._current_mission_text() == Localizer.text("ja", "mission_jurejure_species", [7]))
 	assert(game._jurejure_collection_draw_active())
 	assert(not game.habitat_crisis_pending and not game.habitat_crisis_started)
 	# Mirror the safe boundary of a real habitat battle: while its full-screen UI
 	# is open the deferred story check cannot pre-empt the reward card. Closing
-	# that eighth Species GET card starts rain in this same habitat stay.
+	# that eighth fusion Species GET card starts rain in this same habitat stay.
 	game.puku_puku_battle.visible = true
-	game._register_species_discovery(JUREJURE_SPECIES_IDS[7], true)
+	game._register_species_discovery(JUREJURE_FUSION_SPECIES_IDS[1], true)
 	assert(game._unique_jurejure_species_get_count() == 8)
 	assert(not game._jurejure_collection_draw_active())
 	assert(game.habitat_crisis_pending and not game.habitat_crisis_started)
@@ -720,15 +872,15 @@ func _test_jurejure_crisis_threshold(game: Node) -> void:
 	await get_tree().process_frame
 	assert(not game.habitat_crisis_started)
 	game.puku_puku_battle.visible = false
-	game._queue_species_get_by_id(JUREJURE_SPECIES_IDS[7], true, "jurejure_battle")
+	game._queue_species_get_by_id(JUREJURE_FUSION_SPECIES_IDS[1], true, "fusion_lab")
 	await get_tree().process_frame
 	assert(game.species_get_overlay.visible)
 	while game.species_get_overlay.busy:
 		await get_tree().process_frame
 	assert(not game.habitat_crisis_started)
-	game._register_species_discovery(JUREJURE_SPECIES_IDS[0], true)
+	game._register_species_discovery(JUREJURE_FUSION_SPECIES_IDS[1], true)
 	assert(game._unique_jurejure_species_get_count() == 8)
-	for index in range(8, 10):
+	for index in range(6, 10):
 		game._register_species_discovery(JUREJURE_SPECIES_IDS[index], true)
 	assert(game._jurejure_reward_candidates().size() == 10)
 	var total_gets_before := 0

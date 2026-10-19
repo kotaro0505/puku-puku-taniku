@@ -31,12 +31,19 @@ func _test_catalog_contract(game: Node) -> void:
 	assert(jurejure_entries.size() == 10)
 	for entry in jurejure_entries:
 		assert(game._is_jurejure_species(entry) and not game._is_fantasy_species(entry))
+		assert(game._is_jurejure_collection_species(entry))
 		var image_path := str(entry.get("image_path", ""))
 		assert(image_path.ends_with(".png") and FileAccess.file_exists(image_path))
 		var texture := load(image_path) as Texture2D
 		var image := texture.get_image()
 		assert(image != null and image.detect_alpha() != Image.ALPHA_NONE)
 		assert(image.get_pixel(0, 0).a < 0.02 and image.get_pixel(image.get_width() - 1, image.get_height() - 1).a < 0.02)
+	var jurejure_catalog_entries: Array[Dictionary] = game._catalog_display_entries_for_series("jurejure")
+	assert(jurejure_catalog_entries.size() == 20)
+	assert(jurejure_catalog_entries.filter(func(entry: Dictionary) -> bool: return game._is_jurejure_species(entry)).size() == 10)
+	assert(jurejure_catalog_entries.filter(func(entry: Dictionary) -> bool: return game._catalog_entry_is_fusion(entry)).size() == 10)
+	assert(jurejure_catalog_entries.all(func(entry: Dictionary) -> bool: return game._is_jurejure_collection_species(entry)))
+	assert(not game._is_jurejure_collection_species(game._catalog_entry("hyb_gummy_jure")))
 	for removed_id in StoryProgressionClass.REMOVED_COMMON_SPECIES_IDS:
 		assert(game._catalog_entry(str(removed_id)).is_empty())
 	var originals: Array[String] = []
@@ -502,7 +509,8 @@ func _test_three_act_sequence(game: Node) -> void:
 	assert(not game.habitat_crisis_pending and not game.habitat_crisis_started)
 	game._register_species_discovery(first_exploitation_reward_id, true)
 	assert(game._unique_jurejure_species_get_count() == 3 and not game.habitat_crisis_pending)
-	assert(game._register_species_discovery(unowned_jurejure_ids[2], true))
+	# A fusion displayed on the JureJure catalog page is the fourth formal GET.
+	assert(game._register_species_discovery("hyb_sweets_jure", true))
 	assert(game._unique_jurejure_species_get_count() == 4)
 	assert(bool(game.story_progression_state.get("exploitation_midpoint_pending", false)))
 	assert(not game.habitat_crisis_pending and not game.habitat_crisis_started)
@@ -541,13 +549,14 @@ func _test_three_act_sequence(game: Node) -> void:
 	assert(not game.jurejure_intro_camera_active and is_equal_approx(game.view_yaw, late_visit_yaw))
 	_finish_dialog(game)
 
-	for index in range(3, 6):
+	for index in range(2, 5):
 		assert(game._register_species_discovery(unowned_jurejure_ids[index], true))
 	assert(game._unique_jurejure_species_get_count() == 7)
 	assert(not game.habitat_crisis_pending and not game.habitat_crisis_started)
 	game._register_species_discovery(first_exploitation_reward_id, true)
 	assert(game._unique_jurejure_species_get_count() == 7 and not game.habitat_crisis_pending)
-	assert(game._register_species_discovery(unowned_jurejure_ids[6], true))
+	# Seven ordinary species plus the fusion reach the crisis threshold.
+	assert(game._register_species_discovery(unowned_jurejure_ids[5], true))
 	assert(game._unique_jurejure_species_get_count() == 8)
 	assert(game.habitat_crisis_pending and not game.habitat_crisis_started)
 	assert(StoryProgressionClass.habitat_crisis_route(game.story_progression_state) == StoryProgressionClass.CRISIS_ROUTE_SAME_HABITAT)

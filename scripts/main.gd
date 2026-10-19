@@ -6730,6 +6730,13 @@ func _species_get_count(species_id:String)->int:
 func _is_jurejure_species(entry:Dictionary)->bool:
 	return not entry.is_empty() and str(entry.get("story_group","")).to_lower()==JUREJURE_STORY_GROUP
 
+func _is_jurejure_collection_species(entry:Dictionary)->bool:
+	# The Act III collection mission follows the page shown in the catalog. Keep
+	# this separate from _is_jurejure_species(), which gates the gang-only spawn
+	# pool and battle rewards and therefore must not treat fusion species as
+	# members of that acquisition pool.
+	return not entry.is_empty() and _catalog_display_series_id_for_entry(entry)==JUREJURE_SERIES_ID
+
 func _is_jurejure_species_unlocked(species_id:String)->bool:
 	return jurejure_pool_unlocked and _is_jurejure_species(_catalog_entry(species_id))
 
@@ -6812,7 +6819,7 @@ func _unique_act2_species_get_count()->int:
 func _unique_jurejure_species_get_count()->int:
 	var count:=0
 	for entry_value in catalog_species:
-		if entry_value is Dictionary and _is_jurejure_species(entry_value) and _species_get_count(str(entry_value.get("species_id","")))>0:count+=1
+		if entry_value is Dictionary and _is_jurejure_collection_species(entry_value) and _species_get_count(str(entry_value.get("species_id","")))>0:count+=1
 	return count
 
 func _jurejure_collection_draw_active()->bool:
