@@ -465,7 +465,7 @@ func _test_early_fantasy_candidate_contract(game: Node) -> void:
 	var page_keys := ["fantasy_six_girl_1", "fantasy_six_armadillo", "fantasy_six_girl_2", "fantasy_six_armadillo_2", "fantasy_six_armadillo_3", "fantasy_six_armadillo_4", "fantasy_six_armadillo_5"]
 	var speakers := ["girl", "armadillo", "girl", "armadillo", "armadillo", "armadillo", "armadillo"]
 	var expected_pages := {
-		"ja": ["ゼリーに、ゆめふわ……私が好きなものばっかり。", "石に宝石……僕が集めてるものと同じだ。", "……もしかして、私たちが想像したものが、多肉になってる？", "そうかもしれない…", "もしかして、あの原生地には、ぼくたちの想像を多肉に変える力があるのかもしれないね。", "本当に不思議だ…", "それと、大きな株を収穫するほど、新しい品種が出るような気がするよ"],
+		"ja": ["ゼリーに、ゆめふわ……私が好きなものばっかり。", "石に宝石……僕が集めてるものと同じだ。", "……もしかして、私たちが想像したものが、多肉になってる？", "そうかもしれない…", "もしかして、あの原生地には、僕たちの想像を多肉に変える力があるのかもしれないね。", "本当に不思議だ…", "それと、大きな株を収穫するほど、新しい品種が出るような気がするよ"],
 		"hiragana": ["ぜりーに、ゆめふわ……わたしが すきなもの ばっかり。", "いしに ほうせき……ぼくが あつめてるものと おなじだ。", "……もしかして、わたしたちが そうぞうしたものが、たにくに なってる？", "そうかもしれない…", "もしかして、あの げんせいちには、ぼくたちの そうぞうを たにくに かえる ちからが あるのかもしれないね。", "ほんとうに ふしぎだ…", "それと、おおきな かぶを しゅうかくするほど、あたらしい ひんしゅが でるような きがするよ"],
 		"en": ["Jelly and dreamy colors... They are all things I love.", "Stone and jewels... just like the things I collect.", "...Could the things we imagine be turning into succulents?", "Maybe you're right...", "Maybe that habitat has the power to turn what we imagine into succulents.", "It's really strange...", "And it feels like the bigger the plant you harvest, the more likely a new variety is to appear."],
 	}
@@ -599,6 +599,11 @@ func _test_fusion_fantasy_count(game: Node) -> void:
 
 
 func _test_story_copy() -> void:
+	var forbidden_ja_spellings := ["ぼく", "ボク", "わたし", "ワタシ", "きみ", "キミ", "おれ", "オレ", "僕達", "私達", "君達", "俺達", "子供達", "仲間達", "動物達"]
+	for key in Localizer.TEXT["ja"]:
+		var localized_text := str(Localizer.TEXT["ja"][key])
+		for spelling in forbidden_ja_spellings:
+			assert(spelling not in localized_text, "noncanonical Japanese dialogue spelling key=%s spelling=%s" % [key, spelling])
 	assert(Localizer.text("ja", "forest_gacha_intro_panda") == "僕が見つけた品種をガチャにしてみたんだ！良かったらやってみてよ！")
 	assert("アルマジロ君" in Localizer.text("ja", "restoration_epilogue_mouse"))
 	assert(Localizer.text("ja", "restoration_return_5_girl") == "これで5株目だよ。")

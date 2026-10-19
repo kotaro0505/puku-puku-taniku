@@ -252,7 +252,7 @@ func _test_three_act_sequence(game: Node) -> void:
 	for page_index in range(3, 7):
 		assert(str(game.scripted_dialog_pages[page_index].get("speaker", "")) == "armadillo")
 	assert(str(game.scripted_dialog_pages[3].get("text", "")) == "そうかもしれない…")
-	assert(str(game.scripted_dialog_pages[4].get("text", "")) == "もしかして、あの原生地には、ぼくたちの想像を多肉に変える力があるのかもしれないね。")
+	assert(str(game.scripted_dialog_pages[4].get("text", "")) == "もしかして、あの原生地には、僕たちの想像を多肉に変える力があるのかもしれないね。")
 	assert(str(game.scripted_dialog_pages[5].get("text", "")) == "本当に不思議だ…")
 	assert(str(game.scripted_dialog_pages[6].get("text", "")) == "それと、大きな株を収穫するほど、新しい品種が出るような気がするよ")
 	_finish_dialog(game)
@@ -573,7 +573,7 @@ func _test_three_act_sequence(game: Node) -> void:
 	assert(str(game.scripted_dialog_pages[2].get("text", "")) == "やっぱり…\nずっと無理してたんだ。")
 	assert(str(game.scripted_dialog_pages[3].get("text", "")) == "……そんなはずないチュー。")
 	assert(str(game.scripted_dialog_pages[4].get("text", "")) == "さっきまで、\nもっと作れてたッペ…。")
-	assert(str(game.scripted_dialog_pages[5].get("text", "")) == "オレたち……のせいっスカ……？")
+	assert(str(game.scripted_dialog_pages[5].get("text", "")) == "俺たち……のせいっスカ……？")
 	assert(not game.rain_bonus_active and not game.rain_bonus_in_progress and game.rain_bag_count == 0)
 	assert(game.rain_visual == null)
 	assert(game.habitat_returned_species == settled_before)

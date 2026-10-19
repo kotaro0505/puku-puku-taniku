@@ -62,7 +62,7 @@ func _prepare_visible_greenhouse(game: Node) -> void:
 
 
 func _assert_localization() -> void:
-	assert(Localizer.text("ja", "catalog_first_new_armadillo") == "新しく発見した品種はぼくが原生地に\nお還しておくからね。")
+	assert(Localizer.text("ja", "catalog_first_new_armadillo") == "新しく発見した品種は僕が原生地に\nお還しておくからね。")
 	assert(Localizer.text("hiragana", "catalog_first_new_armadillo") == "あたらしく はっけんした ひんしゅは ぼくが げんせいちに\nおかえししておくからね。")
 	assert(Localizer.text("en", "catalog_first_new_armadillo") == "I'll return every newly discovered species\nto the habitat for you.")
 
@@ -113,7 +113,7 @@ func _test_normal_new_card_then_dialog(game: Node) -> void:
 	assert(game.scripted_dialog_kind == "catalog_first_new")
 	assert(game.scripted_dialog_pages.size() == 1)
 	assert(game.intro_speaker_label.text == "アルマジロ")
-	assert(game.intro_dialogue_label.text == "新しく発見した品種はぼくが原生地に\nお還しておくからね。")
+	assert(game.intro_dialogue_label.text == "新しく発見した品種は僕が原生地に\nお還しておくからね。")
 	assert(game.intro_overlay.visible)
 	game._advance_scripted_dialog()
 	await get_tree().process_frame

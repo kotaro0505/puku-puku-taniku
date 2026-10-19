@@ -28,7 +28,7 @@ func _ready() -> void:
 	# "leftover seed" story.
 	game._start_intro_story()
 	assert(game.intro_dialogue_label.text == Localizer.text("ja", "intro_old_seed"))
-	assert(game.intro_dialogue_label.text == "はい、これ。きみの分の1粒。古いから、芽が出るかは分からないけど…")
+	assert(game.intro_dialogue_label.text == "はい、これ。君の分の1粒。古いから、芽が出るかは分からないけど…")
 	assert(Localizer.text("hiragana", "intro_old_seed") == "はい、これ。きみの ぶんの 1つぶ。ふるいから、めが でるかは わからないけど…")
 	assert(Localizer.text("en", "intro_old_seed") == "Here, one seed for you. It's old, so I don't know if it will sprout...")
 	assert("ぼくが まいた たね" in Localizer.text("hiragana", "story_trio_1"))

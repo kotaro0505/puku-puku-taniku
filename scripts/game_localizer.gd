@@ -46,7 +46,7 @@ const TEXT := {
 		"jurejure_skunk_name": "スカンク",
 		"jurejure_peccary_name": "ペッカリー",
 		"daily_seed_gift": "今日も来てくれてありがとう。\nたね（12粒）×1セット GET！",
-		"intro_old_seed": "はい、これ。きみの分の1粒。古いから、芽が出るかは分からないけど…",
+		"intro_old_seed": "はい、これ。君の分の1粒。古いから、芽が出るかは分からないけど…",
 		"intro_old_seed_get": "古いたね ×1 GET",
 		"old_seed_reaction_sprout": "見て！芽が出たよ！",
 		"old_seed_reaction_trio": "多肉植物だ！！",
@@ -55,7 +55,7 @@ const TEXT := {
 		"story_colorata_1": "本当に多肉植物のたねだったなんて！",
 		"story_colorata_2": "この本によると、これは『%s』っていう種類らしいよ！",
 		"story_colorata_3": "すごい。世界に多肉植物が帰って来てくれたんだ……！",
-		"story_trio_1": "聞いて！ ぼくがまいたたねも育ったんだ！\nこの本によると『%s』っていうみたい。",
+		"story_trio_1": "聞いて！ 僕がまいたたねも育ったんだ！\nこの本によると『%s』っていうみたい。",
 		"story_trio_2": "僕もだよ！『%s』っていう種類らしい。",
 		"story_trio_3": "信じられない。\n長い間失われていた植物を\nこうして見られるなんて…。",
 		"story_trio_4": "とってもきれい。そして、\nぷくぷくしてて可愛いね！",
@@ -114,7 +114,7 @@ const TEXT := {
 		"fantasy_six_armadillo": "石に宝石……僕が集めてるものと同じだ。",
 		"fantasy_six_girl_2": "……もしかして、私たちが想像したものが、多肉になってる？",
 		"fantasy_six_armadillo_2": "そうかもしれない…",
-		"fantasy_six_armadillo_3": "もしかして、あの原生地には、ぼくたちの想像を多肉に変える力があるのかもしれないね。",
+		"fantasy_six_armadillo_3": "もしかして、あの原生地には、僕たちの想像を多肉に変える力があるのかもしれないね。",
 		"fantasy_six_armadillo_4": "本当に不思議だ…",
 		"fantasy_six_armadillo_5": "それと、大きな株を収穫するほど、新しい品種が出るような気がするよ",
 		"fusion_lab_intro_armadillo_1": "できた！",
@@ -135,7 +135,7 @@ const TEXT := {
 		"habitat_crisis_girl": "やっぱり…\nずっと無理してたんだ。",
 		"habitat_crisis_mouse": "……そんなはずないチュー。",
 		"habitat_crisis_peccary": "さっきまで、\nもっと作れてたッペ…。",
-		"habitat_crisis_skunk": "オレたち……のせいっスカ……？",
+		"habitat_crisis_skunk": "俺たち……のせいっスカ……？",
 		"final_theme_girl": "私たちは、自然の中で創造していることを、\n忘れちゃいけないんだね。",
 		"jurejure_intro_panda_1": "あれ……？",
 		"jurejure_intro_panda_2": "ここにあった多肉、なくなってない？",
@@ -161,13 +161,13 @@ const TEXT := {
 		"jurejure_confront_peccary": "せっかく戻ってきたから頂きに来たんだっぺ。",
 		"jurejure_confront_girl_1": "あなたたちみたいな人たちのせいで\n昔多肉は絶滅したのよ！",
 		"jurejure_confront_skunk": "でも、ここに生えてるだけじゃ\n誰にも見てもらえない。\nそれでいいんスカ？",
-		"jurejure_confront_mouse_panda": "パンダくん！\nキミだって多肉で商売\nしてるチュー！",
+		"jurejure_confront_mouse_panda": "パンダくん！\n君だって多肉で商売\nしてるチュー！",
 		"jurejure_confront_panda": "…。ダメだ。\n何を言っても通じない。",
 		"jurejure_confront_girl_2": "とにかく、今取った多肉を原生地に返してあげて！",
-		"jurejure_confront_mouse_battle": "ぷくぷくバトルでキミらが勝ったら\n考えてあげるチュー！",
+		"jurejure_confront_mouse_battle": "ぷくぷくバトルで君らが勝ったら\n考えてあげるチュー！",
 		"jurejure_after_encounter_panda": "困ったな…。ジュレジュレ団の好きにさせるのはまずいぞ…",
 		"jurejure_after_encounter_armadillo": "僕らも定期的に原生地へ行こう。",
-		"jurejure_challenge_1": "またキミたちか！\nしつこいやつらでチュー！",
+		"jurejure_challenge_1": "また君たちか！\nしつこいやつらでチュー！",
 		"jurejure_challenge_2": "ぷくぷくバトルで勝負だチュー！",
 		"jurejure_exploit_mouse_treasure": "もっともっとすごいお宝を出すんだチュー！",
 		"jurejure_exploit_peccary_more": "まだまだ足りないッペ！\nもっと原生地に出させるッペ！",
@@ -219,8 +219,8 @@ const TEXT := {
 		"post_crisis_greenhouse_panda_1": "原生地を元に戻すには、どうしたらいいんだろう……。",
 		"post_crisis_greenhouse_armadillo": "弱ってるなら、まずは多肉を戻してあげた方がいいかもしれない。",
 		"post_crisis_greenhouse_girl": "じゃあ、とにかく大きな株を作って持っていってみない？",
-		"post_crisis_greenhouse_armadillo_2": "育った多肉は、今までどおり原生地にぼくが持って行くよ。",
-		"post_crisis_greenhouse_panda_2": "ぼくも一緒に行くよ！",
+		"post_crisis_greenhouse_armadillo_2": "育った多肉は、今までどおり原生地に僕が持って行くよ。",
+		"post_crisis_greenhouse_panda_2": "僕も一緒に行くよ！",
 		"post_crisis_greenhouse_girl_2": "私はどんどんたねをまくね！",
 		"post_crisis_greenhouse_panda_3": "うん。やってみよう！",
 		"restoration_join_home_armadillo": "そうだ！ジュレジュレ団にも手伝ってもらおうよ。",
@@ -232,7 +232,7 @@ const TEXT := {
 		"restoration_join_panda_1": "……すごい落ち込んでる。",
 		"restoration_join_armadillo_call": "ジュレジュレ団！",
 		"restoration_join_mouse_2": "……なんだチュー……。",
-		"restoration_join_armadillo_plan": "ぼくたち、温室で育てた多肉を少しずつ原生地に戻してるんだ。",
+		"restoration_join_armadillo_plan": "僕たち、温室で育てた多肉を少しずつ原生地に戻してるんだ。",
 		"restoration_join_girl_request": "私がどんどん育てるから、みんなにも運ぶのを手伝ってほしいの。",
 		"restoration_join_mouse_question": "…運べば、またここに多肉が\n増えるチュー？",
 		"restoration_join_armadillo_answer": "それはわからないけど、少しずつ戻るかもしれない。やってみよう。",
@@ -258,11 +258,11 @@ const TEXT := {
 		"restoration_return_2_girl": "2つ目も根付いたよ！",
 		"restoration_return_2_armadillo": "届いてくれるといいな…",
 		"restoration_return_2_mouse": "…なかなかの株だチュー。",
-		"restoration_return_2_peccary": "オレが運んだッペ。",
+		"restoration_return_2_peccary": "俺が運んだッペ。",
 		"restoration_return_2_skunk": "もういっちょ、運びまスカ！",
 		"restoration_return_3_girl_1": "これで3つめだね！",
 		"restoration_return_3_panda": "あっ！あそこにも生えてる！",
-		"restoration_return_3_armadillo": "ぼくたちが戻した株\nだけじゃない…。",
+		"restoration_return_3_armadillo": "僕たちが戻した株\nだけじゃない…。",
 		"restoration_return_3_girl_2": "原生地から、\n新しい多肉が生えて来てる！",
 		"restoration_return_3_mouse": "チュごい……！",
 		"restoration_return_3_peccary": "戻ってきてるッペ！",
@@ -328,10 +328,10 @@ const TEXT := {
 		"jurejure_battle_loss": "敗北……",
 		"jurejure_battle_return": "原生地へ戻る",
 		"jurejure_battle_win_mouse": "わかったわかった。\nさっき取ったやつは返すチュー。",
-		"jurejure_battle_win_no_reward": "今回はキミたちの勝ちにしてやるチュー！",
+		"jurejure_battle_win_no_reward": "今回は君たちの勝ちにしてやるチュー！",
 		"jurejure_battle_loss_mouse": "ぜーんぶいただくチュー！",
 		"jurejure_battle_loss_penalty": "ジュレジュレ団に%dぷくコインを取られた！",
-		"jurejure_battle_loss_friendly_mouse": "今回はオレたちの勝ちだチュー！また勝負するチュー！",
+		"jurejure_battle_loss_friendly_mouse": "今回は俺たちの勝ちだチュー！また勝負するチュー！",
 		"jurejure_battle_loss_friendly": "友だちとの勝負なので、多肉もぷくコインも失わなかった。",
 		"jurejure_mid_peccary": "これ、まだ小さいっぺ……。",
 		"jurejure_mid_skunk": "これまで持っていくんスカ？",
@@ -415,7 +415,7 @@ const TEXT := {
 		,"armadillo_intro_panda_1": "アルマジロから、古い資料の研究報告があるみたいだよ。"
 		,"armadillo_intro_panda_2": "昔の植物や古いたねをずっと調べてくれているんだ。"
 		,"armadillo_intro_self": "古い記録を調べていたら、気になる原種の手がかりを見つけたんだ。"
-		,"armadillo_pinwheel_gift": "記録をたどって復活できたピンウィールだ。\nきみに育ててほしい。"
+		,"armadillo_pinwheel_gift": "記録をたどって復活できたピンウィールだ。\n君に育ててほしい。"
 		,"catalog": "図鑑"
 		,"best_record": "最高記録\n%.1f cm"
 		,"best_showcase_title": "最大サイズ記録！"
@@ -677,15 +677,15 @@ const TEXT := {
 		,"volume_intro_2": "36粒入ってるから、普通のたねよりたっぷり楽しめるよ。\nこれなら、じっくりどデカい多肉を育てられるね！"
 		,"bustamante_gift": "いつも来てくれてありがとう。\nストリクチフローラ ブスタマンテを1株、君にあげるよ。"
 		,"pinwheel_intro_1": "古い資料を調べていたら、育て方の手がかりを見つけたんだ。"
-		,"pinwheel_intro_2": "ぼくたちのたねで試してみたら、また一株育てられたよ。"
-		,"pinwheel_intro_3": "図鑑で照合すると、ピンウィールという原種らしい。\nきみに託すよ。"
+		,"pinwheel_intro_2": "僕たちのたねで試してみたら、また一株育てられたよ。"
+		,"pinwheel_intro_3": "図鑑で照合すると、ピンウィールという原種らしい。\n君に託すよ。"
 		,"armadillo_idle_1": "原生地にお還しした品種は原生地で\n自然に増えてるみたいだ。"
 		,"armadillo_idle_2": "原生地からもらった種のさやと図鑑、\n大切にしよう。"
 		,"armadillo_idle_3": "絶滅したはずの多肉植物が見れるなんて\nすごいことだよね。"
-		,"armadillo_idle_4": "新しく発見した品種はぼくが原生地に\nお還しておくからね。"
+		,"armadillo_idle_4": "新しく発見した品種は僕が原生地に\nお還しておくからね。"
 		,"armadillo_idle_5_1": "多肉の葉をもいで土に挿しておくと\n根と芽が出て増えるんだ。"
 		,"armadillo_idle_5_2": "「葉挿し」って言うんだよ。"
-		,"catalog_first_new_armadillo": "新しく発見した品種はぼくが原生地に\nお還しておくからね。"
+		,"catalog_first_new_armadillo": "新しく発見した品種は僕が原生地に\nお還しておくからね。"
 		,"restore_offer": "この記録は、不思議な図鑑へ自動で反映されるよ。"
 		,"restore_shortage": "この記録は、不思議な図鑑へ自動で反映されるよ。"
 		,"restore_success": "復元できたよ！\nこれは『%s』のページだったんだ。\nまだ見つけていない品種も、影から少しずつ調べられそうだね。"
