@@ -4961,6 +4961,7 @@ func _plant_label_visibility_button_text()->String:
 	return Localizer.text(language_code,"plant_labels_on" if show_growing_plant_labels else "plant_labels_off")
 
 func _plant_label_visibility_button_should_show()->bool:
+	if not play_active or current_mode!="greenhouse":return false
 	if not opening_finished or not _tutorial_fully_complete() or first_play_tutorial_active or puku_buyback_tutorial_active or first_seed_pod_reward_event_active:return false
 	if _old_seed_story_active():return false
 	if _endless_greenhouse_auto_start_blocked():return false

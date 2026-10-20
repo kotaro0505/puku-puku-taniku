@@ -16,6 +16,7 @@ func _ready()->void:
 	game.habitat_tutorial_complete=true;game.mystery_items_acquired=true;game.mystery_catalog_tutorial_complete=true
 	game.normal_play_tutorial_complete=true;game.puku_buyback_tutorial_complete=true;game.puku_gauge_intro_complete=true
 	game.current_mode="greenhouse";game.puku_balance_units=999;game._apply_mode();game._update_play_ui()
+	assert(not game.plant_label_visibility_button.visible,"plant-label toggle must stay hidden while the greenhouse is idle")
 	assert(game.play_open_button.visible and not game.play_open_button.disabled)
 	assert(game.play_open_button.text=="パンダのお手伝いをする\n＋1ぷくコイン")
 	game._open_play_modal();assert(not game.play_active and game.puku_balance_units==999 and game.shop_overlay.visible)
@@ -28,12 +29,29 @@ func _ready()->void:
 	game.rng.seed=target_five_seed
 	game._open_play_modal()
 	assert(game.play_active and game.puku_balance_units==4000 and game.endless_economy_seed_cost_units==1000)
+	assert(game.plant_label_visibility_button.visible,"plant-label toggle must appear during a normal greenhouse round")
 	assert(game.ENDLESS_NORMAL_MIN_PLANTS==5 and game.ENDLESS_NORMAL_MAX_PLANTS==8)
 	assert(game.play_concurrent_target==5)
 	assert(game.play_seeds_remaining==12-game.play_concurrent_target)
 	assert(await _wait_for_population(game,5),"initial population did not settle: %s"%_round_state(game,-1))
 	assert(game.plants.size()==5 and game.endless_economy_seed_count==5)
 	_assert_normal_plant_balance(game)
+	assert(game.show_growing_plant_labels)
+	game._toggle_growing_plant_labels()
+	assert(not game.show_growing_plant_labels and game.plant_label_visibility_button.visible)
+	for plant in game.plants:assert(not plant.label.visible,"turning labels off must hide every growing-plant label")
+	game.species_get_overlay.visible=true;game._update_play_ui()
+	assert(not game.plant_label_visibility_button.visible and not game.show_growing_plant_labels,"NEW-card overlays must hide the toggle without changing its setting")
+	game.species_get_overlay.visible=false;game._update_play_ui()
+	assert(game.plant_label_visibility_button.visible and not game.show_growing_plant_labels)
+	game.current_mode="habitat";game._update_play_ui()
+	assert(not game.plant_label_visibility_button.visible and not game.show_growing_plant_labels,"the habitat must never show the plant-label toggle")
+	game.current_mode="greenhouse";game._update_play_ui()
+	assert(game.plant_label_visibility_button.visible and not game.show_growing_plant_labels)
+	game.first_play_tutorial_active=true;game._update_play_ui()
+	assert(not game.plant_label_visibility_button.visible,"the existing tutorial suppression must remain active")
+	game.first_play_tutorial_active=false;game._update_play_ui()
+	assert(game.plant_label_visibility_button.visible and not game.show_growing_plant_labels)
 	print("NORMAL_ROUND_STAGE initial ",_round_state(game,-1))
 	# This suite settles the round manually. Pause the game's frame loop and
 	# disable automatic checks before each manual tick so the formal random
@@ -86,11 +104,13 @@ func _ready()->void:
 	assert(game.endless_economy_seed_count==12 and game.endless_economy_jelly_count==12 and game.endless_economy_harvest_count==0)
 	assert(game.puku_balance_units==4000 and game.endless_economy_seed_cost_units==1000 and game.endless_economy_harvest_reward_units==0)
 	assert(game.play_open_button.visible and not game.play_open_button.disabled)
+	assert(not game.plant_label_visibility_button.visible and not game.show_growing_plant_labels,"round completion must hide the toggle without resetting its setting")
 	game.species=[game._catalog_entry("colorata")]
 	game.species_get_counts["colorata"]=1;game.discovered["colorata"]=true
 	game.puku_gauge_animation_speed_scale=.01
 	game._open_play_modal()
 	assert(game.play_active and game.puku_balance_units==3000)
+	assert(game.plant_label_visibility_button.visible and not game.show_growing_plant_labels,"the next round must restore the previous label setting")
 	for harvest_index in range(game.NORMAL_GERMINATION_COUNT):
 		assert(await _wait_for_settlement_plant(game),"all-harvest round ended early: %s"%_round_state(game,harvest_index))
 		_disable_automatic_jelly(game)
@@ -103,7 +123,8 @@ func _ready()->void:
 	assert(game.endless_economy_seed_count==12 and game.endless_economy_harvest_count==12 and game.endless_economy_jelly_count==0)
 	assert(game.endless_economy_harvest_reward_units==1440 and game.puku_balance_units==4440)
 	assert(not game.species_get_overlay.visible and game.play_open_button.visible and not game.play_open_button.disabled)
-	print("NORMAL_ROUND_SMOKE_OK seeds=12 concurrent=5-8 dynamic=5_to_8_to_5 max_planned=8 entry_cost=1 refill_cost=0 all_jelly_net=-1 all_harvest_reward=1.44 result=removed next_round=immediate")
+	assert(not game.plant_label_visibility_button.visible and not game.show_growing_plant_labels)
+	print("NORMAL_ROUND_SMOKE_OK seeds=12 concurrent=5-8 dynamic=5_to_8_to_5 max_planned=8 entry_cost=1 refill_cost=0 all_jelly_net=-1 all_harvest_reward=1.44 result=removed next_round=immediate plant_label_toggle=active_greenhouse_only state=retained")
 	game.queue_free()
 	get_tree().quit()
 
