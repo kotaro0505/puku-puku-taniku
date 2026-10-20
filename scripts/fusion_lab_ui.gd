@@ -78,6 +78,9 @@ var picker_scroll: ScrollContainer
 var picker_grid: GridContainer
 var picker_empty_label: Label
 var picker_filter_series_id := "all"
+var picker_filter_series_ids_by_slot: Array[String] = ["all", "all"]
+var picker_scroll_verticals_by_slot: Array[int] = [0, 0]
+var picker_scroll_restore_serial := 0
 var candidate_cache_signature := ""
 var candidate_cards_by_id: Dictionary = {}
 var candidate_images_by_id: Dictionary = {}
@@ -352,6 +355,11 @@ func _build_picker_page() -> void:
 	picker_scroll.add_child(picker_grid)
 
 func open_lab(parent_candidates: Array[Dictionary], counts: Dictionary, parent_a_id := "", parent_b_id := "", series_data: Array = []) -> void:
+	if picker_page.visible:
+		_remember_picker_state()
+	picker_scroll_restore_serial += 1
+	main_page.visible = true
+	picker_page.visible = false
 	var next_signature := _candidate_signature(parent_candidates)
 	if next_signature != candidate_cache_signature:
 		_clear_picker_card_cache()
@@ -380,14 +388,15 @@ func open_lab(parent_candidates: Array[Dictionary], counts: Dictionary, parent_a
 	parent_a_button.scale = Vector2.ONE
 	parent_b_button.scale = Vector2.ONE
 	set_processing_state(false)
-	picker_filter_series_id = "all"
-	_refresh_picker_filters(true)
 	visible = true
-	_show_main_page()
+	_show_main_page(false)
 	refresh_selection(selected_a_id, selected_b_id, {}, false)
 
 func close_lab() -> void:
 	visible = false
+	main_page.visible = true
+	picker_page.visible = false
+	_reset_picker_view_state()
 	result_image.texture = null
 	result_image.material = null
 	result_image.modulate = Color.WHITE
@@ -413,10 +422,16 @@ func set_language(value: String) -> void:
 		parent_b_heading.text = Localizer.text(language, "fusion_parent_b")
 	result_new_label.text = Localizer.text(language, "fusion_new")
 	refresh_selection(selected_a_id, selected_b_id, current_result, current_result_is_new)
+	var restore_scroll_vertical := -1
+	if picker_page.visible:
+		_remember_picker_state()
+		restore_scroll_vertical = picker_scroll_verticals_by_slot[picker_slot]
 	_refresh_picker_filters(false)
 	_refresh_cached_candidate_language()
 	if picker_page.visible:
+		picker_filter_series_ids_by_slot[picker_slot] = picker_filter_series_id
 		_rebuild_picker()
+		_queue_picker_scroll_restore(picker_slot, restore_scroll_vertical)
 
 func refresh_selection(parent_a_id: String, parent_b_id: String, result: Dictionary, is_new: bool) -> void:
 	selected_a_id = parent_a_id
@@ -573,14 +588,59 @@ func _refresh_parent_card(slot: int, species_id: String) -> void:
 	name_label.text = Localizer.species_name(language, entry)
 	candidate_image_requested.emit(entry, image, true)
 
+func _reset_picker_view_state() -> void:
+	picker_scroll_restore_serial += 1
+	picker_filter_series_id = "all"
+	for slot in range(2):
+		picker_filter_series_ids_by_slot[slot] = "all"
+		picker_scroll_verticals_by_slot[slot] = 0
+	if picker_filter != null and picker_filter.item_count > 0:
+		picker_filter.select(0)
+	if picker_scroll != null:
+		picker_scroll.scroll_vertical = 0
+
+func _remember_picker_state() -> void:
+	if picker_slot < 0 or picker_slot >= picker_scroll_verticals_by_slot.size():
+		return
+	picker_filter_series_ids_by_slot[picker_slot] = picker_filter_series_id
+	picker_scroll_verticals_by_slot[picker_slot] = picker_scroll.scroll_vertical
+
+func _picker_max_scroll_vertical() -> int:
+	if picker_scroll == null:
+		return 0
+	var scroll_bar := picker_scroll.get_v_scroll_bar()
+	return maxi(0, int(floor(scroll_bar.max_value - scroll_bar.page)))
+
+func _queue_picker_scroll_restore(slot: int, scroll_vertical: int) -> void:
+	picker_scroll_restore_serial += 1
+	var restore_serial := picker_scroll_restore_serial
+	call_deferred("_restore_picker_scroll", slot, scroll_vertical, restore_serial)
+
+func _restore_picker_scroll(slot: int, scroll_vertical: int, restore_serial: int) -> void:
+	await get_tree().process_frame
+	if restore_serial != picker_scroll_restore_serial or not picker_page.visible or picker_slot != slot:
+		return
+	var restored_scroll := clampi(scroll_vertical, 0, _picker_max_scroll_vertical())
+	picker_scroll.scroll_vertical = restored_scroll
+	picker_scroll_verticals_by_slot[slot] = restored_scroll
+
 func _open_picker(slot: int) -> void:
-	picker_slot = slot
+	if picker_page.visible:
+		_remember_picker_state()
+	picker_slot = clampi(slot, 0, 1)
 	main_page.visible = false
 	picker_page.visible = true
-	picker_filter_series_id = "all"
-	_refresh_picker_filters(true)
+	var requested_series_id := picker_filter_series_ids_by_slot[picker_slot]
+	var requested_scroll_vertical := picker_scroll_verticals_by_slot[picker_slot]
+	picker_filter_series_id = requested_series_id
 	picker_scroll.scroll_vertical = 0
+	_refresh_picker_filters(false)
+	if picker_filter_series_id != requested_series_id:
+		requested_scroll_vertical = 0
+		picker_filter_series_ids_by_slot[picker_slot] = picker_filter_series_id
+		picker_scroll_verticals_by_slot[picker_slot] = 0
 	_rebuild_picker()
+	_queue_picker_scroll_restore(picker_slot, requested_scroll_vertical)
 
 func _rebuild_picker() -> void:
 	if picker_grid == null:
@@ -668,9 +728,13 @@ func _refresh_picker_filters(reset_selection: bool = false) -> void:
 func _on_picker_filter_changed(index: int) -> void:
 	if index < 0 or index >= picker_filter.item_count:
 		return
+	picker_scroll_restore_serial += 1
 	picker_filter_series_id = str(picker_filter.get_item_metadata(index))
+	picker_filter_series_ids_by_slot[picker_slot] = picker_filter_series_id
+	picker_scroll_verticals_by_slot[picker_slot] = 0
 	picker_scroll.scroll_vertical = 0
 	_apply_picker_filter()
+	_queue_picker_scroll_restore(picker_slot, 0)
 
 func _ensure_picker_empty_label() -> void:
 	if picker_empty_label == null:
@@ -800,7 +864,10 @@ func _choose_candidate(species_id: String) -> void:
 	parent_selected.emit(picker_slot, species_id)
 	_show_main_page()
 
-func _show_main_page() -> void:
+func _show_main_page(remember_picker_state := true) -> void:
+	if remember_picker_state and picker_page.visible:
+		_remember_picker_state()
+	picker_scroll_restore_serial += 1
 	main_page.visible = true
 	picker_page.visible = false
 

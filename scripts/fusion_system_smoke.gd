@@ -108,7 +108,7 @@ func _ready() -> void:
 	await _test_tier3_game_flow(game)
 	game._reset_progression_state()
 	game.queue_free()
-	print("FUSION_SYSTEM_SMOKE_OK hybrid_lab_name=true attached_background=720x1280 result_heading_removed=true instruction_cards_separated=true symmetric_margins=true top_close_removed=true main_back=close picker_back=main processing_exit_guard=true energy_speed_unchanged=true energy_emission_3x=true fusion_series=11 basic_species=66 basic_recipes=66 tier1_species=22 tier1_special=22 tier2_species=21 tier2_exact=16 tier2_terminal=10 tier2_series=5 tier3_species=5 tier3_exact=5 cost_schedule=1/3/7/12 total_cost=339 transparent_images=114 jelly_catalog=24 picker_touch_contract=true unordered=true originals=fallback exact_then_series_special=priority advanced_series_fallback=true all_eligible_pairs=defined preview_name=unobtained_visible_82_hidden_32+GET_history_all_114 preview_resolution_independent=true parents=GET_only terminal_results=true cost=atomic silhouette=species_specific double_submit=blocked known_result=disabled return_after_GET=lab seeds=after_GET languages=3")
+	print("FUSION_SYSTEM_SMOKE_OK hybrid_lab_name=true attached_background=720x1280 result_heading_removed=true instruction_cards_separated=true symmetric_margins=true top_close_removed=true main_back=close picker_back=main processing_exit_guard=true energy_speed_unchanged=true energy_emission_3x=true fusion_series=11 basic_species=66 basic_recipes=66 tier1_species=22 tier1_special=22 tier2_species=21 tier2_exact=16 tier2_terminal=10 tier2_series=5 tier3_species=5 tier3_exact=5 cost_schedule=1/3/7/12 total_cost=339 transparent_images=114 jelly_catalog=24 picker_touch_contract=true picker_state_memory=per_slot_filter+scroll+clamp+close_reset unordered=true originals=fallback exact_then_series_special=priority advanced_series_fallback=true all_eligible_pairs=defined preview_name=unobtained_visible_82_hidden_32+GET_history_all_114 preview_resolution_independent=true parents=GET_only terminal_results=true cost=atomic silhouette=species_specific double_submit=blocked known_result=disabled return_after_GET=lab seeds=after_GET languages=3")
 	get_tree().quit()
 
 func _test_hybrid_lab_presentation(game) -> void:
@@ -870,30 +870,185 @@ func _test_parent_picker_touch_scrolling(game) -> void:
 		if scroll_candidates.size() == 12:
 			break
 	assert(scroll_candidates.size() == 12)
-	game.fusion_lab_ui.open_lab(scroll_candidates, game.species_get_counts)
-	game.fusion_lab_ui._open_picker(0)
-	await get_tree().process_frame
-	await get_tree().process_frame
-	var picker_scroll: ScrollContainer = game.fusion_lab_ui.picker_scroll
+	var ui = game.fusion_lab_ui
+	ui.open_lab(scroll_candidates, game.species_get_counts)
+	ui._open_picker(0)
+	await _wait_for_picker_layout()
+	var picker_scroll: ScrollContainer = ui.picker_scroll
 	assert(picker_scroll.scroll_deadzone == 12)
 	assert(picker_scroll.mouse_filter == Control.MOUSE_FILTER_STOP)
-	assert(game.fusion_lab_ui.picker_grid.mouse_filter == Control.MOUSE_FILTER_PASS)
+	assert(ui.picker_grid.mouse_filter == Control.MOUSE_FILTER_PASS)
 	assert(picker_scroll.get_v_scroll_bar().max_value > picker_scroll.size.y)
-	var first_card := game.fusion_lab_ui.picker_grid.get_child(0) as Button
+	var first_card := ui.picker_grid.get_child(0) as Button
 	assert(first_card != null)
 	assert(first_card.action_mode == BaseButton.ACTION_MODE_BUTTON_RELEASE)
 	assert(first_card.mouse_filter == Control.MOUSE_FILTER_PASS)
 	assert(first_card.mouse_force_pass_scroll_events)
 	var first_species_id := str(first_card.get_meta("species_id", ""))
+
+	# Selecting a parent remembers the position that was visible when the picker closed.
 	picker_scroll.scroll_vertical = 100000
 	await get_tree().process_frame
-	assert(picker_scroll.scroll_vertical > 0)
-	assert(game.fusion_lab_ui.picker_page.visible)
+	var selected_scroll_vertical := picker_scroll.scroll_vertical
+	assert(selected_scroll_vertical > 0)
+	assert(ui.picker_page.visible)
 	assert(game.fusion_parent_a_id.is_empty())
 	first_card.pressed.emit()
 	await get_tree().process_frame
 	assert(game.fusion_parent_a_id == first_species_id)
-	assert(game.fusion_lab_ui.main_page.visible and not game.fusion_lab_ui.picker_page.visible)
+	assert(ui.main_page.visible and not ui.picker_page.visible)
+	ui._open_picker(0)
+	await _wait_for_picker_layout()
+	assert(absi(picker_scroll.scroll_vertical - selected_scroll_vertical) <= 1)
+
+	# Returning without choosing also remembers the last position.
+	var slot_a_scroll_vertical := maxi(1, ui._picker_max_scroll_vertical() / 2)
+	picker_scroll.scroll_vertical = slot_a_scroll_vertical
+	await get_tree().process_frame
+	slot_a_scroll_vertical = picker_scroll.scroll_vertical
+	ui.picker_back_button.pressed.emit()
+	await get_tree().process_frame
+	ui._open_picker(0)
+	await _wait_for_picker_layout()
+	assert(absi(picker_scroll.scroll_vertical - slot_a_scroll_vertical) <= 1)
+	ui.picker_back_button.pressed.emit()
+	await get_tree().process_frame
+
+	# Parent A and B keep independent positions.
+	ui._open_picker(1)
+	await _wait_for_picker_layout()
+	var slot_b_scroll_vertical := maxi(1, ui._picker_max_scroll_vertical() / 3)
+	if slot_b_scroll_vertical == slot_a_scroll_vertical:
+		slot_b_scroll_vertical = ui._picker_max_scroll_vertical()
+	picker_scroll.scroll_vertical = slot_b_scroll_vertical
+	await get_tree().process_frame
+	slot_b_scroll_vertical = picker_scroll.scroll_vertical
+	assert(slot_b_scroll_vertical != slot_a_scroll_vertical)
+	ui.picker_back_button.pressed.emit()
+	await get_tree().process_frame
+	ui._open_picker(0)
+	await _wait_for_picker_layout()
+	assert(absi(picker_scroll.scroll_vertical - slot_a_scroll_vertical) <= 1)
+	ui.picker_back_button.pressed.emit()
+	await get_tree().process_frame
+	ui._open_picker(1)
+	await _wait_for_picker_layout()
+	assert(absi(picker_scroll.scroll_vertical - slot_b_scroll_vertical) <= 1)
+	ui.picker_back_button.pressed.emit()
+	await get_tree().process_frame
+
+	# Series filters are also independent, and a manual change starts at the top.
+	ui._open_picker(0)
+	await _wait_for_picker_layout()
+	var filter_ids: Array[String] = []
+	for index in range(1, ui.picker_filter.item_count):
+		filter_ids.append(str(ui.picker_filter.get_item_metadata(index)))
+	assert(filter_ids.size() >= 2)
+	var slot_a_filter_id := filter_ids[0]
+	var slot_a_filter_count := -1
+	for filter_id in filter_ids:
+		var candidate_count := 0
+		for entry in scroll_candidates:
+			if ui._candidate_display_series_id(entry) == filter_id:
+				candidate_count += 1
+		if candidate_count > slot_a_filter_count:
+			slot_a_filter_id = filter_id
+			slot_a_filter_count = candidate_count
+	var slot_b_filter_id := ""
+	for filter_id in filter_ids:
+		if filter_id != slot_a_filter_id:
+			slot_b_filter_id = filter_id
+			break
+	assert(not slot_b_filter_id.is_empty())
+	var slot_a_filter_index := _picker_filter_index(ui, slot_a_filter_id)
+	assert(slot_a_filter_index > 0)
+	ui.picker_filter.select(slot_a_filter_index)
+	ui.picker_filter.item_selected.emit(slot_a_filter_index)
+	await _wait_for_picker_layout()
+	assert(_selected_picker_filter_id(ui) == slot_a_filter_id)
+	assert(picker_scroll.scroll_vertical == 0)
+	picker_scroll.scroll_vertical = 100000
+	await get_tree().process_frame
+	var slot_a_filtered_scroll := picker_scroll.scroll_vertical
+	ui.picker_back_button.pressed.emit()
+	await get_tree().process_frame
+
+	ui._open_picker(1)
+	await _wait_for_picker_layout()
+	assert(_selected_picker_filter_id(ui) == "all")
+	assert(absi(picker_scroll.scroll_vertical - slot_b_scroll_vertical) <= 1)
+	var slot_b_filter_index := _picker_filter_index(ui, slot_b_filter_id)
+	assert(slot_b_filter_index > 0)
+	ui.picker_filter.select(slot_b_filter_index)
+	ui.picker_filter.item_selected.emit(slot_b_filter_index)
+	await _wait_for_picker_layout()
+	assert(_selected_picker_filter_id(ui) == slot_b_filter_id)
+	assert(picker_scroll.scroll_vertical == 0)
+	picker_scroll.scroll_vertical = 100000
+	await get_tree().process_frame
+	var slot_b_filtered_scroll := picker_scroll.scroll_vertical
+	ui.picker_back_button.pressed.emit()
+	await get_tree().process_frame
+
+	ui._open_picker(0)
+	await _wait_for_picker_layout()
+	assert(_selected_picker_filter_id(ui) == slot_a_filter_id)
+	assert(absi(picker_scroll.scroll_vertical - slot_a_filtered_scroll) <= 1)
+	ui.picker_back_button.pressed.emit()
+	await get_tree().process_frame
+	ui._open_picker(1)
+	await _wait_for_picker_layout()
+	assert(_selected_picker_filter_id(ui) == slot_b_filter_id)
+	assert(absi(picker_scroll.scroll_vertical - slot_b_filtered_scroll) <= 1)
+	ui.picker_back_button.pressed.emit()
+	await get_tree().process_frame
+
+	# A shorter candidate list clamps the remembered position to the new range.
+	ui._open_picker(0)
+	await _wait_for_picker_layout()
+	ui.picker_filter.select(0)
+	ui.picker_filter.item_selected.emit(0)
+	await _wait_for_picker_layout()
+	picker_scroll.scroll_vertical = 100000
+	await get_tree().process_frame
+	var before_candidate_shrink := picker_scroll.scroll_vertical
+	assert(before_candidate_shrink > 0)
+	ui.picker_back_button.pressed.emit()
+	await get_tree().process_frame
+	var reduced_candidates: Array[Dictionary] = [scroll_candidates[0].duplicate(true), scroll_candidates[1].duplicate(true)]
+	ui.open_lab(reduced_candidates, game.species_get_counts)
+	ui._open_picker(0)
+	await _wait_for_picker_layout()
+	assert(_selected_picker_filter_id(ui) == "all")
+	assert(picker_scroll.scroll_vertical == clampi(before_candidate_shrink, 0, ui._picker_max_scroll_vertical()))
+	ui.picker_back_button.pressed.emit()
+	await get_tree().process_frame
+
+	# Closing the lab ends the session and resets both slots.
+	ui.close_lab()
+	assert(ui.picker_filter_series_ids_by_slot == ["all", "all"])
+	assert(ui.picker_scroll_verticals_by_slot == [0, 0])
+	ui.open_lab(scroll_candidates, game.species_get_counts)
+	for slot in range(2):
+		ui._open_picker(slot)
+		await _wait_for_picker_layout()
+		assert(_selected_picker_filter_id(ui) == "all")
+		assert(picker_scroll.scroll_vertical == 0)
+		ui.picker_back_button.pressed.emit()
+		await get_tree().process_frame
+
+func _wait_for_picker_layout() -> void:
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+func _picker_filter_index(ui, series_id: String) -> int:
+	for index in range(ui.picker_filter.item_count):
+		if str(ui.picker_filter.get_item_metadata(index)) == series_id:
+			return index
+	return -1
+
+func _selected_picker_filter_id(ui) -> String:
+	return str(ui.picker_filter.get_item_metadata(ui.picker_filter.selected))
 
 func _test_tier1_game_flow(game) -> void:
 	game._reset_progression_state()
