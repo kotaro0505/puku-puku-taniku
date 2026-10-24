@@ -43,7 +43,7 @@ func _ready() -> void:
 	_test_legacy_save_migration(game)
 	_test_export_exclusions_and_source_retention()
 	game._reset_progression_state()
-	print("RETIRED_FEATURES_SMOKE_OK secret_runtime=absent secret_tombstone=progression retired_species=9 retired_series=neon legacy_state=sanitized arrangements=preserved pots=preserved protected=3 forest=active exports=web+ios")
+	print("RETIRED_FEATURES_SMOKE_OK secret_runtime=absent secret_tombstone=progression retired_species=9 retired_series=neon legacy_state=sanitized arrangements=preserved pots=preserved protected=3 forest=active exports=web+ios-production+ios-development")
 	get_tree().quit()
 
 
@@ -244,10 +244,10 @@ func _test_legacy_save_migration(game: Node) -> void:
 
 func _test_export_exclusions_and_source_retention() -> void:
 	var export_source := FileAccess.get_file_as_string("res://export_presets.cfg")
-	assert(export_source.count("assets/secret_gacha/*") == 2)
+	assert(export_source.count("assets/secret_gacha/*") == 3)
 	for asset_path in RETIRED_IMAGE_PATHS:
 		assert(FileAccess.file_exists("res://" + asset_path))
-		assert(export_source.count(asset_path) == 2)
+		assert(export_source.count(asset_path) == 3)
 	var runtime_sources := "\n".join([
 		FileAccess.get_file_as_string("res://scripts/main.gd"),
 		FileAccess.get_file_as_string("res://scripts/succulent.gd"),

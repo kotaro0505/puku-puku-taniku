@@ -9,3 +9,7 @@ Thumbs.db
 .idea/
 .tools/
 tmp/
+
+# Generated from encrypted Codemagic environment variables. Never commit ad IDs.
+/addons/AdmobPlugin/ios_export.cfg
+/data/mobile-ads.cfg

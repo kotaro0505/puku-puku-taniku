@@ -180,7 +180,7 @@ func _test_plant_label_visibility_toggle(game)->void:
 	game._input(press);game._input(release);assert(known.state=="growing" and not game.pointer_down,"label-toggle tap harvested the giant leaf behind the button")
 	game.active_seed_type="old";game.first_colorata_confirmed=false;game.play_active=true;game._update_play_ui();assert(not game.plant_label_visibility_button.visible,"label toggle appeared during the old-seed story")
 	game.active_seed_type="normal"
-	game.play_active=false;game._update_play_ui();assert(game.plant_label_visibility_button.visible,"label toggle disappeared after a normal game ended")
+	game.play_active=false;game._update_play_ui();assert(not game.plant_label_visibility_button.visible,"label toggle remained after a normal game ended")
 	game.play_active=true;game.current_mode="habitat";game._update_play_ui();assert(not game.plant_label_visibility_button.visible,"label toggle appeared in habitat")
 	game.current_mode="greenhouse";game.arrangement_scene_active=true;game._update_play_ui();assert(not game.plant_label_visibility_button.visible,"label toggle appeared in arrangement")
 	game.arrangement_scene_active=false;game.first_play_tutorial_active=true;game._update_play_ui();assert(not game.plant_label_visibility_button.visible,"label toggle covered the first-play tutorial")

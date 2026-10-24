@@ -12,3 +12,11 @@ Godot 4.7 / GDScript / Compatibility renderer の縦画面3Dゲームです。
 造形確認用に `succulent_test.tscn`、11品種比較用に `species_gallery.tscn`、基本ロジック確認用に `logic_smoke.tscn` を用意しています。これらは通常プレイ画面には表示されません。
 
 ジュレ危険度や事前警告は表示せず、GETまたはジュレで1株が消えるたび、短い間を置いて空き位置へ小苗が1株だけ補充されます。ラウイ／ゴールデンラウイ／アフィニスの比較には `reference_trio.tscn` を使用できます。
+
+## iOSリリースプロファイル
+
+- `ios-development`: `.dev` Bundle ID、開発機能有効、Googleテスト広告
+- `ios-testflight`: 本番Bundle ID、本番ゲート、TestFlight内部テスト専用
+- `ios-app-store-release`: 本番Bundle ID、本番ゲート、App Store審査提出
+
+本番広告IDはCodemagicのSecret環境変数からのみ注入します。App Storeへの実行条件、未確認項目、App Store Connectで必要な作業は [docs/app-store-release-readiness.md](docs/app-store-release-readiness.md) を参照してください。

@@ -1,5 +1,5 @@
 workflows:
-  ios-testflight:
+  ios-testflight: &ios-production-workflow
     name: ぷくぷく！たにくらいふ iOS TestFlight
     instance_type: mac_mini_m2
     max_build_duration: 120
@@ -18,9 +18,18 @@ workflows:
         APP_VERSION: "1.0.0"
         APPLE_TEAM_ID: "UK8FRB9XKH"
         BUNDLE_ID: "com.ohanayanouen.pukupukutaniku"
+        BUILD_PROFILE: "app_store"
+        MOBILE_ADS_MODE: "production"
+        GODOT_IOS_PRESET: "iOS"
+        DISPLAY_NAME: "ぷくぷく！たにくらいふ"
+        IOS_APP_DIR: "build/ios/puku_puku_taniku"
+        IOS_INFO_PLIST: "build/ios/puku_puku_taniku/puku_puku_taniku-Info.plist"
+        IPA_DIR: "build/ios/ipa"
+        INTERNAL_TESTFLIGHT_ONLY: "true"
+        APP_STORE_SUBMISSION: "false"
         XCODE_PROJECT: "build/ios/puku_puku_taniku.xcodeproj"
         XCODE_SCHEME: "puku_puku_taniku"
-      xcode: latest
+      xcode: 26.5
     cache:
       cache_paths:
         - $HOME/.cache/puku-puku-taniku/godot-4.7.2
@@ -39,7 +48,13 @@ workflows:
         script: |
           #!/bin/bash
           set -euo pipefail
-          test "$BUNDLE_ID" = "com.ohanayanouen.pukupukutaniku"
+          python3 scripts/ci/validate_build_profile.py "$BUILD_PROFILE"
+          if [ "$BUILD_PROFILE" = "app_store" ]; then
+            test "$BUNDLE_ID" = "com.ohanayanouen.pukupukutaniku"
+          else
+            test "$BUILD_PROFILE" = "development"
+            test "$BUNDLE_ID" = "com.ohanayanouen.pukupukutaniku.dev"
+          fi
           test "$APPLE_TEAM_ID" = "UK8FRB9XKH"
           test "$APP_VERSION" = "1.0.0"
           test "$IOS_MIN_VERSION" = "15.6"
@@ -53,10 +68,21 @@ workflows:
           grep -Fq 'plugins/SharePlugin=true' export_presets.cfg
           grep -Fq 'plugins/NotificationSchedulerPlugin=true' export_presets.cfg
           grep -Fq 'plugins/godot-storekit2=true' export_presets.cfg
+          grep -Fq 'plugins/AdmobPlugin=true' export_presets.cfg
           test -f ios/plugins/SharePlugin.gdip
           test -f ios/plugins/NotificationSchedulerPlugin.gdip
           test -f ios/plugins/SharePlugin.release.xcframework/ios-arm64/SharePlugin.a
           test -f ios/plugins/NotificationSchedulerPlugin.release.xcframework/ios-arm64/NotificationSchedulerPlugin.a
+          test -f ios/plugins/AdmobPlugin.gdip
+          test -f ios/plugins/AdmobPlugin.release.xcframework/ios-arm64/AdmobPlugin.a
+          test -f addons/AdmobPlugin/LICENSE.txt
+          test -f addons/AdmobPlugin/VENDORED_VERSION.md
+          grep -Fq 'version="7.0"' addons/AdmobPlugin/plugin.cfg
+          grep -Fq 'GoogleMobileAds' addons/AdmobPlugin/AdmobPlugin.gd
+          grep -Fq '12.14.0' addons/AdmobPlugin/AdmobPlugin.gd
+          grep -Fq 'NSAllowsArbitraryLoadsForMedia' addons/AdmobPlugin/AdmobPlugin.gd
+          grep -Fq 'NSAllowsArbitraryLoadsInWebContent' addons/AdmobPlugin/AdmobPlugin.gd
+          ! grep -Fq '<key>NSAllowsArbitraryLoads</key>' addons/AdmobPlugin/AdmobPlugin.gd
           grep -Fq 'initialization="share_plugin_init"' ios/plugins/SharePlugin.gdip
           SHARE_PLUGIN_STRINGS="$(mktemp)"
           strings ios/plugins/SharePlugin.release.xcframework/ios-arm64/SharePlugin.a > "$SHARE_PLUGIN_STRINGS"
@@ -86,6 +112,33 @@ workflows:
               raise SystemExit(f"iOS icon must be opaque, PNG color type is {color_type}")
           print(f"IOS_ICON_OK size={width}x{height} bit_depth={bit_depth} opaque=true")
           PY
+
+      - name: Configure rewarded ads without committing identifiers
+        script: |
+          #!/bin/bash
+          set -euo pipefail
+          python3 scripts/ci/configure_mobile_ads.py "$MOBILE_ADS_MODE"
+          test -f addons/AdmobPlugin/ios_export.cfg
+          test -f data/mobile-ads.cfg
+          if [ "$MOBILE_ADS_MODE" = "production" ]; then
+            grep -Fq 'is_real=true' addons/AdmobPlugin/ios_export.cfg
+            ! grep -Fq 'ca-app-pub-3940256099942544/1712485313' data/mobile-ads.cfg
+          else
+            test "$BUILD_PROFILE" = "development"
+            grep -Fq 'is_real=false' addons/AdmobPlugin/ios_export.cfg
+          fi
+
+      - name: Verify Apple toolchain meets current upload minimum
+        script: |
+          #!/bin/bash
+          set -euo pipefail
+          xcodebuild -version
+          XCODE_MAJOR="$(xcodebuild -version | awk '/Xcode/{split($2,v,"."); print v[1]}')"
+          IOS_SDK_VERSION="$(xcrun --sdk iphoneos --show-sdk-version)"
+          IOS_SDK_MAJOR="${IOS_SDK_VERSION%%.*}"
+          test "$XCODE_MAJOR" -ge 26
+          test "$IOS_SDK_MAJOR" -ge 26
+          echo "APPLE_TOOLCHAIN_OK xcode_major=$XCODE_MAJOR iphoneos_sdk=$IOS_SDK_VERSION"
 
       - name: Install Godot 4.7.2 and matching iOS export template
         script: |
@@ -175,6 +228,9 @@ workflows:
           run_scene_smoke res://scripts/first_play_tutorial_smoke.tscn FIRST_PLAY_TUTORIAL_SMOKE_OK
           run_scene_smoke res://scripts/first_old_seed_restart_smoke.tscn FIRST_OLD_SEED_RESTART_SMOKE_OK
           run_scene_smoke res://scripts/story_dev_presets_smoke.tscn STORY_DEV_PRESETS_SMOKE_OK
+          run_scene_smoke res://scripts/build_profile_smoke.tscn BUILD_PROFILE_SMOKE_OK
+          run_scene_smoke res://scripts/release_gate_smoke.tscn RELEASE_GATE_SMOKE_OK
+          run_scene_smoke res://scripts/rewarded_ad_service_smoke.tscn REWARDED_AD_SERVICE_SMOKE_OK
           run_scene_smoke res://scripts/catalog_cover_species_smoke.tscn CATALOG_COVER_SPECIES_SMOKE_OK
           run_scene_smoke res://scripts/collection_complete_smoke.tscn COLLECTION_COMPLETE_SMOKE_OK
           run_scene_smoke res://scripts/carnicolor_first_get_story_smoke.tscn CARNICOLOR_FIRST_GET_STORY_SMOKE_OK
@@ -218,8 +274,8 @@ workflows:
 
           path = Path("export_presets.cfg")
           text = path.read_text(encoding="utf-8")
-          updated, count = re.subn(r'application/version="[^"]*"', f'application/version="{sys.argv[1]}"', text, count=1)
-          if count != 1:
+          updated, count = re.subn(r'application/version="[^"]*"', f'application/version="{sys.argv[1]}"', text)
+          if count < 2:
               raise SystemExit("Unable to set iOS build number in export_presets.cfg")
           path.write_text(updated, encoding="utf-8", newline="\n")
           PY
@@ -230,19 +286,21 @@ workflows:
         script: |
           #!/bin/bash
           set -euo pipefail
-          mkdir -p build/ios
-          "$GODOT_BIN" --headless --path "$CM_BUILD_DIR" --export-release iOS "$CM_BUILD_DIR/$XCODE_PROJECT"
+          mkdir -p "$(dirname "$XCODE_PROJECT")"
+          "$GODOT_BIN" --headless --path "$CM_BUILD_DIR" --export-release "$GODOT_IOS_PRESET" "$CM_BUILD_DIR/$XCODE_PROJECT"
           test -d "$CM_BUILD_DIR/$XCODE_PROJECT"
           test -f "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
           grep -Fq "PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID;" "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
           grep -Fq "DEVELOPMENT_TEAM = $APPLE_TEAM_ID;" "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
           grep -Fq "MARKETING_VERSION = $APP_VERSION;" "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
           grep -Fq "CURRENT_PROJECT_VERSION = $IOS_BUILD_NUMBER;" "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
-          grep -Fq 'INFOPLIST_KEY_CFBundleDisplayName = "ぷくぷく！たにくらいふ";' "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
+          grep -Fq "INFOPLIST_KEY_CFBundleDisplayName = \"$DISPLAY_NAME\";" "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
           grep -Fq 'SharePlugin' "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
           grep -Fq 'NotificationSchedulerPlugin' "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
           grep -Fq 'godot-storekit2' "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
           grep -Fq 'StoreKit.framework' "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
+          grep -Fq 'AdmobPlugin' "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
+          grep -Fq 'GoogleMobileAds' "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
           python3 - "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj" "$IOS_MIN_VERSION" <<'PY'
           import re
           import sys
@@ -258,15 +316,45 @@ workflows:
               )
           print(f"GODOT_IOS_DEPLOYMENT_TARGET_OK target={expected} project={project_path}")
           PY
-          test -f "$CM_BUILD_DIR/build/ios/puku_puku_taniku/Images.xcassets/AppIcon.appiconset/Icon-1024.png"
-          test "$(grep -c '<key>ITSAppUsesNonExemptEncryption</key>' "$CM_BUILD_DIR/build/ios/puku_puku_taniku/puku_puku_taniku-Info.plist")" = "1"
+          test -f "$CM_BUILD_DIR/$IOS_APP_DIR/Images.xcassets/AppIcon.appiconset/Icon-1024.png"
+          test "$(grep -c '<key>ITSAppUsesNonExemptEncryption</key>' "$CM_BUILD_DIR/$IOS_INFO_PLIST")" = "1"
+          test "$(grep -c '<key>GADApplicationIdentifier</key>' "$CM_BUILD_DIR/$IOS_INFO_PLIST")" = "1"
+          python3 - "$CM_BUILD_DIR/$IOS_INFO_PLIST" <<'PY'
+          import plistlib
+          import sys
+
+          with open(sys.argv[1], "rb") as handle:
+              info = plistlib.load(handle)
+          ats = info.get("NSAppTransportSecurity", {})
+          if ats.get("NSAllowsArbitraryLoads"):
+              raise SystemExit("Exported app disables ATS globally")
+          if not ats.get("NSAllowsArbitraryLoadsForMedia") or not ats.get("NSAllowsArbitraryLoadsInWebContent"):
+              raise SystemExit("Exported app is missing scoped Google Mobile Ads ATS exceptions")
+          print("IOS_ATS_OK global=false media=true web_content=true")
+          PY
+          test -f "$CM_BUILD_DIR/$IOS_APP_DIR/PrivacyInfo.xcprivacy"
+          plutil -lint "$CM_BUILD_DIR/$IOS_APP_DIR/PrivacyInfo.xcprivacy"
+          grep -Fq 'C617.1' "$CM_BUILD_DIR/$IOS_APP_DIR/PrivacyInfo.xcprivacy"
+          grep -Fq '35F9.1' "$CM_BUILD_DIR/$IOS_APP_DIR/PrivacyInfo.xcprivacy"
+          grep -Fq 'E174.1' "$CM_BUILD_DIR/$IOS_APP_DIR/PrivacyInfo.xcprivacy"
+          grep -Fq 'CA92.1' "$CM_BUILD_DIR/$IOS_APP_DIR/PrivacyInfo.xcprivacy"
           echo "GODOT_IOS_EXPORT_OK project=$XCODE_PROJECT"
 
       - name: Apply App Store distribution signing
         script: |
           #!/bin/bash
           set -euo pipefail
-          xcode-project use-profiles --custom-export-options='{"testFlightInternalTestingOnly": true}'
+          if [ "$APP_STORE_SUBMISSION" = "true" ]; then
+            test "$BUILD_PROFILE" = "app_store"
+            test "$INTERNAL_TESTFLIGHT_ONLY" = "false"
+            xcode-project use-profiles
+          elif [ "$INTERNAL_TESTFLIGHT_ONLY" = "true" ]; then
+            test "$BUILD_PROFILE" = "app_store"
+            xcode-project use-profiles --custom-export-options='{"testFlightInternalTestingOnly": true}'
+          else
+            test "$BUILD_PROFILE" = "development"
+            xcode-project use-profiles
+          fi
           echo "IOS_SIGNING_APPLIED bundle_id=$BUNDLE_ID team_id=$APPLE_TEAM_ID"
 
       - name: Archive and build signed IPA
@@ -276,9 +364,59 @@ workflows:
           xcode-project build-ipa \
             --project "$CM_BUILD_DIR/$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME"
-          IPA_PATH="$(find build/ios/ipa -type f -name '*.ipa' -print -quit)"
+          IPA_PATH="$(find "$IPA_DIR" -type f -name '*.ipa' -print -quit)"
           test -n "$IPA_PATH"
           xcode-project ipa-info "$IPA_PATH"
+          IPA_AUDIT_DIR="$(mktemp -d)"
+          unzip -q "$IPA_PATH" -d "$IPA_AUDIT_DIR"
+          APP_PATH="$(find "$IPA_AUDIT_DIR/Payload" -maxdepth 1 -type d -name '*.app' -print -quit)"
+          test -n "$APP_PATH"
+          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+          python3 - "$APP_PATH" "$BUNDLE_ID" "$DISPLAY_NAME" "$BUILD_PROFILE" <<'PY'
+          import plistlib
+          import sys
+          from pathlib import Path
+
+          app = Path(sys.argv[1])
+          expected_bundle, expected_name, profile = sys.argv[2:5]
+          with (app / "Info.plist").open("rb") as handle:
+              info = plistlib.load(handle)
+          if info.get("CFBundleIdentifier") != expected_bundle:
+              raise SystemExit("Signed IPA has an unexpected bundle identifier")
+          if info.get("CFBundleDisplayName") != expected_name:
+              raise SystemExit("Signed IPA has an unexpected display name")
+          app_id = str(info.get("GADApplicationIdentifier", ""))
+          if not app_id.startswith("ca-app-pub-"):
+              raise SystemExit("Signed IPA is missing GADApplicationIdentifier")
+          if profile == "app_store" and app_id == "ca-app-pub-3940256099942544~1458002511":
+              raise SystemExit("Signed App Store IPA contains Google's sample app ID")
+          ats = info.get("NSAppTransportSecurity", {})
+          if ats.get("NSAllowsArbitraryLoads"):
+              raise SystemExit("Signed IPA disables ATS globally")
+          if not ats.get("NSAllowsArbitraryLoadsForMedia") or not ats.get("NSAllowsArbitraryLoadsInWebContent"):
+              raise SystemExit("Signed IPA is missing scoped Google Mobile Ads ATS exceptions")
+
+          privacy_path = app / "PrivacyInfo.xcprivacy"
+          with privacy_path.open("rb") as handle:
+              privacy = plistlib.load(handle)
+          reasons = {
+              item.get("NSPrivacyAccessedAPIType"): set(item.get("NSPrivacyAccessedAPITypeReasons", []))
+              for item in privacy.get("NSPrivacyAccessedAPITypes", [])
+          }
+          required = {
+              "NSPrivacyAccessedAPICategoryFileTimestamp": "C617.1",
+              "NSPrivacyAccessedAPICategorySystemBootTime": "35F9.1",
+              "NSPrivacyAccessedAPICategoryDiskSpace": "E174.1",
+              "NSPrivacyAccessedAPICategoryUserDefaults": "CA92.1",
+          }
+          for category, reason in required.items():
+              if reason not in reasons.get(category, set()):
+                  raise SystemExit(f"Missing privacy reason {category}/{reason}")
+          sdk_manifests = [path for path in app.rglob("PrivacyInfo.xcprivacy") if path != privacy_path]
+          if not any("GoogleMobileAds" in str(path) for path in sdk_manifests):
+              raise SystemExit("Google Mobile Ads privacy manifest is missing from the signed IPA")
+          print(f"SIGNED_IPA_AUDIT_OK bundle={expected_bundle} privacy_manifests={1 + len(sdk_manifests)}")
+          PY
           echo "IOS_IPA_OK path=$IPA_PATH version=$APP_VERSION build=$IOS_BUILD_NUMBER"
 
       - name: Record iOS build diagnostics
@@ -286,9 +424,9 @@ workflows:
           #!/bin/bash
           set -euo pipefail
           mkdir -p build/ios-diagnostics
-          printf '{"bundle_id":"%s","team_id":"%s","version":"%s","build":"%s"}\n' \
-            "$BUNDLE_ID" "$APPLE_TEAM_ID" "$APP_VERSION" "$IOS_BUILD_NUMBER" \
-            > build/ios-diagnostics/app-store-app.json
+          printf '{"profile":"%s","bundle_id":"%s","team_id":"%s","version":"%s","build":"%s"}\n' \
+            "$BUILD_PROFILE" "$BUNDLE_ID" "$APPLE_TEAM_ID" "$APP_VERSION" "$IOS_BUILD_NUMBER" \
+            > "build/ios-diagnostics/$BUILD_PROFILE-app.json"
     artifacts:
       - build/ios/ipa/*.ipa
       - build/ios-diagnostics/*.json
@@ -298,5 +436,76 @@ workflows:
     publishing:
       app_store_connect:
         auth: integration
-        submit_to_testflight: true
+        submit_to_testflight: false
         submit_to_app_store: false
+
+  ios-app-store-release:
+    <<: *ios-production-workflow
+    name: ぷくぷく！たにくらいふ App Store正式リリース
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.ohanayanouen.pukupukutaniku
+      vars:
+        GODOT_VERSION: "4.7.2"
+        GODOT_TEMPLATE_VERSION: "4.7.2.stable"
+        STOREKIT2_VERSION: "v0.2"
+        IOS_MIN_VERSION: "15.6"
+        STOREKIT2_COMPAT_REVISION: "compat2"
+        APP_VERSION: "1.0.0"
+        APPLE_TEAM_ID: "UK8FRB9XKH"
+        BUNDLE_ID: "com.ohanayanouen.pukupukutaniku"
+        BUILD_PROFILE: "app_store"
+        MOBILE_ADS_MODE: "production"
+        GODOT_IOS_PRESET: "iOS"
+        DISPLAY_NAME: "ぷくぷく！たにくらいふ"
+        IOS_APP_DIR: "build/ios/puku_puku_taniku"
+        IOS_INFO_PLIST: "build/ios/puku_puku_taniku/puku_puku_taniku-Info.plist"
+        IPA_DIR: "build/ios/ipa"
+        INTERNAL_TESTFLIGHT_ONLY: "false"
+        APP_STORE_SUBMISSION: "true"
+        XCODE_PROJECT: "build/ios/puku_puku_taniku.xcodeproj"
+        XCODE_SCHEME: "puku_puku_taniku"
+      xcode: 26.5
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: false
+        submit_to_app_store: true
+        release_type: MANUAL
+
+  ios-development:
+    <<: *ios-production-workflow
+    name: ぷくぷく！たにくらいふ iPhone開発版
+    environment:
+      ios_signing:
+        distribution_type: development
+        bundle_identifier: com.ohanayanouen.pukupukutaniku.dev
+      vars:
+        GODOT_VERSION: "4.7.2"
+        GODOT_TEMPLATE_VERSION: "4.7.2.stable"
+        STOREKIT2_VERSION: "v0.2"
+        IOS_MIN_VERSION: "15.6"
+        STOREKIT2_COMPAT_REVISION: "compat2"
+        APP_VERSION: "1.0.0"
+        APPLE_TEAM_ID: "UK8FRB9XKH"
+        BUNDLE_ID: "com.ohanayanouen.pukupukutaniku.dev"
+        BUILD_PROFILE: "development"
+        MOBILE_ADS_MODE: "test"
+        GODOT_IOS_PRESET: "iOS Development"
+        DISPLAY_NAME: "ぷくぷく DEV"
+        IOS_APP_DIR: "build/ios-dev/puku_puku_taniku_dev"
+        IOS_INFO_PLIST: "build/ios-dev/puku_puku_taniku_dev/puku_puku_taniku_dev-Info.plist"
+        IPA_DIR: "build/ios-dev/ipa"
+        INTERNAL_TESTFLIGHT_ONLY: "false"
+        APP_STORE_SUBMISSION: "false"
+        XCODE_PROJECT: "build/ios-dev/puku_puku_taniku_dev.xcodeproj"
+        XCODE_SCHEME: "puku_puku_taniku_dev"
+      xcode: 26.5
+    artifacts:
+      - build/ios-dev/ipa/*.ipa
+      - build/ios-diagnostics/*.json
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+    publishing: {}

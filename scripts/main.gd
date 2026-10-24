@@ -4,6 +4,8 @@ signal rescue_reward_ad_requested(reward_context:String)
 
 const SucculentClass = preload("res://scripts/succulent.gd")
 const AudioManagerClass = preload("res://scripts/audio_manager.gd")
+const BuildProfileClass = preload("res://scripts/build_profile.gd")
+const RewardedAdServiceClass = preload("res://scripts/rewarded_ad_service.gd")
 const JellyBalanceClass = preload("res://scripts/jelly_balance.gd")
 const ArrangementUIClass = preload("res://scripts/arrangement_ui.gd")
 const ArrangementShareBackgroundsClass = preload("res://scripts/arrangement_share_backgrounds.gd")
@@ -42,13 +44,14 @@ const HabitatRestorationClass = preload("res://scripts/habitat_restoration.gd")
 const HabitatRestorationUIClass = preload("res://scripts/habitat_restoration_ui.gd")
 const EndlessGreenhouseExperimentClass = preload("res://scripts/endless_greenhouse_experiment.gd")
 const SlotMachineScene = preload("res://scenes/slot_machine.tscn")
-# Master release gate for every development-only UI and action. Keep this true
-# for Web, Codemagic iOS, and native development builds. The App Store release
-# can disable the whole group by changing this single value to false.
-const TRIAL_DEV_CONTROLS_ENABLED := true
+# Master release gate for every development-only UI and action. It is derived
+# from export feature tags so a production build never depends on a manual
+# source edit. Untagged release builds fail closed; editor/debug builds remain
+# convenient development environments.
+var TRIAL_DEV_CONTROLS_ENABLED := BuildProfileClass.development_tools_enabled()
 # Kept as a compatibility alias for existing tests/callers. Catalog preview is
 # deliberately governed by the same release gate instead of a second switch.
-const DEVELOPMENT_CATALOG_PREVIEW_ENABLED := TRIAL_DEV_CONTROLS_ENABLED
+var DEVELOPMENT_CATALOG_PREVIEW_ENABLED := TRIAL_DEV_CONTROLS_ENABLED
 const PROGRESSION_VERSION := 28
 const RETIRED_CONTENT_VERSION := 3
 const NORMAL_SAVE_PATH := EndlessGreenhouseExperimentClass.NORMAL_SAVE_PATH
@@ -159,7 +162,7 @@ const SEED_PACK_CONFIG := {
 }
 const RESCUE_REWARD_SEED_TYPE := "normal"
 const RESCUE_REWARD_SEED_BAGS := 1
-const REWARDED_AD_DEVELOPMENT_STUB_ENABLED := true
+var REWARDED_AD_DEVELOPMENT_STUB_ENABLED := BuildProfileClass.rewarded_ad_stub_enabled()
 const HIDDEN_PINWHEEL_ID := "pinwheel"
 const HIDDEN_TOVAR_ID := "tovarensis_tovar"
 const HIDDEN_BUSTAMANTE_ID := "strictiflora_bustamante"
@@ -495,6 +498,7 @@ var last_shop_chatter := ""
 var last_armadillo_shop_chatter_index := -1
 var rescue_reward_in_progress := false
 var rescue_reward_context := ""
+var rewarded_ad_service
 var intro_overlay: Control
 var intro_dialog_panel: PanelContainer
 var intro_dialogue_label: Label
@@ -846,6 +850,8 @@ var act3_intro_eligible_visit_id := 0
 var habitat_crisis_eligible_visit_id := 0
 
 func _ready() -> void:
+	for profile_error in BuildProfileClass.runtime_profile_errors():
+		push_error(str(profile_error))
 	if _slot_preview_requested():
 		set_process(false)
 		set_process_input(false)
@@ -874,6 +880,7 @@ func _ready() -> void:
 	_load_pot_data()
 	_load_save()
 	_setup_pot_unlock_iap()
+	_setup_rewarded_ads()
 	habitat_simulation_unix=Time.get_unix_time_from_system()
 	var recovered_forest_encounters:=_register_encountered_species_for_unlocked_series()
 	_apply_saved_unlocks()
@@ -1110,6 +1117,16 @@ func _setup_pot_unlock_iap()->void:
 	pot_unlock_iap_service.purchase_failed.connect(_on_pot_iap_purchase_failed)
 	pot_unlock_iap_service.restore_finished.connect(_on_pot_iap_restore_finished)
 	pot_unlock_iap_service.configure(pot_catalog,pot_design_unlocks)
+
+func _setup_rewarded_ads()->void:
+	rewarded_ad_service=RewardedAdServiceClass.new()
+	rewarded_ad_service.reward_finished.connect(_on_rewarded_ad_service_finished)
+	rescue_reward_ad_requested.connect(rewarded_ad_service.request_reward)
+	add_child(rewarded_ad_service)
+
+func _on_rewarded_ad_service_finished(reward_context:String,reward_earned:bool)->void:
+	if not rescue_reward_in_progress or reward_context!=rescue_reward_context:return
+	_on_rescue_reward_ad_completed(reward_earned)
 
 func _load_save() -> void:
 	_cancel_puku_gauge_animations()
@@ -2883,6 +2900,7 @@ func _on_rescue_reward_ad_completed(reward_earned:bool)->void:
 	rescue_reward_in_progress=false
 	if not reward_earned:
 		shop_chatter_action_button.disabled=false;shop_chatter_action_button.text=Localizer.text(language_code,"shop_help_action") if rescue_reward_context=="shop_puku_rescue" else Localizer.text(language_code,"ad_seed");rescue_reward_context=""
+		_show_shop_chatter(Localizer.text(language_code,"ad_unavailable"),false)
 		return
 	var completed_context:=rescue_reward_context;rescue_reward_context=""
 	if completed_context=="shop_puku_rescue":_change_puku_balance(PUKU_UNITS_PER_PUKU,"shop_puku_rescue",false,true)
@@ -4982,6 +5000,7 @@ func _toggle_growing_plant_labels()->void:
 	_update_labels()
 
 func _reset_progression_state()->void:
+	if not _trial_dev_controls_enabled():return
 	_end_first_play_tutorial_context()
 	_reset_collection_complete_presentation(true)
 	collection_complete_versions.clear();collection_complete_pending_species_id="";collection_complete_resume_context="";collection_complete_resume_shop_visible=false
@@ -7953,6 +7972,7 @@ func _format_habitat_event_time(unix_time:float)->String:
 	return Time.get_datetime_string_from_unix_time(int(unix_time),true) if unix_time>0.0 else "—"
 
 func _record_habitat_debug_event(message:String)->void:
+	if not _trial_dev_controls_enabled():return
 	habitat_debug_log.append(message)
 	while habitat_debug_log.size()>40:habitat_debug_log.pop_front()
 	_refresh_habitat_dev_panel()
