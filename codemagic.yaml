@@ -6,6 +6,8 @@ workflows:
     integrations:
       app_store_connect: Codemagic
     environment:
+      groups:
+        - admob_production
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.ohanayanouen.pukupukutaniku
@@ -443,6 +445,8 @@ workflows:
     <<: *ios-production-workflow
     name: ぷくぷく！たにくらいふ App Store正式リリース
     environment:
+      groups:
+        - admob_production
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.ohanayanouen.pukupukutaniku
