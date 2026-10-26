@@ -59,6 +59,7 @@ validate_plugin_artifacts() {
     "$plugin_dir/AdmobPlugin.debug.xcframework" \
     "$plugin_dir/AdmobPlugin.release.xcframework" <<'PY'
 import plistlib
+import subprocess
 import sys
 from pathlib import Path
 
@@ -71,7 +72,11 @@ required_tokens = [
 
 for framework_arg in sys.argv[1:]:
     framework = Path(framework_arg)
+    if not framework.is_dir():
+        raise SystemExit(f"Missing XCFramework directory: {framework}")
     info_path = framework / "Info.plist"
+    if not info_path.is_file():
+        raise SystemExit(f"Missing XCFramework Info.plist: {info_path}")
     with info_path.open("rb") as stream:
         info = plistlib.load(stream)
     candidates = [
@@ -84,17 +89,41 @@ for framework_arg in sys.argv[1:]:
     if len(candidates) != 1:
         raise SystemExit(f"Expected one iOS arm64 slice in {framework}, found {len(candidates)}")
     library = candidates[0]
-    library_path = framework / library["LibraryIdentifier"] / library["LibraryPath"]
+    library_identifier = library.get("LibraryIdentifier")
+    library_name = library.get("LibraryPath")
+    if not library_identifier or not library_name:
+        raise SystemExit(f"Incomplete iOS arm64 library entry in {info_path}: {library}")
+    library_path = framework / library_identifier / library_name
+    if not library_path.is_file() or library_path.stat().st_size == 0:
+        raise SystemExit(f"Missing or empty iOS arm64 library: {library_path}")
+    try:
+        lipo_result = subprocess.run(
+            ["xcrun", "lipo", "-archs", str(library_path)],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise SystemExit(f"Unable to inspect iOS library architecture for {library_path}: {error}")
+    architectures = lipo_result.stdout.strip().split()
+    if architectures != ["arm64"]:
+        raise SystemExit(
+            f"Expected an arm64-only iOS library in {library_path}, found {architectures}"
+        )
     data = library_path.read_bytes()
     for token in required_tokens:
         if token not in data:
             raise SystemExit(f"Missing native UMP bridge token {token!r} in {library_path}")
-    print(f"ADMOB_UMP_XCFRAMEWORK_OK path={framework} ios_arm64=true bridge=complete")
+    print(
+        f"ADMOB_UMP_XCFRAMEWORK_OK path={framework} library={library_path} "
+        f"bytes={len(data)} architectures=arm64 bridge=complete"
+    )
 PY
 }
 
 copy_plugin_artifacts() {
   local plugin_dir="$1"
+  validate_plugin_artifacts "$plugin_dir"
   case "$OUTPUT_DEBUG" in
     "$PROJECT_DIR/ios/plugins/"*) ;;
     *) echo "Unsafe AdMob output path: $OUTPUT_DEBUG" >&2; exit 1 ;;
@@ -102,6 +131,7 @@ copy_plugin_artifacts() {
   rm -rf "$OUTPUT_DEBUG" "$OUTPUT_RELEASE"
   cp -R "$plugin_dir/AdmobPlugin.debug.xcframework" "$OUTPUT_DEBUG"
   cp -R "$plugin_dir/AdmobPlugin.release.xcframework" "$OUTPUT_RELEASE"
+  validate_plugin_artifacts "$PROJECT_DIR/ios/plugins"
 }
 
 if [ -f "$CACHE_METADATA" ] \
@@ -131,6 +161,9 @@ git -C "$PLUGIN_SOURCE" diff --check
 
 chmod +x "$PLUGIN_SOURCE/common/gradlew" "$PLUGIN_SOURCE"/script/*.sh
 (cd "$PLUGIN_SOURCE" && ./script/build_ios.sh -A)
+# v7.0's build tasks finalize with this Sync task. Run it once more after both
+# device variants so the distribution tree is explicitly assembled and checked.
+(cd "$PLUGIN_SOURCE" && ./script/run_gradle_task.sh copyiOSBuildArtifacts)
 
 python3 - "$PLUGIN_SOURCE/ios/plugin.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved" <<'PY'
 import json
@@ -160,8 +193,18 @@ for identity, (version, revision) in expected.items():
 print("ADMOB_SPM_DEPENDENCIES_OK gma=12.14.0 ump=3.1.0")
 PY
 
-BUILT_PLUGIN="$PLUGIN_SOURCE/common/build/plugin/ios/plugins"
+for variant in debug release; do
+  ARCHIVE_LIBRARY="$PLUGIN_SOURCE/ios/build/lib/ios_${variant}.xcarchive/Products/usr/local/lib/AdmobPlugin.a"
+  test -s "$ARCHIVE_LIBRARY"
+done
+
+BUILT_FRAMEWORKS="$PLUGIN_SOURCE/ios/build/framework"
+# copyiOSBuildArtifacts uses common/build/plugin/ios as destinationDir and then
+# copies XCFrameworks into ios/plugins beneath it; the nested ios is intentional.
+BUILT_PLUGIN="$PLUGIN_SOURCE/common/build/plugin/ios/ios/plugins"
+validate_plugin_artifacts "$BUILT_FRAMEWORKS"
 validate_plugin_artifacts "$BUILT_PLUGIN"
+echo "ADMOB_BUILD_LAYOUT_OK frameworks=$BUILT_FRAMEWORKS distribution=$BUILT_PLUGIN"
 
 case "$CACHE_ROOT" in
   "$HOME/.cache/puku-puku-taniku/"*) ;;
@@ -171,6 +214,7 @@ rm -rf "$CACHE_ROOT"
 mkdir -p "$CACHE_PLUGIN"
 cp -R "$BUILT_PLUGIN/AdmobPlugin.debug.xcframework" "$CACHE_PLUGIN/AdmobPlugin.debug.xcframework"
 cp -R "$BUILT_PLUGIN/AdmobPlugin.release.xcframework" "$CACHE_PLUGIN/AdmobPlugin.release.xcframework"
+validate_plugin_artifacts "$CACHE_PLUGIN"
 printf '%s\n' "$EXPECTED_METADATA" > "$CACHE_METADATA"
 copy_plugin_artifacts "$CACHE_PLUGIN"
 

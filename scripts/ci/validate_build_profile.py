@@ -120,6 +120,18 @@ def main() -> None:
     ]:
         if required_pin not in admob_build_source:
             fail(f"AdMob native build pin is missing: {required_pin}")
+    for required_build_step in [
+        '(cd "$PLUGIN_SOURCE" && ./script/run_gradle_task.sh copyiOSBuildArtifacts)',
+        'BUILT_FRAMEWORKS="$PLUGIN_SOURCE/ios/build/framework"',
+        'BUILT_PLUGIN="$PLUGIN_SOURCE/common/build/plugin/ios/ios/plugins"',
+        'validate_plugin_artifacts "$BUILT_FRAMEWORKS"',
+        '["xcrun", "lipo", "-archs", str(library_path)]',
+        "ADMOB_BUILD_LAYOUT_OK",
+    ]:
+        if required_build_step not in admob_build_source:
+            fail(f"AdMob iOS artifact assembly check is missing: {required_build_step}")
+    if 'BUILT_PLUGIN="$PLUGIN_SOURCE/common/build/plugin/ios/plugins"' in admob_build_source:
+        fail("AdMob build still uses the pre-v7 distribution path without the nested ios directory")
     for required_native_api in [
         "UMPConsentInformation.sharedInstance.privacyOptionsRequirementStatus",
         "UMPConsentInformation.sharedInstance.canRequestAds",
