@@ -1,16 +1,16 @@
 # 『ぷくぷく！たにくらいふ』プライバシーポリシー草案
 
-> **未公開・未確定の作業用草案（2026年10月25日）**<br>
-> この文書は、現行ソースコードと同梱SDKを調査して作成した公開前の草案です。現時点では正式なプライバシーポリシーではありません。角括弧内の情報、子ども向け方針、広告のトラッキング／ATT方針、UMPのプライバシー設定再表示導線、および最終IPAのPrivacy Reportを確定・検証するまで、App Store Connectへ登録したり正式ページとして案内したりしないでください。
+> **未公開・未確定の作業用草案（2026年10月26日）**<br>
+> この文書は、現行ソースコードと同梱SDKを調査して作成した公開前の草案です。現時点では正式なプライバシーポリシーではありません。角括弧内の情報、子どもを含む利用者に対する広告上の年齢取扱い、広告のトラッキング／ATT方針、UMPのプライバシー設定再表示導線、および最終IPAのPrivacy Reportを確定・検証するまで、App Store Connectへ登録したり正式ページとして案内したりしないでください。
 
 ## 公開前に必ず確定する項目
 
-- 運営者の正式名称または氏名
-- 問い合わせ用メールアドレス
-- 運営者の国・地域、および法令上必要な場合の住所・責任者情報
+- 適用法令上必要な場合の住所・代表者または個人情報保護責任者情報
 - 公開日・施行日
 - 正式なプライバシーポリシーURLとサポートURL
-- 本アプリを子ども向けとして提供するか、一般向けとして提供するか
+- 問い合わせ情報を最終対応日から原則1年以内に削除または匿名化する運用方針の最終承認
+- App Store Connectの年齢レーティング質問票への、実際のゲーム内容に基づく回答
+- 一般向けアプリにおけるAdMobの年齢取扱い設定と、現行プラグインが提供する設定方法の確認
 - AdMob管理画面の「プライバシーとメッセージ」、広告配信地域、メディエーション、広告技術プロバイダの最終設定
 - Google Mobile Ads SDKのDevice IDに関する「Tracking」宣言と、ATTを使用しない現行実装との整合性
 - UMPで同意内容を後から変更できるアプリ内導線
@@ -22,12 +22,12 @@
 
 ## 1. 基本情報
 
-本プライバシーポリシーは、[運営者の正式名称または氏名]（以下「運営者」といいます）が提供するゲームアプリ『ぷくぷく！たにくらいふ』（以下「本アプリ」といいます）における情報の取扱いについて説明するものです。
+本プライバシーポリシーは、オハナ屋農園（以下「運営者」といいます）が提供するゲームアプリ『ぷくぷく！たにくらいふ』（以下「本アプリ」といいます）における情報の取扱いについて説明するものです。
 
 - アプリ名：ぷくぷく！たにくらいふ
-- 運営者：[運営者の正式名称または氏名を入力]
-- 連絡先：[問い合わせ用メールアドレスを入力]
-- 運営者の国・地域：[国・地域を入力]
+- 運営者：オハナ屋農園
+- 連絡先：kotaro.hana.0505@gmail.com
+- 運営者の国・地域：日本
 - 施行日：[施行日を入力]
 
 ## 2. 取り扱う可能性がある情報
@@ -84,6 +84,10 @@
 
 Web版はGitHub Pagesから配信され、一部の図鑑画像を同じGitHub Pagesサイトから追加で読み込みます。Web版へのアクセス時には、配信に必要なIPアドレス、ブラウザ・端末情報、アクセス日時、要求したURL等がホスティング事業者によって処理される場合があります。GitHubによる取扱いはGitHubのプライバシーに関する文書をご確認ください。
 
+### 2.7 お問い合わせに伴う情報
+
+利用者が電子メールで運営者へ問い合わせた場合、運営者は、送信元のメールアドレス、表示名、問い合わせ本文、および利用者が任意に添付したファイルを受け取ることがあります。これらの情報は本アプリから自動送信されるものではなく、問い合わせへの回答、追加確認、対応履歴の管理、および紛争への対応に必要な範囲で取り扱います。
+
 ## 3. 利用目的
 
 前項の情報は、該当する範囲で次の目的に利用されます。
@@ -96,6 +100,7 @@ Web版はGitHub Pagesから配信され、一部の図鑑画像を同じGitHub P
 - アプリ内課金の商品情報表示、購入、購入済み商品の復元、返金等による利用権変更の反映のため
 - 利用者が選択した共有先へゲーム画像を渡すため
 - Web版のコンテンツを配信するため
+- 問い合わせへの回答、追加確認、対応履歴の管理、および紛争への対応のため
 
 ## 4. 第三者サービス
 
@@ -135,7 +140,7 @@ Web版およびその静的素材の配信に利用します。
 - 端末内のセーブデータ、購入利用権の端末内キャッシュ、および生成した共有画像は、原則としてアプリ専用領域に保持されます。現行実装には本番ユーザー向けの全データ削除ボタンはありません。通常、アプリを削除すると当該端末上のアプリデータも削除されますが、OSのバックアップ、オフロード、復元等の挙動はAppleまたは利用者の端末設定に従います。
 - 非消耗型アプリ内課金の購入記録は、購入の復元、返金および権利管理のためAppleが保持します。Appleが保有する情報の削除・訂正等はAppleの手続に従います。
 - Googleが広告・同意管理に関連して処理する情報の保持期間と削除方法は、Googleのポリシーおよび利用者のGoogle／端末のプライバシー設定に従います。
-- 運営者への問い合わせに伴って利用者が任意に提供した情報については、[問い合わせ対応データの保持期間または判断基準を入力]。法令上の保存義務がある場合は、その期間保持することがあります。
+- 運営者への問い合わせに伴って利用者が任意に提供した情報は、問い合わせへの回答、追加対応、対応履歴の管理、および紛争への対応に必要な範囲で保持し、原則として最終対応日から1年以内に削除または匿名化します。法令上の保存義務、現に係属する紛争、またはセキュリティ上の合理的な必要がある場合は、その目的に必要な最小限の期間に限って保持し、必要がなくなり次第、遅滞なく削除または匿名化します。
 
 端末内データの削除方法、または本ポリシーに関する質問は、第9項の連絡先へお問い合わせください。ただし、運営者が保有していない端末内データや、AppleまたはGoogleが独自に管理するデータについては、運営者が直接削除できない場合があります。
 
@@ -145,18 +150,18 @@ Google、Apple、GitHubその他のサービス提供者が、利用者の居住
 
 ## 8. 子どものプライバシー
 
-**[公開を止める未確定項目]** 本アプリを子ども向けとして提供するか、一般向けとして提供するかは、運営者が対象年齢、App Storeの年齢レーティング、配信地域の法令およびAdMobのポリシーを踏まえて確定する必要があります。広告コンテンツの上限を `G` にしていることだけでは、子ども向けアプリとしての設定や法令対応を満たしたことにはなりません。現行コードでは、AdMobの「子ども向け取扱い」および「同意年齢未満」のタグは未指定です。
+本アプリは一般向けゲームであり、子ども専用アプリまたは子どもを主な対象とするアプリとして提供するものではありません。AppleのKids Categoryには登録しません。子どもも本アプリを利用する可能性がありますが、Kids Categoryに登録しないことだけを理由に、適用される子どものプライバシー保護法令やプラットフォーム規則への対応が不要になるものではありません。
 
-[一般向けとして確定する場合の本文案：本アプリは、適用法令で定められた年齢未満の子どもを対象として意図的に提供するものではありません。運営者が、保護者の同意なく子どもの情報を取り扱ったことを把握した場合は、確認のうえ適切に対応します。保護者の方は第9項の連絡先へお問い合わせください。]
+年齢レーティングは、実際のゲーム内容に基づいてApp Store Connectの質問票へ回答し、Appleが示すレーティングに従います。運営者が、法令上必要な保護者の同意なく子どもの個人情報を取り扱ったことを把握した場合は、事実関係を確認し、利用停止、削除その他の適切な対応を行います。保護者の方は第9項の連絡先へお問い合わせください。
 
-[子ども向けとして確定する場合：この文章をそのまま使用せず、対象年齢、保護者同意、AdMobの子ども向け設定、年齢確認、広告制限、適用される児童プライバシー法令を実装・確認したうえで専用の本文に差し替える。]
+**[公開前に確認が必要]** 広告コンテンツの上限を `G` にしていることだけでは、子どもに関する広告設定や法令対応を満たしたことにはなりません。現行コードでは、AdMobプラグインの `child_directed` および `under_age_of_consent` は未指定です。一方、Googleの現行資料では、従来のTFCD／TFUAに代わるTag for Age Treatment（TFAT）が案内されています。一般向けアプリであることを前提としつつ、既知の未成年利用者を含む利用者の年齢に応じた取扱い、現行プラグインで利用可能な設定、および配信地域ごとの法令・Googleポリシーとの整合を、公開前に確認します。
 
 ## 9. お問い合わせ
 
 本ポリシーまたは本アプリにおける情報の取扱いに関するお問い合わせ先は次のとおりです。
 
-- 運営者：[運営者の正式名称または氏名を入力]
-- メールアドレス：[問い合わせ用メールアドレスを入力]
+- 運営者：オハナ屋農園
+- メールアドレス：kotaro.hana.0505@gmail.com
 - その他法令上必要な連絡先：[必要な場合に入力]
 
 ## 10. 本ポリシーの改定
@@ -172,12 +177,12 @@ Google、Apple、GitHubその他のサービス提供者が、利用者の居住
 
 ## 1. Basic Information
 
-This Privacy Policy explains how [enter the operator's legal name] (the “Operator”) handles information in the game application “Puku Puku! Taniku Life” (the “App”).
+This Privacy Policy explains how オハナ屋農園 (the “Operator”) handles information in the game application “Puku Puku! Taniku Life” (the “App”).
 
 - App name: Puku Puku! Taniku Life (ぷくぷく！たにくらいふ)
-- Operator: [enter the operator's legal name]
-- Contact: [enter a contact email address]
-- Operator country or region: [enter country or region]
+- Operator: オハナ屋農園
+- Contact: kotaro.hana.0505@gmail.com
+- Operator country or region: Japan
 - Effective date: [enter effective date]
 
 ## 2. Information That May Be Processed
@@ -234,6 +239,10 @@ Generated images are stored in the App's private storage. The current implementa
 
 The web version is delivered through GitHub Pages and loads some catalog images from the same GitHub Pages site. The hosting provider may process connection information necessary to deliver the site, such as IP address, browser or device information, request time, and requested URL. Please review GitHub's privacy documentation for details.
 
+### 2.7 Support inquiry information
+
+If a user contacts the Operator by email, the Operator may receive the sender's email address, display name, message, and any files that the user voluntarily attaches. This information is not transmitted automatically by the App. It is processed only as needed to respond to the inquiry, request additional information, maintain a support history, and address disputes.
+
 ## 3. Purposes of Processing
 
 The information described above is used, as applicable, to:
@@ -244,8 +253,9 @@ The information described above is used, as applicable, to:
 - diagnose failures, measure performance, and improve advertising and SDK quality;
 - display consent messages required for a user's region and apply the user's privacy choices;
 - show in-app purchase products and prices, process purchases, restore purchases, and reflect refunds or entitlement changes;
-- send a game image to a destination selected by the user; and
-- deliver web-version content.
+- send a game image to a destination selected by the user;
+- deliver web-version content; and
+- respond to inquiries, request additional information, maintain a support history, and address disputes.
 
 ## 4. Third-Party Services
 
@@ -283,7 +293,7 @@ Advertising and tracking controls may also be available in iOS Settings. Disabli
 - On-device save data, the on-device entitlement cache, and generated share images are generally retained in the App's private storage. The current production implementation has no “delete all data” button. Deleting the App will normally remove its local app data, while device backup, offloading, and restoration behavior is controlled by Apple and the user's device settings.
 - Apple retains non-consumable purchase records as needed for purchase restoration, refunds, and entitlement management. Requests concerning data held by Apple are governed by Apple's procedures.
 - Retention and deletion of information processed by Google for advertising and consent management are governed by Google's policies and the user's Google and device privacy settings.
-- Information voluntarily provided to the Operator in a support inquiry will be retained for [enter the support-data retention period or decision criteria], subject to any legal retention obligation.
+- Information voluntarily provided to the Operator in a support inquiry will be retained only as needed to respond, provide follow-up support, maintain a support history, and address disputes, and will generally be deleted or anonymized within one year after the final response. If a legal retention obligation, a pending dispute, or a reasonable security need applies, the information will be retained only for the minimum period necessary for that purpose and deleted or anonymized without undue delay when it is no longer needed.
 
 Questions about local data deletion or this Policy may be sent to the contact in Section 9. The Operator may be unable to directly delete information that remains solely on a user's device or is independently controlled by Apple or Google.
 
@@ -293,18 +303,18 @@ Google, Apple, GitHub, or another service provider may process information throu
 
 ## 8. Children's Privacy
 
-**[Publication-blocking decision required]** The Operator must decide whether the App is directed to children or to a general audience after considering its intended audience, App Store age rating, applicable laws in each distribution region, and AdMob policies. Setting the maximum ad content rating to `G` does not by itself make the App compliant as a child-directed app. In the current code, the AdMob child-directed-treatment and under-age-of-consent tags are unspecified.
+The App is a general-audience game. It is not offered as an app specifically for children or primarily directed to children, and it will not be listed in Apple's Kids Category. Children may nevertheless use the App. The decision not to list the App in the Kids Category does not remove obligations under applicable children's privacy laws or platform rules.
 
-[Proposed text only if the App is confirmed to be general-audience: The App is not intentionally directed to children below the age defined by applicable law. If the Operator learns that information from a child was processed without required parental consent, the Operator will review the matter and take appropriate action. A parent or guardian may contact the Operator using the details in Section 9.]
+The Operator will answer the App Store Connect age-rating questionnaire based on the App's actual content and will follow the rating assigned by Apple. If the Operator becomes aware that it has handled a child's personal information without parental consent where such consent is legally required, the Operator will investigate and take appropriate action, including ceasing the relevant use or deleting the information. A parent or guardian may contact the Operator using the details in Section 9.
 
-[If the App will be child-directed: do not use the paragraph above without change. Replace this section only after implementing and verifying the intended age range, parental consent, AdMob child-directed settings, age handling, advertising restrictions, and all applicable child-privacy requirements.]
+**[Verification required before publication]** Limiting the maximum ad content rating to `G` does not by itself satisfy advertising settings or legal requirements concerning children. In the current code, the AdMob plug-in's `child_directed` and `under_age_of_consent` settings are unspecified. Google's current documentation describes Tag for Age Treatment (TFAT) as the replacement for the former TFCD and TFUA settings. Before publication, the Operator will verify the treatment appropriate to users' ages, including known underage users, the settings available through the current plug-in, and consistency with applicable laws and Google policies in each distribution region, while maintaining the App's general-audience positioning.
 
 ## 9. Contact
 
 Questions about this Policy or the App's handling of information may be directed to:
 
-- Operator: [enter the operator's legal name]
-- Email: [enter a contact email address]
+- Operator: オハナ屋農園
+- Email: kotaro.hana.0505@gmail.com
 - Other legally required contact details: [enter if applicable]
 
 ## 10. Changes to This Policy
@@ -365,7 +375,11 @@ The Operator may revise this Policy when App features, SDKs, laws, or services c
 - [Google UMP setup](https://developers.google.com/admob/ios/privacy)
 - [Google iOS privacy strategies](https://developers.google.com/admob/ios/privacy/strategies)
 - [Google ad serving modes](https://developers.google.com/admob/ios/privacy/ad-serving-modes)
+- [Google AdMob: Tag for Age Treatment](https://support.google.com/admob/answer/6219315)
 - [Google partner-sites privacy explanation](https://policies.google.com/technologies/partner-sites)
+- [Apple App Store Connect: Set an app age rating](https://developer.apple.com/help/app-store-connect/manage-app-information/set-an-app-age-rating/)
+- [Apple App Store categories](https://developer.apple.com/app-store/categories/)
+- [個人情報保護委員会：個人データの保存期間](https://www.ppc.go.jp/all_faq_index/faq1-q5-2/)
 
 ## コードから確認できた内容
 
@@ -378,7 +392,7 @@ The Operator may revise this Policy when App features, SDKs, laws, or services c
 | 広告設定 | 非パーソナライズ、first-party ID無効、最大コンテンツレーティングG | 非パーソナライズでも識別子等が全く処理されないとは限らない |
 | UMP | 本番で同意情報更新・必要時フォーム表示 | 同意再選択用 `privacyOptionsRequirementStatus` / privacy options formの公開API・アプリ内入口は現行プラグインにない |
 | ATT | 現行コードでは無効 | `att_enabled = false`、exportのtrackingもfalse。ただしGMA 12.14.0 manifestはDevice IDのtrackingをtrueと宣言 |
-| 子ども向け広告タグ | 未指定 | `child_directed` と `under_age_of_consent` はプラグイン既定のUNSPECIFIED。最大レーティングGとは別問題 |
+| 広告上の年齢取扱い | 未指定 | `child_directed` と `under_age_of_consent` はプラグイン既定のUNSPECIFIED。最大レーティングGとは別問題。Googleは従来のTFCD／TFUAに代わるTFATを案内しているため、現行プラグインでの対応方法を要確認 |
 | StoreKit 2 | 36個の非消耗型商品 | 商品情報、価格、購入、復元、返金／期限切れ等を処理。支払カード情報はアプリへ渡らない |
 | セーブ | 端末内JSON | 現在の既定は `user://records_endless_experiment.json`。旧 `records.json` からの移行を維持 |
 | クラウドセーブ | 見つからない | 現行コードに外部送信なし |
@@ -421,25 +435,33 @@ Google Mobile Ads SDK 12.14.0の実物 `PrivacyInfo.xcprivacy` も確認済み�
 
 ## 未確認・公開前の阻害事項
 
-1. **運営者情報が未提供**：正式名称、問い合わせ先、国・地域、必要に応じて住所・責任者を入力する。
-2. **子ども向け方針が未決定**：対象年齢を決め、App Store年齢レーティング、AdMobのCOPPA／TFUA設定、配信地域の法令と一致させる。
-3. **ATTとDevice ID trackingの不整合**：GMA manifestではtracking=true、アプリではATT=false。実際の本番データフローを確認し、必要ならATTを実装する。確認前に「トラッキングなし」と申告しない。
-4. **UMPのプライバシー設定再表示が未実装**：Googleは必要時に表示可能な入口を要求する。現行プラグイン公開APIでは不足している。
-5. **AdMob管理画面が未監査**：Privacy & messaging、地域別メッセージ、広告技術プロバイダ、メディエーション、制限付き広告、本番ユニット設定を実アカウントで確認する。
-6. **UMPの正確なバージョンとmanifest**：ローカルのGMA 12.14.0配布物ではGMA manifestを確認したが、最終アーカイブ内のUMP frameworkとmanifestは未確認。
-7. **最終IPA Privacy Reportが未生成**：Codemagicはアプリ本体とGMA manifestの存在を検査するが、全SDKを含むXcode Privacy Reportは最終署名済みIPA／archiveで確認する。
-8. **実機通信が未検証**：同意状態・地域・広告在庫・端末設定別に送信されるフィールドと広告配信モードを実機で確認していない。
-9. **保持期間が未確定**：問い合わせ情報の保持期間、法令上の保存方針を運営者が決める。
-10. **公開URLとサポートURLが未確定**：HTTPSの正式URLを決め、App Store Connectとアプリ内から同じURLへ到達できるようにする。
+1. **公開日・施行日が未確定**：制定日、施行日および最終改定日を正式公開時に確定する。
+2. **追加の運営者表示事項を要確認**：運営者名、問い合わせ先、国・地域は確定済み。適用法令上、住所、代表者または個人情報保護責任者の表示が必要かを確認する。
+3. **年齢レーティングと広告上の年齢取扱いが未確定**：一般向けゲームとし、Kids Categoryへ登録しない方針は確定済み。実際の内容に基づくApp Store Connectの年齢レーティング回答と、一般向けアプリにおけるAdMobのTFATを含む年齢取扱い、現行プラグインでの設定方法、配信地域の法令との整合を確認する。
+4. **ATTとDevice ID trackingの不整合**：GMA manifestではtracking=true、アプリではATT=false。実際の本番データフローを確認し、必要ならATTを実装する。確認前に「トラッキングなし」と申告しない。
+5. **UMPのプライバシー設定再表示が未実装**：Googleは必要時に表示可能な入口を要求する。現行プラグイン公開APIでは不足している。
+6. **AdMob管理画面が未監査**：Privacy & messaging、地域別メッセージ、広告技術プロバイダ、メディエーション、制限付き広告、本番ユニット設定を実アカウントで確認する。
+7. **UMPの正確なバージョンとmanifest**：ローカルのGMA 12.14.0配布物ではGMA manifestを確認したが、最終アーカイブ内のUMP frameworkとmanifestは未確認。
+8. **最終IPA Privacy Reportが未生成**：Codemagicはアプリ本体とGMA manifestの存在を検査するが、全SDKを含むXcode Privacy Reportは最終署名済みIPA／archiveで確認する。
+9. **実機通信が未検証**：同意状態・地域・広告在庫・端末設定別に送信されるフィールドと広告配信モードを実機で確認していない。
+10. **問い合わせ情報の保持方針は承認待ち**：本文には「最終対応日から原則1年以内に削除または匿名化」とする運用案を記載した。これは法定期間ではなく、問い合わせ対応の必要性を考慮した運営方針案である。日本の個人情報保護法は一律の保存期間を定めておらず、利用する必要がなくなったときは遅滞なく消去するよう努めるものとされているため、この期間で実際に運用できるかを正式公開前に承認する。
+11. **公開URLとサポートURLが未確定**：HTTPSの正式URLを決め、App Store Connectとアプリ内から同じURLへ到達できるようにする。
 
-## 公開に必要な運営者情報
+## 確定済みの運営者情報と公開前に残る情報
 
-- App Store ConnectのSeller／Developer情報と整合する正式な運営者名
-- 問い合わせを継続して受信できるメールアドレス
-- 運営者の国・地域
+### 確定済み
+
+- 運営者名：オハナ屋農園
+- 問い合わせ用メールアドレス：kotaro.hana.0505@gmail.com
+- 運営者の国・地域：日本
+- 対象方針：一般向けゲーム。AppleのKids Categoryには登録しない
+- 年齢レーティング方針：実際のゲーム内容に基づき、App Store Connectで決定する
+
+### 公開前に確定・確認するもの
+
+- App Store ConnectのSeller／Developer情報と「オハナ屋農園」という表示名の整合
 - 適用法令上必要な場合の住所、代表者または個人情報保護責任者
-- 問い合わせ情報の保持期間・削除基準
-- 対象年齢と子ども向け方針
+- 問い合わせ情報を最終対応日から原則1年以内に削除または匿名化する運用案の承認、および実際の削除手順
 - 制定日、施行日、最終改定日
 - 正式なプライバシーポリシーURL
 - サポートURL
