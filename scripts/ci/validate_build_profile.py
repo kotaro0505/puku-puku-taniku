@@ -95,6 +95,8 @@ def main() -> None:
         "ios/plugins/AdmobPlugin.release.xcframework/ios-arm64/AdmobPlugin.a",
         "scripts/ci/build_admob_plugin.sh",
         "scripts/ci/patch_admob_ump_native.py",
+        "scripts/ci/validate_ios_export.py",
+        "scripts/ci/validate_ios_export_smoke.py",
         "scripts/build_profile.gd",
         "scripts/rewarded_ad_service.gd",
         "scripts/story_dev_presets.gd",
@@ -186,6 +188,32 @@ def main() -> None:
     for secret_path in ["addons/AdmobPlugin/ios_export.cfg", "data/mobile-ads.cfg"]:
         if secret_path in tracked:
             fail(f"Generated ad configuration must not be committed: {secret_path}")
+
+    ios_export_validator_source = Path("scripts/ci/validate_ios_export.py").read_text(
+        encoding="utf-8"
+    )
+    for required_validation in [
+        'privacy_path = project.parent / "PrivacyInfo.xcprivacy"',
+        "IOS_EXPORT_VALIDATION_FAILED check=",
+        '"google_mobile_ads_package": "GoogleMobileAds"',
+        '"info_plist.admob_app_id_key"',
+    ]:
+        if required_validation not in ios_export_validator_source:
+            fail(f"Named iOS export validation is missing: {required_validation}")
+
+    codemagic_source = Path("codemagic.yaml").read_text(encoding="utf-8")
+    for required_diagnostic in [
+        "python3 scripts/ci/validate_ios_export_smoke.py",
+        "GODOT_IOS_EXPORT_COMMAND_FAILED",
+        "python3 scripts/ci/validate_ios_export.py",
+        'PRIVACY_MANIFEST="$(dirname "$CM_BUILD_DIR/$XCODE_PROJECT")/PrivacyInfo.xcprivacy"',
+        "IOS_EXPORT_CHECK_OK check=privacy_manifest.plutil",
+        "[REDACTED_ADMOB_ID]",
+    ]:
+        if required_diagnostic not in codemagic_source:
+            fail(f"Codemagic iOS export diagnostic is missing: {required_diagnostic}")
+    if "$IOS_APP_DIR/PrivacyInfo.xcprivacy" in codemagic_source:
+        fail("Codemagic still checks PrivacyInfo.xcprivacy in the generated app source directory")
 
     print(
         f"BUILD_PROFILE_VALIDATE_OK profile={profile} preset={preset_name} "
