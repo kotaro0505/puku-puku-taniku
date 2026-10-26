@@ -624,6 +624,7 @@ var audio_manager: Node
 var audio_settings: Dictionary = {"bgm_enabled":true,"se_enabled":true,"bgm_volume":0.65,"se_volume":0.62}
 var show_growing_puku_preview := true
 var growing_puku_preview_toggle: CheckButton
+var privacy_options_button: Button
 var harvest_puku_reward_slopes:Array[float]=[]
 var rain_visual: Control
 var rain_drops: Array = []
@@ -1121,12 +1122,31 @@ func _setup_pot_unlock_iap()->void:
 func _setup_rewarded_ads()->void:
 	rewarded_ad_service=RewardedAdServiceClass.new()
 	rewarded_ad_service.reward_finished.connect(_on_rewarded_ad_service_finished)
+	rewarded_ad_service.privacy_options_requirement_changed.connect(_on_privacy_options_requirement_changed)
+	rewarded_ad_service.privacy_options_form_finished.connect(_on_privacy_options_form_finished)
 	rescue_reward_ad_requested.connect(rewarded_ad_service.request_reward)
 	add_child(rewarded_ad_service)
 
 func _on_rewarded_ad_service_finished(reward_context:String,reward_earned:bool)->void:
 	if not rescue_reward_in_progress or reward_context!=rescue_reward_context:return
 	_on_rescue_reward_ad_completed(reward_earned)
+
+func _on_privacy_options_requirement_changed(_required:bool)->void:
+	_refresh_privacy_options_button()
+
+func _on_privacy_options_form_finished(_succeeded:bool)->void:
+	_refresh_privacy_options_button()
+
+func _on_privacy_options_pressed()->void:
+	if privacy_options_button:privacy_options_button.disabled=true
+	if rewarded_ad_service==null or not rewarded_ad_service.present_privacy_options():
+		_refresh_privacy_options_button()
+
+func _refresh_privacy_options_button()->void:
+	if privacy_options_button==null:return
+	var required:bool=rewarded_ad_service!=null and bool(rewarded_ad_service.is_privacy_options_required())
+	privacy_options_button.visible=required
+	privacy_options_button.disabled=not required or rewarded_ad_service.is_privacy_options_form_open()
 
 func _load_save() -> void:
 	_cancel_puku_gauge_animations()
@@ -4040,6 +4060,7 @@ func _build_settings(hud:Control)->void:
 	_add_audio_setting_controls(content,Localizer.text(language_code,"audio_se"),false)
 	var note:=Label.new();note.name="AudioSettingsNote";note.text=Localizer.text(language_code,"audio_note");note.custom_minimum_size=Vector2(420,40);note.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;note.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;note.add_theme_font_size_override("font_size",14);note.add_theme_color_override("font_color",Color("#76513b"));content.add_child(note)
 	growing_puku_preview_toggle=CheckButton.new();growing_puku_preview_toggle.name="GrowingPukuPreviewToggle";growing_puku_preview_toggle.text=_growing_puku_preview_setting_text();growing_puku_preview_toggle.button_pressed=show_growing_puku_preview;growing_puku_preview_toggle.custom_minimum_size=Vector2(420,52);growing_puku_preview_toggle.alignment=HORIZONTAL_ALIGNMENT_CENTER;growing_puku_preview_toggle.add_theme_font_size_override("font_size",16);growing_puku_preview_toggle.add_theme_color_override("font_color",UI_BROWN);growing_puku_preview_toggle.toggled.connect(_change_growing_puku_preview);content.add_child(growing_puku_preview_toggle)
+	privacy_options_button=Button.new();privacy_options_button.name="PrivacyOptionsButton";privacy_options_button.text=Localizer.text(language_code,"privacy_settings");privacy_options_button.custom_minimum_size=Vector2(370,58);privacy_options_button.visible=false;privacy_options_button.disabled=true;_skin_button(privacy_options_button,Color("#c7d6ad"),17);privacy_options_button.pressed.connect(_on_privacy_options_pressed);content.add_child(privacy_options_button)
 	if _trial_dev_controls_enabled():
 		var habitat_test:=Button.new();habitat_test.name="HabitatDevOpen";habitat_test.text="開発用：通常原生地テスト";habitat_test.custom_minimum_size=Vector2(370,58);_skin_button(habitat_test,Color("#adcbb8"),16);habitat_test.pressed.connect(_open_habitat_dev);content.add_child(habitat_test)
 		var opening_story_replay:=Button.new();opening_story_replay.name="OpeningStoryReplay";opening_story_replay.text="開発用：オープニングストーリー再表示";opening_story_replay.custom_minimum_size=Vector2(370,58);_skin_button(opening_story_replay,Color("#d8c29e"),15);opening_story_replay.pressed.connect(_replay_opening_story_for_development);content.add_child(opening_story_replay)
@@ -4055,6 +4076,7 @@ func _build_settings(hud:Control)->void:
 			catalog_preview_settings_button=Button.new();catalog_preview_settings_button.name="CatalogPreviewDevOpen";catalog_preview_settings_button.text="開発用：品種プレビュー";catalog_preview_settings_button.custom_minimum_size=Vector2(370,58);_skin_button(catalog_preview_settings_button,Color("#c7d6ad"),17);catalog_preview_settings_button.pressed.connect(_open_catalog_preview_dev);content.add_child(catalog_preview_settings_button)
 	settings_close_button=Button.new();settings_close_button.text="閉じる";settings_close_button.custom_minimum_size=Vector2(280,55);_skin_button(settings_close_button,Color("#ead8b1"),18);settings_close_button.pressed.connect(_close_settings);content.add_child(settings_close_button)
 	_refresh_progression_dev_counters()
+	_refresh_privacy_options_button()
 
 func _build_habitat_plant_panel(hud:Control)->void:
 	habitat_plant_panel=HabitatPlantPanelClass.new();hud.add_child(habitat_plant_panel)
@@ -4242,7 +4264,7 @@ func _add_audio_setting_controls(parent:VBoxContainer,label_text:String,is_bgm:b
 
 func _open_settings()->void:
 	if play_active:return
-	_refresh_progression_dev_counters();settings_overlay.visible=true;_update_play_ui()
+	_refresh_progression_dev_counters();_refresh_privacy_options_button();settings_overlay.visible=true;_update_play_ui()
 
 func _close_settings()->void:
 	settings_overlay.visible=false;_save();_update_play_ui()
@@ -4273,6 +4295,7 @@ func _apply_language_to_ui()->void:
 	var audio_note:=find_child("AudioSettingsNote",true,false) as Label
 	if audio_note:audio_note.text=Localizer.text(language_code,"audio_note")
 	if growing_puku_preview_toggle:growing_puku_preview_toggle.text=_growing_puku_preview_setting_text()
+	if privacy_options_button:privacy_options_button.text=Localizer.text(language_code,"privacy_settings")
 	_update_plant_label_visibility_button()
 	if best_record_showcase:best_record_showcase.set_language(language_code)
 	if intro_speaker_label:intro_speaker_label.text=Localizer.text(language_code,"story_speaker_panda")

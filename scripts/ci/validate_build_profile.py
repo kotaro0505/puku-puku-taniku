@@ -108,6 +108,30 @@ def main() -> None:
     if "<key>NSAllowsArbitraryLoads</key>" in admob_export_source:
         fail("AdMob export must not disable ATS globally")
 
+    ad_service_source = Path("scripts/rewarded_ad_service.gd").read_text(encoding="utf-8")
+    for required_setting in [
+        "max_ad_content_rating = AdmobConfigClass.ContentRating.G",
+        "child_directed = AdmobConfigClass.TagForChildDirectedTreatment.UNSPECIFIED",
+        "under_age_of_consent = AdmobConfigClass.TagForUnderAgeOfConsent.UNSPECIFIED",
+        "first_party_id_enabled = false",
+        "personalization_state = AdmobConfigClass.PersonalizationState.DISABLED",
+        "att_enabled = false",
+    ]:
+        if required_setting not in ad_service_source:
+            fail(f"Rewarded-ad privacy setting is missing: {required_setting}")
+    for required_privacy_gate in [
+        "is_privacy_options_supported()",
+        "get_privacy_options_requirement_status()",
+        "can_request_ads()",
+        "privacy_options_form_dismissed.connect",
+    ]:
+        if required_privacy_gate not in ad_service_source:
+            fail(f"Rewarded-ad privacy-options gate is missing: {required_privacy_gate}")
+
+    config_source = Path("scripts/ci/configure_mobile_ads.py").read_text(encoding="utf-8")
+    if '"att_enabled=false"' not in config_source or "'att_text=\"\"'" not in config_source:
+        fail("Generated mobile-ads configuration must keep ATT disabled and omit prompt text")
+
     tracked = set(
         subprocess.check_output(["git", "ls-files"], text=True, encoding="utf-8").splitlines()
     )

@@ -1,15 +1,15 @@
 # App Store正式リリース準備記録
 
-最終更新: 2026-10-24
+最終更新: 2026-10-26
 
 ## 現在の判定
 
 **NO GO**。コード内で安全に完了できるリリース対策は進めたが、次の項目は外部アカウント、署名環境、実機、または運営者情報が必要であり、現時点では検証済みではない。
 
-1. AdMob本番アプリ／リワード広告ユニットの作成、UMPメッセージ設定、実機での本番相当テスト
+1. AdMob本番アプリ／リワード広告ユニットとCodemagic Secretは用意済み。残るのはUMPメッセージ設定の実アカウント確認、公開、および実機での本番相当テスト
 2. ATTとApp Privacyの最終判断。Google Mobile Ads SDKのPrivacy ManifestはDevice IDのTracking利用可能性を宣言しているため、非パーソナライズ設定だけを根拠に「ATT不要」と断定しない
-3. UMPの「プライバシー設定を再表示する入口」。採用プラグインv7.0は初回同意フォームを扱えるが、現在の公開APIでは `privacyOptionsRequirementStatus` / `showPrivacyOptionsForm` を扱えない
-4. 対象年齢／Kids Category方針と、AdMobのchild-directed／under-age-of-consent設定の確定
+3. UMPの「プライバシー設定を再表示する入口」。3言語UIと安全な機能検出層は追加したが、採用プラグインv7.0のネイティブバイナリには `privacyOptionsRequirementStatus` / `presentPrivacyOptionsForm` / `canRequestAds` の橋渡しがないため、現行ビルドでは入口を非表示にする
+4. 一般向け／Kids Category不使用の方針は確定済み。ただし利用者の年齢を把握する仕組みがなく、Google Mobile Ads 12.14.0はTFATを利用できないため、既知の子ども・ティーンをどう判定するかと年齢別広告取扱いの法務・運用判断が未確定
 5. App Store Connectでの非消耗型IAP 36商品の登録とSandbox／TestFlight実機購入テスト
 6. 公開済みプライバシーポリシーURL、アプリ内からそのURLへ到達できる導線、サポートURL
 7. Codemagicでの署名済みIPA生成・署名検証・App Store Connectアップロード
@@ -27,6 +27,32 @@
 - Web `index.pck` SHA-256: `7c6faa10eb59ff7ce928310deac5e83f5496d38ccdadf2095139e8451a89b333`
 
 Windows上のローカル検証であり、Codemagic macOS実行、Xcode archive、署名、IPA、App Store Connect、AdMob実機、StoreKit Sandboxの検証を代替しない。
+
+## 2026-10-26 広告プライバシー調査
+
+- Google Mobile Ads SDK 12.14.0はTFAT APIを持たない。`ageRestrictedTreatment` と `CHILD` / `TEEN` / `UNSPECIFIED` が導入されたのは13.3.0で、現在のGodot AdMob Plugin v7.0は旧TFCD／TFUAだけを公開している
+- 年齢情報を取得していない現状では、旧2設定を明示的に `UNSPECIFIED` のままとした。これは「成人」を意味せず、特定の年齢処理を申告していない状態である。根拠なく全員をCHILDまたはTEENにはしていない
+- UMP公式の要否判定、プライバシーオプションフォーム表示、広告要求可否の3能力を検出するGDScript層と、日本語・ひらがな・英語の設定ボタンを追加した。v7.0ネイティブバイナリでは3能力が不足するためボタンは非表示で、初回同意フォームを代用しない
+- 非パーソナライズ、first-party ID無効、最大コンテンツレーティングG、ATTプロンプト無効を維持した。CIは生成設定、export後Info.plist、署名済みIPAに意図しないATT用途説明が入った場合に失敗する
+- ただし、上記の静的設定だけではApple定義上のトラッキング不存在を証明しない。最終IPAのPrivacy Report、実機通信、AdMobの広告ソース／メディエーション設定を確認するまでATTとApp PrivacyはNO GOのままである
+
+ローカル検証結果:
+
+- Godot 4.7.2でCodemagic相当の回帰スモーク39本を連続実行し、39/39 PASS
+- UMP required／not required／広告要求不可／フォームエラー、同意変更後の広告再読み込み、報酬の一度だけ付与、途中終了時の非付与を自動テストで確認
+- 本番／開発ビルドプロファイル検証、AdMob Secret欠落時の失敗、Codemagic公式JSON Schema検証がPASS
+- 一時Web release exportをChromiumで起動し、canvas生成とAdMob／privacy-options未対応エラー0件を確認
+- これはWindows上のモック／静的検証であり、iOS実機上のUMPフォーム、IDFA、通信、署名済みIPAを検証したものではない
+
+TFATの意味と旧設定との関係:
+
+| TFAT値 | 意味 | GMA 12.14.0の旧設定との関係 |
+| --- | --- | --- |
+| `CHILD` | その広告要求へ子ども向け保護を適用する | TFCD `true` またはTFUA `true` は移行表上 `CHILD` に対応 |
+| `TEEN` | その広告要求へティーン向け保護を適用する | 旧TFCD／TFUAに同等値なし |
+| `UNSPECIFIED` | 特定の年齢処理シグナルを適用しない | 旧設定の `false`、未設定、`UNSPECIFIED` に対応。成人であるという表明ではない |
+
+新旧設定を同時に指定するとGoogleは最も保守的な処理を適用する。いずれの値も利用者の実際の年齢・法的区分をアプリ側で正しく判断する責任を置き換えるものではない。
 
 ## 実装済みのリリース対策
 
@@ -58,6 +84,7 @@ Godot 4.7対応のAdMobプラグインv7.0と、同プラグインが固定す�
 実装済みの広告処理:
 
 - UMP同意情報を起動ごとに更新し、同意が必要な場合はフォームを表示
+- 対応する将来のネイティブ橋渡しがある場合だけ、UMPの要否に応じて「プライバシー設定」ボタンを3言語で表示し、変更後は古い広告を破棄して `canRequestAds` を再確認
 - 初期化、読み込み、読み込み失敗、指数バックオフ再試行、表示失敗、閉じる、報酬獲得を分離
 - SDKの「報酬獲得」コールバック時だけ報酬を付与
 - 途中終了時は付与しない
@@ -65,26 +92,40 @@ Godot 4.7対応のAdMobプラグインv7.0と、同プラグインが固定す�
 - 表示失敗後にリクエストロックを解除し、次回読み込みへ復帰
 - 広告利用不可時はゲーム内案内を表示
 - first-party IDを無効化し、非パーソナライズ広告を指定
+- 広告コンテンツ最大レーティングをGに固定
+- 年齢を把握していない現状では、旧TFCD／TFUAを明示的に `UNSPECIFIED` とする（成人指定ではない）
 - ATSを全面解除せず、Googleが案内するMedia／WebContentの限定例外だけを付与
 
 現在広告を要求する既存仕様は、パンダのお手伝いによる「ぷくコイン救済」および「たね救済」だけである。ジュレ団リベンジ広告と広告削除購入は、現行ソースに仕様・商品・画面が存在しないため独断で追加していない。したがって「広告削除購入」は未実装であり、審査資料で実装済みと説明してはいけない。
 
 残る広告ブロッカー:
 
-- AdMob > Appsで本番iOSアプリを登録し、Rewarded ad unitを作成する
-- AdMob > Privacy & messagingでEuropean regulations messageを公開する
-- EEA/UK/Switzerland向けの同意撤回入口を提供できるプラグイン更新またはネイティブ拡張が必要
+- AdMob > Privacy & messagingでEuropean regulations message、対象地域、広告パートナー、プライバシーポリシーURLを確認して公開する（今回は未実施）
+- EEA/UK/Switzerland向けの同意撤回入口を実際に動かすには、3つの公式UMP APIを公開するプラグイン更新または検証済みネイティブ拡張が必要
 - SDKのPrivacy Reportと実際のAdMob設定を確認し、Trackingを行うならATTを広告読み込み前に実装する。Trackingを行わない方針なら、IDFAが送信されないことを実機／Xcode Privacy Reportで確認する
-- 対象年齢を決定する。現在は広告コンテンツをGに制限しているが、child-directed／under-age-of-consentは未指定であり、Kids Categoryや法的対象年齢をコードから推測して設定してはいけない
+- GMA 13.3.0以降と対応プラグインへの更新計画を立てる。現行12.14.0にはTFATがなく、旧TFCD／TFUAにはTEEN相当値もない。SDKだけを独断で更新せず、プラグイン互換性と実機回帰を確認する
+- 年齢情報を取得しない一般向けアプリでの `UNSPECIFIED` 運用が、配信地域・想定利用者・Googleポリシー・適用法令に照らして十分かを確認する。既知の子ども／ティーンへ動的に切り替えるには、適法で検証可能な年齢シグナルの設計が別途必要
 - テスト広告で、完了、途中終了、読み込み失敗、オフライン、連打、復帰を実機確認する
 - 本番広告は自分で繰り返し視聴せず、リリース前確認はGoogleテスト広告を使う
 
 参考:
 
 - Google: <https://developers.google.com/admob/ios/privacy>
+- Googleの年齢別広告設定と旧設定の対応表: <https://developers.google.com/admob/ios/targeting>
+- Google Mobile Ads iOS release notes: <https://developers.google.com/admob/ios/rel-notes>
+- Googleの広告配信モード: <https://developers.google.com/admob/ios/privacy/ad-serving-modes>
+- GoogleのIDFA／ATT案内: <https://developers.google.com/admob/ios/privacy/idfa>
 - GoogleのApp Storeデータ開示: <https://developers.google.com/admob/ios/privacy/data-disclosure>
 - GoogleのATS設定: <https://developers.google.com/admob/ios/privacy/app-transport-security>
 - AppleのATT／データ利用: <https://developer.apple.com/app-store/user-privacy-and-data-use/>
+
+AdMob管理画面で必要な操作（今回は実行しない）:
+
+1. **Apps → ぷくぷく！たにくらいふ → Blocking controls → Manage ad content rating** を開き、`Match account-level setting` を外してアプリ単位の上限が `G` であることを確認して保存する。
+2. **Privacy & messaging → European regulations → Manage** からメッセージを作成または開き、対象をEEA・英国・スイス（または法務判断に基づく範囲）に設定する。広告パートナーと「自社利用目的」を実際の利用に合わせる。
+3. 同画面の **Create message → Select apps** またはMessages表のAppリンクから対象アプリを開き、**Privacy policy URL** に正式公開後のHTTPS URLを登録してSave／Confirmする。
+4. アプリ内の撤回入口を実機で確認できるまではメッセージを公開しない。確認後、Messages表のPublish切替を使って公開し、反映に最大10分程度を見込む。
+5. メディエーションまたは追加広告ソースを使う場合は各SDK、広告パートナー、年齢シグナル転送、App Privacy申告を再監査する。現行ソースからは追加アダプタの利用を確認していない。
 
 ### 非消耗型IAP 36商品
 

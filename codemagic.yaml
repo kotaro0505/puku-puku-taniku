@@ -122,6 +122,8 @@ workflows:
           python3 scripts/ci/configure_mobile_ads.py "$MOBILE_ADS_MODE"
           test -f addons/AdmobPlugin/ios_export.cfg
           test -f data/mobile-ads.cfg
+          grep -Fxq 'att_enabled=false' addons/AdmobPlugin/ios_export.cfg
+          grep -Fxq 'att_text=""' addons/AdmobPlugin/ios_export.cfg
           if [ "$MOBILE_ADS_MODE" = "production" ]; then
             grep -Fq 'is_real=true' addons/AdmobPlugin/ios_export.cfg
             ! grep -Fq 'ca-app-pub-3940256099942544/1712485313' data/mobile-ads.cfg
@@ -233,6 +235,7 @@ workflows:
           run_scene_smoke res://scripts/build_profile_smoke.tscn BUILD_PROFILE_SMOKE_OK
           run_scene_smoke res://scripts/release_gate_smoke.tscn RELEASE_GATE_SMOKE_OK
           run_scene_smoke res://scripts/rewarded_ad_service_smoke.tscn REWARDED_AD_SERVICE_SMOKE_OK
+          run_scene_smoke res://scripts/progression_ui_revision_smoke.tscn PROGRESSION_UI_REVISION_SMOKE_OK
           run_scene_smoke res://scripts/catalog_cover_species_smoke.tscn CATALOG_COVER_SPECIES_SMOKE_OK
           run_scene_smoke res://scripts/collection_complete_smoke.tscn COLLECTION_COMPLETE_SMOKE_OK
           run_scene_smoke res://scripts/carnicolor_first_get_story_smoke.tscn CARNICOLOR_FIRST_GET_STORY_SMOKE_OK
@@ -332,7 +335,9 @@ workflows:
               raise SystemExit("Exported app disables ATS globally")
           if not ats.get("NSAllowsArbitraryLoadsForMedia") or not ats.get("NSAllowsArbitraryLoadsInWebContent"):
               raise SystemExit("Exported app is missing scoped Google Mobile Ads ATS exceptions")
-          print("IOS_ATS_OK global=false media=true web_content=true")
+          if "NSUserTrackingUsageDescription" in info:
+              raise SystemExit("ATT is disabled but the exported app contains NSUserTrackingUsageDescription")
+          print("IOS_ATS_OK global=false media=true web_content=true att_prompt=false")
           PY
           test -f "$CM_BUILD_DIR/$IOS_APP_DIR/PrivacyInfo.xcprivacy"
           plutil -lint "$CM_BUILD_DIR/$IOS_APP_DIR/PrivacyInfo.xcprivacy"
@@ -397,6 +402,8 @@ workflows:
               raise SystemExit("Signed IPA disables ATS globally")
           if not ats.get("NSAllowsArbitraryLoadsForMedia") or not ats.get("NSAllowsArbitraryLoadsInWebContent"):
               raise SystemExit("Signed IPA is missing scoped Google Mobile Ads ATS exceptions")
+          if "NSUserTrackingUsageDescription" in info:
+              raise SystemExit("ATT is disabled but the signed IPA contains NSUserTrackingUsageDescription")
 
           privacy_path = app / "PrivacyInfo.xcprivacy"
           with privacy_path.open("rb") as handle:

@@ -54,6 +54,12 @@ func _ready() -> void:
 	assert(FileAccess.get_file_as_string("res://project.godot").contains("res://addons/AdmobPlugin/plugin.cfg"))
 	var admob_descriptor:=FileAccess.get_file_as_string("res://ios/plugins/AdmobPlugin.gdip")
 	assert(admob_descriptor.contains('name="AdmobPlugin"'))
+	var admob_binary:=FileAccess.get_file_as_bytes("res://ios/plugins/AdmobPlugin.release.xcframework/ios-arm64/AdmobPlugin.a")
+	# v7.0 does not bridge UMP's privacy-options entry point. GDScript must keep
+	# the button hidden until a future native binary exposes the complete contract.
+	assert(not _binary_contains_ascii(admob_binary,"privacy_options_form_dismissed"))
+	assert(not _binary_contains_ascii(admob_binary,"present_privacy_options_form"))
+	assert(not _binary_contains_ascii(admob_binary,"get_privacy_options_requirement_status"))
 	var admob_export_source:=FileAccess.get_file_as_string("res://addons/AdmobPlugin/AdmobPlugin.gd")
 	assert(admob_export_source.contains("GoogleMobileAds") and admob_export_source.contains('version": "12.14.0"'))
 	assert(admob_export_source.contains("NSAllowsArbitraryLoadsForMedia"))
@@ -143,6 +149,15 @@ func _ready() -> void:
 	assert(rewarded_ad_source.contains("_completion_sent"))
 	assert(rewarded_ad_source.contains("personalization_state = AdmobConfigClass.PersonalizationState.DISABLED"))
 	assert(rewarded_ad_source.contains("att_enabled = false"))
+	assert(rewarded_ad_source.contains("child_directed = AdmobConfigClass.TagForChildDirectedTreatment.UNSPECIFIED"))
+	assert(rewarded_ad_source.contains("under_age_of_consent = AdmobConfigClass.TagForUnderAgeOfConsent.UNSPECIFIED"))
+	assert(rewarded_ad_source.contains("privacy_options_form_dismissed.connect"))
+	assert(rewarded_ad_source.contains("consent_disallows_ads"))
+	var admob_wrapper_source:=FileAccess.get_file_as_string("res://addons/AdmobPlugin/Admob.gd")
+	assert(admob_wrapper_source.contains("func is_privacy_options_supported()"))
+	assert(admob_wrapper_source.contains('has_method("present_privacy_options_form")'))
+	assert(admob_wrapper_source.contains('has_method("can_request_ads")'))
+	assert(admob_wrapper_source.contains('return "UNKNOWN"'))
 
 	var game = load("res://main.tscn").instantiate()
 	add_child(game)

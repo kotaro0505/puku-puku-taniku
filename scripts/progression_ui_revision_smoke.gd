@@ -14,6 +14,7 @@ func _ready() -> void:
 	_prepare_safe_greenhouse(game)
 	_test_localized_copy()
 	await _test_language_ui_geometry(game)
+	_test_privacy_options_ui(game)
 	_test_top_hud_and_speaker_geometry(game)
 	_test_shop_chatter_contract(game)
 	_test_habitat_button_stays_plain(game)
@@ -21,7 +22,7 @@ func _ready() -> void:
 	_test_progression_thresholds()
 	_test_phase_bgm_policy(game)
 	game._reset_progression_state()
-	print("PROGRESSION_UI_REVISION_SMOKE_OK copy=updated language_ui=fixed panda_chatter=5 armadillo_chatter=5 habitat_button=always_plain arrangement=3+swipe forest=8 fusion=12 bgm=phase-aware migration=preserved")
+	print("PROGRESSION_UI_REVISION_SMOKE_OK copy=updated language_ui=fixed privacy_options=localized+state-gated panda_chatter=5 armadillo_chatter=5 habitat_button=always_plain arrangement=3+swipe forest=8 fusion=12 bgm=phase-aware migration=preserved")
 	get_tree().quit()
 
 
@@ -74,6 +75,9 @@ func _test_localized_copy() -> void:
 	assert(Localizer.text("ja", "main_forest_gacha") == "ガチャ")
 	assert(Localizer.text("hiragana", "main_forest_gacha") == "がちゃ")
 	assert(Localizer.text("en", "main_forest_gacha") == "Gacha")
+	assert(Localizer.text("ja", "privacy_settings") == "プライバシー設定")
+	assert(Localizer.text("hiragana", "privacy_settings") == "ぷらいばしー せってい")
+	assert(Localizer.text("en", "privacy_settings") == "Privacy Settings")
 	assert(Localizer.text("ja", "fusion_lab_intro_armadillo_3") == "多肉植物同士をかけあわせて\n新たな品種を作れるよ！")
 	assert(Localizer.text("ja", "self_best", [12.3]) == "最大サイズ 12.3cm")
 	assert(Localizer.text("ja", "self_best_none") == "最大サイズ ー")
@@ -128,6 +132,29 @@ func _test_language_ui_geometry(game: Node) -> void:
 		assert(bgm_toggle.custom_minimum_size.x == 145.0 and se_toggle.custom_minimum_size.x == 145.0)
 		assert(bgm_toggle.text == "BGM" and se_toggle.text == "SE")
 	game._set_language("ja")
+
+
+func _test_privacy_options_ui(game: Node) -> void:
+	var button := game.find_child("PrivacyOptionsButton", true, false) as Button
+	assert(button != null)
+	assert(not button.visible and button.disabled)
+	for locale in Localizer.SUPPORTED_LANGUAGES:
+		game.language_code = locale
+		game._apply_language_to_ui()
+		assert(button.text == Localizer.text(locale, "privacy_settings"))
+	game.rewarded_ad_service._privacy_options_required = true
+	game.rewarded_ad_service._privacy_options_form_open = false
+	game._refresh_privacy_options_button()
+	assert(button.visible and not button.disabled)
+	game.rewarded_ad_service._privacy_options_form_open = true
+	game._refresh_privacy_options_button()
+	assert(button.visible and button.disabled)
+	game.rewarded_ad_service._privacy_options_form_open = false
+	game.rewarded_ad_service._privacy_options_required = false
+	game._refresh_privacy_options_button()
+	assert(not button.visible and button.disabled)
+	game.language_code = "ja"
+	game._apply_language_to_ui()
 
 
 func _test_top_hud_and_speaker_geometry(game: Node) -> void:

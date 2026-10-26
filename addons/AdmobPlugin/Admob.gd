@@ -60,6 +60,10 @@ signal consent_form_dismissed(error_data: FormError)
 signal consent_form_failed_to_load(error_data: FormError)
 signal consent_info_updated
 signal consent_info_update_failed(error_data: FormError)
+## Emitted by a future native bridge after Google's UMP privacy options form closes.
+## The vendored v7.0 iOS binary does not expose this signal yet, so callers must
+## check is_privacy_options_supported() before showing an entry point.
+signal privacy_options_form_dismissed(error_data)
 signal tracking_authorization_granted
 signal tracking_authorization_denied
 
@@ -561,6 +565,8 @@ func _connect_signals() -> void:
 	_plugin_singleton.connect("consent_form_failed_to_load", _on_consent_form_failed_to_load)
 	_plugin_singleton.connect("consent_info_updated", _on_consent_info_updated)
 	_plugin_singleton.connect("consent_info_update_failed", _on_consent_info_update_failed)
+	if _plugin_singleton.has_signal("privacy_options_form_dismissed"):
+		_plugin_singleton.connect("privacy_options_form_dismissed", _on_privacy_options_form_dismissed)
 	if _plugin_singleton.has_signal("tracking_authorization_granted"):
 		_plugin_singleton.connect("tracking_authorization_granted", _on_tracking_authorization_granted)
 	if _plugin_singleton.has_signal("tracking_authorization_denied"):
@@ -1265,6 +1271,52 @@ func reset_consent_info() -> void:
 		_plugin_singleton.reset_consent_info()
 
 
+## The native bridge contract intentionally requires all three official UMP
+## capabilities. Returning false keeps the setting hidden on the vendored v7.0
+## binary instead of substituting the initial-consent form for the privacy form.
+func is_privacy_options_supported() -> bool:
+	return (
+		_plugin_singleton != null
+		and _plugin_singleton.has_method("get_privacy_options_requirement_status")
+		and _plugin_singleton.has_method("present_privacy_options_form")
+		and _plugin_singleton.has_method("can_request_ads")
+		and _plugin_singleton.has_signal("privacy_options_form_dismissed")
+	)
+
+
+## A compatible native bridge may return the official UMP enum integer or one
+## of these names. Unknown values fail closed instead of showing the entry point.
+func get_privacy_options_requirement_status() -> String:
+	if not is_privacy_options_supported():
+		return "UNKNOWN"
+	var raw_status:Variant=_plugin_singleton.call("get_privacy_options_requirement_status")
+	if raw_status is int:
+		match int(raw_status):
+			0:return "UNKNOWN"
+			1:return "REQUIRED"
+			2:return "NOT_REQUIRED"
+			_:return "UNKNOWN"
+	var status := str(raw_status).to_upper()
+	if status in ["REQUIRED", "NOT_REQUIRED", "UNKNOWN"]:
+		return status
+	return "UNKNOWN"
+
+
+func can_request_ads() -> bool:
+	if not is_privacy_options_supported():
+		return false
+	return bool(_plugin_singleton.call("can_request_ads"))
+
+
+func present_privacy_options_form() -> bool:
+	if not is_privacy_options_supported():
+		return false
+	if get_privacy_options_requirement_status() != "REQUIRED":
+		return false
+	_plugin_singleton.call("present_privacy_options_form")
+	return true
+
+
 func set_mediation_privacy_settings(privacySettings: NetworkPrivacySettings) -> void:
 	if _plugin_singleton == null:
 		GmpLogger.log_error("%s plugin not initialized" % PLUGIN_SINGLETON_NAME)
@@ -1534,6 +1586,10 @@ func _on_consent_info_updated() -> void:
 
 func _on_consent_info_update_failed(error_data: Dictionary) -> void:
 	consent_info_update_failed.emit(FormError.new(error_data))
+
+
+func _on_privacy_options_form_dismissed(error_data = null) -> void:
+	privacy_options_form_dismissed.emit(error_data)
 
 
 func _on_tracking_authorization_granted() -> void:
