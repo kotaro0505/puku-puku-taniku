@@ -17,6 +17,10 @@ workflows:
         STOREKIT2_VERSION: "v0.2"
         IOS_MIN_VERSION: "15.6"
         STOREKIT2_COMPAT_REVISION: "compat2"
+        ADMOB_PLUGIN_VERSION: "v7.0"
+        ADMOB_PLUGIN_UPSTREAM_COMMIT: "4b4ddceab0be81f0dcb12a6313038dba6cf9eacf"
+        ADMOB_NATIVE_COMPAT_REVISION: "ump1"
+        GOOGLE_MOBILE_ADS_VERSION: "12.14.0"
         APP_VERSION: "1.0.0"
         APPLE_TEAM_ID: "UK8FRB9XKH"
         BUNDLE_ID: "com.ohanayanouen.pukupukutaniku"
@@ -36,6 +40,7 @@ workflows:
       cache_paths:
         - $HOME/.cache/puku-puku-taniku/godot-4.7.2
         - $HOME/.cache/puku-puku-taniku/storekit2-v0.2-godot-4.7.2-ios15.6-compat2
+        - $HOME/.cache/puku-puku-taniku/admob-v7.0-ump1-godot-4.7.2-gma-12.14.0-ios15.6
         - $HOME/Library/Application Support/Godot/export_templates/4.7.2.stable
     scripts:
       - name: Report checked-out source revision
@@ -61,6 +66,10 @@ workflows:
           test "$APP_VERSION" = "1.0.0"
           test "$IOS_MIN_VERSION" = "15.6"
           test "$STOREKIT2_COMPAT_REVISION" = "compat2"
+          test "$ADMOB_PLUGIN_VERSION" = "v7.0"
+          test "$ADMOB_PLUGIN_UPSTREAM_COMMIT" = "4b4ddceab0be81f0dcb12a6313038dba6cf9eacf"
+          test "$ADMOB_NATIVE_COMPAT_REVISION" = "ump1"
+          test "$GOOGLE_MOBILE_ADS_VERSION" = "12.14.0"
           grep -Fq 'application/bundle_identifier="com.ohanayanouen.pukupukutaniku"' export_presets.cfg
           grep -Fq 'application/app_store_team_id="UK8FRB9XKH"' export_presets.cfg
           grep -Fq 'application/targeted_device_family=0' export_presets.cfg
@@ -79,9 +88,14 @@ workflows:
           test -f ios/plugins/AdmobPlugin.release.xcframework/ios-arm64/AdmobPlugin.a
           test -f addons/AdmobPlugin/LICENSE.txt
           test -f addons/AdmobPlugin/VENDORED_VERSION.md
+          test -f scripts/ci/build_admob_plugin.sh
+          test -f scripts/ci/patch_admob_ump_native.py
           grep -Fq 'version="7.0"' addons/AdmobPlugin/plugin.cfg
           grep -Fq 'GoogleMobileAds' addons/AdmobPlugin/AdmobPlugin.gd
           grep -Fq '12.14.0' addons/AdmobPlugin/AdmobPlugin.gd
+          grep -Fq 'presentPrivacyOptionsFormFromViewController' scripts/ci/patch_admob_ump_native.py
+          grep -Fq 'UMPConsentInformation.sharedInstance.canRequestAds' scripts/ci/patch_admob_ump_native.py
+          grep -Fq 'UMPConsentInformation.sharedInstance.privacyOptionsRequirementStatus' scripts/ci/patch_admob_ump_native.py
           grep -Fq 'NSAllowsArbitraryLoadsForMedia' addons/AdmobPlugin/AdmobPlugin.gd
           grep -Fq 'NSAllowsArbitraryLoadsInWebContent' addons/AdmobPlugin/AdmobPlugin.gd
           ! grep -Fq '<key>NSAllowsArbitraryLoads</key>' addons/AdmobPlugin/AdmobPlugin.gd
@@ -184,6 +198,25 @@ workflows:
           echo "GODOT_BIN=$GODOT_BIN" >> "$CM_ENV"
           echo "GODOT_IOS_TEMPLATE=$TEMPLATE_DIR/ios.zip" >> "$CM_ENV"
           echo "GODOT_VERSION_OK editor=$ACTUAL_GODOT_VERSION templates=$(cat "$TEMPLATE_DIR/version.txt")"
+
+      - name: Build AdMob v7 native UMP privacy bridge
+        script: |
+          #!/bin/bash
+          set -euo pipefail
+          chmod +x scripts/ci/build_admob_plugin.sh
+          scripts/ci/build_admob_plugin.sh
+          for variant in debug release; do
+            LIBRARY="ios/plugins/AdmobPlugin.$variant.xcframework/ios-arm64/AdmobPlugin.a"
+            test -f "$LIBRARY"
+            BRIDGE_STRINGS="$(mktemp)"
+            strings "$LIBRARY" > "$BRIDGE_STRINGS"
+            grep -Fxq 'privacy_options_form_dismissed' "$BRIDGE_STRINGS"
+            grep -Fxq 'get_privacy_options_requirement_status' "$BRIDGE_STRINGS"
+            grep -Fxq 'present_privacy_options_form' "$BRIDGE_STRINGS"
+            grep -Fxq 'can_request_ads' "$BRIDGE_STRINGS"
+            rm -f "$BRIDGE_STRINGS"
+          done
+          echo "ADMOB_UMP_NATIVE_BRIDGE_OK version=$ADMOB_PLUGIN_VERSION gma=$GOOGLE_MOBILE_ADS_VERSION godot=$GODOT_VERSION"
 
       - name: Build matching StoreKit 2 iOS plugin
         script: |
@@ -463,6 +496,10 @@ workflows:
         STOREKIT2_VERSION: "v0.2"
         IOS_MIN_VERSION: "15.6"
         STOREKIT2_COMPAT_REVISION: "compat2"
+        ADMOB_PLUGIN_VERSION: "v7.0"
+        ADMOB_PLUGIN_UPSTREAM_COMMIT: "4b4ddceab0be81f0dcb12a6313038dba6cf9eacf"
+        ADMOB_NATIVE_COMPAT_REVISION: "ump1"
+        GOOGLE_MOBILE_ADS_VERSION: "12.14.0"
         APP_VERSION: "1.0.0"
         APPLE_TEAM_ID: "UK8FRB9XKH"
         BUNDLE_ID: "com.ohanayanouen.pukupukutaniku"
@@ -498,6 +535,10 @@ workflows:
         STOREKIT2_VERSION: "v0.2"
         IOS_MIN_VERSION: "15.6"
         STOREKIT2_COMPAT_REVISION: "compat2"
+        ADMOB_PLUGIN_VERSION: "v7.0"
+        ADMOB_PLUGIN_UPSTREAM_COMMIT: "4b4ddceab0be81f0dcb12a6313038dba6cf9eacf"
+        ADMOB_NATIVE_COMPAT_REVISION: "ump1"
+        GOOGLE_MOBILE_ADS_VERSION: "12.14.0"
         APP_VERSION: "1.0.0"
         APPLE_TEAM_ID: "UK8FRB9XKH"
         BUNDLE_ID: "com.ohanayanouen.pukupukutaniku.dev"

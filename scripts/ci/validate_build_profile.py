@@ -93,6 +93,8 @@ def main() -> None:
         "addons/AdmobPlugin/LICENSE.txt",
         "ios/plugins/AdmobPlugin.gdip",
         "ios/plugins/AdmobPlugin.release.xcframework/ios-arm64/AdmobPlugin.a",
+        "scripts/ci/build_admob_plugin.sh",
+        "scripts/ci/patch_admob_ump_native.py",
         "scripts/build_profile.gd",
         "scripts/rewarded_ad_service.gd",
         "scripts/story_dev_presets.gd",
@@ -107,6 +109,40 @@ def main() -> None:
         fail("AdMob export is missing the scoped ATS web-content exception")
     if "<key>NSAllowsArbitraryLoads</key>" in admob_export_source:
         fail("AdMob export must not disable ATS globally")
+
+    admob_build_source = Path("scripts/ci/build_admob_plugin.sh").read_text(encoding="utf-8")
+    admob_patch_source = Path("scripts/ci/patch_admob_ump_native.py").read_text(encoding="utf-8")
+    for required_pin in [
+        "4b4ddceab0be81f0dcb12a6313038dba6cf9eacf",
+        'GOOGLE_MOBILE_ADS_VERSION="${GOOGLE_MOBILE_ADS_VERSION:-12.14.0}"',
+        'ADMOB_NATIVE_COMPAT_REVISION="${ADMOB_NATIVE_COMPAT_REVISION:-ump1}"',
+        "ADMOB_UMP_NATIVE_BUILT",
+    ]:
+        if required_pin not in admob_build_source:
+            fail(f"AdMob native build pin is missing: {required_pin}")
+    for required_native_api in [
+        "UMPConsentInformation.sharedInstance.privacyOptionsRequirementStatus",
+        "UMPConsentInformation.sharedInstance.canRequestAds",
+        "presentPrivacyOptionsFormFromViewController",
+        'D_METHOD("get_privacy_options_requirement_status")',
+        'D_METHOD("can_request_ads")',
+        'D_METHOD("present_privacy_options_form")',
+    ]:
+        if required_native_api not in admob_patch_source:
+            fail(f"AdMob native UMP bridge is missing: {required_native_api}")
+
+    committed_admob_binary = Path(
+        "ios/plugins/AdmobPlugin.release.xcframework/ios-arm64/AdmobPlugin.a"
+    ).read_bytes()
+    bridge_tokens = [
+        b"privacy_options_form_dismissed",
+        b"get_privacy_options_requirement_status",
+        b"present_privacy_options_form",
+        b"can_request_ads",
+    ]
+    bridge_token_count = sum(token in committed_admob_binary for token in bridge_tokens)
+    if bridge_token_count not in {0, len(bridge_tokens)}:
+        fail("Committed AdMob binary contains a partial UMP native bridge")
 
     ad_service_source = Path("scripts/rewarded_ad_service.gd").read_text(encoding="utf-8")
     for required_setting in [

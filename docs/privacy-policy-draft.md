@@ -13,7 +13,7 @@
 - 一般向けアプリで年齢が不明な利用者を `UNSPECIFIED` とする運用、および既知の子ども・ティーンを判定する必要性についての法務・運用確認
 - AdMob管理画面の「プライバシーとメッセージ」、広告配信地域、メディエーション、広告技術プロバイダの最終設定
 - Google Mobile Ads SDKのDevice IDに関する「Tracking」宣言と、ATTを使用しない現行実装との整合性
-- UMPで同意内容を後から変更できるネイティブAPIを備えたプラグインと、その実機動作確認（UI側の入口は機能検出付きで準備済み）
+- UMPで同意内容を後から変更できるローカルネイティブ拡張のCodemagicビルド成功と、そのiOS実機動作確認（UI側と固定ソースからの再現ビルド経路は準備済み）
 - App Store提出用の署名済み最終IPAから生成したPrivacy Report
 
 ---
@@ -131,7 +131,7 @@ Web版およびその静的素材の配信に利用します。
 
 本アプリは、Google UMPを通じて同意情報を更新し、対象地域等により同意が必要な場合にGoogleが提供する同意フォームを表示する構成です。同意が取得できない場合、現行実装はリワード広告を利用不可として扱います。
 
-[公開前に実装・確認：Googleがプライバシー設定の再表示を要求する場合だけ表示する設定画面の入口は、日本語・ひらがな・英語で追加済みです。ただし、現行Godot AdMob Plugin v7.0のiOSバイナリは公式UMP再表示APIを公開していないため、現在のビルドでは入口を安全のため非表示にしています。対応ネイティブプラグインを導入して実機検証した後、その操作方法をここへ記載します。]
+[公開前に確認：Googleがプライバシー設定の再表示を要求する場合だけ表示する設定画面の入口は、日本語・ひらがな・英語で追加済みです。Godot AdMob Plugin v7.0の固定コミットへ公式UMP再表示APIを追加し、Godot 4.7.2向けにCodemagicで再現ビルドする経路も追加済みです。ただし、macOSネイティブビルドとiOS実機での表示・変更・再読込は未確認です。確認後、その操作方法をここへ記載します。]
 
 端末の広告およびトラッキングに関する設定は、iOSの設定画面から変更できます。広告のパーソナライズを無効にしても、広告配信、集計測定、不正利用防止等に必要な処理がすべて停止するとは限りません。
 
@@ -284,7 +284,7 @@ GitHub Pages is used to deliver the web version and its static assets. See:
 
 The App updates consent information through Google UMP and is configured to display a Google-provided consent form when consent is required for a user based on region or other applicable factors. Under the current implementation, rewarded ads remain unavailable when the required consent cannot be obtained.
 
-[Before publication: a Japanese, hiragana, and English settings entry has been added and is shown only when Google reports that privacy options are required. However, the current Godot AdMob Plugin v7.0 iOS binary does not expose the official UMP privacy-options APIs, so the entry remains safely hidden in current builds. After a compatible native plug-in is integrated and tested on-device, describe the operating steps here.]
+[Before publication: a Japanese, hiragana, and English settings entry has been added and is shown only when Google reports that privacy options are required. A reproducible Codemagic build now applies a minimal bridge for the official UMP privacy-options APIs to the pinned Godot AdMob Plugin v7.0 source and compiles it for Godot 4.7.2. The macOS native build and the display, change, and reload flow on an iOS device remain unverified. Describe the operating steps here after those checks pass.]
 
 Advertising and tracking controls may also be available in iOS Settings. Disabling personalized advertising does not necessarily stop all processing needed for ad delivery, aggregate measurement, or fraud prevention.
 
@@ -358,7 +358,7 @@ The Operator may revise this Policy when App features, SDKs, laws, or services c
 - Godot Engine 4.7.2（Compatibility renderer）
 - Godot AdMob Plugin v7.0
 - Google Mobile Ads iOS SDK 12.14.0（Swift Package Manager）
-- Google User Messaging Platform（AdMobプラグインのネイティブ実装から利用。最終的に解決されるUMPの版は最終Xcodeアーカイブで要確認）
+- Google User Messaging Platform 3.1.0（v7.0のPackage.resolvedで固定。最終Xcodeアーカイブへの収録は要確認）
 - GodotStoreKit2 v0.2（Codemagicでビルド）
 - NotificationSchedulerPlugin
 - SharePlugin v6.0
@@ -392,7 +392,7 @@ The Operator may revise this Policy when App features, SDKs, laws, or services c
 | AdMob | iOS本番版で有効 | 本番IDはCodemagic Secretからビルド時に生成。ソースには保存しない |
 | 広告形式 | リワード広告 | SDKの報酬獲得コールバック時のみ一度報酬を付与する実装 |
 | 広告設定 | 非パーソナライズ、first-party ID無効、最大コンテンツレーティングG | 非パーソナライズでも識別子等が全く処理されないとは限らない |
-| UMP | 本番で同意情報更新・必要時フォーム表示 | 3言語の再選択入口と機能検出は追加済み。現行v7.0ネイティブバイナリに `privacyOptionsRequirementStatus` / `presentPrivacyOptionsForm` / `canRequestAds` がないため入口は非表示 |
+| UMP | 本番で同意情報更新・必要時フォーム表示 | 3言語の再選択入口と、固定v7.0ソースへ公式3 APIを追加するCodemagic再現ビルドを実装済み。macOSビルドとiOS実機は未確認 |
 | ATT | 現行コードでは無効 | `att_enabled = false`、exportのtrackingもfalse。ただしGMA 12.14.0 manifestはDevice IDのtrackingをtrueと宣言 |
 | 広告上の年齢取扱い | 年齢不明として明示的にUNSPECIFIED | GMA 12.14.0／plugin v7.0は旧TFCD／TFUAのみ。TFATはGMA 13.3.0で追加され、旧設定にTEEN相当値はない。年齢を把握していないためCHILD／TEENを推測設定しない |
 | StoreKit 2 | 36個の非消耗型商品 | 商品情報、価格、購入、復元、返金／期限切れ等を処理。支払カード情報はアプリへ渡らない |
@@ -441,7 +441,7 @@ Google Mobile Ads SDK 12.14.0の実物 `PrivacyInfo.xcprivacy` も確認済み�
 2. **追加の運営者表示事項を要確認**：運営者名、問い合わせ先、国・地域は確定済み。適用法令上、住所、代表者または個人情報保護責任者の表示が必要かを確認する。
 3. **年齢レーティングと広告上の年齢取扱いが未確定**：一般向けゲームとし、Kids Categoryへ登録しない方針は確定済み。現行12.14.0ではTFATを利用できないため、年齢不明利用者の `UNSPECIFIED` 運用、既知の子ども／ティーンの判定要否、13.3.0以降への互換性を伴う移行時期、配信地域の法令との整合を確認する。
 4. **ATTとDevice ID trackingの不整合**：GMA manifestではtracking=true、アプリではATT=false。実際の本番データフローを確認し、必要ならATTを実装する。確認前に「トラッキングなし」と申告しない。
-5. **UMPのプライバシー設定再表示がネイティブ側で未実装**：必要時だけ表示する3言語UI、失敗時の安全停止、同意変更後の広告再読み込みは実装・自動テスト済みだが、現行v7.0ネイティブバイナリが公式3 APIを公開しないため実機では入口が非表示になる。対応バイナリの導入と実機確認が必要。
+5. **UMPネイティブ再表示のMac／実機検証が未完了**：必要時だけ表示する3言語UI、失敗時の安全停止、同意変更後の広告再読み込み、固定v7.0ソースへ公式3 APIを追加する再現ビルド経路は実装済み。CodemagicでのXCFrameworkコンパイルとiOS実機でのrequired／not required／同意変更を確認する必要がある。
 6. **AdMob管理画面が未監査**：Privacy & messaging、地域別メッセージ、広告技術プロバイダ、メディエーション、制限付き広告、本番ユニット設定を実アカウントで確認する。
 7. **UMPの正確なバージョンとmanifest**：ローカルのGMA 12.14.0配布物ではGMA manifestを確認したが、最終アーカイブ内のUMP frameworkとmanifestは未確認。
 8. **最終IPA Privacy Reportが未生成**：Codemagicはアプリ本体とGMA manifestの存在を検査するが、全SDKを含むXcode Privacy Reportは最終署名済みIPA／archiveで確認する。
@@ -490,7 +490,7 @@ Google Mobile Ads SDK 12.14.0の実物 `PrivacyInfo.xcprivacy` も確認済み�
 2. `scripts/main.gd` の `_build_settings()` に、既存レイアウトを崩さない「プライバシーポリシー」ボタンを追加する。
 3. `scripts/game_localizer.gd` に日本語、ひらがな、英語の文言を追加する。
 4. 押下時にGodotの `OS.shell_open()` で正式HTTPS URLを開く。URLスキームを `https` に限定し、失敗時はローカライズした案内を表示する。
-5. Google UMPの `privacyOptionsRequirementStatus` がrequiredの場合だけ表示する「プライバシー設定」ボタンは3言語で追加済み。単なるWebポリシーリンクとは別機能であり、現行v7.0では非表示になる。`presentPrivacyOptionsForm` と `canRequestAds` を含む検証済みネイティブAPIの追加または対応版への更新が必要。
+5. Google UMPの `privacyOptionsRequirementStatus` がrequiredの場合だけ表示する「プライバシー設定」ボタンは3言語で追加済み。単なるWebポリシーリンクとは別機能であり、`presentPrivacyOptionsForm` と `canRequestAds` を含むネイティブ拡張も再現ビルドへ追加済み。CodemagicビルドとiOS実機確認後に有効と判定する。
 6. 設定画面、3言語、iOS実機、Web、オフライン時、外部ブラウザ復帰、UMP required／not requiredの各状態を回帰テストする。
 7. App Store審査前に、App Store ConnectのPrivacy Policy URL、公開ページ、アプリ内リンクが同じ正式文書を指すことを確認する。
 

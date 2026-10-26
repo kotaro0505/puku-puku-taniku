@@ -55,11 +55,29 @@ func _ready() -> void:
 	var admob_descriptor:=FileAccess.get_file_as_string("res://ios/plugins/AdmobPlugin.gdip")
 	assert(admob_descriptor.contains('name="AdmobPlugin"'))
 	var admob_binary:=FileAccess.get_file_as_bytes("res://ios/plugins/AdmobPlugin.release.xcframework/ios-arm64/AdmobPlugin.a")
-	# v7.0 does not bridge UMP's privacy-options entry point. GDScript must keep
-	# the button hidden until a future native binary exposes the complete contract.
-	assert(not _binary_contains_ascii(admob_binary,"privacy_options_form_dismissed"))
-	assert(not _binary_contains_ascii(admob_binary,"present_privacy_options_form"))
-	assert(not _binary_contains_ascii(admob_binary,"get_privacy_options_requirement_status"))
+	var ump_bridge_tokens:=PackedStringArray([
+		"privacy_options_form_dismissed",
+		"present_privacy_options_form",
+		"get_privacy_options_requirement_status",
+		"can_request_ads",
+	])
+	var ump_bridge_token_count:=0
+	for token in ump_bridge_tokens:
+		if _binary_contains_ascii(admob_binary,token):ump_bridge_token_count+=1
+	# The checked-in upstream binary intentionally remains untouched. Codemagic
+	# replaces it with an exact-Godot-version build; accept either the untouched
+	# baseline or the complete bridge, but never a partial native contract.
+	assert(ump_bridge_token_count in [0,ump_bridge_tokens.size()])
+	assert(FileAccess.file_exists("res://scripts/ci/build_admob_plugin.sh"))
+	assert(FileAccess.file_exists("res://scripts/ci/patch_admob_ump_native.py"))
+	var admob_build_source:=FileAccess.get_file_as_string("res://scripts/ci/build_admob_plugin.sh")
+	var admob_patch_source:=FileAccess.get_file_as_string("res://scripts/ci/patch_admob_ump_native.py")
+	assert(admob_build_source.contains("4b4ddceab0be81f0dcb12a6313038dba6cf9eacf"))
+	assert(admob_build_source.contains('GOOGLE_MOBILE_ADS_VERSION:-12.14.0'))
+	assert(admob_build_source.contains("ADMOB_UMP_NATIVE_BUILT"))
+	assert(admob_patch_source.contains("UMPConsentInformation.sharedInstance.privacyOptionsRequirementStatus"))
+	assert(admob_patch_source.contains("UMPConsentInformation.sharedInstance.canRequestAds"))
+	assert(admob_patch_source.contains("presentPrivacyOptionsFormFromViewController"))
 	var admob_export_source:=FileAccess.get_file_as_string("res://addons/AdmobPlugin/AdmobPlugin.gd")
 	assert(admob_export_source.contains("GoogleMobileAds") and admob_export_source.contains('version": "12.14.0"'))
 	assert(admob_export_source.contains("NSAllowsArbitraryLoadsForMedia"))
@@ -92,6 +110,9 @@ func _ready() -> void:
 	assert(codemagic_source.contains('IOS_MIN_VERSION: "15.6"'))
 	assert(codemagic_source.contains('STOREKIT2_COMPAT_REVISION: "compat2"'))
 	assert(codemagic_source.contains("storekit2-v0.2-godot-4.7.2-ios15.6-compat2"))
+	assert(codemagic_source.contains('ADMOB_NATIVE_COMPAT_REVISION: "ump1"'))
+	assert(codemagic_source.contains("admob-v7.0-ump1-godot-4.7.2-gma-12.14.0-ios15.6"))
+	assert(codemagic_source.contains("ADMOB_UMP_NATIVE_BRIDGE_OK"))
 	assert(codemagic_source.contains('CODEMAGIC_SOURCE_HEAD=$(git rev-parse HEAD)'))
 	assert(codemagic_source.contains("git status --short --branch"))
 	assert(codemagic_source.contains("git log -1 --oneline"))

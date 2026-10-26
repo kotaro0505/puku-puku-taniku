@@ -60,9 +60,9 @@ signal consent_form_dismissed(error_data: FormError)
 signal consent_form_failed_to_load(error_data: FormError)
 signal consent_info_updated
 signal consent_info_update_failed(error_data: FormError)
-## Emitted by a future native bridge after Google's UMP privacy options form closes.
-## The vendored v7.0 iOS binary does not expose this signal yet, so callers must
-## check is_privacy_options_supported() before showing an entry point.
+## Emitted by the locally rebuilt iOS bridge after Google's UMP privacy options
+## form closes. Callers must still check is_privacy_options_supported(), because
+## editor, Web, and the untouched upstream fallback binary do not expose it.
 signal privacy_options_form_dismissed(error_data)
 signal tracking_authorization_granted
 signal tracking_authorization_denied
@@ -1272,8 +1272,8 @@ func reset_consent_info() -> void:
 
 
 ## The native bridge contract intentionally requires all three official UMP
-## capabilities. Returning false keeps the setting hidden on the vendored v7.0
-## binary instead of substituting the initial-consent form for the privacy form.
+## capabilities. Returning false keeps the setting hidden on unsupported builds
+## instead of substituting the initial-consent form for the privacy form.
 func is_privacy_options_supported() -> bool:
 	return (
 		_plugin_singleton != null
@@ -1313,8 +1313,8 @@ func present_privacy_options_form() -> bool:
 		return false
 	if get_privacy_options_requirement_status() != "REQUIRED":
 		return false
-	_plugin_singleton.call("present_privacy_options_form")
-	return true
+	var result:Variant=_plugin_singleton.call("present_privacy_options_form")
+	return not (result is int) or int(result) == OK
 
 
 func set_mediation_privacy_settings(privacySettings: NetworkPrivacySettings) -> void:

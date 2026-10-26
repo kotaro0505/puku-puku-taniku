@@ -34,8 +34,9 @@ class FakeNativePrivacyPlugin:
 	signal privacy_options_form_dismissed(error_data)
 	var requirement_status := 0
 	var presentation_count := 0
+	var presentation_result := OK
 	func get_privacy_options_requirement_status() -> int:return requirement_status
-	func present_privacy_options_form() -> void:presentation_count+=1
+	func present_privacy_options_form() -> int:presentation_count+=1;return presentation_result
 	func can_request_ads() -> bool:return true
 
 
@@ -74,8 +75,8 @@ func _ready() -> void:
 	assert(not completions[2].earned)
 	assert(service._showing_context.is_empty() and not service._completion_sent)
 
-	# The vendored native v7.0 plugin does not expose Google's privacy-options
-	# APIs. The wrapper must fail closed instead of showing the wrong UMP form.
+	# Unsupported editor/Web or untouched upstream binaries must fail closed
+	# instead of showing the wrong UMP form.
 	var wrapper := AdmobClass.new()
 	assert(not wrapper.is_privacy_options_supported())
 	assert(wrapper.get_privacy_options_requirement_status() == "UNKNOWN")
@@ -90,10 +91,13 @@ func _ready() -> void:
 	native.requirement_status = 1
 	assert(wrapper.can_request_ads() and wrapper.present_privacy_options_form())
 	assert(native.presentation_count == 1)
+	native.presentation_result = FAILED
+	assert(not wrapper.present_privacy_options_form())
+	assert(native.presentation_count == 2)
 	wrapper.free()
 
-	# A future compatible native bridge can opt into the UI through capability
-	# detection. A successful consent change discards the old loaded ad and loads
+	# A compatible native bridge opts into the UI through capability detection.
+	# A successful consent change discards the old loaded ad and loads
 	# a fresh request without creating a reward callback.
 	var fake := FakePrivacyAdmob.new()
 	service._admob = fake

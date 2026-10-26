@@ -9,6 +9,7 @@ Thumbs.db
 .idea/
 .tools/
 tmp/
+__pycache__/
 
 # Generated from encrypted Codemagic environment variables. Never commit ad IDs.
 /addons/AdmobPlugin/ios_export.cfg

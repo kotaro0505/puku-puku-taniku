@@ -8,7 +8,7 @@
 
 1. AdMob本番アプリ／リワード広告ユニットとCodemagic Secretは用意済み。残るのはUMPメッセージ設定の実アカウント確認、公開、および実機での本番相当テスト
 2. ATTとApp Privacyの最終判断。Google Mobile Ads SDKのPrivacy ManifestはDevice IDのTracking利用可能性を宣言しているため、非パーソナライズ設定だけを根拠に「ATT不要」と断定しない
-3. UMPの「プライバシー設定を再表示する入口」。3言語UIと安全な機能検出層は追加したが、採用プラグインv7.0のネイティブバイナリには `privacyOptionsRequirementStatus` / `presentPrivacyOptionsForm` / `canRequestAds` の橋渡しがないため、現行ビルドでは入口を非表示にする
+3. UMPの「プライバシー設定を再表示する入口」。3言語UIに加え、固定したプラグインv7.0ソースへ `privacyOptionsRequirementStatus` / `presentPrivacyOptionsForm` / `canRequestAds` を追加してGodot 4.7.2用に再現ビルドする経路を実装したが、Codemagic macOSコンパイルとiOS実機動作は未確認
 4. 一般向け／Kids Category不使用の方針は確定済み。ただし利用者の年齢を把握する仕組みがなく、Google Mobile Ads 12.14.0はTFATを利用できないため、既知の子ども・ティーンをどう判定するかと年齢別広告取扱いの法務・運用判断が未確定
 5. App Store Connectでの非消耗型IAP 36商品の登録とSandbox／TestFlight実機購入テスト
 6. 公開済みプライバシーポリシーURL、アプリ内からそのURLへ到達できる導線、サポートURL
@@ -22,7 +22,7 @@
 
 - Godot `4.7.2.stable.official.ed1daf0bf` でCodemagicと同じ回帰テスト38本を連続実行し、38/38 PASS
 - 本番／開発ビルドプロファイル検証がともにPASS
-- `codemagic.yaml` は3ワークフロー、各12ステップとして解析でき、Codemagic公式JSON Schema検証もPASS
+- `codemagic.yaml` は3ワークフロー、各13ステップとして解析でき、Codemagic公式JSON Schema検証もPASS
 - Web release exportに成功し、更新後の `index.pck` をGodotで直接起動して終了コード0を確認
 - Web `index.pck` SHA-256: `7c6faa10eb59ff7ce928310deac5e83f5496d38ccdadf2095139e8451a89b333`
 
@@ -32,7 +32,9 @@ Windows上のローカル検証であり、Codemagic macOS実行、Xcode archive
 
 - Google Mobile Ads SDK 12.14.0はTFAT APIを持たない。`ageRestrictedTreatment` と `CHILD` / `TEEN` / `UNSPECIFIED` が導入されたのは13.3.0で、現在のGodot AdMob Plugin v7.0は旧TFCD／TFUAだけを公開している
 - 年齢情報を取得していない現状では、旧2設定を明示的に `UNSPECIFIED` のままとした。これは「成人」を意味せず、特定の年齢処理を申告していない状態である。根拠なく全員をCHILDまたはTEENにはしていない
-- UMP公式の要否判定、プライバシーオプションフォーム表示、広告要求可否の3能力を検出するGDScript層と、日本語・ひらがな・英語の設定ボタンを追加した。v7.0ネイティブバイナリでは3能力が不足するためボタンは非表示で、初回同意フォームを代用しない
+- UMP公式の要否判定、プライバシーオプションフォーム表示、広告要求可否の3能力を検出するGDScript層と、日本語・ひらがな・英語の設定ボタンを追加した
+- 上流v7.0コミット `4b4ddceab0be81f0dcb12a6313038dba6cf9eacf` を固定し、UMP 3.1.0の3 APIとdismiss signalだけを追加するネイティブパッチを実装した。CodemagicはGodot 4.7.2 stableヘッダー／iOS 15.6／GMA 12.14.0でdebug・release XCFrameworkを再構築し、4シンボルが揃わなければiOS export前に失敗する
+- リポジトリ同梱の上流バイナリそのものは変更していない。Windows／Webでは従来どおり安全に機能検出し、Macビルドを通していない部分バイナリをmainへ置かない
 - 非パーソナライズ、first-party ID無効、最大コンテンツレーティングG、ATTプロンプト無効を維持した。CIは生成設定、export後Info.plist、署名済みIPAに意図しないATT用途説明が入った場合に失敗する
 - ただし、上記の静的設定だけではApple定義上のトラッキング不存在を証明しない。最終IPAのPrivacy Report、実機通信、AdMobの広告ソース／メディエーション設定を確認するまでATTとApp PrivacyはNO GOのままである
 
@@ -40,8 +42,9 @@ Windows上のローカル検証であり、Codemagic macOS実行、Xcode archive
 
 - Godot 4.7.2でCodemagic相当の回帰スモーク39本を連続実行し、39/39 PASS
 - UMP required／not required／広告要求不可／フォームエラー、同意変更後の広告再読み込み、報酬の一度だけ付与、途中終了時の非付与を自動テストで確認
+- 固定した上流v7.0ソースへのネイティブパッチ適用、二重適用時のfail-closed、ビルドスクリプトのBash構文、生成物の完全ブリッジ検査を確認
 - 本番／開発ビルドプロファイル検証、AdMob Secret欠落時の失敗、Codemagic公式JSON Schema検証がPASS
-- 一時Web release exportをChromiumで起動し、canvas生成とAdMob／privacy-options未対応エラー0件を確認
+- 一時Web release exportを作成し、生成した `index.pck` の直接起動で終了コード0、AdMob／privacy-options未対応によるスクリプトエラー0件を確認
 - これはWindows上のモック／静的検証であり、iOS実機上のUMPフォーム、IDFA、通信、署名済みIPAを検証したものではない
 
 TFATの意味と旧設定との関係:
@@ -84,7 +87,7 @@ Godot 4.7対応のAdMobプラグインv7.0と、同プラグインが固定す�
 実装済みの広告処理:
 
 - UMP同意情報を起動ごとに更新し、同意が必要な場合はフォームを表示
-- 対応する将来のネイティブ橋渡しがある場合だけ、UMPの要否に応じて「プライバシー設定」ボタンを3言語で表示し、変更後は古い広告を破棄して `canRequestAds` を再確認
+- 完全なネイティブ橋渡しがある場合だけ、UMPの要否に応じて「プライバシー設定」ボタンを3言語で表示し、変更後は古い広告を破棄して `canRequestAds` を再確認
 - 初期化、読み込み、読み込み失敗、指数バックオフ再試行、表示失敗、閉じる、報酬獲得を分離
 - SDKの「報酬獲得」コールバック時だけ報酬を付与
 - 途中終了時は付与しない
@@ -101,7 +104,7 @@ Godot 4.7対応のAdMobプラグインv7.0と、同プラグインが固定す�
 残る広告ブロッカー:
 
 - AdMob > Privacy & messagingでEuropean regulations message、対象地域、広告パートナー、プライバシーポリシーURLを確認して公開する（今回は未実施）
-- EEA/UK/Switzerland向けの同意撤回入口を実際に動かすには、3つの公式UMP APIを公開するプラグイン更新または検証済みネイティブ拡張が必要
+- EEA/UK/Switzerland向けの同意撤回入口はネイティブ拡張のソースと再現ビルド経路まで実装済み。Codemagicでのコンパイル、署名された開発版、実機でのrequired／not required／フォーム完了／フォーム失敗／同意撤回後の広告再読込を確認するまでGOにしない
 - SDKのPrivacy Reportと実際のAdMob設定を確認し、Trackingを行うならATTを広告読み込み前に実装する。Trackingを行わない方針なら、IDFAが送信されないことを実機／Xcode Privacy Reportで確認する
 - GMA 13.3.0以降と対応プラグインへの更新計画を立てる。現行12.14.0にはTFATがなく、旧TFCD／TFUAにはTEEN相当値もない。SDKだけを独断で更新せず、プラグイン互換性と実機回帰を確認する
 - 年齢情報を取得しない一般向けアプリでの `UNSPECIFIED` 運用が、配信地域・想定利用者・Googleポリシー・適用法令に照らして十分かを確認する。既知の子ども／ティーンへ動的に切り替えるには、適法で検証可能な年齢シグナルの設計が別途必要
@@ -227,6 +230,7 @@ CIは次を行う。
 - ビルドプロファイル、Bundle ID、Team ID、秘密情報非コミットを検査
 - AdMob本番ID／テストIDを秘密環境変数から生成
 - Godot 4.7.2と対応iOS templateをchecksum検証して導入
+- 固定したAdMob Plugin v7.0ソースへ最小UMP橋渡しを適用し、Godot 4.7.2用XCFrameworkを再現ビルドして必須シンボルを検査
 - Godot 4.7.2対応StoreKit 2プラグインを再現ビルド
 - 回帰smoke testsを実行
 - Codemagic build numberを `CFBundleVersion` に適用
