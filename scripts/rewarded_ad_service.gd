@@ -11,6 +11,9 @@ const AdmobClass = preload("res://addons/AdmobPlugin/Admob.gd")
 const AdmobConfigClass = preload("res://addons/AdmobPlugin/model/AdmobConfig.gd")
 const MOBILE_ADS_CONFIG_PATH := "res://data/mobile-ads.cfg"
 const MAX_AUTOMATIC_RETRIES := 3
+const UNKNOWN_SDK_ERROR_CODE := -1
+const AD_MODE_PRODUCTION := "production"
+const AD_MODE_TEST := "test"
 
 enum State {
 	INACTIVE,
@@ -24,18 +27,31 @@ enum State {
 
 var state := State.INACTIVE
 var last_failure_reason := ""
+var last_failure_stage := ""
+var last_failure_code := UNKNOWN_SDK_ERROR_CODE
 var _admob
 var _initialized := false
 var _retry_count := 0
 var _retry_generation := 0
+var _consent_update_attempt_count := 0
+var _load_attempt_count := 0
 var _showing_context := ""
 var _completion_sent := false
 var _privacy_options_required := false
 var _privacy_options_form_open := false
+var _ads_mode := "unknown"
+var _plugin_detected := false
+var _privacy_bridge_supported := false
+var _initialization_callback_received := false
 
 
 func _ready() -> void:
 	call_deferred("_start_if_supported")
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_RESUMED and is_inside_tree():
+		call_deferred("_recover_after_resume")
 
 
 func is_available() -> bool:
@@ -48,6 +64,52 @@ func is_privacy_options_required() -> bool:
 
 func is_privacy_options_form_open() -> bool:
 	return _privacy_options_form_open
+
+
+func diagnostic_snapshot() -> Dictionary:
+	var can_request_ads := false
+	var privacy_requirement := "UNSUPPORTED"
+	if _admob != null and _privacy_bridge_supported:
+		can_request_ads = _admob.can_request_ads()
+		privacy_requirement = _admob.get_privacy_options_requirement_status()
+	return {
+		"state": _state_name(state),
+		"ads_mode": _ads_mode,
+		"plugin_detected": _plugin_detected,
+		"privacy_bridge_supported": _privacy_bridge_supported,
+		"privacy_requirement": privacy_requirement,
+		"can_request_ads": can_request_ads,
+		"initialization_callback_received": _initialization_callback_received,
+		"initialized": _initialized,
+		"consent_update_attempts": _consent_update_attempt_count,
+		"load_attempts": _load_attempt_count,
+		"retry_count": _retry_count,
+		"failure_reason": last_failure_reason,
+		"failure_stage": last_failure_stage,
+		"failure_code": last_failure_code,
+		"diagnostic_code": user_diagnostic_code(),
+	}
+
+
+func user_diagnostic_code() -> String:
+	var stage_code := _diagnostic_stage_code(last_failure_reason, last_failure_stage)
+	if not stage_code.is_empty():
+		return "ADS-%s-%d" % [stage_code, last_failure_code] if last_failure_code >= 0 else "ADS-%s" % stage_code
+	match state:
+		State.CONSENT:
+			return "ADS-WAIT-CONSENT"
+		State.INITIALIZING:
+			return "ADS-WAIT-INIT"
+		State.LOADING:
+			return "ADS-WAIT-LOAD"
+		State.READY:
+			return "ADS-READY"
+		State.SHOWING:
+			return "ADS-SHOWING"
+		State.UNAVAILABLE:
+			return "ADS-UNAVAILABLE"
+		_:
+			return "ADS-INACTIVE"
 
 
 func present_privacy_options() -> bool:
@@ -69,6 +131,7 @@ func request_reward(reward_context: String) -> bool:
 	if reward_context.is_empty() or not _showing_context.is_empty():
 		return false
 	if not is_available():
+		_log_diagnostic("request_not_ready")
 		_recover_after_request()
 		reward_finished.emit(reward_context, false)
 		return false
@@ -89,9 +152,25 @@ func _start_if_supported() -> void:
 	if not Engine.has_singleton("AdmobPlugin"):
 		_mark_unavailable("admob_plugin_missing")
 		return
+	_plugin_detected = true
+	var mobile_ads_config := _load_mobile_ads_config()
+	if mobile_ads_config.is_empty():
+		_mark_unavailable("mobile_ads_config_missing")
+		return
+	_ads_mode = str(mobile_ads_config.get("mode", ""))
+	if _ads_mode not in [AD_MODE_PRODUCTION, AD_MODE_TEST]:
+		_mark_unavailable("mobile_ads_mode_invalid")
+		return
+	if _ads_mode == AD_MODE_PRODUCTION and not BuildProfileClass.is_app_store_release():
+		_mark_unavailable("production_ads_in_development")
+		return
+	var rewarded_id := str(mobile_ads_config.get("rewarded_ad_unit_id", ""))
+	if rewarded_id.is_empty():
+		_mark_unavailable("rewarded_id_missing")
+		return
 
 	_admob = AdmobClass.new()
-	_admob.is_real = BuildProfileClass.is_app_store_release()
+	_admob.is_real = _ads_mode == AD_MODE_PRODUCTION
 	_admob.max_ad_content_rating = AdmobConfigClass.ContentRating.G
 	# The app has no verified age signal. UNSPECIFIED means unknown, not adult.
 	# GMA 12.14.0/plugin v7.0 only expose the legacy TFCD/TFUA settings;
@@ -101,13 +180,10 @@ func _start_if_supported() -> void:
 	_admob.first_party_id_enabled = false
 	_admob.personalization_state = AdmobConfigClass.PersonalizationState.DISABLED
 	_admob.att_enabled = false
-	if BuildProfileClass.is_app_store_release():
-		var rewarded_id := _load_production_rewarded_id()
-		if rewarded_id.is_empty():
-			_mark_unavailable("production_rewarded_id_missing")
-			_admob = null
-			return
+	if _admob.is_real:
 		_admob.ios_real_rewarded_id = rewarded_id
+	else:
+		_admob.ios_debug_rewarded_id = rewarded_id
 
 	_admob.initialization_completed.connect(_on_initialization_completed)
 	_admob.rewarded_ad_loaded.connect(_on_rewarded_ad_loaded)
@@ -122,6 +198,8 @@ func _start_if_supported() -> void:
 	_admob.consent_form_dismissed.connect(_on_consent_form_dismissed)
 	_admob.privacy_options_form_dismissed.connect(_on_privacy_options_form_dismissed)
 	add_child(_admob)
+	_privacy_bridge_supported = _admob.is_privacy_options_supported()
+	_log_diagnostic("service_configured")
 
 	if BuildProfileClass.is_app_store_release():
 		_request_consent_update()
@@ -129,17 +207,23 @@ func _start_if_supported() -> void:
 		_initialize_ads()
 
 
-func _load_production_rewarded_id() -> String:
+func _load_mobile_ads_config() -> Dictionary:
 	var config := ConfigFile.new()
 	if config.load(MOBILE_ADS_CONFIG_PATH) != OK:
-		return ""
-	return str(config.get_value("ios", "rewarded_ad_unit_id", "")).strip_edges()
+		return {}
+	var mode := str(config.get_value("ios", "mode", "")).strip_edges().to_lower()
+	var rewarded_id := str(config.get_value("ios", "rewarded_ad_unit_id", "")).strip_edges()
+	if mode not in [AD_MODE_PRODUCTION, AD_MODE_TEST] or rewarded_id.is_empty():
+		return {}
+	return {"mode": mode, "rewarded_ad_unit_id": rewarded_id}
 
 
 func _request_consent_update() -> void:
 	if _admob == null:
 		return
 	_set_state(State.CONSENT)
+	_consent_update_attempt_count += 1
+	_log_diagnostic("consent_update_requested")
 	_admob.update_consent_info()
 
 
@@ -147,6 +231,7 @@ func _on_consent_info_updated() -> void:
 	if _admob == null:
 		return
 	_refresh_privacy_options_requirement()
+	_log_diagnostic("consent_info_updated")
 	if _admob.is_privacy_options_supported() and _admob.can_request_ads():
 		_initialize_ads()
 		return
@@ -161,12 +246,13 @@ func _on_consent_info_updated() -> void:
 			_retry_or_unavailable("consent_status_unknown", true)
 
 
-func _on_consent_info_update_failed(_error_data = null) -> void:
+func _on_consent_info_update_failed(error_data = null) -> void:
 	_refresh_privacy_options_requirement()
 	if _admob != null and _admob.is_privacy_options_supported() and _admob.can_request_ads():
+		_record_failure("consent_update_failed_previous_consent_usable", "consent", error_data)
 		_initialize_ads()
 		return
-	_retry_or_unavailable("consent_update_failed", true)
+	_retry_or_unavailable("consent_update_failed", true, error_data, "consent")
 
 
 func _on_consent_form_loaded() -> void:
@@ -174,11 +260,11 @@ func _on_consent_form_loaded() -> void:
 		_admob.show_consent_form()
 
 
-func _on_consent_form_failed_to_load(_error_data = null) -> void:
-	_retry_or_unavailable("consent_form_load_failed", true)
+func _on_consent_form_failed_to_load(error_data = null) -> void:
+	_retry_or_unavailable("consent_form_load_failed", true, error_data, "consent")
 
 
-func _on_consent_form_dismissed(_error_data = null) -> void:
+func _on_consent_form_dismissed(error_data = null) -> void:
 	if _admob == null:
 		return
 	_refresh_privacy_options_requirement()
@@ -186,14 +272,14 @@ func _on_consent_form_dismissed(_error_data = null) -> void:
 		if _admob.can_request_ads():
 			_initialize_ads()
 		else:
-			_retry_or_unavailable("consent_disallows_ads", true)
+			_retry_or_unavailable("consent_disallows_ads", true, error_data, "consent")
 		return
 	var consent = _admob.get_consent_status()
 	var status: String = "UNKNOWN" if consent == null else str(consent.to_status_string())
 	if status in ["NOT_REQUIRED", "OBTAINED"]:
 		_initialize_ads()
 	else:
-		_retry_or_unavailable("consent_not_obtained", true)
+		_retry_or_unavailable("consent_not_obtained", true, error_data, "consent")
 
 
 func _refresh_privacy_options_requirement() -> void:
@@ -224,7 +310,7 @@ func _on_privacy_options_form_dismissed(error_data = null) -> void:
 			_admob.remove_rewarded_ad()
 		_mark_unavailable("consent_disallows_ads")
 	else:
-		last_failure_reason = "privacy_options_form_failed"
+		_record_failure("privacy_options_form_failed", "privacy", error_data)
 	privacy_options_form_finished.emit(succeeded)
 
 
@@ -236,8 +322,13 @@ func _initialize_ads() -> void:
 
 
 func _on_initialization_completed(_status_data = null) -> void:
+	_initialization_callback_received = true
 	_initialized = true
 	_retry_count = 0
+	last_failure_reason = ""
+	last_failure_stage = ""
+	last_failure_code = UNKNOWN_SDK_ERROR_CODE
+	_log_diagnostic("initialization_completed")
 	_load_rewarded_ad()
 
 
@@ -245,26 +336,32 @@ func _load_rewarded_ad() -> void:
 	if _admob == null or not _initialized or state == State.SHOWING:
 		return
 	_set_state(State.LOADING)
+	_load_attempt_count += 1
+	_log_diagnostic("rewarded_load_requested")
 	_admob.load_rewarded_ad()
 
 
 func _on_rewarded_ad_loaded(_ad_info = null, _response_info = null) -> void:
 	_retry_count = 0
+	last_failure_reason = ""
+	last_failure_stage = ""
+	last_failure_code = UNKNOWN_SDK_ERROR_CODE
 	_set_state(State.READY)
+	_log_diagnostic("rewarded_loaded")
 
 
-func _on_rewarded_ad_failed_to_load(_ad_info = null, _error_data = null) -> void:
-	_retry_or_unavailable("rewarded_ad_load_failed", false)
+func _on_rewarded_ad_failed_to_load(_ad_info = null, error_data = null) -> void:
+	_retry_or_unavailable("rewarded_ad_load_failed", false, error_data, "load")
 
 
-func _on_rewarded_ad_failed_to_show(_ad_info = null, _error_data = null) -> void:
+func _on_rewarded_ad_failed_to_show(_ad_info = null, error_data = null) -> void:
+	_retry_or_unavailable("rewarded_ad_show_failed", false, error_data, "show")
 	_finish_show(false)
 	# A failed presentation does not reliably produce a dismissal callback. Clear
 	# the active request here so the retry can load a fresh ad and future requests
 	# are not permanently blocked.
 	_showing_context = ""
 	_completion_sent = false
-	_retry_or_unavailable("rewarded_ad_show_failed", false)
 
 
 func _on_rewarded_ad_user_earned_reward(_ad_info = null, _reward_data = null) -> void:
@@ -287,8 +384,8 @@ func _finish_show(reward_earned: bool) -> void:
 	reward_finished.emit(_showing_context, reward_earned)
 
 
-func _retry_or_unavailable(reason: String, retry_consent: bool) -> void:
-	last_failure_reason = reason
+func _retry_or_unavailable(reason: String, retry_consent: bool, error_data = null, stage := "") -> void:
+	_record_failure(reason, stage, error_data)
 	if _retry_count >= MAX_AUTOMATIC_RETRIES:
 		_mark_unavailable(reason)
 		return
@@ -308,6 +405,8 @@ func _retry_or_unavailable(reason: String, retry_consent: bool) -> void:
 func _recover_after_request() -> void:
 	if _admob == null:
 		return
+	if state in [State.CONSENT, State.INITIALIZING, State.LOADING, State.SHOWING]:
+		return
 	_retry_generation += 1
 	_retry_count = 0
 	if not _initialized:
@@ -319,14 +418,81 @@ func _recover_after_request() -> void:
 		_load_rewarded_ad()
 
 
+func _recover_after_resume() -> void:
+	if state in [State.INACTIVE, State.READY, State.SHOWING]:
+		return
+	_log_diagnostic("application_resumed")
+	_recover_after_request()
+
+
 func _mark_unavailable(reason: String) -> void:
-	last_failure_reason = reason
+	if last_failure_reason != reason:
+		_record_failure(reason, _diagnostic_stage_code(reason, "").to_lower())
 	_set_state(State.UNAVAILABLE)
 
 
 func _set_state(next_state: State) -> void:
 	var was_available := state == State.READY
+	var changed := state != next_state
 	state = next_state
 	var now_available := state == State.READY
 	if was_available != now_available:
 		availability_changed.emit(now_available)
+	if changed:
+		_log_diagnostic("state_changed")
+
+
+func _record_failure(reason: String, stage: String, error_data = null) -> void:
+	last_failure_reason = reason
+	last_failure_stage = stage
+	last_failure_code = _safe_error_code(error_data)
+	_log_diagnostic("failure")
+
+
+func _safe_error_code(error_data) -> int:
+	if error_data == null:
+		return UNKNOWN_SDK_ERROR_CODE
+	if error_data is Dictionary:
+		return int(error_data.get("code", UNKNOWN_SDK_ERROR_CODE))
+	if error_data is Object and error_data.has_method("get_code"):
+		return int(error_data.call("get_code"))
+	return UNKNOWN_SDK_ERROR_CODE
+
+
+func _diagnostic_stage_code(reason: String, stage: String) -> String:
+	var normalized_stage := stage.to_upper()
+	if normalized_stage in ["CONFIG", "PLUGIN", "CONSENT", "PRIVACY", "INIT", "LOAD", "SHOW"]:
+		return normalized_stage
+	if reason in ["admob_plugin_missing"]:
+		return "PLUGIN"
+	if reason in ["mobile_ads_config_missing", "mobile_ads_mode_invalid", "production_ads_in_development", "rewarded_id_missing"]:
+		return "CONFIG"
+	if reason.begins_with("consent_"):
+		return "CONSENT"
+	if reason.begins_with("privacy_"):
+		return "PRIVACY"
+	if reason.begins_with("rewarded_ad_load"):
+		return "LOAD"
+	if reason.begins_with("rewarded_ad_show"):
+		return "SHOW"
+	return ""
+
+
+func _state_name(value: int) -> String:
+	match value:
+		State.INACTIVE:return "INACTIVE"
+		State.CONSENT:return "CONSENT"
+		State.INITIALIZING:return "INITIALIZING"
+		State.LOADING:return "LOADING"
+		State.READY:return "READY"
+		State.SHOWING:return "SHOWING"
+		State.UNAVAILABLE:return "UNAVAILABLE"
+		_:return "UNKNOWN"
+
+
+func _log_diagnostic(event: String) -> void:
+	var snapshot := diagnostic_snapshot()
+	snapshot["event"] = event
+	# This deliberately contains only state enums, counters, booleans, and SDK
+	# error codes. Never add ad unit IDs, response identifiers, messages, or user data.
+	print("REWARDED_AD_DIAGNOSTIC ", JSON.stringify(snapshot))

@@ -183,6 +183,7 @@ func _test_shop_chatter_contract(game: Node) -> void:
 	assert(Localizer.text("ja", "shop_chatter_puku_help") == "もし、ぷくコインがなくなったら僕に声かけてよ！")
 	assert(Localizer.text("ja", "shop_puku_rescue_offer") == "ぷくコインが足りないの？\nお店を手伝ってくれたら、1ぷくコイン渡すよ！")
 	assert(Localizer.text("ja", "shop_puku_rescue_success") == "お手伝いありがとう！\n1ぷくコインを受け取ってね。")
+	assert(Localizer.text("ja", "ad_diagnostic_code", ["ADS-LOAD-1"]) == "診断コード：ADS-LOAD-1")
 	var expected_armadillo_pages := [
 		["原生地にお還しした品種は原生地で\n自然に増えてるみたいだ。"],
 		["原生地からもらった種のさやと図鑑、\n大切にしよう。"],

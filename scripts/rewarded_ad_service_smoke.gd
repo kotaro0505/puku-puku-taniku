@@ -2,6 +2,7 @@ extends Node
 
 const ServiceClass = preload("res://scripts/rewarded_ad_service.gd")
 const AdmobClass = preload("res://addons/AdmobPlugin/Admob.gd")
+const LoadAdErrorClass = preload("res://addons/AdmobPlugin/model/LoadAdError.gd")
 
 var completions: Array[Dictionary] = []
 var privacy_requirements: Array[bool] = []
@@ -74,6 +75,18 @@ func _ready() -> void:
 	assert(completions[2].context == "shop_seed_rescue")
 	assert(not completions[2].earned)
 	assert(service._showing_context.is_empty() and not service._completion_sent)
+	assert(service.user_diagnostic_code() == "ADS-SHOW")
+
+	# SDK diagnostics retain only a stable stage and numeric code. They never
+	# include ad unit IDs, response identifiers, or localized SDK messages.
+	service._record_failure("rewarded_ad_load_failed", "load", {"code": 1, "message": "must not be retained"})
+	assert(service.user_diagnostic_code() == "ADS-LOAD-1")
+	var diagnostic_json := JSON.stringify(service.diagnostic_snapshot())
+	assert(not diagnostic_json.contains("must not be retained"))
+	assert(not diagnostic_json.contains("ca-app-pub"))
+	service._record_failure("rewarded_ad_load_failed", "load", LoadAdErrorClass.new({"code": 2, "message": "also discarded"}))
+	assert(service.user_diagnostic_code() == "ADS-LOAD-2")
+	assert(not JSON.stringify(service.diagnostic_snapshot()).contains("also discarded"))
 
 	# Unsupported editor/Web or untouched upstream binaries must fail closed
 	# instead of showing the wrong UMP form.
@@ -154,7 +167,22 @@ func _ready() -> void:
 	assert(privacy_results == [true, true, false])
 	assert(completions.size() == reward_count_before_privacy)
 
-	print("REWARDED_AD_SERVICE_SMOKE_OK earned_once=true early_close_no_reward=true show_failure_recovers=true privacy_capability_gated=true consent_change_reloads=true desktop_inactive=true")
+	# A user tap while consent, initialization, or a load is already in flight
+	# must not start a duplicate request. An unavailable service may start one
+	# fresh recovery load, and an app resume uses that same guarded path.
+	service._retry_generation += 1
+	service._initialized = true
+	fake.loaded = false
+	service.state = ServiceClass.State.LOADING
+	var load_count_before_guard := fake.load_count
+	service._recover_after_request()
+	assert(fake.load_count == load_count_before_guard)
+	service.state = ServiceClass.State.UNAVAILABLE
+	service._recover_after_resume()
+	assert(fake.load_count == load_count_before_guard + 1)
+	assert(service.state == ServiceClass.State.LOADING)
+
+	print("REWARDED_AD_SERVICE_SMOKE_OK earned_once=true early_close_no_reward=true show_failure_recovers=true privacy_capability_gated=true consent_change_reloads=true sanitized_diagnostics=true duplicate_load_guarded=true resume_recovers=true desktop_inactive=true")
 	get_tree().quit()
 
 

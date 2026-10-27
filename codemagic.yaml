@@ -1,13 +1,11 @@
 workflows:
   ios-testflight: &ios-production-workflow
-    name: ぷくぷく！たにくらいふ iOS TestFlight
+    name: ぷくぷく！たにくらいふ iOS TestFlight（Googleテスト広告）
     instance_type: mac_mini_m2
     max_build_duration: 120
     integrations:
       app_store_connect: Codemagic
     environment:
-      groups:
-        - admob_production
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.ohanayanouen.pukupukutaniku
@@ -25,7 +23,7 @@ workflows:
         APPLE_TEAM_ID: "UK8FRB9XKH"
         BUNDLE_ID: "com.ohanayanouen.pukupukutaniku"
         BUILD_PROFILE: "app_store"
-        MOBILE_ADS_MODE: "production"
+        MOBILE_ADS_MODE: "test"
         GODOT_IOS_PRESET: "iOS"
         DISPLAY_NAME: "ぷくぷく！たにくらいふ"
         IOS_APP_DIR: "build/ios/puku_puku_taniku"
@@ -71,6 +69,17 @@ workflows:
           test "$ADMOB_PLUGIN_UPSTREAM_COMMIT" = "4b4ddceab0be81f0dcb12a6313038dba6cf9eacf"
           test "$ADMOB_NATIVE_COMPAT_REVISION" = "ump1"
           test "$GOOGLE_MOBILE_ADS_VERSION" = "12.14.0"
+          if [ "$APP_STORE_SUBMISSION" = "true" ]; then
+            test "$BUILD_PROFILE" = "app_store"
+            test "$INTERNAL_TESTFLIGHT_ONLY" = "false"
+            test "$MOBILE_ADS_MODE" = "production"
+          elif [ "$INTERNAL_TESTFLIGHT_ONLY" = "true" ]; then
+            test "$BUILD_PROFILE" = "app_store"
+            test "$MOBILE_ADS_MODE" = "test"
+          else
+            test "$BUILD_PROFILE" = "development"
+            test "$MOBILE_ADS_MODE" = "test"
+          fi
           grep -Fq 'application/bundle_identifier="com.ohanayanouen.pukupukutaniku"' export_presets.cfg
           grep -Fq 'application/app_store_team_id="UK8FRB9XKH"' export_presets.cfg
           grep -Fq 'application/targeted_device_family=0' export_presets.cfg
@@ -142,9 +151,11 @@ workflows:
           if [ "$MOBILE_ADS_MODE" = "production" ]; then
             grep -Fq 'is_real=true' addons/AdmobPlugin/ios_export.cfg
             ! grep -Fq 'ca-app-pub-3940256099942544/1712485313' data/mobile-ads.cfg
+            grep -Fxq 'mode="production"' data/mobile-ads.cfg
           else
-            test "$BUILD_PROFILE" = "development"
             grep -Fq 'is_real=false' addons/AdmobPlugin/ios_export.cfg
+            grep -Fxq 'mode="test"' data/mobile-ads.cfg
+            grep -Fq 'ca-app-pub-3940256099942544/1712485313' data/mobile-ads.cfg
           fi
 
       - name: Verify Apple toolchain meets current upload minimum
@@ -391,13 +402,13 @@ workflows:
           APP_PATH="$(find "$IPA_AUDIT_DIR/Payload" -maxdepth 1 -type d -name '*.app' -print -quit)"
           test -n "$APP_PATH"
           codesign --verify --deep --strict --verbose=2 "$APP_PATH"
-          python3 - "$APP_PATH" "$BUNDLE_ID" "$DISPLAY_NAME" "$BUILD_PROFILE" <<'PY'
+          python3 - "$APP_PATH" "$BUNDLE_ID" "$DISPLAY_NAME" "$BUILD_PROFILE" "$MOBILE_ADS_MODE" <<'PY'
           import plistlib
           import sys
           from pathlib import Path
 
           app = Path(sys.argv[1])
-          expected_bundle, expected_name, profile = sys.argv[2:5]
+          expected_bundle, expected_name, profile, ads_mode = sys.argv[2:6]
           with (app / "Info.plist").open("rb") as handle:
               info = plistlib.load(handle)
           if info.get("CFBundleIdentifier") != expected_bundle:
@@ -407,8 +418,13 @@ workflows:
           app_id = str(info.get("GADApplicationIdentifier", ""))
           if not app_id.startswith("ca-app-pub-"):
               raise SystemExit("Signed IPA is missing GADApplicationIdentifier")
-          if profile == "app_store" and app_id == "ca-app-pub-3940256099942544~1458002511":
-              raise SystemExit("Signed App Store IPA contains Google's sample app ID")
+          sample_app_id = "ca-app-pub-3940256099942544~1458002511"
+          if ads_mode == "production" and app_id == sample_app_id:
+              raise SystemExit("Signed production-ad IPA contains Google's sample app ID")
+          if ads_mode == "test" and app_id != sample_app_id:
+              raise SystemExit("Signed test-ad IPA does not contain Google's sample app ID")
+          if ads_mode not in {"production", "test"}:
+              raise SystemExit("Signed IPA has an unknown mobile ads mode")
           ats = info.get("NSAppTransportSecurity", {})
           if ats.get("NSAllowsArbitraryLoads"):
               raise SystemExit("Signed IPA disables ATS globally")
@@ -436,7 +452,7 @@ workflows:
           sdk_manifests = [path for path in app.rglob("PrivacyInfo.xcprivacy") if path != privacy_path]
           if not any("GoogleMobileAds" in str(path) for path in sdk_manifests):
               raise SystemExit("Google Mobile Ads privacy manifest is missing from the signed IPA")
-          print(f"SIGNED_IPA_AUDIT_OK bundle={expected_bundle} privacy_manifests={1 + len(sdk_manifests)}")
+          print(f"SIGNED_IPA_AUDIT_OK bundle={expected_bundle} ads_mode={ads_mode} privacy_manifests={1 + len(sdk_manifests)}")
           PY
           echo "IOS_IPA_OK path=$IPA_PATH version=$APP_VERSION build=$IOS_BUILD_NUMBER"
 
@@ -445,8 +461,8 @@ workflows:
           #!/bin/bash
           set -euo pipefail
           mkdir -p build/ios-diagnostics
-          printf '{"profile":"%s","bundle_id":"%s","team_id":"%s","version":"%s","build":"%s"}\n' \
-            "$BUILD_PROFILE" "$BUNDLE_ID" "$APPLE_TEAM_ID" "$APP_VERSION" "$IOS_BUILD_NUMBER" \
+          printf '{"profile":"%s","ads_mode":"%s","bundle_id":"%s","team_id":"%s","version":"%s","build":"%s"}\n' \
+            "$BUILD_PROFILE" "$MOBILE_ADS_MODE" "$BUNDLE_ID" "$APPLE_TEAM_ID" "$APP_VERSION" "$IOS_BUILD_NUMBER" \
             > "build/ios-diagnostics/$BUILD_PROFILE-app.json"
     artifacts:
       - build/ios/ipa/*.ipa

@@ -1,6 +1,6 @@
 # App Store正式リリース準備記録
 
-最終更新: 2026-10-26
+最終更新: 2026-10-27
 
 ## 現在の判定
 
@@ -66,7 +66,7 @@ TFATの意味と旧設定との関係:
 | GodotローカルDebug | Debug判定 | ローカル | 有効 | 疑似広告 |
 | Web開発版 | `puku_development,puku_rewarded_ad_stub` | Web | 有効 | 疑似広告 |
 | iPhone開発版 | `puku_development,puku_ios_test_ads` | `com.ohanayanouen.pukupukutaniku.dev` | 有効 | Google公式テスト広告 |
-| TestFlight内部版 | `puku_app_store_release` | `com.ohanayanouen.pukupukutaniku` | 無効 | 本番ID必須 |
+| TestFlight内部版 | `puku_app_store_release` | `com.ohanayanouen.pukupukutaniku` | 無効 | Google公式テスト広告 |
 | App Store版 | `puku_app_store_release` | `com.ohanayanouen.pukupukutaniku` | 無効 | 本番ID必須 |
 
 `scripts/build_profile.gd` が唯一の判定元である。本番タグが存在すると、競合する開発タグが誤って付いていても本番側へ閉じ、CIも競合をエラーにする。`main.gd` の定数を手作業で切り替える運用ではない。
@@ -77,7 +77,9 @@ TFATの意味と旧設定との関係:
 
 ### 広告
 
-Godot 4.7対応のAdMobプラグインv7.0と、同プラグインが固定するGoogle Mobile Ads SDK 12.14.0を組み込んだ。Googleの公式テストIDは開発版だけに生成し、本番ワークフローは次の暗号化環境変数が欠落、不正形式、またはGoogleサンプルIDの場合に失敗する。
+Godot 4.7対応のAdMobプラグインv7.0と、同プラグインが固定するGoogle Mobile Ads SDK 12.14.0を組み込んだ。未公開iOSアプリには本番広告が配信されないGoogleの制約と、テスト時はテスト広告を使う公式要件に合わせ、内部TestFlight版とiPhone開発版はGoogle公式テストIDを使う。App Store正式リリース用ワークフローだけが、次の暗号化環境変数を必須とし、欠落、不正形式、またはGoogleサンプルIDの場合に失敗する。
+
+TestFlight 1.0.0 (63)は本番IDを使う設定だったため、未公開アプリの内部試験として不適合だった。同ビルドはSDKエラーの詳細を捨てていたため、個別リクエストがno fill、通信、UMP、またはAdMob審査のどれで最終的に失敗したかは後から確定できない。次回以降は内部TestFlightを公式テスト広告に固定し、App Store正式版だけを本番IDにする。
 
 - `ADMOB_IOS_APP_ID`
 - `ADMOB_IOS_REWARDED_AD_UNIT_ID`
@@ -93,7 +95,9 @@ Godot 4.7対応のAdMobプラグインv7.0と、同プラグインが固定す�
 - 途中終了時は付与しない
 - 同じ広告の重複コールバックでも1回しか付与しない
 - 表示失敗後にリクエストロックを解除し、次回読み込みへ復帰
+- 読み込み中の重複要求を防ぎ、アプリ復帰時に安全に再試行
 - 広告利用不可時はゲーム内案内を表示
+- 利用不可案内に安定した診断コードを表示し、デバイスログには段階、状態、回数、真偽値、SDK数値コードだけを出力（広告ID、SDKメッセージ、レスポンス識別子、ユーザー情報は出力しない）
 - first-party IDを無効化し、非パーソナライズ広告を指定
 - 広告コンテンツ最大レーティングをGに固定
 - 年齢を把握していない現状では、旧TFCD／TFUAを明示的に `UNSPECIFIED` とする（成人指定ではない）
@@ -108,12 +112,16 @@ Godot 4.7対応のAdMobプラグインv7.0と、同プラグインが固定す�
 - SDKのPrivacy Reportと実際のAdMob設定を確認し、Trackingを行うならATTを広告読み込み前に実装する。Trackingを行わない方針なら、IDFAが送信されないことを実機／Xcode Privacy Reportで確認する
 - GMA 13.3.0以降と対応プラグインへの更新計画を立てる。現行12.14.0にはTFATがなく、旧TFCD／TFUAにはTEEN相当値もない。SDKだけを独断で更新せず、プラグイン互換性と実機回帰を確認する
 - 年齢情報を取得しない一般向けアプリでの `UNSPECIFIED` 運用が、配信地域・想定利用者・Googleポリシー・適用法令に照らして十分かを確認する。既知の子ども／ティーンへ動的に切り替えるには、適法で検証可能な年齢シグナルの設計が別途必要
-- テスト広告で、完了、途中終了、読み込み失敗、オフライン、連打、復帰を実機確認する
+- 内部TestFlightのGoogle公式テスト広告で、完了、途中終了、読み込み失敗、オフライン、連打、復帰を実機確認する
 - 本番広告は自分で繰り返し視聴せず、リリース前確認はGoogleテスト広告を使う
 
 参考:
 
 - Google: <https://developers.google.com/admob/ios/privacy>
+- Google公式テスト広告: <https://developers.google.com/admob/ios/test-ads>
+- Googleの広告読み込みエラー: <https://developers.google.com/admob/ios/ad-load-errors>
+- Googleの広告非表示トラブルシュート: <https://support.google.com/admob/answer/9469204>
+- Googleのアプリ対応状況審査: <https://support.google.com/admob/answer/12206349>
 - Googleの年齢別広告設定と旧設定の対応表: <https://developers.google.com/admob/ios/targeting>
 - Google Mobile Ads iOS release notes: <https://developers.google.com/admob/ios/rel-notes>
 - Googleの広告配信モード: <https://developers.google.com/admob/ios/privacy/ad-serving-modes>
@@ -220,7 +228,7 @@ Google Mobile Ads SDK 12.14.0自身のPrivacy Manifestも最終IPAへ含める�
 | Workflow | 目的 | 署名 | 公開動作 |
 | --- | --- | --- | --- |
 | `ios-development` | 同一iPhoneへ併存できる開発版 | Development / `.dev` Bundle ID | アーティファクトのみ |
-| `ios-testflight` | 本番ゲートの内部実機確認 | App Store Distribution / 本番Bundle ID / internal-only | App Store Connectへアップロード、外部Beta審査は行わない |
+| `ios-testflight` | 本番ゲート＋公式テスト広告の内部実機確認 | App Store Distribution / 本番Bundle ID / internal-only | App Store Connectへアップロード、外部Beta審査は行わない |
 | `ios-app-store-release` | 本審査提出 | App Store Distribution / 本番Bundle ID | App Store Reviewへ自動提出、承認後は手動リリース |
 
 全ワークフローはCodemagicで利用可能な安定版Xcode 26.5を指定し、実行時にもXcode major 26以上／iPhoneOS SDK 26以上を検査する。App Store本番ワークフローでは `testFlightInternalTestingOnly` を使わない。内部TestFlight用ワークフローだけが同オプションを保持する。
@@ -228,7 +236,7 @@ Google Mobile Ads SDK 12.14.0自身のPrivacy Manifestも最終IPAへ含める�
 CIは次を行う。
 
 - ビルドプロファイル、Bundle ID、Team ID、秘密情報非コミットを検査
-- AdMob本番ID／テストIDを秘密環境変数から生成
+- App Store版はSecretのAdMob本番ID、内部TestFlight／開発版はGoogle公式テストIDから設定ファイルを生成
 - Godot 4.7.2と対応iOS templateをchecksum検証して導入
 - 固定したAdMob Plugin v7.0ソースへ最小UMP橋渡しを適用し、Godot 4.7.2用XCFrameworkを再現ビルドして必須シンボルを検査
 - Godot 4.7.2対応StoreKit 2プラグインを再現ビルド
@@ -245,7 +253,7 @@ Codemagic側で必要な事前設定:
 2. Production bundle `com.ohanayanouen.pukupukutaniku` のDistribution certificate/profileを用意
 3. 開発版を使う場合は `com.ohanayanouen.pukupukutaniku.dev` をIdentifiersへ登録し、Development certificate/profileを用意
 4. `ADMOB_IOS_APP_ID` と `ADMOB_IOS_REWARDED_AD_UNIT_ID` をSecret登録
-5. 最初に `ios-development`、次に `ios-testflight` を手動実行
+5. 最初に `ios-development`、次にGoogle公式テスト広告を使う `ios-testflight` を手動実行
 6. App Store Connectの全項目と実機試験が完了した最後にだけ `ios-app-store-release` を実行
 
 Appleは2026-04-28以降、Xcode 26以降とiOS 26 SDK以降を要求している。参考: <https://developer.apple.com/news/upcoming-requirements/?id=02032026a>
@@ -319,7 +327,7 @@ Apps > 対象バージョン > App Review Informationに、連絡先、審査メ
 
 1. 通常開発はGodot DebugまたはWeb presetで行う。ストーリージャンプ等は保持される
 2. iPhone開発版が必要なら `ios-development` を実行する。本番アプリと別セーブで併存する
-3. リリース候補は `ios-testflight` を実行する。これは本番ゲート、本番Bundle ID、本番広告IDを使うが内部テスト専用である
+3. リリース候補は `ios-testflight` を実行する。これは本番ゲートと本番Bundle IDを使う一方、未公開アプリで安全に検証できるGoogle公式テスト広告を使い、internal-only指定によって提出用ビルドと分離する
 4. 実機、Sandbox IAP、広告、プライバシー、セーブ移行、メタデータを確認する
 5. バージョンは `APP_VERSION` とGodot export presetを一致させ、Codemagic build numberは自動採番する
 6. 最終承認後にのみ `ios-app-store-release` を実行する

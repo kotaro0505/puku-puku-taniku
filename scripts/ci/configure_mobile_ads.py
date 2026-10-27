@@ -68,6 +68,7 @@ def main() -> None:
         "\n".join(
             [
                 "[ios]",
+                f'mode="{mode}"',
                 f'rewarded_ad_unit_id="{rewarded_id}"',
                 "",
             ]

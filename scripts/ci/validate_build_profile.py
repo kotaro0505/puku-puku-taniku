@@ -181,6 +181,8 @@ def main() -> None:
     config_source = Path("scripts/ci/configure_mobile_ads.py").read_text(encoding="utf-8")
     if '"att_enabled=false"' not in config_source or "'att_text=\"\"'" not in config_source:
         fail("Generated mobile-ads configuration must keep ATT disabled and omit prompt text")
+    if "f'mode=\"{mode}\"'" not in config_source:
+        fail("Generated runtime mobile-ads configuration must identify test or production mode")
 
     tracked = set(
         subprocess.check_output(["git", "ls-files"], text=True, encoding="utf-8").splitlines()
@@ -214,6 +216,34 @@ def main() -> None:
             fail(f"Codemagic iOS export diagnostic is missing: {required_diagnostic}")
     if "$IOS_APP_DIR/PrivacyInfo.xcprivacy" in codemagic_source:
         fail("Codemagic still checks PrivacyInfo.xcprivacy in the generated app source directory")
+
+    testflight_block = codemagic_source.split("  ios-testflight:", 1)[1].split(
+        "  ios-app-store-release:", 1
+    )[0]
+    release_block = codemagic_source.split("  ios-app-store-release:", 1)[1].split(
+        "  ios-development:", 1
+    )[0]
+    development_block = codemagic_source.split("  ios-development:", 1)[1]
+    if 'MOBILE_ADS_MODE: "test"' not in testflight_block:
+        fail("Internal TestFlight must use Google test ads before the iOS app is store-listed")
+    if "admob_production" in testflight_block:
+        fail("Internal TestFlight must not load production AdMob secrets")
+    if 'INTERNAL_TESTFLIGHT_ONLY: "true"' not in testflight_block:
+        fail("Test-ad TestFlight workflow must remain internal-testing-only")
+    if 'MOBILE_ADS_MODE: "production"' not in release_block or "admob_production" not in release_block:
+        fail("App Store release must load production AdMob secrets")
+    if 'APP_STORE_SUBMISSION: "true"' not in release_block:
+        fail("App Store release workflow lost its explicit submission gate")
+    if 'MOBILE_ADS_MODE: "test"' not in development_block or "admob_production" in development_block:
+        fail("iPhone development workflow must use Google test ads without production secrets")
+    for required_ads_gate in [
+        'test "$MOBILE_ADS_MODE" = "production"',
+        'test "$MOBILE_ADS_MODE" = "test"',
+        'Signed test-ad IPA does not contain Google\'s sample app ID',
+        'Signed production-ad IPA contains Google\'s sample app ID',
+    ]:
+        if required_ads_gate not in codemagic_source:
+            fail(f"Codemagic mobile-ads separation gate is missing: {required_ads_gate}")
 
     print(
         f"BUILD_PROFILE_VALIDATE_OK profile={profile} preset={preset_name} "
