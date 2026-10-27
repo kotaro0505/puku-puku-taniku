@@ -75,6 +75,15 @@ def main() -> None:
     for line in required_lines:
         if line not in block:
             fail(f"{preset_name} is missing {line}")
+    included_files = {entry.strip() for entry in preset.get("include_filter", "").split(",")}
+    if "data/mobile-ads.cfg" not in included_files:
+        fail(f"{preset_name} must include the generated runtime mobile-ads config")
+    web_preset = presets.get("Web", {})
+    web_included_files = {
+        entry.strip() for entry in web_preset.get("include_filter", "").split(",")
+    }
+    if "data/mobile-ads.cfg" in web_included_files:
+        fail("Web export must not package the iOS mobile-ads config")
 
     main_source = Path("scripts/main.gd").read_text(encoding="utf-8")
     if "BuildProfileClass.development_tools_enabled()" not in main_source:
@@ -97,6 +106,8 @@ def main() -> None:
         "scripts/ci/patch_admob_ump_native.py",
         "scripts/ci/validate_ios_export.py",
         "scripts/ci/validate_ios_export_smoke.py",
+        "scripts/ci/verify_mobile_ads_export.sh",
+        "scripts/ci/verify_mobile_ads_pack.gd",
         "scripts/build_profile.gd",
         "scripts/rewarded_ad_service.gd",
         "scripts/story_dev_presets.gd",
@@ -184,6 +195,43 @@ def main() -> None:
     if "f'mode=\"{mode}\"'" not in config_source:
         fail("Generated runtime mobile-ads configuration must identify test or production mode")
 
+    if 'const MOBILE_ADS_CONFIG_PATH := "res://data/mobile-ads.cfg"' not in ad_service_source:
+        fail("Rewarded-ad runtime config path does not match the exported path")
+    for required_config_diagnostic in [
+        "mobile_ads_config_file_missing",
+        "mobile_ads_config_load_failed",
+        'return "CONFIG-MISSING"',
+        'return "CONFIG-PARSE"',
+        'return "CONFIG-MODE"',
+        'return "CONFIG-ID"',
+        'return "CONFIG-PROFILE"',
+    ]:
+        if required_config_diagnostic not in ad_service_source:
+            fail(f"Rewarded-ad configuration diagnostic is missing: {required_config_diagnostic}")
+
+    pack_validator_source = Path("scripts/ci/verify_mobile_ads_pack.gd").read_text(
+        encoding="utf-8"
+    )
+    export_validator_source = Path("scripts/ci/verify_mobile_ads_export.sh").read_text(
+        encoding="utf-8"
+    )
+    for required_pack_check in [
+        'const CONFIG_PATH := "res://data/mobile-ads.cfg"',
+        "ProjectSettings.load_resource_pack(pack_path, true)",
+        'expected_mode not in ["test", "production"]',
+        "MOBILE_ADS_PACK_OK",
+    ]:
+        if required_pack_check not in pack_validator_source:
+            fail(f"Exported mobile-ads pack validation is missing: {required_pack_check}")
+    for required_export_check in [
+        "find \"$distribution_root\" -type f -name '*.pck'",
+        'mv "$runtime_config" "$backup_config"',
+        "[REDACTED_ADMOB_ID]",
+        "MOBILE_ADS_EXPORT_OK",
+    ]:
+        if required_export_check not in export_validator_source:
+            fail(f"Mobile-ads distribution validation is missing: {required_export_check}")
+
     tracked = set(
         subprocess.check_output(["git", "ls-files"], text=True, encoding="utf-8").splitlines()
     )
@@ -210,12 +258,15 @@ def main() -> None:
         "python3 scripts/ci/validate_ios_export.py",
         'PRIVACY_MANIFEST="$(dirname "$CM_BUILD_DIR/$XCODE_PROJECT")/PrivacyInfo.xcprivacy"',
         "IOS_EXPORT_CHECK_OK check=privacy_manifest.plutil",
+        "bash scripts/ci/verify_mobile_ads_export.sh",
         "[REDACTED_ADMOB_ID]",
     ]:
         if required_diagnostic not in codemagic_source:
             fail(f"Codemagic iOS export diagnostic is missing: {required_diagnostic}")
     if "$IOS_APP_DIR/PrivacyInfo.xcprivacy" in codemagic_source:
         fail("Codemagic still checks PrivacyInfo.xcprivacy in the generated app source directory")
+    if codemagic_source.count("bash scripts/ci/verify_mobile_ads_export.sh") < 2:
+        fail("Codemagic must verify mobile-ads config in both the Xcode export and signed IPA")
 
     testflight_block = codemagic_source.split("  ios-testflight:", 1)[1].split(
         "  ios-app-store-release:", 1

@@ -87,6 +87,21 @@ func _ready() -> void:
 	service._record_failure("rewarded_ad_load_failed", "load", LoadAdErrorClass.new({"code": 2, "message": "also discarded"}))
 	assert(service.user_diagnostic_code() == "ADS-LOAD-2")
 	assert(not JSON.stringify(service.diagnostic_snapshot()).contains("also discarded"))
+	# Configuration failures are distinguishable without exposing either ad ID.
+	for config_case in [
+		["mobile_ads_config_file_missing", "ADS-CONFIG-MISSING"],
+		["mobile_ads_config_load_failed", "ADS-CONFIG-PARSE"],
+		["mobile_ads_mode_invalid", "ADS-CONFIG-MODE"],
+		["rewarded_id_invalid", "ADS-CONFIG-ID"],
+		["production_ads_in_development", "ADS-CONFIG-PROFILE"],
+	]:
+		service._mark_unavailable(str(config_case[0]))
+		assert(service.user_diagnostic_code() == str(config_case[1]))
+	assert(service._valid_rewarded_id(ServiceClass.TEST_REWARDED_ID, ServiceClass.AD_MODE_TEST))
+	assert(not service._valid_rewarded_id(ServiceClass.TEST_REWARDED_ID, ServiceClass.AD_MODE_PRODUCTION))
+	var fake_production_id := "ca-app-pub-" + "1".repeat(16) + "/" + "2".repeat(10)
+	assert(service._valid_rewarded_id(fake_production_id, ServiceClass.AD_MODE_PRODUCTION))
+	assert(not JSON.stringify(service.diagnostic_snapshot()).contains("ca-app-pub"))
 
 	# Unsupported editor/Web or untouched upstream binaries must fail closed
 	# instead of showing the wrong UMP form.
@@ -182,7 +197,7 @@ func _ready() -> void:
 	assert(fake.load_count == load_count_before_guard + 1)
 	assert(service.state == ServiceClass.State.LOADING)
 
-	print("REWARDED_AD_SERVICE_SMOKE_OK earned_once=true early_close_no_reward=true show_failure_recovers=true privacy_capability_gated=true consent_change_reloads=true sanitized_diagnostics=true duplicate_load_guarded=true resume_recovers=true desktop_inactive=true")
+	print("REWARDED_AD_SERVICE_SMOKE_OK earned_once=true early_close_no_reward=true show_failure_recovers=true privacy_capability_gated=true consent_change_reloads=true sanitized_diagnostics=true config_diagnostics_specific=true duplicate_load_guarded=true resume_recovers=true desktop_inactive=true")
 	get_tree().quit()
 
 

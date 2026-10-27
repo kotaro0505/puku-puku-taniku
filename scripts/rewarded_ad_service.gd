@@ -14,6 +14,8 @@ const MAX_AUTOMATIC_RETRIES := 3
 const UNKNOWN_SDK_ERROR_CODE := -1
 const AD_MODE_PRODUCTION := "production"
 const AD_MODE_TEST := "test"
+const TEST_REWARDED_ID := "ca-app-pub-3940256099942544/1712485313"
+const AD_UNIT_PATTERN := "^ca-app-pub-[0-9]{16}/[0-9]{10}$"
 
 enum State {
 	INACTIVE,
@@ -43,6 +45,7 @@ var _ads_mode := "unknown"
 var _plugin_detected := false
 var _privacy_bridge_supported := false
 var _initialization_callback_received := false
+var _mobile_ads_config_failure_reason := ""
 
 
 func _ready() -> void:
@@ -155,7 +158,11 @@ func _start_if_supported() -> void:
 	_plugin_detected = true
 	var mobile_ads_config := _load_mobile_ads_config()
 	if mobile_ads_config.is_empty():
-		_mark_unavailable("mobile_ads_config_missing")
+		_mark_unavailable(
+			_mobile_ads_config_failure_reason
+			if not _mobile_ads_config_failure_reason.is_empty()
+			else "mobile_ads_config_invalid"
+		)
 		return
 	_ads_mode = str(mobile_ads_config.get("mode", ""))
 	if _ads_mode not in [AD_MODE_PRODUCTION, AD_MODE_TEST]:
@@ -208,14 +215,37 @@ func _start_if_supported() -> void:
 
 
 func _load_mobile_ads_config() -> Dictionary:
+	_mobile_ads_config_failure_reason = ""
+	if not FileAccess.file_exists(MOBILE_ADS_CONFIG_PATH):
+		_mobile_ads_config_failure_reason = "mobile_ads_config_file_missing"
+		return {}
 	var config := ConfigFile.new()
 	if config.load(MOBILE_ADS_CONFIG_PATH) != OK:
+		_mobile_ads_config_failure_reason = "mobile_ads_config_load_failed"
 		return {}
 	var mode := str(config.get_value("ios", "mode", "")).strip_edges().to_lower()
 	var rewarded_id := str(config.get_value("ios", "rewarded_ad_unit_id", "")).strip_edges()
-	if mode not in [AD_MODE_PRODUCTION, AD_MODE_TEST] or rewarded_id.is_empty():
+	if mode not in [AD_MODE_PRODUCTION, AD_MODE_TEST]:
+		_mobile_ads_config_failure_reason = "mobile_ads_mode_invalid"
+		return {}
+	if rewarded_id.is_empty():
+		_mobile_ads_config_failure_reason = "rewarded_id_missing"
+		return {}
+	if not _valid_rewarded_id(rewarded_id, mode):
+		_mobile_ads_config_failure_reason = "rewarded_id_invalid"
 		return {}
 	return {"mode": mode, "rewarded_ad_unit_id": rewarded_id}
+
+
+func _valid_rewarded_id(rewarded_id: String, mode: String) -> bool:
+	if mode == AD_MODE_TEST:
+		return rewarded_id == TEST_REWARDED_ID
+	if rewarded_id == TEST_REWARDED_ID:
+		return false
+	var regex := RegEx.new()
+	if regex.compile(AD_UNIT_PATTERN) != OK:
+		return false
+	return regex.search(rewarded_id) != null
 
 
 func _request_consent_update() -> void:
@@ -461,11 +491,34 @@ func _safe_error_code(error_data) -> int:
 
 func _diagnostic_stage_code(reason: String, stage: String) -> String:
 	var normalized_stage := stage.to_upper()
-	if normalized_stage in ["CONFIG", "PLUGIN", "CONSENT", "PRIVACY", "INIT", "LOAD", "SHOW"]:
+	if normalized_stage in [
+		"CONFIG",
+		"CONFIG-MISSING",
+		"CONFIG-PARSE",
+		"CONFIG-MODE",
+		"CONFIG-ID",
+		"CONFIG-PROFILE",
+		"PLUGIN",
+		"CONSENT",
+		"PRIVACY",
+		"INIT",
+		"LOAD",
+		"SHOW",
+	]:
 		return normalized_stage
 	if reason in ["admob_plugin_missing"]:
 		return "PLUGIN"
-	if reason in ["mobile_ads_config_missing", "mobile_ads_mode_invalid", "production_ads_in_development", "rewarded_id_missing"]:
+	if reason in ["mobile_ads_config_file_missing", "mobile_ads_config_missing"]:
+		return "CONFIG-MISSING"
+	if reason == "mobile_ads_config_load_failed":
+		return "CONFIG-PARSE"
+	if reason == "mobile_ads_mode_invalid":
+		return "CONFIG-MODE"
+	if reason in ["rewarded_id_missing", "rewarded_id_invalid"]:
+		return "CONFIG-ID"
+	if reason == "production_ads_in_development":
+		return "CONFIG-PROFILE"
+	if reason == "mobile_ads_config_invalid":
 		return "CONFIG"
 	if reason.begins_with("consent_"):
 		return "CONSENT"
