@@ -14,7 +14,9 @@ func _ready() -> void:
 	_prepare_safe_greenhouse(game)
 	_test_localized_copy()
 	await _test_language_ui_geometry(game)
-	_test_privacy_options_ui(game)
+	await _test_settings_controls(game)
+	await _test_privacy_options_ui(game)
+	await _test_product_settings_layout()
 	_test_top_hud_and_speaker_geometry(game)
 	_test_shop_chatter_contract(game)
 	_test_habitat_button_stays_plain(game)
@@ -22,7 +24,7 @@ func _ready() -> void:
 	_test_progression_thresholds()
 	_test_phase_bgm_policy(game)
 	game._reset_progression_state()
-	print("PROGRESSION_UI_REVISION_SMOKE_OK copy=updated language_ui=fixed privacy_options=localized+state-gated panda_chatter=5 armadillo_chatter=5 habitat_button=always_plain arrangement=3+swipe forest=8 fusion=12 bgm=phase-aware migration=preserved")
+	print("PROGRESSION_UI_REVISION_SMOKE_OK copy=updated language_ui=fixed settings=content-sized+stable-toggles privacy_options=localized+state-gated panda_chatter=5 armadillo_chatter=5 habitat_button=always_plain arrangement=3+swipe forest=8 fusion=12 bgm=phase-aware migration=preserved")
 	get_tree().quit()
 
 
@@ -103,9 +105,20 @@ func _test_localized_copy() -> void:
 
 
 func _test_language_ui_geometry(game: Node) -> void:
-	var settings_panel := game.settings_overlay.get_child(1) as PanelContainer
+	var settings_panel := game.settings_panel as PanelContainer
 	var original_panel_rect := Rect2(settings_panel.position, settings_panel.size)
 	var original_play_rect := Rect2(game.play_open_button.position, game.play_open_button.size)
+	assert(settings_panel.size == Vector2(488, 896), "development settings panel size: %s" % settings_panel.size)
+	_assert_settings_panel_centered(game.settings_overlay, settings_panel)
+	assert(game.settings_content.alignment == BoxContainer.ALIGNMENT_BEGIN)
+	game.settings_overlay.visible = true
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var scroll_bar: VScrollBar = game.settings_scroll.get_v_scroll_bar()
+	assert(scroll_bar.max_value > scroll_bar.page, "development settings must remain vertically scrollable")
+	game.settings_overlay.visible = false
+	for development_control_name in ["HabitatDevOpen", "OpeningStoryReplay", "StoryDevOpen", "ProgressionDevReset", "JellyDevOpen", "TrialDevGachaOpen", "CatalogPreviewDevOpen"]:
+		assert(game.settings_content.find_child(development_control_name, true, false) != null, "missing development setting: %s" % development_control_name)
 	for locale in Localizer.SUPPORTED_LANGUAGES:
 		game._set_language(locale)
 		await get_tree().process_frame
@@ -127,11 +140,145 @@ func _test_language_ui_geometry(game: Node) -> void:
 		for language_button_value in game.language_buttons.values():
 			var language_button := language_button_value as Button
 			assert(language_button.custom_minimum_size.x == 134.0 and language_button.clip_text)
-		var bgm_toggle := game.find_child("BgmToggle", true, false) as CheckButton
-		var se_toggle := game.find_child("SeToggle", true, false) as CheckButton
-		assert(bgm_toggle.custom_minimum_size.x == 145.0 and se_toggle.custom_minimum_size.x == 145.0)
-		assert(bgm_toggle.text == "BGM" and se_toggle.text == "SE")
+		var bgm_label := game.find_child("BgmSettingLabel", true, false) as Label
+		var se_label := game.find_child("SeSettingLabel", true, false) as Label
+		var growing_label := game.find_child("GrowingPukuPreviewLabel", true, false) as Label
+		assert(bgm_label.text == Localizer.text(locale, "audio_bgm"))
+		assert(se_label.text == Localizer.text(locale, "audio_se"))
+		assert(growing_label.text == Localizer.text(locale, "growing_puku_preview_setting"))
+		var bgm_toggle := game.find_child("BgmToggle", true, false) as Button
+		var se_toggle := game.find_child("SeToggle", true, false) as Button
+		assert(bgm_toggle.custom_minimum_size.x == 82.0 and se_toggle.custom_minimum_size.x == 82.0)
+		assert(bgm_toggle.text in ["ON", "OFF"] and se_toggle.text in ["ON", "OFF"])
+		assert(game.find_child("AudioSettingsNote", true, false) == null)
 	game._set_language("ja")
+
+
+func _test_settings_controls(game: Node) -> void:
+	var bgm_toggle := game.find_child("BgmToggle", true, false) as Button
+	var se_toggle := game.find_child("SeToggle", true, false) as Button
+	var preview_toggle := game.find_child("GrowingPukuPreviewToggle", true, false) as Button
+	assert(bgm_toggle != null and se_toggle != null and preview_toggle != null)
+	assert(not (bgm_toggle is CheckButton) and not (se_toggle is CheckButton) and not (preview_toggle is CheckButton))
+	var original_audio: Dictionary = game.audio_settings.duplicate(true)
+	var original_preview: bool = game.show_growing_puku_preview
+
+	game._change_audio_enabled(true, true)
+	_assert_stable_settings_toggle(bgm_toggle, true)
+	var enabled_background := (bgm_toggle.get_theme_stylebox("normal") as StyleBoxFlat).bg_color
+	game._change_audio_enabled(false, true)
+	_assert_stable_settings_toggle(bgm_toggle, false)
+	var disabled_background := (bgm_toggle.get_theme_stylebox("normal") as StyleBoxFlat).bg_color
+	assert(enabled_background.get_luminance() > disabled_background.get_luminance())
+	assert(not game.audio_manager.bgm_enabled)
+
+	game._change_audio_enabled(true, false)
+	_assert_stable_settings_toggle(se_toggle, true)
+	game._change_audio_enabled(false, false)
+	_assert_stable_settings_toggle(se_toggle, false)
+	assert(not game.audio_manager.se_enabled)
+
+	game._change_growing_puku_preview(false)
+	_assert_stable_settings_toggle(preview_toggle, false)
+	game._change_growing_puku_preview(true)
+	_assert_stable_settings_toggle(preview_toggle, true)
+
+	game._change_audio_volume(37.0, true)
+	game._change_audio_volume(41.0, false)
+	assert(is_equal_approx(game.audio_manager.bgm_volume, 0.37))
+	assert(is_equal_approx(game.audio_manager.se_volume, 0.41))
+	var saved = JSON.parse_string(FileAccess.get_file_as_string(game._active_save_path()))
+	assert(saved is Dictionary)
+	assert(not bool(saved.audio_settings.bgm_enabled) and not bool(saved.audio_settings.se_enabled))
+	assert(bool(saved.show_growing_puku_preview))
+
+	game._change_audio_enabled(bool(original_audio.get("bgm_enabled", true)), true)
+	game._change_audio_enabled(bool(original_audio.get("se_enabled", true)), false)
+	game._change_audio_volume(float(original_audio.get("bgm_volume", 0.65)) * 100.0, true)
+	game._change_audio_volume(float(original_audio.get("se_volume", 0.62)) * 100.0, false)
+	game._change_growing_puku_preview(original_preview)
+	await get_tree().process_frame
+
+
+func _assert_stable_settings_toggle(button: Button, enabled: bool) -> void:
+	assert(button.toggle_mode)
+	assert(button.action_mode == BaseButton.ACTION_MODE_BUTTON_RELEASE)
+	assert(button.focus_mode == Control.FOCUS_NONE)
+	assert(button.button_pressed == enabled)
+	assert(button.text == ("ON" if enabled else "OFF"))
+	var normal_style := button.get_theme_stylebox("normal") as StyleBoxFlat
+	assert(normal_style != null)
+	for style_name in ["hover", "pressed", "hover_pressed", "focus", "disabled"]:
+		var state_style := button.get_theme_stylebox(style_name) as StyleBoxFlat
+		assert(state_style != null)
+		assert(state_style.bg_color.is_equal_approx(normal_style.bg_color), "%s background changed for %s" % [button.name, style_name])
+		assert(state_style.border_color.is_equal_approx(normal_style.border_color), "%s border changed for %s" % [button.name, style_name])
+	var normal_font_color := button.get_theme_color("font_color")
+	for color_name in ["font_hover_color", "font_pressed_color", "font_focus_color", "font_hover_pressed_color", "font_disabled_color"]:
+		assert(button.get_theme_color(color_name).is_equal_approx(normal_font_color), "%s font changed for %s" % [button.name, color_name])
+
+
+func _test_product_settings_layout() -> void:
+	var product_game = load("res://main.tscn").instantiate()
+	product_game.TRIAL_DEV_CONTROLS_ENABLED = false
+	product_game.DEVELOPMENT_CATALOG_PREVIEW_ENABLED = false
+	add_child(product_game)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	product_game.audio_manager.apply_settings({"bgm_enabled": false, "se_enabled": false})
+	var panel := product_game.settings_panel as PanelContainer
+	assert(panel != null and panel.size.x == 488.0)
+	assert(panel.size.y < 896.0, "product settings retained development height: %s" % panel.size.y)
+	_assert_settings_panel_centered(product_game.settings_overlay, panel)
+	assert(product_game.settings_content.alignment == BoxContainer.ALIGNMENT_BEGIN)
+	assert(product_game.settings_content.find_child("AudioSettingsNote", true, false) == null)
+	for development_control_name in ["HabitatDevOpen", "OpeningStoryReplay", "StoryDevOpen", "ProgressionDevReset", "JellyDevOpen", "TrialDevGachaOpen", "CatalogPreviewDevOpen"]:
+		assert(product_game.settings_content.find_child(development_control_name, true, false) == null)
+	product_game.settings_overlay.visible = true
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var scroll_bar: VScrollBar = product_game.settings_scroll.get_v_scroll_bar()
+	assert(scroll_bar.max_value <= scroll_bar.page, "compact product settings unexpectedly scroll")
+	var compact_height: float = panel.size.y
+	assert(not product_game.settings_language_status.visible, "empty language status left product padding")
+	var localized_height := -1.0
+	for locale in Localizer.SUPPORTED_LANGUAGES:
+		product_game._set_language(locale)
+		await get_tree().process_frame
+		await get_tree().process_frame
+		if localized_height < 0.0:localized_height = panel.size.y
+		assert(is_equal_approx(panel.size.y, localized_height), "product settings height changed for %s" % locale)
+		assert(localized_height > compact_height, "visible language feedback did not participate in content sizing")
+		_assert_settings_panel_centered(product_game.settings_overlay, panel)
+		assert(scroll_bar.max_value <= scroll_bar.page, "product settings overflowed for %s" % locale)
+		var growing_row := product_game.find_child("GrowingPukuPreviewRow", true, false) as HBoxContainer
+		var growing_label := product_game.find_child("GrowingPukuPreviewLabel", true, false) as Label
+		assert(growing_row != null and growing_label != null)
+		assert(growing_label.position.x + growing_label.size.x <= growing_row.size.x)
+		assert(growing_label.position.y + growing_label.size.y <= growing_row.size.y)
+	product_game._set_language("ja")
+	await get_tree().process_frame
+	product_game.rewarded_ad_service._privacy_options_required = true
+	product_game.rewarded_ad_service._privacy_options_form_open = false
+	product_game._refresh_privacy_options_button()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert(product_game.privacy_options_button.visible)
+	assert(panel.size.y > localized_height and panel.size.y < 896.0)
+	_assert_settings_panel_centered(product_game.settings_overlay, panel)
+	product_game.rewarded_ad_service._privacy_options_required = false
+	product_game._refresh_privacy_options_button()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert(is_equal_approx(panel.size.y, localized_height))
+	product_game.queue_free()
+	await get_tree().process_frame
+
+
+func _assert_settings_panel_centered(overlay: Control, panel: Control) -> void:
+	var panel_center := panel.position + panel.size * 0.5
+	var overlay_center := overlay.size * 0.5
+	assert(panel_center.distance_to(overlay_center) <= 1.0, "settings panel is not centered: panel=%s overlay=%s" % [panel_center, overlay_center])
 
 
 func _test_privacy_options_ui(game: Node) -> void:
@@ -145,6 +292,7 @@ func _test_privacy_options_ui(game: Node) -> void:
 	game.rewarded_ad_service._privacy_options_required = true
 	game.rewarded_ad_service._privacy_options_form_open = false
 	game._refresh_privacy_options_button()
+	await get_tree().process_frame
 	assert(button.visible and not button.disabled)
 	game.rewarded_ad_service._privacy_options_form_open = true
 	game._refresh_privacy_options_button()
@@ -152,6 +300,7 @@ func _test_privacy_options_ui(game: Node) -> void:
 	game.rewarded_ad_service._privacy_options_form_open = false
 	game.rewarded_ad_service._privacy_options_required = false
 	game._refresh_privacy_options_button()
+	await get_tree().process_frame
 	assert(not button.visible and button.disabled)
 	game.language_code = "ja"
 	game._apply_language_to_ui()

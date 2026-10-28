@@ -96,7 +96,8 @@ func _test_harvest_result_presentation(game)->void:
 	game._clear_greenhouse_plants()
 
 func _test_live_harvest_preview(game)->void:
-	assert(game.growing_puku_preview_toggle and game.growing_puku_preview_toggle.button_pressed and game.growing_puku_preview_toggle.text=="育成中のぷくコイン表示　ON")
+	assert(game.growing_puku_preview_toggle and game.growing_puku_preview_toggle.button_pressed and game.growing_puku_preview_toggle.text=="ON")
+	assert(game.find_child("GrowingPukuPreviewLabel",true,false).text=="育成中のぷくコイン表示")
 	var foreground_ui:=game.labels_layer.get_parent() as CanvasLayer;var foreground_hud:Node=game.main_status_hud.get_parent()
 	assert(game.greenhouse_layer.layer<game.best_record_layer.layer and game.best_record_layer.layer<game.plant_screen_layer.layer,"best record canvas is not behind the screen-space plants")
 	assert(game.best_panel.get_parent()==game.best_record_layer and foreground_ui and game.plant_screen_layer.layer<foreground_ui.layer,"plants, best record, or growing labels are on the wrong canvas")

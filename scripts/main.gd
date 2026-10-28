@@ -81,6 +81,11 @@ const JUREJURE_LOSS_MIN_PUKU := 1
 const JUREJURE_LOSS_MAX_PUKU := 5
 const NORMAL_ROUND_COST_UNITS := 1000
 const NORMAL_ROUND_AD_RESCUE_COOLDOWN_SECONDS := 10 * 60
+const SETTINGS_PANEL_WIDTH := 488.0
+const SETTINGS_PANEL_MAX_HEIGHT := 896.0
+const SETTINGS_PANEL_SCREEN_MARGIN := 64.0
+const SETTINGS_PANEL_HORIZONTAL_PADDING := 24.0
+const SETTINGS_PANEL_VERTICAL_PADDING := 18.0
 const PUKU_GAUGE_FINISH_SPEED_SCALE := 0.5
 const FIRST_GET_MIN_REWARD_UNITS := 200
 const INITIAL_PUKU_CAPITAL_UNITS := 5000
@@ -562,6 +567,10 @@ var puku_buyback_tutorial_index := 0
 var habitat_scroll_tutorial_active := false
 var puku_gauge_intro_complete := false
 var settings_overlay: Control
+var settings_panel: PanelContainer
+var settings_scroll: ScrollContainer
+var settings_content: VBoxContainer
+var settings_panel_layout_queued := false
 var settings_title_label:Label
 var settings_language_heading:Label
 var settings_close_button:Button
@@ -624,7 +633,7 @@ var old_catalog_page_roll_play_count:=-1
 var audio_manager: Node
 var audio_settings: Dictionary = {"bgm_enabled":true,"se_enabled":true,"bgm_volume":0.65,"se_volume":0.62}
 var show_growing_puku_preview := true
-var growing_puku_preview_toggle: CheckButton
+var growing_puku_preview_toggle: Button
 var privacy_options_button: Button
 var harvest_puku_reward_slopes:Array[float]=[]
 var rain_visual: Control
@@ -1160,6 +1169,7 @@ func _refresh_privacy_options_button()->void:
 	var required:bool=rewarded_ad_service!=null and bool(rewarded_ad_service.is_privacy_options_required())
 	privacy_options_button.visible=required
 	privacy_options_button.disabled=not required or rewarded_ad_service.is_privacy_options_form_open()
+	_queue_settings_panel_layout()
 
 func _load_save() -> void:
 	_cancel_puku_gauge_animations()
@@ -4110,19 +4120,21 @@ func _show_intro_gift_effect()->void:
 func _build_settings(hud:Control)->void:
 	settings_overlay=Control.new();settings_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);settings_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;settings_overlay.visible=false;hud.add_child(settings_overlay)
 	var shade:=ColorRect.new();shade.color=Color(0.12,0.07,0.04,.68);shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);shade.mouse_filter=Control.MOUSE_FILTER_STOP;settings_overlay.add_child(shade)
-	var panel:=PanelContainer.new();panel.position=Vector2(44,64);panel.size=Vector2(488,896);panel.add_theme_stylebox_override("panel",_box(Color("#f7e8c7"),Color("#9b642f"),26,4));settings_overlay.add_child(panel)
-	var scroll:=ScrollContainer.new();scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;scroll.vertical_scroll_mode=ScrollContainer.SCROLL_MODE_AUTO;scroll.scroll_deadzone=12;panel.add_child(scroll)
-	var content:=VBoxContainer.new();content.custom_minimum_size=Vector2(450,0);content.alignment=BoxContainer.ALIGNMENT_CENTER;content.add_theme_constant_override("separation",11);scroll.add_child(content)
+	settings_panel=PanelContainer.new();settings_panel.name="SettingsPanel"
+	var panel_style:=_box(Color("#f7e8c7"),Color("#9b642f"),26,4);panel_style.content_margin_left=SETTINGS_PANEL_HORIZONTAL_PADDING;panel_style.content_margin_right=SETTINGS_PANEL_HORIZONTAL_PADDING;panel_style.content_margin_top=SETTINGS_PANEL_VERTICAL_PADDING;panel_style.content_margin_bottom=SETTINGS_PANEL_VERTICAL_PADDING
+	settings_panel.add_theme_stylebox_override("panel",panel_style);settings_overlay.add_child(settings_panel)
+	settings_scroll=ScrollContainer.new();settings_scroll.name="SettingsScroll";settings_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;settings_scroll.vertical_scroll_mode=ScrollContainer.SCROLL_MODE_AUTO;settings_scroll.scroll_deadzone=12;settings_panel.add_child(settings_scroll)
+	settings_content=VBoxContainer.new();settings_content.name="SettingsContent";settings_content.custom_minimum_size=Vector2(420,0);settings_content.alignment=BoxContainer.ALIGNMENT_BEGIN;settings_content.size_flags_horizontal=Control.SIZE_EXPAND_FILL;settings_content.size_flags_vertical=Control.SIZE_SHRINK_BEGIN;settings_content.add_theme_constant_override("separation",11);settings_scroll.add_child(settings_content)
+	var content:=settings_content
 	settings_title_label=Label.new();settings_title_label.text="設定";settings_title_label.custom_minimum_size=Vector2(420,42);settings_title_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;settings_title_label.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS;settings_title_label.add_theme_font_size_override("font_size",30);settings_title_label.add_theme_color_override("font_color",UI_BROWN);content.add_child(settings_title_label)
 	settings_language_heading=Label.new();settings_language_heading.name="LanguageHeading";settings_language_heading.text=Localizer.text(language_code,"language_heading");settings_language_heading.custom_minimum_size=Vector2(420,30);settings_language_heading.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;settings_language_heading.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS;settings_language_heading.add_theme_font_size_override("font_size",19);settings_language_heading.add_theme_color_override("font_color",UI_BROWN);content.add_child(settings_language_heading)
 	var language_row:=HBoxContainer.new();language_row.alignment=BoxContainer.ALIGNMENT_CENTER;language_row.add_theme_constant_override("separation",7);content.add_child(language_row)
 	for option in [{"code":"ja","label":"日本語"},{"code":"hiragana","label":"ひらがな"},{"code":"en","label":"English"}]:
 		var language_button:=Button.new();language_button.text=str(option.label);language_button.custom_minimum_size=Vector2(134,50);language_button.clip_text=true;language_button.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS;_skin_button(language_button,Color("#d9c49d"),15);language_button.pressed.connect(_set_language.bind(str(option.code)));language_row.add_child(language_button);language_buttons[str(option.code)]=language_button
-	settings_language_status=Label.new();settings_language_status.custom_minimum_size=Vector2(420,36);settings_language_status.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;settings_language_status.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;settings_language_status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;settings_language_status.add_theme_font_size_override("font_size",13);settings_language_status.add_theme_color_override("font_color",Color("#76513b"));content.add_child(settings_language_status)
+	settings_language_status=Label.new();settings_language_status.custom_minimum_size=Vector2(420,36);settings_language_status.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;settings_language_status.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;settings_language_status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;settings_language_status.add_theme_font_size_override("font_size",13);settings_language_status.add_theme_color_override("font_color",Color("#76513b"));settings_language_status.visible=false;content.add_child(settings_language_status)
 	_add_audio_setting_controls(content,Localizer.text(language_code,"audio_bgm"),true)
 	_add_audio_setting_controls(content,Localizer.text(language_code,"audio_se"),false)
-	var note:=Label.new();note.name="AudioSettingsNote";note.text=Localizer.text(language_code,"audio_note");note.custom_minimum_size=Vector2(420,40);note.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;note.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;note.add_theme_font_size_override("font_size",14);note.add_theme_color_override("font_color",Color("#76513b"));content.add_child(note)
-	growing_puku_preview_toggle=CheckButton.new();growing_puku_preview_toggle.name="GrowingPukuPreviewToggle";growing_puku_preview_toggle.text=_growing_puku_preview_setting_text();growing_puku_preview_toggle.button_pressed=show_growing_puku_preview;growing_puku_preview_toggle.custom_minimum_size=Vector2(420,52);growing_puku_preview_toggle.alignment=HORIZONTAL_ALIGNMENT_CENTER;growing_puku_preview_toggle.add_theme_font_size_override("font_size",16);growing_puku_preview_toggle.add_theme_color_override("font_color",UI_BROWN);growing_puku_preview_toggle.toggled.connect(_change_growing_puku_preview);content.add_child(growing_puku_preview_toggle)
+	_add_growing_puku_preview_control(content)
 	privacy_options_button=Button.new();privacy_options_button.name="PrivacyOptionsButton";privacy_options_button.text=Localizer.text(language_code,"privacy_settings");privacy_options_button.custom_minimum_size=Vector2(370,58);privacy_options_button.visible=false;privacy_options_button.disabled=true;_skin_button(privacy_options_button,Color("#c7d6ad"),17);privacy_options_button.pressed.connect(_on_privacy_options_pressed);content.add_child(privacy_options_button)
 	if _trial_dev_controls_enabled():
 		var habitat_test:=Button.new();habitat_test.name="HabitatDevOpen";habitat_test.text="開発用：通常原生地テスト";habitat_test.custom_minimum_size=Vector2(370,58);_skin_button(habitat_test,Color("#adcbb8"),16);habitat_test.pressed.connect(_open_habitat_dev);content.add_child(habitat_test)
@@ -4138,8 +4150,10 @@ func _build_settings(hud:Control)->void:
 		if DEVELOPMENT_CATALOG_PREVIEW_ENABLED:
 			catalog_preview_settings_button=Button.new();catalog_preview_settings_button.name="CatalogPreviewDevOpen";catalog_preview_settings_button.text="開発用：品種プレビュー";catalog_preview_settings_button.custom_minimum_size=Vector2(370,58);_skin_button(catalog_preview_settings_button,Color("#c7d6ad"),17);catalog_preview_settings_button.pressed.connect(_open_catalog_preview_dev);content.add_child(catalog_preview_settings_button)
 	settings_close_button=Button.new();settings_close_button.text="閉じる";settings_close_button.custom_minimum_size=Vector2(280,55);_skin_button(settings_close_button,Color("#ead8b1"),18);settings_close_button.pressed.connect(_close_settings);content.add_child(settings_close_button)
+	settings_content.minimum_size_changed.connect(_queue_settings_panel_layout)
 	_refresh_progression_dev_counters()
 	_refresh_privacy_options_button()
+	_queue_settings_panel_layout()
 
 func _build_habitat_plant_panel(hud:Control)->void:
 	habitat_plant_panel=HabitatPlantPanelClass.new();hud.add_child(habitat_plant_panel)
@@ -4186,8 +4200,9 @@ func _open_habitat_dev()->void:
 	habitat_dev_panel.open();_refresh_habitat_dev_panel();_update_play_ui()
 
 func _add_progression_dev_counter(parent:VBoxContainer,key:String,title:String)->void:
-	var row:=HBoxContainer.new();row.alignment=BoxContainer.ALIGNMENT_CENTER;row.add_theme_constant_override("separation",8);parent.add_child(row)
-	var label:=Label.new();label.custom_minimum_size=Vector2(250,42);label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.add_theme_font_size_override("font_size",15);label.add_theme_color_override("font_color",UI_BROWN);row.add_child(label);progression_dev_labels[key]=label
+	var section:=VBoxContainer.new();section.custom_minimum_size=Vector2(420,0);section.add_theme_constant_override("separation",4);parent.add_child(section)
+	var label:=Label.new();label.custom_minimum_size=Vector2(420,30);label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.add_theme_font_size_override("font_size",15);label.add_theme_color_override("font_color",UI_BROWN);section.add_child(label);progression_dev_labels[key]=label
+	var row:=HBoxContainer.new();row.alignment=BoxContainer.ALIGNMENT_CENTER;row.add_theme_constant_override("separation",8);section.add_child(row)
 	var deltas:Array=[-1.0,-0.1,0.1,1.0] if key=="puku_coin" else [-1.0,1.0]
 	for delta_value in deltas:
 		var delta:=float(delta_value)
@@ -4320,21 +4335,56 @@ func _dev_spawn_50cm()->void:
 	_update_play_ui()
 
 func _add_audio_setting_controls(parent:VBoxContainer,label_text:String,is_bgm:bool)->void:
-	var row:=HBoxContainer.new();row.alignment=BoxContainer.ALIGNMENT_CENTER;row.add_theme_constant_override("separation",12);parent.add_child(row)
-	var toggle:=CheckButton.new();toggle.name="BgmToggle" if is_bgm else "SeToggle";toggle.text=Localizer.text(language_code,"audio_bgm_on" if is_bgm else "audio_se_on");toggle.button_pressed=bool(audio_settings.get("bgm_enabled" if is_bgm else "se_enabled",true));toggle.custom_minimum_size=Vector2(145,48);toggle.clip_text=true;toggle.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS;row.add_child(toggle)
-	var slider:=HSlider.new();slider.min_value=0;slider.max_value=100;slider.step=1;slider.value=float(audio_settings.get("bgm_volume" if is_bgm else "se_volume",.65)) * 100.0;slider.custom_minimum_size=Vector2(210,48);row.add_child(slider)
+	var row:=HBoxContainer.new();row.name="BgmSettingRow" if is_bgm else "SeSettingRow";row.custom_minimum_size=Vector2(420,48);row.alignment=BoxContainer.ALIGNMENT_CENTER;row.add_theme_constant_override("separation",10);parent.add_child(row)
+	var label:=Label.new();label.name="BgmSettingLabel" if is_bgm else "SeSettingLabel";label.text=label_text;label.custom_minimum_size=Vector2(58,48);label.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT;label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.add_theme_font_size_override("font_size",18);label.add_theme_color_override("font_color",UI_BROWN);row.add_child(label)
+	var toggle:=Button.new();toggle.name="BgmToggle" if is_bgm else "SeToggle";toggle.toggle_mode=true;toggle.action_mode=BaseButton.ACTION_MODE_BUTTON_RELEASE;toggle.focus_mode=Control.FOCUS_NONE;toggle.custom_minimum_size=Vector2(82,44);toggle.clip_text=true;toggle.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS;row.add_child(toggle)
+	var enabled:=bool(audio_settings.get("bgm_enabled" if is_bgm else "se_enabled",true));_apply_settings_toggle_style(toggle,enabled)
+	var slider:=HSlider.new();slider.name="BgmVolumeSlider" if is_bgm else "SeVolumeSlider";slider.min_value=0;slider.max_value=100;slider.step=1;slider.value=float(audio_settings.get("bgm_volume" if is_bgm else "se_volume",.65)) * 100.0;slider.custom_minimum_size=Vector2(240,48);slider.size_flags_horizontal=Control.SIZE_EXPAND_FILL;row.add_child(slider)
 	toggle.toggled.connect(_change_audio_enabled.bind(is_bgm));slider.value_changed.connect(_change_audio_volume.bind(is_bgm))
+
+func _add_growing_puku_preview_control(parent:VBoxContainer)->void:
+	var row:=HBoxContainer.new();row.name="GrowingPukuPreviewRow";row.custom_minimum_size=Vector2(420,50);row.alignment=BoxContainer.ALIGNMENT_CENTER;row.add_theme_constant_override("separation",12);parent.add_child(row)
+	var label:=Label.new();label.name="GrowingPukuPreviewLabel";label.text=Localizer.text(language_code,"growing_puku_preview_setting");label.custom_minimum_size=Vector2(310,50);label.size_flags_horizontal=Control.SIZE_EXPAND_FILL;label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;label.add_theme_font_size_override("font_size",15);label.add_theme_color_override("font_color",UI_BROWN);row.add_child(label)
+	growing_puku_preview_toggle=Button.new();growing_puku_preview_toggle.name="GrowingPukuPreviewToggle";growing_puku_preview_toggle.toggle_mode=true;growing_puku_preview_toggle.action_mode=BaseButton.ACTION_MODE_BUTTON_RELEASE;growing_puku_preview_toggle.focus_mode=Control.FOCUS_NONE;growing_puku_preview_toggle.custom_minimum_size=Vector2(82,44);growing_puku_preview_toggle.clip_text=true;growing_puku_preview_toggle.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS;_apply_settings_toggle_style(growing_puku_preview_toggle,show_growing_puku_preview);growing_puku_preview_toggle.toggled.connect(_change_growing_puku_preview);row.add_child(growing_puku_preview_toggle)
+
+func _apply_settings_toggle_style(button:Button,enabled:bool)->void:
+	button.set_pressed_no_signal(enabled);button.text="ON" if enabled else "OFF"
+	var background:=Color("#f1cf68") if enabled else Color("#5b5049")
+	var border:=Color("#fff0ae") if enabled else Color("#82746a")
+	var font_color:=UI_BROWN if enabled else Color("#e8e0d8")
+	var state_style:=_box(background,border,16,3)
+	for style_name in ["normal","hover","pressed","hover_pressed","focus","disabled"]:button.add_theme_stylebox_override(style_name,state_style)
+	for color_name in ["font_color","font_hover_color","font_pressed_color","font_focus_color","font_hover_pressed_color","font_disabled_color"]:button.add_theme_color_override(color_name,font_color)
+	button.add_theme_font_size_override("font_size",16)
+
+func _queue_settings_panel_layout()->void:
+	if settings_panel_layout_queued or settings_panel==null or not is_inside_tree():return
+	settings_panel_layout_queued=true;call_deferred("_refresh_settings_panel_layout")
+
+func _refresh_settings_panel_layout()->void:
+	settings_panel_layout_queued=false
+	if settings_overlay==null or settings_panel==null or settings_content==null:return
+	var available_size:=settings_overlay.size
+	if available_size.x<=0.0 or available_size.y<=0.0:available_size=get_viewport().get_visible_rect().size
+	var panel_width:=minf(SETTINGS_PANEL_WIDTH,maxf(0.0,available_size.x-SETTINGS_PANEL_HORIZONTAL_PADDING*2.0))
+	var maximum_height:=minf(SETTINGS_PANEL_MAX_HEIGHT,maxf(0.0,available_size.y-SETTINGS_PANEL_SCREEN_MARGIN*2.0))
+	var desired_height:=ceilf(settings_content.get_combined_minimum_size().y+SETTINGS_PANEL_VERTICAL_PADDING*2.0)
+	var panel_height:=minf(desired_height,maximum_height)
+	var target_size:=Vector2(panel_width,panel_height)
+	if not settings_panel.custom_minimum_size.is_equal_approx(target_size):settings_panel.custom_minimum_size=target_size
+	settings_panel.size=target_size
+	settings_panel.position=Vector2(roundf((available_size.x-panel_width)*.5),roundf((available_size.y-panel_height)*.5))
 
 func _open_settings()->void:
 	if play_active:return
-	_refresh_progression_dev_counters();_refresh_privacy_options_button();settings_overlay.visible=true;_update_play_ui()
+	_refresh_progression_dev_counters();_refresh_privacy_options_button();settings_overlay.visible=true;_queue_settings_panel_layout();_update_play_ui()
 
 func _close_settings()->void:
 	settings_overlay.visible=false;_save();_update_play_ui()
 
 func _set_language(value:String)->void:
 	language_code=Localizer.normalize_language(value);language_selected=true;_save();_apply_language_to_ui()
-	if settings_language_status:settings_language_status.text=Localizer.text(language_code,"language_saved")
+	if settings_language_status:settings_language_status.text=Localizer.text(language_code,"language_saved");settings_language_status.visible=true
 
 func _apply_language_to_ui()->void:
 	_refresh_opening_prompt()
@@ -4351,13 +4401,17 @@ func _apply_language_to_ui()->void:
 	if settings_title_label:settings_title_label.text=Localizer.text(language_code,"settings")
 	if settings_language_heading:settings_language_heading.text=Localizer.text(language_code,"language_heading")
 	if settings_close_button:settings_close_button.text=Localizer.text(language_code,"close")
-	var bgm_toggle:=find_child("BgmToggle",true,false) as CheckButton
-	var se_toggle:=find_child("SeToggle",true,false) as CheckButton
-	if bgm_toggle:bgm_toggle.text=Localizer.text(language_code,"audio_bgm_on")
-	if se_toggle:se_toggle.text=Localizer.text(language_code,"audio_se_on")
-	var audio_note:=find_child("AudioSettingsNote",true,false) as Label
-	if audio_note:audio_note.text=Localizer.text(language_code,"audio_note")
-	if growing_puku_preview_toggle:growing_puku_preview_toggle.text=_growing_puku_preview_setting_text()
+	var bgm_label:=find_child("BgmSettingLabel",true,false) as Label
+	var se_label:=find_child("SeSettingLabel",true,false) as Label
+	if bgm_label:bgm_label.text=Localizer.text(language_code,"audio_bgm")
+	if se_label:se_label.text=Localizer.text(language_code,"audio_se")
+	var bgm_toggle:=find_child("BgmToggle",true,false) as Button
+	var se_toggle:=find_child("SeToggle",true,false) as Button
+	if bgm_toggle:_apply_settings_toggle_style(bgm_toggle,bool(audio_settings.get("bgm_enabled",true)))
+	if se_toggle:_apply_settings_toggle_style(se_toggle,bool(audio_settings.get("se_enabled",true)))
+	var growing_preview_label:=find_child("GrowingPukuPreviewLabel",true,false) as Label
+	if growing_preview_label:growing_preview_label.text=Localizer.text(language_code,"growing_puku_preview_setting")
+	if growing_puku_preview_toggle:_apply_settings_toggle_style(growing_puku_preview_toggle,show_growing_puku_preview)
 	if privacy_options_button:privacy_options_button.text=Localizer.text(language_code,"privacy_settings")
 	_update_plant_label_visibility_button()
 	if best_record_showcase:best_record_showcase.set_language(language_code)
@@ -4387,9 +4441,7 @@ func _apply_language_to_ui()->void:
 	_set_named_localized_text("EncyclopediaCloseButton","back")
 	_set_named_localized_text("MainLogo","game_title_compact")
 	_set_named_localized_text("MainLogoRibbon","game_title_ribbon")
-	_set_named_localized_text("BgmToggle","audio_bgm_on")
-	_set_named_localized_text("SeToggle","audio_se_on")
-	_set_named_localized_text("AudioSettingsNote","audio_note")
+	_queue_settings_panel_layout()
 	_refresh_series_selection();_refresh_encyclopedia_header();_refresh_encyclopedia_cards();_refresh_collection_complete_badge();_update_currency_ui();_update_shop_ui();_update_play_ui()
 
 func _set_named_localized_text(node_name:String,key:String,args:Array=[])->void:
@@ -5047,18 +5099,17 @@ func _immediate_get_story_transition_pending()->bool:
 	return _unique_jurejure_species_get_count()>=1 and not jurejure_species_first_seen
 
 func _change_audio_enabled(enabled:bool,is_bgm:bool)->void:
-	audio_settings["bgm_enabled" if is_bgm else "se_enabled"]=enabled;audio_manager.apply_settings(audio_settings);_save()
+	audio_settings["bgm_enabled" if is_bgm else "se_enabled"]=enabled
+	var toggle:=find_child("BgmToggle" if is_bgm else "SeToggle",true,false) as Button
+	if toggle:_apply_settings_toggle_style(toggle,enabled)
+	audio_manager.apply_settings(audio_settings);_save()
 
 func _change_audio_volume(value:float,is_bgm:bool)->void:
 	audio_settings["bgm_volume" if is_bgm else "se_volume"]=value/100.0;audio_manager.apply_settings(audio_settings);_save()
 
-func _growing_puku_preview_setting_text()->String:
-	return Localizer.text(language_code,"growing_puku_preview_on" if show_growing_puku_preview else "growing_puku_preview_off")
-
 func _change_growing_puku_preview(enabled:bool)->void:
 	show_growing_puku_preview=enabled
-	if growing_puku_preview_toggle:
-		growing_puku_preview_toggle.set_pressed_no_signal(enabled);growing_puku_preview_toggle.text=_growing_puku_preview_setting_text()
+	if growing_puku_preview_toggle:_apply_settings_toggle_style(growing_puku_preview_toggle,enabled)
 	_update_labels();_save()
 
 func _plant_label_visibility_button_text()->String:
@@ -5111,7 +5162,7 @@ func _reset_progression_state()->void:
 	first_seed_pod_reward_event_active=false;habitat_visit_id=0;jurejure_focused_habitat_visit_id=-1;act3_intro_eligible_visit_id=0;habitat_crisis_eligible_visit_id=0
 	if habitat_crisis_atmosphere:habitat_crisis_atmosphere.deactivate()
 	_cancel_puku_gauge_animations();puku_gauge_cm=0.0;puku_balance_units=0;show_growing_puku_preview=true;bests.clear();discovered.clear();species_get_counts.clear();catalog_cover_species.clear();unlocked_series={INITIAL_SERIES_ID:true};series_seed_inventory.clear();forest_gacha_draw_count=0;forest_gacha_encountered.clear();active_series_seed_id="";owned_pots={DEFAULT_POT_ID:1};saved_arrangements.clear();arrangement_save_capacity=ARRANGEMENT_SAVE_CAPACITY;greenhouse_available=_initial_greenhouse_state();unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;opening_story_complete=false;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;puku_gauge_intro_complete=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;login_bonus_date="";armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();result_deferred_species_queue.clear();pending_round_new_species_ids.clear();round_result_species_finalize_queue.clear();round_result_species_finalize_active=false;round_result_species_save_pending=false;shop_chatter_acquired_species.clear();species_get_queue.clear();play_share_record.clear();play_active=false;play_time_remaining=0.0;play_harvest_cm_total=0.0;play_puku_reward_units_total=0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;greenhouse_round_followup_started=false;_reset_endless_economy_stats();rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_time_multiplier=1;habitat_simulation_unix=Time.get_unix_time_from_system();habitat_debug_log.clear();habitat_scroll_tutorial_active=false;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_clear_habitat_items();_save();_update_currency_ui();_update_play_ui()
-	if growing_puku_preview_toggle:growing_puku_preview_toggle.set_pressed_no_signal(true);growing_puku_preview_toggle.text=_growing_puku_preview_setting_text()
+	if growing_puku_preview_toggle:_apply_settings_toggle_style(growing_puku_preview_toggle,true)
 	normal_round_free_plays=0
 	normal_round_ad_rescue_ticket_active=false
 	normal_round_ad_rescue_next_available_unix=0
@@ -8330,6 +8381,7 @@ func _play_ui_tap()->void:
 	if audio_manager:audio_manager.notify_user_gesture();audio_manager.play_se("ui_tap",.22)
 
 func _layout() -> void:
+	_queue_settings_panel_layout()
 	if arrangement_scene_active:
 		arrangement_transition_target_x=_arrangement_focus_transition_for_pan(saved_greenhouse_pan_x)
 		if not arrangement_transitioning:arrangement_transition_x=arrangement_transition_target_x

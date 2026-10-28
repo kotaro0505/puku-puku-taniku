@@ -71,7 +71,7 @@ func _test_language_and_symbol_safety(game)->void:
 			var seed_detail:=Localizer.text(language,key).to_lower()
 			for term in forbidden_rarity_terms[language]:assert(str(term).to_lower() not in seed_detail)
 	game._set_language("en");assert(game.language_code=="en" and game.settings_button.text=="Settings" and game.forest_gacha_ui.language=="en" and game.opening_prompt_localized.visible and not game.opening_prompt.visible and game.opening_prompt_localized_label.text=="Tap to Start")
-	assert(game.find_child("SeToggle",true,false).text==Localizer.text("en","audio_se_on"))
+	assert(game.find_child("SeSettingLabel",true,false).text==Localizer.text("en","audio_se"))
 	game._set_language("hiragana");assert(game.language_code=="hiragana" and game.opening_prompt_localized.visible and game.opening_prompt_localized_label.text=="タップして はじめる")
 	game._set_language("ja");assert(game.opening_prompt.visible and not game.opening_prompt_localized.visible)
 	game._set_language("ja")
