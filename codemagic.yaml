@@ -282,6 +282,7 @@ workflows:
           run_scene_smoke res://scripts/rewarded_ad_service_smoke.tscn REWARDED_AD_SERVICE_SMOKE_OK
           run_scene_smoke res://scripts/progression_ui_revision_smoke.tscn PROGRESSION_UI_REVISION_SMOKE_OK
           run_scene_smoke res://scripts/catalog_cover_species_smoke.tscn CATALOG_COVER_SPECIES_SMOKE_OK
+          run_scene_smoke res://scripts/encyclopedia_card_layout_smoke.tscn ENCYCLOPEDIA_CARD_LAYOUT_SMOKE_OK
           run_scene_smoke res://scripts/collection_complete_smoke.tscn COLLECTION_COMPLETE_SMOKE_OK
           run_scene_smoke res://scripts/carnicolor_first_get_story_smoke.tscn CARNICOLOR_FIRST_GET_STORY_SMOKE_OK
           run_scene_smoke res://scripts/pot_unlock_iap_smoke.tscn POT_UNLOCK_IAP_SMOKE_OK
