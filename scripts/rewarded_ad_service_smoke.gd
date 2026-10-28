@@ -99,10 +99,13 @@ func _ready() -> void:
 	var cycle_service := ServiceClass.new()
 	var fake_rewarded := FakeRewardedAdmob.new()
 	var cycle_results: Array[Dictionary] = []
+	var presentation_events: Array[String] = []
 	cycle_service._admob = fake_rewarded
 	cycle_service.reward_finished.connect(func(context: String, earned: bool) -> void:
 		cycle_results.append({"context": context, "earned": earned})
 	)
+	cycle_service.presentation_started.connect(func() -> void:presentation_events.append("started"))
+	cycle_service.presentation_finished.connect(func() -> void:presentation_events.append("finished"))
 	add_child(cycle_service)
 	cycle_service.state = ServiceClass.State.INITIALIZING
 	cycle_service._on_initialization_completed()
@@ -125,16 +128,25 @@ func _ready() -> void:
 		assert(cycle_service.request_reward(context))
 		assert(cycle_service.state == ServiceClass.State.SHOWING)
 		assert(fake_rewarded.show_count == view_index + 1)
+		var presentation_count_before:=presentation_events.size()
+		cycle_service._on_rewarded_ad_showed()
+		cycle_service._on_rewarded_ad_showed()
+		assert(presentation_events.size()==presentation_count_before+1 and presentation_events[-1]=="started")
 		assert(not cycle_service.request_reward("already_showing"))
 		assert(fake_rewarded.show_count == view_index + 1)
 		cycle_service._on_rewarded_ad_user_earned_reward()
 		cycle_service._on_rewarded_ad_user_earned_reward()
 		assert(cycle_results.size() == result_count_before + 1)
 		assert(cycle_results[-1].context == context and cycle_results[-1].earned)
+		# Earning can precede dismissal; game audio must remain paused until the
+		# full-screen ad is actually gone.
+		assert(presentation_events.size()==presentation_count_before+1)
 		cycle_service._on_rewarded_ad_dismissed()
+		assert(presentation_events.size()==presentation_count_before+2 and presentation_events[-1]=="finished")
 		assert(cycle_service.state == ServiceClass.State.LOADING)
 		assert(fake_rewarded.load_count == load_count_before + 1)
 		cycle_service._on_rewarded_ad_dismissed()
+		assert(presentation_events.size()==presentation_count_before+2)
 		assert(fake_rewarded.load_count == load_count_before + 1)
 		assert(cycle_results.size() == result_count_before + 1)
 		fake_rewarded.loaded = true
@@ -150,7 +162,10 @@ func _ready() -> void:
 	var early_close_result_count := cycle_results.size()
 	var early_close_load_count := fake_rewarded.load_count
 	assert(cycle_service.request_reward("early_close"))
+	var early_close_presentation_count:=presentation_events.size()
+	cycle_service._on_rewarded_ad_showed()
 	cycle_service._on_rewarded_ad_dismissed()
+	assert(presentation_events.slice(early_close_presentation_count)==["started","finished"])
 	assert(cycle_results.size() == early_close_result_count + 1)
 	assert(cycle_results[-1].context == "early_close" and not cycle_results[-1].earned)
 	cycle_service._on_rewarded_ad_user_earned_reward()
@@ -168,6 +183,13 @@ func _ready() -> void:
 	cycle_service._on_rewarded_ad_failed_to_load(null, {"code": 1})
 	assert(cycle_service.state == ServiceClass.State.UNAVAILABLE)
 	assert(cycle_service._retry_count == 1)
+	assert(cycle_service.is_preparing() and not cycle_service.is_unavailable_for_rescue())
+	# Taps during automatic backoff report a wait without resetting the retry
+	# budget or launching a duplicate load.
+	var backoff_result_count:=cycle_results.size()
+	assert(not cycle_service.request_reward("automatic_backoff"))
+	assert(cycle_results.size()==backoff_result_count+1 and not cycle_results[-1].earned)
+	assert(cycle_service._retry_count==1 and fake_rewarded.load_count==failed_load_count)
 	cycle_service._on_rewarded_ad_failed_to_load(null, {"code": 1})
 	assert(cycle_service._retry_count == 1)
 	await get_tree().create_timer(1.1).timeout
@@ -181,7 +203,10 @@ func _ready() -> void:
 	var show_failure_results := cycle_results.size()
 	var show_failure_load_count := fake_rewarded.load_count
 	assert(cycle_service.request_reward("show_failure"))
+	var show_failure_presentation_count:=presentation_events.size()
+	cycle_service._on_rewarded_ad_showed()
 	cycle_service._on_rewarded_ad_failed_to_show(null, {"code": 2})
+	assert(presentation_events.slice(show_failure_presentation_count)==["started","finished"])
 	assert(cycle_results.size() == show_failure_results + 1)
 	assert(not cycle_results[-1].earned)
 	assert(cycle_service._showing_context.is_empty())
@@ -195,6 +220,26 @@ func _ready() -> void:
 	assert(cycle_service.state == ServiceClass.State.LOADING)
 	assert(fake_rewarded.load_count == show_failure_load_count + 1)
 	fake_rewarded.loaded = true
+	cycle_service._on_rewarded_ad_loaded()
+
+	# Only the terminal state reached after the automatic retry budget is
+	# exhausted is eligible for the game's fail-safe free play. The user-facing
+	# failure is emitted while that state is observable, then a fresh background
+	# load begins on the next frame.
+	fake_rewarded.loaded=false
+	cycle_service._load_rewarded_ad()
+	cycle_service._retry_count=cycle_service.MAX_AUTOMATIC_RETRIES
+	cycle_service._on_rewarded_ad_failed_to_load(null,{"code":1})
+	assert(cycle_service.is_unavailable_for_rescue() and not cycle_service.is_preparing())
+	var terminal_result_count:=cycle_results.size()
+	var terminal_load_count:=fake_rewarded.load_count
+	assert(not cycle_service.request_reward("terminal_unavailable"))
+	assert(cycle_service.is_unavailable_for_rescue())
+	assert(cycle_results.size()==terminal_result_count+1 and not cycle_results[-1].earned)
+	await get_tree().process_frame
+	assert(not cycle_service.is_unavailable_for_rescue())
+	assert(cycle_service.state==ServiceClass.State.LOADING and fake_rewarded.load_count==terminal_load_count+1)
+	fake_rewarded.loaded=true
 	cycle_service._on_rewarded_ad_loaded()
 
 	# Resuming while a reload is in flight cannot duplicate it. A new service
@@ -218,8 +263,16 @@ func _ready() -> void:
 	assert(LocalizerClass.text("ja", "ad_loading").contains("準備"))
 	assert(LocalizerClass.text("hiragana", "ad_loading").contains("じゅんび"))
 	assert(LocalizerClass.text("en", "ad_loading").contains("prepared"))
+	assert(LocalizerClass.text("ja", "ad_unavailable_free_play_granted").contains("1回無料"))
+	assert(LocalizerClass.text("hiragana", "ad_unavailable_free_play_granted").contains("1かい むりょう"))
+	assert(LocalizerClass.text("en", "ad_unavailable_free_play_granted").contains("one normal game for free"))
+	assert(LocalizerClass.text("ja", "ad_unavailable_free_play_cooldown", [10]).contains("10分"))
+	assert(LocalizerClass.text("hiragana", "ad_unavailable_free_play_cooldown", [10]).contains("10ふん"))
+	assert(LocalizerClass.text("en", "ad_unavailable_free_play_cooldown", [10]).contains("10 min"))
 	var main_source := FileAccess.get_file_as_string("res://scripts/main.gd")
 	assert(main_source.contains("rewarded_ad_service.is_preparing()"))
+	assert(main_source.contains("pause_for_rewarded_ad()"))
+	assert(main_source.contains("resume_from_rewarded_ad()"))
 
 	# SDK diagnostics retain only a stable stage and numeric code. They never
 	# include ad unit IDs, response identifiers, or localized SDK messages.
@@ -341,7 +394,7 @@ func _ready() -> void:
 	assert(fake.load_count == load_count_before_guard + 1)
 	assert(service.state == ServiceClass.State.LOADING)
 
-	print("REWARDED_AD_SERVICE_SMOKE_OK earned_once=true early_close_no_reward=true repeated_views=5 dismissal_reloads=true duplicate_terminal_guarded=true load_failure_recovers=true show_failure_recovers=true loading_message_specific=true privacy_capability_gated=true consent_change_reloads=true sanitized_diagnostics=true config_diagnostics_specific=true duplicate_load_guarded=true resume_recovers=true restart_reloads=true desktop_inactive=true")
+	print("REWARDED_AD_SERVICE_SMOKE_OK earned_once=true early_close_no_reward=true repeated_views=5 presentation=start_until_dismissed show_failure_finishes_audio=true dismissal_reloads=true duplicate_terminal_guarded=true load_failure_recovers=true retry_backoff=preparing_no_duplicate terminal_unavailable=rescue_eligible_then_reload loading_message_specific=true privacy_capability_gated=true consent_change_reloads=true sanitized_diagnostics=true config_diagnostics_specific=true duplicate_load_guarded=true resume_recovers=true restart_reloads=true desktop_inactive=true")
 	get_tree().quit()
 
 

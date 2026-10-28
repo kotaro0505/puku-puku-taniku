@@ -107,9 +107,53 @@ func _ready() -> void:
 	await get_tree().create_timer(audio.BGM_FADE_SECONDS + 0.10).timeout
 	_assert_single_finished_crossfade(audio, "shop")
 
+	# A full-screen rewarded ad pauses only game audio. It preserves the BGM
+	# stream/settings, stops already-playing effects, and rejects new game effects
+	# until the SDK reports that the ad screen has actually closed.
+	var settings_before_ad:Dictionary=audio.settings_dictionary().duplicate(true)
+	var active_stream_before_ad:AudioStream=audio.bgm_players[audio.active_bgm].stream
+	audio.play_se("harvest",.55)
+	audio.pause_for_rewarded_ad()
+	assert(audio.rewarded_ad_audio_paused and audio.application_audio_paused)
+	assert(_unpaused_playing_count(audio)==0)
+	assert(audio.bgm_players[audio.active_bgm].stream==active_stream_before_ad)
+	for player in audio.se_players:assert(not player.playing and player.stream==null)
+	audio.last_se_key="";audio.play_se("harvest",.55);assert(audio.last_se_key.is_empty())
+	assert(audio.settings_dictionary()==settings_before_ad)
+
+	# Background/focus suspension and ad suspension are independent reasons. A
+	# resume from one source must not override the other source's active pause.
+	audio._pause_bgm_for_background()
+	audio._resume_bgm_from_background()
+	assert(audio.rewarded_ad_audio_paused and audio.application_audio_paused and _unpaused_playing_count(audio)==0)
+	audio.resume_from_rewarded_ad()
+	assert(not audio.application_audio_paused and _unpaused_playing_count(audio)==1)
+	audio._pause_bgm_for_background()
+	audio.pause_for_rewarded_ad()
+	audio.resume_from_rewarded_ad()
+	assert(audio.background_audio_paused and audio.application_audio_paused and _unpaused_playing_count(audio)==0)
+	audio._resume_bgm_from_background()
+	assert(not audio.application_audio_paused and _unpaused_playing_count(audio)==1)
+
+	# Repeated ads cannot accumulate a stuck pause reason.
+	for _view_index in range(5):
+		audio.pause_for_rewarded_ad()
+		assert(audio.application_audio_paused and _unpaused_playing_count(audio)==0)
+		audio.resume_from_rewarded_ad()
+		assert(not audio.application_audio_paused and _unpaused_playing_count(audio)==1)
+	assert(audio.settings_dictionary()==settings_before_ad)
+
+	# User OFF choices remain OFF; ad presentation never changes stored volume or
+	# enablement and does not restart BGM on dismissal.
+	audio.apply_settings({"bgm_enabled":false,"se_enabled":false,"bgm_volume":0.27,"se_volume":0.19})
+	var disabled_settings:Dictionary=audio.settings_dictionary().duplicate(true)
+	audio.pause_for_rewarded_ad();audio.resume_from_rewarded_ad()
+	assert(audio.settings_dictionary()==disabled_settings and _playing_count(audio)==0)
+	audio.last_se_key="";audio.play_se("harvest");assert(audio.last_se_key.is_empty())
+
 	audio.queue_free()
 	await get_tree().process_frame
-	print("WEB_AUDIO_SMOKE_OK locked_start=silent playback=stream crossfade=single harvest_default=firefly_1 harvest_loop=false se_off=true se_volume=true harvest_pool=true jurejure_sequence=true crisis_sequence=true ending=true custom_fade=true mp3_loop=true visibility=pause_resume")
+	print("WEB_AUDIO_SMOKE_OK locked_start=silent playback=stream crossfade=single harvest_default=firefly_1 harvest_loop=false se_off=true se_volume=true harvest_pool=true jurejure_sequence=true crisis_sequence=true ending=true custom_fade=true mp3_loop=true visibility=pause_resume rewarded_ad=pause_bgm_stop_se_resume_on_close focus_reasons=independent repeated_ads=5 settings=preserved")
 	get_tree().quit()
 
 func _playing_count(audio:Node) -> int:

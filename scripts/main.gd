@@ -80,6 +80,7 @@ const PUKU_UNITS_PER_PUKU := 1000
 const JUREJURE_LOSS_MIN_PUKU := 1
 const JUREJURE_LOSS_MAX_PUKU := 5
 const NORMAL_ROUND_COST_UNITS := 1000
+const NORMAL_ROUND_AD_RESCUE_COOLDOWN_SECONDS := 10 * 60
 const PUKU_GAUGE_FINISH_SPEED_SCALE := 0.5
 const FIRST_GET_MIN_REWARD_UNITS := 200
 const INITIAL_PUKU_CAPITAL_UNITS := 5000
@@ -635,6 +636,10 @@ var encyclopedia_navigation_controls: Array[Control] = []
 var puku_gauge_cm := 0.0
 var puku_balance_units := 0
 var normal_round_free_plays := 0
+var normal_round_ad_rescue_ticket_active := false
+var normal_round_ad_rescue_next_available_unix := 0
+var normal_round_ad_rescue_clock_floor_unix := 0
+var normal_round_ad_rescue_session_not_before_msec := 0
 var puku_points:int:
 	get:
 		return maxi(0,floori(float(puku_balance_units)/float(PUKU_UNITS_PER_PUKU)))
@@ -1122,10 +1127,18 @@ func _setup_pot_unlock_iap()->void:
 func _setup_rewarded_ads()->void:
 	rewarded_ad_service=RewardedAdServiceClass.new()
 	rewarded_ad_service.reward_finished.connect(_on_rewarded_ad_service_finished)
+	rewarded_ad_service.presentation_started.connect(_on_rewarded_ad_presentation_started)
+	rewarded_ad_service.presentation_finished.connect(_on_rewarded_ad_presentation_finished)
 	rewarded_ad_service.privacy_options_requirement_changed.connect(_on_privacy_options_requirement_changed)
 	rewarded_ad_service.privacy_options_form_finished.connect(_on_privacy_options_form_finished)
 	rescue_reward_ad_requested.connect(rewarded_ad_service.request_reward)
 	add_child(rewarded_ad_service)
+
+func _on_rewarded_ad_presentation_started()->void:
+	if audio_manager:audio_manager.pause_for_rewarded_ad()
+
+func _on_rewarded_ad_presentation_finished()->void:
+	if audio_manager:audio_manager.resume_from_rewarded_ad()
 
 func _on_rewarded_ad_service_finished(reward_context:String,reward_earned:bool)->void:
 	if not rescue_reward_in_progress or reward_context!=rescue_reward_context:return
@@ -1157,6 +1170,10 @@ func _load_save() -> void:
 	first_old_seed_stage=FIRST_OLD_SEED_STAGE_NOT_RECEIVED
 	puku_balance_units=0
 	normal_round_free_plays=0
+	normal_round_ad_rescue_ticket_active=false
+	normal_round_ad_rescue_next_available_unix=0
+	normal_round_ad_rescue_clock_floor_unix=0
+	normal_round_ad_rescue_session_not_before_msec=0
 	catalog_cover_species={}
 	collection_complete_versions={}
 	collection_complete_pending_species_id=""
@@ -1215,6 +1232,9 @@ func _load_save() -> void:
 				puku_balance_units=legacy_puku_points*PUKU_UNITS_PER_PUKU+roundi(legacy_puku_coin_gauge_cm/LEGACY_PUKU_GAUGE_TARGET_CM*LEGACY_PUKU_GAUGE_REWARD_UNITS)
 				puku_balance_migration_dirty=true
 			normal_round_free_plays=maxi(0,int(value.get("normal_round_free_plays",0)))
+			normal_round_ad_rescue_ticket_active=bool(value.get("normal_round_ad_rescue_ticket_active",false)) and normal_round_free_plays>0
+			normal_round_ad_rescue_clock_floor_unix=maxi(0,int(value.get("normal_round_ad_rescue_clock_floor_unix",0)))
+			normal_round_ad_rescue_next_available_unix=maxi(normal_round_ad_rescue_clock_floor_unix,int(value.get("normal_round_ad_rescue_next_available_unix",0)))
 			bests=value.get("bests",{});puku_gauge_cm=maxf(0.0,float(value.get("puku_gauge_cm",0.0)));discovered=value.get("discovered",{})
 			if saved_progression_version<21:
 				# v20 used one 600 cm gauge for both rewards. Preserve its fill ratio as
@@ -1425,6 +1445,11 @@ func _save() -> void:
 		if not old_colorata_save_name.is_empty():_old_colorata_profile_mark(old_colorata_save_name+"_end")
 		return
 	if audio_manager:audio_settings=audio_manager.settings_dictionary()
+	# Keep the greatest wall-clock value observed after the rescue has been used.
+	# Together with the per-process monotonic deadline, this prevents a backwards
+	# clock change or an app restart from shortening the saved cooldown.
+	if normal_round_ad_rescue_next_available_unix>0:
+		normal_round_ad_rescue_clock_floor_unix=maxi(normal_round_ad_rescue_clock_floor_unix,floori(Time.get_unix_time_from_system()))
 	var payload:={
 		"progression_version":PROGRESSION_VERSION,"retired_content_version":RETIRED_CONTENT_VERSION,"bests":bests,"discovered":discovered,"species_get_counts":species_get_counts,"catalog_cover_species":catalog_cover_species,"collection_complete_versions":collection_complete_versions,
 		"unlocked_series":unlocked_series,"owned_pots":owned_pots,"pot_design_unlocks":pot_design_unlocks,"saved_arrangements":saved_arrangements,"arrangement_save_capacity":arrangement_save_capacity,
@@ -1452,7 +1477,7 @@ func _save() -> void:
 		"volume_seed_unlocked":volume_seed_unlocked,"volume_seed_intro_seen":volume_seed_intro_seen,"premium_seed_unlocked":premium_seed_unlocked,
 		"best_100_achieved":best_100_achieved,"login_bonus_date":login_bonus_date,"audio_settings":audio_settings,"show_growing_puku_preview":show_growing_puku_preview,"pending_round_new_species_ids":pending_round_new_species_ids,
 		"series_seed_inventory":series_seed_inventory,"forest_gacha_draw_count":forest_gacha_draw_count,"forest_gacha_encountered":forest_gacha_encountered,
-		"puku_gauge_cm":puku_gauge_cm,"puku_balance_units":puku_balance_units,"normal_round_free_plays":normal_round_free_plays,"puku_coin_gauge_cm":_legacy_puku_coin_gauge_cm_for_save(),"puku_points":puku_points,"old_catalog_pages":old_catalog_pages,"old_catalog_page_inventory":old_catalog_page_inventory,
+		"puku_gauge_cm":puku_gauge_cm,"puku_balance_units":puku_balance_units,"normal_round_free_plays":normal_round_free_plays,"normal_round_ad_rescue_ticket_active":normal_round_ad_rescue_ticket_active,"normal_round_ad_rescue_next_available_unix":normal_round_ad_rescue_next_available_unix,"normal_round_ad_rescue_clock_floor_unix":normal_round_ad_rescue_clock_floor_unix,"puku_coin_gauge_cm":_legacy_puku_coin_gauge_cm_for_save(),"puku_points":puku_points,"old_catalog_pages":old_catalog_pages,"old_catalog_page_inventory":old_catalog_page_inventory,
 		"old_catalog_intro_seen":old_catalog_intro_seen,"old_catalog_intro_pending":old_catalog_intro_pending,
 		"habitat_old_catalog_page_pending":habitat_old_catalog_page_pending,"habitat_old_catalog_page_series_id":habitat_old_catalog_page_series_id,
 		"habitat_old_catalog_page_point_x":habitat_old_catalog_page_point.x,"habitat_old_catalog_page_point_y":habitat_old_catalog_page_point.y,
@@ -2905,6 +2930,35 @@ func _shop_seed_rescue_needed()->bool:
 func _shop_rescue_needed()->bool:
 	return _shop_puku_rescue_needed() or _shop_seed_rescue_needed()
 
+func _normal_round_ad_rescue_cooldown_remaining_seconds(now_unix:int=-1,now_ticks_msec:int=-1)->int:
+	var observed_unix:=floori(Time.get_unix_time_from_system()) if now_unix<0 else now_unix
+	var checked_unix:=maxi(observed_unix,normal_round_ad_rescue_clock_floor_unix)
+	var checked_ticks:=Time.get_ticks_msec() if now_ticks_msec<0 else now_ticks_msec
+	var wall_remaining:=maxi(0,normal_round_ad_rescue_next_available_unix-checked_unix)
+	var session_remaining:=maxi(0,ceili(float(normal_round_ad_rescue_session_not_before_msec-checked_ticks)/1000.0))
+	return maxi(wall_remaining,session_remaining)
+
+func _begin_normal_round_ad_rescue_cooldown(now_unix:int=-1,now_ticks_msec:int=-1)->void:
+	var system_now:=floori(Time.get_unix_time_from_system()) if now_unix<0 else now_unix
+	var monotonic_now:=Time.get_ticks_msec() if now_ticks_msec<0 else now_ticks_msec
+	# A backwards wall-clock change never makes another ticket available sooner.
+	# Monotonic time also blocks repeated clock jumps during the current process.
+	var safe_now:=maxi(system_now,normal_round_ad_rescue_clock_floor_unix)
+	normal_round_ad_rescue_clock_floor_unix=safe_now
+	normal_round_ad_rescue_next_available_unix=safe_now+NORMAL_ROUND_AD_RESCUE_COOLDOWN_SECONDS
+	normal_round_ad_rescue_session_not_before_msec=monotonic_now+NORMAL_ROUND_AD_RESCUE_COOLDOWN_SECONDS*1000
+
+func _try_grant_normal_round_ad_unavailable_rescue(failed_context:String)->bool:
+	if failed_context!="shop_puku_rescue" or rewarded_ad_service==null:return false
+	if not rewarded_ad_service.is_unavailable_for_rescue() or not _shop_puku_rescue_needed():return false
+	if _normal_round_ad_rescue_cooldown_remaining_seconds()>0:return false
+	normal_round_free_plays=1
+	normal_round_ad_rescue_ticket_active=true
+	_begin_normal_round_ad_rescue_cooldown()
+	_save();_update_shop_ui();_update_play_ui()
+	_show_shop_chatter(Localizer.text(language_code,"ad_unavailable_free_play_granted"),false)
+	return true
+
 func _request_rescue_reward_ad()->void:
 	if rescue_reward_in_progress or not _shop_rescue_needed():return
 	rescue_reward_context="shop_puku_rescue" if _shop_puku_rescue_needed() else "shop_seed_rescue"
@@ -2919,9 +2973,14 @@ func _on_rescue_reward_ad_completed(reward_earned:bool)->void:
 	if not rescue_reward_in_progress:return
 	rescue_reward_in_progress=false
 	if not reward_earned:
-		shop_chatter_action_button.disabled=false;shop_chatter_action_button.text=Localizer.text(language_code,"shop_help_action") if rescue_reward_context=="shop_puku_rescue" else Localizer.text(language_code,"ad_seed");rescue_reward_context=""
+		var failed_context:=rescue_reward_context
+		shop_chatter_action_button.disabled=false;shop_chatter_action_button.text=Localizer.text(language_code,"shop_help_action") if failed_context=="shop_puku_rescue" else Localizer.text(language_code,"ad_seed");rescue_reward_context=""
+		if _try_grant_normal_round_ad_unavailable_rescue(failed_context):return
 		var message_key:="ad_loading" if rewarded_ad_service!=null and rewarded_ad_service.is_preparing() else "ad_unavailable"
 		var unavailable_message:=Localizer.text(language_code,message_key)
+		if failed_context=="shop_puku_rescue" and rewarded_ad_service!=null and rewarded_ad_service.is_unavailable_for_rescue():
+			var remaining_seconds:=_normal_round_ad_rescue_cooldown_remaining_seconds()
+			if remaining_seconds>0:unavailable_message=Localizer.text(language_code,"ad_unavailable_free_play_cooldown",[maxi(1,ceili(float(remaining_seconds)/60.0))])
 		if rewarded_ad_service!=null:
 			unavailable_message+="\n"+Localizer.text(language_code,"ad_diagnostic_code",[rewarded_ad_service.user_diagnostic_code()])
 		_show_shop_chatter(unavailable_message,false)
@@ -5054,6 +5113,10 @@ func _reset_progression_state()->void:
 	_cancel_puku_gauge_animations();puku_gauge_cm=0.0;puku_balance_units=0;show_growing_puku_preview=true;bests.clear();discovered.clear();species_get_counts.clear();catalog_cover_species.clear();unlocked_series={INITIAL_SERIES_ID:true};series_seed_inventory.clear();forest_gacha_draw_count=0;forest_gacha_encountered.clear();active_series_seed_id="";owned_pots={DEFAULT_POT_ID:1};saved_arrangements.clear();arrangement_save_capacity=ARRANGEMENT_SAVE_CAPACITY;greenhouse_available=_initial_greenhouse_state();unlocked_species=greenhouse_available.duplicate(true);completed_unlock_conditions.clear();pending_habitat_species.clear();total_play_count=0;formal_play_count=0;opening_story_complete=false;intro_story_complete=false;encyclopedia_unlocked=false;habitat_unlocked=false;puku_gauge_intro_complete=false;tutorial_steps.clear();normal_seed_bags=0;volume_seed_bags=0;premium_seed_bags=0;old_seed_bags=0;volume_seed_unlocked=false;volume_seed_intro_seen=false;premium_seed_unlocked=false;login_bonus_date="";armadillo_dialog_mode="";opening_species.clear();result_new_species_queue.clear();result_deferred_species_queue.clear();pending_round_new_species_ids.clear();round_result_species_finalize_queue.clear();round_result_species_finalize_active=false;round_result_species_save_pending=false;shop_chatter_acquired_species.clear();species_get_queue.clear();play_share_record.clear();play_active=false;play_time_remaining=0.0;play_harvest_cm_total=0.0;play_puku_reward_units_total=0;current_target_count=NORMAL_GERMINATION_COUNT;play_seeds_remaining=0;play_spawn_queue=0;play_seed_animations_pending=0;play_spawn_timer=0.0;play_concurrent_target=PLAY_INITIAL_MAX_PLANTS;greenhouse_round_followup_started=false;_reset_endless_economy_stats();rain_bag_count=0;rain_event_pending=false;rain_bonus_in_progress=false;rain_bonus_active=false;rain_time_remaining=0.0;rain_spawn_queue=0;rain_spawn_timer=0.0;rain_last_saved_second=-1;rain_intro_normal_bags=0;rain_draws_unlocked=false;habitat_time_multiplier=1;habitat_simulation_unix=Time.get_unix_time_from_system();habitat_debug_log.clear();habitat_scroll_tutorial_active=false;tutorial_habitat_item.clear();_stop_rain_visual();_apply_saved_unlocks();_clear_greenhouse_plants();_clear_habitat_items();_save();_update_currency_ui();_update_play_ui()
 	if growing_puku_preview_toggle:growing_puku_preview_toggle.set_pressed_no_signal(true);growing_puku_preview_toggle.text=_growing_puku_preview_setting_text()
 	normal_round_free_plays=0
+	normal_round_ad_rescue_ticket_active=false
+	normal_round_ad_rescue_next_available_unix=0
+	normal_round_ad_rescue_clock_floor_unix=0
+	normal_round_ad_rescue_session_not_before_msec=0
 	normal_play_count=0;shop_visit_count=0;hidden_species_acquired.clear();tovar_next_play=TOVAR_FIRST_PLAY;tovar_attempt_count=0;tovar_event_active=false;tovar_harvested_this_play=false;armadillo_present=false;_save()
 
 func _reset_progression_for_development(button:Button)->void:
@@ -5184,6 +5247,9 @@ func _start_greenhouse_play(seed_type:String)->void:
 		if puku_gauge_intro_complete:
 			if normal_round_free_plays>0:
 				normal_round_free_plays-=1
+				if normal_round_ad_rescue_ticket_active:
+					normal_round_ad_rescue_ticket_active=false
+					_begin_normal_round_ad_rescue_cooldown()
 			else:
 				var paid_units:=_change_puku_balance(-NORMAL_ROUND_COST_UNITS,"normal_round_start",false,true)
 				if paid_units!=-NORMAL_ROUND_COST_UNITS:

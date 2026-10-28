@@ -2,6 +2,7 @@ extends Node
 
 const SucculentClass=preload("res://scripts/succulent.gd")
 const Localizer=preload("res://scripts/game_localizer.gd")
+const RewardedAdServiceClass=preload("res://scripts/rewarded_ad_service.gd")
 var sprite3d_render_oracle_status:="not_run"
 var sprite3d_render_max_edge_error_px:=0
 
@@ -28,9 +29,10 @@ func _ready()->void:
 	_test_catalog_auto_record(game)
 	_test_save_and_legacy_load(game)
 	await _test_panda_rescue(game)
+	_test_ad_unavailable_free_play(game)
 	_test_max_size_record_is_silent(game)
 	game._reset_progression_state();game.queue_free()
-	print("PUKU_POINTS_SMOKE_OK unit=1/1000 round_cost=1.00 direct_harvest=true harvest_hold=1.40+stackable sprite3d_render_oracle="+sprite3d_render_oracle_status+" legacy_sprite3d_match=1.6,5,10,20,30,40,60,80,100,120cm giant=150,200,300,500,700,1000,1500,2000,10000cm_species3_positions3_speeds1.6+10 transition120=true depth_pan=front_center_rear+left_center_right+tap60+120+150 label_toggle=localized_persistent_on_off+main_only_live_recalc max_record=silent_visual_preserved reward1000+2000=true new_floor=.20 migration=points+legacy_gauge forest_cost=3 rescue=wallet_plus_1 combo=true fly_removed=true result=removed automatic_get=true")
+	print("PUKU_POINTS_SMOKE_OK unit=1/1000 round_cost=1.00 direct_harvest=true harvest_hold=1.40+stackable sprite3d_render_oracle="+sprite3d_render_oracle_status+" legacy_sprite3d_match=1.6,5,10,20,30,40,60,80,100,120cm giant=150,200,300,500,700,1000,1500,2000,10000cm_species3_positions3_speeds1.6+10 transition120=true depth_pan=front_center_rear+left_center_right+tap60+120+150 label_toggle=localized_persistent_on_off+main_only_live_recalc max_record=silent_visual_preserved reward1000+2000=true new_floor=.20 migration=points+legacy_gauge forest_cost=3 rescue=wallet_plus_1 ad_unavailable_rescue=one_free_saved_consumed_cooldown600_no_reward_spoof combo=true fly_removed=true result=removed automatic_get=true")
 	get_tree().quit()
 
 func _test_seed_pod_thresholds(game)->void:
@@ -603,6 +605,11 @@ func _test_save_and_legacy_load(game)->void:
 	var save_path:String=str(game._active_save_path())
 	game.puku_gauge_cm=250.5;game.puku_balance_units=4375;game.normal_round_free_plays=1;game.show_growing_puku_preview=false;game._save();var current=JSON.parse_string(FileAccess.get_file_as_string(save_path));assert(current is Dictionary and int(current.get("puku_balance_units",-1))==4375 and int(current.get("normal_round_free_plays",0))==1 and not bool(current.get("show_growing_puku_preview",true)));game.puku_gauge_cm=0.0;game.puku_balance_units=0;game.normal_round_free_plays=0;game.show_growing_puku_preview=true;game._load_save()
 	assert(is_equal_approx(game.puku_gauge_cm,250.5) and game.puku_balance_units==4375 and game.puku_points==4 and game.normal_round_free_plays==1 and not game.show_growing_puku_preview)
+	# Saves created before the ad-unavailable rescue existed retain their ordinary
+	# free-play count and receive safe defaults for the new metadata.
+	current.erase("normal_round_ad_rescue_ticket_active");current.erase("normal_round_ad_rescue_next_available_unix");current.erase("normal_round_ad_rescue_clock_floor_unix")
+	var old_rescue_save:=FileAccess.open(save_path,FileAccess.WRITE);old_rescue_save.store_string(JSON.stringify(current));old_rescue_save.close();game.normal_round_ad_rescue_ticket_active=true;game.normal_round_ad_rescue_next_available_unix=999999999;game.normal_round_ad_rescue_clock_floor_unix=999999999;game._load_save()
+	assert(game.normal_round_free_plays==1 and not game.normal_round_ad_rescue_ticket_active and game.normal_round_ad_rescue_next_available_unix==0 and game.normal_round_ad_rescue_clock_floor_unix==0)
 	# A legacy wallet keeps both whole coins and the old 500cm=>3 puku partial gauge.
 	current.erase("puku_balance_units");current.erase("show_growing_puku_preview");current["puku_points"]=4;current["puku_coin_gauge_cm"]=125.0;current["puku_gauge_intro_complete"]=false;current["mystery_items_acquired"]=false;current["habitat_awakened"]=false;current["habitat_tutorial_started"]=false;current["habitat_tutorial_complete"]=false;current["habitat_unlocked"]=false;current["tutorial_steps"]={}
 	var legacy_wallet:=FileAccess.open(save_path,FileAccess.WRITE);legacy_wallet.store_string(JSON.stringify(current));legacy_wallet.close();game.puku_balance_units=0;game._load_save()
@@ -627,4 +634,67 @@ func _test_panda_rescue(game)->void:
 	assert(game.play_open_button.text=="たねをまく\n1ぷくコイン消費")
 	game._start_greenhouse_play("normal");assert(game.play_active and game.normal_round_free_plays==0 and game.puku_balance_units==100 and game.endless_economy_seed_cost_units==1000)
 	assert(game.FOREST_GACHA_SPIN_COST==3)
-	game.play_active=false
+	game.play_active=false;game.play_seed_animations_pending=0;game.play_spawn_queue=0;game._clear_greenhouse_plants()
+
+func _test_ad_unavailable_free_play(game)->void:
+	game.play_active=false;game.active_seed_type="normal";game.current_mode="greenhouse";game._apply_mode();game.first_habitat_gift_claimed=true;game.puku_gauge_intro_complete=true;game.mystery_items_acquired=true;game.mystery_catalog_tutorial_complete=true;game.initial_seed_stock_notice_complete=true;game.normal_play_tutorial_complete=true;game.habitat_awakened=true;game.habitat_tutorial_complete=true;game.seed_shop_open=true;game.puku_balance_units=0;game.normal_round_free_plays=0
+	game.normal_round_ad_rescue_ticket_active=false;game.normal_round_ad_rescue_next_available_unix=0;game.normal_round_ad_rescue_clock_floor_unix=0;game.normal_round_ad_rescue_session_not_before_msec=0
+	game.opening_finished=true;game.opening_overlay.visible=false;game.play_modal_open=false;game.result_overlay.visible=false;game.shop_overlay.visible=true;game.encyclopedia_overlay.visible=false;game.settings_overlay.visible=false;game.fusion_lab_ui.visible=false;game.species_get_overlay.visible=false;game.catalog_series_unlock_overlay.visible=false;game.forest_gacha_ui.visible=false;game.arrangement_ui.visible=false
+	assert(game._shop_puku_rescue_needed())
+	game.rewarded_ad_service.presentation_started.emit();assert(game.audio_manager.rewarded_ad_audio_paused)
+	game.rewarded_ad_service.presentation_finished.emit();assert(not game.audio_manager.rewarded_ad_audio_paused)
+
+	# Loading, automatic retry backoff, and a user-closing-without-reward path are
+	# not terminal failures and therefore cannot mint a free play.
+	for unavailable_case in [
+		[RewardedAdServiceClass.State.LOADING,false,false],
+		[RewardedAdServiceClass.State.UNAVAILABLE,false,true],
+		[RewardedAdServiceClass.State.SHOWING,false,false],
+	]:
+		game.rewarded_ad_service.state=int(unavailable_case[0]);game.rewarded_ad_service._terminal_unavailable=bool(unavailable_case[1]);game.rewarded_ad_service._automatic_retry_pending=bool(unavailable_case[2])
+		game.rescue_reward_in_progress=true;game.rescue_reward_context="shop_puku_rescue";game._on_rescue_reward_ad_completed(false)
+		assert(game.normal_round_free_plays==0 and game.puku_balance_units==0)
+
+	# Once the automatic retry budget is exhausted, exactly one saved normal-game
+	# ticket is granted. It is neither a coin nor a successful ad reward.
+	game.rewarded_ad_service.state=RewardedAdServiceClass.State.UNAVAILABLE;game.rewarded_ad_service._terminal_unavailable=true;game.rewarded_ad_service._automatic_retry_pending=false
+	game.rescue_reward_in_progress=true;game.rescue_reward_context="shop_puku_rescue";game._on_rescue_reward_ad_completed(false)
+	assert(game.normal_round_free_plays==1 and game.normal_round_ad_rescue_ticket_active and game.puku_balance_units==0)
+	assert(game.shop_chatter_label.text.contains("1回無料"))
+	var save_path:String=str(game._active_save_path());var granted_save=JSON.parse_string(FileAccess.get_file_as_string(save_path))
+	assert(granted_save is Dictionary and int(granted_save.get("normal_round_free_plays",0))==1 and bool(granted_save.get("normal_round_ad_rescue_ticket_active",false)))
+	assert(int(granted_save.get("normal_round_ad_rescue_next_available_unix",0))>0)
+	# Re-loading preserves the pending ticket without touching the wallet.
+	game.normal_round_free_plays=0;game.normal_round_ad_rescue_ticket_active=false;game.normal_round_ad_rescue_next_available_unix=0;game.normal_round_ad_rescue_clock_floor_unix=0;game._load_save()
+	assert(game.normal_round_free_plays==1 and game.normal_round_ad_rescue_ticket_active and game.puku_balance_units==0)
+	# A duplicate terminal callback cannot hold more than one ticket.
+	game.rescue_reward_in_progress=true;game.rescue_reward_context="shop_puku_rescue";game._on_rescue_reward_ad_completed(false)
+	assert(game.normal_round_free_plays==1 and game.puku_balance_units==0)
+
+	game.shop_overlay.visible=false;game.play_modal_open=false;game._start_greenhouse_play("normal")
+	assert(game.play_active and game.normal_round_free_plays==0 and not game.normal_round_ad_rescue_ticket_active and game.puku_balance_units==0)
+	assert(game.endless_economy_seed_cost_units==0)
+	var cooldown_after_use:int=int(game._normal_round_ad_rescue_cooldown_remaining_seconds())
+	assert(cooldown_after_use>0 and cooldown_after_use<=game.NORMAL_ROUND_AD_RESCUE_COOLDOWN_SECONDS)
+	var used_save=JSON.parse_string(FileAccess.get_file_as_string(save_path))
+	assert(used_save is Dictionary and int(used_save.get("normal_round_free_plays",-1))==0 and not bool(used_save.get("normal_round_ad_rescue_ticket_active",true)))
+	game.play_active=false;game.play_seed_animations_pending=0;game.play_spawn_queue=0;game._clear_greenhouse_plants();game.shop_overlay.visible=true
+
+	# Both wall-clock rollback and a forward jump during this process are bounded
+	# by the saved floor and monotonic deadline. A terminal failure during the
+	# cooldown shows the wait message and grants nothing.
+	var floor_unix:int=game.normal_round_ad_rescue_clock_floor_unix
+	var monotonic_before_deadline:int=game.normal_round_ad_rescue_session_not_before_msec-1000
+	assert(game._normal_round_ad_rescue_cooldown_remaining_seconds(floor_unix-3600,monotonic_before_deadline)>0)
+	assert(game._normal_round_ad_rescue_cooldown_remaining_seconds(game.normal_round_ad_rescue_next_available_unix+3600,monotonic_before_deadline)>0)
+	game.rewarded_ad_service.state=RewardedAdServiceClass.State.UNAVAILABLE;game.rewarded_ad_service._terminal_unavailable=true;game.rewarded_ad_service._automatic_retry_pending=false
+	game.rescue_reward_in_progress=true;game.rescue_reward_context="shop_puku_rescue";game._on_rescue_reward_ad_completed(false)
+	assert(game.normal_round_free_plays==0 and game.shop_chatter_label.text.contains("待って"))
+
+	# Simulate the full ten-minute interval elapsing. Another terminal outage may
+	# then grant one replacement ticket, but never more than one.
+	var now_unix:=floori(Time.get_unix_time_from_system());game.normal_round_ad_rescue_clock_floor_unix=now_unix;game.normal_round_ad_rescue_next_available_unix=now_unix-1;game.normal_round_ad_rescue_session_not_before_msec=Time.get_ticks_msec()-1
+	game.rescue_reward_in_progress=true;game.rescue_reward_context="shop_puku_rescue";game._on_rescue_reward_ad_completed(false)
+	assert(game.normal_round_free_plays==1 and game.normal_round_ad_rescue_ticket_active and game.puku_balance_units==0)
+	game.rescue_reward_in_progress=true;game.rescue_reward_context="shop_puku_rescue";game._on_rescue_reward_ad_completed(false)
+	assert(game.normal_round_free_plays==1)

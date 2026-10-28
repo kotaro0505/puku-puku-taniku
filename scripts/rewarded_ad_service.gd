@@ -3,6 +3,8 @@ extends Node
 
 signal reward_finished(reward_context: String, reward_earned: bool)
 signal availability_changed(available: bool)
+signal presentation_started
+signal presentation_finished
 signal privacy_options_requirement_changed(required: bool)
 signal privacy_options_form_finished(succeeded: bool)
 
@@ -39,6 +41,9 @@ var _consent_update_attempt_count := 0
 var _load_attempt_count := 0
 var _showing_context := ""
 var _completion_sent := false
+var _presentation_active := false
+var _terminal_unavailable := false
+var _automatic_retry_pending := false
 var _privacy_options_required := false
 var _privacy_options_form_open := false
 var _ads_mode := "unknown"
@@ -62,7 +67,11 @@ func is_available() -> bool:
 
 
 func is_preparing() -> bool:
-	return state in [State.CONSENT, State.INITIALIZING, State.LOADING]
+	return state in [State.CONSENT, State.INITIALIZING, State.LOADING] or _automatic_retry_pending
+
+
+func is_unavailable_for_rescue() -> bool:
+	return state == State.UNAVAILABLE and _terminal_unavailable
 
 
 func is_privacy_options_required() -> bool:
@@ -91,6 +100,9 @@ func diagnostic_snapshot() -> Dictionary:
 		"consent_update_attempts": _consent_update_attempt_count,
 		"load_attempts": _load_attempt_count,
 		"retry_count": _retry_count,
+		"terminal_unavailable": _terminal_unavailable,
+		"automatic_retry_pending": _automatic_retry_pending,
+		"presentation_active": _presentation_active,
 		"failure_reason": last_failure_reason,
 		"failure_stage": last_failure_stage,
 		"failure_code": last_failure_code,
@@ -139,8 +151,15 @@ func request_reward(reward_context: String) -> bool:
 		return false
 	if not is_available():
 		_log_diagnostic("request_not_ready")
-		_recover_after_request()
+		var terminal_unavailable := is_unavailable_for_rescue()
+		if not terminal_unavailable and not _automatic_retry_pending:
+			_recover_after_request()
 		reward_finished.emit(reward_context, false)
+		# Keep the terminal state visible during the synchronous completion signal so
+		# the game can grant a fail-safe play only after retries are exhausted. Then
+		# make a fresh attempt without requiring an application restart.
+		if terminal_unavailable:
+			call_deferred("_recover_terminal_unavailable")
 		return false
 	_showing_context = reward_context
 	_completion_sent = false
@@ -199,6 +218,7 @@ func _start_if_supported() -> void:
 	_admob.initialization_completed.connect(_on_initialization_completed)
 	_admob.rewarded_ad_loaded.connect(_on_rewarded_ad_loaded)
 	_admob.rewarded_ad_failed_to_load.connect(_on_rewarded_ad_failed_to_load)
+	_admob.rewarded_ad_showed_full_screen_content.connect(_on_rewarded_ad_showed)
 	_admob.rewarded_ad_failed_to_show_full_screen_content.connect(_on_rewarded_ad_failed_to_show)
 	_admob.rewarded_ad_dismissed_full_screen_content.connect(_on_rewarded_ad_dismissed)
 	_admob.rewarded_ad_user_earned_reward.connect(_on_rewarded_ad_user_earned_reward)
@@ -395,6 +415,7 @@ func _on_rewarded_ad_failed_to_load(_ad_info = null, error_data = null) -> void:
 
 
 func _on_rewarded_ad_failed_to_show(_ad_info = null, error_data = null) -> void:
+	_end_presentation()
 	if state != State.SHOWING or _showing_context.is_empty():
 		return
 	_retry_or_unavailable("rewarded_ad_show_failed", false, error_data, "show")
@@ -412,7 +433,15 @@ func _on_rewarded_ad_user_earned_reward(_ad_info = null, _reward_data = null) ->
 	_finish_show(true)
 
 
+func _on_rewarded_ad_showed(_ad_info = null) -> void:
+	if state != State.SHOWING or _showing_context.is_empty() or _presentation_active:
+		return
+	_presentation_active = true
+	presentation_started.emit()
+
+
 func _on_rewarded_ad_dismissed(_ad_info = null) -> void:
+	_end_presentation()
 	if state != State.SHOWING or _showing_context.is_empty():
 		return
 	_finish_show(false)
@@ -422,6 +451,13 @@ func _on_rewarded_ad_dismissed(_ad_info = null) -> void:
 	# fresh request while explicitly allowing this SHOWING -> LOADING transition;
 	# a duplicate dismissal then sees LOADING and cannot create a second request.
 	_load_rewarded_ad(true)
+
+
+func _end_presentation() -> void:
+	if not _presentation_active:
+		return
+	_presentation_active = false
+	presentation_finished.emit()
 
 
 func _finish_show(reward_earned: bool) -> void:
@@ -439,9 +475,14 @@ func _retry_or_unavailable(reason: String, retry_consent: bool, error_data = nul
 	_retry_count += 1
 	_retry_generation += 1
 	var generation := _retry_generation
+	_terminal_unavailable = false
+	_automatic_retry_pending = true
 	_set_state(State.UNAVAILABLE)
 	await get_tree().create_timer(float(1 << (_retry_count - 1))).timeout
-	if generation != _retry_generation or _admob == null or not _showing_context.is_empty():
+	if generation != _retry_generation:
+		return
+	_automatic_retry_pending = false
+	if _admob == null or not _showing_context.is_empty():
 		return
 	if retry_consent:
 		_request_consent_update()
@@ -452,7 +493,7 @@ func _retry_or_unavailable(reason: String, retry_consent: bool, error_data = nul
 func _recover_after_request() -> void:
 	if _admob == null:
 		return
-	if state in [State.CONSENT, State.INITIALIZING, State.LOADING, State.SHOWING]:
+	if state in [State.CONSENT, State.INITIALIZING, State.LOADING, State.SHOWING] or _automatic_retry_pending:
 		return
 	_retry_generation += 1
 	_retry_count = 0
@@ -462,6 +503,21 @@ func _recover_after_request() -> void:
 		else:
 			_initialize_ads()
 	elif not _admob.is_rewarded_ad_loaded():
+		_load_rewarded_ad()
+
+
+func _recover_terminal_unavailable() -> void:
+	if not is_unavailable_for_rescue() or _admob == null:
+		return
+	_retry_generation += 1
+	_retry_count = 0
+	_automatic_retry_pending = false
+	if last_failure_stage in ["consent", "privacy"] or not _initialized:
+		if BuildProfileClass.is_app_store_release():
+			_request_consent_update()
+		else:
+			_initialize_ads()
+	else:
 		_load_rewarded_ad()
 
 
@@ -475,6 +531,8 @@ func _recover_after_resume() -> void:
 func _mark_unavailable(reason: String) -> void:
 	if last_failure_reason != reason:
 		_record_failure(reason, _diagnostic_stage_code(reason, "").to_lower())
+	_terminal_unavailable = true
+	_automatic_retry_pending = false
 	_set_state(State.UNAVAILABLE)
 
 
@@ -482,6 +540,9 @@ func _set_state(next_state: State) -> void:
 	var was_available := state == State.READY
 	var changed := state != next_state
 	state = next_state
+	if next_state != State.UNAVAILABLE:
+		_terminal_unavailable = false
+		_automatic_retry_pending = false
 	var now_available := state == State.READY
 	if was_available != now_available:
 		availability_changed.emit(now_available)

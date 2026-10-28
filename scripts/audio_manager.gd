@@ -22,6 +22,8 @@ var bgm_restart_queued := false
 var bgm_fade_tween: Tween
 var last_bgm_fade_seconds := BGM_FADE_SECONDS
 var application_audio_paused := false
+var background_audio_paused := false
+var rewarded_ad_audio_paused := false
 var bgm_changed_while_paused := false
 var web_visibility_callback
 
@@ -157,12 +159,39 @@ func _notification(what:int) -> void:
 		_resume_bgm_from_background()
 
 func _pause_bgm_for_background() -> void:
-	if application_audio_paused: return
-	application_audio_paused = true
-	for player in bgm_players:
-		if player.playing: player.stream_paused = true
+	if background_audio_paused: return
+	background_audio_paused = true
+	_apply_audio_pause_reasons()
 
 func _resume_bgm_from_background() -> void:
+	if not background_audio_paused: return
+	background_audio_paused = false
+	_apply_audio_pause_reasons()
+
+func pause_for_rewarded_ad() -> void:
+	if rewarded_ad_audio_paused: return
+	rewarded_ad_audio_paused = true
+	# Do not resume a half-played game effect after the ad closes. BGM streams are
+	# paused instead, preserving their playback position whenever the track did
+	# not change while the full-screen ad was visible.
+	for player in se_players:
+		player.stop()
+		player.stream = null
+	_apply_audio_pause_reasons()
+
+func resume_from_rewarded_ad() -> void:
+	if not rewarded_ad_audio_paused: return
+	rewarded_ad_audio_paused = false
+	_apply_audio_pause_reasons()
+
+func _apply_audio_pause_reasons() -> void:
+	var should_pause := background_audio_paused or rewarded_ad_audio_paused
+	if should_pause:
+		if application_audio_paused: return
+		application_audio_paused = true
+		for player in bgm_players:
+			if player.playing: player.stream_paused = true
+		return
 	if not application_audio_paused: return
 	application_audio_paused = false
 	if not bgm_enabled or (web_audio_mode and not web_audio_unlocked): return
@@ -186,7 +215,7 @@ func _cancel_bgm_fade() -> void:
 	bgm_fade_tween = null
 
 func play_se(key: String, gain := 1.0) -> void:
-	if not se_enabled: return
+	if not se_enabled or application_audio_paused: return
 	var stream := _stream_for("se", key)
 	if stream == null: return
 	last_se_key = key
