@@ -224,13 +224,17 @@ def main() -> None:
         if required_pack_check not in pack_validator_source:
             fail(f"Exported mobile-ads pack validation is missing: {required_pack_check}")
     for required_export_check in [
-        "find \"$distribution_root\" -type f -name '*.pck'",
-        'mv "$runtime_config" "$backup_config"',
+        'exported_pack="$3"',
+        '--main-pack "$exported_pack"',
+        'cd "$validation_workdir"',
+        "pack_selection=explicit",
         "[REDACTED_ADMOB_ID]",
         "MOBILE_ADS_EXPORT_OK",
     ]:
         if required_export_check not in export_validator_source:
             fail(f"Mobile-ads distribution validation is missing: {required_export_check}")
+    if 'mv "$runtime_config"' in export_validator_source:
+        fail("Mobile-ads distribution validation must not move the source config")
 
     tracked = set(
         subprocess.check_output(["git", "ls-files"], text=True, encoding="utf-8").splitlines()
@@ -259,6 +263,8 @@ def main() -> None:
         'PRIVACY_MANIFEST="$(dirname "$CM_BUILD_DIR/$XCODE_PROJECT")/PrivacyInfo.xcprivacy"',
         "IOS_EXPORT_CHECK_OK check=privacy_manifest.plutil",
         "bash scripts/ci/verify_mobile_ads_export.sh",
+        'EXPORTED_PCK="$CM_BUILD_DIR/${XCODE_PROJECT%.xcodeproj}.pck"',
+        'SIGNED_PCK="$APP_PATH/$XCODE_SCHEME.pck"',
         "[REDACTED_ADMOB_ID]",
     ]:
         if required_diagnostic not in codemagic_source:

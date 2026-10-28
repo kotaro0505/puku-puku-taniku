@@ -368,11 +368,13 @@ workflows:
             exit 1
           fi
           echo "IOS_EXPORT_CHECK_OK check=privacy_manifest.plutil"
+          EXPORTED_PCK="$CM_BUILD_DIR/${XCODE_PROJECT%.xcodeproj}.pck"
           bash scripts/ci/verify_mobile_ads_export.sh \
             "$GODOT_BIN" \
             "$CM_BUILD_DIR" \
-            "$CM_BUILD_DIR/$IOS_APP_DIR" \
+            "$EXPORTED_PCK" \
             "$MOBILE_ADS_MODE"
+          echo "IOS_EXPORT_CHECK_OK check=mobile_ads.pack_path layout=xcode_project_sibling"
           echo "GODOT_IOS_EXPORT_OK project=$XCODE_PROJECT"
 
       - name: Apply App Store distribution signing
@@ -407,11 +409,13 @@ workflows:
           APP_PATH="$(find "$IPA_AUDIT_DIR/Payload" -maxdepth 1 -type d -name '*.app' -print -quit)"
           test -n "$APP_PATH"
           codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+          SIGNED_PCK="$APP_PATH/$XCODE_SCHEME.pck"
           bash scripts/ci/verify_mobile_ads_export.sh \
             "$GODOT_BIN" \
             "$CM_BUILD_DIR" \
-            "$APP_PATH" \
+            "$SIGNED_PCK" \
             "$MOBILE_ADS_MODE"
+          echo "SIGNED_IPA_CHECK_OK check=mobile_ads.pack_path layout=bundle_root"
           python3 - "$APP_PATH" "$BUNDLE_ID" "$DISPLAY_NAME" "$BUILD_PROFILE" "$MOBILE_ADS_MODE" <<'PY'
           import plistlib
           import sys
