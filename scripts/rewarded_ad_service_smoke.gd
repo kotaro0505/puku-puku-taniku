@@ -3,6 +3,7 @@ extends Node
 const ServiceClass = preload("res://scripts/rewarded_ad_service.gd")
 const AdmobClass = preload("res://addons/AdmobPlugin/Admob.gd")
 const LoadAdErrorClass = preload("res://addons/AdmobPlugin/model/LoadAdError.gd")
+const LocalizerClass = preload("res://scripts/game_localizer.gd")
 
 var completions: Array[Dictionary] = []
 var privacy_requirements: Array[bool] = []
@@ -41,6 +42,17 @@ class FakeNativePrivacyPlugin:
 	func can_request_ads() -> bool:return true
 
 
+class FakeRewardedAdmob:
+	extends RefCounted
+	var loaded := false
+	var load_count := 0
+	var show_count := 0
+
+	func is_rewarded_ad_loaded() -> bool:return loaded
+	func load_rewarded_ad() -> void:load_count+=1;loaded=false
+	func show_rewarded_ad() -> void:assert(loaded);show_count+=1;loaded=false
+
+
 func _ready() -> void:
 	var service := ServiceClass.new()
 	service.reward_finished.connect(_on_reward_finished)
@@ -49,6 +61,7 @@ func _ready() -> void:
 
 	# Reward is emitted exactly once even if the SDK repeats the callback and
 	# dismissal follows it.
+	service.state = ServiceClass.State.SHOWING
 	service._showing_context = "shop_seed_rescue"
 	service._completion_sent = false
 	service._on_rewarded_ad_user_earned_reward()
@@ -59,6 +72,7 @@ func _ready() -> void:
 	assert(completions[0].earned)
 
 	# Closing before the earned callback never grants the reward.
+	service.state = ServiceClass.State.SHOWING
 	service._showing_context = "shop_puku_rescue"
 	service._completion_sent = false
 	service._on_rewarded_ad_dismissed()
@@ -68,6 +82,7 @@ func _ready() -> void:
 
 	# A presentation failure may not be followed by dismissal. It must finish the
 	# current request without reward and release the request lock for recovery.
+	service.state = ServiceClass.State.SHOWING
 	service._showing_context = "shop_seed_rescue"
 	service._completion_sent = false
 	service._on_rewarded_ad_failed_to_show()
@@ -76,6 +91,135 @@ func _ready() -> void:
 	assert(not completions[2].earned)
 	assert(service._showing_context.is_empty() and not service._completion_sent)
 	assert(service.user_diagnostic_code() == "ADS-SHOW")
+
+	# A real rewarded-ad lifecycle must leave SHOWING before requesting the next
+	# ad. Verify the initial load, tap spam while loading, five consecutive earned
+	# rewards, early dismissal, load/show failure recovery, and duplicate terminal
+	# callbacks without restarting the application.
+	var cycle_service := ServiceClass.new()
+	var fake_rewarded := FakeRewardedAdmob.new()
+	var cycle_results: Array[Dictionary] = []
+	cycle_service._admob = fake_rewarded
+	cycle_service.reward_finished.connect(func(context: String, earned: bool) -> void:
+		cycle_results.append({"context": context, "earned": earned})
+	)
+	add_child(cycle_service)
+	cycle_service.state = ServiceClass.State.INITIALIZING
+	cycle_service._on_initialization_completed()
+	assert(cycle_service.state == ServiceClass.State.LOADING)
+	assert(cycle_service.is_preparing())
+	assert(cycle_service.user_diagnostic_code() == "ADS-WAIT-LOAD")
+	assert(fake_rewarded.load_count == 1)
+	for tap_index in range(3):
+		assert(not cycle_service.request_reward("loading_tap_%d" % tap_index))
+	assert(fake_rewarded.load_count == 1 and cycle_service.state == ServiceClass.State.LOADING)
+	assert(cycle_results.size() == 3)
+	fake_rewarded.loaded = true
+	cycle_service._on_rewarded_ad_loaded()
+	assert(cycle_service.state == ServiceClass.State.READY and cycle_service.is_available())
+
+	for view_index in range(5):
+		var result_count_before := cycle_results.size()
+		var load_count_before := fake_rewarded.load_count
+		var context := "repeat_%d" % view_index
+		assert(cycle_service.request_reward(context))
+		assert(cycle_service.state == ServiceClass.State.SHOWING)
+		assert(fake_rewarded.show_count == view_index + 1)
+		assert(not cycle_service.request_reward("already_showing"))
+		assert(fake_rewarded.show_count == view_index + 1)
+		cycle_service._on_rewarded_ad_user_earned_reward()
+		cycle_service._on_rewarded_ad_user_earned_reward()
+		assert(cycle_results.size() == result_count_before + 1)
+		assert(cycle_results[-1].context == context and cycle_results[-1].earned)
+		cycle_service._on_rewarded_ad_dismissed()
+		assert(cycle_service.state == ServiceClass.State.LOADING)
+		assert(fake_rewarded.load_count == load_count_before + 1)
+		cycle_service._on_rewarded_ad_dismissed()
+		assert(fake_rewarded.load_count == load_count_before + 1)
+		assert(cycle_results.size() == result_count_before + 1)
+		fake_rewarded.loaded = true
+		cycle_service._on_rewarded_ad_loaded()
+		assert(cycle_service.state == ServiceClass.State.READY)
+	var earned_count := 0
+	for result in cycle_results:
+		if bool(result.earned):earned_count+=1
+	assert(earned_count == 5 and fake_rewarded.show_count == 5)
+
+	# Closing before earning finishes once without a reward, then immediately
+	# starts one fresh load for the following view.
+	var early_close_result_count := cycle_results.size()
+	var early_close_load_count := fake_rewarded.load_count
+	assert(cycle_service.request_reward("early_close"))
+	cycle_service._on_rewarded_ad_dismissed()
+	assert(cycle_results.size() == early_close_result_count + 1)
+	assert(cycle_results[-1].context == "early_close" and not cycle_results[-1].earned)
+	cycle_service._on_rewarded_ad_user_earned_reward()
+	assert(cycle_results.size() == early_close_result_count + 1)
+	assert(cycle_service.state == ServiceClass.State.LOADING)
+	assert(fake_rewarded.load_count == early_close_load_count + 1)
+	fake_rewarded.loaded = true
+	cycle_service._on_rewarded_ad_loaded()
+
+	# A failed load retries once, ignores a duplicate failure callback, and
+	# returns to READY when that retry completes.
+	fake_rewarded.loaded = false
+	cycle_service._load_rewarded_ad()
+	var failed_load_count := fake_rewarded.load_count
+	cycle_service._on_rewarded_ad_failed_to_load(null, {"code": 1})
+	assert(cycle_service.state == ServiceClass.State.UNAVAILABLE)
+	assert(cycle_service._retry_count == 1)
+	cycle_service._on_rewarded_ad_failed_to_load(null, {"code": 1})
+	assert(cycle_service._retry_count == 1)
+	await get_tree().create_timer(1.1).timeout
+	assert(cycle_service.state == ServiceClass.State.LOADING)
+	assert(fake_rewarded.load_count == failed_load_count + 1)
+	fake_rewarded.loaded = true
+	cycle_service._on_rewarded_ad_loaded()
+
+	# A failed presentation emits one failure, clears the active context, and
+	# retries once even if the SDK repeats failure/dismissal terminal callbacks.
+	var show_failure_results := cycle_results.size()
+	var show_failure_load_count := fake_rewarded.load_count
+	assert(cycle_service.request_reward("show_failure"))
+	cycle_service._on_rewarded_ad_failed_to_show(null, {"code": 2})
+	assert(cycle_results.size() == show_failure_results + 1)
+	assert(not cycle_results[-1].earned)
+	assert(cycle_service._showing_context.is_empty())
+	assert(cycle_service.state == ServiceClass.State.UNAVAILABLE)
+	assert(cycle_service._retry_count == 1)
+	cycle_service._on_rewarded_ad_failed_to_show(null, {"code": 2})
+	cycle_service._on_rewarded_ad_dismissed()
+	assert(cycle_service._retry_count == 1)
+	assert(cycle_results.size() == show_failure_results + 1)
+	await get_tree().create_timer(1.1).timeout
+	assert(cycle_service.state == ServiceClass.State.LOADING)
+	assert(fake_rewarded.load_count == show_failure_load_count + 1)
+	fake_rewarded.loaded = true
+	cycle_service._on_rewarded_ad_loaded()
+
+	# Resuming while a reload is in flight cannot duplicate it. A new service
+	# instance (the process-restart path) starts exactly one initial load.
+	fake_rewarded.loaded = false
+	cycle_service._load_rewarded_ad()
+	var resume_load_count := fake_rewarded.load_count
+	cycle_service._recover_after_resume()
+	assert(fake_rewarded.load_count == resume_load_count)
+	var restarted_service := ServiceClass.new()
+	var restarted_fake := FakeRewardedAdmob.new()
+	restarted_service._admob = restarted_fake
+	add_child(restarted_service)
+	restarted_service.state = ServiceClass.State.INITIALIZING
+	restarted_service._on_initialization_completed()
+	assert(restarted_service.state == ServiceClass.State.LOADING)
+	assert(restarted_fake.load_count == 1)
+
+	# Loading gets a preparation message rather than a misleading connection
+	# error in all supported languages. The main UI selects it from service state.
+	assert(LocalizerClass.text("ja", "ad_loading").contains("準備"))
+	assert(LocalizerClass.text("hiragana", "ad_loading").contains("じゅんび"))
+	assert(LocalizerClass.text("en", "ad_loading").contains("prepared"))
+	var main_source := FileAccess.get_file_as_string("res://scripts/main.gd")
+	assert(main_source.contains("rewarded_ad_service.is_preparing()"))
 
 	# SDK diagnostics retain only a stable stage and numeric code. They never
 	# include ad unit IDs, response identifiers, or localized SDK messages.
@@ -197,7 +341,7 @@ func _ready() -> void:
 	assert(fake.load_count == load_count_before_guard + 1)
 	assert(service.state == ServiceClass.State.LOADING)
 
-	print("REWARDED_AD_SERVICE_SMOKE_OK earned_once=true early_close_no_reward=true show_failure_recovers=true privacy_capability_gated=true consent_change_reloads=true sanitized_diagnostics=true config_diagnostics_specific=true duplicate_load_guarded=true resume_recovers=true desktop_inactive=true")
+	print("REWARDED_AD_SERVICE_SMOKE_OK earned_once=true early_close_no_reward=true repeated_views=5 dismissal_reloads=true duplicate_terminal_guarded=true load_failure_recovers=true show_failure_recovers=true loading_message_specific=true privacy_capability_gated=true consent_change_reloads=true sanitized_diagnostics=true config_diagnostics_specific=true duplicate_load_guarded=true resume_recovers=true restart_reloads=true desktop_inactive=true")
 	get_tree().quit()
 
 

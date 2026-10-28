@@ -2920,7 +2920,8 @@ func _on_rescue_reward_ad_completed(reward_earned:bool)->void:
 	rescue_reward_in_progress=false
 	if not reward_earned:
 		shop_chatter_action_button.disabled=false;shop_chatter_action_button.text=Localizer.text(language_code,"shop_help_action") if rescue_reward_context=="shop_puku_rescue" else Localizer.text(language_code,"ad_seed");rescue_reward_context=""
-		var unavailable_message:=Localizer.text(language_code,"ad_unavailable")
+		var message_key:="ad_loading" if rewarded_ad_service!=null and rewarded_ad_service.is_preparing() else "ad_unavailable"
+		var unavailable_message:=Localizer.text(language_code,message_key)
 		if rewarded_ad_service!=null:
 			unavailable_message+="\n"+Localizer.text(language_code,"ad_diagnostic_code",[rewarded_ad_service.user_diagnostic_code()])
 		_show_shop_chatter(unavailable_message,false)

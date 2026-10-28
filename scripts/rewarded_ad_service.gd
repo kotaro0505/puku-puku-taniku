@@ -61,6 +61,10 @@ func is_available() -> bool:
 	return state == State.READY and _admob != null and _admob.is_rewarded_ad_loaded()
 
 
+func is_preparing() -> bool:
+	return state in [State.CONSENT, State.INITIALIZING, State.LOADING]
+
+
 func is_privacy_options_required() -> bool:
 	return _privacy_options_required
 
@@ -362,8 +366,10 @@ func _on_initialization_completed(_status_data = null) -> void:
 	_load_rewarded_ad()
 
 
-func _load_rewarded_ad() -> void:
-	if _admob == null or not _initialized or state == State.SHOWING:
+func _load_rewarded_ad(allow_showing_transition := false) -> void:
+	if _admob == null or not _initialized or state == State.LOADING:
+		return
+	if state == State.SHOWING and not allow_showing_transition:
 		return
 	_set_state(State.LOADING)
 	_load_attempt_count += 1
@@ -372,6 +378,8 @@ func _load_rewarded_ad() -> void:
 
 
 func _on_rewarded_ad_loaded(_ad_info = null, _response_info = null) -> void:
+	if state != State.LOADING:
+		return
 	_retry_count = 0
 	last_failure_reason = ""
 	last_failure_stage = ""
@@ -381,10 +389,14 @@ func _on_rewarded_ad_loaded(_ad_info = null, _response_info = null) -> void:
 
 
 func _on_rewarded_ad_failed_to_load(_ad_info = null, error_data = null) -> void:
+	if state != State.LOADING:
+		return
 	_retry_or_unavailable("rewarded_ad_load_failed", false, error_data, "load")
 
 
 func _on_rewarded_ad_failed_to_show(_ad_info = null, error_data = null) -> void:
+	if state != State.SHOWING or _showing_context.is_empty():
+		return
 	_retry_or_unavailable("rewarded_ad_show_failed", false, error_data, "show")
 	_finish_show(false)
 	# A failed presentation does not reliably produce a dismissal callback. Clear
@@ -401,10 +413,15 @@ func _on_rewarded_ad_user_earned_reward(_ad_info = null, _reward_data = null) ->
 
 
 func _on_rewarded_ad_dismissed(_ad_info = null) -> void:
+	if state != State.SHOWING or _showing_context.is_empty():
+		return
 	_finish_show(false)
 	_showing_context = ""
 	_completion_sent = false
-	_load_rewarded_ad()
+	# The dismissal callback is the terminal event for the displayed ad. Start a
+	# fresh request while explicitly allowing this SHOWING -> LOADING transition;
+	# a duplicate dismissal then sees LOADING and cannot create a second request.
+	_load_rewarded_ad(true)
 
 
 func _finish_show(reward_earned: bool) -> void:
