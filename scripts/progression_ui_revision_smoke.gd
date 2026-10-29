@@ -116,11 +116,18 @@ func _test_language_ui_geometry(game: Node) -> void:
 	await get_tree().process_frame
 	var scroll_bar: VScrollBar = game.settings_scroll.get_v_scroll_bar()
 	assert(scroll_bar.max_value > scroll_bar.page, "development settings must remain vertically scrollable")
-	game.settings_overlay.visible = false
+	var development_preview_toggle := game.find_child("GrowingPukuPreviewToggle", true, false) as Button
+	_assert_button_decoration_inside_scroll(development_preview_toggle, game.settings_scroll, ["normal", "hover", "pressed"])
+	game.settings_scroll.scroll_vertical = roundi(scroll_bar.max_value)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	_assert_button_decoration_inside_scroll(game.settings_close_button, game.settings_scroll, ["normal", "hover", "pressed"])
+	game.settings_scroll.scroll_vertical = 0
 	for development_control_name in ["HabitatDevOpen", "OpeningStoryReplay", "StoryDevOpen", "ProgressionDevReset", "JellyDevOpen", "TrialDevGachaOpen", "CatalogPreviewDevOpen"]:
 		assert(game.settings_content.find_child(development_control_name, true, false) != null, "missing development setting: %s" % development_control_name)
 	for locale in Localizer.SUPPORTED_LANGUAGES:
 		game._set_language(locale)
+		await get_tree().process_frame
 		await get_tree().process_frame
 		assert(Rect2(settings_panel.position, settings_panel.size) == original_panel_rect)
 		assert(Rect2(game.play_open_button.position, game.play_open_button.size) == original_play_rect)
@@ -148,10 +155,17 @@ func _test_language_ui_geometry(game: Node) -> void:
 		assert(growing_label.text == Localizer.text(locale, "growing_puku_preview_setting"))
 		var bgm_toggle := game.find_child("BgmToggle", true, false) as Button
 		var se_toggle := game.find_child("SeToggle", true, false) as Button
+		var growing_toggle := game.find_child("GrowingPukuPreviewToggle", true, false) as Button
 		assert(bgm_toggle.custom_minimum_size.x == 82.0 and se_toggle.custom_minimum_size.x == 82.0)
 		assert(bgm_toggle.text in ["ON", "OFF"] and se_toggle.text in ["ON", "OFF"])
+		_assert_settings_label_toggle_gap(bgm_label, bgm_toggle)
+		_assert_settings_label_toggle_gap(se_label, se_toggle)
+		_assert_settings_label_toggle_gap(growing_label, growing_toggle)
 		assert(game.find_child("AudioSettingsNote", true, false) == null)
 	game._set_language("ja")
+	await get_tree().process_frame
+	await get_tree().process_frame
+	game.settings_overlay.visible = false
 
 
 func _test_settings_controls(game: Node) -> void:
@@ -239,6 +253,7 @@ func _test_product_settings_layout() -> void:
 	await get_tree().process_frame
 	var scroll_bar: VScrollBar = product_game.settings_scroll.get_v_scroll_bar()
 	assert(scroll_bar.max_value <= scroll_bar.page, "compact product settings unexpectedly scroll")
+	_assert_button_decoration_inside_scroll(product_game.settings_close_button, product_game.settings_scroll, ["normal", "hover", "pressed"])
 	var compact_height: float = panel.size.y
 	assert(not product_game.settings_language_status.visible, "empty language status left product padding")
 	var localized_height := -1.0
@@ -253,9 +268,19 @@ func _test_product_settings_layout() -> void:
 		assert(scroll_bar.max_value <= scroll_bar.page, "product settings overflowed for %s" % locale)
 		var growing_row := product_game.find_child("GrowingPukuPreviewRow", true, false) as HBoxContainer
 		var growing_label := product_game.find_child("GrowingPukuPreviewLabel", true, false) as Label
+		var growing_toggle := product_game.find_child("GrowingPukuPreviewToggle", true, false) as Button
+		var bgm_label := product_game.find_child("BgmSettingLabel", true, false) as Label
+		var bgm_toggle := product_game.find_child("BgmToggle", true, false) as Button
+		var se_label := product_game.find_child("SeSettingLabel", true, false) as Label
+		var se_toggle := product_game.find_child("SeToggle", true, false) as Button
 		assert(growing_row != null and growing_label != null)
 		assert(growing_label.position.x + growing_label.size.x <= growing_row.size.x)
 		assert(growing_label.position.y + growing_label.size.y <= growing_row.size.y)
+		_assert_settings_label_toggle_gap(bgm_label, bgm_toggle)
+		_assert_settings_label_toggle_gap(se_label, se_toggle)
+		_assert_settings_label_toggle_gap(growing_label, growing_toggle)
+		_assert_button_decoration_inside_scroll(growing_toggle, product_game.settings_scroll, ["normal", "hover", "pressed", "hover_pressed", "focus", "disabled"])
+		_assert_button_decoration_inside_scroll(product_game.settings_close_button, product_game.settings_scroll, ["normal", "hover", "pressed"])
 	product_game._set_language("ja")
 	await get_tree().process_frame
 	product_game.rewarded_ad_service._privacy_options_required = true
@@ -266,13 +291,58 @@ func _test_product_settings_layout() -> void:
 	assert(product_game.privacy_options_button.visible)
 	assert(panel.size.y > localized_height and panel.size.y < 896.0)
 	_assert_settings_panel_centered(product_game.settings_overlay, panel)
+	_assert_button_decoration_inside_scroll(product_game.settings_close_button, product_game.settings_scroll, ["normal", "hover", "pressed"])
 	product_game.rewarded_ad_service._privacy_options_required = false
 	product_game._refresh_privacy_options_button()
 	await get_tree().process_frame
 	await get_tree().process_frame
 	assert(is_equal_approx(panel.size.y, localized_height))
+	_assert_button_decoration_inside_scroll(product_game.settings_close_button, product_game.settings_scroll, ["normal", "hover", "pressed"])
 	product_game.queue_free()
 	await get_tree().process_frame
+
+
+func _assert_settings_label_toggle_gap(label: Label, toggle: Button) -> void:
+	assert(label != null and toggle != null)
+	var label_rect := label.get_global_rect()
+	var toggle_rect := toggle.get_global_rect()
+	var gap := toggle_rect.position.x - (label_rect.position.x + label_rect.size.x)
+	assert(is_equal_approx(gap, 10.0), "%s to %s gap changed: %.2f" % [label.name, toggle.name, gap])
+	if label.horizontal_alignment == HORIZONTAL_ALIGNMENT_LEFT:
+		var font := label.get_theme_font("font")
+		var font_size := label.get_theme_font_size("font_size")
+		var text_width := font.get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size).x
+		assert(absf(label.size.x - ceilf(text_width)) <= 1.0, "%s keeps unused width beside its text: control=%.2f text=%.2f" % [label.name, label.size.x, text_width])
+
+
+func _assert_button_decoration_inside_scroll(button: Button, scroll: ScrollContainer, style_names: Array) -> void:
+	assert(button != null and scroll != null)
+	var clip_rect := scroll.get_global_rect()
+	var vertical_scroll_bar := scroll.get_v_scroll_bar()
+	if vertical_scroll_bar.visible:
+		clip_rect.size.x = minf(clip_rect.position.x + clip_rect.size.x, vertical_scroll_bar.get_global_rect().position.x) - clip_rect.position.x
+	for style_name_value in style_names:
+		var style_name := str(style_name_value)
+		var style := button.get_theme_stylebox(style_name) as StyleBoxFlat
+		assert(style != null, "%s has no %s StyleBoxFlat" % [button.name, style_name])
+		var decoration_rect := _button_decoration_rect(button, style)
+		var decoration_end := decoration_rect.position + decoration_rect.size
+		var clip_end := clip_rect.position + clip_rect.size
+		assert(decoration_rect.position.x >= clip_rect.position.x - 0.01, "%s %s decoration clipped on left: decoration=%s clip=%s" % [button.name, style_name, decoration_rect, clip_rect])
+		assert(decoration_rect.position.y >= clip_rect.position.y - 0.01, "%s %s decoration clipped on top: decoration=%s clip=%s" % [button.name, style_name, decoration_rect, clip_rect])
+		assert(decoration_end.x <= clip_end.x + 0.01, "%s %s decoration clipped on right: decoration=%s clip=%s" % [button.name, style_name, decoration_rect, clip_rect])
+		assert(decoration_end.y <= clip_end.y + 0.01, "%s %s decoration clipped on bottom: decoration=%s clip=%s" % [button.name, style_name, decoration_rect, clip_rect])
+
+
+func _button_decoration_rect(button: Button, style: StyleBoxFlat) -> Rect2:
+	var control_rect := button.get_global_rect()
+	var control_end := control_rect.position + control_rect.size
+	var shadow_extent := float(style.shadow_size)
+	var shadow_position := control_rect.position - Vector2.ONE * shadow_extent + style.shadow_offset
+	var shadow_end := control_end + Vector2.ONE * shadow_extent + style.shadow_offset
+	var decoration_position := Vector2(minf(control_rect.position.x, shadow_position.x), minf(control_rect.position.y, shadow_position.y))
+	var decoration_end := Vector2(maxf(control_end.x, shadow_end.x), maxf(control_end.y, shadow_end.y))
+	return Rect2(decoration_position, decoration_end - decoration_position)
 
 
 func _assert_settings_panel_centered(overlay: Control, panel: Control) -> void:

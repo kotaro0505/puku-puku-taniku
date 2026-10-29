@@ -86,6 +86,9 @@ const SETTINGS_PANEL_MAX_HEIGHT := 896.0
 const SETTINGS_PANEL_SCREEN_MARGIN := 64.0
 const SETTINGS_PANEL_HORIZONTAL_PADDING := 24.0
 const SETTINGS_PANEL_VERTICAL_PADDING := 18.0
+const SETTINGS_CONTENT_DECORATION_MARGIN_HORIZONTAL := 6.0
+const SETTINGS_CONTENT_DECORATION_MARGIN_TOP := 4.0
+const SETTINGS_CONTENT_DECORATION_MARGIN_BOTTOM := 10.0
 const PUKU_GAUGE_FINISH_SPEED_SCALE := 0.5
 const FIRST_GET_MIN_REWARD_UNITS := 200
 const INITIAL_PUKU_CAPITAL_UNITS := 5000
@@ -569,6 +572,7 @@ var puku_gauge_intro_complete := false
 var settings_overlay: Control
 var settings_panel: PanelContainer
 var settings_scroll: ScrollContainer
+var settings_content_frame: MarginContainer
 var settings_content: VBoxContainer
 var settings_panel_layout_queued := false
 var settings_title_label:Label
@@ -4124,7 +4128,8 @@ func _build_settings(hud:Control)->void:
 	var panel_style:=_box(Color("#f7e8c7"),Color("#9b642f"),26,4);panel_style.content_margin_left=SETTINGS_PANEL_HORIZONTAL_PADDING;panel_style.content_margin_right=SETTINGS_PANEL_HORIZONTAL_PADDING;panel_style.content_margin_top=SETTINGS_PANEL_VERTICAL_PADDING;panel_style.content_margin_bottom=SETTINGS_PANEL_VERTICAL_PADDING
 	settings_panel.add_theme_stylebox_override("panel",panel_style);settings_overlay.add_child(settings_panel)
 	settings_scroll=ScrollContainer.new();settings_scroll.name="SettingsScroll";settings_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;settings_scroll.vertical_scroll_mode=ScrollContainer.SCROLL_MODE_AUTO;settings_scroll.scroll_deadzone=12;settings_panel.add_child(settings_scroll)
-	settings_content=VBoxContainer.new();settings_content.name="SettingsContent";settings_content.custom_minimum_size=Vector2(420,0);settings_content.alignment=BoxContainer.ALIGNMENT_BEGIN;settings_content.size_flags_horizontal=Control.SIZE_EXPAND_FILL;settings_content.size_flags_vertical=Control.SIZE_SHRINK_BEGIN;settings_content.add_theme_constant_override("separation",11);settings_scroll.add_child(settings_content)
+	settings_content_frame=MarginContainer.new();settings_content_frame.name="SettingsContentFrame";settings_content_frame.size_flags_horizontal=Control.SIZE_EXPAND_FILL;settings_content_frame.size_flags_vertical=Control.SIZE_SHRINK_BEGIN;settings_content_frame.add_theme_constant_override("margin_left",roundi(SETTINGS_CONTENT_DECORATION_MARGIN_HORIZONTAL));settings_content_frame.add_theme_constant_override("margin_right",roundi(SETTINGS_CONTENT_DECORATION_MARGIN_HORIZONTAL));settings_content_frame.add_theme_constant_override("margin_top",roundi(SETTINGS_CONTENT_DECORATION_MARGIN_TOP));settings_content_frame.add_theme_constant_override("margin_bottom",roundi(SETTINGS_CONTENT_DECORATION_MARGIN_BOTTOM));settings_scroll.add_child(settings_content_frame)
+	settings_content=VBoxContainer.new();settings_content.name="SettingsContent";settings_content.custom_minimum_size=Vector2(420,0);settings_content.alignment=BoxContainer.ALIGNMENT_BEGIN;settings_content.size_flags_horizontal=Control.SIZE_EXPAND_FILL;settings_content.size_flags_vertical=Control.SIZE_SHRINK_BEGIN;settings_content.add_theme_constant_override("separation",11);settings_content_frame.add_child(settings_content)
 	var content:=settings_content
 	settings_title_label=Label.new();settings_title_label.text="設定";settings_title_label.custom_minimum_size=Vector2(420,42);settings_title_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;settings_title_label.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS;settings_title_label.add_theme_font_size_override("font_size",30);settings_title_label.add_theme_color_override("font_color",UI_BROWN);content.add_child(settings_title_label)
 	settings_language_heading=Label.new();settings_language_heading.name="LanguageHeading";settings_language_heading.text=Localizer.text(language_code,"language_heading");settings_language_heading.custom_minimum_size=Vector2(420,30);settings_language_heading.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;settings_language_heading.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS;settings_language_heading.add_theme_font_size_override("font_size",19);settings_language_heading.add_theme_color_override("font_color",UI_BROWN);content.add_child(settings_language_heading)
@@ -4150,7 +4155,7 @@ func _build_settings(hud:Control)->void:
 		if DEVELOPMENT_CATALOG_PREVIEW_ENABLED:
 			catalog_preview_settings_button=Button.new();catalog_preview_settings_button.name="CatalogPreviewDevOpen";catalog_preview_settings_button.text="開発用：品種プレビュー";catalog_preview_settings_button.custom_minimum_size=Vector2(370,58);_skin_button(catalog_preview_settings_button,Color("#c7d6ad"),17);catalog_preview_settings_button.pressed.connect(_open_catalog_preview_dev);content.add_child(catalog_preview_settings_button)
 	settings_close_button=Button.new();settings_close_button.text="閉じる";settings_close_button.custom_minimum_size=Vector2(280,55);_skin_button(settings_close_button,Color("#ead8b1"),18);settings_close_button.pressed.connect(_close_settings);content.add_child(settings_close_button)
-	settings_content.minimum_size_changed.connect(_queue_settings_panel_layout)
+	settings_content_frame.minimum_size_changed.connect(_queue_settings_panel_layout)
 	_refresh_progression_dev_counters()
 	_refresh_privacy_options_button()
 	_queue_settings_panel_layout()
@@ -4336,15 +4341,15 @@ func _dev_spawn_50cm()->void:
 
 func _add_audio_setting_controls(parent:VBoxContainer,label_text:String,is_bgm:bool)->void:
 	var row:=HBoxContainer.new();row.name="BgmSettingRow" if is_bgm else "SeSettingRow";row.custom_minimum_size=Vector2(420,48);row.alignment=BoxContainer.ALIGNMENT_CENTER;row.add_theme_constant_override("separation",10);parent.add_child(row)
-	var label:=Label.new();label.name="BgmSettingLabel" if is_bgm else "SeSettingLabel";label.text=label_text;label.custom_minimum_size=Vector2(58,48);label.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT;label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.add_theme_font_size_override("font_size",18);label.add_theme_color_override("font_color",UI_BROWN);row.add_child(label)
+	var label:=Label.new();label.name="BgmSettingLabel" if is_bgm else "SeSettingLabel";label.text=label_text;label.custom_minimum_size=Vector2(58,48);label.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.add_theme_font_size_override("font_size",18);label.add_theme_color_override("font_color",UI_BROWN);row.add_child(label)
 	var toggle:=Button.new();toggle.name="BgmToggle" if is_bgm else "SeToggle";toggle.toggle_mode=true;toggle.action_mode=BaseButton.ACTION_MODE_BUTTON_RELEASE;toggle.focus_mode=Control.FOCUS_NONE;toggle.custom_minimum_size=Vector2(82,44);toggle.clip_text=true;toggle.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS;row.add_child(toggle)
 	var enabled:=bool(audio_settings.get("bgm_enabled" if is_bgm else "se_enabled",true));_apply_settings_toggle_style(toggle,enabled)
 	var slider:=HSlider.new();slider.name="BgmVolumeSlider" if is_bgm else "SeVolumeSlider";slider.min_value=0;slider.max_value=100;slider.step=1;slider.value=float(audio_settings.get("bgm_volume" if is_bgm else "se_volume",.65)) * 100.0;slider.custom_minimum_size=Vector2(240,48);slider.size_flags_horizontal=Control.SIZE_EXPAND_FILL;row.add_child(slider)
 	toggle.toggled.connect(_change_audio_enabled.bind(is_bgm));slider.value_changed.connect(_change_audio_volume.bind(is_bgm))
 
 func _add_growing_puku_preview_control(parent:VBoxContainer)->void:
-	var row:=HBoxContainer.new();row.name="GrowingPukuPreviewRow";row.custom_minimum_size=Vector2(420,50);row.alignment=BoxContainer.ALIGNMENT_CENTER;row.add_theme_constant_override("separation",12);parent.add_child(row)
-	var label:=Label.new();label.name="GrowingPukuPreviewLabel";label.text=Localizer.text(language_code,"growing_puku_preview_setting");label.custom_minimum_size=Vector2(310,50);label.size_flags_horizontal=Control.SIZE_EXPAND_FILL;label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;label.add_theme_font_size_override("font_size",15);label.add_theme_color_override("font_color",UI_BROWN);row.add_child(label)
+	var row:=HBoxContainer.new();row.name="GrowingPukuPreviewRow";row.custom_minimum_size=Vector2(420,50);row.alignment=BoxContainer.ALIGNMENT_CENTER;row.add_theme_constant_override("separation",10);parent.add_child(row)
+	var label:=Label.new();label.name="GrowingPukuPreviewLabel";label.text=Localizer.text(language_code,"growing_puku_preview_setting");label.custom_minimum_size=Vector2(0,50);label.size_flags_horizontal=Control.SIZE_SHRINK_BEGIN;label.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT;label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;label.add_theme_font_size_override("font_size",15);label.add_theme_color_override("font_color",UI_BROWN);row.add_child(label)
 	growing_puku_preview_toggle=Button.new();growing_puku_preview_toggle.name="GrowingPukuPreviewToggle";growing_puku_preview_toggle.toggle_mode=true;growing_puku_preview_toggle.action_mode=BaseButton.ACTION_MODE_BUTTON_RELEASE;growing_puku_preview_toggle.focus_mode=Control.FOCUS_NONE;growing_puku_preview_toggle.custom_minimum_size=Vector2(82,44);growing_puku_preview_toggle.clip_text=true;growing_puku_preview_toggle.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS;_apply_settings_toggle_style(growing_puku_preview_toggle,show_growing_puku_preview);growing_puku_preview_toggle.toggled.connect(_change_growing_puku_preview);row.add_child(growing_puku_preview_toggle)
 
 func _apply_settings_toggle_style(button:Button,enabled:bool)->void:
@@ -4363,12 +4368,12 @@ func _queue_settings_panel_layout()->void:
 
 func _refresh_settings_panel_layout()->void:
 	settings_panel_layout_queued=false
-	if settings_overlay==null or settings_panel==null or settings_content==null:return
+	if settings_overlay==null or settings_panel==null or settings_content_frame==null:return
 	var available_size:=settings_overlay.size
 	if available_size.x<=0.0 or available_size.y<=0.0:available_size=get_viewport().get_visible_rect().size
 	var panel_width:=minf(SETTINGS_PANEL_WIDTH,maxf(0.0,available_size.x-SETTINGS_PANEL_HORIZONTAL_PADDING*2.0))
 	var maximum_height:=minf(SETTINGS_PANEL_MAX_HEIGHT,maxf(0.0,available_size.y-SETTINGS_PANEL_SCREEN_MARGIN*2.0))
-	var desired_height:=ceilf(settings_content.get_combined_minimum_size().y+SETTINGS_PANEL_VERTICAL_PADDING*2.0)
+	var desired_height:=ceilf(settings_content_frame.get_combined_minimum_size().y+SETTINGS_PANEL_VERTICAL_PADDING*2.0)
 	var panel_height:=minf(desired_height,maximum_height)
 	var target_size:=Vector2(panel_width,panel_height)
 	if not settings_panel.custom_minimum_size.is_equal_approx(target_size):settings_panel.custom_minimum_size=target_size
