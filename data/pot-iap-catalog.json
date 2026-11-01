@@ -9,7 +9,7 @@
     "sales_stage": 1,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_001",
-    "price_puku": 1,
+    "price_puku": 2,
     "sort_order": 100
   },
   {
@@ -22,7 +22,7 @@
     "sales_stage": 1,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_002",
-    "price_puku": 1,
+    "price_puku": 2,
     "sort_order": 110
   },
   {
@@ -35,7 +35,7 @@
     "sales_stage": 1,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_003",
-    "price_puku": 1,
+    "price_puku": 2,
     "sort_order": 120
   },
   {
@@ -48,7 +48,7 @@
     "sales_stage": 1,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_004",
-    "price_puku": 1,
+    "price_puku": 2,
     "sort_order": 130
   },
   {
@@ -61,7 +61,7 @@
     "sales_stage": 1,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_005",
-    "price_puku": 1,
+    "price_puku": 2,
     "sort_order": 140
   },
   {
@@ -74,7 +74,7 @@
     "sales_stage": 1,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_006",
-    "price_puku": 1,
+    "price_puku": 2,
     "sort_order": 150
   },
   {
@@ -87,7 +87,7 @@
     "sales_stage": 1,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_007",
-    "price_puku": 1,
+    "price_puku": 2,
     "sort_order": 160
   },
   {
@@ -100,7 +100,7 @@
     "sales_stage": 1,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_008",
-    "price_puku": 1,
+    "price_puku": 2,
     "sort_order": 170
   },
   {
@@ -113,7 +113,7 @@
     "sales_stage": 1,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_009",
-    "price_puku": 1,
+    "price_puku": 2,
     "sort_order": 180
   },
   {
@@ -126,7 +126,7 @@
     "sales_stage": 1,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_010",
-    "price_puku": 1,
+    "price_puku": 3,
     "sort_order": 190
   },
   {
@@ -139,7 +139,7 @@
     "sales_stage": 1,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_011",
-    "price_puku": 1,
+    "price_puku": 30,
     "sort_order": 200
   },
   {
@@ -152,7 +152,7 @@
     "sales_stage": 1,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_012",
-    "price_puku": 1,
+    "price_puku": 30,
     "sort_order": 210
   },
   {
@@ -165,7 +165,7 @@
     "sales_stage": 1,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_013",
-    "price_puku": 1,
+    "price_puku": 30,
     "sort_order": 220
   },
   {
@@ -178,7 +178,7 @@
     "sales_stage": 1,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_014",
-    "price_puku": 1,
+    "price_puku": 30,
     "sort_order": 230
   },
   {
@@ -191,7 +191,7 @@
     "sales_stage": 2,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_015",
-    "price_puku": 1,
+    "price_puku": 5,
     "sort_order": 240
   },
   {
@@ -204,7 +204,7 @@
     "sales_stage": 2,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_016",
-    "price_puku": 1,
+    "price_puku": 5,
     "sort_order": 250
   },
   {
@@ -217,7 +217,7 @@
     "sales_stage": 2,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_017",
-    "price_puku": 1,
+    "price_puku": 5,
     "sort_order": 260
   },
   {
@@ -230,7 +230,7 @@
     "sales_stage": 2,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_018",
-    "price_puku": 1,
+    "price_puku": 5,
     "sort_order": 270
   },
   {
@@ -243,7 +243,7 @@
     "sales_stage": 2,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_019",
-    "price_puku": 1,
+    "price_puku": 5,
     "sort_order": 280
   },
   {
@@ -256,7 +256,7 @@
     "sales_stage": 2,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_020",
-    "price_puku": 1,
+    "price_puku": 5,
     "sort_order": 290
   },
   {
@@ -269,7 +269,7 @@
     "sales_stage": 2,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_021",
-    "price_puku": 1,
+    "price_puku": 5,
     "sort_order": 300
   },
   {
@@ -282,7 +282,7 @@
     "sales_stage": 2,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_022",
-    "price_puku": 1,
+    "price_puku": 5,
     "sort_order": 310
   },
   {
@@ -295,7 +295,7 @@
     "sales_stage": 2,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_023",
-    "price_puku": 1,
+    "price_puku": 5,
     "sort_order": 320
   },
   {
@@ -308,7 +308,7 @@
     "sales_stage": 2,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_024",
-    "price_puku": 1,
+    "price_puku": 10,
     "sort_order": 330
   },
   {
@@ -321,7 +321,7 @@
     "sales_stage": 2,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_025",
-    "price_puku": 1,
+    "price_puku": 10,
     "sort_order": 340
   },
   {
@@ -334,7 +334,7 @@
     "sales_stage": 2,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_026",
-    "price_puku": 1,
+    "price_puku": 10,
     "sort_order": 350
   },
   {
@@ -347,7 +347,7 @@
     "sales_stage": 2,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_027",
-    "price_puku": 1,
+    "price_puku": 10,
     "sort_order": 360
   },
   {
@@ -360,7 +360,7 @@
     "sales_stage": 2,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_028",
-    "price_puku": 1,
+    "price_puku": 10,
     "sort_order": 370
   },
   {
@@ -373,7 +373,7 @@
     "sales_stage": 2,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_029",
-    "price_puku": 1,
+    "price_puku": 10,
     "sort_order": 380
   },
   {
@@ -386,7 +386,7 @@
     "sales_stage": 2,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_030",
-    "price_puku": 1,
+    "price_puku": 10,
     "sort_order": 390
   },
   {
@@ -399,7 +399,7 @@
     "sales_stage": 2,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_031",
-    "price_puku": 1,
+    "price_puku": 10,
     "sort_order": 400
   },
   {
@@ -412,7 +412,7 @@
     "sales_stage": 2,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_032",
-    "price_puku": 1,
+    "price_puku": 10,
     "sort_order": 410
   },
   {
@@ -425,7 +425,7 @@
     "sales_stage": 2,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_033",
-    "price_puku": 1,
+    "price_puku": 10,
     "sort_order": 420
   },
   {
@@ -438,7 +438,7 @@
     "sales_stage": 2,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_034",
-    "price_puku": 1,
+    "price_puku": 10,
     "sort_order": 430
   },
   {
@@ -451,7 +451,7 @@
     "sales_stage": 2,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_035",
-    "price_puku": 1,
+    "price_puku": 10,
     "sort_order": 440
   },
   {
@@ -464,7 +464,7 @@
     "sales_stage": 2,
     "unlock_type": "iap_unlock",
     "iap_product_id": "pot_unlock_036",
-    "price_puku": 1,
+    "price_puku": 100,
     "sort_order": 450
   }
 ]

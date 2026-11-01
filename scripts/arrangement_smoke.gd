@@ -246,15 +246,29 @@ func _ready()->void:
 	var paid_pot:Dictionary=game._pot_entry("g1_crystal_goblet");var paid_product_id:=str(paid_pot.iap_product_id);game.forest_gacha_unlocked=true;game.pot_design_unlocks.erase(paid_product_id);game.owned_pots.erase("g1_crystal_goblet")
 	var paid_puku_before:int=game.puku_points;game._on_pot_purchase_requested("g1_crystal_goblet");assert(game._owned_pot_total("g1_crystal_goblet")==0 and game.puku_points==paid_puku_before)
 	game.pot_design_unlocks[paid_product_id]=true;game._on_pot_purchase_requested("g1_crystal_goblet");assert(game._owned_pot_total("g1_crystal_goblet")==1 and game.puku_points==paid_puku_before-2)
+	var rose_pot:Dictionary=game._pot_entry("g1_rose_gold_glass");var rose_product_id:=str(rose_pot.iap_product_id)
 	var jackpot_pot:Dictionary=game._pot_entry("g1_gold_jackpot");var jackpot_product_id:=str(jackpot_pot.iap_product_id)
+	var shell_pot:Dictionary=game._pot_entry("g2_shell_coral");var shell_product_id:=str(shell_pot.iap_product_id)
+	var neon_pot:Dictionary=game._pot_entry("g2_neon_crystal");var neon_product_id:=str(neon_pot.iap_product_id)
 	var ramen_pot:Dictionary=game._pot_entry("g2_ramen_bowl");var ramen_product_id:=str(ramen_pot.iap_product_id)
-	game.act3_unlocked=true;game.puku_points=200;game.pot_design_unlocks[jackpot_product_id]=true;game.pot_design_unlocks[ramen_product_id]=true
-	game._on_pot_purchase_requested("g1_gold_jackpot");assert(game._owned_pot_total("g1_gold_jackpot")==1 and game.puku_points==170)
-	game._on_pot_purchase_requested("g2_ramen_bowl");assert(game._owned_pot_total("g2_ramen_bowl")==1 and game.puku_points==70)
-	game._save();game.pot_design_unlocks.clear();game.owned_pots.erase("g1_crystal_goblet");game.owned_pots.erase("g1_gold_jackpot");game.owned_pots.erase("g2_ramen_bowl");game.puku_points=0;game._load_save()
-	assert(bool(game.pot_design_unlocks.get(paid_product_id,false)) and bool(game.pot_design_unlocks.get(jackpot_product_id,false)) and bool(game.pot_design_unlocks.get(ramen_product_id,false)))
-	assert(game._owned_pot_total("g1_crystal_goblet")==1 and game._owned_pot_total("g1_gold_jackpot")==1 and game._owned_pot_total("g2_ramen_bowl")==1 and game.puku_points==70)
-	game.owned_pots.erase("g1_crystal_goblet");game.owned_pots.erase("g1_gold_jackpot");game.owned_pots.erase("g2_ramen_bowl");game.pot_design_unlocks.erase(paid_product_id);game.pot_design_unlocks.erase(jackpot_product_id);game.pot_design_unlocks.erase(ramen_product_id);game.forest_gacha_unlocked=false;game.act3_unlocked=false
+	game.act3_unlocked=true;game.puku_points=200
+	for product_id in [rose_product_id,jackpot_product_id,shell_product_id,neon_product_id,ramen_product_id]:game.pot_design_unlocks[product_id]=true
+	game._on_pot_purchase_requested("g1_rose_gold_glass");assert(game._owned_pot_total("g1_rose_gold_glass")==1 and game.puku_points==197)
+	game._on_pot_purchase_requested("g1_gold_jackpot");assert(game._owned_pot_total("g1_gold_jackpot")==1 and game.puku_points==167)
+	game._on_pot_purchase_requested("g2_shell_coral");assert(game._owned_pot_total("g2_shell_coral")==1 and game.puku_points==162)
+	game._on_pot_purchase_requested("g2_neon_crystal");assert(game._owned_pot_total("g2_neon_crystal")==1 and game.puku_points==152)
+	game._on_pot_purchase_requested("g2_ramen_bowl");assert(game._owned_pot_total("g2_ramen_bowl")==1 and game.puku_points==52)
+	var paid_pot_ids:=["g1_crystal_goblet","g1_rose_gold_glass","g1_gold_jackpot","g2_shell_coral","g2_neon_crystal","g2_ramen_bowl"]
+	var paid_product_ids:=[paid_product_id,rose_product_id,jackpot_product_id,shell_product_id,neon_product_id,ramen_product_id]
+	game._save();game.pot_design_unlocks.clear()
+	for pot_id in paid_pot_ids:game.owned_pots.erase(pot_id)
+	game.puku_points=0;game._load_save()
+	for product_id in paid_product_ids:assert(bool(game.pot_design_unlocks.get(product_id,false)))
+	for pot_id in paid_pot_ids:assert(game._owned_pot_total(pot_id)==1)
+	assert(game.puku_points==52)
+	for pot_id in paid_pot_ids:game.owned_pots.erase(pot_id)
+	for product_id in paid_product_ids:game.pot_design_unlocks.erase(product_id)
+	game.forest_gacha_unlocked=false;game.act3_unlocked=false
 	ui.open_pot_shop();classic_shop_card=_pot_shop_card(ui,"classic_terracotta");var classic_buy_buttons:=classic_shop_card.find_children("*","Button",true,false);assert(_has_label_text_containing(classic_shop_card,"所持 ×2") and classic_buy_buttons.size()==1 and not (classic_buy_buttons[0] as Button).disabled and "1ぷくコイン" in (classic_buy_buttons[0] as Button).text)
 	game._save();game.owned_pots.erase("classic_terracotta");game._load_save();assert(int(game.owned_pots.get("classic_terracotta",0))==2 and typeof(game.owned_pots.get("classic_terracotta"))==TYPE_INT)
 	game._sync_arrangement_ui();ui.open_home();assert(ui.pot_select_grid.get_child_count()==3 and _has_label_text_containing(ui.pot_select_grid.get_child(0),"浅型素焼き鉢") and _has_label_text_containing(ui.pot_select_grid.get_child(1),"素焼き鉢") and _has_label_text_containing(ui.pot_select_grid.get_child(2),"黒陶器鉢"));ui._select_editor_pot("classic_terracotta");assert(ui.editor_page.visible and str(ui.current_arrangement.pot_id)=="classic_terracotta")
