@@ -44,6 +44,7 @@ const HabitatRestorationClass = preload("res://scripts/habitat_restoration.gd")
 const HabitatRestorationUIClass = preload("res://scripts/habitat_restoration_ui.gd")
 const EndlessGreenhouseExperimentClass = preload("res://scripts/endless_greenhouse_experiment.gd")
 const SlotMachineScene = preload("res://scenes/slot_machine.tscn")
+const IAP_REVIEW_CAPTURE_SCRIPT_PATH := "res://scripts/iap_review_capture.gd"
 # Master release gate for every development-only UI and action. It is derived
 # from export feature tags so a production build never depends on a manual
 # source edit. Untagged release builds fail closed; editor/debug builds remain
@@ -680,6 +681,7 @@ var pot_unlock_iap_service
 var saved_arrangements: Array = []
 var arrangement_save_capacity := ARRANGEMENT_SAVE_CAPACITY
 var arrangement_ui
+var iap_review_capture_controller
 var arrangement_navigation_hint
 var unlocked_species: Dictionary = {}
 var greenhouse_available: Dictionary = {}
@@ -878,11 +880,17 @@ func _ready() -> void:
 		set_process_unhandled_input(false)
 		add_child(SlotMachineScene.instantiate())
 		return
+	var iap_review_capture_enabled:=BuildProfileClass.iap_review_capture_enabled()
 	endless_greenhouse.configure(EndlessGreenhouseExperimentClass.requested_by_runtime())
-	var endless_save_setup:=endless_greenhouse.prepare_save_namespace()
-	if int(endless_save_setup.get("error",OK))!=OK:
-		push_error("ENDLESS save namespace setup failed: %s"%error_string(int(endless_save_setup.get("error",FAILED))))
-	print("ENDLESS_GREENHOUSE_BOOT enabled=",endless_greenhouse.enabled," save_path=",endless_greenhouse.active_save_path()," copied_normal_save=",bool(endless_save_setup.get("copied",false)))
+	if iap_review_capture_enabled:
+		# A review-capture build may read the existing state to boot the real game
+		# screen, but it must never migrate or write the player's save namespace.
+		print("IAP_REVIEW_CAPTURE_BOOT save_namespace_migration=disabled")
+	else:
+		var endless_save_setup:=endless_greenhouse.prepare_save_namespace()
+		if int(endless_save_setup.get("error",OK))!=OK:
+			push_error("ENDLESS save namespace setup failed: %s"%error_string(int(endless_save_setup.get("error",FAILED))))
+		print("ENDLESS_GREENHOUSE_BOOT enabled=",endless_greenhouse.enabled," save_path=",endless_greenhouse.active_save_path()," copied_normal_save=",bool(endless_save_setup.get("copied",false)))
 	habitat_debug_enabled=_habitat_debug_requested()
 	_configure_habitat_texture_ab()
 	_configure_habitat_background_ab()
@@ -900,7 +908,7 @@ func _ready() -> void:
 	_load_pot_data()
 	_load_save()
 	_setup_pot_unlock_iap()
-	_setup_rewarded_ads()
+	if not iap_review_capture_enabled:_setup_rewarded_ads()
 	habitat_simulation_unix=Time.get_unix_time_from_system()
 	var recovered_forest_encounters:=_register_encountered_species_for_unlocked_series()
 	_apply_saved_unlocks()
@@ -908,7 +916,7 @@ func _ready() -> void:
 	# The retired Panda Beacon may have left native notifications on an upgraded
 	# device.  Create the legacy service only long enough to cancel those IDs;
 	# normal play never schedules habitat notifications anymore.
-	if not legacy_habitat_notification_ids_to_cancel.is_empty():
+	if not iap_review_capture_enabled and not legacy_habitat_notification_ids_to_cancel.is_empty():
 		habitat_notification_service=HabitatNotificationServiceClass.new();add_child(habitat_notification_service)
 		habitat_notification_service.cancel_all(legacy_habitat_notification_ids_to_cancel);legacy_habitat_notification_ids_to_cancel.clear()
 	if best_spawn_unlocks_dirty or get_counts_migration_dirty or puku_balance_migration_dirty or catalog_cover_migration_dirty or collection_completion_migration_dirty or pot_inventory_migration_dirty or retired_content_migration_dirty or arrangement_capacity_migration_dirty or first_old_seed_recovery_dirty or recovered_forest_encounters:
@@ -925,7 +933,8 @@ func _ready() -> void:
 	_layout()
 	_wire_ui_sounds(self)
 	_update_main_story_progress(false)
-	if _giant_plant_preview_requested():call_deferred("_open_giant_plant_preview")
+	if iap_review_capture_enabled:call_deferred("_start_iap_review_capture")
+	elif _giant_plant_preview_requested():call_deferred("_open_giant_plant_preview")
 	elif _opening_story_preview_requested():call_deferred("_open_opening_story_preview")
 	elif _seed_pod_story_preview_requested():call_deferred("_open_seed_pod_story_preview")
 	elif _arrangement_test_preview_requested():call_deferred("_open_arrangement_test_preview")
@@ -933,6 +942,17 @@ func _ready() -> void:
 	elif _jurejure_habitat_preview_requested():call_deferred("_open_jurejure_habitat_preview")
 	elif _puku_puku_battle_preview_requested():call_deferred("_open_puku_puku_battle_preview")
 	elif _habitat_test_preview_requested():call_deferred("_open_habitat_test_preview")
+
+func _start_iap_review_capture()->void:
+	if not BuildProfileClass.iap_review_capture_enabled():return
+	var capture_script:=load(IAP_REVIEW_CAPTURE_SCRIPT_PATH) as Script
+	if capture_script==null:
+		push_error("IAP_REVIEW_CAPTURE_FAILED reason=capture_script_missing")
+		return
+	iap_review_capture_controller=capture_script.new()
+	iap_review_capture_controller.name="IAPReviewCapture"
+	add_child(iap_review_capture_controller)
+	iap_review_capture_controller.begin(self)
 
 func _habitat_debug_requested()->bool:
 	if not _trial_dev_controls_enabled():return false
@@ -1443,6 +1463,10 @@ func _load_save() -> void:
 			if migrating_legacy_puku_balance and _ensure_initial_puku_capital(false):puku_balance_migration_dirty=true
 
 func _save() -> void:
+	if BuildProfileClass.iap_review_capture_enabled():
+		# The capture-only build renders live StoreKit information but never
+		# persists entitlement refreshes, migrations, or gameplay state.
+		return
 	var profile_save_name := ""
 	if get_close_profile_enabled and get_close_profile_active:
 		get_close_profile_save_count += 1

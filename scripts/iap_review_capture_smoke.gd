@@ -1,0 +1,55 @@
+extends Node
+
+const CaptureClass = preload("res://scripts/iap_review_capture.gd")
+
+
+func _ready()->void:
+	assert(CaptureClass.PRODUCT_ID=="pot_unlock_001")
+	assert(CaptureClass.POT_ID=="g1_crystal_goblet")
+	assert(CaptureClass.EXPECTED_PUKU_PRICE==2)
+	assert(CaptureClass.is_supported_apple_portrait_size(Vector2i(1320,2868)))
+	assert(CaptureClass.is_supported_apple_portrait_size(Vector2i(1179,2556)))
+	assert(not CaptureClass.is_supported_apple_portrait_size(Vector2i(576,1024)))
+
+	var rgb_header:=_png_header(Vector2i(1320,2868),2)
+	assert(CaptureClass._is_rgb_png_without_alpha(rgb_header,Vector2i(1320,2868)))
+	var rgba_header:=_png_header(Vector2i(1320,2868),6)
+	assert(not CaptureClass._is_rgb_png_without_alpha(rgba_header,Vector2i(1320,2868)))
+	assert(not CaptureClass._is_rgb_png_without_alpha(rgb_header,Vector2i(1290,2796)))
+
+	var capture_source:=FileAccess.get_file_as_string("res://scripts/iap_review_capture.gd")
+	assert(capture_source.contains('const PRODUCT_ID := "pot_unlock_001"'))
+	assert(not capture_source.contains("pot_unlock_002"))
+	assert(capture_source.contains("image.convert(Image.FORMAT_RGB8)"))
+	assert(capture_source.contains("buy_button.mouse_filter=Control.MOUSE_FILTER_IGNORE"))
+	assert(capture_source.contains('"storekit_price_is_jpy_100"'))
+
+	var presets:=FileAccess.get_file_as_string("res://export_presets.cfg")
+	var production_header:=presets.get_slice('[preset.1]',1).get_slice('[preset.1.options]',0)
+	assert(production_header.contains('custom_features="puku_app_store_release"'))
+	assert(not production_header.contains("puku_iap_review_capture"))
+	assert(presets.contains('custom_features="puku_app_store_release,puku_iap_review_capture"'))
+
+	print("IAP_REVIEW_CAPTURE_SMOKE_OK target=pot_unlock_001 native_size_gate=true rgb_png_gate=true production_isolated=true")
+	get_tree().quit()
+
+
+func _png_header(size:Vector2i,color_type:int)->PackedByteArray:
+	var bytes:=PackedByteArray()
+	bytes.resize(33)
+	var signature:=PackedByteArray([137,80,78,71,13,10,26,10])
+	for index in signature.size():bytes[index]=signature[index]
+	bytes[8]=0;bytes[9]=0;bytes[10]=0;bytes[11]=13
+	bytes[12]=73;bytes[13]=72;bytes[14]=68;bytes[15]=82
+	_write_u32_be(bytes,16,size.x)
+	_write_u32_be(bytes,20,size.y)
+	bytes[24]=8
+	bytes[25]=color_type
+	return bytes
+
+
+func _write_u32_be(bytes:PackedByteArray,offset:int,value:int)->void:
+	bytes[offset]=(value>>24)&0xff
+	bytes[offset+1]=(value>>16)&0xff
+	bytes[offset+2]=(value>>8)&0xff
+	bytes[offset+3]=value&0xff

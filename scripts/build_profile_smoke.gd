@@ -8,6 +8,7 @@ func _ready() -> void:
 		BuildProfileClass.APP_STORE_RELEASE_FEATURE: true,
 	})
 	assert(production.app_store_release)
+	assert(not production.iap_review_capture)
 	assert(not production.development_tools)
 	assert(not production.rewarded_ad_stub)
 	assert(not production.ios_test_ads)
@@ -20,10 +21,28 @@ func _ready() -> void:
 		BuildProfileClass.IOS_TEST_ADS_FEATURE: true,
 	})
 	assert(conflicting.app_store_release)
+	assert(not conflicting.iap_review_capture)
 	assert(not conflicting.development_tools)
 	assert(not conflicting.rewarded_ad_stub)
 	assert(not conflicting.ios_test_ads)
 	assert(conflicting.errors.size() == 3)
+
+	var review_capture := BuildProfileClass.evaluate_feature_set({
+		BuildProfileClass.APP_STORE_RELEASE_FEATURE: true,
+		BuildProfileClass.IAP_REVIEW_CAPTURE_FEATURE: true,
+	}, false, true)
+	assert(review_capture.app_store_release)
+	assert(review_capture.iap_review_capture)
+	assert(not review_capture.development_tools)
+	assert(not review_capture.rewarded_ad_stub)
+	assert(not review_capture.ios_test_ads)
+	assert(review_capture.errors.is_empty())
+
+	var invalid_review_capture := BuildProfileClass.evaluate_feature_set({
+		BuildProfileClass.IAP_REVIEW_CAPTURE_FEATURE: true,
+	}, false, false)
+	assert(not invalid_review_capture.iap_review_capture)
+	assert(invalid_review_capture.errors.size() == 2)
 
 	var web_development := BuildProfileClass.evaluate_feature_set({
 		BuildProfileClass.DEVELOPMENT_FEATURE: true,
@@ -51,5 +70,5 @@ func _ready() -> void:
 	assert(editor_debug.development_tools)
 	assert(editor_debug.rewarded_ad_stub)
 
-	print("BUILD_PROFILE_SMOKE_OK production_closed=true conflict_closed=true web_dev=true ios_dev_test_ads=true untagged_release_closed=true")
+	print("BUILD_PROFILE_SMOKE_OK production_closed=true capture_isolated=true conflict_closed=true web_dev=true ios_dev_test_ads=true untagged_release_closed=true")
 	get_tree().quit()

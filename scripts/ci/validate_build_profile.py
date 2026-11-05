@@ -38,24 +38,53 @@ def parse_presets(text: str) -> dict[str, dict[str, str]]:
 
 
 def main() -> None:
-    if len(sys.argv) != 2 or sys.argv[1] not in {"app_store", "development"}:
-        fail("usage: validate_build_profile.py app_store|development")
+    profiles = {
+        "app_store": {
+            "preset": "iOS",
+            "features": "puku_app_store_release",
+            "bundle": PRODUCTION_BUNDLE,
+            "forbidden": [
+                "puku_iap_review_capture",
+                "puku_development",
+                "puku_rewarded_ad_stub",
+                "puku_ios_test_ads",
+            ],
+        },
+        "iap_review_capture": {
+            "preset": "iOS IAP Review Capture",
+            "features": "puku_app_store_release,puku_iap_review_capture",
+            "bundle": PRODUCTION_BUNDLE,
+            "forbidden": [
+                "puku_development",
+                "puku_rewarded_ad_stub",
+                "puku_ios_test_ads",
+            ],
+        },
+        "development": {
+            "preset": "iOS Development",
+            "features": "puku_development,puku_ios_test_ads",
+            "bundle": DEVELOPMENT_BUNDLE,
+            "forbidden": [
+                "puku_app_store_release",
+                "puku_iap_review_capture",
+                "puku_rewarded_ad_stub",
+            ],
+        },
+    }
+    if len(sys.argv) != 2 or sys.argv[1] not in profiles:
+        fail("usage: validate_build_profile.py app_store|iap_review_capture|development")
     profile = sys.argv[1]
     presets = parse_presets(Path("export_presets.cfg").read_text(encoding="utf-8"))
-    preset_name = "iOS" if profile == "app_store" else "iOS Development"
+    profile_config = profiles[profile]
+    preset_name = profile_config["preset"]
     if preset_name not in presets:
         fail(f"Missing export preset: {preset_name}")
     preset = presets[preset_name]
     block = preset["_block"]
 
-    if profile == "app_store":
-        expected_features = "puku_app_store_release"
-        expected_bundle = PRODUCTION_BUNDLE
-        forbidden = ["puku_development", "puku_rewarded_ad_stub", "puku_ios_test_ads"]
-    else:
-        expected_features = "puku_development,puku_ios_test_ads"
-        expected_bundle = DEVELOPMENT_BUNDLE
-        forbidden = ["puku_app_store_release", "puku_rewarded_ad_stub"]
+    expected_features = profile_config["features"]
+    expected_bundle = profile_config["bundle"]
+    forbidden = profile_config["forbidden"]
 
     if preset.get("custom_features") != expected_features:
         fail(f"{preset_name} custom_features must be exactly {expected_features}")
@@ -90,6 +119,13 @@ def main() -> None:
         fail("main.gd is not using the centralized development feature gate")
     if "BuildProfileClass.rewarded_ad_stub_enabled()" not in main_source:
         fail("main.gd is not using the centralized rewarded-ad stub gate")
+    for required_capture_gate in [
+        "BuildProfileClass.iap_review_capture_enabled()",
+        "IAP_REVIEW_CAPTURE_SCRIPT_PATH",
+        "save_namespace_migration=disabled",
+    ]:
+        if required_capture_gate not in main_source:
+            fail(f"main.gd is missing IAP review capture gate: {required_capture_gate}")
     for forbidden_literal in [
         "const TRIAL_DEV_CONTROLS_ENABLED := true",
         "const REWARDED_AD_DEVELOPMENT_STUB_ENABLED := true",
@@ -109,6 +145,7 @@ def main() -> None:
         "scripts/ci/verify_mobile_ads_export.sh",
         "scripts/ci/verify_mobile_ads_pack.gd",
         "scripts/build_profile.gd",
+        "scripts/iap_review_capture.gd",
         "scripts/rewarded_ad_service.gd",
         "scripts/story_dev_presets.gd",
     ]:
@@ -278,6 +315,9 @@ def main() -> None:
         "  ios-app-store-release:", 1
     )[0]
     release_block = codemagic_source.split("  ios-app-store-release:", 1)[1].split(
+        "  ios-iap-review-capture:", 1
+    )[0]
+    capture_block = codemagic_source.split("  ios-iap-review-capture:", 1)[1].split(
         "  ios-development:", 1
     )[0]
     development_block = codemagic_source.split("  ios-development:", 1)[1]
@@ -291,6 +331,19 @@ def main() -> None:
         fail("App Store release must load production AdMob secrets")
     if 'APP_STORE_SUBMISSION: "true"' not in release_block:
         fail("App Store release workflow lost its explicit submission gate")
+    for required_capture_setting in [
+        'BUILD_PROFILE: "iap_review_capture"',
+        'GODOT_IOS_PRESET: "iOS IAP Review Capture"',
+        'BUNDLE_ID: "com.ohanayanouen.pukupukutaniku"',
+        'MOBILE_ADS_MODE: "test"',
+        'INTERNAL_TESTFLIGHT_ONLY: "true"',
+        'APP_STORE_SUBMISSION: "false"',
+        'publishing: {}',
+    ]:
+        if required_capture_setting not in capture_block:
+            fail(f"IAP review capture workflow is missing: {required_capture_setting}")
+    if "submit_to_testflight" in capture_block or "submit_to_app_store" in capture_block:
+        fail("IAP review capture workflow must never auto-upload or submit")
     if 'MOBILE_ADS_MODE: "test"' not in development_block or "admob_production" in development_block:
         fail("iPhone development workflow must use Google test ads without production secrets")
     for required_ads_gate in [
