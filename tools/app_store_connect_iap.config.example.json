@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "bundleId": "com.ohanayanouen.pukupukutaniku",
+  "catalogPath": "data/pot-iap-catalog.json",
+  "baseTerritory": "JPN",
+  "desiredCustomerPrice": "",
+  "sellInAllTerritories": false,
+  "availableInNewTerritories": false,
+  "priceSourceProductId": "",
+  "availabilitySourceProductId": "",
+  "allowEmptyAvailability": false,
+  "localizations": {
+    "ja": {
+      "locale": "ja",
+      "description": "デザインを永続解放。以後ぷくコインで購入できます。"
+    },
+    "en-US": {
+      "locale": "en-US",
+      "description": "Unlocks this design. Pots cost Puku Coins."
+    }
+  },
+  "reviewScreenshots": {}
+}

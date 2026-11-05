@@ -142,7 +142,7 @@ AdMob管理画面で必要な操作（今回は実行しない）:
 
 StoreKit 2サービスは、商品情報とローカライズ価格の取得、購入成功、キャンセル、失敗、復元、再起動時キャッシュ、再インストール時のStoreKit entitlement再同期、返金／権利喪失時のローカル解除を扱う。購入済み商品の再購入は開始しない。StoreKitが返す価格を表示し、価格をソースへ固定していない。
 
-全36商品は非消耗型である。デザイン解除後に鉢本体を購入するときのゲーム内価格は、仕様どおりすべて **1ぷくコイン** に統一した。これはApp Store上の現金価格とは別である。
+全36商品は非消耗型である。デザイン解除後に鉢本体を購入するときのゲーム内価格は正式設定に従い、`001〜009=2`、`010=3`、`011〜014=30`、`015〜023=5`、`024〜035=10`、`036=100`ぷくコインである。これはApp Store上の現金価格とは別であり、App Store Connect自動化ツールはゲーム内価格を送信・変更しない。
 
 | Product ID | 鉢 |
 | --- | --- |
@@ -183,17 +183,11 @@ StoreKit 2サービスは、商品情報とローカライズ価格の取得、�
 | `pot_unlock_035` | 苔むす森鉢 |
 | `pot_unlock_036` | ラーメン鉢 |
 
-App Store Connectで各商品に必要な操作:
+App Store Connect APIによる段階登録ツールと手順は [App Store Connect 鉢デザインIAP一括登録](app-store-connect-iap-automation.md) にまとめた。最新のIAPバージョン方式で、非消耗型作成、日英メタデータ、価格、販売地域、実画面の審査用スクリーンショット、状態検証を自動化する。既存商品の重複作成を防ぎ、Dry Run、未登録1件の試験登録、残りの一括登録の順に進める。
 
-1. Apps > 対象アプリ > Monetization > In-App Purchases > `+`
-2. TypeをNon-Consumableにし、上記Product IDを完全一致で登録
-3. Reference Name、各言語のDisplay Name／Descriptionを登録
-4. Price Schedule、販売地域、Tax Categoryを運営判断で設定
-5. Review Notesと、ゲーム内購入画面が分かるReview Screenshotを追加
-6. 36件すべてを初回アプリバージョンと同じ審査Submissionへ追加
-7. Sandbox Testerを用意し、購入、キャンセル、失敗、復元、再起動、再インストール、返金／権利変更を実機検証
+共通商品説明は日本語「デザインを永続解放。以後ぷくコインで購入できます。」、英語「Unlocks this design. Pots cost Puku Coins.」に確定した。2026-11-05に36商品すべての商品本体と日英メタデータを登録し、日本100円、手動価格は日本1地域のみ、海外174地域はApple自動価格、販売地域は全175地域、将来追加地域ONであることをAPIで再確認した。審査画像だけ未設定で、審査提出・公開は行っていない。
 
-現金価格、販売地域、商品説明は提供されていないため設定していない。App Store Connect未接続のローカルモックテストだけを根拠に「購入検証済み」とはしない。別Bundle IDの開発版には本番アプリのIAP商品を共有できないため、IAP実機確認は本番Bundle IDのSandbox／TestFlightビルドで行う。
+App Store Connect未接続のローカルモックテストだけを根拠に「購入検証済み」とはしない。別Bundle IDの開発版には本番アプリのIAP商品を共有できないため、IAP実機確認は本番Bundle IDのSandbox／TestFlightビルドで行う。Sandbox Testerを用意し、購入、キャンセル、失敗、復元、再起動、再インストール、返金／権利変更を実機検証する。
 
 参考:
 
@@ -265,7 +259,7 @@ Appleは2026-04-28以降、Xcode 26以降とiOS 26 SDK以降を要求してい�
 1. Business > AgreementsでPaid Apps AgreementをActiveにする。Account Holderによる同意が必要
 2. Business > Tax FormsとBank Accountsを完了する
 3. AdMobアプリ、Rewarded unit、Privacy & messagingを設定し、Secret IDをCodemagicへ登録
-4. Apps > 対象アプリ > Monetization > In-App Purchasesで36商品を登録
+4. 認証付きIAP Dry Runで登録済み商品、Apple側日本円価格、販売地域を確認し、1件試験後に残りを一括登録
 5. App PrivacyでPrivacy Policy URLを登録し、Google SDKを含むデータ収集を申告
 6. 公開Support URLを用意する
 
@@ -301,7 +295,7 @@ Apps > 対象バージョン > App Review Informationに、連絡先、審査メ
 
 - 縦画面のストーリーゲームであること
 - パンダのお手伝い広告は任意視聴で、完了時のみゲーム内救済を1回付与すること
-- 有料鉢は非消耗型で、購入後に1ぷくコインでゲーム内購入できること
+- 有料鉢は非消耗型で、購入後に各鉢の正式なぷくコイン価格でゲーム内購入できること
 - Restore Purchasesの場所と操作
 - IAP画面に通常進行で到達する手順
 - 通知を利用する場合の用途

@@ -261,62 +261,62 @@ Appleが質問票の回答から世界共通および地域別のレーティン
 
 - 実装上は全36件が `iap_unlock` で、StoreKit entitlementを永続利用権として扱うため、登録タイプは **Non-Consumable** です。
 - App Store Connect上のProduct Typeはリポジトリから確認できないため、36件を実際に `Non-Consumable` として作成したことは未確認です。
-- 1回のIAPで該当デザインが永続解放されます。その後、同じデザインの鉢本体をゲーム内で1個ずつ **1ぷくコイン** で購入できます。
-- 1ぷくコインはApp Store上の現金価格ではありません。
-- 現金価格、価格帯、販売地域、税区分は未設定です。ここでは推測しません。
+- 1回のIAPで該当デザインが永続解放されます。その後、同じデザインの鉢本体をゲーム内カタログの正式価格（2、3、5、10、30、100ぷくコインのいずれか）で1個ずつ購入できます。
+- ぷくコイン価格はApp Store上の現金価格ではありません。
+- Apple側は36商品すべて、日本を基準地域とする顧客価格100円、海外174地域のApple自動価格、現在の全175地域、将来追加地域ONで登録・再検証済みです。審査画像だけ未設定です。
 - Reference Nameは内部管理用の候補で、36件すべて一意です。
 
 | Product ID | Reference Name | 日本語Display Name | English Display Name | 日本語Description | English Description | Type |
 | --- | --- | --- | --- | --- | --- | --- |
-| `pot_unlock_001` | Pot Unlock 001 - Crystal Goblet Pot | クリスタルゴブレット鉢 | Crystal Goblet Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_002` | Pot Unlock 002 - Green Glass Pot | グリーングラス鉢 | Green Glass Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_003` | Pot Unlock 003 - Silver Metal Pot | シルバーメタル鉢 | Silver Metal Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_004` | Pot Unlock 004 - White Bowl Pot | ホワイトボウル鉢 | White Bowl Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_005` | Pot Unlock 005 - Tall Terracotta Pot | テラコッタロング鉢 | Tall Terracotta Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_006` | Pot Unlock 006 - Pearl Pink Pot | パールピンク鉢 | Pearl Pink Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_007` | Pot Unlock 007 - Wood Barrel Pot | ウッドバレル鉢 | Wood Barrel Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_008` | Pot Unlock 008 - Blue Diamond Pot | ブルーダイヤ鉢 | Blue Diamond Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_009` | Pot Unlock 009 - Rock Bowl Pot | ロックボウル鉢 | Rock Bowl Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_010` | Pot Unlock 010 - Rose Gold Glass Pot | ローズゴールドグラス鉢 | Rose Gold Glass Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_011` | Pot Unlock 011 - Gold Jackpot Pot | ゴールドジャックポット鉢 | Gold Jackpot Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_012` | Pot Unlock 012 - Flamingo Resort Pot | フラミンゴリゾート鉢 | Flamingo Resort Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_013` | Pot Unlock 013 - Crown Watch Pot | クラウンウォッチ鉢 | Crown Watch Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_014` | Pot Unlock 014 - Magenta Supercar Pot | マゼンタスーパーカー鉢 | Magenta Supercar Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_015` | Pot Unlock 015 - Shell Coral Pot | シェルコーラル鉢 | Shell Coral Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_016` | Pot Unlock 016 - Weathered Stump Pot | 古木の切り株鉢 | Weathered Stump Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_017` | Pot Unlock 017 - Concrete Round Pot | コンクリートラウンド鉢 | Concrete Round Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_018` | Pot Unlock 018 - Rough Rock Pot | ロックストーン鉢 | Rough Rock Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_019` | Pot Unlock 019 - Stardust Moon Pot | スターダストムーン鉢 | Stardust Moon Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_020` | Pot Unlock 020 - Amber Crystal Pot | アンバークリスタル鉢 | Amber Crystal Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_021` | Pot Unlock 021 - Antique Fleur Pot | アンティークフルール鉢 | Antique Fleur Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_022` | Pot Unlock 022 - Rusty Bucket Pot | ラスティバケツ鉢 | Rusty Bucket Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_023` | Pot Unlock 023 - Aurora Pearl Pot | オーロラパール鉢 | Aurora Pearl Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_024` | Pot Unlock 024 - Neon Crystal Pot | ネオンクリスタル鉢 | Neon Crystal Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_025` | Pot Unlock 025 - King Money Pot | キングマネー鉢 | King Money Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_026` | Pot Unlock 026 - Retro Arcade Pot | レトロアーケード鉢 | Retro Arcade Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_027` | Pot Unlock 027 - Royal Jewel Pot | ロイヤルジュエル鉢 | Royal Jewel Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_028` | Pot Unlock 028 - Jellyfish Aqua Pot | ジェリーフィッシュアクア鉢 | Jellyfish Aqua Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_029` | Pot Unlock 029 - Red Jackpot Pot | レッドジャックポット鉢 | Red Jackpot Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_030` | Pot Unlock 030 - Sleepy Moon Pot | おやすみムーン鉢 | Sleepy Moon Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_031` | Pot Unlock 031 - Disco Mirror Pot | ディスコボール鉢 | Disco Mirror Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_032` | Pot Unlock 032 - UFO Pot | UFO鉢 | UFO Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_033` | Pot Unlock 033 - Forest Stump Pot | 森の切り株鉢 | Forest Stump Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_034` | Pot Unlock 034 - Flower Meadow Pot | 花畑鉢 | Flower Meadow Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_035` | Pot Unlock 035 - Mossy Forest Pot | 苔むす森鉢 | Mossy Forest Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
-| `pot_unlock_036` | Pot Unlock 036 - Ramen Bowl Pot | ラーメン鉢 | Ramen Bowl Pot | デザインを永続解放。以後1ぷくコインで購入できます。 | Permanently unlocks; pots cost 1 Puku Coin. | Non-Consumable |
+| `pot_unlock_001` | Pot Unlock 001 - Crystal Goblet Pot | クリスタルゴブレット鉢 | Crystal Goblet Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_002` | Pot Unlock 002 - Green Glass Pot | グリーングラス鉢 | Green Glass Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_003` | Pot Unlock 003 - Silver Metal Pot | シルバーメタル鉢 | Silver Metal Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_004` | Pot Unlock 004 - White Bowl Pot | ホワイトボウル鉢 | White Bowl Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_005` | Pot Unlock 005 - Tall Terracotta Pot | テラコッタロング鉢 | Tall Terracotta Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_006` | Pot Unlock 006 - Pearl Pink Pot | パールピンク鉢 | Pearl Pink Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_007` | Pot Unlock 007 - Wood Barrel Pot | ウッドバレル鉢 | Wood Barrel Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_008` | Pot Unlock 008 - Blue Diamond Pot | ブルーダイヤ鉢 | Blue Diamond Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_009` | Pot Unlock 009 - Rock Bowl Pot | ロックボウル鉢 | Rock Bowl Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_010` | Pot Unlock 010 - Rose Gold Glass Pot | ローズゴールドグラス鉢 | Rose Gold Glass Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_011` | Pot Unlock 011 - Gold Jackpot Pot | ゴールドジャックポット鉢 | Gold Jackpot Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_012` | Pot Unlock 012 - Flamingo Resort Pot | フラミンゴリゾート鉢 | Flamingo Resort Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_013` | Pot Unlock 013 - Crown Watch Pot | クラウンウォッチ鉢 | Crown Watch Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_014` | Pot Unlock 014 - Magenta Supercar Pot | マゼンタスーパーカー鉢 | Magenta Supercar Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_015` | Pot Unlock 015 - Shell Coral Pot | シェルコーラル鉢 | Shell Coral Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_016` | Pot Unlock 016 - Weathered Stump Pot | 古木の切り株鉢 | Weathered Stump Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_017` | Pot Unlock 017 - Concrete Round Pot | コンクリートラウンド鉢 | Concrete Round Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_018` | Pot Unlock 018 - Rough Rock Pot | ロックストーン鉢 | Rough Rock Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_019` | Pot Unlock 019 - Stardust Moon Pot | スターダストムーン鉢 | Stardust Moon Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_020` | Pot Unlock 020 - Amber Crystal Pot | アンバークリスタル鉢 | Amber Crystal Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_021` | Pot Unlock 021 - Antique Fleur Pot | アンティークフルール鉢 | Antique Fleur Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_022` | Pot Unlock 022 - Rusty Bucket Pot | ラスティバケツ鉢 | Rusty Bucket Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_023` | Pot Unlock 023 - Aurora Pearl Pot | オーロラパール鉢 | Aurora Pearl Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_024` | Pot Unlock 024 - Neon Crystal Pot | ネオンクリスタル鉢 | Neon Crystal Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_025` | Pot Unlock 025 - King Money Pot | キングマネー鉢 | King Money Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_026` | Pot Unlock 026 - Retro Arcade Pot | レトロアーケード鉢 | Retro Arcade Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_027` | Pot Unlock 027 - Royal Jewel Pot | ロイヤルジュエル鉢 | Royal Jewel Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_028` | Pot Unlock 028 - Jellyfish Aqua Pot | ジェリーフィッシュアクア鉢 | Jellyfish Aqua Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_029` | Pot Unlock 029 - Red Jackpot Pot | レッドジャックポット鉢 | Red Jackpot Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_030` | Pot Unlock 030 - Sleepy Moon Pot | おやすみムーン鉢 | Sleepy Moon Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_031` | Pot Unlock 031 - Disco Mirror Pot | ディスコボール鉢 | Disco Mirror Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_032` | Pot Unlock 032 - UFO Pot | UFO鉢 | UFO Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_033` | Pot Unlock 033 - Forest Stump Pot | 森の切り株鉢 | Forest Stump Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_034` | Pot Unlock 034 - Flower Meadow Pot | 花畑鉢 | Flower Meadow Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_035` | Pot Unlock 035 - Mossy Forest Pot | 苔むす森鉢 | Mossy Forest Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
+| `pot_unlock_036` | Pot Unlock 036 - Ramen Bowl Pot | ラーメン鉢 | Ramen Bowl Pot | デザインを永続解放。以後ぷくコインで購入できます。 | Unlocks this design. Pots cost Puku Coins. | Non-Consumable |
 
 ### IAP審査用の共通説明候補
 
 日本語:
 
 ```text
-この非消耗型商品は、表示名の鉢デザインを永続的にアンロックします。アンロック後は、同デザインの鉢をゲーム内の1ぷくコインで1個ずつ購入し、寄せ植えに使用できます。ランダム商品ではありません。購入の復元は「パンダのお店」＞「鉢」画面上部の「購入を復元」から行えます。
+この非消耗型商品は、表示名の鉢デザインを永続的にアンロックします。アンロック後は、同デザインの鉢をゲーム内カタログに表示されたぷくコイン価格で1個ずつ購入し、寄せ植えに使用できます。ランダム商品ではありません。購入の復元は「パンダのお店」＞「鉢」画面上部の「購入を復元」から行えます。
 ```
 
 English:
 
 ```text
-This non-consumable permanently unlocks the pot design named above. After unlocking it, the player can buy individual pots of that design for 1 Puku Coin each and use them in arrangements. This is not a randomized purchase. Restore Purchases is at the top of Panda's Shop > Pots.
+This non-consumable permanently unlocks the pot design named above. After unlocking it, the player can buy individual pots of that design for the Puku Coin price shown in the in-game catalog and use them in arrangements. This is not a randomized purchase. Restore Purchases is at the top of Panda's Shop > Pots.
 ```
 
 各商品には、対象カード、StoreKitのローカライズ価格、購入ボタンが同時に見えるReview Screenshotを用意してください。現時点ではスクリーンショットを作成していません。
@@ -352,7 +352,7 @@ AppleはApp Review連絡先として担当者名、メール、電話番号を�
 任意視聴のリワード動画広告だけを使用します。通常ゲーム用のぷくコインまたはたねが不足した際に「パンダのお店」でパンダをタップすると、救済の案内が表示されます。「お手伝いする」または「広告を見てたねをもらう」を選ぶと広告を要求します。SDKから視聴完了が通知された場合だけ、1ぷくコインまたはたね1セットを1回付与します。途中終了や読み込み失敗では報酬を付与しません。地域等により必要な場合、初回起動時にGoogle UMPの同意画面が表示されます。
 
 アプリ内課金:
-pot_unlock_001〜pot_unlock_036は非消耗型です。購入すると特定の鉢デザインを永続解放し、その後は同じデザインの鉢をゲーム内の1ぷくコインで1個ずつ購入できます。現金でぷくコインを販売する機能や、ランダムな有料IAPはありません。
+pot_unlock_001〜pot_unlock_036は非消耗型です。購入すると特定の鉢デザインを永続解放し、その後は同じデザインの鉢をゲーム内カタログに設定されたぷくコイン価格で何度でも購入できます。現金でぷくコインを販売する機能や、ランダムな有料IAPはありません。
 
 購入画面への通常導線:
 オープニングと初回チュートリアルを完了し、不思議な多肉を3品種取得すると寄せ植えとショップ内の鉢カテゴリが解放されます。6品種取得後はpot_unlock_001〜pot_unlock_014が「パンダのお店」＞「鉢」に表示されます。第三幕の解放後はpot_unlock_015〜pot_unlock_036も表示されます。「購入を復元」は鉢画面上部にあります。
@@ -375,7 +375,7 @@ Ads:
 The app uses optional rewarded video ads only. When the player lacks Puku Coins or playable seeds, open Panda's Shop and tap the panda. Choose "Help at the shop" or "Watch an ad to get seeds" to request an ad. One Puku Coin or one seed set is granted once only after the SDK reports that the reward was earned. Closing early or failing to load grants nothing. A Google UMP consent form may appear on first launch when required for the user's region or consent state.
 
 In-App Purchases:
-pot_unlock_001 through pot_unlock_036 are non-consumables. Each purchase permanently unlocks one specific pot design. The player can then buy individual pots of that design for 1 in-game Puku Coin each. The app does not sell Puku Coins for money and has no randomized paid IAP.
+pot_unlock_001 through pot_unlock_036 are non-consumables. Each purchase permanently unlocks one specific pot design. The player can then buy individual pots of that design repeatedly at its in-game Puku Coin catalog price. The app does not sell Puku Coins for money and has no randomized paid IAP.
 
 Normal route to the purchase screen:
 Complete the opening and first tutorial. After discovering 3 fantasy varieties, arrangements and the Pots category unlock. After 6 such discoveries, pot_unlock_001 through pot_unlock_014 appear in Panda's Shop > Pots. pot_unlock_015 through pot_unlock_036 appear after Act III unlocks. Restore Purchases is at the top of the Pots screen.
@@ -390,7 +390,7 @@ The production build disables all developer-only story jumps, progress resets, a
 3. 地域またはデバッグ用同意状態に応じたUMP画面と設定内のプライバシー設定導線を確認する。
 4. Googleテスト広告または審査環境で、完了時だけ報酬が1回付与され、途中終了では付与されないことを確認する。
 5. Sandboxで鉢の購入、キャンセル、購入失敗、再起動後の権利維持、購入の復元を確認する。
-6. 購入後、該当鉢が1ぷくコインで購入でき、寄せ植えに使用できることを確認する。
+6. 購入後、該当鉢がゲーム内カタログに表示された正式なぷくコイン価格で購入でき、寄せ植えに使用できることを確認する。
 
 ### 通常プレイでは到達に時間がかかる項目への対応案
 

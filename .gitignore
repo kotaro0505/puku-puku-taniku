@@ -11,6 +11,14 @@ Thumbs.db
 tmp/
 __pycache__/
 
+# App Store Connect credentials and local IAP registration inputs.
+# Private keys must live outside this repository; these patterns are a final
+# guard against accidentally staging one.
+*.p8
+/tools/app_store_connect_iap.auth.local.json
+/tools/app_store_connect_iap.config.local.json
+/tools/app_store_connect_iap_private/
+
 # Generated from encrypted Codemagic environment variables. Never commit ad IDs.
 /addons/AdmobPlugin/ios_export.cfg
 /data/mobile-ads.cfg
