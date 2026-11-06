@@ -11,6 +11,8 @@ from pathlib import Path
 
 PRODUCTION_BUNDLE = "com.ohanayanouen.pukupukutaniku"
 DEVELOPMENT_BUNDLE = "com.ohanayanouen.pukupukutaniku.dev"
+PRODUCTION_DISPLAY_NAME = "ぷくぷく！たにくらいふ"
+IAP_REVIEW_CAPTURE_DISPLAY_NAME = "ぷくぷく 撮影"
 
 
 def fail(message: str) -> None:
@@ -37,12 +39,19 @@ def parse_presets(text: str) -> dict[str, dict[str, str]]:
     return result
 
 
+def read_project_string(source: str, key: str) -> str | None:
+    match = re.search(rf'(?m)^{re.escape(key)}="([^"]*)"$', source)
+    return match.group(1) if match else None
+
+
 def main() -> None:
     profiles = {
         "app_store": {
             "preset": "iOS",
             "features": "puku_app_store_release",
             "bundle": PRODUCTION_BUNDLE,
+            "display_name_setting": "config/name",
+            "display_name": PRODUCTION_DISPLAY_NAME,
             "forbidden": [
                 "puku_iap_review_capture",
                 "puku_development",
@@ -54,6 +63,8 @@ def main() -> None:
             "preset": "iOS IAP Review Capture",
             "features": "puku_app_store_release,puku_iap_review_capture",
             "bundle": PRODUCTION_BUNDLE,
+            "display_name_setting": "config/name.puku_iap_review_capture",
+            "display_name": IAP_REVIEW_CAPTURE_DISPLAY_NAME,
             "forbidden": [
                 "puku_development",
                 "puku_rewarded_ad_stub",
@@ -85,6 +96,7 @@ def main() -> None:
     expected_features = profile_config["features"]
     expected_bundle = profile_config["bundle"]
     forbidden = profile_config["forbidden"]
+    expected_display_name = profile_config.get("display_name")
 
     if preset.get("custom_features") != expected_features:
         fail(f"{preset_name} custom_features must be exactly {expected_features}")
@@ -92,6 +104,21 @@ def main() -> None:
         fail(f"{preset_name} has an unexpected bundle identifier")
     if any(feature in preset.get("custom_features", "").split(",") for feature in forbidden):
         fail(f"{preset_name} contains a forbidden feature")
+    if profile == "iap_review_capture" and "application/name" in preset:
+        fail(
+            "iOS IAP Review Capture must not use the unsupported export option "
+            "application/name; use the project feature override"
+        )
+    if expected_display_name is not None:
+        project_source = Path("project.godot").read_text(encoding="utf-8")
+        display_name_setting = profile_config["display_name_setting"]
+        configured_display_name = read_project_string(project_source, display_name_setting)
+        if configured_display_name != expected_display_name:
+            fail(
+                f"{preset_name} display name must resolve from project setting "
+                f"{display_name_setting} as {expected_display_name!r}; "
+                f"found {configured_display_name!r}"
+            )
     required_lines = [
         "plugins/AdmobPlugin=true",
         "plugins/godot-storekit2=true",
@@ -148,6 +175,7 @@ def main() -> None:
         "scripts/iap_review_capture.gd",
         "scripts/rewarded_ad_service.gd",
         "scripts/story_dev_presets.gd",
+        "tools/.gdignore",
     ]:
         if not Path(required_path).exists():
             fail(f"Missing release dependency: {required_path}")
@@ -288,6 +316,8 @@ def main() -> None:
         "IOS_EXPORT_VALIDATION_FAILED check=",
         '"google_mobile_ads_package": "GoogleMobileAds"',
         '"info_plist.admob_app_id_key"',
+        '"info_plist.display_name_reference"',
+        "GODOT_IOS_DISPLAY_NAME_OK",
     ]:
         if required_validation not in ios_export_validator_source:
             fail(f"Named iOS export validation is missing: {required_validation}")
@@ -334,6 +364,7 @@ def main() -> None:
     for required_capture_setting in [
         'BUILD_PROFILE: "iap_review_capture"',
         'GODOT_IOS_PRESET: "iOS IAP Review Capture"',
+        f'DISPLAY_NAME: "{IAP_REVIEW_CAPTURE_DISPLAY_NAME}"',
         'BUNDLE_ID: "com.ohanayanouen.pukupukutaniku"',
         'MOBILE_ADS_MODE: "test"',
         'INTERNAL_TESTFLIGHT_ONLY: "true"',
@@ -358,6 +389,7 @@ def main() -> None:
     print(
         f"BUILD_PROFILE_VALIDATE_OK profile={profile} preset={preset_name} "
         f"bundle={expected_bundle} features={expected_features}"
+        + (f" display_name={expected_display_name!r}" if expected_display_name else "")
     )
 
 

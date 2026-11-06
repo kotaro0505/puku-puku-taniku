@@ -12,6 +12,8 @@
 
 通常のApp Store用 `iOS` presetのfeature tagは従来どおり `puku_app_store_release` だけである。CI検証は、このpresetに撮影用tagが混入した場合に失敗する。
 
+Godot 4.7.2のiOS exporterは、表示名をexport presetの `application/name` ではなくProjectSettingsの `application/config/name` から生成する。撮影専用名 `ぷくぷく 撮影` は `project.godot` の `config/name.puku_iap_review_capture` で上書きし、通常ビルドの `ぷくぷく！たにくらいふ` には影響させない。生成後のXcode projectではDebug/Release両方の `INFOPLIST_KEY_CFBundleDisplayName` を期待値と照合する。
+
 ## 実機で行う処理
 
 1. 本番と同じbundle IDでStoreKitの商品情報を取得する。

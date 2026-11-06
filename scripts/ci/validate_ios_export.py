@@ -52,6 +52,21 @@ def load_plist(path: Path, check: str) -> dict:
     return value
 
 
+def xcode_build_setting_values(source: str, key: str) -> list[str]:
+    """Return every value assigned to an Xcode build setting."""
+    raw_values = re.findall(
+        rf"(?m)^\s*{re.escape(key)}\s*=\s*(.*?);\s*$",
+        source,
+    )
+    values: list[str] = []
+    for raw_value in raw_values:
+        value = raw_value.strip()
+        if len(value) >= 2 and value.startswith('"') and value.endswith('"'):
+            value = value[1:-1].replace(r'\"', '"')
+        values.append(value)
+    return values
+
+
 def validate(expectations: ExportExpectations) -> Path:
     project = expectations.xcode_project
     pbxproj = project / "project.pbxproj"
@@ -64,7 +79,6 @@ def validate(expectations: ExportExpectations) -> Path:
         "team_id": f"DEVELOPMENT_TEAM = {expectations.team_id};",
         "marketing_version": f"MARKETING_VERSION = {expectations.app_version};",
         "build_number": f"CURRENT_PROJECT_VERSION = {expectations.build_number};",
-        "display_name": f'INFOPLIST_KEY_CFBundleDisplayName = "{expectations.display_name}";',
     }
     for name, marker in metadata.items():
         require_contains(
@@ -73,6 +87,22 @@ def validate(expectations: ExportExpectations) -> Path:
             f"xcode_project.{name}",
             f"generated project does not contain the expected {name}",
         )
+
+    display_names = xcode_build_setting_values(source, "INFOPLIST_KEY_CFBundleDisplayName")
+    distinct_display_names = sorted(set(display_names))
+    require(
+        len(display_names) >= 2
+        and distinct_display_names == [expectations.display_name],
+        "xcode_project.display_name",
+        f"expected {expectations.display_name!r}; "
+        f"found {', '.join(repr(value) for value in distinct_display_names) or 'missing'}; "
+        f"assignments={len(display_names)}",
+    )
+    print(
+        "GODOT_IOS_DISPLAY_NAME_OK "
+        f"value={expectations.display_name!r} configurations="
+        f"{len(display_names)}"
+    )
 
     dependencies = {
         "share_plugin": "SharePlugin",
@@ -113,6 +143,11 @@ def validate(expectations: ExportExpectations) -> Path:
         else ""
     )
     info = load_plist(expectations.info_plist, "info_plist")
+    require(
+        info.get("CFBundleDisplayName") == "$(INFOPLIST_KEY_CFBundleDisplayName)",
+        "info_plist.display_name_reference",
+        "CFBundleDisplayName must resolve through the validated Xcode build setting",
+    )
     require(
         info_source.count("<key>ITSAppUsesNonExemptEncryption</key>") == 1,
         "info_plist.export_compliance_key",

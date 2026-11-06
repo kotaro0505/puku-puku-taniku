@@ -1,5 +1,6 @@
 [application]
 config/name="ぷくぷく！たにくらいふ"
+config/name.puku_iap_review_capture="ぷくぷく 撮影"
 config/version="1.0.0"
 config/icon="res://assets/ios/app-icon-1024.png"
 run/main_scene="res://main.tscn"

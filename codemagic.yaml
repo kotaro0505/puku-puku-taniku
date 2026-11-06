@@ -56,17 +56,24 @@ workflows:
           python3 scripts/ci/validate_build_profile.py "$BUILD_PROFILE"
           python3 scripts/ci/validate_ios_export_smoke.py
           case "$BUILD_PROFILE" in
-            app_store|iap_review_capture)
+            app_store)
               test "$BUNDLE_ID" = "com.ohanayanouen.pukupukutaniku"
+              test "$DISPLAY_NAME" = "ぷくぷく！たにくらいふ"
+              ;;
+            iap_review_capture)
+              test "$BUNDLE_ID" = "com.ohanayanouen.pukupukutaniku"
+              test "$DISPLAY_NAME" = "ぷくぷく 撮影"
               ;;
             development)
               test "$BUNDLE_ID" = "com.ohanayanouen.pukupukutaniku.dev"
+              test "$DISPLAY_NAME" = "ぷくぷく DEV"
               ;;
             *)
               echo "Unknown BUILD_PROFILE: $BUILD_PROFILE" >&2
               exit 1
               ;;
           esac
+          echo "IOS_DISPLAY_NAME_EXPECTATION_OK profile=$BUILD_PROFILE display_name=$DISPLAY_NAME"
           test "$APPLE_TEAM_ID" = "UK8FRB9XKH"
           test "$APP_VERSION" = "1.0.0"
           test "$IOS_MIN_VERSION" = "15.6"
