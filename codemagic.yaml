@@ -414,11 +414,12 @@ workflows:
         script: |
           #!/bin/bash
           set -euo pipefail
+          bash scripts/ci/resolve_ipa_path_smoke.sh
           xcode-project build-ipa \
             --project "$CM_BUILD_DIR/$XCODE_PROJECT" \
-            --scheme "$XCODE_SCHEME"
-          IPA_PATH="$(find "$IPA_DIR" -type f -name '*.ipa' -print -quit)"
-          test -n "$IPA_PATH"
+            --scheme "$XCODE_SCHEME" \
+            --ipa-directory "$CM_BUILD_DIR/$IPA_DIR"
+          IPA_PATH="$(bash scripts/ci/resolve_ipa_path.sh "$CM_BUILD_DIR/$IPA_DIR")"
           xcode-project ipa-info "$IPA_PATH"
           IPA_AUDIT_DIR="$(mktemp -d)"
           unzip -q "$IPA_PATH" -d "$IPA_AUDIT_DIR"

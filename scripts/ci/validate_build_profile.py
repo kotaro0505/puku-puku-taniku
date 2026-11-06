@@ -325,6 +325,7 @@ def main() -> None:
     codemagic_source = Path("codemagic.yaml").read_text(encoding="utf-8")
     for required_diagnostic in [
         "python3 scripts/ci/validate_ios_export_smoke.py",
+        "bash scripts/ci/resolve_ipa_path_smoke.sh",
         "GODOT_IOS_EXPORT_COMMAND_FAILED",
         "python3 scripts/ci/validate_ios_export.py",
         'PRIVACY_MANIFEST="$(dirname "$CM_BUILD_DIR/$XCODE_PROJECT")/PrivacyInfo.xcprivacy"',
@@ -332,6 +333,8 @@ def main() -> None:
         "bash scripts/ci/verify_mobile_ads_export.sh",
         'EXPORTED_PCK="$CM_BUILD_DIR/${XCODE_PROJECT%.xcodeproj}.pck"',
         'SIGNED_PCK="$APP_PATH/$XCODE_SCHEME.pck"',
+        '--ipa-directory "$CM_BUILD_DIR/$IPA_DIR"',
+        'IPA_PATH="$(bash scripts/ci/resolve_ipa_path.sh "$CM_BUILD_DIR/$IPA_DIR")"',
         "[REDACTED_ADMOB_ID]",
     ]:
         if required_diagnostic not in codemagic_source:
@@ -367,6 +370,8 @@ def main() -> None:
         f'DISPLAY_NAME: "{IAP_REVIEW_CAPTURE_DISPLAY_NAME}"',
         'BUNDLE_ID: "com.ohanayanouen.pukupukutaniku"',
         'MOBILE_ADS_MODE: "test"',
+        'IPA_DIR: "build/ios-iap-capture/ipa"',
+        '- build/ios-iap-capture/ipa/*.ipa',
         'INTERNAL_TESTFLIGHT_ONLY: "true"',
         'APP_STORE_SUBMISSION: "false"',
         'publishing: {}',
@@ -375,6 +380,8 @@ def main() -> None:
             fail(f"IAP review capture workflow is missing: {required_capture_setting}")
     if "submit_to_testflight" in capture_block or "submit_to_app_store" in capture_block:
         fail("IAP review capture workflow must never auto-upload or submit")
+    if 'IPA_DIR: "build/ios/ipa"' in capture_block:
+        fail("IAP review capture workflow must keep its IPA outside the normal iOS output directory")
     if 'MOBILE_ADS_MODE: "test"' not in development_block or "admob_production" in development_block:
         fail("iPhone development workflow must use Google test ads without production secrets")
     for required_ads_gate in [

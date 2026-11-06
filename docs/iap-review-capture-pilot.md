@@ -61,9 +61,19 @@ node tools/verify_iap_review_capture.mjs pot_unlock_001-app-review.png
 
 ## Codemagic
 
-`ios-iap-review-capture` はGodot 4.7.2で専用Xcode projectと署名済みIPAを生成する。出力先は `build/ios-iap-capture/` で、通常の `build/ios/` と分離される。
+`ios-iap-review-capture` はGodot 4.7.2で専用Xcode projectと署名済みIPAを生成する。Xcode projectとIPAの出力先は `build/ios-iap-capture/` で、通常の `build/ios/` と分離される。
+
+Codemagic CLIの `xcode-project build-ipa` は、`--ipa-directory` を省略するとXcode projectの場所に関係なく `build/ios/ipa` を使う。workflowの `IPA_DIR` はCLIが自動参照する変数ではないため、buildコマンドへ `--ipa-directory "$CM_BUILD_DIR/$IPA_DIR"` を明示する。生成後の存在確認、IPA情報表示、展開、署名検証は、この同じディレクトリから解決した唯一のIPAだけを使用する。0件なら `IOS_IPA_NOT_FOUND`、複数なら `IOS_IPA_AMBIGUOUS` で停止する。artifact収集も同じ `build/ios-iap-capture/ipa/*.ipa` を参照する。
 
 このworkflowの `publishing` は空である。IPAをartifactとして作るだけで、TestFlightへのアップロード、App Storeへの提出、公開を自動実行しない。実機配布には、追加承認後にこのIPAを明示的にTestFlightへアップロードするか、許可された端末へ別途インストールする必要がある。
+
+## カメラ・写真・マイク用途説明の警告
+
+Godot 4.7.2のApple Embedded用Info.plistテンプレートは、`NSCameraUsageDescription`、`NSPhotoLibraryUsageDescription`、`NSMicrophoneUsageDescription` の3キーを常に出力する。現在のexport presetは `modules/camera=false` で、3種類の用途説明も設定していないため、生成値は空文字列になり、Xcodeのexport検証で警告される。
+
+撮影機能はroot viewportをアプリsandbox内のPNGへ保存し、既存の `UIActivityViewController` で共有するだけである。カメラ、写真ライブラリ、マイク、ReplayKitのAPIは呼ばず、これらの権限プロンプトも要求しない。したがって、この警告はIPAパス不一致による今回の終了コード1とは別件であり、archiveまたはIPA生成を失敗させたものではない。
+
+未使用権限に架空の用途説明を追加するのは適切ではない。警告を解消する場合は、Godotが生成したplistから空の未使用キーだけを除外する処理を、署名・archive前かつ全iOS workflowで一貫して検証する必要がある。今回は撮影用workflowのIPAパス修正に範囲を限定し、本番用plistや権限宣言は変更しない。
 
 ## 実機検証チェックリスト
 
