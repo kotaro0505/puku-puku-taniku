@@ -374,12 +374,39 @@ def main() -> None:
         '- build/ios-iap-capture/ipa/*.ipa',
         'INTERNAL_TESTFLIGHT_ONLY: "true"',
         'APP_STORE_SUBMISSION: "false"',
-        'publishing: {}',
+        'app_store_connect:',
+        'auth: integration',
+        'submit_to_testflight: false',
+        'submit_to_app_store: false',
     ]:
         if required_capture_setting not in capture_block:
             fail(f"IAP review capture workflow is missing: {required_capture_setting}")
-    if "submit_to_testflight" in capture_block or "submit_to_app_store" in capture_block:
-        fail("IAP review capture workflow must never auto-upload or submit")
+    for forbidden_capture_setting in [
+        "publishing: {}",
+        "submit_to_testflight: true",
+        "submit_to_app_store: true",
+        "beta_groups:",
+        "release_type:",
+    ]:
+        if forbidden_capture_setting in capture_block:
+            fail(
+                "IAP review capture workflow contains a forbidden publishing setting: "
+                f"{forbidden_capture_setting}"
+            )
+    for required_capture_build_number_guard in [
+        'if [ "$BUILD_PROFILE" = "iap_review_capture" ]; then',
+        "app-store-connect apps list",
+        '--bundle-id-identifier "$BUNDLE_ID"',
+        "--strict-match-identifier",
+        "app-store-connect get-latest-build-number",
+        '--version-string "$APP_VERSION"',
+        'IOS_BUILD_NUMBER="$((10#$LATEST_APPLE_BUILD_NUMBER + 1))"',
+    ]:
+        if required_capture_build_number_guard not in codemagic_source:
+            fail(
+                "IAP review capture workflow is missing its Apple build-number guard: "
+                f"{required_capture_build_number_guard}"
+            )
     if 'IPA_DIR: "build/ios/ipa"' in capture_block:
         fail("IAP review capture workflow must keep its IPA outside the normal iOS output directory")
     if 'MOBILE_ADS_MODE: "test"' not in development_block or "admob_production" in development_block:

@@ -329,10 +329,65 @@ workflows:
         script: |
           #!/bin/bash
           set -euo pipefail
-          IOS_BUILD_NUMBER="$PROJECT_BUILD_NUMBER"
-          case "$IOS_BUILD_NUMBER" in
+          case "$PROJECT_BUILD_NUMBER" in
             ''|*[!0-9]*) echo "PROJECT_BUILD_NUMBER must be numeric" >&2; exit 1 ;;
           esac
+          if [ "$BUILD_PROFILE" = "iap_review_capture" ]; then
+            APP_LIST_JSON="$(mktemp)"
+            app-store-connect apps list \
+              --bundle-id-identifier "$BUNDLE_ID" \
+              --strict-match-identifier \
+              --json \
+              --silent > "$APP_LIST_JSON"
+            APP_STORE_APP_ID="$(python3 - "$APP_LIST_JSON" "$BUNDLE_ID" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          bundle_id = sys.argv[2]
+          if isinstance(payload, list):
+              entries = payload
+          elif isinstance(payload, dict):
+              entries = payload.get("data", payload.get("apps", [payload]))
+          else:
+              entries = []
+          matches = []
+          for entry in entries:
+              if not isinstance(entry, dict):
+                  continue
+              attributes = entry.get("attributes", {})
+              candidate_bundle = entry.get("bundleId", entry.get("bundle_id"))
+              if isinstance(attributes, dict):
+                  candidate_bundle = candidate_bundle or attributes.get("bundleId")
+              candidate_id = entry.get("id")
+              if candidate_bundle == bundle_id and candidate_id:
+                  matches.append(str(candidate_id))
+          if len(matches) != 1:
+              raise SystemExit(
+                  f"Expected exactly one App Store Connect app for {bundle_id}; found {len(matches)}"
+              )
+          print(matches[0])
+          PY
+            )"
+            rm -f "$APP_LIST_JSON"
+            LATEST_APPLE_BUILD_NUMBER="$(app-store-connect get-latest-build-number \
+              --platform IOS \
+              --version-string "$APP_VERSION" \
+              --silent \
+              "$APP_STORE_APP_ID" | tr -d '[:space:]')"
+            case "$LATEST_APPLE_BUILD_NUMBER" in
+              ''|*[!0-9]*) echo "Unable to resolve the latest Apple build number" >&2; exit 1 ;;
+            esac
+            IOS_BUILD_NUMBER="$((10#$LATEST_APPLE_BUILD_NUMBER + 1))"
+            if [ "$((10#$PROJECT_BUILD_NUMBER))" -gt "$IOS_BUILD_NUMBER" ]; then
+              IOS_BUILD_NUMBER="$((10#$PROJECT_BUILD_NUMBER))"
+            fi
+            echo "IOS_BUILD_NUMBER_SOURCE profile=$BUILD_PROFILE apple_latest=$LATEST_APPLE_BUILD_NUMBER selected=$IOS_BUILD_NUMBER"
+          else
+            IOS_BUILD_NUMBER="$PROJECT_BUILD_NUMBER"
+            echo "IOS_BUILD_NUMBER_SOURCE profile=$BUILD_PROFILE source=project selected=$IOS_BUILD_NUMBER"
+          fi
           python3 - "$IOS_BUILD_NUMBER" <<'PY'
           import re
           import sys
@@ -550,7 +605,7 @@ workflows:
 
   ios-iap-review-capture:
     <<: *ios-production-workflow
-    name: IAP審査画像 撮影専用IPA（自動アップロードなし）
+    name: IAP審査画像 撮影専用IPA（Internal Only・アップロードのみ）
     environment:
       ios_signing:
         distribution_type: app_store
@@ -586,7 +641,11 @@ workflows:
       - /tmp/xcodebuild_logs/*.log
       - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
       - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
-    publishing: {}
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: false
+        submit_to_app_store: false
 
   ios-development:
     <<: *ios-production-workflow
