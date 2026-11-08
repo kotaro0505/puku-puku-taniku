@@ -87,12 +87,20 @@ func _ready()->void:
 	# The review-capture profile needs only the visible StoreKit price. It must
 	# issue one price-only request and must not start 36 entitlement lookups.
 	var capture_mock:=MockClass.new();capture_mock.localized_prices=prices.duplicate(true)
+	capture_mock.localized_prices[first_product]="¥100.00"
+	capture_mock.currency_values[first_product]=100.0
+	capture_mock.currency_codes[first_product]="JPY"
+	capture_mock.currency_symbols[first_product]="¥"
 	var capture_service:=ServiceClass.new();add_child(capture_service);capture_service.configure(all_pots,{},capture_mock,first_product)
 	await get_tree().process_frame
 	var capture_diagnostic:Dictionary=capture_service.diagnostic_snapshot()
+	var capture_state:Dictionary=capture_service.product_states_snapshot()[first_product]
 	assert(capture_mock.requested_prices==[first_product] and capture_mock.requested_products.is_empty())
-	assert(str(capture_service.product_states_snapshot()[first_product].status)==capture_service.STATUS_AVAILABLE)
-	assert(str(capture_service.product_states_snapshot()[first_product].localized_price)=="€0,99")
+	assert(str(capture_state.status)==capture_service.STATUS_AVAILABLE)
+	assert(str(capture_state.localized_price)=="¥100.00")
+	assert(is_equal_approx(float(capture_state.currency_value),100.0))
+	assert(str(capture_state.currency_code)=="JPY" and str(capture_state.currency_symbol)=="¥")
+	assert(capture_mock.purchase_calls.is_empty())
 	assert(str(capture_service.product_states_snapshot()[last_product].status)==capture_service.STATUS_UNAVAILABLE)
 	assert(str(capture_service.product_states_snapshot()[last_product].error)=="capture_not_requested")
 	assert(str(capture_diagnostic.request_mode)=="price_only")
@@ -124,6 +132,11 @@ func _ready()->void:
 
 	var ui:=ArrangementUIClass.new();add_child(ui);await get_tree().process_frame
 	var owned:Dictionary={"shallow_terracotta":1}
+	ui.configure([],[],all_pots,{},owned,[],20,5,Callable(),Callable(),{},"ja",2,{},capture_service.product_states_snapshot(),false,false)
+	ui.open_pot_shop()
+	var capture_card:=_pot_shop_card(ui,"g1_crystal_goblet")
+	var capture_buy_button:=capture_card.find_child("PotBuyButton",true,false) as Button
+	assert(capture_buy_button.text==Localizer.text("ja","iap_unlock_for_price",["¥100.00"]))
 	ui.configure([],[],all_pots,{},owned,[],20,5,Callable(),Callable(),{},"ja",0,{},service.product_states_snapshot(),false,false)
 	ui.open_pot_shop();assert(ui.shop_grid.get_child_count()==8 and not ui.shop_restore_button.visible)
 	ui.configure([],[],all_pots,{},owned,[],20,5,Callable(),Callable(),{},"ja",1,{},service.product_states_snapshot(),false,false)

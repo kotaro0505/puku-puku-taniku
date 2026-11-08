@@ -11,6 +11,19 @@ func _ready()->void:
 	assert(CaptureClass.is_supported_apple_portrait_size(Vector2i(1320,2868)))
 	assert(CaptureClass.is_supported_apple_portrait_size(Vector2i(1179,2556)))
 	assert(not CaptureClass.is_supported_apple_portrait_size(Vector2i(576,1024)))
+	# Display formatting is presentation only. StoreKit's numeric value and ISO
+	# currency code are the authoritative 100-yen gate.
+	for display in ["¥100","￥100","¥100.00","100円"]:
+		assert(CaptureClass.is_expected_jpy_100_price({"currency_code":"JPY","currency_value":100.0,"localized_price":display}))
+	assert(CaptureClass.is_expected_jpy_100_price({"currency_code":"jpy","currency_value":100,"localized_price":"JP¥ 100"}))
+	assert(not CaptureClass.is_expected_jpy_100_price({"currency_code":"USD","currency_value":100.0,"localized_price":"$100.00"}))
+	assert(not CaptureClass.is_expected_jpy_100_price({"currency_code":"JPY","currency_value":99.0,"localized_price":"¥99"}))
+	assert(not CaptureClass.is_expected_jpy_100_price({"currency_code":"JPY","currency_value":100.01,"localized_price":"¥100.01"}))
+	assert(not CaptureClass.is_expected_jpy_100_price({"currency_code":"JPY","localized_price":"¥100"}))
+	var price_diagnostic:=CaptureClass._storekit_price_diagnostic({"currency_code":"JPY","currency_value":100.0,"localized_price":"¥100.00"})
+	assert(price_diagnostic.contains("currency_code=JPY"))
+	assert(price_diagnostic.contains("currency_value=100"))
+	assert(price_diagnostic.contains('localized_price="¥100.00"'))
 
 	var rgb_header:=_png_header(Vector2i(1320,2868),2)
 	assert(CaptureClass._is_rgb_png_without_alpha(rgb_header,Vector2i(1320,2868)))
@@ -25,6 +38,8 @@ func _ready()->void:
 	assert(capture_source.contains("buy_button.mouse_filter=Control.MOUSE_FILTER_IGNORE"))
 	assert(capture_source.contains('"storekit_price_is_jpy_100"'))
 	assert(capture_source.contains('"storekit_price_response_timeout"'))
+	assert(capture_source.contains("IAP_REVIEW_CAPTURE_STOREKIT_PRICE"))
+	assert(not capture_source.contains("_is_jpy_100_display"))
 	var main_source:=FileAccess.get_file_as_string("res://scripts/main.gd")
 	assert(main_source.contains("price_only_product_id"))
 	assert(main_source.contains("BuildProfileClass.IAP_REVIEW_CAPTURE_PRODUCT_ID"))

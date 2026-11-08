@@ -72,16 +72,18 @@ func _run_capture()->void:
 	_show_status("StoreKitから pot_unlock_001 の100円表示を取得しています…",false)
 	var product_state:Dictionary=await _wait_for_storekit_product()
 	if product_state.is_empty():return
-	var localized_price:=str(product_state.get("localized_price","")).strip_edges()
-	if not _is_jpy_100_display(localized_price):
-		_fail("unexpected_storekit_price")
+	var localized_price:=str(product_state.get("localized_price",""))
+	var price_diagnostic:=_storekit_price_diagnostic(product_state)
+	print("IAP_REVIEW_CAPTURE_STOREKIT_PRICE product_id=",PRODUCT_ID," ",price_diagnostic)
+	if not is_expected_jpy_100_price(product_state):
+		_fail("unexpected_storekit_price",price_diagnostic)
 		return
 
 	var pot:Dictionary=_pot_entry()
 	if not _validate_catalog_entry(pot):return
 	var card:Control=await _prepare_real_pot_shop(product_state)
 	if card==null:return
-	var content_result:=_validate_card_content(card,localized_price)
+	var content_result:=_validate_card_content(card,product_state)
 	if not bool(content_result.get("ok",false)):
 		_fail(str(content_result.get("error","card_content_invalid")))
 		return
@@ -132,6 +134,9 @@ func _run_capture()->void:
 		"pot_name":EXPECTED_NAME_JA,
 		"iap_type":"NON_CONSUMABLE",
 		"storekit_localized_price":localized_price,
+		"storekit_currency_value":product_state.get("currency_value",null),
+		"storekit_currency_code":str(product_state.get("currency_code","")),
+		"storekit_currency_symbol":str(product_state.get("currency_symbol","")),
 		"expected_japan_price_yen":100,
 		"puku_price":EXPECTED_PUKU_PRICE,
 		"width":image_size.x,
@@ -255,7 +260,8 @@ func _prepare_real_pot_shop(product_state:Dictionary)->Control:
 	return card
 
 
-func _validate_card_content(card:Control,localized_price:String)->Dictionary:
+func _validate_card_content(card:Control,product_state:Dictionary)->Dictionary:
+	var localized_price:=str(product_state.get("localized_price",""))
 	var expected_unlock:=GameLocalizer.text("ja","pot_permanent_unlock")
 	var expected_puku:=GameLocalizer.text("ja","pot_locked_puku_price",[EXPECTED_PUKU_PRICE])
 	var expected_button:=GameLocalizer.text("ja","iap_unlock_for_price",[localized_price])
@@ -279,7 +285,7 @@ func _validate_card_content(card:Control,localized_price:String)->Dictionary:
 		"permanent_unlock_visible":owned_label!=null and owned_label.is_visible_in_tree() and owned_label.text==expected_unlock,
 		"puku_price_visible":puku_label!=null and puku_label.is_visible_in_tree() and puku_label.text==expected_puku,
 		"storekit_button_visible":buy_button!=null and buy_button.is_visible_in_tree() and not buy_button.disabled and buy_button.text==expected_button,
-		"storekit_price_is_jpy_100":_is_jpy_100_display(localized_price),
+		"storekit_price_is_jpy_100":is_expected_jpy_100_price(product_state),
 	}
 	for key in checks:
 		if not bool(checks[key]):return {"ok":false,"error":"card_check_failed_%s"%str(key),"checks":checks}
@@ -294,13 +300,20 @@ func _ancestor_scroll_container(control:Control)->ScrollContainer:
 	return null
 
 
-func _is_jpy_100_display(localized_price:String)->bool:
-	var compact:=localized_price.replace(" ","").replace(",","").to_upper()
-	var digits:=""
-	for character in compact:
-		if character>="0" and character<="9":digits+=character
-	if digits!="100":return false
-	return compact.contains("¥") or compact.contains("￥") or compact.contains("円") or compact.contains("JPY") or compact.contains("JP¥")
+static func is_expected_jpy_100_price(product_state:Dictionary)->bool:
+	if str(product_state.get("currency_code","")).strip_edges().to_upper()!="JPY":return false
+	if not product_state.has("currency_value") or product_state.get("currency_value")==null:return false
+	var numeric_text:=str(product_state.get("currency_value")).strip_edges()
+	if not numeric_text.is_valid_float():return false
+	return absf(float(numeric_text)-100.0)<=0.0001
+
+
+static func _storekit_price_diagnostic(product_state:Dictionary)->String:
+	var currency_code:=str(product_state.get("currency_code","<missing>")).strip_edges().to_upper()
+	if currency_code.is_empty():currency_code="<missing>"
+	var currency_value:="<missing>" if not product_state.has("currency_value") or product_state.get("currency_value")==null else str(product_state.get("currency_value"))
+	var localized_price:=str(product_state.get("localized_price",""))
+	return "currency_code=%s currency_value=%s localized_price=%s"%[currency_code,currency_value,JSON.stringify(localized_price)]
 
 
 static func is_supported_apple_portrait_size(size:Vector2i)->bool:
@@ -382,6 +395,9 @@ func _share_png()->void:
 	_main.call("_open_native_share_or_fallback",_output_path,OUTPUT_FILENAME,"iap_review_capture")
 
 
-func _fail(reason:String)->void:
-	_show_status("撮影を停止しました。\n理由コード: %s\n商品作成・購入・送信は行っていません。"%reason,false)
-	push_error("IAP_REVIEW_CAPTURE_FAILED product_id=%s reason=%s"%[PRODUCT_ID,reason])
+func _fail(reason:String,diagnostic:String="")->void:
+	var message:="撮影を停止しました。\n理由コード: %s"%reason
+	if not diagnostic.is_empty():message+="\n診断: %s"%diagnostic
+	message+="\n商品作成・購入・送信は行っていません。"
+	_show_status(message,false)
+	push_error("IAP_REVIEW_CAPTURE_FAILED product_id=%s reason=%s%s"%[PRODUCT_ID,reason," diagnostic="+diagnostic if not diagnostic.is_empty() else ""])

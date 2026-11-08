@@ -194,11 +194,21 @@ func _on_product_price_received(price:Dictionary)->void:
 	var product_id:=str(price.get("product_id",_price_only_product_id))
 	if product_id!=_price_only_product_id:return
 	var error:=str(price.get("error",""))
-	var localized_price:=str(price.get("localized_price","")).strip_edges()
-	if not error.is_empty() or localized_price.is_empty():
+	# Keep StoreKit's localized display byte-for-byte for the review button. The
+	# numeric value and ISO currency code are retained separately so validation
+	# never has to parse locale-dependent presentation text.
+	var localized_price:=str(price.get("localized_price",""))
+	if not error.is_empty() or localized_price.strip_edges().is_empty():
 		_set_product_unavailable(product_id,error if not error.is_empty() else "localized_price_missing")
 		return
-	_product_states[product_id]={"status":STATUS_AVAILABLE,"localized_price":localized_price,"error":""}
+	_product_states[product_id]={
+		"status":STATUS_AVAILABLE,
+		"localized_price":localized_price,
+		"currency_value":price.get("currency_value",null),
+		"currency_code":str(price.get("currency_code","")),
+		"currency_symbol":str(price.get("currency_symbol","")),
+		"error":"",
+	}
 	state_changed.emit()
 
 func _on_transaction_state_changed(transaction:Dictionary)->void:

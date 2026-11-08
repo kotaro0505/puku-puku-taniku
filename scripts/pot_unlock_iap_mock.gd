@@ -10,6 +10,9 @@ const TRANSACTION_PURCHASED := 3
 const TRANSACTION_RESTORED := 4
 
 var localized_prices:Dictionary={}
+var currency_values:Dictionary={}
+var currency_codes:Dictionary={}
+var currency_symbols:Dictionary={}
 var purchased:Dictionary={}
 var restore_entitlements:Dictionary={}
 var next_purchase_error:=""
@@ -46,9 +49,9 @@ func request_product_price(product_id:String)->Signal:
 		product_price_received.emit({
 			"error":"",
 			"product_id":product_id,
-			"currency_value":0.0,
-			"currency_code":"TEST",
-			"currency_symbol":"",
+			"currency_value":currency_values.get(product_id,0.0),
+			"currency_code":str(currency_codes.get(product_id,"TEST")),
+			"currency_symbol":str(currency_symbols.get(product_id,"")),
 			"localized_price":str(localized_prices[product_id]),
 		})
 	return product_price_received
