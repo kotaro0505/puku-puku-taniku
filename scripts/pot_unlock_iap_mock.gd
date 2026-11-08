@@ -13,6 +13,7 @@ var localized_prices:Dictionary={}
 var currency_values:Dictionary={}
 var currency_codes:Dictionary={}
 var currency_symbols:Dictionary={}
+var storefront_country_codes:Dictionary={}
 var purchased:Dictionary={}
 var restore_entitlements:Dictionary={}
 var next_purchase_error:=""
@@ -52,6 +53,7 @@ func request_product_price(product_id:String)->Signal:
 			"currency_value":currency_values.get(product_id,0.0),
 			"currency_code":str(currency_codes.get(product_id,"TEST")),
 			"currency_symbol":str(currency_symbols.get(product_id,"")),
+			"storefront_country_code":str(storefront_country_codes.get(product_id,"")),
 			"localized_price":str(localized_prices[product_id]),
 		})
 	return product_price_received

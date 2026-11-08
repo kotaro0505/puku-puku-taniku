@@ -91,6 +91,7 @@ func _ready()->void:
 	capture_mock.currency_values[first_product]=100.0
 	capture_mock.currency_codes[first_product]="JPY"
 	capture_mock.currency_symbols[first_product]="¥"
+	capture_mock.storefront_country_codes[first_product]="JPN"
 	var capture_service:=ServiceClass.new();add_child(capture_service);capture_service.configure(all_pots,{},capture_mock,first_product)
 	await get_tree().process_frame
 	var capture_diagnostic:Dictionary=capture_service.diagnostic_snapshot()
@@ -100,6 +101,7 @@ func _ready()->void:
 	assert(str(capture_state.localized_price)=="¥100.00")
 	assert(is_equal_approx(float(capture_state.currency_value),100.0))
 	assert(str(capture_state.currency_code)=="JPY" and str(capture_state.currency_symbol)=="¥")
+	assert(str(capture_state.storefront_country_code)=="JPN")
 	assert(capture_mock.purchase_calls.is_empty())
 	assert(str(capture_service.product_states_snapshot()[last_product].status)==capture_service.STATUS_UNAVAILABLE)
 	assert(str(capture_service.product_states_snapshot()[last_product].error)=="capture_not_requested")

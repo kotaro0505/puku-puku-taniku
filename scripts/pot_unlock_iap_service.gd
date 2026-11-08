@@ -196,7 +196,8 @@ func _on_product_price_received(price:Dictionary)->void:
 	var error:=str(price.get("error",""))
 	# Keep StoreKit's localized display byte-for-byte for the review button. The
 	# numeric value and ISO currency code are retained separately so validation
-	# never has to parse locale-dependent presentation text.
+	# never has to parse locale-dependent presentation text. The storefront code
+	# is an in-memory diagnostic only and is never written to the game save.
 	var localized_price:=str(price.get("localized_price",""))
 	if not error.is_empty() or localized_price.strip_edges().is_empty():
 		_set_product_unavailable(product_id,error if not error.is_empty() else "localized_price_missing")
@@ -207,6 +208,7 @@ func _on_product_price_received(price:Dictionary)->void:
 		"currency_value":price.get("currency_value",null),
 		"currency_code":str(price.get("currency_code","")),
 		"currency_symbol":str(price.get("currency_symbol","")),
+		"storefront_country_code":str(price.get("storefront_country_code","")),
 		"error":"",
 	}
 	state_changed.emit()

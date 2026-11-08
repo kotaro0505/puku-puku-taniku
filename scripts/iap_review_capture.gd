@@ -312,8 +312,10 @@ static func _storekit_price_diagnostic(product_state:Dictionary)->String:
 	var currency_code:=str(product_state.get("currency_code","<missing>")).strip_edges().to_upper()
 	if currency_code.is_empty():currency_code="<missing>"
 	var currency_value:="<missing>" if not product_state.has("currency_value") or product_state.get("currency_value")==null else str(product_state.get("currency_value"))
+	var storefront_country_code:=str(product_state.get("storefront_country_code","<missing>")).strip_edges().to_upper()
+	if storefront_country_code.is_empty():storefront_country_code="<missing>"
 	var localized_price:=str(product_state.get("localized_price",""))
-	return "currency_code=%s currency_value=%s localized_price=%s"%[currency_code,currency_value,JSON.stringify(localized_price)]
+	return "currency_code=%s currency_value=%s storefront_country_code=%s localized_price=%s"%[currency_code,currency_value,storefront_country_code,JSON.stringify(localized_price)]
 
 
 static func is_supported_apple_portrait_size(size:Vector2i)->bool:

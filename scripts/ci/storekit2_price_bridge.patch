@@ -3,7 +3,11 @@ diff --git a/godot-storekit2/godot-storekit2.mm b/godot-storekit2/godot-storekit
 +++ b/godot-storekit2/godot-storekit2.mm
 @@ -18,0 +19 @@
 +	ClassDB::bind_method(D_METHOD("request_product_price", "product_id"), &GodotStoreKit2::request_product_price);
-@@ -60,0 +62,21 @@
+@@ -43 +44,2 @@
+-			result["currency_value"] = priceInfo.currencyValue;
++			result["currency_value"] = priceInfo.currencyValue.doubleValue;
++			result["storefront_country_code"] = toGodotString(priceInfo.storefrontCountryCode);
+@@ -60,0 +63,22 @@
 +
 +Signal GodotStoreKit2::request_product_price(String p_product_id) {
 +	NSString *productId = fromGodotString(p_product_id);
@@ -14,7 +18,8 @@ diff --git a/godot-storekit2/godot-storekit2.mm b/godot-storekit2/godot-storekit
 +			result["error"] = toGodotString(error.localizedDescription);
 +		} else {
 +			result["error"] = String();
-+			result["currency_value"] = info.currencyValue;
++			result["currency_value"] = info.currencyValue.doubleValue;
++			result["storefront_country_code"] = toGodotString(info.storefrontCountryCode);
 +			result["currency_code"] = toGodotString(info.currencyCode);
 +			result["currency_symbol"] = toGodotString(info.currencySymbol);
 +			result["localized_price"] = toGodotString(info.localizedDisplay);
@@ -25,3 +30,21 @@ diff --git a/godot-storekit2/godot-storekit2.mm b/godot-storekit2/godot-storekit
 +
 +	return Signal(this, "product_price_received");
 +}
+diff --git a/godot-storekit2/GodotStoreKit2Swift.swift b/godot-storekit2/GodotStoreKit2Swift.swift
+--- a/godot-storekit2/GodotStoreKit2Swift.swift
++++ b/godot-storekit2/GodotStoreKit2Swift.swift
+@@ -77 +77 @@
+-	private func priceInfoFromProduct(product: Product) -> PriceInfo {
++	private func priceInfoFromProduct(product: Product) async -> PriceInfo {
+@@ -91,0 +92,3 @@
++		if let storefront = await Storefront.current {
++			info.storefrontCountryCode = storefront.countryCode
++		}
+@@ -107 +110 @@
+-		info.priceInfo = priceInfoFromProduct(product: product)
++		info.priceInfo = await priceInfoFromProduct(product: product)
+@@ -138 +141 @@
+-		return priceInfoFromProduct(product: product)
++		return await priceInfoFromProduct(product: product)
+@@ -196,0 +200 @@
++	public var storefrontCountryCode = ""

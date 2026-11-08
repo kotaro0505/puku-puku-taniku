@@ -4,7 +4,7 @@ set -euo pipefail
 : "${GODOT_VERSION:?GODOT_VERSION is required}"
 STOREKIT2_VERSION="${STOREKIT2_VERSION:-v0.2}"
 IOS_MIN_VERSION="${IOS_MIN_VERSION:-15.6}"
-STOREKIT2_COMPAT_REVISION="${STOREKIT2_COMPAT_REVISION:-compat3}"
+STOREKIT2_COMPAT_REVISION="${STOREKIT2_COMPAT_REVISION:-compat4}"
 PROJECT_DIR="${CM_BUILD_DIR:-$(pwd)}"
 SOURCE_HEAD="$(git -C "$PROJECT_DIR" rev-parse HEAD 2>/dev/null || true)"
 [ -n "$SOURCE_HEAD" ] || SOURCE_HEAD="unavailable"
@@ -30,8 +30,8 @@ if [ "$STOREKIT2_VERSION" != "v0.2" ]; then
   exit 1
 fi
 
-if [ "$STOREKIT2_COMPAT_REVISION" != "compat3" ]; then
-  echo "Unexpected StoreKit2 compatibility revision: expected compat3, got $STOREKIT2_COMPAT_REVISION" >&2
+if [ "$STOREKIT2_COMPAT_REVISION" != "compat4" ]; then
+  echo "Unexpected StoreKit2 compatibility revision: expected compat4, got $STOREKIT2_COMPAT_REVISION" >&2
   exit 1
 fi
 
@@ -77,6 +77,8 @@ for framework_arg in sys.argv[1:]:
             b"product_info_received",
             b"request_product_price",
             b"product_price_received",
+            b"storefront_country_code",
+            b"doubleValue",
         ):
             if marker not in library_data:
                 raise SystemExit(
@@ -130,9 +132,14 @@ mv "$GODOT_SOURCE" "$PLUGIN_SOURCE/godot"
 
 PLUGIN_HEADER="$PLUGIN_SOURCE/godot-storekit2/godot-storekit2.h"
 PLUGIN_IMPLEMENTATION="$PLUGIN_SOURCE/godot-storekit2/godot-storekit2.mm"
+PLUGIN_SWIFT="$PLUGIN_SOURCE/godot-storekit2/GodotStoreKit2Swift.swift"
 GODOT_TYPE_INFO_HEADER="$PLUGIN_SOURCE/godot/core/variant/type_info.h"
 if [ ! -f "$PLUGIN_HEADER" ]; then
   echo "Missing godot-storekit2 header for the Godot 4.7.2 compatibility patch: $PLUGIN_HEADER" >&2
+  exit 1
+fi
+if [ ! -f "$PLUGIN_SWIFT" ]; then
+  echo "Missing godot-storekit2 Swift source for the StoreKit price bridge patch: $PLUGIN_SWIFT" >&2
   exit 1
 fi
 if [ ! -f "$GODOT_TYPE_INFO_HEADER" ]; then
@@ -145,6 +152,18 @@ git -C "$PLUGIN_SOURCE" apply --unidiff-zero "$PRICE_BRIDGE_PATCH"
 grep -Fq 'D_METHOD("request_product_price", "product_id")' "$PLUGIN_IMPLEMENTATION"
 grep -Fq 'getProductPriceWithProductId:productId' "$PLUGIN_IMPLEMENTATION"
 grep -Fq '"product_price_received"' "$PLUGIN_IMPLEMENTATION"
+grep -Fq 'result["currency_value"] = priceInfo.currencyValue.doubleValue;' "$PLUGIN_IMPLEMENTATION"
+grep -Fq 'result["currency_value"] = info.currencyValue.doubleValue;' "$PLUGIN_IMPLEMENTATION"
+grep -Fq 'result["storefront_country_code"] = toGodotString(priceInfo.storefrontCountryCode);' "$PLUGIN_IMPLEMENTATION"
+grep -Fq 'result["storefront_country_code"] = toGodotString(info.storefrontCountryCode);' "$PLUGIN_IMPLEMENTATION"
+if grep -Fq 'result["currency_value"] = priceInfo.currencyValue;' "$PLUGIN_IMPLEMENTATION" \
+  || grep -Fq 'result["currency_value"] = info.currencyValue;' "$PLUGIN_IMPLEMENTATION"; then
+  echo "Unsafe NSDecimalNumber pointer assignment remains in StoreKit2 bridge: $PLUGIN_IMPLEMENTATION" >&2
+  exit 1
+fi
+grep -Fq 'private func priceInfoFromProduct(product: Product) async -> PriceInfo' "$PLUGIN_SWIFT"
+grep -Fq 'if let storefront = await Storefront.current {' "$PLUGIN_SWIFT"
+grep -Fq 'public var storefrontCountryCode = ""' "$PLUGIN_SWIFT"
 if ! grep -Eq '^[[:space:]]*#[[:space:]]*define[[:space:]]+VARIANT_ENUM_CAST[[:space:]]*\(' "$GODOT_TYPE_INFO_HEADER"; then
   echo "Godot $GODOT_VERSION type_info.h does not define VARIANT_ENUM_CAST: $GODOT_TYPE_INFO_HEADER" >&2
   exit 1
@@ -197,6 +216,7 @@ nl -ba "$PLUGIN_HEADER" | sed -n '1,55p'
 echo "STOREKIT2_PATCHED_HEADER_END"
 echo "STOREKIT2_GODOT_COMPAT_PATCH_OK godot=$GODOT_VERSION include=core/variant/type_info.h count=$TYPE_INFO_INCLUDE_COUNT"
 echo "STOREKIT2_PRICE_BRIDGE_PATCH_OK method=request_product_price signal=product_price_received"
+echo "STOREKIT2_NUMERIC_PRICE_BRIDGE_OK conversion=NSDecimalNumber.doubleValue paths=product_info,product_price storefront=Storefront.current"
 
 PLUGIN_PROJECT="$PLUGIN_SOURCE/godot-storekit2.xcodeproj/project.pbxproj"
 python3 - "$PLUGIN_PROJECT" "$IOS_MIN_VERSION" <<'PY'
