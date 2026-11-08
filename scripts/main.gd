@@ -1156,7 +1156,8 @@ func _setup_pot_unlock_iap()->void:
 	pot_unlock_iap_service.entitlement_changed.connect(_on_pot_iap_entitlement_changed)
 	pot_unlock_iap_service.purchase_failed.connect(_on_pot_iap_purchase_failed)
 	pot_unlock_iap_service.restore_finished.connect(_on_pot_iap_restore_finished)
-	pot_unlock_iap_service.configure(pot_catalog,pot_design_unlocks)
+	var price_only_product_id:=BuildProfileClass.IAP_REVIEW_CAPTURE_PRODUCT_ID if BuildProfileClass.iap_review_capture_enabled() else ""
+	pot_unlock_iap_service.configure(pot_catalog,pot_design_unlocks,null,price_only_product_id)
 
 func _setup_rewarded_ads()->void:
 	rewarded_ad_service=RewardedAdServiceClass.new()

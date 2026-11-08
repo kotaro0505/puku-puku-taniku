@@ -1,0 +1,27 @@
+diff --git a/godot-storekit2/godot-storekit2.mm b/godot-storekit2/godot-storekit2.mm
+--- a/godot-storekit2/godot-storekit2.mm
++++ b/godot-storekit2/godot-storekit2.mm
+@@ -18,0 +19 @@
++	ClassDB::bind_method(D_METHOD("request_product_price", "product_id"), &GodotStoreKit2::request_product_price);
+@@ -60,0 +62,21 @@
++
++Signal GodotStoreKit2::request_product_price(String p_product_id) {
++	NSString *productId = fromGodotString(p_product_id);
++	[proxy getProductPriceWithProductId:productId completionHandler:^(PriceInfo *info, NSError *error) {
++		Dictionary result;
++		result["product_id"] = toGodotString(productId);
++		if (error) {
++			result["error"] = toGodotString(error.localizedDescription);
++		} else {
++			result["error"] = String();
++			result["currency_value"] = info.currencyValue;
++			result["currency_code"] = toGodotString(info.currencyCode);
++			result["currency_symbol"] = toGodotString(info.currencySymbol);
++			result["localized_price"] = toGodotString(info.localizedDisplay);
++		}
++
++		call_deferred("emit_signal", "product_price_received", result);
++	}];
++
++	return Signal(this, "product_price_received");
++}

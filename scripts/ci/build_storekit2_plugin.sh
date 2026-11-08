@@ -4,7 +4,7 @@ set -euo pipefail
 : "${GODOT_VERSION:?GODOT_VERSION is required}"
 STOREKIT2_VERSION="${STOREKIT2_VERSION:-v0.2}"
 IOS_MIN_VERSION="${IOS_MIN_VERSION:-15.6}"
-STOREKIT2_COMPAT_REVISION="${STOREKIT2_COMPAT_REVISION:-compat2}"
+STOREKIT2_COMPAT_REVISION="${STOREKIT2_COMPAT_REVISION:-compat3}"
 PROJECT_DIR="${CM_BUILD_DIR:-$(pwd)}"
 SOURCE_HEAD="$(git -C "$PROJECT_DIR" rev-parse HEAD 2>/dev/null || true)"
 [ -n "$SOURCE_HEAD" ] || SOURCE_HEAD="unavailable"
@@ -13,6 +13,7 @@ CACHE_PLUGIN="$CACHE_ROOT/godot-storekit2"
 CACHE_TARGET_FILE="$CACHE_ROOT/ios-min-version.txt"
 CACHE_COMPAT_FILE="$CACHE_ROOT/compat-revision.txt"
 OUTPUT_DIR="$PROJECT_DIR/ios/plugins/godot-storekit2"
+PRICE_BRIDGE_PATCH="$PROJECT_DIR/scripts/ci/storekit2_price_bridge.patch"
 
 if [ "$IOS_MIN_VERSION" != "15.6" ]; then
   echo "godot-storekit2 $STOREKIT2_VERSION requires IOS_MIN_VERSION=15.6, got $IOS_MIN_VERSION" >&2
@@ -29,8 +30,13 @@ if [ "$STOREKIT2_VERSION" != "v0.2" ]; then
   exit 1
 fi
 
-if [ "$STOREKIT2_COMPAT_REVISION" != "compat2" ]; then
-  echo "Unexpected StoreKit2 compatibility revision: expected compat2, got $STOREKIT2_COMPAT_REVISION" >&2
+if [ "$STOREKIT2_COMPAT_REVISION" != "compat3" ]; then
+  echo "Unexpected StoreKit2 compatibility revision: expected compat3, got $STOREKIT2_COMPAT_REVISION" >&2
+  exit 1
+fi
+
+if [ ! -f "$PRICE_BRIDGE_PATCH" ]; then
+  echo "Missing StoreKit2 price bridge patch: $PRICE_BRIDGE_PATCH" >&2
   exit 1
 fi
 
@@ -65,6 +71,17 @@ for framework_arg in sys.argv[1:]:
         library_path = framework / library["LibraryIdentifier"] / library["LibraryPath"]
         if not library_path.exists():
             raise SystemExit(f"Missing iOS arm64 library: {library_path}")
+        library_data = library_path.read_bytes()
+        for marker in (
+            b"request_product_info",
+            b"product_info_received",
+            b"request_product_price",
+            b"product_price_received",
+        ):
+            if marker not in library_data:
+                raise SystemExit(
+                    f"Missing StoreKit2 bridge marker {marker.decode()} in {library_path}"
+                )
     print(f"STOREKIT2_XCFRAMEWORK_OK path={framework} ios_arm64=true")
 PY
 }
@@ -112,6 +129,7 @@ rm -rf "$PLUGIN_SOURCE/godot"
 mv "$GODOT_SOURCE" "$PLUGIN_SOURCE/godot"
 
 PLUGIN_HEADER="$PLUGIN_SOURCE/godot-storekit2/godot-storekit2.h"
+PLUGIN_IMPLEMENTATION="$PLUGIN_SOURCE/godot-storekit2/godot-storekit2.mm"
 GODOT_TYPE_INFO_HEADER="$PLUGIN_SOURCE/godot/core/variant/type_info.h"
 if [ ! -f "$PLUGIN_HEADER" ]; then
   echo "Missing godot-storekit2 header for the Godot 4.7.2 compatibility patch: $PLUGIN_HEADER" >&2
@@ -121,6 +139,12 @@ if [ ! -f "$GODOT_TYPE_INFO_HEADER" ]; then
   echo "Missing Godot type_info.h required by godot-storekit2: $GODOT_TYPE_INFO_HEADER" >&2
   exit 1
 fi
+
+git -C "$PLUGIN_SOURCE" apply --unidiff-zero --check "$PRICE_BRIDGE_PATCH"
+git -C "$PLUGIN_SOURCE" apply --unidiff-zero "$PRICE_BRIDGE_PATCH"
+grep -Fq 'D_METHOD("request_product_price", "product_id")' "$PLUGIN_IMPLEMENTATION"
+grep -Fq 'getProductPriceWithProductId:productId' "$PLUGIN_IMPLEMENTATION"
+grep -Fq '"product_price_received"' "$PLUGIN_IMPLEMENTATION"
 if ! grep -Eq '^[[:space:]]*#[[:space:]]*define[[:space:]]+VARIANT_ENUM_CAST[[:space:]]*\(' "$GODOT_TYPE_INFO_HEADER"; then
   echo "Godot $GODOT_VERSION type_info.h does not define VARIANT_ENUM_CAST: $GODOT_TYPE_INFO_HEADER" >&2
   exit 1
@@ -172,6 +196,7 @@ echo "STOREKIT2_PATCHED_HEADER_BEGIN"
 nl -ba "$PLUGIN_HEADER" | sed -n '1,55p'
 echo "STOREKIT2_PATCHED_HEADER_END"
 echo "STOREKIT2_GODOT_COMPAT_PATCH_OK godot=$GODOT_VERSION include=core/variant/type_info.h count=$TYPE_INFO_INCLUDE_COUNT"
+echo "STOREKIT2_PRICE_BRIDGE_PATCH_OK method=request_product_price signal=product_price_received"
 
 PLUGIN_PROJECT="$PLUGIN_SOURCE/godot-storekit2.xcodeproj/project.pbxproj"
 python3 - "$PLUGIN_PROJECT" "$IOS_MIN_VERSION" <<'PY'

@@ -3,6 +3,7 @@ extends RefCounted
 
 signal transaction_state_changed(transaction:Dictionary)
 signal product_info_received(product_info:Dictionary)
+signal product_price_received(product_price:Dictionary)
 signal synchronized
 
 const TRANSACTION_PURCHASED := 3
@@ -14,6 +15,8 @@ var restore_entitlements:Dictionary={}
 var next_purchase_error:=""
 var purchase_calls:Array[String]=[]
 var requested_products:Array[String]=[]
+var requested_prices:Array[String]=[]
+var suppress_price_response:=false
 var sync_calls:=0
 
 func request_product_info(product_id:String)->Signal:
@@ -33,6 +36,22 @@ func request_product_info(product_id:String)->Signal:
 			"localized_price":str(localized_prices[product_id]),
 		})
 	return product_info_received
+
+func request_product_price(product_id:String)->Signal:
+	requested_prices.append(product_id)
+	if suppress_price_response:return product_price_received
+	if not localized_prices.has(product_id):
+		product_price_received.emit({"product_id":product_id,"error":"not_configured"})
+	else:
+		product_price_received.emit({
+			"error":"",
+			"product_id":product_id,
+			"currency_value":0.0,
+			"currency_code":"TEST",
+			"currency_symbol":"",
+			"localized_price":str(localized_prices[product_id]),
+		})
+	return product_price_received
 
 func purchase_product(product_id:String,_quantity:int=1)->Signal:
 	purchase_calls.append(product_id)

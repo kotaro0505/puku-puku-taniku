@@ -73,6 +73,7 @@ func _ready()->void:
 	var service:=ServiceClass.new();add_child(service);service.configure(all_pots,{},mock)
 	await get_tree().process_frame
 	assert(service.restore_available() and service.using_test_bridge())
+	assert(mock.requested_products.size()==36 and mock.requested_prices.is_empty())
 	assert(str(service.product_states_snapshot()[first_product].localized_price)=="€0,99")
 	assert(str(service.product_states_snapshot()[first_product].status)==service.STATUS_AVAILABLE)
 	assert(service.purchase(first_product));assert(service.is_unlocked(first_product) and mock.purchase_calls.size()==1)
@@ -82,6 +83,31 @@ func _ready()->void:
 	await get_tree().process_frame
 	assert(failure_service.purchase(first_product));assert(not failure_service.is_unlocked(first_product))
 	assert(str(failure_service.product_states_snapshot()[first_product].status)==failure_service.STATUS_AVAILABLE)
+
+	# The review-capture profile needs only the visible StoreKit price. It must
+	# issue one price-only request and must not start 36 entitlement lookups.
+	var capture_mock:=MockClass.new();capture_mock.localized_prices=prices.duplicate(true)
+	var capture_service:=ServiceClass.new();add_child(capture_service);capture_service.configure(all_pots,{},capture_mock,first_product)
+	await get_tree().process_frame
+	var capture_diagnostic:Dictionary=capture_service.diagnostic_snapshot()
+	assert(capture_mock.requested_prices==[first_product] and capture_mock.requested_products.is_empty())
+	assert(str(capture_service.product_states_snapshot()[first_product].status)==capture_service.STATUS_AVAILABLE)
+	assert(str(capture_service.product_states_snapshot()[first_product].localized_price)=="€0,99")
+	assert(str(capture_service.product_states_snapshot()[last_product].status)==capture_service.STATUS_UNAVAILABLE)
+	assert(str(capture_service.product_states_snapshot()[last_product].error)=="capture_not_requested")
+	assert(str(capture_diagnostic.request_mode)=="price_only")
+	assert(int(capture_diagnostic.requested_product_count)==1 and int(capture_diagnostic.requests_dispatched)==1 and int(capture_diagnostic.responses_received)==1)
+	assert(bool(capture_diagnostic.request_method_available) and bool(capture_diagnostic.response_signal_available))
+
+	# A native request that never returns remains distinguishable from a missing
+	# bridge API without weakening the capture timeout gate.
+	var timeout_mock:=MockClass.new();timeout_mock.localized_prices=prices.duplicate(true);timeout_mock.suppress_price_response=true
+	var timeout_service:=ServiceClass.new();add_child(timeout_service);timeout_service.configure(all_pots,{},timeout_mock,first_product)
+	await get_tree().process_frame
+	var timeout_diagnostic:Dictionary=timeout_service.diagnostic_snapshot()
+	assert(str(timeout_service.product_states_snapshot()[first_product].status)==timeout_service.STATUS_LOADING)
+	assert(timeout_mock.requested_prices==[first_product] and timeout_mock.requested_products.is_empty())
+	assert(int(timeout_diagnostic.requests_dispatched)==1 and int(timeout_diagnostic.responses_received)==0)
 
 	var restore_mock:=MockClass.new();restore_mock.localized_prices=prices.duplicate(true);restore_mock.restore_entitlements={first_product:true,last_product:true}
 	var restore_service:=ServiceClass.new();add_child(restore_service);restore_service.configure(all_pots,{},restore_mock)

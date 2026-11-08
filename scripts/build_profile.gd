@@ -3,6 +3,7 @@ extends RefCounted
 
 const APP_STORE_RELEASE_FEATURE := "puku_app_store_release"
 const IAP_REVIEW_CAPTURE_FEATURE := "puku_iap_review_capture"
+const IAP_REVIEW_CAPTURE_PRODUCT_ID := "pot_unlock_001"
 const DEVELOPMENT_FEATURE := "puku_development"
 const REWARDED_AD_STUB_FEATURE := "puku_rewarded_ad_stub"
 const IOS_TEST_ADS_FEATURE := "puku_ios_test_ads"

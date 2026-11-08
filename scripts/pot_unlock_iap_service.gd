@@ -29,8 +29,13 @@ var _entitlements:Dictionary={}
 var _restore_in_progress:=false
 var _active_purchase_product_id:=""
 var _using_test_bridge:=false
+var _price_only_product_id:=""
+var _request_method_available:=false
+var _response_signal_available:=false
+var _requests_dispatched:=0
+var _responses_received:=0
 
-func configure(pots:Array,cached_entitlements:Dictionary={},test_bridge:Variant=null)->void:
+func configure(pots:Array,cached_entitlements:Dictionary={},test_bridge:Variant=null,price_only_product_id:String="")->void:
 	_product_ids.clear()
 	_product_states.clear()
 	_entitlements.clear()
@@ -38,6 +43,11 @@ func configure(pots:Array,cached_entitlements:Dictionary={},test_bridge:Variant=
 	_active_purchase_product_id=""
 	_store_kit=null
 	_using_test_bridge=false
+	_price_only_product_id=price_only_product_id.strip_edges()
+	_request_method_available=false
+	_response_signal_available=false
+	_requests_dispatched=0
+	_responses_received=0
 	for pot_value in pots:
 		if not pot_value is Dictionary:continue
 		var pot:Dictionary=pot_value
@@ -47,6 +57,13 @@ func configure(pots:Array,cached_entitlements:Dictionary={},test_bridge:Variant=
 		_product_ids.append(product_id)
 		_product_states[product_id]={"status":STATUS_LOADING,"localized_price":"","error":""}
 		if bool(cached_entitlements.get(product_id,false)):_entitlements[product_id]=true
+	if not _price_only_product_id.is_empty() and not _product_ids.has(_price_only_product_id):
+		_mark_all_unavailable("capture_product_unknown")
+		return
+	if not _price_only_product_id.is_empty():
+		for product_id in _product_ids:
+			if product_id==_price_only_product_id:continue
+			_product_states[product_id]={"status":STATUS_UNAVAILABLE,"localized_price":"","error":"capture_not_requested"}
 	if test_bridge!=null:
 		if not OS.is_debug_build():
 			push_error("Pot IAP test bridge is disabled in release builds")
@@ -59,7 +76,8 @@ func configure(pots:Array,cached_entitlements:Dictionary={},test_bridge:Variant=
 		_mark_all_unavailable("storekit_unavailable")
 		return
 	_connect_bridge_signals()
-	call_deferred("_request_all_product_info")
+	if not _validate_product_request_api():return
+	call_deferred("_request_configured_product_data")
 
 func product_states_snapshot()->Dictionary:
 	return _product_states.duplicate(true)
@@ -78,6 +96,18 @@ func restore_in_progress()->bool:
 
 func using_test_bridge()->bool:
 	return _using_test_bridge
+
+func diagnostic_snapshot()->Dictionary:
+	return {
+		"bridge_available":_store_kit!=null,
+		"request_mode":"price_only" if not _price_only_product_id.is_empty() else "product_info",
+		"request_method_available":_request_method_available,
+		"response_signal_available":_response_signal_available,
+		"configured_product_count":_product_ids.size(),
+		"requested_product_count":1 if not _price_only_product_id.is_empty() else _product_ids.size(),
+		"requests_dispatched":_requests_dispatched,
+		"responses_received":_responses_received,
+	}
 
 func purchase(product_id:String)->bool:
 	if not _product_ids.has(product_id):
@@ -107,18 +137,39 @@ func restore_purchases()->bool:
 func _connect_bridge_signals()->void:
 	if _store_kit.has_signal("product_info_received"):
 		_store_kit.connect("product_info_received",_on_product_info_received)
+	if _store_kit.has_signal("product_price_received"):
+		_store_kit.connect("product_price_received",_on_product_price_received)
 	if _store_kit.has_signal("transaction_state_changed"):
 		_store_kit.connect("transaction_state_changed",_on_transaction_state_changed)
 	if _store_kit.has_signal("synchronized"):
 		_store_kit.connect("synchronized",_on_synchronized)
 
-func _request_all_product_info()->void:
+func _validate_product_request_api()->bool:
+	var method_name:="request_product_price" if not _price_only_product_id.is_empty() else "request_product_info"
+	var signal_name:="product_price_received" if not _price_only_product_id.is_empty() else "product_info_received"
+	_request_method_available=_store_kit.has_method(method_name)
+	_response_signal_available=_store_kit.has_signal(signal_name)
+	if _request_method_available and _response_signal_available:return true
+	var error:="storekit_%s_%s_missing"%[
+		"price" if not _price_only_product_id.is_empty() else "product_info",
+		"method" if not _request_method_available else "signal",
+	]
+	if not _price_only_product_id.is_empty():_set_product_unavailable(_price_only_product_id,error)
+	else:_mark_loading_unavailable(error)
+	return false
+
+func _request_configured_product_data()->void:
 	if _store_kit==null:return
+	if not _price_only_product_id.is_empty():
+		_requests_dispatched+=1
+		_store_kit.call("request_product_price",_price_only_product_id)
+		return
 	for product_id in _product_ids:
-		if _store_kit.has_method("request_product_info"):
-			_store_kit.call("request_product_info",product_id)
+		_requests_dispatched+=1
+		_store_kit.call("request_product_info",product_id)
 
 func _on_product_info_received(info:Dictionary)->void:
+	_responses_received+=1
 	var product_id:=str(info.get("product_id",""))
 	if product_id.is_empty():
 		# StoreKit may omit the product id on an error. Keep every unresolved item
@@ -136,6 +187,18 @@ func _on_product_info_received(info:Dictionary)->void:
 	# A successful StoreKit lookup is authoritative. It restores purchases on a
 	# new save/device and also removes a refunded entitlement from the local cache.
 	_set_entitlement(product_id,bool(info.get("is_purchased",false)))
+	state_changed.emit()
+
+func _on_product_price_received(price:Dictionary)->void:
+	_responses_received+=1
+	var product_id:=str(price.get("product_id",_price_only_product_id))
+	if product_id!=_price_only_product_id:return
+	var error:=str(price.get("error",""))
+	var localized_price:=str(price.get("localized_price","")).strip_edges()
+	if not error.is_empty() or localized_price.is_empty():
+		_set_product_unavailable(product_id,error if not error.is_empty() else "localized_price_missing")
+		return
+	_product_states[product_id]={"status":STATUS_AVAILABLE,"localized_price":localized_price,"error":""}
 	state_changed.emit()
 
 func _on_transaction_state_changed(transaction:Dictionary)->void:
@@ -167,9 +230,9 @@ func _on_transaction_state_changed(transaction:Dictionary)->void:
 			_reset_product_after_purchase(product_id,"purchase_failed")
 			purchase_failed.emit(product_id,"purchase_failed")
 
-func _on_synchronized()->void:
+func _on_synchronized(_error:String="")->void:
 	_restore_in_progress=false
-	_request_all_product_info()
+	_request_configured_product_data()
 	restore_finished.emit(true)
 	state_changed.emit()
 
@@ -195,6 +258,11 @@ func _mark_loading_unavailable(error:String)->void:
 			state["status"]=STATUS_UNAVAILABLE
 			state["error"]=error
 			_product_states[product_id]=state
+	state_changed.emit()
+
+func _set_product_unavailable(product_id:String,error:String)->void:
+	if not _product_ids.has(product_id):return
+	_product_states[product_id]={"status":STATUS_UNAVAILABLE,"localized_price":"","error":error}
 	state_changed.emit()
 
 func _mark_all_unavailable(error:String)->void:

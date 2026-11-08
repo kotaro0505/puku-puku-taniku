@@ -5,6 +5,7 @@ const CaptureClass = preload("res://scripts/iap_review_capture.gd")
 
 func _ready()->void:
 	assert(CaptureClass.PRODUCT_ID=="pot_unlock_001")
+	assert(CaptureClass.PRODUCT_ID==preload("res://scripts/build_profile.gd").IAP_REVIEW_CAPTURE_PRODUCT_ID)
 	assert(CaptureClass.POT_ID=="g1_crystal_goblet")
 	assert(CaptureClass.EXPECTED_PUKU_PRICE==2)
 	assert(CaptureClass.is_supported_apple_portrait_size(Vector2i(1320,2868)))
@@ -18,11 +19,15 @@ func _ready()->void:
 	assert(not CaptureClass._is_rgb_png_without_alpha(rgb_header,Vector2i(1290,2796)))
 
 	var capture_source:=FileAccess.get_file_as_string("res://scripts/iap_review_capture.gd")
-	assert(capture_source.contains('const PRODUCT_ID := "pot_unlock_001"'))
+	assert(capture_source.contains("BuildProfileClass.IAP_REVIEW_CAPTURE_PRODUCT_ID"))
 	assert(not capture_source.contains("pot_unlock_002"))
 	assert(capture_source.contains("image.convert(Image.FORMAT_RGB8)"))
 	assert(capture_source.contains("buy_button.mouse_filter=Control.MOUSE_FILTER_IGNORE"))
 	assert(capture_source.contains('"storekit_price_is_jpy_100"'))
+	assert(capture_source.contains('"storekit_price_response_timeout"'))
+	var main_source:=FileAccess.get_file_as_string("res://scripts/main.gd")
+	assert(main_source.contains("price_only_product_id"))
+	assert(main_source.contains("BuildProfileClass.IAP_REVIEW_CAPTURE_PRODUCT_ID"))
 
 	var presets:=FileAccess.get_file_as_string("res://export_presets.cfg")
 	var production_header:=presets.get_slice('[preset.1]',1).get_slice('[preset.1.options]',0)

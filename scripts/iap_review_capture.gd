@@ -4,7 +4,7 @@ extends Node
 const BuildProfileClass = preload("res://scripts/build_profile.gd")
 const GameLocalizer = preload("res://scripts/game_localizer.gd")
 
-const PRODUCT_ID := "pot_unlock_001"
+const PRODUCT_ID := BuildProfileClass.IAP_REVIEW_CAPTURE_PRODUCT_ID
 const POT_ID := "g1_crystal_goblet"
 const EXPECTED_NAME_JA := "クリスタルゴブレット鉢"
 const EXPECTED_IMAGE_PATH := "res://assets/arrangement/pots/pot-g1-001-crystal-goblet.png"
@@ -172,7 +172,23 @@ func _wait_for_storekit_product()->Dictionary:
 				_fail("storekit_product_unavailable")
 				return {}
 		await get_tree().create_timer(.1).timeout
-	_fail("storekit_product_timeout")
+	var diagnostic:Dictionary={}
+	if _main.pot_unlock_iap_service.has_method("diagnostic_snapshot"):
+		diagnostic=_main.pot_unlock_iap_service.diagnostic_snapshot()
+	print(
+		"IAP_REVIEW_CAPTURE_STOREKIT_TIMEOUT mode=",str(diagnostic.get("request_mode","unknown")),
+		" bridge=",bool(diagnostic.get("bridge_available",false)),
+		" method=",bool(diagnostic.get("request_method_available",false)),
+		" signal=",bool(diagnostic.get("response_signal_available",false)),
+		" dispatched=",int(diagnostic.get("requests_dispatched",0)),
+		" responses=",int(diagnostic.get("responses_received",0))
+	)
+	if int(diagnostic.get("requests_dispatched",0))<=0:
+		_fail("storekit_request_not_dispatched")
+	elif int(diagnostic.get("responses_received",0))<=0:
+		_fail("storekit_price_response_timeout")
+	else:
+		_fail("storekit_product_timeout")
 	return {}
 
 
