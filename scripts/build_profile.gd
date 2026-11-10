@@ -3,7 +3,7 @@ extends RefCounted
 
 const APP_STORE_RELEASE_FEATURE := "puku_app_store_release"
 const IAP_REVIEW_CAPTURE_FEATURE := "puku_iap_review_capture"
-const IAP_REVIEW_CAPTURE_PRODUCT_ID := "pot_unlock_001"
+const IAP_REVIEW_CAPTURE_PRODUCT_COUNT := 36
 const DEVELOPMENT_FEATURE := "puku_development"
 const REWARDED_AD_STUB_FEATURE := "puku_rewarded_ad_stub"
 const IOS_TEST_ADS_FEATURE := "puku_ios_test_ads"
@@ -15,6 +15,13 @@ static func is_app_store_release() -> bool:
 
 static func iap_review_capture_enabled() -> bool:
 	return is_app_store_release() and OS.has_feature("ios") and OS.has_feature(IAP_REVIEW_CAPTURE_FEATURE)
+
+
+static func iap_review_capture_product_ids() -> Array[String]:
+	var product_ids: Array[String] = []
+	for product_number in range(1, IAP_REVIEW_CAPTURE_PRODUCT_COUNT + 1):
+		product_ids.append("pot_unlock_%03d" % product_number)
+	return product_ids
 
 
 static func development_tools_enabled() -> bool:

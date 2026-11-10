@@ -1156,8 +1156,10 @@ func _setup_pot_unlock_iap()->void:
 	pot_unlock_iap_service.entitlement_changed.connect(_on_pot_iap_entitlement_changed)
 	pot_unlock_iap_service.purchase_failed.connect(_on_pot_iap_purchase_failed)
 	pot_unlock_iap_service.restore_finished.connect(_on_pot_iap_restore_finished)
-	var price_only_product_id:=BuildProfileClass.IAP_REVIEW_CAPTURE_PRODUCT_ID if BuildProfileClass.iap_review_capture_enabled() else ""
-	pot_unlock_iap_service.configure(pot_catalog,pot_design_unlocks,null,price_only_product_id)
+	var price_only_product_ids:Variant=null
+	if BuildProfileClass.iap_review_capture_enabled():
+		price_only_product_ids=BuildProfileClass.iap_review_capture_product_ids()
+	pot_unlock_iap_service.configure(pot_catalog,pot_design_unlocks,null,price_only_product_ids)
 
 func _setup_rewarded_ads()->void:
 	rewarded_ad_service=RewardedAdServiceClass.new()
@@ -6166,7 +6168,7 @@ func _create_personal_best_share_image(record:Dictionary)->String:
 	viewport.queue_free()
 	return output_path if error==OK else ""
 
-func _open_native_share_or_fallback(image_path:String,download_filename:String="",share_context:String="personal_best")->String:
+func _open_native_share_or_fallback(image_path:String,download_filename:String="",share_context:String="personal_best",mime_type:String="image/png")->String:
 	var absolute_path:=ProjectSettings.globalize_path(image_path)
 	var safe_filename:=download_filename.strip_edges()
 	if safe_filename.is_empty():safe_filename=image_path.get_file()
@@ -6185,7 +6187,7 @@ func _open_native_share_or_fallback(image_path:String,download_filename:String="
 				"subject":share_subject,
 				"content":Localizer.text(language_code,"share_prompt"),
 				"file_path":absolute_path,
-				"mime_type":"image/png"
+				"mime_type":mime_type
 			})
 			if typeof(share_result)==TYPE_INT and int(share_result)!=OK:
 				push_warning("SharePlugin rejected the share request with error %d"%int(share_result))

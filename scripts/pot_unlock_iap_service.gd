@@ -29,13 +29,13 @@ var _entitlements:Dictionary={}
 var _restore_in_progress:=false
 var _active_purchase_product_id:=""
 var _using_test_bridge:=false
-var _price_only_product_id:=""
+var _price_only_product_ids:Array[String]=[]
 var _request_method_available:=false
 var _response_signal_available:=false
 var _requests_dispatched:=0
 var _responses_received:=0
 
-func configure(pots:Array,cached_entitlements:Dictionary={},test_bridge:Variant=null,price_only_product_id:String="")->void:
+func configure(pots:Array,cached_entitlements:Dictionary={},test_bridge:Variant=null,price_only_products:Variant=null)->void:
 	_product_ids.clear()
 	_product_states.clear()
 	_entitlements.clear()
@@ -43,7 +43,7 @@ func configure(pots:Array,cached_entitlements:Dictionary={},test_bridge:Variant=
 	_active_purchase_product_id=""
 	_store_kit=null
 	_using_test_bridge=false
-	_price_only_product_id=price_only_product_id.strip_edges()
+	_price_only_product_ids=_normalize_price_only_product_ids(price_only_products)
 	_request_method_available=false
 	_response_signal_available=false
 	_requests_dispatched=0
@@ -57,12 +57,13 @@ func configure(pots:Array,cached_entitlements:Dictionary={},test_bridge:Variant=
 		_product_ids.append(product_id)
 		_product_states[product_id]={"status":STATUS_LOADING,"localized_price":"","error":""}
 		if bool(cached_entitlements.get(product_id,false)):_entitlements[product_id]=true
-	if not _price_only_product_id.is_empty() and not _product_ids.has(_price_only_product_id):
-		_mark_all_unavailable("capture_product_unknown")
-		return
-	if not _price_only_product_id.is_empty():
+	for requested_product_id in _price_only_product_ids:
+		if not _product_ids.has(requested_product_id):
+			_mark_all_unavailable("capture_product_unknown")
+			return
+	if not _price_only_product_ids.is_empty():
 		for product_id in _product_ids:
-			if product_id==_price_only_product_id:continue
+			if _price_only_product_ids.has(product_id):continue
 			_product_states[product_id]={"status":STATUS_UNAVAILABLE,"localized_price":"","error":"capture_not_requested"}
 	if test_bridge!=null:
 		if not OS.is_debug_build():
@@ -100,11 +101,11 @@ func using_test_bridge()->bool:
 func diagnostic_snapshot()->Dictionary:
 	return {
 		"bridge_available":_store_kit!=null,
-		"request_mode":"price_only" if not _price_only_product_id.is_empty() else "product_info",
+		"request_mode":"price_only" if not _price_only_product_ids.is_empty() else "product_info",
 		"request_method_available":_request_method_available,
 		"response_signal_available":_response_signal_available,
 		"configured_product_count":_product_ids.size(),
-		"requested_product_count":1 if not _price_only_product_id.is_empty() else _product_ids.size(),
+		"requested_product_count":_price_only_product_ids.size() if not _price_only_product_ids.is_empty() else _product_ids.size(),
 		"requests_dispatched":_requests_dispatched,
 		"responses_received":_responses_received,
 	}
@@ -145,24 +146,26 @@ func _connect_bridge_signals()->void:
 		_store_kit.connect("synchronized",_on_synchronized)
 
 func _validate_product_request_api()->bool:
-	var method_name:="request_product_price" if not _price_only_product_id.is_empty() else "request_product_info"
-	var signal_name:="product_price_received" if not _price_only_product_id.is_empty() else "product_info_received"
+	var method_name:="request_product_price" if not _price_only_product_ids.is_empty() else "request_product_info"
+	var signal_name:="product_price_received" if not _price_only_product_ids.is_empty() else "product_info_received"
 	_request_method_available=_store_kit.has_method(method_name)
 	_response_signal_available=_store_kit.has_signal(signal_name)
 	if _request_method_available and _response_signal_available:return true
 	var error:="storekit_%s_%s_missing"%[
-		"price" if not _price_only_product_id.is_empty() else "product_info",
+		"price" if not _price_only_product_ids.is_empty() else "product_info",
 		"method" if not _request_method_available else "signal",
 	]
-	if not _price_only_product_id.is_empty():_set_product_unavailable(_price_only_product_id,error)
+	if not _price_only_product_ids.is_empty():
+		for product_id in _price_only_product_ids:_set_product_unavailable(product_id,error)
 	else:_mark_loading_unavailable(error)
 	return false
 
 func _request_configured_product_data()->void:
 	if _store_kit==null:return
-	if not _price_only_product_id.is_empty():
-		_requests_dispatched+=1
-		_store_kit.call("request_product_price",_price_only_product_id)
+	if not _price_only_product_ids.is_empty():
+		for product_id in _price_only_product_ids:
+			_requests_dispatched+=1
+			_store_kit.call("request_product_price",product_id)
 		return
 	for product_id in _product_ids:
 		_requests_dispatched+=1
@@ -191,8 +194,9 @@ func _on_product_info_received(info:Dictionary)->void:
 
 func _on_product_price_received(price:Dictionary)->void:
 	_responses_received+=1
-	var product_id:=str(price.get("product_id",_price_only_product_id))
-	if product_id!=_price_only_product_id:return
+	var fallback_product_id:=_price_only_product_ids[0] if _price_only_product_ids.size()==1 else ""
+	var product_id:=str(price.get("product_id",fallback_product_id))
+	if not _price_only_product_ids.has(product_id):return
 	var error:=str(price.get("error",""))
 	# Keep StoreKit's localized display byte-for-byte for the review button. The
 	# numeric value and ISO currency code are retained separately so validation
@@ -212,6 +216,21 @@ func _on_product_price_received(price:Dictionary)->void:
 		"error":"",
 	}
 	state_changed.emit()
+
+
+func _normalize_price_only_product_ids(value:Variant)->Array[String]:
+	var normalized:Array[String]=[]
+	var candidates:Array=[]
+	if typeof(value)==TYPE_STRING:
+		candidates=[value]
+	elif value is Array:
+		candidates=value
+	elif typeof(value)==TYPE_PACKED_STRING_ARRAY:
+		for packed_value in value:candidates.append(packed_value)
+	for candidate in candidates:
+		var product_id:=str(candidate).strip_edges()
+		if not product_id.is_empty() and not normalized.has(product_id):normalized.append(product_id)
+	return normalized
 
 func _on_transaction_state_changed(transaction:Dictionary)->void:
 	var product_id:=str(transaction.get("product_id",""))

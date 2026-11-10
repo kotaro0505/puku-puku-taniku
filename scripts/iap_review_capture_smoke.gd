@@ -1,55 +1,79 @@
 extends Node
 
 const CaptureClass = preload("res://scripts/iap_review_capture.gd")
+const BuildProfileClass = preload("res://scripts/build_profile.gd")
 
 
 func _ready()->void:
-	assert(CaptureClass.PRODUCT_ID=="pot_unlock_001")
-	assert(CaptureClass.PRODUCT_ID==preload("res://scripts/build_profile.gd").IAP_REVIEW_CAPTURE_PRODUCT_ID)
-	assert(CaptureClass.POT_ID=="g1_crystal_goblet")
-	assert(CaptureClass.EXPECTED_PUKU_PRICE==2)
+	var product_ids:=BuildProfileClass.iap_review_capture_product_ids()
+	assert(CaptureClass.PRODUCT_COUNT==36)
+	assert(product_ids.size()==36)
+	assert(product_ids[0]=="pot_unlock_001" and product_ids[35]=="pot_unlock_036")
+	var unique_ids:Dictionary={}
+	for product_id in product_ids:
+		assert(not unique_ids.has(product_id))
+		unique_ids[product_id]=true
 	assert(CaptureClass.is_supported_apple_portrait_size(Vector2i(1320,2868)))
 	assert(CaptureClass.is_supported_apple_portrait_size(Vector2i(1179,2556)))
 	assert(not CaptureClass.is_supported_apple_portrait_size(Vector2i(576,1024)))
-	# Display formatting is presentation only. StoreKit's numeric value and ISO
-	# currency code are the authoritative 100-yen gate.
-	for display in ["¥100","￥100","¥100.00","100円"]:
-		assert(CaptureClass.is_expected_jpy_100_price({"currency_code":"JPY","currency_value":100.0,"localized_price":display}))
-	assert(CaptureClass.is_expected_jpy_100_price({"currency_code":"jpy","currency_value":100,"localized_price":"JP¥ 100"}))
-	assert(not CaptureClass.is_expected_jpy_100_price({"currency_code":"USD","currency_value":100.0,"localized_price":"$100.00"}))
-	assert(not CaptureClass.is_expected_jpy_100_price({"currency_code":"JPY","currency_value":99.0,"localized_price":"¥99"}))
-	assert(not CaptureClass.is_expected_jpy_100_price({"currency_code":"JPY","currency_value":100.01,"localized_price":"¥100.01"}))
-	assert(not CaptureClass.is_expected_jpy_100_price({"currency_code":"JPY","localized_price":"¥100"}))
-	var usd_diagnostic:=CaptureClass._storekit_price_diagnostic({"currency_code":"USD","currency_value":0.49,"storefront_country_code":"USA","localized_price":"$0.49"})
-	assert(not CaptureClass.is_expected_jpy_100_price({"currency_code":"USD","currency_value":0.49,"storefront_country_code":"USA","localized_price":"$0.49"}))
+
+	# StoreKit's numeric value, ISO currency code, localized display, and current
+	# storefront must all be present. No particular display string or JPY value is
+	# invented by the capture feature.
+	var usa_price:={"currency_code":"USD","currency_value":0.49,"storefront_country_code":"USA","localized_price":"$0.49"}
+	var japan_price:={"currency_code":"JPY","currency_value":100.0,"storefront_country_code":"JPN","localized_price":"¥100"}
+	assert(bool(CaptureClass.validate_storekit_price_tuple(usa_price).ok))
+	assert(bool(CaptureClass.validate_storekit_price_tuple(japan_price).ok))
+	assert(not bool(CaptureClass.validate_storekit_price_tuple({"currency_code":"USD","currency_value":true,"storefront_country_code":"USA","localized_price":"$0.49"}).ok))
+	assert(not bool(CaptureClass.validate_storekit_price_tuple({"currency_code":"JPY","currency_value":100.0,"storefront_country_code":"USA","localized_price":"¥100"}).ok))
+	assert(not bool(CaptureClass.validate_storekit_price_tuple({"currency_code":"USD","currency_value":0.0,"storefront_country_code":"USA","localized_price":"$0.00"}).ok))
+	assert(not bool(CaptureClass.validate_storekit_price_tuple({"currency_code":"USD","currency_value":0.49,"storefront_country_code":"","localized_price":"$0.49"}).ok))
+	assert(not bool(CaptureClass.validate_storekit_price_tuple(usa_price,"JPN","JPY").ok))
+	var states:Dictionary={}
+	for product_id in product_ids:states[product_id]=usa_price.duplicate(true)
+	var batch_result:=CaptureClass.validate_storekit_price_batch(product_ids,states)
+	assert(bool(batch_result.ok) and str(batch_result.storefront_country_code)=="USA" and str(batch_result.currency_code)=="USD")
+	states["pot_unlock_036"]=japan_price.duplicate(true)
+	var mixed_batch:=CaptureClass.validate_storekit_price_batch(product_ids,states)
+	assert(not bool(mixed_batch.ok) and str(mixed_batch.error).contains("storefront_changed_during_batch"))
+	var usd_diagnostic:=CaptureClass._storekit_price_diagnostic(usa_price)
 	assert(usd_diagnostic.contains("currency_code=USD"))
 	assert(usd_diagnostic.contains("currency_value=0.49"))
 	assert(usd_diagnostic.contains("storefront_country_code=USA"))
-	var price_diagnostic:=CaptureClass._storekit_price_diagnostic({"currency_code":"JPY","currency_value":100.0,"storefront_country_code":"JPN","localized_price":"¥100.00"})
-	assert(price_diagnostic.contains("currency_code=JPY"))
-	assert(price_diagnostic.contains("currency_value=100"))
-	assert(price_diagnostic.contains("storefront_country_code=JPN"))
-	assert(price_diagnostic.contains('localized_price="¥100.00"'))
+	assert(usd_diagnostic.contains('localized_price="$0.49"'))
 
 	var rgb_header:=_png_header(Vector2i(1320,2868),2)
 	assert(CaptureClass._is_rgb_png_without_alpha(rgb_header,Vector2i(1320,2868)))
 	var rgba_header:=_png_header(Vector2i(1320,2868),6)
 	assert(not CaptureClass._is_rgb_png_without_alpha(rgba_header,Vector2i(1320,2868)))
 	assert(not CaptureClass._is_rgb_png_without_alpha(rgb_header,Vector2i(1290,2796)))
+	_test_zip_bundle_round_trip(product_ids,rgb_header)
+
+	var catalog=JSON.parse_string(FileAccess.get_file_as_string("res://data/pot-iap-catalog.json"))
+	assert(catalog is Array and catalog.size()==36)
+	for index in catalog.size():
+		var pot:Dictionary=catalog[index]
+		assert(str(pot.iap_product_id)==product_ids[index])
+		assert(str(pot.unlock_type)=="iap_unlock")
+		assert(str(pot.image_path).ends_with(".png") and ResourceLoader.exists(str(pot.image_path)))
+		assert(not str(pot.display_name).strip_edges().is_empty())
 
 	var capture_source:=FileAccess.get_file_as_string("res://scripts/iap_review_capture.gd")
-	assert(capture_source.contains("BuildProfileClass.IAP_REVIEW_CAPTURE_PRODUCT_ID"))
-	assert(not capture_source.contains("pot_unlock_002"))
+	assert(capture_source.contains("iap_review_capture_product_ids"))
+	assert(capture_source.contains("validate_storekit_price_batch"))
+	assert(capture_source.contains("ZIPPacker.new()") and capture_source.contains("ZIPReader.new()"))
+	assert(capture_source.contains('"application/zip"'))
 	assert(capture_source.contains("image.convert(Image.FORMAT_RGB8)"))
 	assert(capture_source.contains("buy_button.mouse_filter=Control.MOUSE_FILTER_IGNORE"))
-	assert(capture_source.contains('"storekit_price_is_jpy_100"'))
-	assert(capture_source.contains('"storekit_price_response_timeout"'))
-	assert(capture_source.contains("IAP_REVIEW_CAPTURE_STOREKIT_PRICE"))
-	assert(capture_source.contains("storefront_country_code=%s"))
-	assert(not capture_source.contains("_is_jpy_100_display"))
+	assert(capture_source.contains('"storekit_price_valid"'))
+	assert(capture_source.contains("storekit_product_batch_timeout"))
+	assert(capture_source.contains("IAP_REVIEW_CAPTURE_BATCH_OK"))
+	assert(not capture_source.contains("is_expected_jpy_100_price"))
+	assert(not capture_source.contains("expected_japan_price_yen"))
 	var main_source:=FileAccess.get_file_as_string("res://scripts/main.gd")
-	assert(main_source.contains("price_only_product_id"))
-	assert(main_source.contains("BuildProfileClass.IAP_REVIEW_CAPTURE_PRODUCT_ID"))
+	assert(main_source.contains("price_only_product_ids"))
+	assert(main_source.contains("BuildProfileClass.iap_review_capture_product_ids()"))
+	assert(main_source.contains('mime_type:String="image/png"'))
 
 	var presets:=FileAccess.get_file_as_string("res://export_presets.cfg")
 	var production_header:=presets.get_slice('[preset.1]',1).get_slice('[preset.1.options]',0)
@@ -57,8 +81,33 @@ func _ready()->void:
 	assert(not production_header.contains("puku_iap_review_capture"))
 	assert(presets.contains('custom_features="puku_app_store_release,puku_iap_review_capture"'))
 
-	print("IAP_REVIEW_CAPTURE_SMOKE_OK target=pot_unlock_001 native_size_gate=true rgb_png_gate=true production_isolated=true")
+	print("IAP_REVIEW_CAPTURE_SMOKE_OK products=36 storefront_price_gate=true native_size_gate=true rgb_png_gate=true zip_bundle=true production_isolated=true")
 	get_tree().quit()
+
+
+func _test_zip_bundle_round_trip(product_ids:Array[String],png_bytes:PackedByteArray)->void:
+	var capture_controller:=CaptureClass.new()
+	add_child(capture_controller)
+	var output_directory_absolute:=ProjectSettings.globalize_path(CaptureClass.OUTPUT_DIRECTORY)
+	assert(DirAccess.make_dir_recursive_absolute(output_directory_absolute)==OK)
+	var captures:Array=[]
+	for product_id in product_ids:
+		var filename:="%s-app-review.png"%product_id
+		var path:=CaptureClass.OUTPUT_DIRECTORY.path_join(filename)
+		var file:=FileAccess.open(path,FileAccess.WRITE)
+		assert(file!=null)
+		file.store_buffer(png_bytes)
+		file.close()
+		captures.append({"product_id":product_id,"filename":filename,"sha256":capture_controller._sha256_hex(png_bytes)})
+	var manifest_path:=CaptureClass.OUTPUT_DIRECTORY.path_join(CaptureClass.BATCH_MANIFEST_FILENAME)
+	assert(capture_controller._write_json_file(manifest_path,{"product_count":36}))
+	var bundle_path:=CaptureClass.OUTPUT_DIRECTORY.path_join("smoke-iap-review-captures.zip")
+	var result:Dictionary=capture_controller._create_and_validate_bundle(bundle_path,manifest_path,captures,Vector2i(1320,2868))
+	assert(bool(result.get("ok",false)))
+	var reader:=ZIPReader.new()
+	assert(reader.open(bundle_path)==OK)
+	assert(reader.get_files().size()==37)
+	reader.close()
 
 
 func _png_header(size:Vector2i,color_type:int)->PackedByteArray:

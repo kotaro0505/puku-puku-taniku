@@ -84,29 +84,32 @@ func _ready()->void:
 	assert(failure_service.purchase(first_product));assert(not failure_service.is_unlocked(first_product))
 	assert(str(failure_service.product_states_snapshot()[first_product].status)==failure_service.STATUS_AVAILABLE)
 
-	# The review-capture profile needs only the visible StoreKit price. It must
-	# issue one price-only request and must not start 36 entitlement lookups.
-	var capture_mock:=MockClass.new();capture_mock.localized_prices=prices.duplicate(true)
-	capture_mock.localized_prices[first_product]="¥100.00"
-	capture_mock.currency_values[first_product]=100.0
-	capture_mock.currency_codes[first_product]="JPY"
-	capture_mock.currency_symbols[first_product]="¥"
-	capture_mock.storefront_country_codes[first_product]="JPN"
-	var capture_service:=ServiceClass.new();add_child(capture_service);capture_service.configure(all_pots,{},capture_mock,first_product)
+	# The review-capture profile needs only visible StoreKit prices. It requests
+	# all 36 products through the price-only bridge without entitlement lookups.
+	var capture_product_ids:Array[String]=[]
+	var capture_mock:=MockClass.new()
+	for product_number in range(1,37):
+		var product_id:="pot_unlock_%03d"%product_number
+		capture_product_ids.append(product_id)
+		capture_mock.localized_prices[product_id]="$0.49"
+		capture_mock.currency_values[product_id]=0.49
+		capture_mock.currency_codes[product_id]="USD"
+		capture_mock.currency_symbols[product_id]="$"
+		capture_mock.storefront_country_codes[product_id]="USA"
+	var capture_service:=ServiceClass.new();add_child(capture_service);capture_service.configure(all_pots,{},capture_mock,capture_product_ids)
 	await get_tree().process_frame
 	var capture_diagnostic:Dictionary=capture_service.diagnostic_snapshot()
 	var capture_state:Dictionary=capture_service.product_states_snapshot()[first_product]
-	assert(capture_mock.requested_prices==[first_product] and capture_mock.requested_products.is_empty())
+	assert(capture_mock.requested_prices==capture_product_ids and capture_mock.requested_products.is_empty())
 	assert(str(capture_state.status)==capture_service.STATUS_AVAILABLE)
-	assert(str(capture_state.localized_price)=="¥100.00")
-	assert(is_equal_approx(float(capture_state.currency_value),100.0))
-	assert(str(capture_state.currency_code)=="JPY" and str(capture_state.currency_symbol)=="¥")
-	assert(str(capture_state.storefront_country_code)=="JPN")
+	assert(str(capture_state.localized_price)=="$0.49")
+	assert(is_equal_approx(float(capture_state.currency_value),0.49))
+	assert(str(capture_state.currency_code)=="USD" and str(capture_state.currency_symbol)=="$")
+	assert(str(capture_state.storefront_country_code)=="USA")
 	assert(capture_mock.purchase_calls.is_empty())
-	assert(str(capture_service.product_states_snapshot()[last_product].status)==capture_service.STATUS_UNAVAILABLE)
-	assert(str(capture_service.product_states_snapshot()[last_product].error)=="capture_not_requested")
+	assert(str(capture_service.product_states_snapshot()[last_product].status)==capture_service.STATUS_AVAILABLE)
 	assert(str(capture_diagnostic.request_mode)=="price_only")
-	assert(int(capture_diagnostic.requested_product_count)==1 and int(capture_diagnostic.requests_dispatched)==1 and int(capture_diagnostic.responses_received)==1)
+	assert(int(capture_diagnostic.requested_product_count)==36 and int(capture_diagnostic.requests_dispatched)==36 and int(capture_diagnostic.responses_received)==36)
 	assert(bool(capture_diagnostic.request_method_available) and bool(capture_diagnostic.response_signal_available))
 
 	# A native request that never returns remains distinguishable from a missing
@@ -138,7 +141,7 @@ func _ready()->void:
 	ui.open_pot_shop()
 	var capture_card:=_pot_shop_card(ui,"g1_crystal_goblet")
 	var capture_buy_button:=capture_card.find_child("PotBuyButton",true,false) as Button
-	assert(capture_buy_button.text==Localizer.text("ja","iap_unlock_for_price",["¥100.00"]))
+	assert(capture_buy_button.text==Localizer.text("ja","iap_unlock_for_price",["$0.49"]))
 	ui.configure([],[],all_pots,{},owned,[],20,5,Callable(),Callable(),{},"ja",0,{},service.product_states_snapshot(),false,false)
 	ui.open_pot_shop();assert(ui.shop_grid.get_child_count()==8 and not ui.shop_restore_button.visible)
 	ui.configure([],[],all_pots,{},owned,[],20,5,Callable(),Callable(),{},"ja",1,{},service.product_states_snapshot(),false,false)
