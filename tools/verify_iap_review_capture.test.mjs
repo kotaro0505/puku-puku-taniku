@@ -9,7 +9,7 @@ import {
   verifyCapture,
 } from "./verify_iap_review_capture.mjs";
 
-function pngHeader(width = 1320, height = 2868, colorType = 2) {
+function pngHeader(width = 1125, height = 2436, colorType = 2) {
   const bytes = Buffer.alloc(33);
   Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).copy(bytes, 0);
   bytes.writeUInt32BE(13, 8);
@@ -34,8 +34,16 @@ function capture(buffer, productId = "pot_unlock_001") {
     storekit_currency_value: 0.49,
     storekit_localized_price: "$0.49",
     filename: `${productId}-app-review.png`,
-    width: 1320,
-    height: 2868,
+    width: 1125,
+    height: 2436,
+    viewport_content_width: 1125,
+    viewport_content_height: 2000,
+    viewport_offset_x: 0,
+    viewport_offset_y: 218,
+    letterbox_top: 218,
+    letterbox_bottom: 218,
+    capture_composition: "native_screen_with_unscaled_viewport_and_black_letterbox",
+    content_scaled: false,
     format: "PNG",
     pixel_format: "RGB8",
     has_alpha: false,
@@ -64,8 +72,12 @@ function batch(buffer) {
     expected_product_ids: expectedProductIds(),
     storefront_country_code: "USA",
     currency_code: "USD",
-    width: 1320,
-    height: 2868,
+    width: 1125,
+    height: 2436,
+    viewport_content_width: 1125,
+    viewport_content_height: 2000,
+    capture_composition: "native_screen_with_unscaled_viewport_and_black_letterbox",
+    content_scaled: false,
     format: "PNG",
     pixel_format: "RGB8",
     has_alpha: false,
@@ -76,7 +88,7 @@ function batch(buffer) {
 test("accepts a real US StoreKit price without replacing it with JPY", () => {
   const buffer = pngHeader();
   const result = verifyCapture(buffer, capture(buffer));
-  assert.equal(result.width, 1320);
+  assert.equal(result.width, 1125);
   assert.equal(result.storefront, "USA");
   assert.equal(result.currency, "USD");
   assert.equal(result.localized, "$0.49");
@@ -101,6 +113,16 @@ test("rejects the logical 576x1024 viewport size", () => {
   data.width = 576;
   data.height = 1024;
   assert.throws(() => verifyCapture(buffer, data), /unsupported_dimensions:576x1024/);
+});
+
+test("rejects scaled or incorrectly centered capture composition", () => {
+  const buffer = pngHeader();
+  const scaled = capture(buffer);
+  scaled.content_scaled = true;
+  assert.throws(() => verifyCapture(buffer, scaled), /capture_content_must_not_be_scaled/);
+  const offCenter = capture(buffer);
+  offCenter.viewport_offset_y = 217;
+  assert.throws(() => verifyCapture(buffer, offCenter), /capture_viewport_not_centered/);
 });
 
 test("rejects a bool currency value and storefront/currency mismatch", () => {

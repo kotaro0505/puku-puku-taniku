@@ -54,6 +54,34 @@ function verifyPrice(capture) {
   return { storefront, currency, value, localized };
 }
 
+function verifyComposition(capture, png) {
+  if (capture.capture_composition !== "native_screen_with_unscaled_viewport_and_black_letterbox") {
+    throw new Error("capture_composition_mismatch");
+  }
+  if (capture.content_scaled !== false) throw new Error("capture_content_must_not_be_scaled");
+  for (const key of [
+    "viewport_content_width",
+    "viewport_content_height",
+    "viewport_offset_x",
+    "viewport_offset_y",
+    "letterbox_top",
+    "letterbox_bottom",
+  ]) {
+    if (!Number.isInteger(capture[key]) || capture[key] < 0) throw new Error(`capture_geometry_invalid:${key}`);
+  }
+  if (capture.viewport_content_width !== png.width || capture.viewport_offset_x !== 0) {
+    throw new Error("capture_viewport_width_or_offset_invalid");
+  }
+  if (capture.viewport_content_height > png.height) throw new Error("capture_viewport_height_invalid");
+  if (capture.viewport_offset_y !== Math.floor((png.height - capture.viewport_content_height) / 2)) {
+    throw new Error("capture_viewport_not_centered");
+  }
+  if (capture.letterbox_top !== capture.viewport_offset_y) throw new Error("capture_top_letterbox_invalid");
+  if (capture.letterbox_bottom !== png.height - capture.viewport_offset_y - capture.viewport_content_height) {
+    throw new Error("capture_bottom_letterbox_invalid");
+  }
+}
+
 export function verifyCapture(pngBuffer, capture) {
   const png = inspectPng(pngBuffer);
   const size = `${png.width}x${png.height}`;
@@ -70,6 +98,7 @@ export function verifyCapture(pngBuffer, capture) {
     throw new Error("manifest_format_mismatch");
   }
   if (capture.sha256 !== png.sha256) throw new Error("sha256_mismatch");
+  verifyComposition(capture, png);
   const price = verifyPrice(capture);
   const checks = capture.content_checks ?? {};
   for (const key of [
@@ -102,6 +131,18 @@ export function verifyBatchManifest(manifest) {
   if (new Set(actual).size !== PRODUCT_COUNT) throw new Error("batch_duplicate_product_id");
   if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error("batch_missing_or_out_of_order_product_id");
   if (!APPLE_IPHONE_PORTRAIT_SIZES.has(`${manifest.width}x${manifest.height}`)) throw new Error("batch_dimensions_invalid");
+  if (manifest.capture_composition !== "native_screen_with_unscaled_viewport_and_black_letterbox" || manifest.content_scaled !== false) {
+    throw new Error("batch_capture_composition_mismatch");
+  }
+  if (!Number.isInteger(manifest.viewport_content_width) || !Number.isInteger(manifest.viewport_content_height)) {
+    throw new Error("batch_viewport_dimensions_invalid");
+  }
+  for (const capture of manifest.captures) {
+    if (capture.width !== manifest.width || capture.height !== manifest.height) throw new Error("batch_capture_dimensions_mismatch");
+    if (capture.viewport_content_width !== manifest.viewport_content_width || capture.viewport_content_height !== manifest.viewport_content_height) {
+      throw new Error("batch_viewport_dimensions_mismatch");
+    }
+  }
   if (manifest.format !== "PNG" || manifest.pixel_format !== "RGB8" || manifest.has_alpha !== false) {
     throw new Error("batch_format_mismatch");
   }

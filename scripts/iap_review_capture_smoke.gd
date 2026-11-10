@@ -15,7 +15,45 @@ func _ready()->void:
 		unique_ids[product_id]=true
 	assert(CaptureClass.is_supported_apple_portrait_size(Vector2i(1320,2868)))
 	assert(CaptureClass.is_supported_apple_portrait_size(Vector2i(1179,2556)))
+	assert(CaptureClass.is_supported_apple_portrait_size(Vector2i(1125,2436)))
 	assert(not CaptureClass.is_supported_apple_portrait_size(Vector2i(576,1024)))
+	assert(int(ProjectSettings.get_setting("display/window/size/viewport_width",0))==576)
+	assert(int(ProjectSettings.get_setting("display/window/size/viewport_height",0))==1024)
+	assert(1125*1024==2000*576)
+
+	# iPhone 11 Pro renders this project's 9:16 viewport at 1125x2000.
+	# Reconstruct the native 1125x2436 app screen by adding the real 218 px
+	# letterbox areas above and below. The source pixels must remain unscaled.
+	var viewport_image:=Image.create(1125,2000,false,Image.FORMAT_RGB8)
+	viewport_image.fill(Color(0.2,0.4,0.6))
+	viewport_image.set_pixel(0,0,Color.RED)
+	viewport_image.set_pixel(1124,1999,Color.GREEN)
+	var composition:=CaptureClass.compose_native_screen_capture(viewport_image,Vector2i(1125,2436))
+	assert(bool(composition.ok))
+	assert(composition.image_size==Vector2i(1125,2436))
+	assert(composition.viewport_content_size==Vector2i(1125,2000))
+	assert(composition.viewport_offset==Vector2i(0,218))
+	assert(int(composition.letterbox_top)==218 and int(composition.letterbox_bottom)==218)
+	assert(composition.content_scaled==false)
+	var native_image:Image=composition.image
+	assert(native_image.get_pixel(0,0)==Color.BLACK)
+	assert(native_image.get_pixel(0,217)==Color.BLACK)
+	assert(native_image.get_pixel(0,218)==Color.RED)
+	assert(native_image.get_pixel(1124,2217)==Color.GREEN)
+	assert(native_image.get_pixel(1124,2218)==Color.BLACK)
+	assert(native_image.get_pixel(1124,2435)==Color.BLACK)
+	assert(CaptureClass._has_black_letterbox(native_image,Vector2i(0,218),Vector2i(1125,2000)))
+	var composed_png_path:=CaptureClass.OUTPUT_DIRECTORY.path_join("smoke-native-screen.png")
+	assert(DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(CaptureClass.OUTPUT_DIRECTORY))==OK)
+	assert(native_image.save_png(composed_png_path)==OK)
+	var composed_png_bytes:=FileAccess.get_file_as_bytes(composed_png_path)
+	assert(CaptureClass._is_rgb_png_without_alpha(composed_png_bytes,Vector2i(1125,2436)))
+	var reloaded_native_image:=Image.new()
+	assert(reloaded_native_image.load_png_from_buffer(composed_png_bytes)==OK)
+	assert(CaptureClass._has_black_letterbox(reloaded_native_image,Vector2i(0,218),Vector2i(1125,2000)))
+	var wrong_width_image:=Image.create(1124,1,false,Image.FORMAT_RGB8)
+	assert(not bool(CaptureClass.compose_native_screen_capture(wrong_width_image,Vector2i(1125,2436)).ok))
+	assert(not bool(CaptureClass.compose_native_screen_capture(viewport_image,Vector2i(1125,2000)).ok))
 
 	# StoreKit's numeric value, ISO currency code, localized display, and current
 	# storefront must all be present. No particular display string or JPY value is
@@ -63,7 +101,10 @@ func _ready()->void:
 	assert(capture_source.contains("validate_storekit_price_batch"))
 	assert(capture_source.contains("ZIPPacker.new()") and capture_source.contains("ZIPReader.new()"))
 	assert(capture_source.contains('"application/zip"'))
-	assert(capture_source.contains("image.convert(Image.FORMAT_RGB8)"))
+	assert(capture_source.contains("viewport_image.convert(Image.FORMAT_RGB8)"))
+	assert(capture_source.contains("DisplayServer.screen_get_size(DisplayServer.SCREEN_OF_MAIN_WINDOW)"))
+	assert(capture_source.contains("native_screen_with_unscaled_viewport_and_black_letterbox"))
+	assert(capture_source.contains('"content_scaled":false'))
 	assert(capture_source.contains("buy_button.mouse_filter=Control.MOUSE_FILTER_IGNORE"))
 	assert(capture_source.contains('"storekit_price_valid"'))
 	assert(capture_source.contains("storekit_product_batch_timeout"))
@@ -81,7 +122,7 @@ func _ready()->void:
 	assert(not production_header.contains("puku_iap_review_capture"))
 	assert(presets.contains('custom_features="puku_app_store_release,puku_iap_review_capture"'))
 
-	print("IAP_REVIEW_CAPTURE_SMOKE_OK products=36 storefront_price_gate=true native_size_gate=true rgb_png_gate=true zip_bundle=true production_isolated=true")
+	print("IAP_REVIEW_CAPTURE_SMOKE_OK products=36 storefront_price_gate=true native_screen_letterbox=true content_scaled=false rgb_png_gate=true zip_bundle=true production_isolated=true")
 	get_tree().quit()
 
 

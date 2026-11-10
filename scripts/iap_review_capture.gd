@@ -12,7 +12,9 @@ const STOREKIT_TIMEOUT_MSEC := 60000
 
 # App Store Connect accepts an IAP review screenshot at any screenshot size the
 # iPhone app supports. Keep this list aligned with Apple's published portrait
-# dimensions; an unexpected logical 576x1024 capture must fail closed.
+# dimensions. The 9:16 Godot viewport can be shorter than a modern iPhone's
+# native screen, so capture-only code composes it over the real black letterbox
+# area without resizing either axis.
 const APPLE_IPHONE_PORTRAIT_SIZES: Array[Vector2i] = [
 	Vector2i(1398,2034), # iPhone Duo outer display
 	Vector2i(2007,2853), # iPhone Duo inner display
@@ -95,6 +97,7 @@ func _run_capture()->void:
 
 	var captures:Array=[]
 	var image_size:=Vector2i.ZERO
+	var viewport_content_size:=Vector2i.ZERO
 	for index in entries.size():
 		var pot:Dictionary=entries[index]
 		_active_product_id=str(pot.get("iap_product_id",""))
@@ -106,9 +109,14 @@ func _run_capture()->void:
 			_fail(str(capture_result.get("error","product_capture_failed")),str(capture_result.get("diagnostic","")))
 			return
 		var current_size:Vector2i=capture_result.get("image_size",Vector2i.ZERO)
+		var current_content_size:Vector2i=capture_result.get("viewport_content_size",Vector2i.ZERO)
 		if image_size==Vector2i.ZERO:image_size=current_size
 		elif current_size!=image_size:
 			_fail("capture_dimensions_changed_between_products")
+			return
+		if viewport_content_size==Vector2i.ZERO:viewport_content_size=current_content_size
+		elif current_content_size!=viewport_content_size:
+			_fail("capture_viewport_dimensions_changed_between_products")
 			return
 		captures.append(capture_result.get("manifest",{}))
 
@@ -125,12 +133,16 @@ func _run_capture()->void:
 		"currency_code":str(price_context.get("currency_code","")),
 		"width":image_size.x,
 		"height":image_size.y,
+		"viewport_content_width":viewport_content_size.x,
+		"viewport_content_height":viewport_content_size.y,
+		"capture_composition":"native_screen_with_unscaled_viewport_and_black_letterbox",
+		"content_scaled":false,
 		"format":"PNG",
 		"pixel_format":"RGB8",
 		"png_color_type":2,
 		"has_alpha":false,
 		"captures":captures,
-		"source":"live Godot iOS viewport",
+		"source":"live Godot iOS viewport centered unscaled on the native iOS screen",
 		"completed_at_utc":Time.get_datetime_string_from_system(true,true),
 	}
 	if not _write_json_file(manifest_path,batch_manifest):
@@ -341,12 +353,30 @@ func _capture_product(pot:Dictionary,product_state:Dictionary)->Dictionary:
 	_status_visual.visible=false
 	await get_tree().process_frame
 	await RenderingServer.frame_post_draw
-	var image:=get_viewport().get_texture().get_image()
-	if image==null or image.is_empty():return {"ok":false,"error":"viewport_capture_empty"}
-	image.convert(Image.FORMAT_RGB8)
+	var viewport_image:=get_viewport().get_texture().get_image()
+	if viewport_image==null or viewport_image.is_empty():return {"ok":false,"error":"viewport_capture_empty"}
+	viewport_image.convert(Image.FORMAT_RGB8)
+	var viewport_content_size:=Vector2i(viewport_image.get_width(),viewport_image.get_height())
+	var native_screen_size:=DisplayServer.screen_get_size(DisplayServer.SCREEN_OF_MAIN_WINDOW)
+	var native_window_size:=DisplayServer.window_get_size(DisplayServer.MAIN_WINDOW_ID)
+	if native_screen_size!=native_window_size:
+		return {
+			"ok":false,
+			"error":"native_screen_window_dimensions_mismatch",
+			"diagnostic":"screen=%dx%d window=%dx%d"%[native_screen_size.x,native_screen_size.y,native_window_size.x,native_window_size.y],
+		}
+	var composition:=compose_native_screen_capture(viewport_image,native_screen_size)
+	if not bool(composition.get("ok",false)):
+		return {
+			"ok":false,
+			"error":str(composition.get("error","native_screen_capture_composition_failed")),
+			"diagnostic":"viewport=%dx%d screen=%dx%d"%[viewport_content_size.x,viewport_content_size.y,native_screen_size.x,native_screen_size.y],
+		}
+	var image:Image=composition.get("image") as Image
 	var image_size:=Vector2i(image.get_width(),image.get_height())
-	if not is_supported_apple_portrait_size(image_size):
-		return {"ok":false,"error":"unsupported_capture_dimensions_%dx%d"%[image_size.x,image_size.y]}
+	var viewport_offset:Vector2i=composition.get("viewport_offset",Vector2i.ZERO)
+	var letterbox_top:=int(composition.get("letterbox_top",0))
+	var letterbox_bottom:=int(composition.get("letterbox_bottom",0))
 	if image.get_format()!=Image.FORMAT_RGB8:return {"ok":false,"error":"capture_is_not_rgb8"}
 
 	var product_id:=str(pot.get("iap_product_id",""))
@@ -355,6 +385,10 @@ func _capture_product(pot:Dictionary,product_state:Dictionary)->Dictionary:
 	if image.save_png(output_path)!=OK:return {"ok":false,"error":"png_save_failed"}
 	var png_bytes:=FileAccess.get_file_as_bytes(output_path)
 	if not _is_rgb_png_without_alpha(png_bytes,image_size):return {"ok":false,"error":"png_structure_or_alpha_invalid"}
+	var saved_image:=Image.new()
+	if saved_image.load_png_from_buffer(png_bytes)!=OK:return {"ok":false,"error":"png_reload_failed"}
+	if not _has_black_letterbox(saved_image,viewport_offset,viewport_content_size):
+		return {"ok":false,"error":"png_letterbox_validation_failed"}
 	var digest:=_sha256_hex(png_bytes)
 	if digest.is_empty():return {"ok":false,"error":"png_sha256_failed"}
 	_status_visual.visible=true
@@ -373,6 +407,14 @@ func _capture_product(pot:Dictionary,product_state:Dictionary)->Dictionary:
 		"filename":filename,
 		"width":image_size.x,
 		"height":image_size.y,
+		"viewport_content_width":viewport_content_size.x,
+		"viewport_content_height":viewport_content_size.y,
+		"viewport_offset_x":viewport_offset.x,
+		"viewport_offset_y":viewport_offset.y,
+		"letterbox_top":letterbox_top,
+		"letterbox_bottom":letterbox_bottom,
+		"capture_composition":"native_screen_with_unscaled_viewport_and_black_letterbox",
+		"content_scaled":false,
 		"format":"PNG",
 		"pixel_format":"RGB8",
 		"png_color_type":2,
@@ -381,8 +423,20 @@ func _capture_product(pot:Dictionary,product_state:Dictionary)->Dictionary:
 		"content_checks":content_result.get("checks",{}),
 		"captured_at_utc":Time.get_datetime_string_from_system(true,true),
 	}
-	print("IAP_REVIEW_CAPTURE_PRODUCT_OK product_id=",product_id," filename=",filename," size=",image_size.x,"x",image_size.y)
-	return {"ok":true,"image_size":image_size,"manifest":manifest}
+	print(
+		"IAP_REVIEW_CAPTURE_PRODUCT_OK product_id=",product_id,
+		" filename=",filename,
+		" size=",image_size.x,"x",image_size.y,
+		" viewport=",viewport_content_size.x,"x",viewport_content_size.y,
+		" offset=",viewport_offset.x,",",viewport_offset.y,
+		" content_scaled=false"
+	)
+	return {
+		"ok":true,
+		"image_size":image_size,
+		"viewport_content_size":viewport_content_size,
+		"manifest":manifest,
+	}
 
 
 func _pot_entry(product_id:String)->Dictionary:
@@ -457,6 +511,56 @@ static func _storekit_price_diagnostic(product_state:Dictionary)->String:
 
 static func is_supported_apple_portrait_size(size:Vector2i)->bool:
 	return size in APPLE_IPHONE_PORTRAIT_SIZES
+
+
+static func compose_native_screen_capture(viewport_image:Image,native_screen_size:Vector2i)->Dictionary:
+	if viewport_image==null or viewport_image.is_empty():return {"ok":false,"error":"viewport_capture_empty"}
+	if viewport_image.get_format()!=Image.FORMAT_RGB8:return {"ok":false,"error":"viewport_capture_is_not_rgb8"}
+	if not is_supported_apple_portrait_size(native_screen_size):
+		return {"ok":false,"error":"unsupported_native_capture_dimensions_%dx%d"%[native_screen_size.x,native_screen_size.y]}
+	var content_size:=Vector2i(viewport_image.get_width(),viewport_image.get_height())
+	# The app's keep-aspect presentation fills the physical width on portrait
+	# iPhone screens. Reject any other geometry instead of cropping or scaling.
+	if content_size.x!=native_screen_size.x:
+		return {"ok":false,"error":"viewport_native_width_mismatch_%d_%d"%[content_size.x,native_screen_size.x]}
+	if content_size.y>native_screen_size.y:
+		return {"ok":false,"error":"viewport_exceeds_native_screen_height_%d_%d"%[content_size.y,native_screen_size.y]}
+	var remaining_height:=native_screen_size.y-content_size.y
+	var viewport_offset:=Vector2i(0,floori(remaining_height*.5))
+	var letterbox_bottom:=remaining_height-viewport_offset.y
+	var full_screen_image:=Image.create(native_screen_size.x,native_screen_size.y,false,Image.FORMAT_RGB8)
+	if full_screen_image==null or full_screen_image.is_empty():
+		return {"ok":false,"error":"native_screen_image_create_failed"}
+	full_screen_image.fill(Color.BLACK)
+	full_screen_image.blit_rect(viewport_image,Rect2i(Vector2i.ZERO,content_size),viewport_offset)
+	return {
+		"ok":true,
+		"image":full_screen_image,
+		"image_size":native_screen_size,
+		"viewport_content_size":content_size,
+		"viewport_offset":viewport_offset,
+		"letterbox_top":viewport_offset.y,
+		"letterbox_bottom":letterbox_bottom,
+		"content_scaled":false,
+	}
+
+
+static func _has_black_letterbox(image:Image,viewport_offset:Vector2i,content_size:Vector2i)->bool:
+	if image==null or image.is_empty():return false
+	var image_size:=Vector2i(image.get_width(),image.get_height())
+	if viewport_offset.x<0 or viewport_offset.y<0:return false
+	if viewport_offset.x+content_size.x>image_size.x or viewport_offset.y+content_size.y>image_size.y:return false
+	var top_height:=viewport_offset.y
+	var bottom_start:=viewport_offset.y+content_size.y
+	var probe_x_values:Array[int]=[0,floori(image_size.x*.5),image_size.x-1]
+	for probe_x in probe_x_values:
+		if top_height>0:
+			for probe_y in [0,floori(top_height*.5),top_height-1]:
+				if image.get_pixel(probe_x,probe_y)!=Color.BLACK:return false
+		if bottom_start<image_size.y:
+			for probe_y in [bottom_start,floori((bottom_start+image_size.y-1)*.5),image_size.y-1]:
+				if image.get_pixel(probe_x,probe_y)!=Color.BLACK:return false
+	return true
 
 
 static func _is_rgb_png_without_alpha(bytes:PackedByteArray,expected_size:Vector2i)->bool:
