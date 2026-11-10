@@ -99,6 +99,11 @@ export function verifyCapture(pngBuffer, capture) {
   }
   if (capture.sha256 !== png.sha256) throw new Error("sha256_mismatch");
   verifyComposition(capture, png);
+  for (const key of ["target_card_center_y", "capture_screen_center_y", "target_card_center_delta_y"]) {
+    if (typeof capture[key] !== "number" || !Number.isFinite(capture[key])) throw new Error(`capture_focus_geometry_invalid:${key}`);
+  }
+  if (Math.abs(capture.target_card_center_delta_y) > 1.5) throw new Error("capture_target_card_not_centered");
+  if (capture.capture_focus_highlight !== "subtle_gold_border") throw new Error("capture_focus_highlight_invalid");
   const price = verifyPrice(capture);
   const checks = capture.content_checks ?? {};
   for (const key of [
@@ -112,6 +117,7 @@ export function verifyCapture(pngBuffer, capture) {
     "puku_price_visible",
     "storekit_button_visible",
     "storekit_price_valid",
+    "capture_focus_highlight_visible",
   ]) {
     if (checks[key] !== true) throw new Error(`content_check_failed:${key}`);
   }

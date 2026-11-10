@@ -54,6 +54,7 @@ func _ready()->void:
 	var wrong_width_image:=Image.create(1124,1,false,Image.FORMAT_RGB8)
 	assert(not bool(CaptureClass.compose_native_screen_capture(wrong_width_image,Vector2i(1125,2436)).ok))
 	assert(not bool(CaptureClass.compose_native_screen_capture(viewport_image,Vector2i(1125,2000)).ok))
+	await _test_capture_card_centering()
 
 	# StoreKit's numeric value, ISO currency code, localized display, and current
 	# storefront must all be present. No particular display string or JPY value is
@@ -105,6 +106,9 @@ func _ready()->void:
 	assert(capture_source.contains("DisplayServer.screen_get_size(DisplayServer.SCREEN_OF_MAIN_WINDOW)"))
 	assert(capture_source.contains("native_screen_with_unscaled_viewport_and_black_letterbox"))
 	assert(capture_source.contains('"content_scaled":false'))
+	assert(capture_source.contains("capture_focus_layout"))
+	assert(capture_source.contains('"capture_focus_highlight":"subtle_gold_border"'))
+	assert(capture_source.contains('"capture_focus_highlight_visible"'))
 	assert(capture_source.contains("buy_button.mouse_filter=Control.MOUSE_FILTER_IGNORE"))
 	assert(capture_source.contains('"storekit_price_valid"'))
 	assert(capture_source.contains("storekit_product_batch_timeout"))
@@ -122,8 +126,58 @@ func _ready()->void:
 	assert(not production_header.contains("puku_iap_review_capture"))
 	assert(presets.contains('custom_features="puku_app_store_release,puku_iap_review_capture"'))
 
-	print("IAP_REVIEW_CAPTURE_SMOKE_OK products=36 storefront_price_gate=true native_screen_letterbox=true content_scaled=false rgb_png_gate=true zip_bundle=true production_isolated=true")
+	print("IAP_REVIEW_CAPTURE_SMOKE_OK products=36 storefront_price_gate=true target_card_centered=true first_last_centered=true subtle_focus_border=true native_screen_letterbox=true content_scaled=false rgb_png_gate=true zip_bundle=true production_isolated=true")
 	get_tree().quit()
+
+
+func _test_capture_card_centering()->void:
+	var page:=Control.new()
+	page.size=Vector2(576,1024)
+	add_child(page)
+	var scroll:=ScrollContainer.new()
+	scroll.position=Vector2(26,252)
+	scroll.size=Vector2(524,732)
+	scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED
+	page.add_child(scroll)
+	var grid:=VBoxContainer.new()
+	grid.custom_minimum_size=Vector2(504,0)
+	grid.add_theme_constant_override("separation",14)
+	scroll.add_child(grid)
+	var cards:Array[PanelContainer]=[]
+	for index in 36:
+		var card:=PanelContainer.new()
+		card.name="CaptureCard%02d"%index
+		card.custom_minimum_size=Vector2(504,204)
+		grid.add_child(card)
+		cards.append(card)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var controller:=CaptureClass.new()
+	add_child(controller)
+	var layout:Dictionary=await controller._install_capture_scroll_padding(page,grid,cards[0],scroll)
+	assert(bool(layout.ok))
+	assert(is_equal_approx(float(layout.screen_center_y),512.0))
+	assert(is_equal_approx(float(layout.focus_local_y),260.0))
+	assert(int(layout.top_padding)==144)
+	assert(int(layout.bottom_padding)==356)
+	for card_index in [0,17,35]:
+		var focus_result:Dictionary=await controller._center_card_for_capture(page,cards[card_index],scroll)
+		assert(bool(focus_result.ok))
+		assert(absf(float(focus_result.center_delta_y))<=1.5)
+		var card_rect:=cards[card_index].get_global_rect()
+		var visible_rect:=card_rect.intersection(scroll.get_global_rect())
+		assert(visible_rect.size.x+1.0>=card_rect.size.x)
+		assert(visible_rect.size.y+1.0>=card_rect.size.y)
+	var focus_overlay:=controller._add_capture_focus_overlay(cards[17])
+	await get_tree().process_frame
+	assert(focus_overlay!=null and focus_overlay.is_visible_in_tree())
+	assert(focus_overlay.size.is_equal_approx(cards[17].size))
+	assert(focus_overlay.get_child_count()==0)
+	var focus_style:=focus_overlay.get_theme_stylebox("panel") as StyleBoxFlat
+	assert(focus_style!=null and not focus_style.draw_center and focus_style.border_width_left==5)
+	page.queue_free()
+	controller.queue_free()
+	await get_tree().process_frame
 
 
 func _test_zip_bundle_round_trip(product_ids:Array[String],png_bytes:PackedByteArray)->void:

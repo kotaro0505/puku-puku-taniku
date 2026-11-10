@@ -44,6 +44,10 @@ function capture(buffer, productId = "pot_unlock_001") {
     letterbox_bottom: 218,
     capture_composition: "native_screen_with_unscaled_viewport_and_black_letterbox",
     content_scaled: false,
+    target_card_center_y: 512,
+    capture_screen_center_y: 512,
+    target_card_center_delta_y: 0,
+    capture_focus_highlight: "subtle_gold_border",
     format: "PNG",
     pixel_format: "RGB8",
     has_alpha: false,
@@ -59,6 +63,7 @@ function capture(buffer, productId = "pot_unlock_001") {
       puku_price_visible: true,
       storekit_button_visible: true,
       storekit_price_valid: true,
+      capture_focus_highlight_visible: true,
     },
   };
 }
@@ -123,6 +128,16 @@ test("rejects scaled or incorrectly centered capture composition", () => {
   const offCenter = capture(buffer);
   offCenter.viewport_offset_y = 217;
   assert.throws(() => verifyCapture(buffer, offCenter), /capture_viewport_not_centered/);
+});
+
+test("rejects an off-center or unhighlighted target card", () => {
+  const buffer = pngHeader();
+  const offCenter = capture(buffer);
+  offCenter.target_card_center_delta_y = 2;
+  assert.throws(() => verifyCapture(buffer, offCenter), /capture_target_card_not_centered/);
+  const missingHighlight = capture(buffer);
+  missingHighlight.content_checks.capture_focus_highlight_visible = false;
+  assert.throws(() => verifyCapture(buffer, missingHighlight), /content_check_failed:capture_focus_highlight_visible/);
 });
 
 test("rejects a bool currency value and storefront/currency mismatch", () => {

@@ -306,6 +306,7 @@ func _prepare_real_pot_shop(states:Dictionary)->bool:
 	ui.call("show_pot_shop_message","")
 	await get_tree().process_frame
 	await get_tree().process_frame
+	var reference_card:Control=null
 	for product_id in BuildProfileClass.iap_review_capture_product_ids():
 		var pot:=_pot_entry(product_id)
 		if pot.is_empty():
@@ -317,6 +318,7 @@ func _prepare_real_pot_shop(states:Dictionary)->bool:
 			_active_product_id=product_id
 			_fail("pot_card_missing")
 			return false
+		if reference_card==null:reference_card=card
 		var buy_button:=card.find_child("PotBuyButton",true,false) as Button
 		if buy_button==null:
 			_active_product_id=product_id
@@ -326,7 +328,127 @@ func _prepare_real_pot_shop(states:Dictionary)->bool:
 		# every transaction entry point inert for the entire batch capture.
 		buy_button.mouse_filter=Control.MOUSE_FILTER_IGNORE
 		buy_button.focus_mode=Control.FOCUS_NONE
+	if reference_card==null:
+		_fail("capture_reference_card_missing")
+		return false
+	var scroll:=_ancestor_scroll_container(reference_card)
+	var shop_grid:=ui.get("shop_grid") as VBoxContainer
+	if scroll==null or shop_grid==null:
+		_fail("capture_shop_scroll_or_grid_missing")
+		return false
+	var padding_result:Dictionary=await _install_capture_scroll_padding(ui,shop_grid,reference_card,scroll)
+	if not bool(padding_result.get("ok",false)):
+		_fail(str(padding_result.get("error","capture_scroll_padding_failed")))
+		return false
 	return true
+
+
+static func capture_focus_layout(page_rect:Rect2,scroll_rect:Rect2,card_size:Vector2,separation:float)->Dictionary:
+	if page_rect.size.x<=0.0 or page_rect.size.y<=0.0:return {"ok":false,"error":"capture_page_size_invalid"}
+	if scroll_rect.size.x<=0.0 or scroll_rect.size.y<=0.0:return {"ok":false,"error":"capture_scroll_size_invalid"}
+	if card_size.x<=0.0 or card_size.y<=0.0 or card_size.y>scroll_rect.size.y:
+		return {"ok":false,"error":"capture_card_size_invalid"}
+	var card_half_height:=card_size.y*.5
+	var screen_center_y:=page_rect.get_center().y
+	var minimum_focus_y:=scroll_rect.position.y+card_half_height
+	var maximum_focus_y:=scroll_rect.end.y-card_half_height
+	var focus_global_y:=clampf(screen_center_y,minimum_focus_y,maximum_focus_y)
+	var focus_local_y:=focus_global_y-scroll_rect.position.y
+	var safe_separation:=maxf(0.0,separation)
+	var top_padding:=ceili(maxf(0.0,focus_local_y-card_half_height-safe_separation))
+	var bottom_padding:=ceili(maxf(0.0,scroll_rect.size.y-focus_local_y-card_half_height-safe_separation))
+	return {
+		"ok":true,
+		"screen_center_y":screen_center_y,
+		"focus_global_y":focus_global_y,
+		"focus_local_y":focus_local_y,
+		"top_padding":top_padding,
+		"bottom_padding":bottom_padding,
+	}
+
+
+func _install_capture_scroll_padding(page:Control,grid:VBoxContainer,reference_card:Control,scroll:ScrollContainer)->Dictionary:
+	if page==null or grid==null or reference_card==null or scroll==null:
+		return {"ok":false,"error":"capture_scroll_padding_nodes_missing"}
+	for child_name in ["IAPReviewCaptureTopPadding","IAPReviewCaptureBottomPadding"]:
+		var existing:=grid.get_node_or_null(NodePath(child_name))
+		if existing!=null:
+			grid.remove_child(existing)
+			existing.free()
+	var separation:=float(grid.get_theme_constant("separation"))
+	var layout:=capture_focus_layout(page.get_global_rect(),scroll.get_global_rect(),reference_card.size,separation)
+	if not bool(layout.get("ok",false)):return layout
+	var top_padding:=Control.new()
+	top_padding.name="IAPReviewCaptureTopPadding"
+	top_padding.custom_minimum_size=Vector2(reference_card.size.x,float(layout.get("top_padding",0)))
+	top_padding.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	grid.add_child(top_padding)
+	grid.move_child(top_padding,0)
+	var bottom_padding:=Control.new()
+	bottom_padding.name="IAPReviewCaptureBottomPadding"
+	bottom_padding.custom_minimum_size=Vector2(reference_card.size.x,float(layout.get("bottom_padding",0)))
+	bottom_padding.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	grid.add_child(bottom_padding)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	return layout
+
+
+func _center_card_for_capture(page:Control,card:Control,scroll:ScrollContainer)->Dictionary:
+	if page==null or card==null or scroll==null:return {"ok":false,"error":"capture_focus_nodes_missing"}
+	var grid:=card.get_parent() as VBoxContainer
+	if grid==null:return {"ok":false,"error":"capture_focus_card_parent_invalid"}
+	var layout:=capture_focus_layout(page.get_global_rect(),scroll.get_global_rect(),card.size,float(grid.get_theme_constant("separation")))
+	if not bool(layout.get("ok",false)):return layout
+	scroll.ensure_control_visible(card)
+	await get_tree().process_frame
+	var requested_scroll:=roundi(card.position.y+card.size.y*.5-float(layout.get("focus_local_y",0.0)))
+	var scroll_bar:=scroll.get_v_scroll_bar()
+	var maximum_scroll:=maxi(0,floori(scroll_bar.max_value-scroll_bar.page))
+	var applied_scroll:=clampi(requested_scroll,0,maximum_scroll)
+	scroll.scroll_vertical=applied_scroll
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var card_center_y:=card.get_global_rect().get_center().y
+	var screen_center_y:=float(layout.get("screen_center_y",0.0))
+	var center_delta_y:=card_center_y-screen_center_y
+	if absf(center_delta_y)>1.5:
+		return {
+			"ok":false,
+			"error":"pot_card_not_centered",
+			"diagnostic":"requested_scroll=%d applied_scroll=%d max_scroll=%d card_center_y=%.3f screen_center_y=%.3f delta_y=%.3f"%[requested_scroll,applied_scroll,maximum_scroll,card_center_y,screen_center_y,center_delta_y],
+		}
+	return {
+		"ok":true,
+		"requested_scroll":requested_scroll,
+		"applied_scroll":applied_scroll,
+		"maximum_scroll":maximum_scroll,
+		"card_center_y":card_center_y,
+		"screen_center_y":screen_center_y,
+		"center_delta_y":center_delta_y,
+	}
+
+
+func _add_capture_focus_overlay(card:Control)->Panel:
+	var existing:=card.get_node_or_null(NodePath("IAPReviewCaptureFocus"))
+	if existing!=null:
+		card.remove_child(existing)
+		existing.free()
+	var overlay:=Panel.new()
+	overlay.name="IAPReviewCaptureFocus"
+	overlay.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	overlay.z_index=100
+	var style:=StyleBoxFlat.new()
+	style.bg_color=Color.TRANSPARENT
+	style.draw_center=false
+	style.border_color=Color("#e1a13a")
+	style.set_border_width_all(5)
+	style.set_corner_radius_all(20)
+	overlay.add_theme_stylebox_override("panel",style)
+	card.add_child(overlay)
+	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	overlay.move_to_front()
+	return overlay
 
 
 func _capture_product(pot:Dictionary,product_state:Dictionary)->Dictionary:
@@ -335,10 +457,15 @@ func _capture_product(pot:Dictionary,product_state:Dictionary)->Dictionary:
 	if card==null:return {"ok":false,"error":"pot_card_missing"}
 	var scroll:=_ancestor_scroll_container(card)
 	if scroll==null:return {"ok":false,"error":"pot_scroll_container_missing"}
-	var target_scroll:=roundi(card.position.y+card.size.y*.5-scroll.size.y*.5)
-	scroll.scroll_vertical=maxi(0,target_scroll)
-	await get_tree().process_frame
-	scroll.ensure_control_visible(card)
+	var focus_result:Dictionary=await _center_card_for_capture(_main.arrangement_ui as Control,card,scroll)
+	if not bool(focus_result.get("ok",false)):
+		return {
+			"ok":false,
+			"error":str(focus_result.get("error","pot_card_centering_failed")),
+			"diagnostic":str(focus_result.get("diagnostic","")),
+		}
+	var focus_overlay:=_add_capture_focus_overlay(card)
+	if focus_overlay==null:return {"ok":false,"error":"pot_card_focus_highlight_failed"}
 	await get_tree().process_frame
 	await RenderingServer.frame_post_draw
 	var card_rect:=card.get_global_rect()
@@ -348,6 +475,7 @@ func _capture_product(pot:Dictionary,product_state:Dictionary)->Dictionary:
 		return {"ok":false,"error":"pot_card_not_fully_visible"}
 	var content_result:=_validate_card_content(card,pot,product_state)
 	if not bool(content_result.get("ok",false)):
+		focus_overlay.queue_free()
 		return {"ok":false,"error":str(content_result.get("error","card_content_invalid"))}
 
 	_status_visual.visible=false
@@ -391,6 +519,7 @@ func _capture_product(pot:Dictionary,product_state:Dictionary)->Dictionary:
 		return {"ok":false,"error":"png_letterbox_validation_failed"}
 	var digest:=_sha256_hex(png_bytes)
 	if digest.is_empty():return {"ok":false,"error":"png_sha256_failed"}
+	focus_overlay.queue_free()
 	_status_visual.visible=true
 	var manifest:={
 		"product_id":product_id,
@@ -415,6 +544,10 @@ func _capture_product(pot:Dictionary,product_state:Dictionary)->Dictionary:
 		"letterbox_bottom":letterbox_bottom,
 		"capture_composition":"native_screen_with_unscaled_viewport_and_black_letterbox",
 		"content_scaled":false,
+		"target_card_center_y":float(focus_result.get("card_center_y",0.0)),
+		"capture_screen_center_y":float(focus_result.get("screen_center_y",0.0)),
+		"target_card_center_delta_y":float(focus_result.get("center_delta_y",999.0)),
+		"capture_focus_highlight":"subtle_gold_border",
 		"format":"PNG",
 		"pixel_format":"RGB8",
 		"png_color_type":2,
@@ -429,6 +562,7 @@ func _capture_product(pot:Dictionary,product_state:Dictionary)->Dictionary:
 		" size=",image_size.x,"x",image_size.y,
 		" viewport=",viewport_content_size.x,"x",viewport_content_size.y,
 		" offset=",viewport_offset.x,",",viewport_offset.y,
+		" card_center_delta_y=",snappedf(float(focus_result.get("center_delta_y",999.0)),.001),
 		" content_scaled=false"
 	)
 	return {
@@ -457,6 +591,7 @@ func _validate_card_content(card:Control,pot:Dictionary,product_state:Dictionary
 	var owned_label:=card.find_child("PotOwnedTotal",true,false) as Label
 	var puku_label:=card.find_child("PotLockedPukuPrice",true,false) as Label
 	var buy_button:=card.find_child("PotBuyButton",true,false) as Button
+	var focus_overlay:=card.get_node_or_null(NodePath("IAPReviewCaptureFocus")) as Panel
 	var name_label:Label=null
 	var image_rect:TextureRect=null
 	for label_value in card.find_children("*","Label",true,false):
@@ -480,6 +615,7 @@ func _validate_card_content(card:Control,pot:Dictionary,product_state:Dictionary
 		"puku_price_visible":puku_label!=null and puku_label.is_visible_in_tree() and puku_label.text==expected_puku,
 		"storekit_button_visible":buy_button!=null and buy_button.is_visible_in_tree() and not buy_button.disabled and buy_button.text==expected_button,
 		"storekit_price_valid":bool(validate_storekit_price_tuple(product_state).get("ok",false)),
+		"capture_focus_highlight_visible":focus_overlay!=null and focus_overlay.is_visible_in_tree(),
 	}
 	for key in checks:
 		if not bool(checks[key]):return {"ok":false,"error":"card_check_failed_%s"%str(key),"checks":checks}
