@@ -170,6 +170,8 @@ def main() -> None:
         "scripts/ci/validate_ios_export.py",
         "scripts/ci/validate_ios_export_smoke.py",
         "scripts/ci/configure_mobile_ads_smoke.py",
+        "scripts/ci/configure_att_localizations.py",
+        "scripts/ci/configure_att_localizations_smoke.py",
         "scripts/ci/verify_mobile_ads_export.sh",
         "scripts/ci/verify_mobile_ads_pack.gd",
         "scripts/build_profile.gd",
@@ -287,14 +289,27 @@ def main() -> None:
         'os.environ.get("IOS_ATT_ENABLED", "")',
         'att_setting not in {"true", "false"}',
         "ATT_USAGE_DESCRIPTION",
-        "許可しなくてもゲームを続けられます",
-        "You can continue playing without allowing tracking",
+        "ATT_USAGE_DESCRIPTION_EN",
     ]:
         if required_att_configuration not in config_source:
             fail(f"Generated mobile-ads ATT configuration is missing: {required_att_configuration}")
     if "f'mode=\"{mode}\"'" not in config_source:
         fail("Generated runtime mobile-ads configuration must identify test or production mode")
 
+    att_localization_source = Path("scripts/ci/configure_att_localizations.py").read_text(
+        encoding="utf-8"
+    )
+    for required_att_localization in [
+        "ATT_USAGE_DESCRIPTION_JA",
+        "ATT_USAGE_DESCRIPTION_EN",
+        "許可しなくても広告を利用でき、報酬は変わりません",
+        "You can still use rewarded ads without allowing tracking",
+        "rewards will not change",
+        "ja.lproj/InfoPlist.strings",
+        "verify_bundle_localizations",
+    ]:
+        if required_att_localization not in att_localization_source:
+            fail(f"Localized ATT configuration is missing: {required_att_localization}")
     if 'const MOBILE_ADS_CONFIG_PATH := "res://data/mobile-ads.cfg"' not in ad_service_source:
         fail("Rewarded-ad runtime config path does not match the exported path")
     for required_config_diagnostic in [
@@ -352,6 +367,8 @@ def main() -> None:
         '"google_mobile_ads_package": "GoogleMobileAds"',
         '"info_plist.admob_app_id_key"',
         '"info_plist.display_name_reference"',
+        '"info_plist.att_prompt.fallback_en"',
+        'f"info_plist.att_prompt.{locale}"',
         "GODOT_IOS_DISPLAY_NAME_OK",
     ]:
         if required_validation not in ios_export_validator_source:
@@ -361,6 +378,9 @@ def main() -> None:
     for required_diagnostic in [
         "python3 scripts/ci/validate_ios_export_smoke.py",
         "python3 scripts/ci/configure_mobile_ads_smoke.py",
+        "python3 scripts/ci/configure_att_localizations_smoke.py",
+        "python3 scripts/ci/configure_att_localizations.py configure",
+        "python3 scripts/ci/configure_att_localizations.py verify",
         "bash scripts/ci/resolve_ipa_path_smoke.sh",
         "GODOT_IOS_EXPORT_COMMAND_FAILED",
         "python3 scripts/ci/validate_ios_export.py",

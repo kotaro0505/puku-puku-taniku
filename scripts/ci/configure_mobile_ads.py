@@ -8,17 +8,17 @@ import re
 import sys
 from pathlib import Path
 
+from configure_att_localizations import ATT_USAGE_DESCRIPTION_EN
+
 
 SAMPLE_IOS_APP_ID = "ca-app-pub-3940256099942544~1458002511"
 SAMPLE_IOS_REWARDED_ID = "ca-app-pub-3940256099942544/1712485313"
 APP_ID_PATTERN = re.compile(r"^ca-app-pub-[0-9]{16}~[0-9]{10}$")
 AD_UNIT_PATTERN = re.compile(r"^ca-app-pub-[0-9]{16}/[0-9]{10}$")
-ATT_USAGE_DESCRIPTION = (
-    "リワード広告の表示回数調整と効果測定のため、端末の広告識別子を利用する許可を求めます。"
-    "許可しなくてもゲームを続けられます。 / "
-    "We request permission to use the device advertising identifier for rewarded-ad "
-    "frequency control and measurement. You can continue playing without allowing tracking."
-)
+# The plugin writes this value into the base Info.plist. Keep an English-only
+# fallback there, then add locale-specific values to InfoPlist.strings after
+# Godot generates the Xcode project.
+ATT_USAGE_DESCRIPTION = ATT_USAGE_DESCRIPTION_EN
 
 
 def fail(message: str) -> None:

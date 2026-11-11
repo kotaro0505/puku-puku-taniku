@@ -75,6 +75,9 @@ class FakeAttAdmob:
 	var consent_load_count := 0
 	var consent_show_count := 0
 	var consent_update_count := 0
+	var loaded := false
+	var load_count := 0
+	var show_count := 0
 	func is_privacy_options_supported() -> bool:return true
 	func get_privacy_options_requirement_status() -> String:return "NOT_REQUIRED"
 	func can_request_ads() -> bool:return ads_allowed
@@ -86,6 +89,9 @@ class FakeAttAdmob:
 	func get_tracking_authorization_status() -> String:return tracking_status
 	func request_tracking_authorization() -> bool:tracking_request_count+=1;return request_succeeds
 	func initialize() -> void:initialize_count+=1
+	func is_rewarded_ad_loaded() -> bool:return loaded
+	func load_rewarded_ad() -> void:load_count+=1;loaded=false
+	func show_rewarded_ad() -> void:assert(loaded);show_count+=1;loaded=false
 
 
 class FakeRewardedAdmob:
@@ -490,8 +496,12 @@ func _ready() -> void:
 
 	var denied_service := ServiceClass.new()
 	var denied_att := FakeAttAdmob.new()
+	var denied_results: Array[Dictionary] = []
 	denied_service._admob = denied_att
 	denied_service._att_required = true
+	denied_service.reward_finished.connect(func(context: String, earned: bool) -> void:
+		denied_results.append({"context": context, "earned": earned})
+	)
 	add_child(denied_service)
 	denied_service.state = ServiceClass.State.CONSENT
 	denied_service._on_consent_info_updated()
@@ -501,6 +511,19 @@ func _ready() -> void:
 	denied_service._on_tracking_authorization_denied()
 	assert(denied_service.state == ServiceClass.State.INITIALIZING)
 	assert(denied_att.initialize_count == 1)
+	denied_service._on_initialization_completed()
+	assert(denied_service.state == ServiceClass.State.LOADING and denied_att.load_count == 1)
+	denied_att.loaded = true
+	denied_service._on_rewarded_ad_loaded()
+	assert(denied_service.state == ServiceClass.State.READY)
+	assert(denied_service.request_reward("att_denied_reward"))
+	assert(denied_service.state == ServiceClass.State.SHOWING and denied_att.show_count == 1)
+	denied_service._on_rewarded_ad_showed()
+	denied_service._on_rewarded_ad_user_earned_reward()
+	denied_service._on_rewarded_ad_dismissed()
+	assert(denied_results.size() == 1)
+	assert(denied_results[0].context == "att_denied_reward" and denied_results[0].earned)
+	assert(denied_service.state == ServiceClass.State.LOADING and denied_att.load_count == 2)
 
 	var unresolved_service := ServiceClass.new()
 	var unresolved_att := FakeAttAdmob.new()
@@ -604,7 +627,7 @@ func _ready() -> void:
 	assert(fake.load_count == load_count_before_guard + 1)
 	assert(service.state == ServiceClass.State.LOADING)
 
-	print("REWARDED_AD_SERVICE_SMOKE_OK earned_once=true early_close_no_reward=true repeated_views=5 presentation=start_until_dismissed show_failure_finishes_audio=true dismissal_reloads=true duplicate_terminal_guarded=true load_failure_recovers=true retry_backoff=preparing_no_duplicate terminal_unavailable=rescue_eligible_then_reload loading_message_specific=true privacy_capability_gated=true consent_required=preinit_form_then_att consent_existing=direct_att consent_timeout=fail_closed att_gate=ump_then_four_states att_timeout=late_callback_recovers att_duplicate_guarded=true consent_change_reloads=true sanitized_diagnostics=true config_diagnostics_specific=true duplicate_load_guarded=true resume_recovers=true restart_reloads=true desktop_inactive=true")
+	print("REWARDED_AD_SERVICE_SMOKE_OK earned_once=true early_close_no_reward=true repeated_views=5 presentation=start_until_dismissed show_failure_finishes_audio=true dismissal_reloads=true duplicate_terminal_guarded=true load_failure_recovers=true retry_backoff=preparing_no_duplicate terminal_unavailable=rescue_eligible_then_reload loading_message_specific=true privacy_capability_gated=true consent_required=preinit_form_then_att consent_existing=direct_att consent_timeout=fail_closed att_gate=ump_then_four_states att_denied=reward_preserved att_timeout=late_callback_recovers att_duplicate_guarded=true consent_change_reloads=true sanitized_diagnostics=true config_diagnostics_specific=true duplicate_load_guarded=true resume_recovers=true restart_reloads=true desktop_inactive=true")
 	get_tree().quit()
 
 

@@ -10,6 +10,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+from configure_att_localizations import ATT_USAGE_DESCRIPTION_EN
+
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts/ci/configure_mobile_ads.py"
@@ -38,8 +40,11 @@ def main() -> None:
     enabled, enabled_output = run_configuration("true")
     assert enabled.getboolean("ATT", "att_enabled")
     usage = enabled.get("ATT", "att_text")
-    assert "許可しなくてもゲームを続けられます" in usage
-    assert "You can continue playing without allowing tracking" in usage
+    assert usage == f'"{ATT_USAGE_DESCRIPTION_EN}"'
+    assert "あなたに合った" not in usage
+    assert "personalized" not in usage.lower()
+    assert " / " not in usage
+    assert "rewards will not change" in usage
     assert "att=true" in enabled_output
 
     disabled, disabled_output = run_configuration("false")

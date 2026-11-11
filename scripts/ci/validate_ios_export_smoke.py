@@ -7,6 +7,11 @@ import plistlib
 import tempfile
 from pathlib import Path
 
+from configure_att_localizations import (
+    ATT_KEY,
+    ATT_USAGE_DESCRIPTION_EN,
+    ATT_USAGE_DESCRIPTION_JA,
+)
 from validate_ios_export import ExportExpectations, ValidationError, validate
 
 
@@ -26,20 +31,27 @@ def write_fixture(root: Path, att_enabled: bool = False) -> ExportExpectations:
     project.mkdir(parents=True)
     (app_dir / "Images.xcassets" / "AppIcon.appiconset").mkdir(parents=True)
     (app_dir / "Images.xcassets" / "AppIcon.appiconset" / "Icon-1024.png").write_bytes(b"png")
-    (project / "project.pbxproj").write_text(
-        "\n".join(
+    project_lines = [
+        f"PRODUCT_BUNDLE_IDENTIFIER = {BUNDLE_ID};",
+        f"DEVELOPMENT_TEAM = {TEAM_ID};",
+        f"MARKETING_VERSION = {APP_VERSION};",
+        f"CURRENT_PROJECT_VERSION = {BUILD_NUMBER};",
+        f'INFOPLIST_KEY_CFBundleDisplayName = "{DISPLAY_NAME}";',
+        f'INFOPLIST_KEY_CFBundleDisplayName = "{DISPLAY_NAME}";',
+        "SharePlugin NotificationSchedulerPlugin godot-storekit2 StoreKit.framework",
+        "AdmobPlugin GoogleMobileAds AppTrackingTransparency.framework PrivacyInfo.xcprivacy",
+        f"IPHONEOS_DEPLOYMENT_TARGET = {IOS_MIN_VERSION};",
+    ]
+    if att_enabled:
+        project_lines.extend(
             [
-                f"PRODUCT_BUNDLE_IDENTIFIER = {BUNDLE_ID};",
-                f"DEVELOPMENT_TEAM = {TEAM_ID};",
-                f"MARKETING_VERSION = {APP_VERSION};",
-                f"CURRENT_PROJECT_VERSION = {BUILD_NUMBER};",
-                f'INFOPLIST_KEY_CFBundleDisplayName = "{DISPLAY_NAME}";',
-                f'INFOPLIST_KEY_CFBundleDisplayName = "{DISPLAY_NAME}";',
-                "SharePlugin NotificationSchedulerPlugin godot-storekit2 StoreKit.framework",
-                "AdmobPlugin GoogleMobileAds AppTrackingTransparency.framework PrivacyInfo.xcprivacy",
-                f"IPHONEOS_DEPLOYMENT_TARGET = {IOS_MIN_VERSION};",
+                "path = en.lproj/InfoPlist.strings;",
+                "path = ja.lproj/InfoPlist.strings;",
+                "\t\t\tja,",
             ]
-        ),
+        )
+    (project / "project.pbxproj").write_text(
+        "\n".join(project_lines),
         encoding="utf-8",
     )
     info = {
@@ -52,12 +64,17 @@ def write_fixture(root: Path, att_enabled: bool = False) -> ExportExpectations:
         },
     }
     if att_enabled:
-        info["NSUserTrackingUsageDescription"] = (
-            "リワード広告の表示回数調整と効果測定のため、端末の広告識別子を利用する許可を求めます。"
-            "許可しなくてもゲームを続けられます。 / "
-            "We request permission to use the device advertising identifier for rewarded-ad "
-            "frequency control and measurement. You can continue playing without allowing tracking."
-        )
+        info[ATT_KEY] = ATT_USAGE_DESCRIPTION_EN
+        for locale, value in {
+            "en": ATT_USAGE_DESCRIPTION_EN,
+            "ja": ATT_USAGE_DESCRIPTION_JA,
+        }.items():
+            localized_dir = app_dir / f"{locale}.lproj"
+            localized_dir.mkdir(parents=True, exist_ok=True)
+            (localized_dir / "InfoPlist.strings").write_text(
+                f'{ATT_KEY} = "{value}";\n',
+                encoding="utf-8",
+            )
     with info_plist.open("wb") as stream:
         plistlib.dump(
             info,
@@ -136,11 +153,11 @@ def main() -> None:
     with tempfile.TemporaryDirectory() as temporary_directory:
         att_expectations = write_fixture(Path(temporary_directory), True)
         validate(att_expectations)
-        with att_expectations.info_plist.open("rb") as stream:
-            att_info = plistlib.load(stream)
-        att_info["NSUserTrackingUsageDescription"] = "English only"
-        with att_expectations.info_plist.open("wb") as stream:
-            plistlib.dump(att_info, stream)
+        japanese_strings = att_expectations.app_dir / "ja.lproj" / "InfoPlist.strings"
+        japanese_strings.write_text(
+            f'{ATT_KEY} = "Incorrect Japanese text";\n',
+            encoding="utf-8",
+        )
         try:
             validate(att_expectations)
         except ValidationError as error:
@@ -148,9 +165,23 @@ def main() -> None:
         else:
             raise AssertionError("validator accepted an ATT prompt without Japanese purpose text")
 
+    with tempfile.TemporaryDirectory() as temporary_directory:
+        att_expectations = write_fixture(Path(temporary_directory), True)
+        with att_expectations.info_plist.open("rb") as stream:
+            att_info = plistlib.load(stream)
+        att_info[ATT_KEY] = f"{ATT_USAGE_DESCRIPTION_JA} / {ATT_USAGE_DESCRIPTION_EN}"
+        with att_expectations.info_plist.open("wb") as stream:
+            plistlib.dump(att_info, stream)
+        try:
+            validate(att_expectations)
+        except ValidationError as error:
+            assert error.check == "info_plist.att_prompt.fallback_en"
+        else:
+            raise AssertionError("validator accepted a bilingual base ATT purpose string")
+
     print(
         "IOS_EXPORT_VALIDATOR_SMOKE_OK root_manifest=true "
-        "display_name_mismatch=true named_failure=true att_profiles=true"
+        "display_name_mismatch=true named_failure=true att_profiles=true localized=true"
     )
 
 

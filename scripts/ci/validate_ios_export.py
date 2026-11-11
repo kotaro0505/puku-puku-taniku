@@ -10,6 +10,13 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from configure_att_localizations import (
+    ATT_KEY,
+    ATT_USAGE_DESCRIPTION_EN,
+    ATT_USAGE_DESCRIPTION_JA,
+    read_info_plist_string,
+)
+
 
 class ValidationError(RuntimeError):
     def __init__(self, check: str, detail: str) -> None:
@@ -171,7 +178,7 @@ def validate(expectations: ExportExpectations) -> Path:
         "info_plist.ats_scoped",
         "scoped media and web-content ATS exceptions are required for Google Mobile Ads",
     )
-    usage_description = str(info.get("NSUserTrackingUsageDescription", ""))
+    usage_description = str(info.get(ATT_KEY, ""))
     if expectations.att_enabled:
         require_contains(
             source,
@@ -180,20 +187,54 @@ def validate(expectations: ExportExpectations) -> Path:
             "ATT-enabled export is missing AppTrackingTransparency.framework",
         )
         require(
-            "許可しなくてもゲームを続けられます" in usage_description,
-            "info_plist.att_prompt.ja",
-            "ATT-enabled export is missing the Japanese purpose text",
+            usage_description == ATT_USAGE_DESCRIPTION_EN,
+            "info_plist.att_prompt.fallback_en",
+            "base Info.plist must contain only the exact English ATT fallback text",
         )
+        localized_expectations = {
+            "en": ATT_USAGE_DESCRIPTION_EN,
+            "ja": ATT_USAGE_DESCRIPTION_JA,
+        }
+        for locale, expected_text in localized_expectations.items():
+            localized_path = expectations.app_dir / f"{locale}.lproj" / "InfoPlist.strings"
+            localized_text = read_info_plist_string(localized_path)
+            require(
+                localized_text == expected_text,
+                f"info_plist.att_prompt.{locale}",
+                f"{localized_path} does not contain the exact {locale} ATT purpose text",
+            )
+            require_contains(
+                source,
+                f"path = {locale}.lproj/InfoPlist.strings;",
+                f"xcode_project.att_localization.{locale}",
+                f"generated project does not reference the {locale} ATT localization",
+            )
         require(
-            "You can continue playing without allowing tracking" in usage_description,
-            "info_plist.att_prompt.en",
-            "ATT-enabled export is missing the English purpose text",
+            re.search(r"(?m)^\s*ja,\s*$", source) is not None,
+            "xcode_project.att_localization.ja_region",
+            "generated project does not declare Japanese as a known region",
+        )
+        combined_att_text = " ".join(localized_expectations.values()).lower()
+        require(
+            "personalized" not in combined_att_text and "あなたに合った" not in combined_att_text,
+            "info_plist.att_prompt.accuracy",
+            "ATT purpose text must not claim that personalized ads are enabled",
         )
     else:
         require(
-            "NSUserTrackingUsageDescription" not in info,
+            ATT_KEY not in info,
             "info_plist.att_prompt.absent",
             "ATT-disabled export contains NSUserTrackingUsageDescription",
+        )
+        localized_tracking_files = [
+            path
+            for path in expectations.app_dir.glob("*.lproj/InfoPlist.strings")
+            if read_info_plist_string(path) is not None
+        ]
+        require(
+            not localized_tracking_files,
+            "info_plist.att_prompt.localized_absent",
+            "ATT-disabled export contains a localized tracking purpose string",
         )
     print(
         "IOS_ATS_OK global=false media=true web_content=true "

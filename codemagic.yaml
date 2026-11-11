@@ -57,6 +57,7 @@ workflows:
           python3 scripts/ci/validate_build_profile.py "$BUILD_PROFILE"
           python3 scripts/ci/validate_ios_export_smoke.py
           python3 scripts/ci/configure_mobile_ads_smoke.py
+          python3 scripts/ci/configure_att_localizations_smoke.py
           case "$BUILD_PROFILE" in
             app_store)
               test "$BUNDLE_ID" = "com.ohanayanouen.pukupukutaniku"
@@ -168,8 +169,11 @@ workflows:
           case "$IOS_ATT_ENABLED" in
             true)
               grep -Fxq 'att_enabled=true' addons/AdmobPlugin/ios_export.cfg
-              grep -Fq '許可しなくてもゲームを続けられます' addons/AdmobPlugin/ios_export.cfg
-              grep -Fq 'You can continue playing without allowing tracking' addons/AdmobPlugin/ios_export.cfg
+              grep -Fq 'You can still use rewarded ads without allowing tracking' addons/AdmobPlugin/ios_export.cfg
+              grep -Fq 'rewards will not change.' addons/AdmobPlugin/ios_export.cfg
+              ! grep -Fq ' / ' addons/AdmobPlugin/ios_export.cfg
+              ! grep -Fqi 'personalized' addons/AdmobPlugin/ios_export.cfg
+              ! grep -Fq 'あなたに合った' addons/AdmobPlugin/ios_export.cfg
               ;;
             false)
               grep -Fxq 'att_enabled=false' addons/AdmobPlugin/ios_export.cfg
@@ -443,6 +447,10 @@ workflows:
             exit "${export_pipeline_status[1]}"
           fi
           echo "GODOT_IOS_EXPORT_COMMAND_OK preset=$GODOT_IOS_PRESET project=$XCODE_PROJECT"
+          python3 scripts/ci/configure_att_localizations.py configure \
+            --xcode-project "$CM_BUILD_DIR/$XCODE_PROJECT" \
+            --app-dir "$CM_BUILD_DIR/$IOS_APP_DIR" \
+            --att-enabled "$IOS_ATT_ENABLED"
           python3 scripts/ci/validate_ios_export.py \
             --xcode-project "$CM_BUILD_DIR/$XCODE_PROJECT" \
             --app-dir "$CM_BUILD_DIR/$IOS_APP_DIR" \
@@ -541,10 +549,15 @@ workflows:
               raise SystemExit("Signed IPA audit received an invalid ATT expectation")
           usage_description = str(info.get("NSUserTrackingUsageDescription", ""))
           if att_setting == "true":
-              if "許可しなくてもゲームを続けられます" not in usage_description:
-                  raise SystemExit("ATT-enabled IPA is missing the Japanese purpose text")
-              if "You can continue playing without allowing tracking" not in usage_description:
-                  raise SystemExit("ATT-enabled IPA is missing the English purpose text")
+              expected_att_fallback = (
+                  "We request permission to use the device advertising identifier for rewarded-ad "
+                  "frequency control and measurement. You can still use rewarded ads without allowing "
+                  "tracking, and rewards will not change."
+              )
+              if usage_description != expected_att_fallback:
+                  raise SystemExit("ATT-enabled IPA has an unexpected base purpose text")
+              if "personalized" in usage_description.lower() or "あなたに合った" in usage_description:
+                  raise SystemExit("ATT-enabled IPA contains a misleading personalization claim")
           elif "NSUserTrackingUsageDescription" in info:
               raise SystemExit("ATT-disabled IPA contains NSUserTrackingUsageDescription")
 
@@ -569,6 +582,9 @@ workflows:
               raise SystemExit("Google Mobile Ads privacy manifest is missing from the signed IPA")
           print(f"SIGNED_IPA_AUDIT_OK bundle={expected_bundle} ads_mode={ads_mode} att={att_setting} privacy_manifests={1 + len(sdk_manifests)}")
           PY
+          python3 scripts/ci/configure_att_localizations.py verify \
+            --bundle-dir "$APP_PATH" \
+            --att-enabled "$IOS_ATT_ENABLED"
           echo "IOS_IPA_OK path=$IPA_PATH version=$APP_VERSION build=$IOS_BUILD_NUMBER"
 
       - name: Record iOS build diagnostics
