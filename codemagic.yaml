@@ -600,8 +600,9 @@ workflows:
       app_store_connect:
         auth: integration
         submit_to_testflight: false
-        submit_to_app_store: true
-        release_type: MANUAL
+        # Upload the signed App Store-eligible IPA only. App Review submission
+        # and release remain deliberate manual actions in App Store Connect.
+        submit_to_app_store: false
 
   ios-iap-review-capture:
     <<: *ios-production-workflow

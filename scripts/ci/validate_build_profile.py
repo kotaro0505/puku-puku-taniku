@@ -363,7 +363,33 @@ def main() -> None:
     if 'MOBILE_ADS_MODE: "production"' not in release_block or "admob_production" not in release_block:
         fail("App Store release must load production AdMob secrets")
     if 'APP_STORE_SUBMISSION: "true"' not in release_block:
-        fail("App Store release workflow lost its explicit submission gate")
+        fail("App Store release workflow lost its App Store-eligible signing gate")
+    for required_release_upload_setting in [
+        "publishing:",
+        "app_store_connect:",
+        "auth: integration",
+        "submit_to_testflight: false",
+        "submit_to_app_store: false",
+    ]:
+        if required_release_upload_setting not in release_block:
+            fail(
+                "App Store release upload-only workflow is missing: "
+                f"{required_release_upload_setting}"
+            )
+    for forbidden_release_submission_setting in [
+        "submit_to_testflight: true",
+        "submit_to_app_store: true",
+        "beta_groups:",
+        "release_type:",
+        "cancel_previous_submissions:",
+        "earliest_release_date:",
+    ]:
+        if forbidden_release_submission_setting in release_block:
+            fail(
+                "App Store release upload-only workflow contains an automatic "
+                "submission or distribution setting: "
+                f"{forbidden_release_submission_setting}"
+            )
     for required_capture_setting in [
         'BUILD_PROFILE: "iap_review_capture"',
         'GODOT_IOS_PRESET: "iOS IAP Review Capture"',

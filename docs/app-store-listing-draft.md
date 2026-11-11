@@ -1,10 +1,10 @@
 # App Store 掲載情報・審査資料 草案
 
-作成日: 2026-10-26
+作成日: 2026-10-26 / 最終更新: 2026-11-11
 対象: 『ぷくぷく！たにくらいふ』ストーリー版 iOS 1.0
-状態: **App Store Connect へ未登録の草案**。公開、審査提出、ビルド実行は行っていない。
+状態: **App Store Connect転記前の承認用草案**。36件の非消耗型IAPは商品情報・価格・販売地域・審査画像が登録済みで、全件 `READY_TO_SUBMIT`。アプリ本体の掲載文、ストア用スクリーンショット、URL、審査情報は未登録または未確定であり、審査提出・公開は行っていない。
 
-この文書は、現行のゲーム実装と2026-10-26時点のApple公式資料を照合して、帰宅後にApp Store Connectへ転記できる形に整理したものです。「候補」「未確認」とした内容は、最終ビルドまたはApp Store Connect上で確認してから登録してください。
+この文書は、現行のゲーム実装、2026-11-11の読み取り専用App Store Connect監査、およびApple公式資料を照合し、App Store Connectへ転記できる形に整理したものです。「候補」「未確認」とした内容は、最終ビルドまたはApp Store Connect上で確認してから登録してください。
 
 ## 1. 確定情報
 
@@ -18,6 +18,13 @@
 | Kids Category | 使用しない |
 | ログイン | 不要。独自アカウント機能は現行実装にない |
 | アプリ内言語 | 日本語、ひらがな、英語 |
+
+### 2026-11-11 読み取り専用監査時点のApp Store Connectとの差分
+
+- App Store Connect上の日本語アプリ名は現在「ぷくぷく多肉」。本草案の正式候補「ぷくぷく！たにくらいふ」へ変更できるかは、名称の空き状況を含めて手動確認が必要です。
+- アプリバージョンレコードは `1.0`、Godot／Codemagicの正式ビルド候補は `1.0.0` です。正式IPAアップロード前に同じ値へ統一してください。
+- 審査用に選択されたビルドはありません。アップロード済みビルドは内部テスト専用で、App Store提出可能な通常版ビルドではありません。
+- 日本語の説明、キーワード、サポートURL、プライバシーポリシーURL、ストア用スクリーンショット、英語ローカリゼーションは未登録です。
 
 ## 2. 調査した実装と、正式版で紹介できる内容
 
@@ -260,10 +267,10 @@ Appleが質問票の回答から世界共通および地域別のレーティン
 ### 共通仕様と登録状態
 
 - 実装上は全36件が `iap_unlock` で、StoreKit entitlementを永続利用権として扱うため、登録タイプは **Non-Consumable** です。
-- App Store Connect上のProduct Typeはリポジトリから確認できないため、36件を実際に `Non-Consumable` として作成したことは未確認です。
+- App Store Connect APIの読み取り専用監査で、36件すべてが `NON_CONSUMABLE` であることを確認済みです。
 - 1回のIAPで該当デザインが永続解放されます。その後、同じデザインの鉢本体をゲーム内カタログの正式価格（2、3、5、10、30、100ぷくコインのいずれか）で1個ずつ購入できます。
 - ぷくコイン価格はApp Store上の現金価格ではありません。
-- Apple側は36商品すべて、日本を基準地域とする顧客価格100円、海外174地域のApple自動価格、現在の全175地域、将来追加地域ONで登録・再検証済みです。審査画像だけ未設定です。
+- Apple側は36商品すべて、日本を基準地域とする顧客価格100円、海外174地域のApple自動価格、現在の全175地域、将来追加地域ONで登録・再検証済みです。商品別の審査画像も36/36件で登録完了し、全商品が `READY_TO_SUBMIT` です。
 - Reference Nameは内部管理用の候補で、36件すべて一意です。
 
 | Product ID | Reference Name | 日本語Display Name | English Display Name | 日本語Description | English Description | Type |
@@ -319,7 +326,7 @@ English:
 This non-consumable permanently unlocks the pot design named above. After unlocking it, the player can buy individual pots of that design for the Puku Coin price shown in the in-game catalog and use them in arrangements. This is not a randomized purchase. Restore Purchases is at the top of Panda's Shop > Pots.
 ```
 
-各商品には、対象カード、StoreKitのローカライズ価格、購入ボタンが同時に見えるReview Screenshotを用意してください。現時点ではスクリーンショットを作成していません。
+各商品には、対象カード、StoreKitのローカライズ価格、購入ボタンが同時に見える実機Review Screenshotが登録済みです。36/36件について商品ID対応、1125×2436 PNG、欠番・重複、manifestを検証し、App Store Connect APIで画像状態 `COMPLETE` を再確認しています。
 
 ## 9. App Review Information 草案
 
@@ -349,7 +356,7 @@ AppleはApp Review連絡先として担当者名、メール、電話番号を�
 4. ストーリー進行により、原生地、寄せ植え、ガチャ、ハイブリッドラボ、ジュレジュレ団との育成・収穫スコア対戦が順次解放されます。
 
 広告:
-任意視聴のリワード動画広告だけを使用します。通常ゲーム用のぷくコインまたはたねが不足した際に「パンダのお店」でパンダをタップすると、救済の案内が表示されます。「お手伝いする」または「広告を見てたねをもらう」を選ぶと広告を要求します。SDKから視聴完了が通知された場合だけ、1ぷくコインまたはたね1セットを1回付与します。途中終了や読み込み失敗では報酬を付与しません。地域等により必要な場合、初回起動時にGoogle UMPの同意画面が表示されます。
+任意視聴のリワード動画広告だけを使用します。通常ゲーム用のぷくコインまたはたねが不足した際に「パンダのお店」でパンダをタップすると、救済の案内が表示されます。「お手伝いする」または「広告を見てたねをもらう」を選ぶと広告を要求します。SDKから視聴完了が通知された場合だけ、1ぷくコインまたはたね1セットを1回付与します。途中終了や読み込み失敗では広告報酬を付与しません。ぷくコイン不足時に広告が自動再試行後も利用不可と確定した場合に限り、ぷくコインを付与せず通常ゲーム1回分の無料プレイ券を付与することがあります。券は最大1枚で、消費後の再取得には10分の待ち時間があります。地域等により必要な場合、初回起動時にGoogle UMPの同意画面が表示されます。
 
 アプリ内課金:
 pot_unlock_001〜pot_unlock_036は非消耗型です。購入すると特定の鉢デザインを永続解放し、その後は同じデザインの鉢をゲーム内カタログに設定されたぷくコイン価格で何度でも購入できます。現金でぷくコインを販売する機能や、ランダムな有料IAPはありません。
@@ -372,7 +379,7 @@ Basic flow:
 4. The native habitat, arrangements, gacha, Hybrid Lab, and the grow-and-harvest score matches against the Jurejure Gang unlock through normal story progress.
 
 Ads:
-The app uses optional rewarded video ads only. When the player lacks Puku Coins or playable seeds, open Panda's Shop and tap the panda. Choose "Help at the shop" or "Watch an ad to get seeds" to request an ad. One Puku Coin or one seed set is granted once only after the SDK reports that the reward was earned. Closing early or failing to load grants nothing. A Google UMP consent form may appear on first launch when required for the user's region or consent state.
+The app uses optional rewarded video ads only. When the player lacks Puku Coins or playable seeds, open Panda's Shop and tap the panda. Choose "Help at the shop" or "Watch an ad to get seeds" to request an ad. One Puku Coin or one seed set is granted once only after the SDK reports that the reward was earned. Closing early or failing to load grants no ad reward. Only when an ad remains unavailable after automatic retries while the player lacks the Puku Coin needed for a normal round, the app may grant one free normal-round ticket instead of coins or an ad reward. At most one ticket is held, and another cannot be granted until 10 minutes after use. A Google UMP consent form may appear when required for the user's region or consent state.
 
 In-App Purchases:
 pot_unlock_001 through pot_unlock_036 are non-consumables. Each purchase permanently unlocks one specific pot design. The player can then buy individual pots of that design repeatedly at its in-game Puku Coin catalog price. The app does not sell Puku Coins for money and has no randomized paid IAP.
@@ -388,7 +395,7 @@ The production build disables all developer-only story jumps, progress resets, a
 1. 新規データでオープニングから通常12粒ゲームまで進める。
 2. 収穫とNEWカード、図鑑登録を確認する。
 3. 地域またはデバッグ用同意状態に応じたUMP画面と設定内のプライバシー設定導線を確認する。
-4. Googleテスト広告または審査環境で、完了時だけ報酬が1回付与され、途中終了では付与されないことを確認する。
+4. 本番AdMob広告が審査環境で利用可能な場合、完了時だけ報酬が1回付与され、途中終了では付与されないことを確認する。広告在庫、通信、同意状態により広告が利用できない場合もゲームが異常終了しないことを確認する。
 5. Sandboxで鉢の購入、キャンセル、購入失敗、再起動後の権利維持、購入の復元を確認する。
 6. 購入後、該当鉢がゲーム内カタログに表示された正式なぷくコイン価格で購入でき、寄せ植えに使用できることを確認する。
 
@@ -396,7 +403,7 @@ The production build disables all developer-only story jumps, progress resets, a
 
 IAP後半22件は第三幕まで進めないと表示されないため、審査担当者が短時間で直接確認しにくい状態です。開発用ストーリージャンプは本番で使えず、審査メモに使用可能と書いてはいけません。提出前に次を行ってください。
 
-1. 36件それぞれに、対象商品が実際の購入画面に表示されたReview Screenshotを登録する。
+1. 36件それぞれのReview Screenshotは登録済みです。提出直前に全件が `READY_TO_SUBMIT` のままであることを再確認する。
 2. App Review Informationへ、上記の正確な通常解放条件と、購入・復元を示す短い画面収録を添付する。
 3. TestFlight本番Bundle IDでApp Reviewと同じ商品レコードをSandbox確認する。
 4. Appleが直接操作できる短縮経路を要求した場合は、隠し開発機能を有効にせず、一般利用者にも説明可能な本番安全設計を別途決定する。今回の資料作成ではゲーム仕様を変更しない。
@@ -448,9 +455,8 @@ Appleはデバイスサイズごとに1〜10枚を受け付け、最初の1〜3�
 
 ### 36件のIAP
 
-- App Store Connectで全商品をNon-Consumableとして登録済みか
-- 各商品の現金価格、販売地域、税区分、Family Sharing方針
-- 日英ローカライズ、Review Notes、36件分のReview Screenshot
+- **完了**: 36商品をNon-Consumableとして登録し、日英ローカライズ、現金価格、販売地域、36件分のReview Screenshotを設定。全件 `READY_TO_SUBMIT`
+- **提出前確認**: 税区分、Family Sharing方針、商品情報の最終表示
 - 初回アプリバージョンと同じSubmissionへ36件を追加すること
 - Sandbox/TestFlight実機での購入、キャンセル、失敗、復元、再インストール、返金／権利変更
 - 後半商品まで審査担当者が確認できる方法
@@ -468,7 +474,7 @@ Appleはデバイスサイズごとに1〜10枚を受け付け、最初の1〜3�
 
 1. Privacy Policy URL、Support URL、App Review担当者名・電話番号を確定する。
 2. App Informationで日英名称、カテゴリ、年齢質問票を入力する。Loot Boxesの判断を先送りしない。
-3. 36件のIAPをNon-Consumableとして作成し、日英メタデータ、価格、地域、Review Screenshotを登録する。
+3. 登録済み36件のIAPがすべて `READY_TO_SUBMIT` であることを再確認し、初回アプリバージョンと同じSubmissionへ追加する。
 4. iOSバージョン画面に日英のSubtitle、Description、Keywords、Promotional Text、スクリーンショットを登録する。
 5. App Privacy、広告報告導線、UMP/ATT、Sandbox IAPを最終IPAと実機で照合する。
 6. App Review Informationへ英語審査メモ、担当者情報、必要な画面収録を登録する。

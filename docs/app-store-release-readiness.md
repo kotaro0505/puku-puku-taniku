@@ -1,6 +1,6 @@
 # App Store正式リリース準備記録
 
-最終更新: 2026-10-27
+最終更新: 2026-11-11
 
 ## 現在の判定
 
@@ -8,15 +8,15 @@
 
 1. AdMob本番アプリ／リワード広告ユニットとCodemagic Secretは用意済み。残るのはUMPメッセージ設定の実アカウント確認、公開、および実機での本番相当テスト
 2. ATTとApp Privacyの最終判断。Google Mobile Ads SDKのPrivacy ManifestはDevice IDのTracking利用可能性を宣言しているため、非パーソナライズ設定だけを根拠に「ATT不要」と断定しない
-3. UMPの「プライバシー設定を再表示する入口」。3言語UIに加え、固定したプラグインv7.0ソースへ `privacyOptionsRequirementStatus` / `presentPrivacyOptionsForm` / `canRequestAds` を追加してGodot 4.7.2用に再現ビルドする経路を実装したが、Codemagic macOSコンパイルとiOS実機動作は未確認
+3. UMPの「プライバシー設定を再表示する入口」。3言語UIと3つの公式APIを追加したネイティブプラグインはCodemagicでコンパイル・同梱済みだが、Googleがrequiredを返す実機状態でのフォーム再表示、同意変更、広告再読込は未確認
 4. 一般向け／Kids Category不使用の方針は確定済み。ただし利用者の年齢を把握する仕組みがなく、Google Mobile Ads 12.14.0はTFATを利用できないため、既知の子ども・ティーンをどう判定するかと年齢別広告取扱いの法務・運用判断が未確定
-5. App Store Connectでの非消耗型IAP 36商品の登録とSandbox／TestFlight実機購入テスト
+5. 非消耗型IAP 36商品は商品情報・価格・地域・審査画像を登録済みで全件 `READY_TO_SUBMIT`。残るのはSandbox／TestFlightでの購入、キャンセル、失敗、復元、再インストール、返金／権利変更の実機確認
 6. 公開済みプライバシーポリシーURL、アプリ内からそのURLへ到達できる導線、サポートURL
-7. Codemagicでの署名済みIPA生成・署名検証・App Store Connectアップロード
+7. App Store提出可能な通常版IPAの生成、署名検証、App Store Connectへのアップロード。内部テスト専用ビルドはアップロード済みだが、審査用に選べる通常版ビルドはまだない
 8. 新規データ／既存データ更新の実機テストと、主要iPhone画面サイズでの最終目視確認
 9. App Store Connectのメタデータ、スクリーンショット、年齢レーティング、審査情報、契約・税務・銀行情報
 
-上記を終えるまで `ios-app-store-release` は実行しない。このワークフローは成功後にApp Store審査へ自動提出する設定である。
+`ios-app-store-release` はApp Store提出可能な署名済みIPAをAppleへアップロードするが、App Reviewへの自動提出、TestFlight配信、一般公開は行わない。メタデータと実機確認を完了するまでは実行せず、アップロード後のビルド選択、IAP添付、審査提出、公開はApp Store Connectで明示的に行う。
 
 ## 2026-10-24 ローカル検証結果
 
@@ -185,7 +185,7 @@ StoreKit 2サービスは、商品情報とローカライズ価格の取得、�
 
 App Store Connect APIによる段階登録ツールと手順は [App Store Connect 鉢デザインIAP一括登録](app-store-connect-iap-automation.md) にまとめた。最新のIAPバージョン方式で、非消耗型作成、日英メタデータ、価格、販売地域、実画面の審査用スクリーンショット、状態検証を自動化する。既存商品の重複作成を防ぎ、Dry Run、未登録1件の試験登録、残りの一括登録の順に進める。
 
-共通商品説明は日本語「デザインを永続解放。以後ぷくコインで購入できます。」、英語「Unlocks this design. Pots cost Puku Coins.」に確定した。2026-11-05に36商品すべての商品本体と日英メタデータを登録し、日本100円、手動価格は日本1地域のみ、海外174地域はApple自動価格、販売地域は全175地域、将来追加地域ONであることをAPIで再確認した。審査画像だけ未設定で、審査提出・公開は行っていない。
+共通商品説明は日本語「デザインを永続解放。以後ぷくコインで購入できます。」、英語「Unlocks this design. Pots cost Puku Coins.」に確定した。36商品すべての商品本体と日英メタデータを登録し、日本100円、手動価格は日本1地域のみ、海外174地域はApple自動価格、販売地域は全175地域、将来追加地域ONであることをAPIで再確認した。実機購入画面から作成した審査画像も36/36件で登録し、全商品が `READY_TO_SUBMIT` である。審査提出・公開は行っていない。
 
 App Store Connect未接続のローカルモックテストだけを根拠に「購入検証済み」とはしない。別Bundle IDの開発版には本番アプリのIAP商品を共有できないため、IAP実機確認は本番Bundle IDのSandbox／TestFlightビルドで行う。Sandbox Testerを用意し、購入、キャンセル、失敗、復元、再起動、再インストール、返金／権利変更を実機検証する。
 
@@ -223,7 +223,7 @@ Google Mobile Ads SDK 12.14.0自身のPrivacy Manifestも最終IPAへ含める�
 | --- | --- | --- | --- |
 | `ios-development` | 同一iPhoneへ併存できる開発版 | Development / `.dev` Bundle ID | アーティファクトのみ |
 | `ios-testflight` | 本番ゲート＋公式テスト広告の内部実機確認 | App Store Distribution / 本番Bundle ID / internal-only | App Store Connectへアップロード、外部Beta審査は行わない |
-| `ios-app-store-release` | 本審査提出 | App Store Distribution / 本番Bundle ID | App Store Reviewへ自動提出、承認後は手動リリース |
+| `ios-app-store-release` | 正式IPAのアップロード | App Store Distribution / 本番Bundle ID | App Store Connectへアップロードのみ。TestFlight配信、App Review提出、一般公開はしない |
 
 全ワークフローはCodemagicで利用可能な安定版Xcode 26.5を指定し、実行時にもXcode major 26以上／iPhoneOS SDK 26以上を検査する。App Store本番ワークフローでは `testFlightInternalTestingOnly` を使わない。内部TestFlight用ワークフローだけが同オプションを保持する。
 
@@ -239,7 +239,7 @@ CIは次を行う。
 - Xcode project export後、Bundle ID、version、deployment target、native plugins、ATS、Privacy Manifestを検査
 - 署名済みIPAを生成し、`codesign --verify --deep --strict` と展開後監査を実行
 
-現時点ではCodemagicを実行していない。したがって、IPA生成、Apple Distribution署名、App Store Connectアップロードはいずれも**未確認**である。
+内部テスト用TestFlight版と撮影専用版では、CodemagicによるIPA生成、Apple Distribution署名、App Store Connectアップロードまで成功している。ただし、これらは `testFlightInternalTestingOnly` を付けた内部専用ビルドであり、App Store審査用ビルドには選べない。`ios-app-store-release` による通常版IPAの生成・アップロードは未実行・未確認である。
 
 Codemagic側で必要な事前設定:
 
@@ -248,7 +248,7 @@ Codemagic側で必要な事前設定:
 3. 開発版を使う場合は `com.ohanayanouen.pukupukutaniku.dev` をIdentifiersへ登録し、Development certificate/profileを用意
 4. `ADMOB_IOS_APP_ID` と `ADMOB_IOS_REWARDED_AD_UNIT_ID` をSecret登録
 5. 最初に `ios-development`、次にGoogle公式テスト広告を使う `ios-testflight` を手動実行
-6. App Store Connectの全項目と実機試験が完了した最後にだけ `ios-app-store-release` を実行
+6. App Store Connectの掲載情報と実機試験を確認した後、`ios-app-store-release` を実行して通常版IPAだけをアップロードする。ワークフローは審査提出や公開を行わない
 
 Appleは2026-04-28以降、Xcode 26以降とiOS 26 SDK以降を要求している。参考: <https://developer.apple.com/news/upcoming-requirements/?id=02032026a>
 
@@ -259,7 +259,7 @@ Appleは2026-04-28以降、Xcode 26以降とiOS 26 SDK以降を要求してい�
 1. Business > AgreementsでPaid Apps AgreementをActiveにする。Account Holderによる同意が必要
 2. Business > Tax FormsとBank Accountsを完了する
 3. AdMobアプリ、Rewarded unit、Privacy & messagingを設定し、Secret IDをCodemagicへ登録
-4. 認証付きIAP Dry Runで登録済み商品、Apple側日本円価格、販売地域を確認し、1件試験後に残りを一括登録
+4. **完了**: 36件のIAP商品、日英情報、価格、販売地域、審査画像をAPIで確認し、全件 `READY_TO_SUBMIT`
 5. App PrivacyでPrivacy Policy URLを登録し、Google SDKを含むデータ収集を申告
 6. 公開Support URLを用意する
 
@@ -301,7 +301,7 @@ Apps > 対象バージョン > App Review Informationに、連絡先、審査メ
 - 通知を利用する場合の用途
 - 広告／同意画面の確認手順
 
-最初の非消耗型IAPはアプリバージョンと同じSubmissionへ追加する。36件すべてのReview Screenshotと説明を確認してからSubmit for Reviewする。
+最初の非消耗型IAPはアプリバージョンと同じSubmissionへ追加する。36件すべてのReview Screenshotは登録済みなので、商品状態、説明、価格を再確認してから同じSubmissionへ追加する。追加しただけでは審査提出せず、アプリ本体の全項目が揃ってからSubmit for Reviewする。
 
 ## 回帰テスト方針
 
@@ -324,7 +324,7 @@ Apps > 対象バージョン > App Review Informationに、連絡先、審査メ
 3. リリース候補は `ios-testflight` を実行する。これは本番ゲートと本番Bundle IDを使う一方、未公開アプリで安全に検証できるGoogle公式テスト広告を使い、internal-only指定によって提出用ビルドと分離する
 4. 実機、Sandbox IAP、広告、プライバシー、セーブ移行、メタデータを確認する
 5. バージョンは `APP_VERSION` とGodot export presetを一致させ、Codemagic build numberは自動採番する
-6. 最終承認後にのみ `ios-app-store-release` を実行する
-7. App Store Connectでprocessing、IAP添付、審査Submission、承認後の手動リリースを確認する
+6. 最終承認後に `ios-app-store-release` を実行し、App Store提出可能な通常版IPAだけをアップロードする。このワークフローは審査提出・公開を自動実行しない
+7. App Store Connectでprocessing完了、ビルド選択、IAP添付を確認し、別の明示操作で審査Submissionを作成する。承認後も手動リリースとする
 
 本番版の開発機能を一時的に有効化したり、本番Bundle IDを開発用途へ変更したりしない。
