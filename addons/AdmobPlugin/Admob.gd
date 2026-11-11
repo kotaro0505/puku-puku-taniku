@@ -1325,14 +1325,36 @@ func set_mediation_privacy_settings(privacySettings: NetworkPrivacySettings) -> 
 		_plugin_singleton.set_mediation_privacy_settings(privacySettings.set_enabled_networks(__tags).get_raw_data())
 
 
-func request_tracking_authorization() -> void:
-	if _plugin_singleton == null:
-		GmpLogger.log_error("%s plugin not initialized" % PLUGIN_SINGLETON_NAME)
-	else:
-		if _plugin_singleton.has_method("request_tracking_authorization"):
-			_plugin_singleton.request_tracking_authorization()
-		else:
-			GmpLogger.log_error("request_tracking_authorization() method is not supported")
+func is_tracking_authorization_supported() -> bool:
+	return (
+		_plugin_singleton != null
+		and _plugin_singleton.has_method("request_tracking_authorization")
+		and _plugin_singleton.has_method("get_tracking_authorization_status")
+	)
+
+
+func get_tracking_authorization_status() -> String:
+	if not is_tracking_authorization_supported():
+		return "UNAVAILABLE"
+	match int(_plugin_singleton.call("get_tracking_authorization_status")):
+		0:
+			return "NOT_DETERMINED"
+		1:
+			return "RESTRICTED"
+		2:
+			return "DENIED"
+		3:
+			return "AUTHORIZED"
+		_:
+			return "UNKNOWN"
+
+
+func request_tracking_authorization() -> bool:
+	if not is_tracking_authorization_supported():
+		GmpLogger.log_error("request_tracking_authorization() method is not supported")
+		return false
+	_plugin_singleton.request_tracking_authorization()
+	return true
 
 
 func open_app_settings() -> void:

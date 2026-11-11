@@ -29,6 +29,7 @@ class ExportExpectations:
     build_number: str
     display_name: str
     ios_min_version: str
+    att_enabled: bool
 
 
 def require(condition: bool, check: str, detail: str) -> None:
@@ -170,12 +171,34 @@ def validate(expectations: ExportExpectations) -> Path:
         "info_plist.ats_scoped",
         "scoped media and web-content ATS exceptions are required for Google Mobile Ads",
     )
-    require(
-        "NSUserTrackingUsageDescription" not in info,
-        "info_plist.att_prompt",
-        "ATT is disabled but NSUserTrackingUsageDescription is present",
+    usage_description = str(info.get("NSUserTrackingUsageDescription", ""))
+    if expectations.att_enabled:
+        require_contains(
+            source,
+            "AppTrackingTransparency.framework",
+            "xcode_project.att_framework",
+            "ATT-enabled export is missing AppTrackingTransparency.framework",
+        )
+        require(
+            "許可しなくてもゲームを続けられます" in usage_description,
+            "info_plist.att_prompt.ja",
+            "ATT-enabled export is missing the Japanese purpose text",
+        )
+        require(
+            "You can continue playing without allowing tracking" in usage_description,
+            "info_plist.att_prompt.en",
+            "ATT-enabled export is missing the English purpose text",
+        )
+    else:
+        require(
+            "NSUserTrackingUsageDescription" not in info,
+            "info_plist.att_prompt.absent",
+            "ATT-disabled export contains NSUserTrackingUsageDescription",
+        )
+    print(
+        "IOS_ATS_OK global=false media=true web_content=true "
+        f"att_prompt={'true' if expectations.att_enabled else 'false'}"
     )
-    print("IOS_ATS_OK global=false media=true web_content=true att_prompt=false")
 
     # Godot 4.7.2 writes PrivacyInfo.xcprivacy beside the .xcodeproj, not in the
     # generated application source directory. The Xcode resources phase then
@@ -220,6 +243,7 @@ def parse_args() -> ExportExpectations:
     parser.add_argument("--build-number", required=True)
     parser.add_argument("--display-name", required=True)
     parser.add_argument("--ios-min-version", required=True)
+    parser.add_argument("--att-enabled", required=True, choices=("true", "false"))
     args = parser.parse_args()
     return ExportExpectations(
         xcode_project=args.xcode_project,
@@ -231,6 +255,7 @@ def parse_args() -> ExportExpectations:
         build_number=args.build_number,
         display_name=args.display_name,
         ios_min_version=args.ios_min_version,
+        att_enabled=args.att_enabled == "true",
     )
 
 

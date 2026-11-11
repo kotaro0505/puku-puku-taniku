@@ -17,13 +17,14 @@ workflows:
         STOREKIT2_COMPAT_REVISION: "compat4"
         ADMOB_PLUGIN_VERSION: "v7.0"
         ADMOB_PLUGIN_UPSTREAM_COMMIT: "4b4ddceab0be81f0dcb12a6313038dba6cf9eacf"
-        ADMOB_NATIVE_COMPAT_REVISION: "ump1"
+        ADMOB_NATIVE_COMPAT_REVISION: "ump2-att1"
         GOOGLE_MOBILE_ADS_VERSION: "12.14.0"
         APP_VERSION: "1.0.0"
         APPLE_TEAM_ID: "UK8FRB9XKH"
         BUNDLE_ID: "com.ohanayanouen.pukupukutaniku"
         BUILD_PROFILE: "app_store"
         MOBILE_ADS_MODE: "test"
+        IOS_ATT_ENABLED: "true"
         GODOT_IOS_PRESET: "iOS"
         DISPLAY_NAME: "ぷくぷく！たにくらいふ"
         IOS_APP_DIR: "build/ios/puku_puku_taniku"
@@ -38,7 +39,7 @@ workflows:
       cache_paths:
         - $HOME/.cache/puku-puku-taniku/godot-4.7.2
         - $HOME/.cache/puku-puku-taniku/storekit2-v0.2-godot-4.7.2-ios15.6-compat4
-        - $HOME/.cache/puku-puku-taniku/admob-v7.0-ump1-godot-4.7.2-gma-12.14.0-ios15.6
+        - $HOME/.cache/puku-puku-taniku/admob-v7.0-ump2-att1-godot-4.7.2-gma-12.14.0-ios15.6
         - $HOME/Library/Application Support/Godot/export_templates/4.7.2.stable
     scripts:
       - name: Report checked-out source revision
@@ -55,18 +56,22 @@ workflows:
           set -euo pipefail
           python3 scripts/ci/validate_build_profile.py "$BUILD_PROFILE"
           python3 scripts/ci/validate_ios_export_smoke.py
+          python3 scripts/ci/configure_mobile_ads_smoke.py
           case "$BUILD_PROFILE" in
             app_store)
               test "$BUNDLE_ID" = "com.ohanayanouen.pukupukutaniku"
               test "$DISPLAY_NAME" = "ぷくぷく！たにくらいふ"
+              test "$IOS_ATT_ENABLED" = "true"
               ;;
             iap_review_capture)
               test "$BUNDLE_ID" = "com.ohanayanouen.pukupukutaniku"
               test "$DISPLAY_NAME" = "ぷくぷく 撮影"
+              test "$IOS_ATT_ENABLED" = "false"
               ;;
             development)
               test "$BUNDLE_ID" = "com.ohanayanouen.pukupukutaniku.dev"
               test "$DISPLAY_NAME" = "ぷくぷく DEV"
+              test "$IOS_ATT_ENABLED" = "false"
               ;;
             *)
               echo "Unknown BUILD_PROFILE: $BUILD_PROFILE" >&2
@@ -80,7 +85,7 @@ workflows:
           test "$STOREKIT2_COMPAT_REVISION" = "compat4"
           test "$ADMOB_PLUGIN_VERSION" = "v7.0"
           test "$ADMOB_PLUGIN_UPSTREAM_COMMIT" = "4b4ddceab0be81f0dcb12a6313038dba6cf9eacf"
-          test "$ADMOB_NATIVE_COMPAT_REVISION" = "ump1"
+          test "$ADMOB_NATIVE_COMPAT_REVISION" = "ump2-att1"
           test "$GOOGLE_MOBILE_ADS_VERSION" = "12.14.0"
           if [ "$APP_STORE_SUBMISSION" = "true" ]; then
             test "$BUILD_PROFILE" = "app_store"
@@ -119,6 +124,7 @@ workflows:
           grep -Fq 'presentPrivacyOptionsFormFromViewController' scripts/ci/patch_admob_ump_native.py
           grep -Fq 'UMPConsentInformation.sharedInstance.canRequestAds' scripts/ci/patch_admob_ump_native.py
           grep -Fq 'UMPConsentInformation.sharedInstance.privacyOptionsRequirementStatus' scripts/ci/patch_admob_ump_native.py
+          grep -Fq 'ATTrackingManager.trackingAuthorizationStatus' scripts/ci/patch_admob_ump_native.py
           grep -Fq 'NSAllowsArbitraryLoadsForMedia' addons/AdmobPlugin/AdmobPlugin.gd
           grep -Fq 'NSAllowsArbitraryLoadsInWebContent' addons/AdmobPlugin/AdmobPlugin.gd
           ! grep -Fq '<key>NSAllowsArbitraryLoads</key>' addons/AdmobPlugin/AdmobPlugin.gd
@@ -159,8 +165,21 @@ workflows:
           python3 scripts/ci/configure_mobile_ads.py "$MOBILE_ADS_MODE"
           test -f addons/AdmobPlugin/ios_export.cfg
           test -f data/mobile-ads.cfg
-          grep -Fxq 'att_enabled=false' addons/AdmobPlugin/ios_export.cfg
-          grep -Fxq 'att_text=""' addons/AdmobPlugin/ios_export.cfg
+          case "$IOS_ATT_ENABLED" in
+            true)
+              grep -Fxq 'att_enabled=true' addons/AdmobPlugin/ios_export.cfg
+              grep -Fq '許可しなくてもゲームを続けられます' addons/AdmobPlugin/ios_export.cfg
+              grep -Fq 'You can continue playing without allowing tracking' addons/AdmobPlugin/ios_export.cfg
+              ;;
+            false)
+              grep -Fxq 'att_enabled=false' addons/AdmobPlugin/ios_export.cfg
+              grep -Fxq 'att_text=""' addons/AdmobPlugin/ios_export.cfg
+              ;;
+            *)
+              echo "Unknown IOS_ATT_ENABLED value" >&2
+              exit 1
+              ;;
+          esac
           if [ "$MOBILE_ADS_MODE" = "production" ]; then
             grep -Fq 'is_real=true' addons/AdmobPlugin/ios_export.cfg
             ! grep -Fq 'ca-app-pub-3940256099942544/1712485313' data/mobile-ads.cfg
@@ -239,6 +258,7 @@ workflows:
             grep -Fxq 'get_privacy_options_requirement_status' "$BRIDGE_STRINGS"
             grep -Fxq 'present_privacy_options_form' "$BRIDGE_STRINGS"
             grep -Fxq 'can_request_ads' "$BRIDGE_STRINGS"
+            grep -Fxq 'get_tracking_authorization_status' "$BRIDGE_STRINGS"
             rm -f "$BRIDGE_STRINGS"
           done
           echo "ADMOB_UMP_NATIVE_BRIDGE_OK version=$ADMOB_PLUGIN_VERSION gma=$GOOGLE_MOBILE_ADS_VERSION godot=$GODOT_VERSION"
@@ -432,7 +452,8 @@ workflows:
             --app-version "$APP_VERSION" \
             --build-number "$IOS_BUILD_NUMBER" \
             --display-name "$DISPLAY_NAME" \
-            --ios-min-version "$IOS_MIN_VERSION"
+            --ios-min-version "$IOS_MIN_VERSION" \
+            --att-enabled "$IOS_ATT_ENABLED"
           PRIVACY_MANIFEST="$(dirname "$CM_BUILD_DIR/$XCODE_PROJECT")/PrivacyInfo.xcprivacy"
           if ! plutil -lint "$PRIVACY_MANIFEST"; then
             echo "IOS_EXPORT_VALIDATION_FAILED check=privacy_manifest.plutil detail=plutil rejected the generated manifest" >&2
@@ -488,13 +509,13 @@ workflows:
             "$SIGNED_PCK" \
             "$MOBILE_ADS_MODE"
           echo "SIGNED_IPA_CHECK_OK check=mobile_ads.pack_path layout=bundle_root"
-          python3 - "$APP_PATH" "$BUNDLE_ID" "$DISPLAY_NAME" "$BUILD_PROFILE" "$MOBILE_ADS_MODE" <<'PY'
+          python3 - "$APP_PATH" "$BUNDLE_ID" "$DISPLAY_NAME" "$BUILD_PROFILE" "$MOBILE_ADS_MODE" "$IOS_ATT_ENABLED" <<'PY'
           import plistlib
           import sys
           from pathlib import Path
 
           app = Path(sys.argv[1])
-          expected_bundle, expected_name, profile, ads_mode = sys.argv[2:6]
+          expected_bundle, expected_name, profile, ads_mode, att_setting = sys.argv[2:7]
           with (app / "Info.plist").open("rb") as handle:
               info = plistlib.load(handle)
           if info.get("CFBundleIdentifier") != expected_bundle:
@@ -516,8 +537,16 @@ workflows:
               raise SystemExit("Signed IPA disables ATS globally")
           if not ats.get("NSAllowsArbitraryLoadsForMedia") or not ats.get("NSAllowsArbitraryLoadsInWebContent"):
               raise SystemExit("Signed IPA is missing scoped Google Mobile Ads ATS exceptions")
-          if "NSUserTrackingUsageDescription" in info:
-              raise SystemExit("ATT is disabled but the signed IPA contains NSUserTrackingUsageDescription")
+          if att_setting not in {"true", "false"}:
+              raise SystemExit("Signed IPA audit received an invalid ATT expectation")
+          usage_description = str(info.get("NSUserTrackingUsageDescription", ""))
+          if att_setting == "true":
+              if "許可しなくてもゲームを続けられます" not in usage_description:
+                  raise SystemExit("ATT-enabled IPA is missing the Japanese purpose text")
+              if "You can continue playing without allowing tracking" not in usage_description:
+                  raise SystemExit("ATT-enabled IPA is missing the English purpose text")
+          elif "NSUserTrackingUsageDescription" in info:
+              raise SystemExit("ATT-disabled IPA contains NSUserTrackingUsageDescription")
 
           privacy_path = app / "PrivacyInfo.xcprivacy"
           with privacy_path.open("rb") as handle:
@@ -538,7 +567,7 @@ workflows:
           sdk_manifests = [path for path in app.rglob("PrivacyInfo.xcprivacy") if path != privacy_path]
           if not any("GoogleMobileAds" in str(path) for path in sdk_manifests):
               raise SystemExit("Google Mobile Ads privacy manifest is missing from the signed IPA")
-          print(f"SIGNED_IPA_AUDIT_OK bundle={expected_bundle} ads_mode={ads_mode} privacy_manifests={1 + len(sdk_manifests)}")
+          print(f"SIGNED_IPA_AUDIT_OK bundle={expected_bundle} ads_mode={ads_mode} att={att_setting} privacy_manifests={1 + len(sdk_manifests)}")
           PY
           echo "IOS_IPA_OK path=$IPA_PATH version=$APP_VERSION build=$IOS_BUILD_NUMBER"
 
@@ -579,13 +608,14 @@ workflows:
         STOREKIT2_COMPAT_REVISION: "compat4"
         ADMOB_PLUGIN_VERSION: "v7.0"
         ADMOB_PLUGIN_UPSTREAM_COMMIT: "4b4ddceab0be81f0dcb12a6313038dba6cf9eacf"
-        ADMOB_NATIVE_COMPAT_REVISION: "ump1"
+        ADMOB_NATIVE_COMPAT_REVISION: "ump2-att1"
         GOOGLE_MOBILE_ADS_VERSION: "12.14.0"
         APP_VERSION: "1.0.0"
         APPLE_TEAM_ID: "UK8FRB9XKH"
         BUNDLE_ID: "com.ohanayanouen.pukupukutaniku"
         BUILD_PROFILE: "app_store"
         MOBILE_ADS_MODE: "production"
+        IOS_ATT_ENABLED: "true"
         GODOT_IOS_PRESET: "iOS"
         DISPLAY_NAME: "ぷくぷく！たにくらいふ"
         IOS_APP_DIR: "build/ios/puku_puku_taniku"
@@ -619,13 +649,14 @@ workflows:
         STOREKIT2_COMPAT_REVISION: "compat4"
         ADMOB_PLUGIN_VERSION: "v7.0"
         ADMOB_PLUGIN_UPSTREAM_COMMIT: "4b4ddceab0be81f0dcb12a6313038dba6cf9eacf"
-        ADMOB_NATIVE_COMPAT_REVISION: "ump1"
+        ADMOB_NATIVE_COMPAT_REVISION: "ump2-att1"
         GOOGLE_MOBILE_ADS_VERSION: "12.14.0"
         APP_VERSION: "1.0.0"
         APPLE_TEAM_ID: "UK8FRB9XKH"
         BUNDLE_ID: "com.ohanayanouen.pukupukutaniku"
         BUILD_PROFILE: "iap_review_capture"
         MOBILE_ADS_MODE: "test"
+        IOS_ATT_ENABLED: "false"
         GODOT_IOS_PRESET: "iOS IAP Review Capture"
         DISPLAY_NAME: "ぷくぷく 撮影"
         IOS_APP_DIR: "build/ios-iap-capture/puku_puku_taniku_capture"
@@ -663,13 +694,14 @@ workflows:
         STOREKIT2_COMPAT_REVISION: "compat4"
         ADMOB_PLUGIN_VERSION: "v7.0"
         ADMOB_PLUGIN_UPSTREAM_COMMIT: "4b4ddceab0be81f0dcb12a6313038dba6cf9eacf"
-        ADMOB_NATIVE_COMPAT_REVISION: "ump1"
+        ADMOB_NATIVE_COMPAT_REVISION: "ump2-att1"
         GOOGLE_MOBILE_ADS_VERSION: "12.14.0"
         APP_VERSION: "1.0.0"
         APPLE_TEAM_ID: "UK8FRB9XKH"
         BUNDLE_ID: "com.ohanayanouen.pukupukutaniku.dev"
         BUILD_PROFILE: "development"
         MOBILE_ADS_MODE: "test"
+        IOS_ATT_ENABLED: "false"
         GODOT_IOS_PRESET: "iOS Development"
         DISPLAY_NAME: "ぷくぷく DEV"
         IOS_APP_DIR: "build/ios-dev/puku_puku_taniku_dev"

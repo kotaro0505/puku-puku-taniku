@@ -33,6 +33,8 @@ iOS版は、任意視聴のリワード広告を提供するため、Google Mobi
 
 本アプリの現行設定は、広告のパーソナライズとパブリッシャーのファーストパーティIDを無効にし、広告コンテンツの最大レーティングを `G` にしています。非パーソナライズ広告でも、広告配信、集計測定、不正利用防止等に必要な情報が処理されることがあります。Googleによる具体的な取扱いは、利用者の地域、端末設定、同意状態、Googleの設定および広告配信状況により異なります。
 
+iOS版は、必要なGoogle UMPの同意処理が完了した後、Google Mobile Ads SDKを初期化する前に、AppleのApp Tracking Transparency（ATT）を通じて追跡の許可を求めます。許可された場合、Google Mobile Ads SDKは広告識別子（IDFA）を広告の表示回数調整、効果測定その他Googleが開示する広告目的に利用する可能性があります。拒否または制限された場合、本アプリはIDFAを利用せずに広告SDKを開始します。ATTの選択にかかわらずゲームは利用でき、リワード広告を最後まで視聴した場合のゲーム内報酬は変わりません。拒否しても、IPアドレス、広告データ、利用状況、診断情報等、IDFA以外の情報の処理がすべて停止するとは限りません。
+
 ### 2.2 アプリ内課金
 
 iOS版は、36種類の鉢デザインを永続的に解放する非消耗型アプリ内課金にApple StoreKit 2を使用します。支払い、購入履歴、返金およびApple Accountに関する情報はAppleが処理します。運営者がクレジットカード番号や銀行口座番号等の完全な支払手段情報を直接受け取ることはありません。
@@ -101,6 +103,8 @@ Web版とその静的素材はGitHub Pagesから配信されます。GitHubは�
 
 本アプリはGoogle UMPを使って同意情報を更新し、利用者の地域等により必要な場合はGoogleが提供する同意フォームを表示します。必要な同意または広告要求の許可を確認できない場合、リワード広告は利用できません。広告を視聴していないのに視聴成功として扱うことはありません。
 
+Google UMPによる同意とApple ATTによる追跡許可は別の仕組みです。本アプリはUMPの必要な処理を先に行い、その後、ATTの状態が未決定の場合だけiOSの追跡許可ダイアログを表示します。ATTが許可、拒否または制限のいずれであっても、ゲーム機能は利用できます。ATTの選択は、iOSの設定画面から後で変更できる場合があります。
+
 Googleがプライバシー設定の再表示を必要と判定した場合は、ゲーム内の設定画面に「プライバシー設定」に相当するボタンを表示する構成です。端末および地域によっては、OSやGoogleが提供する追加の広告・プライバシー設定を利用できます。
 
 ## 6. 保持と削除
@@ -160,6 +164,8 @@ The iOS version uses Google Mobile Ads SDK (Google AdMob) and Google User Messag
 
 The current App configuration disables ad personalization and the publisher first-party ID and sets the maximum ad content rating to `G`. Non-personalized ads may still process information required for ad delivery, aggregate measurement, frequency controls, and fraud prevention.
 
+After completing any required Google UMP consent flow and before initializing Google Mobile Ads SDK, the iOS version requests tracking authorization through Apple's App Tracking Transparency (ATT). If authorization is granted, Google Mobile Ads SDK may use the Identifier for Advertisers (IDFA) for ad frequency control, measurement, and other advertising purposes disclosed by Google. If authorization is denied or restricted, the App starts the advertising SDK without using the IDFA. The game remains available regardless of the ATT choice, and the in-game reward for a completed rewarded ad is not reduced. Denying ATT does not necessarily stop processing of non-IDFA information such as IP address, ad data, usage data, or diagnostics.
+
 ### 2.2 In-app purchases
 
 The iOS version uses Apple StoreKit 2 for non-consumable purchases that permanently unlock 36 pot designs. Apple processes payment, purchase history, refunds, and Apple Account information. The Operator does not directly receive complete payment credentials such as credit card or bank account numbers.
@@ -208,6 +214,8 @@ These providers may process information outside Japan.
 
 The App uses Google UMP to update consent information and to display a Google-provided consent form when required based on the user's region or other applicable factors. Rewarded ads remain unavailable when the App cannot confirm the required consent or permission to request ads. The App does not treat an unviewed ad as completed.
 
+Google UMP consent and Apple ATT tracking authorization are separate controls. The App completes the required UMP flow first and then displays the iOS tracking authorization prompt only when the ATT status is not determined. The game remains available whether ATT is authorized, denied, or restricted. The ATT choice may be changeable later in iOS Settings.
+
 When Google reports that privacy options must be made available, the App is designed to show a corresponding Privacy Settings button in its settings screen. Additional advertising or privacy controls may be available through the operating system or Google, depending on the device and region.
 
 ## 6. Retention and Deletion
@@ -245,7 +253,7 @@ This Policy may be updated when the App, SDKs, laws, or services change. Materia
 次を解消するまで、この候補を正式ページへ変換しないでください。
 
 1. 制定日・施行日を確定する。
-2. Google Mobile Ads SDK 12.14.0のPrivacy ManifestにあるDevice IDのTracking宣言、現行のATT無効設定、最終IPAの実際のデータフローを照合し、ATT実装要否とApp Privacy回答を確定する。「トラッキングなし」と推測しない。
+2. ATT実装を含む次回TestFlight実機で、UMP完了後・Google Mobile Ads初期化前にATTが表示されること、許可・拒否・制限済みの各状態、拒否時の広告と報酬を確認する。最終IPAのPrivacy ReportとGoogle Mobile Ads SDK 12.14.0のPrivacy Manifestを照合し、App PrivacyではDevice IDとトラッキングを実際の最終動作に合わせて申告する。
 3. AdMob管理画面のPrivacy & messaging、広告技術プロバイダ、メディエーション、地域、年齢別広告取扱いを確認する。
 4. Google Mobile Ads 12.14.0でTFATを利用できない点を踏まえ、年齢不明利用者を旧設定の `UNSPECIFIED` とする運用と、既知の子ども・ティーンへの対応を確認する。
 5. UMPのプライバシーオプションがrequiredとなる実機状態で、設定ボタン、フォーム、同意変更、広告再読込を確認する。

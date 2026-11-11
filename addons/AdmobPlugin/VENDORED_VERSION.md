@@ -23,8 +23,12 @@ Local release hardening:
   against the exact Godot 4.7.2 stable headers and iOS 15.6 deployment target.
 - The local native bridge exposes UMP 3.1.0's
   `privacyOptionsRequirementStatus`, `presentPrivacyOptionsForm`, and
-  `canRequestAds`, plus a dismissal signal. The build fails before export if the
-  pinned source changes, the SDK versions drift, or any bridge symbol is absent.
+  `canRequestAds`, plus a dismissal signal. It also exposes the four-state
+  `ATTrackingManager.trackingAuthorizationStatus` value while retaining the
+  plugin's existing authorization request and completion signals. Advertising
+  identifiers are never written to the native bridge log. The build fails
+  before export if the pinned source changes, the SDK versions drift, or any
+  bridge symbol is absent.
 - This native bridge does not change the Google Mobile Ads SDK version. TFAT is
   therefore deliberately deferred instead of coupling the UMP fix to the
   breaking 12.x-to-13.x SDK migration.

@@ -22,6 +22,7 @@ const AD_UNIT_PATTERN := "^ca-app-pub-[0-9]{16}/[0-9]{10}$"
 enum State {
 	INACTIVE,
 	CONSENT,
+	ATT,
 	INITIALIZING,
 	LOADING,
 	READY,
@@ -49,6 +50,10 @@ var _privacy_options_form_open := false
 var _ads_mode := "unknown"
 var _plugin_detected := false
 var _privacy_bridge_supported := false
+var _att_required := false
+var _att_request_pending := false
+var _att_resolution_completed := false
+var _att_status := "NOT_REQUIRED"
 var _initialization_callback_received := false
 var _mobile_ads_config_failure_reason := ""
 
@@ -67,7 +72,7 @@ func is_available() -> bool:
 
 
 func is_preparing() -> bool:
-	return state in [State.CONSENT, State.INITIALIZING, State.LOADING] or _automatic_retry_pending
+	return state in [State.CONSENT, State.ATT, State.INITIALIZING, State.LOADING] or _automatic_retry_pending
 
 
 func is_unavailable_for_rescue() -> bool:
@@ -95,6 +100,10 @@ func diagnostic_snapshot() -> Dictionary:
 		"privacy_bridge_supported": _privacy_bridge_supported,
 		"privacy_requirement": privacy_requirement,
 		"can_request_ads": can_request_ads,
+		"att_required": _att_required,
+		"att_status": _att_status,
+		"att_request_pending": _att_request_pending,
+		"att_resolution_completed": _att_resolution_completed,
 		"initialization_callback_received": _initialization_callback_received,
 		"initialized": _initialized,
 		"consent_update_attempts": _consent_update_attempt_count,
@@ -117,6 +126,8 @@ func user_diagnostic_code() -> String:
 	match state:
 		State.CONSENT:
 			return "ADS-WAIT-CONSENT"
+		State.ATT:
+			return "ADS-WAIT-ATT"
 		State.INITIALIZING:
 			return "ADS-WAIT-INIT"
 		State.LOADING:
@@ -209,7 +220,11 @@ func _start_if_supported() -> void:
 	_admob.under_age_of_consent = AdmobConfigClass.TagForUnderAgeOfConsent.UNSPECIFIED
 	_admob.first_party_id_enabled = false
 	_admob.personalization_state = AdmobConfigClass.PersonalizationState.DISABLED
-	_admob.att_enabled = false
+	_att_required = (
+		BuildProfileClass.is_app_store_release()
+		and not BuildProfileClass.iap_review_capture_enabled()
+	)
+	_admob.att_enabled = _att_required
 	if _admob.is_real:
 		_admob.ios_real_rewarded_id = rewarded_id
 	else:
@@ -228,6 +243,8 @@ func _start_if_supported() -> void:
 	_admob.consent_form_failed_to_load.connect(_on_consent_form_failed_to_load)
 	_admob.consent_form_dismissed.connect(_on_consent_form_dismissed)
 	_admob.privacy_options_form_dismissed.connect(_on_privacy_options_form_dismissed)
+	_admob.tracking_authorization_granted.connect(_on_tracking_authorization_granted)
+	_admob.tracking_authorization_denied.connect(_on_tracking_authorization_denied)
 	add_child(_admob)
 	_privacy_bridge_supported = _admob.is_privacy_options_supported()
 	_log_diagnostic("service_configured")
@@ -235,7 +252,7 @@ func _start_if_supported() -> void:
 	if BuildProfileClass.is_app_store_release():
 		_request_consent_update()
 	else:
-		_initialize_ads()
+		_initialize_ads_after_att()
 
 
 func _load_mobile_ads_config() -> Dictionary:
@@ -287,13 +304,13 @@ func _on_consent_info_updated() -> void:
 	_refresh_privacy_options_requirement()
 	_log_diagnostic("consent_info_updated")
 	if _admob.is_privacy_options_supported() and _admob.can_request_ads():
-		_initialize_ads()
+		_initialize_ads_after_att()
 		return
 	var consent = _admob.get_consent_status()
 	var status: String = "UNKNOWN" if consent == null else str(consent.to_status_string())
 	match status:
 		"NOT_REQUIRED", "OBTAINED":
-			_initialize_ads()
+			_initialize_ads_after_att()
 		"REQUIRED":
 			_admob.load_consent_form()
 		_:
@@ -304,7 +321,7 @@ func _on_consent_info_update_failed(error_data = null) -> void:
 	_refresh_privacy_options_requirement()
 	if _admob != null and _admob.is_privacy_options_supported() and _admob.can_request_ads():
 		_record_failure("consent_update_failed_previous_consent_usable", "consent", error_data)
-		_initialize_ads()
+		_initialize_ads_after_att()
 		return
 	_retry_or_unavailable("consent_update_failed", true, error_data, "consent")
 
@@ -324,14 +341,14 @@ func _on_consent_form_dismissed(error_data = null) -> void:
 	_refresh_privacy_options_requirement()
 	if _admob.is_privacy_options_supported():
 		if _admob.can_request_ads():
-			_initialize_ads()
+			_initialize_ads_after_att()
 		else:
 			_retry_or_unavailable("consent_disallows_ads", true, error_data, "consent")
 		return
 	var consent = _admob.get_consent_status()
 	var status: String = "UNKNOWN" if consent == null else str(consent.to_status_string())
 	if status in ["NOT_REQUIRED", "OBTAINED"]:
-		_initialize_ads()
+		_initialize_ads_after_att()
 	else:
 		_retry_or_unavailable("consent_not_obtained", true, error_data, "consent")
 
@@ -358,7 +375,7 @@ func _on_privacy_options_form_dismissed(error_data = null) -> void:
 				_admob.remove_rewarded_ad()
 			_load_rewarded_ad()
 		else:
-			_initialize_ads()
+			_initialize_ads_after_att()
 	elif succeeded:
 		if _admob != null and _initialized and _admob.is_rewarded_ad_loaded():
 			_admob.remove_rewarded_ad()
@@ -368,8 +385,68 @@ func _on_privacy_options_form_dismissed(error_data = null) -> void:
 	privacy_options_form_finished.emit(succeeded)
 
 
-func _initialize_ads() -> void:
+func _initialize_ads_after_att() -> void:
 	if _admob == null or _initialized:
+		return
+	if not _att_required:
+		_att_status = "NOT_REQUIRED"
+		_att_resolution_completed = true
+		_initialize_ads()
+		return
+	if not _admob.is_tracking_authorization_supported():
+		_att_status = "UNAVAILABLE"
+		_mark_unavailable("att_bridge_missing")
+		return
+	var status: String = _admob.get_tracking_authorization_status()
+	_att_status = status
+	match status:
+		"AUTHORIZED", "DENIED", "RESTRICTED":
+			_att_request_pending = false
+			_att_resolution_completed = true
+			_initialize_ads()
+		"NOT_DETERMINED":
+			if _att_request_pending:
+				return
+			_set_state(State.ATT)
+			_att_request_pending = true
+			_log_diagnostic("att_authorization_requested")
+			if not _admob.request_tracking_authorization():
+				_att_request_pending = false
+				_mark_unavailable("att_request_failed")
+		_:
+			_att_request_pending = false
+			_mark_unavailable("att_status_unknown")
+
+
+func _on_tracking_authorization_granted() -> void:
+	_complete_tracking_authorization(true)
+
+
+func _on_tracking_authorization_denied() -> void:
+	_complete_tracking_authorization(false)
+
+
+func _complete_tracking_authorization(expected_authorized: bool) -> void:
+	if not _att_required or _admob == null:
+		return
+	_att_request_pending = false
+	var status: String = _admob.get_tracking_authorization_status()
+	_att_status = status
+	if expected_authorized and status != "AUTHORIZED":
+		_mark_unavailable("att_callback_status_mismatch")
+		return
+	if not expected_authorized and status not in ["DENIED", "RESTRICTED"]:
+		_mark_unavailable("att_callback_status_mismatch")
+		return
+	_att_resolution_completed = true
+	_initialize_ads()
+
+
+func _initialize_ads() -> void:
+	if _admob == null or _initialized or state == State.INITIALIZING:
+		return
+	if _att_required and not _att_resolution_completed:
+		_mark_unavailable("att_gate_not_resolved")
 		return
 	_set_state(State.INITIALIZING)
 	_admob.initialize()
@@ -493,7 +570,7 @@ func _retry_or_unavailable(reason: String, retry_consent: bool, error_data = nul
 func _recover_after_request() -> void:
 	if _admob == null:
 		return
-	if state in [State.CONSENT, State.INITIALIZING, State.LOADING, State.SHOWING] or _automatic_retry_pending:
+	if state in [State.CONSENT, State.ATT, State.INITIALIZING, State.LOADING, State.SHOWING] or _automatic_retry_pending:
 		return
 	_retry_generation += 1
 	_retry_count = 0
@@ -501,7 +578,7 @@ func _recover_after_request() -> void:
 		if BuildProfileClass.is_app_store_release():
 			_request_consent_update()
 		else:
-			_initialize_ads()
+			_initialize_ads_after_att()
 	elif not _admob.is_rewarded_ad_loaded():
 		_load_rewarded_ad()
 
@@ -516,7 +593,7 @@ func _recover_terminal_unavailable() -> void:
 		if BuildProfileClass.is_app_store_release():
 			_request_consent_update()
 		else:
-			_initialize_ads()
+			_initialize_ads_after_att()
 	else:
 		_load_rewarded_ad()
 
@@ -525,10 +602,23 @@ func _recover_after_resume() -> void:
 	if state in [State.INACTIVE, State.READY, State.SHOWING]:
 		return
 	_log_diagnostic("application_resumed")
+	if state == State.ATT:
+		# iOS normally invokes the completion handler directly. Re-read the system
+		# status on resume as a safe fallback without issuing a duplicate prompt.
+		if _admob != null and _att_request_pending:
+			var status: String = _admob.get_tracking_authorization_status()
+			if status in ["AUTHORIZED", "DENIED", "RESTRICTED"]:
+				_att_request_pending = false
+				_att_status = status
+				_att_resolution_completed = true
+				_initialize_ads()
+		return
 	_recover_after_request()
 
 
 func _mark_unavailable(reason: String) -> void:
+	if reason.begins_with("att_"):
+		_att_request_pending = false
 	if last_failure_reason != reason:
 		_record_failure(reason, _diagnostic_stage_code(reason, "").to_lower())
 	_terminal_unavailable = true
@@ -579,6 +669,7 @@ func _diagnostic_stage_code(reason: String, stage: String) -> String:
 		"PLUGIN",
 		"CONSENT",
 		"PRIVACY",
+		"ATT",
 		"INIT",
 		"LOAD",
 		"SHOW",
@@ -586,6 +677,8 @@ func _diagnostic_stage_code(reason: String, stage: String) -> String:
 		return normalized_stage
 	if reason in ["admob_plugin_missing"]:
 		return "PLUGIN"
+	if reason.begins_with("att_"):
+		return "ATT"
 	if reason in ["mobile_ads_config_file_missing", "mobile_ads_config_missing"]:
 		return "CONFIG-MISSING"
 	if reason == "mobile_ads_config_load_failed":
@@ -613,6 +706,7 @@ func _state_name(value: int) -> String:
 	match value:
 		State.INACTIVE:return "INACTIVE"
 		State.CONSENT:return "CONSENT"
+		State.ATT:return "ATT"
 		State.INITIALIZING:return "INITIALIZING"
 		State.LOADING:return "LOADING"
 		State.READY:return "READY"

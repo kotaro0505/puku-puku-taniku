@@ -37,9 +37,28 @@ class FakeNativePrivacyPlugin:
 	var requirement_status := 0
 	var presentation_count := 0
 	var presentation_result := OK
+	var tracking_status := 0
+	var tracking_request_count := 0
 	func get_privacy_options_requirement_status() -> int:return requirement_status
 	func present_privacy_options_form() -> int:presentation_count+=1;return presentation_result
 	func can_request_ads() -> bool:return true
+	func get_tracking_authorization_status() -> int:return tracking_status
+	func request_tracking_authorization() -> void:tracking_request_count+=1
+
+
+class FakeAttAdmob:
+	extends RefCounted
+	var tracking_status := "NOT_DETERMINED"
+	var tracking_request_count := 0
+	var initialize_count := 0
+	var request_succeeds := true
+	func is_privacy_options_supported() -> bool:return true
+	func get_privacy_options_requirement_status() -> String:return "NOT_REQUIRED"
+	func can_request_ads() -> bool:return true
+	func is_tracking_authorization_supported() -> bool:return true
+	func get_tracking_authorization_status() -> String:return tracking_status
+	func request_tracking_authorization() -> bool:tracking_request_count+=1;return request_succeeds
+	func initialize() -> void:initialize_count+=1
 
 
 class FakeRewardedAdmob:
@@ -319,7 +338,72 @@ func _ready() -> void:
 	native.presentation_result = FAILED
 	assert(not wrapper.present_privacy_options_form())
 	assert(native.presentation_count == 2)
+	assert(wrapper.is_tracking_authorization_supported())
+	for tracking_case in [[0, "NOT_DETERMINED"], [1, "RESTRICTED"], [2, "DENIED"], [3, "AUTHORIZED"], [99, "UNKNOWN"]]:
+		native.tracking_status = int(tracking_case[0])
+		assert(wrapper.get_tracking_authorization_status() == str(tracking_case[1]))
+	assert(wrapper.request_tracking_authorization())
+	assert(native.tracking_request_count == 1)
 	wrapper.free()
+
+	# Production-like builds complete UMP first, then resolve ATT before the
+	# Mobile Ads SDK is initialized. Not-determined requests once; every resolved
+	# status continues without changing reward behavior, while an unresolved or
+	# inconsistent callback fails closed before SDK initialization.
+	var att_service := ServiceClass.new()
+	var fake_att := FakeAttAdmob.new()
+	att_service._admob = fake_att
+	att_service._att_required = true
+	add_child(att_service)
+	att_service._initialize_ads_after_att()
+	assert(att_service.state == ServiceClass.State.ATT)
+	assert(att_service.is_preparing() and att_service.user_diagnostic_code() == "ADS-WAIT-ATT")
+	assert(fake_att.tracking_request_count == 1 and fake_att.initialize_count == 0)
+	att_service._initialize_ads_after_att()
+	assert(fake_att.tracking_request_count == 1 and fake_att.initialize_count == 0)
+	fake_att.tracking_status = "AUTHORIZED"
+	att_service._on_tracking_authorization_granted()
+	assert(att_service.state == ServiceClass.State.INITIALIZING)
+	assert(att_service._att_resolution_completed and fake_att.initialize_count == 1)
+	att_service._on_tracking_authorization_granted()
+	assert(fake_att.initialize_count == 1)
+
+	for resolved_status in ["DENIED", "RESTRICTED"]:
+		var resolved_service := ServiceClass.new()
+		var resolved_att := FakeAttAdmob.new()
+		resolved_att.tracking_status = resolved_status
+		resolved_service._admob = resolved_att
+		resolved_service._att_required = true
+		add_child(resolved_service)
+		resolved_service._initialize_ads_after_att()
+		assert(resolved_service.state == ServiceClass.State.INITIALIZING)
+		assert(resolved_service._att_resolution_completed)
+		assert(resolved_att.tracking_request_count == 0 and resolved_att.initialize_count == 1)
+
+	var denied_service := ServiceClass.new()
+	var denied_att := FakeAttAdmob.new()
+	denied_service._admob = denied_att
+	denied_service._att_required = true
+	add_child(denied_service)
+	denied_service.state = ServiceClass.State.CONSENT
+	denied_service._on_consent_info_updated()
+	assert(denied_service.state == ServiceClass.State.ATT)
+	assert(denied_att.initialize_count == 0)
+	denied_att.tracking_status = "DENIED"
+	denied_service._on_tracking_authorization_denied()
+	assert(denied_service.state == ServiceClass.State.INITIALIZING)
+	assert(denied_att.initialize_count == 1)
+
+	var unresolved_service := ServiceClass.new()
+	var unresolved_att := FakeAttAdmob.new()
+	unresolved_service._admob = unresolved_att
+	unresolved_service._att_required = true
+	add_child(unresolved_service)
+	unresolved_service._initialize_ads_after_att()
+	unresolved_service._on_tracking_authorization_denied()
+	assert(unresolved_service.state == ServiceClass.State.UNAVAILABLE)
+	assert(unresolved_service.user_diagnostic_code() == "ADS-ATT")
+	assert(unresolved_att.initialize_count == 0)
 
 	# A compatible native bridge opts into the UI through capability detection.
 	# A successful consent change discards the old loaded ad and loads
@@ -394,7 +478,7 @@ func _ready() -> void:
 	assert(fake.load_count == load_count_before_guard + 1)
 	assert(service.state == ServiceClass.State.LOADING)
 
-	print("REWARDED_AD_SERVICE_SMOKE_OK earned_once=true early_close_no_reward=true repeated_views=5 presentation=start_until_dismissed show_failure_finishes_audio=true dismissal_reloads=true duplicate_terminal_guarded=true load_failure_recovers=true retry_backoff=preparing_no_duplicate terminal_unavailable=rescue_eligible_then_reload loading_message_specific=true privacy_capability_gated=true consent_change_reloads=true sanitized_diagnostics=true config_diagnostics_specific=true duplicate_load_guarded=true resume_recovers=true restart_reloads=true desktop_inactive=true")
+	print("REWARDED_AD_SERVICE_SMOKE_OK earned_once=true early_close_no_reward=true repeated_views=5 presentation=start_until_dismissed show_failure_finishes_audio=true dismissal_reloads=true duplicate_terminal_guarded=true load_failure_recovers=true retry_backoff=preparing_no_duplicate terminal_unavailable=rescue_eligible_then_reload loading_message_specific=true privacy_capability_gated=true consent_change_reloads=true att_gate=ump_then_four_states att_duplicate_guarded=true sanitized_diagnostics=true config_diagnostics_specific=true duplicate_load_guarded=true resume_recovers=true restart_reloads=true desktop_inactive=true")
 	get_tree().quit()
 
 

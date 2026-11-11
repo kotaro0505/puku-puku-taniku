@@ -169,6 +169,7 @@ def main() -> None:
         "scripts/ci/patch_admob_ump_native.py",
         "scripts/ci/validate_ios_export.py",
         "scripts/ci/validate_ios_export_smoke.py",
+        "scripts/ci/configure_mobile_ads_smoke.py",
         "scripts/ci/verify_mobile_ads_export.sh",
         "scripts/ci/verify_mobile_ads_pack.gd",
         "scripts/build_profile.gd",
@@ -193,7 +194,7 @@ def main() -> None:
     for required_pin in [
         "4b4ddceab0be81f0dcb12a6313038dba6cf9eacf",
         'GOOGLE_MOBILE_ADS_VERSION="${GOOGLE_MOBILE_ADS_VERSION:-12.14.0}"',
-        'ADMOB_NATIVE_COMPAT_REVISION="${ADMOB_NATIVE_COMPAT_REVISION:-ump1}"',
+        'ADMOB_NATIVE_COMPAT_REVISION="${ADMOB_NATIVE_COMPAT_REVISION:-ump2-att1}"',
         "ADMOB_UMP_NATIVE_BUILT",
     ]:
         if required_pin not in admob_build_source:
@@ -217,6 +218,8 @@ def main() -> None:
         'D_METHOD("get_privacy_options_requirement_status")',
         'D_METHOD("can_request_ads")',
         'D_METHOD("present_privacy_options_form")',
+        'D_METHOD("get_tracking_authorization_status")',
+        "ATTrackingManager.trackingAuthorizationStatus",
     ]:
         if required_native_api not in admob_patch_source:
             fail(f"AdMob native UMP bridge is missing: {required_native_api}")
@@ -229,6 +232,7 @@ def main() -> None:
         b"get_privacy_options_requirement_status",
         b"present_privacy_options_form",
         b"can_request_ads",
+        b"get_tracking_authorization_status",
     ]
     bridge_token_count = sum(token in committed_admob_binary for token in bridge_tokens)
     if bridge_token_count not in {0, len(bridge_tokens)}:
@@ -241,7 +245,7 @@ def main() -> None:
         "under_age_of_consent = AdmobConfigClass.TagForUnderAgeOfConsent.UNSPECIFIED",
         "first_party_id_enabled = false",
         "personalization_state = AdmobConfigClass.PersonalizationState.DISABLED",
-        "att_enabled = false",
+        "att_enabled = _att_required",
     ]:
         if required_setting not in ad_service_source:
             fail(f"Rewarded-ad privacy setting is missing: {required_setting}")
@@ -250,13 +254,28 @@ def main() -> None:
         "get_privacy_options_requirement_status()",
         "can_request_ads()",
         "privacy_options_form_dismissed.connect",
+        "tracking_authorization_granted.connect",
+        "tracking_authorization_denied.connect",
+        "_initialize_ads_after_att()",
+        "and not BuildProfileClass.iap_review_capture_enabled()",
+        '"AUTHORIZED", "DENIED", "RESTRICTED"',
+        "att_callback_status_mismatch",
     ]:
         if required_privacy_gate not in ad_service_source:
             fail(f"Rewarded-ad privacy-options gate is missing: {required_privacy_gate}")
+    if ad_service_source.count("_admob.initialize()") != 1:
+        fail("Google Mobile Ads initialization must have exactly one ATT-guarded call site")
 
     config_source = Path("scripts/ci/configure_mobile_ads.py").read_text(encoding="utf-8")
-    if '"att_enabled=false"' not in config_source or "'att_text=\"\"'" not in config_source:
-        fail("Generated mobile-ads configuration must keep ATT disabled and omit prompt text")
+    for required_att_configuration in [
+        'os.environ.get("IOS_ATT_ENABLED", "")',
+        'att_setting not in {"true", "false"}',
+        "ATT_USAGE_DESCRIPTION",
+        "許可しなくてもゲームを続けられます",
+        "You can continue playing without allowing tracking",
+    ]:
+        if required_att_configuration not in config_source:
+            fail(f"Generated mobile-ads ATT configuration is missing: {required_att_configuration}")
     if "f'mode=\"{mode}\"'" not in config_source:
         fail("Generated runtime mobile-ads configuration must identify test or production mode")
 
@@ -325,6 +344,7 @@ def main() -> None:
     codemagic_source = Path("codemagic.yaml").read_text(encoding="utf-8")
     for required_diagnostic in [
         "python3 scripts/ci/validate_ios_export_smoke.py",
+        "python3 scripts/ci/configure_mobile_ads_smoke.py",
         "bash scripts/ci/resolve_ipa_path_smoke.sh",
         "GODOT_IOS_EXPORT_COMMAND_FAILED",
         "python3 scripts/ci/validate_ios_export.py",
@@ -336,6 +356,7 @@ def main() -> None:
         '--ipa-directory "$CM_BUILD_DIR/$IPA_DIR"',
         'IPA_PATH="$(bash scripts/ci/resolve_ipa_path.sh "$CM_BUILD_DIR/$IPA_DIR")"',
         "[REDACTED_ADMOB_ID]",
+        '--att-enabled "$IOS_ATT_ENABLED"',
     ]:
         if required_diagnostic not in codemagic_source:
             fail(f"Codemagic iOS export diagnostic is missing: {required_diagnostic}")
@@ -360,10 +381,14 @@ def main() -> None:
         fail("Internal TestFlight must not load production AdMob secrets")
     if 'INTERNAL_TESTFLIGHT_ONLY: "true"' not in testflight_block:
         fail("Test-ad TestFlight workflow must remain internal-testing-only")
+    if 'IOS_ATT_ENABLED: "true"' not in testflight_block:
+        fail("Internal TestFlight must enable ATT")
     if 'MOBILE_ADS_MODE: "production"' not in release_block or "admob_production" not in release_block:
         fail("App Store release must load production AdMob secrets")
     if 'APP_STORE_SUBMISSION: "true"' not in release_block:
         fail("App Store release workflow lost its App Store-eligible signing gate")
+    if 'IOS_ATT_ENABLED: "true"' not in release_block:
+        fail("App Store release must enable ATT")
     for required_release_upload_setting in [
         "publishing:",
         "app_store_connect:",
@@ -396,6 +421,7 @@ def main() -> None:
         f'DISPLAY_NAME: "{IAP_REVIEW_CAPTURE_DISPLAY_NAME}"',
         'BUNDLE_ID: "com.ohanayanouen.pukupukutaniku"',
         'MOBILE_ADS_MODE: "test"',
+        'IOS_ATT_ENABLED: "false"',
         'IPA_DIR: "build/ios-iap-capture/ipa"',
         '- build/ios-iap-capture/ipa/*.ipa',
         'INTERNAL_TESTFLIGHT_ONLY: "true"',
@@ -437,6 +463,8 @@ def main() -> None:
         fail("IAP review capture workflow must keep its IPA outside the normal iOS output directory")
     if 'MOBILE_ADS_MODE: "test"' not in development_block or "admob_production" in development_block:
         fail("iPhone development workflow must use Google test ads without production secrets")
+    if 'IOS_ATT_ENABLED: "false"' not in development_block:
+        fail("iPhone development workflow must not enable ATT")
     for required_ads_gate in [
         'test "$MOBILE_ADS_MODE" = "production"',
         'test "$MOBILE_ADS_MODE" = "test"',

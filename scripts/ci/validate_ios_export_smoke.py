@@ -19,7 +19,7 @@ PREVIOUS_GENERATED_DISPLAY_NAME = "ぷくぷく！たにくらいふ"
 IOS_MIN_VERSION = "15.6"
 
 
-def write_fixture(root: Path) -> ExportExpectations:
+def write_fixture(root: Path, att_enabled: bool = False) -> ExportExpectations:
     project = root / "build" / "ios" / "ExportValidation.xcodeproj"
     app_dir = root / "build" / "ios" / "ExportValidation"
     info_plist = app_dir / "ExportValidation-Info.plist"
@@ -36,23 +36,31 @@ def write_fixture(root: Path) -> ExportExpectations:
                 f'INFOPLIST_KEY_CFBundleDisplayName = "{DISPLAY_NAME}";',
                 f'INFOPLIST_KEY_CFBundleDisplayName = "{DISPLAY_NAME}";',
                 "SharePlugin NotificationSchedulerPlugin godot-storekit2 StoreKit.framework",
-                "AdmobPlugin GoogleMobileAds PrivacyInfo.xcprivacy",
+                "AdmobPlugin GoogleMobileAds AppTrackingTransparency.framework PrivacyInfo.xcprivacy",
                 f"IPHONEOS_DEPLOYMENT_TARGET = {IOS_MIN_VERSION};",
             ]
         ),
         encoding="utf-8",
     )
+    info = {
+        "CFBundleDisplayName": "$(INFOPLIST_KEY_CFBundleDisplayName)",
+        "ITSAppUsesNonExemptEncryption": False,
+        "GADApplicationIdentifier": "redacted",
+        "NSAppTransportSecurity": {
+            "NSAllowsArbitraryLoadsForMedia": True,
+            "NSAllowsArbitraryLoadsInWebContent": True,
+        },
+    }
+    if att_enabled:
+        info["NSUserTrackingUsageDescription"] = (
+            "リワード広告の表示回数調整と効果測定のため、端末の広告識別子を利用する許可を求めます。"
+            "許可しなくてもゲームを続けられます。 / "
+            "We request permission to use the device advertising identifier for rewarded-ad "
+            "frequency control and measurement. You can continue playing without allowing tracking."
+        )
     with info_plist.open("wb") as stream:
         plistlib.dump(
-            {
-                "CFBundleDisplayName": "$(INFOPLIST_KEY_CFBundleDisplayName)",
-                "ITSAppUsesNonExemptEncryption": False,
-                "GADApplicationIdentifier": "redacted",
-                "NSAppTransportSecurity": {
-                    "NSAllowsArbitraryLoadsForMedia": True,
-                    "NSAllowsArbitraryLoadsInWebContent": True,
-                },
-            },
+            info,
             stream,
         )
     privacy_path = project.parent / "PrivacyInfo.xcprivacy"
@@ -84,6 +92,7 @@ def write_fixture(root: Path) -> ExportExpectations:
         build_number=BUILD_NUMBER,
         display_name=DISPLAY_NAME,
         ios_min_version=IOS_MIN_VERSION,
+        att_enabled=att_enabled,
     )
 
 
@@ -124,9 +133,24 @@ def main() -> None:
                 "validator accepted a Privacy Manifest in the old incorrect directory"
             )
 
+    with tempfile.TemporaryDirectory() as temporary_directory:
+        att_expectations = write_fixture(Path(temporary_directory), True)
+        validate(att_expectations)
+        with att_expectations.info_plist.open("rb") as stream:
+            att_info = plistlib.load(stream)
+        att_info["NSUserTrackingUsageDescription"] = "English only"
+        with att_expectations.info_plist.open("wb") as stream:
+            plistlib.dump(att_info, stream)
+        try:
+            validate(att_expectations)
+        except ValidationError as error:
+            assert error.check == "info_plist.att_prompt.ja"
+        else:
+            raise AssertionError("validator accepted an ATT prompt without Japanese purpose text")
+
     print(
         "IOS_EXPORT_VALIDATOR_SMOKE_OK root_manifest=true "
-        "display_name_mismatch=true named_failure=true"
+        "display_name_mismatch=true named_failure=true att_profiles=true"
     )
 
 

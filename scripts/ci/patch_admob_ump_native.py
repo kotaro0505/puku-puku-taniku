@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply the minimal UMP privacy-options bridge to Godot AdMob Plugin v7.0.
+"""Apply the minimal UMP and ATT-status bridge to Godot AdMob Plugin v7.0.
 
 The script only accepts the exact upstream v7.0 source shape. Every replacement
 is count-checked so an upstream change fails the build instead of producing an
@@ -111,6 +111,14 @@ def main() -> None:
                 "\tvoid set_mediation_privacy_settings(Dictionary settings);",
                 "privacy-options method declarations",
             ),
+            (
+                "\tvoid request_tracking_authorization();\n"
+                "\tvoid open_app_settings();",
+                "\tint get_tracking_authorization_status();\n"
+                "\tvoid request_tracking_authorization();\n"
+                "\tvoid open_app_settings();",
+                "tracking-authorization status declaration",
+            ),
         ],
     )
 
@@ -136,6 +144,15 @@ def main() -> None:
                 '\tClassDB::bind_method(D_METHOD("present_privacy_options_form"), '
                 '&AdmobPlugin::present_privacy_options_form);',
                 "privacy-options method bindings",
+            ),
+            (
+                '\tClassDB::bind_method(D_METHOD("request_tracking_authorization"), '
+                '&AdmobPlugin::request_tracking_authorization);',
+                '\tClassDB::bind_method(D_METHOD("get_tracking_authorization_status"), '
+                '&AdmobPlugin::get_tracking_authorization_status);\n'
+                '\tClassDB::bind_method(D_METHOD("request_tracking_authorization"), '
+                '&AdmobPlugin::request_tracking_authorization);',
+                "tracking-authorization status binding",
             ),
             (
                 '\tADD_SIGNAL(MethodInfo(CONSENT_INFO_UPDATE_FAILED_SIGNAL, '
@@ -211,6 +228,49 @@ def main() -> None:
                 'void AdmobPlugin::set_mediation_privacy_settings(Dictionary settings) {',
                 "privacy-options implementations",
             ),
+            (
+                'void AdmobPlugin::request_tracking_authorization() {\n'
+                '\tos_log_debug(admob_log, "AdmobPlugin request_tracking_authorization");\n'
+                '\t[ATTrackingManager\n'
+                '\t\t\trequestTrackingAuthorizationWithCompletionHandler:^(ATTrackingManagerAuthorizationStatus status) {\n'
+                '\t\t\t\tif (status == ATTrackingManagerAuthorizationStatusAuthorized) {\n'
+                '\t\t\t\t\tos_log_debug(admob_log, "Tracking has been authorized for %@",\n'
+                '\t\t\t\t\t\t\t[[ASIdentifierManager sharedManager].advertisingIdentifier UUIDString]);\n'
+                '\t\t\t\t\tdispatch_async(dispatch_get_main_queue(), ^{\n'
+                '\t\t\t\t\t\tinstance->call_deferred("emit_signal", TRACKING_AUTHORIZATION_GRANTED);\n'
+                '\t\t\t\t\t});\n'
+                '\t\t\t\t} else {\n'
+                '\t\t\t\t\tos_log_debug(admob_log, "Tracking has been denied for %@ with status \'%@\'",\n'
+                '\t\t\t\t\t\t\t[[ASIdentifierManager sharedManager].advertisingIdentifier UUIDString],\n'
+                '\t\t\t\t\t\t\t[GAPConverter convertTrackingStatusToString:status]);\n'
+                '\t\t\t\t\tdispatch_async(dispatch_get_main_queue(), ^{\n'
+                '\t\t\t\t\t\tinstance->call_deferred("emit_signal", TRACKING_AUTHORIZATION_DENIED);\n'
+                '\t\t\t\t\t});\n'
+                '\t\t\t\t}\n'
+                '\t\t\t}];\n'
+                '}\n',
+                'int AdmobPlugin::get_tracking_authorization_status() {\n'
+                '\treturn (int)ATTrackingManager.trackingAuthorizationStatus;\n'
+                '}\n\n'
+                'void AdmobPlugin::request_tracking_authorization() {\n'
+                '\tos_log_debug(admob_log, "AdmobPlugin request_tracking_authorization");\n'
+                '\t[ATTrackingManager\n'
+                '\t\t\trequestTrackingAuthorizationWithCompletionHandler:^(ATTrackingManagerAuthorizationStatus status) {\n'
+                '\t\t\t\tos_log_debug(admob_log, "Tracking authorization completed with status \'%@\'",\n'
+                '\t\t\t\t\t\t[GAPConverter convertTrackingStatusToString:status]);\n'
+                '\t\t\t\tif (status == ATTrackingManagerAuthorizationStatusAuthorized) {\n'
+                '\t\t\t\t\tdispatch_async(dispatch_get_main_queue(), ^{\n'
+                '\t\t\t\t\t\tinstance->call_deferred("emit_signal", TRACKING_AUTHORIZATION_GRANTED);\n'
+                '\t\t\t\t\t});\n'
+                '\t\t\t\t} else {\n'
+                '\t\t\t\t\tdispatch_async(dispatch_get_main_queue(), ^{\n'
+                '\t\t\t\t\t\tinstance->call_deferred("emit_signal", TRACKING_AUTHORIZATION_DENIED);\n'
+                '\t\t\t\t\t});\n'
+                '\t\t\t\t}\n'
+                '\t\t\t}];\n'
+                '}\n',
+                "tracking-authorization status implementation and redacted logging",
+            ),
         ],
     )
 
@@ -223,6 +283,8 @@ def main() -> None:
         "UMPConsentInformation.sharedInstance.privacyOptionsRequirementStatus",
         "UMPConsentInformation.sharedInstance.canRequestAds",
         "presentPrivacyOptionsFormFromViewController",
+        'D_METHOD("get_tracking_authorization_status")',
+        "ATTrackingManager.trackingAuthorizationStatus",
     ]
     for token in required_native_tokens:
         if implementation_source.count(token) != 1:
@@ -232,6 +294,9 @@ def main() -> None:
             )
     if "dispatch_get_main_queue()" not in implementation_source:
         raise SystemExit(f"{implementation}: native bridge does not dispatch UMP access to the main queue")
+
+    if "advertisingIdentifier UUIDString" in implementation_source:
+        raise SystemExit(f"{implementation}: ATT bridge must not log the advertising identifier")
 
     print(
         "ADMOB_UMP_NATIVE_PATCH_OK "

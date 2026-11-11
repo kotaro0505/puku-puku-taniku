@@ -1,7 +1,7 @@
 # 『ぷくぷく！たにくらいふ』プライバシーポリシー草案
 
 > **未公開・未確定の作業用草案（最終更新: 2026年11月11日）**<br>
-> この文書は、現行ソースコードと同梱SDKを調査して作成した公開前の草案です。現時点では正式なプライバシーポリシーではありません。角括弧内の情報、子どもを含む利用者に対する広告上の年齢取扱い、広告のトラッキング／ATT方針、UMPのプライバシー設定再表示導線、および最終IPAのPrivacy Reportを確定・検証するまで、App Store Connectへ登録したり正式ページとして案内したりしないでください。
+> この文書は、現行ソースコードと同梱SDKを調査して作成した公開前の草案です。現時点では正式なプライバシーポリシーではありません。角括弧内の情報、子どもを含む利用者に対する広告上の年齢取扱い、ATT実装の実機動作、UMPのプライバシー設定再表示導線、および最終IPAのPrivacy Reportを確定・検証するまで、App Store Connectへ登録したり正式ページとして案内したりしないでください。
 
 ## 公開前に必ず確定する項目
 
@@ -12,7 +12,7 @@
 - App Store Connectの年齢レーティング質問票への、実際のゲーム内容に基づく回答
 - 一般向けアプリで年齢が不明な利用者を `UNSPECIFIED` とする運用、および既知の子ども・ティーンを判定する必要性についての法務・運用確認
 - AdMob管理画面の「プライバシーとメッセージ」、広告配信地域、メディエーション、広告技術プロバイダの最終設定
-- Google Mobile Ads SDKのDevice IDに関する「Tracking」宣言と、ATTを使用しない現行実装との整合性
+- UMP完了後・Google Mobile Ads初期化前にATTを要求する実装について、許可・拒否・制限済みの各状態を実機確認し、Device IDの「Tracking」申告と一致させること
 - UMPで同意内容を後から変更できるローカルネイティブ拡張はCodemagicでビルド・同梱済み。Googleが再表示を要求する状態でのフォーム表示、同意変更、広告再読込をiOS実機で確認すること
 - App Store提出用の署名済み最終IPAから生成したPrivacy Report
 
@@ -47,7 +47,7 @@
 
 本アプリの現行コードでは、広告のパーソナライズを無効にし、パブリッシャーのファーストパーティIDを無効にしています。また、広告コンテンツの上限レーティングを `G` に設定しています。ただし、非パーソナライズ広告であっても、Googleの説明上、フリークエンシーキャップ、集計レポート、不正利用防止などのためにCookie、モバイル広告識別子または他の技術情報が利用される場合があります。
 
-現行コードではAppleのApp Tracking Transparency（ATT）許可ダイアログを表示する処理を無効にしています。一方、同梱SDKのPrivacy ManifestはDevice IDを「ユーザーに関連付けられる」「トラッキングに使用される」データとして宣言しています。この不一致は公開前の確認事項です。最終的な広告設定および実際のデータフローを確認し、トラッキングに該当する処理を行う場合は、Appleの要件に従って事前にATTの許可を取得し、本ポリシーおよびApp Storeの申告を更新します。
+App Store向けコードは、必要なGoogle UMPの同意処理を完了した後、Google Mobile Ads SDKを初期化する前に、AppleのApp Tracking Transparency（ATT）許可を要求します。許可された場合、SDKは広告識別子（IDFA）を広告の表示回数調整や効果測定等に利用する可能性があります。拒否または制限された場合はIDFAを利用せずに広告SDKを開始します。ATTの結果にかかわらずゲームは利用でき、リワード広告を最後まで視聴した場合のゲーム内報酬は変わりません。拒否しても、IPアドレス、広告データ、利用状況、診断情報等の処理がすべて停止するとは限りません。
 
 ### 2.2 アプリ内課金に伴う情報
 
@@ -131,6 +131,8 @@ Web版およびその静的素材の配信に利用します。
 
 本アプリは、Google UMPを通じて同意情報を更新し、対象地域等により同意が必要な場合にGoogleが提供する同意フォームを表示する構成です。同意が取得できない場合、現行実装はリワード広告を利用不可として扱います。
 
+Google UMPの同意とApple ATTの追跡許可は別の仕組みです。本アプリは必要なUMP処理を先に完了し、その後、ATT状態が未決定の場合だけiOSの許可ダイアログを表示します。許可、拒否または制限のいずれでもゲーム機能は利用できます。
+
 [公開前に確認：Googleがプライバシー設定の再表示を要求する場合だけ表示する設定画面の入口は、日本語・ひらがな・英語で追加済みです。Godot AdMob Plugin v7.0の固定コミットへ公式UMP再表示APIを追加し、Godot 4.7.2向けCodemagicビルドへの同梱まで確認済みです。ただし、Googleが再表示を要求する実際の状態でのフォーム表示、同意変更、広告再読込はiOS実機で未確認です。確認後、その操作方法をここへ記載します。]
 
 端末の広告およびトラッキングに関する設定は、iOSの設定画面から変更できます。広告のパーソナライズを無効にしても、広告配信、集計測定、不正利用防止等に必要な処理がすべて停止するとは限りません。
@@ -202,7 +204,7 @@ The iOS version of the App uses the Google Mobile Ads SDK (Google AdMob) and the
 
 The current App code disables ad personalization and the publisher first-party ID, and limits the maximum ad content rating to `G`. However, Google's documentation explains that even non-personalized ads may use cookies, mobile ad identifiers, or other technical information for purposes such as frequency capping, aggregated reporting, and fraud prevention.
 
-The current App code does not present Apple's App Tracking Transparency (ATT) authorization prompt. However, the privacy manifest bundled with the SDK declares Device ID as data that is linked to the user and used for tracking. This conflict must be resolved before publication. The Operator will verify the final ad configuration and actual data flows. If any processing constitutes tracking under Apple's rules, the App will obtain ATT authorization before that processing and this Policy and the App Store disclosures will be updated.
+The App Store code completes any required Google UMP consent flow and then requests Apple's App Tracking Transparency (ATT) authorization before initializing Google Mobile Ads SDK. If authorization is granted, the SDK may use the Identifier for Advertisers (IDFA) for ad frequency control, measurement, and other disclosed advertising purposes. If authorization is denied or restricted, the App starts the advertising SDK without using the IDFA. The game remains available regardless of the ATT result, and a completed rewarded ad grants the same in-game reward. Denial does not necessarily stop processing of non-IDFA information such as IP address, ad data, usage data, or diagnostics.
 
 ### 2.2 Information processed for in-app purchases
 
@@ -283,6 +285,8 @@ GitHub Pages is used to deliver the web version and its static assets. See:
 ## 5. Advertising and Consent Choices
 
 The App updates consent information through Google UMP and is configured to display a Google-provided consent form when consent is required for a user based on region or other applicable factors. Under the current implementation, rewarded ads remain unavailable when the required consent cannot be obtained.
+
+Google UMP consent and Apple ATT tracking authorization are separate controls. The App completes the required UMP flow first and displays the iOS authorization prompt only when the ATT status is not determined. Game functionality remains available when ATT is authorized, denied, or restricted.
 
 [Before publication: a Japanese, hiragana, and English settings entry has been added and is shown only when Google reports that privacy options are required. A reproducible Codemagic build applies a minimal bridge for the official UMP privacy-options APIs to the pinned Godot AdMob Plugin v7.0 source, compiles it for Godot 4.7.2, and includes it in TestFlight builds. The form display, consent change, and ad reload flow still needs verification on an iOS device in a state where Google reports that privacy options are required. Describe the operating steps here after that check passes.]
 
@@ -393,7 +397,7 @@ The Operator may revise this Policy when App features, SDKs, laws, or services c
 | 広告形式 | リワード広告 | SDKの報酬獲得コールバック時のみ一度報酬を付与する実装 |
 | 広告設定 | 非パーソナライズ、first-party ID無効、最大コンテンツレーティングG | 非パーソナライズでも識別子等が全く処理されないとは限らない |
 | UMP | 本番で同意情報更新・必要時フォーム表示 | 3言語の再選択入口と、固定v7.0ソースへ公式3 APIを追加するCodemagic再現ビルドを実装し、TestFlightビルドへの同梱まで確認済み。required状態での再表示・変更・再読込は実機未確認 |
-| ATT | 現行コードでは無効 | `att_enabled = false`、exportのtrackingもfalse。ただしGMA 12.14.0 manifestはDevice IDのtrackingをtrueと宣言 |
+| ATT | App Store本番系で有効 | UMP完了後、GMA初期化前に4状態を確認。未決定時だけ許可を要求し、拒否・制限時はIDFAなしで継続。開発版・IAP撮影版は無効。実機検証は未完了 |
 | 広告上の年齢取扱い | 年齢不明として明示的にUNSPECIFIED | GMA 12.14.0／plugin v7.0は旧TFCD／TFUAのみ。TFATはGMA 13.3.0で追加され、旧設定にTEEN相当値はない。年齢を把握していないためCHILD／TEENを推測設定しない |
 | StoreKit 2 | 36個の非消耗型商品 | 商品情報、価格、購入、復元、返金／期限切れ等を処理。支払カード情報はアプリへ渡らない |
 | セーブ | 端末内JSON | 現在の既定は `user://records_endless_experiment.json`。旧 `records.json` からの移行を維持 |
@@ -440,7 +444,7 @@ Google Mobile Ads SDK 12.14.0の実物 `PrivacyInfo.xcprivacy` も確認済み�
 1. **公開日・施行日が未確定**：制定日、施行日および最終改定日を正式公開時に確定する。
 2. **追加の運営者表示事項を要確認**：運営者名、問い合わせ先、国・地域は確定済み。適用法令上、住所、代表者または個人情報保護責任者の表示が必要かを確認する。
 3. **年齢レーティングと広告上の年齢取扱いが未確定**：一般向けゲームとし、Kids Categoryへ登録しない方針は確定済み。現行12.14.0ではTFATを利用できないため、年齢不明利用者の `UNSPECIFIED` 運用、既知の子ども／ティーンの判定要否、13.3.0以降への互換性を伴う移行時期、配信地域の法令との整合を確認する。
-4. **ATTとDevice ID trackingの不整合**：GMA manifestではtracking=true、アプリではATT=false。実際の本番データフローを確認し、必要ならATTを実装する。確認前に「トラッキングなし」と申告しない。
+4. **ATT実装の実機検証が未完了**：GMA manifestのDevice ID tracking宣言に合わせ、App Store本番系ではUMP完了後・GMA初期化前にATTを要求する実装へ更新済み。次回TestFlightで許可・拒否・制限済みの各状態、拒否時の広告と報酬、最終IPAの説明文を確認し、App Privacyを確定する。
 5. **UMPネイティブ再表示の実機検証が未完了**：必要時だけ表示する3言語UI、失敗時の安全停止、同意変更後の広告再読み込み、固定v7.0ソースへ公式3 APIを追加する再現ビルド経路は実装し、CodemagicでのXCFrameworkコンパイルとTestFlightビルドへの同梱は完了した。iOS実機でrequired／not required／同意変更を確認する必要がある。
 6. **AdMob管理画面が未監査**：Privacy & messaging、地域別メッセージ、広告技術プロバイダ、メディエーション、制限付き広告、本番ユニット設定を実アカウントで確認する。
 7. **UMPの正確なバージョンとmanifest**：ローカルのGMA 12.14.0配布物ではGMA manifestを確認したが、最終アーカイブ内のUMP frameworkとmanifestは未確認。
