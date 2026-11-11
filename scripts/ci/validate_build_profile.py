@@ -194,7 +194,7 @@ def main() -> None:
     for required_pin in [
         "4b4ddceab0be81f0dcb12a6313038dba6cf9eacf",
         'GOOGLE_MOBILE_ADS_VERSION="${GOOGLE_MOBILE_ADS_VERSION:-12.14.0}"',
-        'ADMOB_NATIVE_COMPAT_REVISION="${ADMOB_NATIVE_COMPAT_REVISION:-ump2-att1}"',
+        'ADMOB_NATIVE_COMPAT_REVISION="${ADMOB_NATIVE_COMPAT_REVISION:-ump2-att2}"',
         "ADMOB_UMP_NATIVE_BUILT",
     ]:
         if required_pin not in admob_build_source:
@@ -220,6 +220,8 @@ def main() -> None:
         'D_METHOD("present_privacy_options_form")',
         'D_METHOD("get_tracking_authorization_status")',
         "ATTrackingManager.trackingAuthorizationStatus",
+        "allow UMP form loading before GMA initialization",
+        "UMP form loading still depends on GMA initialization",
     ]:
         if required_native_api not in admob_patch_source:
             fail(f"AdMob native UMP bridge is missing: {required_native_api}")
@@ -260,11 +262,25 @@ def main() -> None:
         "and not BuildProfileClass.iap_review_capture_enabled()",
         '"AUTHORIZED", "DENIED", "RESTRICTED"',
         "att_callback_status_mismatch",
+        "CONSENT_OPERATION_TIMEOUT_SECONDS",
+        "ATT_AUTHORIZATION_TIMEOUT_SECONDS",
+        "consent_form_load_request_failed",
+        "consent_update_timeout",
+        "att_authorization_timeout",
     ]:
         if required_privacy_gate not in ad_service_source:
             fail(f"Rewarded-ad privacy-options gate is missing: {required_privacy_gate}")
     if ad_service_source.count("_admob.initialize()") != 1:
         fail("Google Mobile Ads initialization must have exactly one ATT-guarded call site")
+
+    admob_wrapper_source = Path("addons/AdmobPlugin/Admob.gd").read_text(encoding="utf-8")
+    for required_wrapper_contract in [
+        "func load_consent_form() -> bool:",
+        "func show_consent_form() -> bool:",
+        "func update_consent_info(a_parameters: ConsentRequestParameters = null) -> bool:",
+    ]:
+        if required_wrapper_contract not in admob_wrapper_source:
+            fail(f"AdMob UMP wrapper result contract is missing: {required_wrapper_contract}")
 
     config_source = Path("scripts/ci/configure_mobile_ads.py").read_text(encoding="utf-8")
     for required_att_configuration in [

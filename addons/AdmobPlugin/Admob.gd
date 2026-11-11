@@ -1209,18 +1209,20 @@ func _process(_delta):
 		_sync_native_ad_with_control(ad_id, control)
 
 
-func load_consent_form() -> void:
+func load_consent_form() -> bool:
 	if _plugin_singleton == null:
 		GmpLogger.log_error("%s plugin not initialized" % PLUGIN_SINGLETON_NAME)
-	else:
-		_plugin_singleton.load_consent_form()
+		return false
+	var result: Variant = _plugin_singleton.load_consent_form()
+	return not (result is int) or int(result) == OK
 
 
-func show_consent_form() -> void:
+func show_consent_form() -> bool:
 	if _plugin_singleton == null:
 		GmpLogger.log_error("%s plugin not initialized" % PLUGIN_SINGLETON_NAME)
-	else:
-		_plugin_singleton.show_consent_form()
+		return false
+	var result: Variant = _plugin_singleton.show_consent_form()
+	return not (result is int) or int(result) == OK
 
 
 func get_consent_status() -> UserConsent:
@@ -1242,26 +1244,27 @@ func is_consent_form_available() -> bool:
 	return false
 
 
-func update_consent_info(a_parameters: ConsentRequestParameters = null) -> void:
+func update_consent_info(a_parameters: ConsentRequestParameters = null) -> bool:
 	if _plugin_singleton == null:
 		GmpLogger.log_error("%s plugin not initialized" % PLUGIN_SINGLETON_NAME)
-	else:
-		if a_parameters == null:
-			a_parameters = ConsentRequestParameters.new()
+		return false
+	if a_parameters == null:
+		a_parameters = ConsentRequestParameters.new()
 
-			if under_age_of_consent != AdmobConfig.TagForUnderAgeOfConsent.UNSPECIFIED:
-				a_parameters.set_tag_for_under_age_of_consent(under_age_of_consent)
+		if under_age_of_consent != AdmobConfig.TagForUnderAgeOfConsent.UNSPECIFIED:
+			a_parameters.set_tag_for_under_age_of_consent(under_age_of_consent)
 
-			if not is_real:
-				if debug_geography != ConsentRequestParameters.DebugGeography.NOT_SET:
-					a_parameters.set_debug_geography(debug_geography)
+		if not is_real:
+			if debug_geography != ConsentRequestParameters.DebugGeography.NOT_SET:
+				a_parameters.set_debug_geography(debug_geography)
 
-				for __device_id in test_device_hashed_ids:
-					a_parameters.add_test_device_hashed_id(__device_id)
+			for __device_id in test_device_hashed_ids:
+				a_parameters.add_test_device_hashed_id(__device_id)
 
-		a_parameters.set_is_real(is_real)
+	a_parameters.set_is_real(is_real)
 
-		_plugin_singleton.update_consent_info(a_parameters.get_raw_data())
+	_plugin_singleton.update_consent_info(a_parameters.get_raw_data())
+	return true
 
 
 func reset_consent_info() -> void:

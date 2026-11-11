@@ -126,6 +126,20 @@ def main() -> None:
         implementation,
         [
             (
+                'Error AdmobPlugin::load_consent_form() {\n'
+                '\tos_log_debug(admob_log, "AdmobPlugin load_consent_form");\n\n'
+                '\tif (initialized == false) {\n'
+                '\t\tos_log_error(admob_log, "AdmobPlugin has not been initialized");\n'
+                '\t\treturn FAILED;\n'
+                '\t}\n\n'
+                '\t[consentManager loadFormWithCompletion:^(NSError *_Nullable error) {',
+                'Error AdmobPlugin::load_consent_form() {\n'
+                '\tos_log_debug(admob_log, "AdmobPlugin load_consent_form");\n\n'
+                '\t// UMP consent must be resolved before Google Mobile Ads is initialized.\n'
+                '\t[consentManager loadFormWithCompletion:^(NSError *_Nullable error) {',
+                "allow UMP form loading before GMA initialization",
+            ),
+            (
                 'const String CONSENT_INFO_UPDATE_FAILED_SIGNAL = "consent_info_update_failed";\n'
                 'const String TRACKING_AUTHORIZATION_GRANTED = "tracking_authorization_granted";',
                 'const String CONSENT_INFO_UPDATE_FAILED_SIGNAL = "consent_info_update_failed";\n'
@@ -297,6 +311,11 @@ def main() -> None:
 
     if "advertisingIdentifier UUIDString" in implementation_source:
         raise SystemExit(f"{implementation}: ATT bridge must not log the advertising identifier")
+    load_form_source = implementation_source.split(
+        "Error AdmobPlugin::load_consent_form() {", 1
+    )[1].split("Error AdmobPlugin::show_consent_form() {", 1)[0]
+    if "initialized == false" in load_form_source:
+        raise SystemExit(f"{implementation}: UMP form loading still depends on GMA initialization")
 
     print(
         "ADMOB_UMP_NATIVE_PATCH_OK "

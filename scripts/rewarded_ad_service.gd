@@ -13,6 +13,8 @@ const AdmobClass = preload("res://addons/AdmobPlugin/Admob.gd")
 const AdmobConfigClass = preload("res://addons/AdmobPlugin/model/AdmobConfig.gd")
 const MOBILE_ADS_CONFIG_PATH := "res://data/mobile-ads.cfg"
 const MAX_AUTOMATIC_RETRIES := 3
+const CONSENT_OPERATION_TIMEOUT_SECONDS := 20.0
+const ATT_AUTHORIZATION_TIMEOUT_SECONDS := 60.0
 const UNKNOWN_SDK_ERROR_CODE := -1
 const AD_MODE_PRODUCTION := "production"
 const AD_MODE_TEST := "test"
@@ -39,6 +41,9 @@ var _initialized := false
 var _retry_count := 0
 var _retry_generation := 0
 var _consent_update_attempt_count := 0
+var _consent_operation_generation := 0
+var _consent_operation_pending := false
+var _consent_form_open := false
 var _load_attempt_count := 0
 var _showing_context := ""
 var _completion_sent := false
@@ -52,6 +57,7 @@ var _plugin_detected := false
 var _privacy_bridge_supported := false
 var _att_required := false
 var _att_request_pending := false
+var _att_operation_generation := 0
 var _att_resolution_completed := false
 var _att_status := "NOT_REQUIRED"
 var _initialization_callback_received := false
@@ -107,6 +113,8 @@ func diagnostic_snapshot() -> Dictionary:
 		"initialization_callback_received": _initialization_callback_received,
 		"initialized": _initialized,
 		"consent_update_attempts": _consent_update_attempt_count,
+		"consent_operation_pending": _consent_operation_pending,
+		"consent_form_open": _consent_form_open,
 		"load_attempts": _load_attempt_count,
 		"retry_count": _retry_count,
 		"terminal_unavailable": _terminal_unavailable,
@@ -292,15 +300,21 @@ func _valid_rewarded_id(rewarded_id: String, mode: String) -> bool:
 func _request_consent_update() -> void:
 	if _admob == null:
 		return
+	_cancel_consent_operation_timeout()
+	_consent_form_open = false
 	_set_state(State.CONSENT)
 	_consent_update_attempt_count += 1
 	_log_diagnostic("consent_update_requested")
-	_admob.update_consent_info()
+	if not _admob.update_consent_info():
+		_retry_or_unavailable("consent_update_request_failed", true, null, "consent")
+		return
+	_arm_consent_operation_timeout("consent_update_timeout")
 
 
 func _on_consent_info_updated() -> void:
 	if _admob == null:
 		return
+	_cancel_consent_operation_timeout()
 	_refresh_privacy_options_requirement()
 	_log_diagnostic("consent_info_updated")
 	if _admob.is_privacy_options_supported() and _admob.can_request_ads():
@@ -312,12 +326,13 @@ func _on_consent_info_updated() -> void:
 		"NOT_REQUIRED", "OBTAINED":
 			_initialize_ads_after_att()
 		"REQUIRED":
-			_admob.load_consent_form()
+			_request_consent_form_load()
 		_:
 			_retry_or_unavailable("consent_status_unknown", true)
 
 
 func _on_consent_info_update_failed(error_data = null) -> void:
+	_cancel_consent_operation_timeout()
 	_refresh_privacy_options_requirement()
 	if _admob != null and _admob.is_privacy_options_supported() and _admob.can_request_ads():
 		_record_failure("consent_update_failed_previous_consent_usable", "consent", error_data)
@@ -327,17 +342,25 @@ func _on_consent_info_update_failed(error_data = null) -> void:
 
 
 func _on_consent_form_loaded() -> void:
-	if _admob != null:
-		_admob.show_consent_form()
+	_cancel_consent_operation_timeout()
+	if _admob == null:
+		return
+	if not _admob.show_consent_form():
+		_retry_or_unavailable("consent_form_show_request_failed", true, null, "consent")
+		return
+	_consent_form_open = true
 
 
 func _on_consent_form_failed_to_load(error_data = null) -> void:
+	_cancel_consent_operation_timeout()
 	_retry_or_unavailable("consent_form_load_failed", true, error_data, "consent")
 
 
 func _on_consent_form_dismissed(error_data = null) -> void:
 	if _admob == null:
 		return
+	_cancel_consent_operation_timeout()
+	_consent_form_open = false
 	_refresh_privacy_options_requirement()
 	if _admob.is_privacy_options_supported():
 		if _admob.can_request_ads():
@@ -351,6 +374,39 @@ func _on_consent_form_dismissed(error_data = null) -> void:
 		_initialize_ads_after_att()
 	else:
 		_retry_or_unavailable("consent_not_obtained", true, error_data, "consent")
+
+
+func _request_consent_form_load() -> void:
+	if _admob == null:
+		return
+	if not _admob.load_consent_form():
+		_retry_or_unavailable("consent_form_load_request_failed", true, null, "consent")
+		return
+	_arm_consent_operation_timeout("consent_form_load_timeout")
+
+
+func _arm_consent_operation_timeout(reason: String) -> void:
+	_consent_operation_generation += 1
+	_consent_operation_pending = true
+	var generation := _consent_operation_generation
+	_wait_for_consent_operation(generation, reason)
+
+
+func _cancel_consent_operation_timeout() -> void:
+	_consent_operation_generation += 1
+	_consent_operation_pending = false
+
+
+func _wait_for_consent_operation(generation: int, reason: String) -> void:
+	await get_tree().create_timer(CONSENT_OPERATION_TIMEOUT_SECONDS).timeout
+	_handle_consent_operation_timeout(generation, reason)
+
+
+func _handle_consent_operation_timeout(generation: int, reason: String) -> void:
+	if generation != _consent_operation_generation or state != State.CONSENT:
+		return
+	_consent_operation_pending = false
+	_retry_or_unavailable(reason, true, null, "consent")
 
 
 func _refresh_privacy_options_requirement() -> void:
@@ -401,6 +457,7 @@ func _initialize_ads_after_att() -> void:
 	_att_status = status
 	match status:
 		"AUTHORIZED", "DENIED", "RESTRICTED":
+			_cancel_att_authorization_timeout()
 			_att_request_pending = false
 			_att_resolution_completed = true
 			_initialize_ads()
@@ -413,6 +470,8 @@ func _initialize_ads_after_att() -> void:
 			if not _admob.request_tracking_authorization():
 				_att_request_pending = false
 				_mark_unavailable("att_request_failed")
+			else:
+				_arm_att_authorization_timeout()
 		_:
 			_att_request_pending = false
 			_mark_unavailable("att_status_unknown")
@@ -429,6 +488,7 @@ func _on_tracking_authorization_denied() -> void:
 func _complete_tracking_authorization(expected_authorized: bool) -> void:
 	if not _att_required or _admob == null:
 		return
+	_cancel_att_authorization_timeout()
 	_att_request_pending = false
 	var status: String = _admob.get_tracking_authorization_status()
 	_att_status = status
@@ -440,6 +500,31 @@ func _complete_tracking_authorization(expected_authorized: bool) -> void:
 		return
 	_att_resolution_completed = true
 	_initialize_ads()
+
+
+func _arm_att_authorization_timeout() -> void:
+	_att_operation_generation += 1
+	var generation := _att_operation_generation
+	_wait_for_att_authorization(generation)
+
+
+func _cancel_att_authorization_timeout() -> void:
+	_att_operation_generation += 1
+
+
+func _wait_for_att_authorization(generation: int) -> void:
+	await get_tree().create_timer(ATT_AUTHORIZATION_TIMEOUT_SECONDS).timeout
+	_handle_att_authorization_timeout(generation)
+
+
+func _handle_att_authorization_timeout(generation: int) -> void:
+	if (
+		generation != _att_operation_generation
+		or state != State.ATT
+		or not _att_request_pending
+	):
+		return
+	_mark_unavailable("att_authorization_timeout")
 
 
 func _initialize_ads() -> void:
@@ -602,12 +687,16 @@ func _recover_after_resume() -> void:
 	if state in [State.INACTIVE, State.READY, State.SHOWING]:
 		return
 	_log_diagnostic("application_resumed")
+	if state == State.CONSENT:
+		_recover_consent_after_resume()
+		return
 	if state == State.ATT:
 		# iOS normally invokes the completion handler directly. Re-read the system
 		# status on resume as a safe fallback without issuing a duplicate prompt.
 		if _admob != null and _att_request_pending:
 			var status: String = _admob.get_tracking_authorization_status()
 			if status in ["AUTHORIZED", "DENIED", "RESTRICTED"]:
+				_cancel_att_authorization_timeout()
 				_att_request_pending = false
 				_att_status = status
 				_att_resolution_completed = true
@@ -616,8 +705,27 @@ func _recover_after_resume() -> void:
 	_recover_after_request()
 
 
+func _recover_consent_after_resume() -> void:
+	if _admob == null:
+		return
+	if _admob.is_privacy_options_supported() and _admob.can_request_ads():
+		_cancel_consent_operation_timeout()
+		_consent_form_open = false
+		_initialize_ads_after_att()
+		return
+	var consent = _admob.get_consent_status()
+	var status: String = "UNKNOWN" if consent == null else str(consent.to_status_string())
+	if status in ["NOT_REQUIRED", "OBTAINED"]:
+		_cancel_consent_operation_timeout()
+		_consent_form_open = false
+		_initialize_ads_after_att()
+	elif not _consent_form_open and not _consent_operation_pending:
+		_request_consent_update()
+
+
 func _mark_unavailable(reason: String) -> void:
 	if reason.begins_with("att_"):
+		_cancel_att_authorization_timeout()
 		_att_request_pending = false
 	if last_failure_reason != reason:
 		_record_failure(reason, _diagnostic_stage_code(reason, "").to_lower())

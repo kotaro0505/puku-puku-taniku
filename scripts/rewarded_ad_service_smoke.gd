@@ -10,6 +10,13 @@ var privacy_requirements: Array[bool] = []
 var privacy_results: Array[bool] = []
 
 
+class FakeConsentStatus:
+	extends RefCounted
+	var status := "UNKNOWN"
+	func _init(value: String) -> void:status=value
+	func to_status_string() -> String:return status
+
+
 class FakePrivacyAdmob:
 	extends RefCounted
 	signal privacy_options_form_dismissed(error_data)
@@ -39,11 +46,19 @@ class FakeNativePrivacyPlugin:
 	var presentation_result := OK
 	var tracking_status := 0
 	var tracking_request_count := 0
+	var consent_load_result := OK
+	var consent_show_result := OK
+	var consent_load_count := 0
+	var consent_show_count := 0
+	var consent_update_count := 0
 	func get_privacy_options_requirement_status() -> int:return requirement_status
 	func present_privacy_options_form() -> int:presentation_count+=1;return presentation_result
 	func can_request_ads() -> bool:return true
 	func get_tracking_authorization_status() -> int:return tracking_status
 	func request_tracking_authorization() -> void:tracking_request_count+=1
+	func load_consent_form() -> int:consent_load_count+=1;return consent_load_result
+	func show_consent_form() -> int:consent_show_count+=1;return consent_show_result
+	func update_consent_info(_parameters: Dictionary) -> void:consent_update_count+=1
 
 
 class FakeAttAdmob:
@@ -52,9 +67,21 @@ class FakeAttAdmob:
 	var tracking_request_count := 0
 	var initialize_count := 0
 	var request_succeeds := true
+	var ads_allowed := true
+	var consent_status := "NOT_REQUIRED"
+	var consent_load_succeeds := true
+	var consent_show_succeeds := true
+	var consent_update_succeeds := true
+	var consent_load_count := 0
+	var consent_show_count := 0
+	var consent_update_count := 0
 	func is_privacy_options_supported() -> bool:return true
 	func get_privacy_options_requirement_status() -> String:return "NOT_REQUIRED"
-	func can_request_ads() -> bool:return true
+	func can_request_ads() -> bool:return ads_allowed
+	func get_consent_status():return FakeConsentStatus.new(consent_status)
+	func load_consent_form() -> bool:consent_load_count+=1;return consent_load_succeeds
+	func show_consent_form() -> bool:consent_show_count+=1;return consent_show_succeeds
+	func update_consent_info() -> bool:consent_update_count+=1;return consent_update_succeeds
 	func is_tracking_authorization_supported() -> bool:return true
 	func get_tracking_authorization_status() -> String:return tracking_status
 	func request_tracking_authorization() -> bool:tracking_request_count+=1;return request_succeeds
@@ -344,7 +371,88 @@ func _ready() -> void:
 		assert(wrapper.get_tracking_authorization_status() == str(tracking_case[1]))
 	assert(wrapper.request_tracking_authorization())
 	assert(native.tracking_request_count == 1)
+	assert(wrapper.load_consent_form())
+	assert(wrapper.show_consent_form())
+	assert(wrapper.update_consent_info())
+	assert(native.consent_load_count == 1 and native.consent_show_count == 1)
+	assert(native.consent_update_count == 1)
+	native.consent_load_result = FAILED
+	native.consent_show_result = FAILED
+	assert(not wrapper.load_consent_form())
+	assert(not wrapper.show_consent_form())
 	wrapper.free()
+
+	# A required UMP form must load and display before GMA initialization. The
+	# upstream v7 native guard used to reject this load synchronously and leave
+	# the service permanently in CONSENT; the wrapper now surfaces that result.
+	var required_service := ServiceClass.new()
+	var required_att := FakeAttAdmob.new()
+	required_att.ads_allowed = false
+	required_att.consent_status = "REQUIRED"
+	required_att.tracking_status = "DENIED"
+	required_service._admob = required_att
+	required_service._att_required = true
+	required_service.state = ServiceClass.State.CONSENT
+	add_child(required_service)
+	required_service._on_consent_info_updated()
+	assert(required_service.state == ServiceClass.State.CONSENT)
+	assert(required_att.consent_load_count == 1 and required_att.initialize_count == 0)
+	assert(required_service._consent_operation_pending)
+	required_service._on_consent_form_loaded()
+	assert(required_att.consent_show_count == 1 and required_service._consent_form_open)
+	required_att.ads_allowed = true
+	required_att.consent_status = "OBTAINED"
+	required_service._on_consent_form_dismissed({})
+	assert(required_service.state == ServiceClass.State.INITIALIZING)
+	assert(required_att.initialize_count == 1 and not required_service._consent_form_open)
+
+	# A synchronous native failure and missing asynchronous callbacks both leave
+	# GMA uninitialized and enter the existing bounded failure path, never an
+	# endless ADS-WAIT-CONSENT state.
+	var rejected_load_service := ServiceClass.new()
+	var rejected_load_att := FakeAttAdmob.new()
+	rejected_load_att.ads_allowed = false
+	rejected_load_att.consent_status = "REQUIRED"
+	rejected_load_att.consent_load_succeeds = false
+	rejected_load_service._admob = rejected_load_att
+	rejected_load_service._att_required = true
+	rejected_load_service._retry_count = ServiceClass.MAX_AUTOMATIC_RETRIES
+	rejected_load_service.state = ServiceClass.State.CONSENT
+	add_child(rejected_load_service)
+	rejected_load_service._on_consent_info_updated()
+	assert(rejected_load_service.state == ServiceClass.State.UNAVAILABLE)
+	assert(rejected_load_service.last_failure_reason == "consent_form_load_request_failed")
+	assert(rejected_load_att.initialize_count == 0)
+
+	var consent_timeout_service := ServiceClass.new()
+	var consent_timeout_att := FakeAttAdmob.new()
+	consent_timeout_service._admob = consent_timeout_att
+	consent_timeout_service._att_required = true
+	consent_timeout_service._retry_count = ServiceClass.MAX_AUTOMATIC_RETRIES
+	consent_timeout_service.state = ServiceClass.State.CONSENT
+	consent_timeout_service._consent_operation_generation = 7
+	consent_timeout_service._consent_operation_pending = true
+	add_child(consent_timeout_service)
+	consent_timeout_service._handle_consent_operation_timeout(7, "consent_update_timeout")
+	assert(consent_timeout_service.state == ServiceClass.State.UNAVAILABLE)
+	assert(consent_timeout_service.last_failure_reason == "consent_update_timeout")
+	assert(consent_timeout_att.initialize_count == 0)
+
+	# Saved consent and consent-not-required paths proceed directly to the ATT
+	# gate without loading a form.
+	for consent_case in [[true, "OBTAINED"], [false, "NOT_REQUIRED"]]:
+		var saved_service := ServiceClass.new()
+		var saved_att := FakeAttAdmob.new()
+		saved_att.ads_allowed = bool(consent_case[0])
+		saved_att.consent_status = str(consent_case[1])
+		saved_att.tracking_status = "DENIED"
+		saved_service._admob = saved_att
+		saved_service._att_required = true
+		saved_service.state = ServiceClass.State.CONSENT
+		add_child(saved_service)
+		saved_service._on_consent_info_updated()
+		assert(saved_service.state == ServiceClass.State.INITIALIZING)
+		assert(saved_att.consent_load_count == 0 and saved_att.initialize_count == 1)
 
 	# Production-like builds complete UMP first, then resolve ATT before the
 	# Mobile Ads SDK is initialized. Not-determined requests once; every resolved
@@ -404,6 +512,24 @@ func _ready() -> void:
 	assert(unresolved_service.state == ServiceClass.State.UNAVAILABLE)
 	assert(unresolved_service.user_diagnostic_code() == "ADS-ATT")
 	assert(unresolved_att.initialize_count == 0)
+
+	var att_timeout_service := ServiceClass.new()
+	var att_timeout_admob := FakeAttAdmob.new()
+	att_timeout_service._admob = att_timeout_admob
+	att_timeout_service._att_required = true
+	att_timeout_service.state = ServiceClass.State.ATT
+	att_timeout_service._att_request_pending = true
+	att_timeout_service._att_operation_generation = 9
+	add_child(att_timeout_service)
+	att_timeout_service._handle_att_authorization_timeout(9)
+	assert(att_timeout_service.state == ServiceClass.State.UNAVAILABLE)
+	assert(att_timeout_service.last_failure_reason == "att_authorization_timeout")
+	assert(att_timeout_admob.initialize_count == 0)
+	# A late but valid iOS completion still recovers safely after the timeout.
+	att_timeout_admob.tracking_status = "DENIED"
+	att_timeout_service._on_tracking_authorization_denied()
+	assert(att_timeout_service.state == ServiceClass.State.INITIALIZING)
+	assert(att_timeout_admob.initialize_count == 1)
 
 	# A compatible native bridge opts into the UI through capability detection.
 	# A successful consent change discards the old loaded ad and loads
@@ -478,7 +604,7 @@ func _ready() -> void:
 	assert(fake.load_count == load_count_before_guard + 1)
 	assert(service.state == ServiceClass.State.LOADING)
 
-	print("REWARDED_AD_SERVICE_SMOKE_OK earned_once=true early_close_no_reward=true repeated_views=5 presentation=start_until_dismissed show_failure_finishes_audio=true dismissal_reloads=true duplicate_terminal_guarded=true load_failure_recovers=true retry_backoff=preparing_no_duplicate terminal_unavailable=rescue_eligible_then_reload loading_message_specific=true privacy_capability_gated=true consent_change_reloads=true att_gate=ump_then_four_states att_duplicate_guarded=true sanitized_diagnostics=true config_diagnostics_specific=true duplicate_load_guarded=true resume_recovers=true restart_reloads=true desktop_inactive=true")
+	print("REWARDED_AD_SERVICE_SMOKE_OK earned_once=true early_close_no_reward=true repeated_views=5 presentation=start_until_dismissed show_failure_finishes_audio=true dismissal_reloads=true duplicate_terminal_guarded=true load_failure_recovers=true retry_backoff=preparing_no_duplicate terminal_unavailable=rescue_eligible_then_reload loading_message_specific=true privacy_capability_gated=true consent_required=preinit_form_then_att consent_existing=direct_att consent_timeout=fail_closed att_gate=ump_then_four_states att_timeout=late_callback_recovers att_duplicate_guarded=true consent_change_reloads=true sanitized_diagnostics=true config_diagnostics_specific=true duplicate_load_guarded=true resume_recovers=true restart_reloads=true desktop_inactive=true")
 	get_tree().quit()
 
 

@@ -17,7 +17,7 @@ workflows:
         STOREKIT2_COMPAT_REVISION: "compat4"
         ADMOB_PLUGIN_VERSION: "v7.0"
         ADMOB_PLUGIN_UPSTREAM_COMMIT: "4b4ddceab0be81f0dcb12a6313038dba6cf9eacf"
-        ADMOB_NATIVE_COMPAT_REVISION: "ump2-att1"
+        ADMOB_NATIVE_COMPAT_REVISION: "ump2-att2"
         GOOGLE_MOBILE_ADS_VERSION: "12.14.0"
         APP_VERSION: "1.0.0"
         APPLE_TEAM_ID: "UK8FRB9XKH"
@@ -39,7 +39,7 @@ workflows:
       cache_paths:
         - $HOME/.cache/puku-puku-taniku/godot-4.7.2
         - $HOME/.cache/puku-puku-taniku/storekit2-v0.2-godot-4.7.2-ios15.6-compat4
-        - $HOME/.cache/puku-puku-taniku/admob-v7.0-ump2-att1-godot-4.7.2-gma-12.14.0-ios15.6
+        - $HOME/.cache/puku-puku-taniku/admob-v7.0-ump2-att2-godot-4.7.2-gma-12.14.0-ios15.6
         - $HOME/Library/Application Support/Godot/export_templates/4.7.2.stable
     scripts:
       - name: Report checked-out source revision
@@ -85,7 +85,7 @@ workflows:
           test "$STOREKIT2_COMPAT_REVISION" = "compat4"
           test "$ADMOB_PLUGIN_VERSION" = "v7.0"
           test "$ADMOB_PLUGIN_UPSTREAM_COMMIT" = "4b4ddceab0be81f0dcb12a6313038dba6cf9eacf"
-          test "$ADMOB_NATIVE_COMPAT_REVISION" = "ump2-att1"
+          test "$ADMOB_NATIVE_COMPAT_REVISION" = "ump2-att2"
           test "$GOOGLE_MOBILE_ADS_VERSION" = "12.14.0"
           if [ "$APP_STORE_SUBMISSION" = "true" ]; then
             test "$BUILD_PROFILE" = "app_store"
@@ -608,7 +608,7 @@ workflows:
         STOREKIT2_COMPAT_REVISION: "compat4"
         ADMOB_PLUGIN_VERSION: "v7.0"
         ADMOB_PLUGIN_UPSTREAM_COMMIT: "4b4ddceab0be81f0dcb12a6313038dba6cf9eacf"
-        ADMOB_NATIVE_COMPAT_REVISION: "ump2-att1"
+        ADMOB_NATIVE_COMPAT_REVISION: "ump2-att2"
         GOOGLE_MOBILE_ADS_VERSION: "12.14.0"
         APP_VERSION: "1.0.0"
         APPLE_TEAM_ID: "UK8FRB9XKH"
@@ -649,7 +649,7 @@ workflows:
         STOREKIT2_COMPAT_REVISION: "compat4"
         ADMOB_PLUGIN_VERSION: "v7.0"
         ADMOB_PLUGIN_UPSTREAM_COMMIT: "4b4ddceab0be81f0dcb12a6313038dba6cf9eacf"
-        ADMOB_NATIVE_COMPAT_REVISION: "ump2-att1"
+        ADMOB_NATIVE_COMPAT_REVISION: "ump2-att2"
         GOOGLE_MOBILE_ADS_VERSION: "12.14.0"
         APP_VERSION: "1.0.0"
         APPLE_TEAM_ID: "UK8FRB9XKH"
@@ -694,7 +694,7 @@ workflows:
         STOREKIT2_COMPAT_REVISION: "compat4"
         ADMOB_PLUGIN_VERSION: "v7.0"
         ADMOB_PLUGIN_UPSTREAM_COMMIT: "4b4ddceab0be81f0dcb12a6313038dba6cf9eacf"
-        ADMOB_NATIVE_COMPAT_REVISION: "ump2-att1"
+        ADMOB_NATIVE_COMPAT_REVISION: "ump2-att2"
         GOOGLE_MOBILE_ADS_VERSION: "12.14.0"
         APP_VERSION: "1.0.0"
         APPLE_TEAM_ID: "UK8FRB9XKH"

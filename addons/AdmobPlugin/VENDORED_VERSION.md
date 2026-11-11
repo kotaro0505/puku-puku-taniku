@@ -29,6 +29,9 @@ Local release hardening:
   identifiers are never written to the native bridge log. The build fails
   before export if the pinned source changes, the SDK versions drift, or any
   bridge symbol is absent.
+- The same patch removes v7.0's `initialized == false` guard from UMP consent
+  form loading. This preserves Google's required UMP-before-GMA order instead
+  of deadlocking when a consent form is required before Mobile Ads startup.
 - This native bridge does not change the Google Mobile Ads SDK version. TFAT is
   therefore deliberately deferred instead of coupling the UMP fix to the
   breaking 12.x-to-13.x SDK migration.
