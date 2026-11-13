@@ -1,8 +1,9 @@
-# 『ぷくぷく！たにくらいふ』サポートページ公開候補
+# 『ぷくぷく！たにくらいふ』サポートページ公開原稿
 
-> **承認待ち・未公開**<br>
-> 最終更新: 2026-11-11<br>
-> 公開候補URL: `https://kotaro0505.github.io/puku-puku-taniku/support/`
+> **正式公開済み**<br>
+> 最終更新: 2026-11-13<br>
+> 正式URL: `https://kotaro0505.github.io/puku-puku-taniku/support/`<br>
+> 公開本文は日本語・英語の各サポート節です。末尾の検証記録は公開HTMLに含めません。
 
 ---
 
@@ -32,6 +33,8 @@
 
 Googleがプライバシー設定の再表示を必要と判定した場合は、ゲーム内の設定画面にプライバシー設定ボタンが表示されます。
 
+iOSの追跡許可（ATT）はGoogle UMPの同意とは別の設定です。追跡を許可しない場合でもゲームは利用でき、広告が利用可能で最後まで視聴した場合の報酬は変わりません。
+
 ### 共有画像
 
 最高記録や寄せ植えの共有は、iOSの共有シートを利用します。共有できない場合は、共有先アプリの状態、端末の空き容量、OSの設定をご確認ください。
@@ -47,13 +50,13 @@ Googleがプライバシー設定の再表示を必要と判定した場合は�
 - アプリのバージョンとビルド番号
 - 再起動後も再現するか
 
-Apple Accountのパスワード、クレジットカード番号、認証コード等は送らないでください。セーブデータや画面画像を送る場合は、個人情報が写っていないことをご確認ください。
+Apple Accountのパスワード、クレジットカード番号、認証コード等は送らないでください。セーブデータや画面画像を送る前に、個人情報が含まれていないことをご確認ください。
 
-お問い合わせ情報は、対応、履歴確認および紛争対応に必要な範囲で利用します。法令上または紛争対応上さらに保持する必要がある場合を除き、最終対応日から原則1年以内に削除または匿名化します。
+お問い合わせ内容とメールアドレスは、返信やその後の対応に必要な間だけ保管し、不要になったものは速やかに削除するよう努めます。削除をご希望の場合は、サポート窓口までご連絡ください。
 
 ## プライバシー
 
-プライバシーポリシー：［正式公開後に `https://kotaro0505.github.io/puku-puku-taniku/privacy-policy/` へリンク］
+プライバシーポリシー：[プライバシーポリシーを開く](../privacy-policy/)
 
 ---
 
@@ -83,11 +86,15 @@ Rewarded ads are optional. Availability may depend on the network, ad inventory,
 
 When Google reports that privacy options must be available, the App displays a corresponding Privacy Settings button in its settings screen.
 
+Apple's App Tracking Transparency (ATT) authorization is separate from Google UMP consent. The game remains available if tracking is declined, and the reward is unchanged when a rewarded ad is available and completed.
+
 ### Shared images
 
 Record and arrangement sharing uses the iOS share sheet. If sharing fails, check the destination app, available device storage, and OS settings.
 
 ## Information to Include in an Inquiry
+
+To the extent needed to investigate the issue, please include the following information.
 
 - the screen and steps that caused the issue;
 - any displayed message or reason code;
@@ -96,20 +103,33 @@ Record and arrangement sharing uses the iOS share sheet. If sharing fails, check
 - App version and build number; and
 - whether the issue remains after restarting the App.
 
-Do not send an Apple Account password, credit card number, authentication code, or another secret. Before attaching save data or screenshots, check that they contain no unnecessary personal information.
+Do not send an Apple Account password, credit card number, authentication code, or another secret. Before sending save data or screenshots, check that they contain no personal information.
 
-Inquiry information is used only as needed to respond, maintain support history, and address disputes. Unless a longer period is required by law or for a dispute, it will generally be deleted or anonymized within one year after the last support response.
+We keep your message and email address only for as long as needed to respond to your inquiry and follow up. Once we no longer need this information, we make reasonable efforts to delete it promptly. To request deletion, please contact us at the support email address.
 
 ## Privacy
 
-Privacy Policy: [link to `https://kotaro0505.github.io/puku-puku-taniku/privacy-policy/` after formal publication]
+Privacy Policy: [Open the Privacy Policy](../privacy-policy/)
 
 ---
 
-## 公開前確認（公開ページには含めない）
+## 検証状況と公開前確認（公開ページには含めない）
 
-1. プライバシーポリシーの公開承認と正式URLを確定する。
-2. App Store ConnectのSupport URLとして上記候補URLを使うことを承認する。
-3. 実際の本番画面で「購入を復元」の場所と文言を再確認する。
-4. 問い合わせメールアドレスの受信、迷惑メール対策、1年以内の削除・匿名化運用を確認する。
-5. HTML化後、日本語・英語、iPhone表示、メールリンク、プライバシーポリシーリンク、404、HTTPSを確認する。
+### 確認済み
+
+1. ソースコード上、「購入を復元」は「パンダのお店」内の鉢ショップ上部に表示され、日本語・ひらがな・英語の文言と復元処理を回帰テストで確認している。
+2. リワード広告は任意視聴で、途中終了時は報酬を付与せず、視聴完了時だけ一度付与するコードと回帰テストがある。
+3. TestFlight Build 83の実機で、UMP、ATT許可、Google公式テスト広告、視聴完了報酬まで成功している。ATT拒否時はコード・自動テストのみ確認済みで、実機未確認。
+4. 問い合わせ窓口 `kotaro.hana.0505@gmail.com` でテストメールを受信できることを確認済み。
+
+### 正式公開時に完了した確認
+
+1. 運営者が日本語・英語本文、運営者名、問い合わせ先、保管・削除方針、および正式URLを最終承認した。
+2. App Store ConnectのSupport URLとして `https://kotaro0505.github.io/puku-puku-taniku/support/` を使うことを承認した。
+3. 最新Markdownから、下書き表示、`noindex`、作業用注記を含まない公開HTMLを再生成した。
+4. サポートページとプライバシーポリシーを相互リンクした。
+
+### App Store審査提出前に必要
+
+1. 最終TestFlightまたは本番候補の実機画面で、「購入を復元」の位置・文言・操作結果を目視確認する。
+2. ATT拒否状態でも、広告が利用可能な場合の報酬が変わらないことを実機確認する。
