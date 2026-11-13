@@ -1,0 +1,52 @@
+diff --git a/godot-storekit2/GodotStoreKit2Swift.swift b/godot-storekit2/GodotStoreKit2Swift.swift
+--- a/godot-storekit2/GodotStoreKit2Swift.swift
++++ b/godot-storekit2/GodotStoreKit2Swift.swift
+@@ -151,3 +151,30 @@
+-	public func restorePurchases() async throws -> Void {
+-		try await AppStore.sync()
++	private func restoreErrorCode(error: Error) -> NSString {
++		if let storeKitError = error as? StoreKitError {
++			switch storeKitError {
++			case .userCancelled:
++				return "cancelled"
++			case .networkError(_):
++				return "network_error"
++			case .systemError(let underlyingError):
++				return restoreErrorCode(error: underlyingError)
++			default:
++				return "failed"
++			}
++		}
++		if let urlError = error as? URLError {
++			if urlError.code == .userCancelledAuthentication {
++				return "cancelled"
++			}
++			return "network_error"
++		}
++		return "failed"
++	}
++
++	public func restorePurchases() async -> NSString {
++		do {
++			try await AppStore.sync()
++			return ""
++		} catch {
++			return restoreErrorCode(error: error)
++		}
+-	}
++	}
+diff --git a/godot-storekit2/godot-storekit2.mm b/godot-storekit2/godot-storekit2.mm
+--- a/godot-storekit2/godot-storekit2.mm
++++ b/godot-storekit2/godot-storekit2.mm
+@@ -85,8 +85,3 @@
+-	[proxy restorePurchasesWithCompletionHandler:^(NSError *error) {
+-		String result;
+-		if (error) {
+-			result = toGodotString(error.localizedDescription);
+-		}
+-
+-		call_deferred("emit_signal", "synchronized", result);
++	[proxy restorePurchasesWithCompletionHandler:^(NSString *resultCode) {
++		call_deferred("emit_signal", "synchronized", toGodotString(resultCode));
+-	}];
++	}];

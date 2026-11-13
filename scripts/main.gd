@@ -2727,7 +2727,15 @@ func _on_pot_iap_purchase_failed(_product_id:String,reason:String)->void:
 
 func _on_pot_iap_restore_finished(success:bool)->void:
 	if arrangement_ui==null:return
-	arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"iap_restore_complete" if success else "iap_restore_failed"))
+	var message_key:="iap_restore_complete"
+	if not success:
+		var result_code:String=pot_unlock_iap_service.restore_result_code() if pot_unlock_iap_service!=null else "failed"
+		match result_code:
+			"cancelled":message_key="iap_restore_cancelled"
+			"network_error":message_key="iap_restore_network_failed"
+			"timeout":message_key="iap_restore_timeout"
+			_:message_key="iap_restore_failed"
+	arrangement_ui.show_pot_shop_message(Localizer.text(language_code,message_key))
 	_sync_arrangement_ui()
 
 func _on_catalog_purchase_requested(series_id:String)->void:

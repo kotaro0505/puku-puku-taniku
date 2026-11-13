@@ -4,7 +4,7 @@ set -euo pipefail
 : "${GODOT_VERSION:?GODOT_VERSION is required}"
 STOREKIT2_VERSION="${STOREKIT2_VERSION:-v0.2}"
 IOS_MIN_VERSION="${IOS_MIN_VERSION:-15.6}"
-STOREKIT2_COMPAT_REVISION="${STOREKIT2_COMPAT_REVISION:-compat4}"
+STOREKIT2_COMPAT_REVISION="${STOREKIT2_COMPAT_REVISION:-compat5}"
 PROJECT_DIR="${CM_BUILD_DIR:-$(pwd)}"
 SOURCE_HEAD="$(git -C "$PROJECT_DIR" rev-parse HEAD 2>/dev/null || true)"
 [ -n "$SOURCE_HEAD" ] || SOURCE_HEAD="unavailable"
@@ -14,6 +14,7 @@ CACHE_TARGET_FILE="$CACHE_ROOT/ios-min-version.txt"
 CACHE_COMPAT_FILE="$CACHE_ROOT/compat-revision.txt"
 OUTPUT_DIR="$PROJECT_DIR/ios/plugins/godot-storekit2"
 PRICE_BRIDGE_PATCH="$PROJECT_DIR/scripts/ci/storekit2_price_bridge.patch"
+RESTORE_BRIDGE_PATCH="$PROJECT_DIR/scripts/ci/storekit2_restore_result_bridge.patch"
 
 if [ "$IOS_MIN_VERSION" != "15.6" ]; then
   echo "godot-storekit2 $STOREKIT2_VERSION requires IOS_MIN_VERSION=15.6, got $IOS_MIN_VERSION" >&2
@@ -30,13 +31,18 @@ if [ "$STOREKIT2_VERSION" != "v0.2" ]; then
   exit 1
 fi
 
-if [ "$STOREKIT2_COMPAT_REVISION" != "compat4" ]; then
-  echo "Unexpected StoreKit2 compatibility revision: expected compat4, got $STOREKIT2_COMPAT_REVISION" >&2
+if [ "$STOREKIT2_COMPAT_REVISION" != "compat5" ]; then
+  echo "Unexpected StoreKit2 compatibility revision: expected compat5, got $STOREKIT2_COMPAT_REVISION" >&2
   exit 1
 fi
 
 if [ ! -f "$PRICE_BRIDGE_PATCH" ]; then
   echo "Missing StoreKit2 price bridge patch: $PRICE_BRIDGE_PATCH" >&2
+  exit 1
+fi
+
+if [ ! -f "$RESTORE_BRIDGE_PATCH" ]; then
+  echo "Missing StoreKit2 restore result bridge patch: $RESTORE_BRIDGE_PATCH" >&2
   exit 1
 fi
 
@@ -79,6 +85,8 @@ for framework_arg in sys.argv[1:]:
             b"product_price_received",
             b"storefront_country_code",
             b"doubleValue",
+            b"network_error",
+            b"cancelled",
         ):
             if marker not in library_data:
                 raise SystemExit(
@@ -149,6 +157,8 @@ fi
 
 git -C "$PLUGIN_SOURCE" apply --unidiff-zero --check "$PRICE_BRIDGE_PATCH"
 git -C "$PLUGIN_SOURCE" apply --unidiff-zero "$PRICE_BRIDGE_PATCH"
+git -C "$PLUGIN_SOURCE" apply --unidiff-zero --check "$RESTORE_BRIDGE_PATCH"
+git -C "$PLUGIN_SOURCE" apply --unidiff-zero "$RESTORE_BRIDGE_PATCH"
 grep -Fq 'D_METHOD("request_product_price", "product_id")' "$PLUGIN_IMPLEMENTATION"
 grep -Fq 'getProductPriceWithProductId:productId' "$PLUGIN_IMPLEMENTATION"
 grep -Fq '"product_price_received"' "$PLUGIN_IMPLEMENTATION"
@@ -164,6 +174,18 @@ fi
 grep -Fq 'private func priceInfoFromProduct(product: Product) async -> PriceInfo' "$PLUGIN_SWIFT"
 grep -Fq 'if let storefront = await Storefront.current {' "$PLUGIN_SWIFT"
 grep -Fq 'public var storefrontCountryCode = ""' "$PLUGIN_SWIFT"
+grep -Fq 'private func restoreErrorCode(error: Error) -> NSString' "$PLUGIN_SWIFT"
+grep -Fq 'case .userCancelled:' "$PLUGIN_SWIFT"
+grep -Fq 'case .networkError(_):' "$PLUGIN_SWIFT"
+grep -Fq 'public func restorePurchases() async -> NSString' "$PLUGIN_SWIFT"
+grep -Fq 'return "network_error"' "$PLUGIN_SWIFT"
+grep -Fq 'return "cancelled"' "$PLUGIN_SWIFT"
+grep -Fq 'restorePurchasesWithCompletionHandler:^(NSString *resultCode)' "$PLUGIN_IMPLEMENTATION"
+grep -Fq 'toGodotString(resultCode)' "$PLUGIN_IMPLEMENTATION"
+if grep -Fq 'restorePurchasesWithCompletionHandler:^(NSError *error)' "$PLUGIN_IMPLEMENTATION"; then
+  echo "Localized NSError restore bridge remains in StoreKit2 source: $PLUGIN_IMPLEMENTATION" >&2
+  exit 1
+fi
 if ! grep -Eq '^[[:space:]]*#[[:space:]]*define[[:space:]]+VARIANT_ENUM_CAST[[:space:]]*\(' "$GODOT_TYPE_INFO_HEADER"; then
   echo "Godot $GODOT_VERSION type_info.h does not define VARIANT_ENUM_CAST: $GODOT_TYPE_INFO_HEADER" >&2
   exit 1
@@ -217,6 +239,7 @@ echo "STOREKIT2_PATCHED_HEADER_END"
 echo "STOREKIT2_GODOT_COMPAT_PATCH_OK godot=$GODOT_VERSION include=core/variant/type_info.h count=$TYPE_INFO_INCLUDE_COUNT"
 echo "STOREKIT2_PRICE_BRIDGE_PATCH_OK method=request_product_price signal=product_price_received"
 echo "STOREKIT2_NUMERIC_PRICE_BRIDGE_OK conversion=NSDecimalNumber.doubleValue paths=product_info,product_price storefront=Storefront.current"
+echo "STOREKIT2_RESTORE_RESULT_BRIDGE_OK results=success,cancelled,network_error,failed localized_error_matching=false"
 
 PLUGIN_PROJECT="$PLUGIN_SOURCE/godot-storekit2.xcodeproj/project.pbxproj"
 python3 - "$PLUGIN_PROJECT" "$IOS_MIN_VERSION" <<'PY'

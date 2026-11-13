@@ -125,8 +125,74 @@ func _ready()->void:
 	var restore_mock:=MockClass.new();restore_mock.localized_prices=prices.duplicate(true);restore_mock.restore_entitlements={first_product:true,last_product:true}
 	var restore_service:=ServiceClass.new();add_child(restore_service);restore_service.configure(all_pots,{},restore_mock)
 	await get_tree().process_frame
+	var restore_results:Array[bool]=[]
+	restore_service.restore_finished.connect(func(success:bool)->void:restore_results.append(success))
 	assert(not restore_service.is_unlocked(first_product));assert(restore_service.restore_purchases())
 	assert(restore_mock.sync_calls==1 and restore_service.is_unlocked(first_product) and restore_service.is_unlocked(last_product) and not restore_service.restore_in_progress())
+	assert(restore_results==[true] and restore_service.restore_result_code()==restore_service.RESTORE_RESULT_SUCCESS)
+	# Duplicate native completion callbacks must not complete or refresh twice.
+	restore_mock.emit_sync_result("");assert(restore_results==[true])
+
+	# A successful sync with no purchases is still a completed history check.
+	var empty_restore_mock:=MockClass.new();empty_restore_mock.localized_prices=prices.duplicate(true)
+	var empty_restore_service:=ServiceClass.new();add_child(empty_restore_service);empty_restore_service.configure(all_pots,{},empty_restore_mock)
+	await get_tree().process_frame
+	var empty_restore_results:Array[bool]=[]
+	empty_restore_service.restore_finished.connect(func(success:bool)->void:empty_restore_results.append(success))
+	assert(empty_restore_service.restore_purchases())
+	assert(empty_restore_results==[true] and empty_restore_service.entitlements_snapshot().is_empty())
+
+	# StoreKit sync failures never become a success message. Stable native result
+	# codes keep cancellation and network errors independent of the device locale.
+	for failure_case in [
+		{"native_code":"cancelled","expected":ServiceClass.RESTORE_RESULT_CANCELLED},
+		{"native_code":"network_error","expected":ServiceClass.RESTORE_RESULT_NETWORK_ERROR},
+		{"native_code":"unexpected_storekit_error","expected":ServiceClass.RESTORE_RESULT_FAILED},
+	]:
+		var restore_failure_mock:=MockClass.new();restore_failure_mock.localized_prices=prices.duplicate(true);restore_failure_mock.sync_error=str(failure_case.native_code)
+		var restore_failure_service:=ServiceClass.new();add_child(restore_failure_service);restore_failure_service.configure(all_pots,{},restore_failure_mock)
+		await get_tree().process_frame
+		var failure_results:Array[bool]=[]
+		restore_failure_service.restore_finished.connect(func(success:bool)->void:failure_results.append(success))
+		assert(restore_failure_service.restore_purchases())
+		assert(failure_results==[false] and not restore_failure_service.restore_in_progress())
+		assert(restore_failure_service.restore_result_code()==str(failure_case.expected))
+
+	# A missing native callback and an incomplete entitlement refresh both time
+	# out, re-enable the restore action, and ignore a later stale callback.
+	var sync_timeout_mock:=MockClass.new();sync_timeout_mock.localized_prices=prices.duplicate(true);sync_timeout_mock.suppress_sync_response=true
+	var sync_timeout_service:=ServiceClass.new();add_child(sync_timeout_service);sync_timeout_service.configure(all_pots,{},sync_timeout_mock)
+	await get_tree().process_frame
+	var sync_timeout_results:Array[bool]=[]
+	sync_timeout_service.restore_finished.connect(func(success:bool)->void:sync_timeout_results.append(success))
+	assert(sync_timeout_service.restore_purchases() and sync_timeout_service.restore_in_progress())
+	assert(not sync_timeout_service.restore_purchases())
+	sync_timeout_service._on_restore_timeout(sync_timeout_service._restore_timeout_token)
+	assert(sync_timeout_results==[false] and not sync_timeout_service.restore_in_progress())
+	assert(sync_timeout_service.restore_result_code()==sync_timeout_service.RESTORE_RESULT_TIMEOUT)
+	sync_timeout_mock.emit_sync_result("");assert(sync_timeout_results==[false])
+
+	var refresh_timeout_mock:=MockClass.new();refresh_timeout_mock.localized_prices=prices.duplicate(true)
+	var refresh_timeout_service:=ServiceClass.new();add_child(refresh_timeout_service);refresh_timeout_service.configure(all_pots,{},refresh_timeout_mock)
+	await get_tree().process_frame
+	refresh_timeout_mock.suppress_product_info_response=true
+	var refresh_timeout_results:Array[bool]=[]
+	refresh_timeout_service.restore_finished.connect(func(success:bool)->void:refresh_timeout_results.append(success))
+	assert(refresh_timeout_service.restore_purchases() and refresh_timeout_service.restore_in_progress())
+	refresh_timeout_service._on_restore_timeout(refresh_timeout_service._restore_timeout_token)
+	assert(refresh_timeout_results==[false] and refresh_timeout_service.restore_result_code()==refresh_timeout_service.RESTORE_RESULT_TIMEOUT)
+
+	# A product lookup error after AppStore.sync() is not reported as a fully
+	# verified restore. Existing cached entitlements are not erased on the error.
+	var refresh_failure_mock:=MockClass.new();refresh_failure_mock.localized_prices=prices.duplicate(true);refresh_failure_mock.purchased[first_product]=true
+	var refresh_failure_service:=ServiceClass.new();add_child(refresh_failure_service);refresh_failure_service.configure(all_pots,{first_product:true},refresh_failure_mock)
+	await get_tree().process_frame
+	refresh_failure_mock.localized_prices.erase(last_product)
+	var refresh_failure_results:Array[bool]=[]
+	refresh_failure_service.restore_finished.connect(func(success:bool)->void:refresh_failure_results.append(success))
+	assert(refresh_failure_service.restore_purchases())
+	assert(refresh_failure_results==[false] and refresh_failure_service.is_unlocked(first_product))
+	assert(refresh_failure_service.restore_result_code()==refresh_failure_service.RESTORE_RESULT_FAILED)
 
 	# Production desktop/Web has no StoreKit bridge. It must never simulate a
 	# charge or invent a price; only the isolated test bridge above can do that.
@@ -164,7 +230,7 @@ func _ready()->void:
 	var all_paid_unlocks:Dictionary={}
 	for pot_value in paid:all_paid_unlocks[str((pot_value as Dictionary).iap_product_id)]=true
 	for locale in ["ja","hiragana","en"]:
-		for key in ["pot_not_owned","pot_iap_locked_short","pot_unlock_required","pot_permanent_unlock","pot_locked_puku_price","pot_unlock_success","iap_unlock_for_price","iap_price_loading","iap_purchase_unavailable","iap_restore_purchases","iap_restore_complete"]:assert(Localizer.text(locale,key)!=key)
+		for key in ["pot_not_owned","pot_iap_locked_short","pot_unlock_required","pot_permanent_unlock","pot_locked_puku_price","pot_unlock_success","iap_unlock_for_price","iap_price_loading","iap_purchase_unavailable","iap_restore_purchases","iap_restore_complete","iap_restore_failed","iap_restore_cancelled","iap_restore_network_failed","iap_restore_timeout"]:assert(Localizer.text(locale,key)!=key)
 		ui.configure([],[],all_pots,{},owned,[],200,1000,Callable(),Callable(),{},locale,2,{},service.product_states_snapshot(),false,false);ui.open_pot_shop();await get_tree().process_frame
 		for pot_value in paid:
 			var pot:Dictionary=pot_value;var pot_id:=str(pot.pot_id);var expected_price:=int(expected_prices[pot_id]);var locked_card:=_pot_shop_card(ui,pot_id);var locked_price:=locked_card.find_child("PotLockedPukuPrice",true,false) as Label

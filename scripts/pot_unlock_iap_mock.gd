@@ -4,7 +4,7 @@ extends RefCounted
 signal transaction_state_changed(transaction:Dictionary)
 signal product_info_received(product_info:Dictionary)
 signal product_price_received(product_price:Dictionary)
-signal synchronized
+signal synchronized(error:String)
 
 const TRANSACTION_PURCHASED := 3
 const TRANSACTION_RESTORED := 4
@@ -21,10 +21,14 @@ var purchase_calls:Array[String]=[]
 var requested_products:Array[String]=[]
 var requested_prices:Array[String]=[]
 var suppress_price_response:=false
+var suppress_product_info_response:=false
+var suppress_sync_response:=false
+var sync_error:=""
 var sync_calls:=0
 
 func request_product_info(product_id:String)->Signal:
 	requested_products.append(product_id)
+	if suppress_product_info_response:return product_info_received
 	if not localized_prices.has(product_id):
 		product_info_received.emit({"product_id":product_id,"error":"not_configured"})
 	else:
@@ -79,5 +83,8 @@ func sync()->Signal:
 		if not bool(restore_entitlements[product_id_value]):continue
 		purchased[product_id]=true
 		transaction_state_changed.emit({"error":"","product_id":product_id,"transaction_state":TRANSACTION_RESTORED})
-	synchronized.emit()
+	if not suppress_sync_response:synchronized.emit(sync_error)
 	return synchronized
+
+func emit_sync_result(error:String="")->void:
+	synchronized.emit(error)
