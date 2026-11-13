@@ -90,6 +90,7 @@ const SETTINGS_PANEL_VERTICAL_PADDING := 18.0
 const SETTINGS_CONTENT_DECORATION_MARGIN_HORIZONTAL := 6.0
 const SETTINGS_CONTENT_DECORATION_MARGIN_TOP := 4.0
 const SETTINGS_CONTENT_DECORATION_MARGIN_BOTTOM := 10.0
+const PRIVACY_POLICY_URL := "https://kotaro0505.github.io/puku-puku-taniku/privacy-policy/"
 const PUKU_GAUGE_FINISH_SPEED_SCALE := 0.5
 const FIRST_GET_MIN_REWARD_UNITS := 200
 const INITIAL_PUKU_CAPITAL_UNITS := 5000
@@ -640,6 +641,7 @@ var audio_manager: Node
 var audio_settings: Dictionary = {"bgm_enabled":true,"se_enabled":true,"bgm_volume":0.65,"se_volume":0.62}
 var show_growing_puku_preview := true
 var growing_puku_preview_toggle: Button
+var privacy_policy_button: Button
 var privacy_options_button: Button
 var harvest_puku_reward_slopes:Array[float]=[]
 var rain_visual: Control
@@ -1186,6 +1188,10 @@ func _on_privacy_options_requirement_changed(_required:bool)->void:
 
 func _on_privacy_options_form_finished(_succeeded:bool)->void:
 	_refresh_privacy_options_button()
+
+func _on_privacy_policy_pressed()->void:
+	var open_result:=OS.shell_open(PRIVACY_POLICY_URL)
+	if open_result!=OK:push_warning("Could not open the privacy policy URL (error %d)."%open_result)
 
 func _on_privacy_options_pressed()->void:
 	if privacy_options_button:privacy_options_button.disabled=true
@@ -4168,6 +4174,7 @@ func _build_settings(hud:Control)->void:
 	_add_audio_setting_controls(content,Localizer.text(language_code,"audio_bgm"),true)
 	_add_audio_setting_controls(content,Localizer.text(language_code,"audio_se"),false)
 	_add_growing_puku_preview_control(content)
+	privacy_policy_button=Button.new();privacy_policy_button.name="PrivacyPolicyButton";privacy_policy_button.text=Localizer.text(language_code,"privacy_policy");privacy_policy_button.custom_minimum_size=Vector2(370,58);_skin_button(privacy_policy_button,Color("#c7d6ad"),17);privacy_policy_button.pressed.connect(_on_privacy_policy_pressed);content.add_child(privacy_policy_button)
 	privacy_options_button=Button.new();privacy_options_button.name="PrivacyOptionsButton";privacy_options_button.text=Localizer.text(language_code,"privacy_settings");privacy_options_button.custom_minimum_size=Vector2(370,58);privacy_options_button.visible=false;privacy_options_button.disabled=true;_skin_button(privacy_options_button,Color("#c7d6ad"),17);privacy_options_button.pressed.connect(_on_privacy_options_pressed);content.add_child(privacy_options_button)
 	if _trial_dev_controls_enabled():
 		var habitat_test:=Button.new();habitat_test.name="HabitatDevOpen";habitat_test.text="開発用：通常原生地テスト";habitat_test.custom_minimum_size=Vector2(370,58);_skin_button(habitat_test,Color("#adcbb8"),16);habitat_test.pressed.connect(_open_habitat_dev);content.add_child(habitat_test)
@@ -4445,6 +4452,7 @@ func _apply_language_to_ui()->void:
 	var growing_preview_label:=find_child("GrowingPukuPreviewLabel",true,false) as Label
 	if growing_preview_label:growing_preview_label.text=Localizer.text(language_code,"growing_puku_preview_setting")
 	if growing_puku_preview_toggle:_apply_settings_toggle_style(growing_puku_preview_toggle,show_growing_puku_preview)
+	if privacy_policy_button:privacy_policy_button.text=Localizer.text(language_code,"privacy_policy")
 	if privacy_options_button:privacy_options_button.text=Localizer.text(language_code,"privacy_settings")
 	_update_plant_label_visibility_button()
 	if best_record_showcase:best_record_showcase.set_language(language_code)

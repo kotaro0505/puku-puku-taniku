@@ -15,7 +15,7 @@ func _ready() -> void:
 	_test_localized_copy()
 	await _test_language_ui_geometry(game)
 	await _test_settings_controls(game)
-	await _test_privacy_options_ui(game)
+	await _test_privacy_ui(game)
 	await _test_product_settings_layout()
 	_test_top_hud_and_speaker_geometry(game)
 	_test_shop_chatter_contract(game)
@@ -24,7 +24,7 @@ func _ready() -> void:
 	_test_progression_thresholds()
 	_test_phase_bgm_policy(game)
 	game._reset_progression_state()
-	print("PROGRESSION_UI_REVISION_SMOKE_OK copy=updated language_ui=fixed settings=content-sized+stable-toggles privacy_options=localized+state-gated panda_chatter=5 armadillo_chatter=5 habitat_button=always_plain arrangement=3+swipe forest=8 fusion=12 bgm=phase-aware migration=preserved")
+	print("PROGRESSION_UI_REVISION_SMOKE_OK copy=updated language_ui=fixed settings=content-sized+stable-toggles privacy_policy=localized+always-available privacy_options=localized+state-gated panda_chatter=5 armadillo_chatter=5 habitat_button=always_plain arrangement=3+swipe forest=8 fusion=12 bgm=phase-aware migration=preserved")
 	get_tree().quit()
 
 
@@ -80,6 +80,9 @@ func _test_localized_copy() -> void:
 	assert(Localizer.text("ja", "privacy_settings") == "プライバシー設定")
 	assert(Localizer.text("hiragana", "privacy_settings") == "ぷらいばしー せってい")
 	assert(Localizer.text("en", "privacy_settings") == "Privacy Settings")
+	assert(Localizer.text("ja", "privacy_policy") == "プライバシーポリシー")
+	assert(Localizer.text("hiragana", "privacy_policy") == "ぷらいばしー ぽりしー")
+	assert(Localizer.text("en", "privacy_policy") == "Privacy Policy")
 	assert(Localizer.text("ja", "fusion_lab_intro_armadillo_3") == "多肉植物同士をかけあわせて\n新たな品種を作れるよ！")
 	assert(Localizer.text("ja", "self_best", [12.3]) == "最大サイズ 12.3cm")
 	assert(Localizer.text("ja", "self_best_none") == "最大サイズ ー")
@@ -246,6 +249,7 @@ func _test_product_settings_layout() -> void:
 	_assert_settings_panel_centered(product_game.settings_overlay, panel)
 	assert(product_game.settings_content.alignment == BoxContainer.ALIGNMENT_BEGIN)
 	assert(product_game.settings_content.find_child("AudioSettingsNote", true, false) == null)
+	assert(product_game.privacy_policy_button != null and product_game.privacy_policy_button.visible and not product_game.privacy_policy_button.disabled)
 	for development_control_name in ["HabitatDevOpen", "OpeningStoryReplay", "StoryDevOpen", "ProgressionDevReset", "JellyDevOpen", "TrialDevGachaOpen", "CatalogPreviewDevOpen"]:
 		assert(product_game.settings_content.find_child(development_control_name, true, false) == null)
 	product_game.settings_overlay.visible = true
@@ -280,6 +284,7 @@ func _test_product_settings_layout() -> void:
 		_assert_settings_label_toggle_gap(se_label, se_toggle)
 		_assert_settings_label_toggle_gap(growing_label, growing_toggle)
 		_assert_button_decoration_inside_scroll(growing_toggle, product_game.settings_scroll, ["normal", "hover", "pressed", "hover_pressed", "focus", "disabled"])
+		_assert_button_decoration_inside_scroll(product_game.privacy_policy_button, product_game.settings_scroll, ["normal", "hover", "pressed"])
 		_assert_button_decoration_inside_scroll(product_game.settings_close_button, product_game.settings_scroll, ["normal", "hover", "pressed"])
 	product_game._set_language("ja")
 	await get_tree().process_frame
@@ -351,27 +356,39 @@ func _assert_settings_panel_centered(overlay: Control, panel: Control) -> void:
 	assert(panel_center.distance_to(overlay_center) <= 1.0, "settings panel is not centered: panel=%s overlay=%s" % [panel_center, overlay_center])
 
 
-func _test_privacy_options_ui(game: Node) -> void:
-	var button := game.find_child("PrivacyOptionsButton", true, false) as Button
-	assert(button != null)
-	assert(not button.visible and button.disabled)
+func _test_privacy_ui(game: Node) -> void:
+	var policy_button := game.find_child("PrivacyPolicyButton", true, false) as Button
+	var options_button := game.find_child("PrivacyOptionsButton", true, false) as Button
+	assert(policy_button != null and options_button != null)
+	assert(policy_button.visible and not policy_button.disabled)
+	assert(policy_button.get_index() < options_button.get_index())
+	assert(game.PRIVACY_POLICY_URL == "https://kotaro0505.github.io/puku-puku-taniku/privacy-policy/")
+	assert(policy_button.pressed.is_connected(Callable(game, "_on_privacy_policy_pressed")))
+	var main_source:=FileAccess.get_file_as_string("res://scripts/main.gd")
+	assert(main_source.contains("OS.shell_open(PRIVACY_POLICY_URL)"))
+	assert(not options_button.visible and options_button.disabled)
 	for locale in Localizer.SUPPORTED_LANGUAGES:
 		game.language_code = locale
 		game._apply_language_to_ui()
-		assert(button.text == Localizer.text(locale, "privacy_settings"))
+		assert(policy_button.text == Localizer.text(locale, "privacy_policy"))
+		assert(policy_button.visible and not policy_button.disabled)
+		assert(options_button.text == Localizer.text(locale, "privacy_settings"))
 	game.rewarded_ad_service._privacy_options_required = true
 	game.rewarded_ad_service._privacy_options_form_open = false
 	game._refresh_privacy_options_button()
 	await get_tree().process_frame
-	assert(button.visible and not button.disabled)
+	assert(policy_button.visible and not policy_button.disabled)
+	assert(options_button.visible and not options_button.disabled)
 	game.rewarded_ad_service._privacy_options_form_open = true
 	game._refresh_privacy_options_button()
-	assert(button.visible and button.disabled)
+	assert(policy_button.visible and not policy_button.disabled)
+	assert(options_button.visible and options_button.disabled)
 	game.rewarded_ad_service._privacy_options_form_open = false
 	game.rewarded_ad_service._privacy_options_required = false
 	game._refresh_privacy_options_button()
 	await get_tree().process_frame
-	assert(not button.visible and button.disabled)
+	assert(policy_button.visible and not policy_button.disabled)
+	assert(not options_button.visible and options_button.disabled)
 	game.language_code = "ja"
 	game._apply_language_to_ui()
 
