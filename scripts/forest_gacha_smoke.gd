@@ -126,6 +126,8 @@ func _visible_control_text(root:Node)->String:
 func _test_draw_rules(game)->void:
 	var test_rng:=RandomNumberGenerator.new();test_rng.seed=20260909
 	var unlocked:Dictionary={"base":true};var encountered:Dictionary={};var known:Dictionary={"colorata":true}
+	var shortcake_id:="sweets_strawberry_shortcake";var sweets_candidates:Array[Dictionary]=game.forest_gacha_system.eligible_species("sweets",true)
+	assert(sweets_candidates.any(func(entry:Dictionary)->bool:return str(entry.get("species_id",""))==shortcake_id),"catalog-only shortcake disappeared from the Forest Gacha acquisition route")
 	var pre_act_two_series:Array[Dictionary]=game.forest_gacha_system.eligible_series(false)
 	assert(pre_act_two_series.size()==1 and str(pre_act_two_series[0].get("series_id",""))=="base")
 	for original_entry in game.forest_gacha_system.eligible_species("base",false):

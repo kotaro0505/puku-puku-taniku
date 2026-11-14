@@ -58,6 +58,7 @@ func _test_max_size_record_is_silent(game)->void:
 func _test_fixed_point_and_harvest_curve(game)->void:
 	assert(game.PUKU_UNITS_PER_PUKU==1000)
 	assert(game.NORMAL_ROUND_COST_UNITS==1000 and game.FIRST_GET_MIN_REWARD_UNITS==200)
+	assert(game.DOUBLE_PUKU_REWARD_SPECIES_ID=="sweets_strawberry_shortcake")
 	assert(game.INITIAL_PUKU_CAPITAL_UNITS==5000)
 	for sample in [[0.0,0],[20.0,50],[30.0,120],[40.0,230],[50.0,360],[60.0,540],[70.0,800],[80.0,1390],[90.0,2430],[100.0,3750],[110.0,4980],[120.0,6000],[125.0,7570],[130.0,10320],[135.0,13600],[140.0,16990],[145.0,20270],[150.0,23320],[160.0,28570],[170.0,32710],[180.0,35950],[200.0,40700],[250.0,48650],[300.0,55490],[500.0,82500],[700.0,109500],[1000.0,150000]]:
 		assert(game._harvest_puku_reward_units(float(sample[0]),false)==int(sample[1]))
@@ -75,6 +76,13 @@ func _test_fixed_point_and_harvest_curve(game)->void:
 	assert(game._harvest_puku_curve_units(1100.0)-game._harvest_puku_curve_units(1000.0)<=14000.0)
 	assert(game._harvest_puku_reward_units(8.0,true)==200)
 	assert(game._harvest_puku_reward_units(50.0,true)==360)
+	assert(game._harvest_puku_reward_units(40.0,false,"colorata")==230)
+	assert(game._harvest_puku_reward_units(40.0,false,game.DOUBLE_PUKU_REWARD_SPECIES_ID)==460)
+	assert(game._harvest_puku_reward_units(8.0,true,game.DOUBLE_PUKU_REWARD_SPECIES_ID)==400)
+	var shortcake_entry:Dictionary=game._catalog_entry(game.DOUBLE_PUKU_REWARD_SPECIES_ID)
+	assert(str(shortcake_entry.get("name_ja",""))=="いちごショート")
+	assert(Localizer.species_name("ja",shortcake_entry)=="いちごショート")
+	assert(Localizer.species_name("hiragana",shortcake_entry)=="いちごしょーと")
 	game.puku_balance_units=100;assert(game._change_puku_balance(-200,"test",false,false)==-100 and game.puku_balance_units==0)
 	assert(game._puku_whole_count(4300)==4 and game._puku_fraction_units(4300)==300)
 	assert(game._format_puku_units(2700)=="2.70")
@@ -108,6 +116,10 @@ func _test_live_harvest_preview(game)->void:
 	assert(known.label.visible and known.label.size.x<170.0 and known.label.size.y<58.0 and known.label.get_global_rect().position.x>=0.0 and known.label.get_global_rect().end.x<=game.get_viewport().get_visible_rect().end.x)
 	game.species_get_counts.erase("colorata");known.set_meta("new_species_candidate",true);known.fast_forward_to_diameter(8.0);game._update_labels()
 	assert(known.label.text=="NEW！\n8.0 cm\n+0.20ぷくコイン")
+	game._spawn_specific_plant(game.DOUBLE_PUKU_REWARD_SPECIES_ID);var shortcake=game.plants.back();shortcake.jelly_checks_enabled=false;shortcake.set_meta("new_species_candidate",true);shortcake.fast_forward_to_diameter(8.0);game._update_labels()
+	assert(shortcake.label.text=="NEW！\n8.0 cm\n+0.40ぷくコイン","shortcake first-GET preview was not doubled exactly once: %s"%shortcake.label.text)
+	game.species_get_counts[game.DOUBLE_PUKU_REWARD_SPECIES_ID]=1;shortcake.set_meta("new_species_candidate",false);shortcake.fast_forward_to_diameter(40.0);game._update_labels()
+	assert(shortcake.label.text=="40.0 cm\n+0.46ぷくコイン","shortcake normal preview was not doubled exactly once: %s"%shortcake.label.text)
 	game.language_code="hiragana";game._update_labels();assert(known.label.text.ends_with("+0.20ぷくこいん"))
 	game.language_code="en";game._update_labels();assert(known.label.text.ends_with("+0.20 Puku Coins"))
 	game.language_code="ja";game._change_growing_puku_preview(false);game._update_labels();assert(known.label.text=="NEW！\n8.0 cm" and known.label.size.x<=92.1 and known.label.size.y<68.0 and game.growing_puku_preview_toggle.text.ends_with("OFF"),"OFF label did not compact text=%s size=%s toggle=%s"%[known.label.text,known.label.size,game.growing_puku_preview_toggle.text])
@@ -120,7 +132,7 @@ func _test_live_harvest_preview(game)->void:
 		assert(viewport_rect.encloses(rect))
 		assert(rect.end.y<=plant_screen.y-10.0 and rect.end.y>=plant_screen.y-48.0,"preview label drifted away from its plant")
 		occupied.append(rect)
-	game.play_active=false;game._clear_greenhouse_plants();game.show_growing_puku_preview=true
+	game.species_get_counts.erase(game.DOUBLE_PUKU_REWARD_SPECIES_ID);game.play_active=false;game._clear_greenhouse_plants();game.show_growing_puku_preview=true
 
 func _test_plant_label_visibility_toggle(game)->void:
 	game.language_code="ja";game._update_plant_label_visibility_button()
@@ -490,6 +502,13 @@ func _test_giant_harvest_reward(game)->void:
 		game._try_harvest(tap_point);await get_tree().process_frame;await get_tree().process_frame
 		assert(game.puku_balance_units==expected_units,"%.0fcm screen-tap harvest paid the wrong reward expected=%d actual=%d"%[target_cm,expected_units,game.puku_balance_units]);assert(is_equal_approx(float(game.bests.get("colorata",0.0)),target_cm),"giant screen-tap harvest did not preserve the %.0fcm record"%target_cm)
 		game._clear_greenhouse_plants();game._cancel_puku_gauge_animations()
+	game.species_get_counts[game.DOUBLE_PUKU_REWARD_SPECIES_ID]=1;game.puku_balance_units=0;game.bests.erase(game.DOUBLE_PUKU_REWARD_SPECIES_ID)
+	game._spawn_specific_plant(game.DOUBLE_PUKU_REWARD_SPECIES_ID);var shortcake=game.plants.back();shortcake.jelly_checks_enabled=false;shortcake.original_pos=Vector3(0,.12,0);shortcake.position=shortcake.original_pos;shortcake.fast_forward_to_diameter(40.0);game._update_labels()
+	var shortcake_expected_units:int=game._harvest_puku_reward_units(40.0,false,game.DOUBLE_PUKU_REWARD_SPECIES_ID);var shortcake_rect:Rect2=shortcake.screen_visual_rect(game.camera).intersection(game.get_viewport().get_visible_rect());var shortcake_tap:=_opaque_hit_point(shortcake,game.camera,shortcake_rect)
+	assert(shortcake_tap.x>-9999.0,"could not find a visible shortcake leaf for reward test")
+	game._try_harvest(shortcake_tap);await get_tree().process_frame;await get_tree().process_frame
+	assert(game.puku_balance_units==shortcake_expected_units and shortcake_expected_units==460,"shortcake harvest paid the wrong doubled reward expected=%d actual=%d"%[shortcake_expected_units,game.puku_balance_units])
+	game.species_get_counts.erase(game.DOUBLE_PUKU_REWARD_SPECIES_ID);game.bests.erase(game.DOUBLE_PUKU_REWARD_SPECIES_ID);game._clear_greenhouse_plants();game._cancel_puku_gauge_animations()
 	game.play_active=false;game.play_seed_animations_pending=0;game._clear_greenhouse_plants();game._cancel_puku_gauge_animations();game.puku_gauge_animation_speed_scale=1.0
 	for result_panel in game.effects_layer.find_children("HarvestResult","",true,false):result_panel.free()
 

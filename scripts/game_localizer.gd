@@ -2189,7 +2189,7 @@ const TEXT := {
 const HIRAGANA_NAMES := {
 	"pinwheel":"ぴんうぃーる", "colorata":"ころらーた", "laui":"らうい", "kannte":"かんて",
 	"transparent_succulent":"とうめいなぞたにく",
-	"sweets_strawberry_shortcake":"いちごしょーとたにく", "sweets_matcha_wafer":"まっちゃうえはーす",
+	"sweets_strawberry_shortcake":"いちごしょーと", "sweets_matcha_wafer":"まっちゃうえはーす",
 	"metal_silver_rosette":"きょうぎんろぜっと", "metal_cobalt_cluster":"るりはがねびーず", "metal_rose_copper":"ばらどうろぜっと",
 	"metal_gold_cluster":"おうごんつぶぶーけ", "metal_gunmetal_rosette":"くろがねろぜっと", "metal_iridescent_star":"にじはがねすたー",
 	"metal_silver_branch":"はくぎんぶらんち", "metal_obsidian_spike":"くろはがねすぱいく", "metal_sage_silver":"せいじぎんろぜっと", "metal_patina_copper":"ろくしょうどうろぜっと",

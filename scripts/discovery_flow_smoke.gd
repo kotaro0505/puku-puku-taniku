@@ -22,6 +22,7 @@ func _ready()->void:
 	assert(not bool(game.discovered.get("sweets_strawberry_shortcake",false)) and "sweets_strawberry_shortcake" in game.pending_round_new_species_ids)
 	game.play_active=false;game.greenhouse_round_followup_started=false;game._continue_after_greenhouse_round();await get_tree().process_frame
 	assert(bool(game.discovered.get("sweets_strawberry_shortcake",false)) and bool(game.greenhouse_available.get("sweets_strawberry_shortcake",false)))
+	assert(game._normal_seed_selection_pools().get("all_known",[]).any(func(entry:Dictionary)->bool:return str(entry.get("species_id",""))=="sweets_strawberry_shortcake"),"obtained catalog-only shortcake was not available to normal 12-seed play")
 	assert(bool(game.habitat_returned_species.get("sweets_strawberry_shortcake",false)))
 	assert("sweets_strawberry_shortcake" in game._habitat_population_candidate_ids())
 	game.rain_event_pending=false;game.rain_bonus_active=false;game._roll_rain_event();assert(not game.rain_event_pending and not game.rain_bonus_active)

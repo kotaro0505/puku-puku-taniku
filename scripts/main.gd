@@ -95,6 +95,7 @@ const SETTINGS_CONTENT_DECORATION_MARGIN_BOTTOM := 10.0
 const PRIVACY_POLICY_URL := "https://kotaro0505.github.io/puku-puku-taniku/privacy-policy/"
 const PUKU_GAUGE_FINISH_SPEED_SCALE := 0.5
 const FIRST_GET_MIN_REWARD_UNITS := 200
+const DOUBLE_PUKU_REWARD_SPECIES_ID := "sweets_strawberry_shortcake"
 const INITIAL_PUKU_CAPITAL_UNITS := 5000
 const LEGACY_PUKU_GAUGE_TARGET_CM := 500.0
 const LEGACY_PUKU_GAUGE_REWARD_UNITS := 3000
@@ -6094,9 +6095,10 @@ func _harvest_puku_curve_units(diameter_cm:float)->float:
 			return clampf(interpolated,left.y,right.y)
 	return 0.0
 
-func _harvest_puku_reward_units(diameter_cm:float,is_first_get:bool)->int:
+func _harvest_puku_reward_units(diameter_cm:float,is_first_get:bool,species_id:="")->int:
 	var rounded_units:=maxi(0,roundi(_harvest_puku_curve_units(diameter_cm)))
-	return maxi(FIRST_GET_MIN_REWARD_UNITS,rounded_units) if is_first_get else rounded_units
+	var normal_reward_units:=maxi(FIRST_GET_MIN_REWARD_UNITS,rounded_units) if is_first_get else rounded_units
+	return normal_reward_units*2 if species_id==DOUBLE_PUKU_REWARD_SPECIES_ID else normal_reward_units
 
 func _format_puku_units(units:int)->String:
 	return "%.2f"%(float(abs(units))/float(PUKU_UNITS_PER_PUKU))
@@ -9971,7 +9973,7 @@ func _update_labels()->void:
 		if not new_prefix.is_empty():lines.append(new_prefix.trim_suffix("\n"))
 		lines.append("%.1f cm"%p.diameter_cm)
 		if show_preview:
-			var reward_units:=_harvest_puku_reward_units(float(p.diameter_cm),_plant_is_first_get_for_puku(p))
+			var reward_units:=_harvest_puku_reward_units(float(p.diameter_cm),_plant_is_first_get_for_puku(p),str(p.data.get("species_id","")))
 			lines.append(Localizer.text(language_code,"growing_puku_preview",[_format_puku_units(reward_units)]))
 		var label_size:=_plant_label_size(p.label,lines,show_preview)
 		var screen:=_plant_label_anchor(p,viewport_rect);var r:=_plant_label_rect(screen,label_size,occupied,viewport_rect);occupied.append(r)
@@ -10378,7 +10380,7 @@ func _on_harvested(p)->void:
 	if play_active and active_seed_type!="old":
 		if not _is_endless_greenhouse_enabled():add_seed_pod_gauge_cm(harvested_diameter_cm,false,true)
 		elif _is_endless_normal_play() and puku_gauge_intro_complete and not story_dev_101:
-			harvest_reward_units=_harvest_puku_reward_units(harvested_diameter_cm,is_first_get_for_puku)
+			harvest_reward_units=_harvest_puku_reward_units(harvested_diameter_cm,is_first_get_for_puku,harvested_species_id)
 			_change_puku_balance(harvest_reward_units,"endless_harvest",false,true,harvested_screen_position)
 			endless_economy_harvest_count+=1;endless_economy_max_harvest_cm=maxf(endless_economy_max_harvest_cm,harvested_diameter_cm)
 	if play_active:StoryProgressionClass.record_greenhouse_harvest(story_progression_state,harvested_diameter_cm)
