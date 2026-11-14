@@ -955,6 +955,9 @@ func _request_close() -> void:
 		return
 	close_requested.emit()
 
+func is_ready_for_forced_interstitial_transition() -> bool:
+	return visible and main_page.visible and not picker_page.visible and not fusion_processing
+
 func _request_fusion() -> void:
 	if selected_a_id.is_empty() or selected_b_id.is_empty() or current_result.is_empty():
 		return

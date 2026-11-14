@@ -43,6 +43,20 @@ class FakeInterstitialRuntime:
 		return {"state":"READY" if available else "UNAVAILABLE","available":available}
 
 
+class FakeGachaSurface:
+	extends Control
+	var transition_ready := true
+
+	func is_ready_for_forced_interstitial_transition() -> bool:return transition_ready
+
+
+class FakeFusionSurface:
+	extends Control
+	var transition_ready := true
+
+	func is_ready_for_forced_interstitial_transition() -> bool:return transition_ready
+
+
 func _ready() -> void:
 	_test_counter_policy()
 	await _test_interstitial_lifecycle()
@@ -55,6 +69,24 @@ func _ready() -> void:
 
 func _test_counter_policy() -> void:
 	var policy := PolicyClass.new()
+	var presentation_actions:Array[int]=[]
+	policy.restore_counts(0,0)
+	for action_index in range(1,16):
+		var interval_due:=policy.record_success(PolicyClass.SOURCE_FOREST_GACHA)
+		assert(interval_due==(action_index%PolicyClass.DISPLAY_INTERVAL==0))
+		if interval_due:
+			assert(policy.consume_transition_candidate(PolicyClass.SOURCE_FOREST_GACHA))
+			presentation_actions.append(action_index);policy.mark_presented()
+	assert(presentation_actions==[5,10,15],"gacha interstitial cadence changed: %s"%[presentation_actions])
+	var fusion_presentation_actions:Array[int]=[]
+	policy.restore_counts(0,0)
+	for action_index in range(1,16):
+		var interval_due:=policy.record_success(PolicyClass.SOURCE_FUSION_LAB)
+		assert(interval_due==(action_index%PolicyClass.DISPLAY_INTERVAL==0))
+		if interval_due:
+			assert(policy.consume_transition_candidate(PolicyClass.SOURCE_FUSION_LAB))
+			fusion_presentation_actions.append(action_index);policy.mark_presented()
+	assert(fusion_presentation_actions==[5,10,15],"fusion interstitial cadence changed: %s"%[fusion_presentation_actions])
 	policy.restore_counts(0, 0)
 	for draw_index in range(1, PolicyClass.DISPLAY_INTERVAL):
 		assert(not policy.record_success(PolicyClass.SOURCE_FOREST_GACHA))
@@ -184,6 +216,21 @@ func _test_main_transition_regression() -> void:
 	assert(game._try_present_forced_interstitial(PolicyClass.SOURCE_FOREST_GACHA))
 	assert(runtime.present_count==1 and runtime.last_context==PolicyClass.SOURCE_FOREST_GACHA)
 
+	# The originating surface is allowed only after its result flow has returned
+	# to an idle main page. Other sources and busy result states remain blocked.
+	var gacha_surface:=FakeGachaSurface.new();gacha_surface.visible=true;game.forest_gacha_ui=gacha_surface
+	assert(game._forced_interstitial_transition_block_reason()=="gacha_open")
+	assert(game._forced_interstitial_transition_block_reason(PolicyClass.SOURCE_FOREST_GACHA).is_empty())
+	gacha_surface.transition_ready=false
+	assert(game._forced_interstitial_transition_block_reason(PolicyClass.SOURCE_FOREST_GACHA)=="gacha_busy")
+	gacha_surface.visible=false
+	var fusion_surface:=FakeFusionSurface.new();fusion_surface.visible=true;game.fusion_lab_ui=fusion_surface
+	assert(game._forced_interstitial_transition_block_reason()=="fusion_open")
+	assert(game._forced_interstitial_transition_block_reason(PolicyClass.SOURCE_FUSION_LAB).is_empty())
+	fusion_surface.transition_ready=false
+	assert(game._forced_interstitial_transition_block_reason(PolicyClass.SOURCE_FUSION_LAB)=="fusion_busy")
+	fusion_surface.visible=false;game.forest_gacha_ui=null;game.fusion_lab_ui=null;gacha_surface.free();fusion_surface.free()
+
 	# A story that actually owns the foreground skips exactly this due event and
 	# never reappears after the story is closed.
 	game.forced_interstitial_policy.restore_counts(4,0)
@@ -245,6 +292,9 @@ func _test_integration_contracts() -> void:
 	assert(main_source.contains('_record_forced_interstitial_success(ForcedInterstitialPolicyClass.SOURCE_FUSION_LAB)'))
 	assert(main_source.contains('_schedule_forced_interstitial_transition(ForcedInterstitialPolicyClass.SOURCE_FOREST_GACHA)'))
 	assert(main_source.contains('_schedule_forced_interstitial_transition(ForcedInterstitialPolicyClass.SOURCE_FUSION_LAB)'))
+	assert(main_source.contains('forest_gacha_ui.resume_after_species_reveal()'))
+	assert(main_source.contains('func _resume_fusion_lab_after_get()'))
+	assert(main_source.contains('_forced_interstitial_transition_block_reason(source)'))
 	assert(main_source.contains('_try_present_forced_interstitial(source)'))
 	assert(main_source.contains('internal_forced_ad_diagnostic_button.name="InternalForcedAdDiagnosticButton"'))
 	assert(not main_source.contains('if not str(StoryProgressionClass.peek_story_event(story_progression_state)).is_empty():return false'))

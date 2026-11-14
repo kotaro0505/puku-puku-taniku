@@ -4707,7 +4707,7 @@ func _refresh_fusion_lab_result()->void:
 	_request_species_texture(result_entry,fusion_lab_ui.result_image,true)
 
 func _perform_fusion(parent_a_id:String,parent_b_id:String)->void:
-	if fusion_system==null or fusion_lab_ui==null or fusion_in_progress:return
+	if fusion_system==null or fusion_lab_ui==null or fusion_in_progress or _forced_interstitial_presentation_active():return
 	if not fusion_system.parents_are_owned(parent_a_id,parent_b_id,species_get_counts):
 		fusion_lab_ui.show_error(Localizer.text(language_code,"fusion_parent_missing"));return
 	var resolution:Dictionary=fusion_system.resolve(parent_a_id,parent_b_id)
@@ -4752,6 +4752,7 @@ func _resume_fusion_lab_after_get()->void:
 	fusion_lab_ui.open_lab(fusion_system.eligible_parents(species_get_counts),species_get_counts,"","",species_picker_series_catalog)
 	fusion_lab_ui.move_to_front()
 	_update_play_ui()
+	_schedule_forced_interstitial_transition(ForcedInterstitialPolicyClass.SOURCE_FUSION_LAB)
 
 func _open_forest_gacha()->void:
 	if forest_gacha_ui==null or not forest_gacha_unlocked or play_active or arrangement_scene_active or not _tutorial_fully_complete():return
@@ -4859,6 +4860,9 @@ func _close_forest_gacha()->void:
 
 func _spin_forest_gacha()->void:
 	if forest_gacha_ui==null or not forest_gacha_ui.visible or forest_gacha_ui.is_busy():return
+	if _forced_interstitial_presentation_active():
+		forest_gacha_ui.cancel_spin_feedback()
+		return
 	if forest_gacha_preview_mode:
 		if not _trial_dev_controls_enabled():forest_gacha_ui.cancel_spin_feedback();return
 		if forest_gacha_preview_puku_points<FOREST_GACHA_SPIN_COST:forest_gacha_ui.cancel_spin_feedback();return
@@ -4956,7 +4960,7 @@ func _try_present_forced_interstitial(source:String)->bool:
 	# Determine whether this exact screen transition is safe before consuming the
 	# fifth-use candidate. The previous ordering silently erased the opportunity
 	# before we could identify a queued-but-not-active story event.
-	var block_reason:=_forced_interstitial_transition_block_reason()
+	var block_reason:=_forced_interstitial_transition_block_reason(source)
 	if not block_reason.is_empty():
 		forced_interstitial_policy.discard_transition_candidate(source)
 		forced_ad_last_decision="skipped_unsafe";forced_ad_last_block_reason=block_reason;_refresh_internal_forced_ad_diagnostics();return false
@@ -4973,10 +4977,10 @@ func _try_present_forced_interstitial(source:String)->bool:
 	forced_ad_last_decision="show_requested";forced_ad_last_block_reason="";_refresh_internal_forced_ad_diagnostics()
 	return true
 
-func _forced_interstitial_transition_safe()->bool:
-	return _forced_interstitial_transition_block_reason().is_empty()
+func _forced_interstitial_transition_safe(source:String="")->bool:
+	return _forced_interstitial_transition_block_reason(source).is_empty()
 
-func _forced_interstitial_transition_block_reason()->String:
+func _forced_interstitial_transition_block_reason(source:String="")->String:
 	if current_mode!="greenhouse":return "wrong_mode"
 	if play_active:return "gameplay_active"
 	if arrangement_scene_active or arrangement_transitioning:return "arrangement_active"
@@ -4999,8 +5003,12 @@ func _forced_interstitial_transition_block_reason()->String:
 	if (puku_puku_battle and puku_puku_battle.visible):return "battle"
 	if (species_get_overlay and species_get_overlay.visible):return "get_card"
 	if (catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible):return "catalog_unlock"
-	if (forest_gacha_ui and forest_gacha_ui.visible):return "gacha_open"
-	if (fusion_lab_ui and fusion_lab_ui.visible):return "fusion_open"
+	if forest_gacha_ui and forest_gacha_ui.visible:
+		if source!=ForcedInterstitialPolicyClass.SOURCE_FOREST_GACHA:return "gacha_open"
+		if not forest_gacha_ui.is_ready_for_forced_interstitial_transition():return "gacha_busy"
+	if fusion_lab_ui and fusion_lab_ui.visible:
+		if source!=ForcedInterstitialPolicyClass.SOURCE_FUSION_LAB:return "fusion_open"
+		if fusion_in_progress or fusion_return_pending or not fusion_lab_ui.is_ready_for_forced_interstitial_transition():return "fusion_busy"
 	if (result_overlay and result_overlay.visible):return "result_overlay"
 	if (play_overlay and play_overlay.visible):return "play_overlay"
 	if (shop_overlay and shop_overlay.visible):return "shop_open"
@@ -5013,6 +5021,9 @@ func _forced_interstitial_transition_block_reason()->String:
 	if (story_dev_panel and story_dev_panel.visible):return "story_dev"
 	if (internal_forced_ad_diagnostic_overlay and internal_forced_ad_diagnostic_overlay.visible):return "diagnostics_open"
 	return ""
+
+func _forced_interstitial_presentation_active()->bool:
+	return interstitial_ad_service!=null and interstitial_ad_service.has_method("is_showing") and bool(interstitial_ad_service.is_showing())
 
 func _unlock_forest_gacha_series(series_id:String,_species_id:String)->void:
 	if forest_gacha_ui==null or not forest_gacha_ui.visible:return
@@ -5335,9 +5346,11 @@ func _continue_after_species_get_card(context:String)->void:
 				if close_foreground_for_story:
 					forest_gacha_ui.close_gacha();forest_gacha_preview_mode=false;forest_gacha_trial_dev_mode=false;_play_current_area_bgm();_update_play_ui()
 				else:forest_gacha_ui.resume_after_species_reveal()
+				_schedule_forced_interstitial_transition(ForcedInterstitialPolicyClass.SOURCE_FOREST_GACHA)
 		"fusion_lab":
 			if close_foreground_for_story:
 				if fusion_lab_ui:fusion_lab_ui.visible=false
+				_schedule_forced_interstitial_transition(ForcedInterstitialPolicyClass.SOURCE_FUSION_LAB)
 			else:
 				followup_started=true
 				call_deferred("_resume_fusion_lab_after_get")

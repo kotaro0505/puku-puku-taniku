@@ -62,6 +62,7 @@ const TERMINAL_TIER2_EXACT_RECIPES := [
 	["hyb_sweets_yumekawa", "hyb_sweets_forest_amber", "fus2_cosmos_montblanc", "yumekawa"],
 	["hyb_metal_sweets", "hyb_sweets_sea", "fus2_warm_cacao", "sweets"],
 ]
+
 const TIER2_SERIES_RECIPES := [
 	["fus1_diving_sphere", "glow", "glow_emerald_rosette", "fus2_deep_sea_light"],
 	["fus1_sunset_jelly", "stone", "stone_black_lava_rosette", "fus2_sunset_stone"],
@@ -76,6 +77,15 @@ const TIER3_EXACT_RECIPES := [
 	["fus2_abyss_glass", "lutea", "fus3_lagoon_lutea", "sea"],
 	["fus2_sunset_stone", "colorata", "fus3_heart_of_magma", "stone"],
 ]
+
+class FakeInterstitialRuntime:
+	extends RefCounted
+	var present_count:=0
+	var last_context:=""
+	var showing:=false
+	func try_present(context:String)->bool:present_count+=1;last_context=context;showing=true;return true
+	func diagnostic_snapshot()->Dictionary:return {"state":"READY","available":true}
+	func is_showing()->bool:return showing
 
 func _ready() -> void:
 	var game = load("res://main.tscn").instantiate()
@@ -1335,6 +1345,8 @@ func _test_terminal_tier2_discovery_flow(game) -> void:
 
 func _test_tier3_game_flow(game) -> void:
 	game._reset_progression_state()
+	game.opening_finished=true
+	game.opening_overlay.visible=false
 	game.story_progression_state["fusion_lab_unlocked"] = true
 	game.story_progression_state["fusion_lab_intro_seen"] = true
 	game.opening_story_complete = true
@@ -1370,6 +1382,10 @@ func _test_tier3_game_flow(game) -> void:
 	assert(not game.fusion_in_progress and game.puku_points == 11)
 	assert(game._species_get_count(result_id) == 0)
 	assert(game.fusion_lab_ui.result_status_label.text == Localizer.text("ja", "not_enough_puku"))
+	var original_interstitial_service=game.interstitial_ad_service
+	var fake_interstitial:=FakeInterstitialRuntime.new()
+	game.interstitial_ad_service=fake_interstitial
+	game.forced_interstitial_policy.restore_counts(0,4)
 	game.puku_points = 12
 	game._perform_fusion(parent_a_id, parent_b_id)
 	assert(game.fusion_in_progress and game.puku_points == 0)
@@ -1380,6 +1396,7 @@ func _test_tier3_game_flow(game) -> void:
 	assert(not game.fusion_in_progress)
 	assert(game.fusion_lab_ui.result_name_label.text == "ハート・オブ・マグマ")
 	assert(game.species_get_overlay.visible and game.species_get_overlay.name_label.text == "ハート・オブ・マグマ")
+	assert(fake_interstitial.present_count==0,"interstitial interrupted the fusion result or GET card")
 	assert(bool(game.discovered.get(result_id, false)) and bool(game.greenhouse_available.get(result_id, false)))
 	assert(bool(game.unlocked_series.get("fusion_tier3", false)))
 	game.species_get_overlay.busy = false
@@ -1387,7 +1404,9 @@ func _test_tier3_game_flow(game) -> void:
 	await get_tree().create_timer(.22).timeout
 	await get_tree().process_frame
 	await get_tree().process_frame
+	assert(fake_interstitial.present_count==1 and fake_interstitial.last_context=="fusion_lab","fifth-fusion interstitial was not requested after the GET card closed decision=%s block=%s policy=%s active_context=%s queue=%d return_pending=%s"%[game.forced_ad_last_decision,game.forced_ad_last_block_reason,game.forced_interstitial_policy.diagnostic_snapshot(),game.species_get_active_context,game.species_get_queue.size(),game.fusion_return_pending])
 	assert(game.fusion_lab_ui.visible)
+	assert(game.fusion_lab_ui.is_ready_for_forced_interstitial_transition(),"lab was not ready for the next fusion after the interstitial request")
 	assert(game.fusion_parent_a_id.is_empty() and game.fusion_parent_b_id.is_empty())
 	assert(game.fusion_lab_ui.selected_a_id.is_empty() and game.fusion_lab_ui.selected_b_id.is_empty())
 	assert(game.fusion_lab_ui.parent_a_image.texture == null and game.fusion_lab_ui.parent_b_image.texture == null)
@@ -1397,6 +1416,12 @@ func _test_tier3_game_flow(game) -> void:
 	assert(not game.fusion_lab_ui.result_new_label.visible)
 	assert(not game.fusion_lab_ui.fusion_cost_label.visible)
 	assert(game.fusion_lab_ui.fuse_button.disabled)
+	var status_while_ad_showing:String=str(game.fusion_lab_ui.result_status_label.text)
+	var balance_while_ad_showing:int=int(game.puku_points)
+	game._perform_fusion(parent_a_id,parent_b_id)
+	assert(game.puku_points==balance_while_ad_showing and game.fusion_lab_ui.result_status_label.text==status_while_ad_showing,"a new fusion started behind the interstitial")
+	fake_interstitial.showing=false
+	game.interstitial_ad_service=original_interstitial_service
 	game._close_fusion_lab()
 	game._save()
 	game.discovered.erase(result_id)

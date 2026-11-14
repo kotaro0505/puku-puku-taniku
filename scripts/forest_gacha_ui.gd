@@ -265,6 +265,9 @@ func _request_close()->void:
 func is_open()->bool:return visible
 func is_busy()->bool:return busy or capsule_ready or result_overlay.visible
 
+func is_ready_for_forced_interstitial_transition()->bool:
+	return visible and not busy and not _spin_feedback_active and not capsule_ready and not result_overlay.visible and pending_result.is_empty()
+
 func _skin_button(button:Button,background:Color,font_size:int)->void:
 	button.add_theme_font_size_override("font_size",font_size);button.add_theme_color_override("font_color",UI_BROWN if background.get_luminance()>.55 else Color.WHITE);button.add_theme_color_override("font_hover_color",UI_BROWN);button.add_theme_stylebox_override("normal",_box(background,background.lightened(.22),20,3));button.add_theme_stylebox_override("hover",_box(background.lightened(.08),Color.WHITE,20,3));button.add_theme_stylebox_override("pressed",_box(background.darkened(.08),background.lightened(.2),20,3));button.add_theme_stylebox_override("disabled",_box(background.darkened(.28),Color(.55,.48,.36,.65),20,2))
 

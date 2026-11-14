@@ -3,6 +3,15 @@ extends Node
 const Localizer=preload("res://scripts/game_localizer.gd")
 const ForestGachaSystemClass=preload("res://scripts/forest_gacha_system.gd")
 
+class FakeInterstitialRuntime:
+	extends RefCounted
+	var present_count:=0
+	var last_context:=""
+	var showing:=false
+	func try_present(context:String)->bool:present_count+=1;last_context=context;showing=true;return true
+	func diagnostic_snapshot()->Dictionary:return {"state":"READY","available":true}
+	func is_showing()->bool:return showing
+
 func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
 	await get_tree().process_frame;await get_tree().process_frame
@@ -357,6 +366,8 @@ func _test_jurejure_species_gate(game)->void:
 
 func _test_spin_capsule_and_reveal(game)->void:
 	game.puku_points=9;game.forest_gacha_draw_count=0;game.forest_gacha_encountered.clear();game.discovered={"colorata":true};game.greenhouse_available={"colorata":true};game.unlocked_species=game.greenhouse_available.duplicate(true);game.unlocked_series={"base":true};game.story_progression_state["fantasy_unlocked"]=true;game.story_progression_state["pending_story_events"]=[];game.fantasy_first_discovery_seen=true;game.fantasy_realization_seen=true;game._apply_saved_unlocks();game.forest_gacha_ui.animation_time_scale=1.0
+	game.opening_finished=true;game.opening_overlay.visible=false
+	var original_interstitial_service=game.interstitial_ad_service;var fake_interstitial:=FakeInterstitialRuntime.new();game.interstitial_ad_service=fake_interstitial;game.forced_interstitial_policy.restore_counts(4,0)
 	var locked_seed:=-1
 	for seed_value in range(1,100):
 		var probe:=RandomNumberGenerator.new();probe.seed=seed_value
@@ -390,10 +401,17 @@ func _test_spin_capsule_and_reveal(game)->void:
 	var profile_totals:Array[int]=[];profile_totals.append(game.gacha_capsule_profile_total_msec)
 	assert(await _wait_until(func()->bool:return not game.species_get_overlay.busy,900));await game.species_get_overlay.close_overlay();await get_tree().process_frame
 	assert(not game.species_get_overlay.visible and game.catalog_series_unlock_overlay.visible and game.scripted_dialog_kind.is_empty())
+	assert(fake_interstitial.present_count==0,"interstitial interrupted the series-unlock follow-up")
 	assert(game.catalog_series_unlock_overlay.title_label.text=="図鑑ページ解放！" and game.catalog_series_unlock_overlay.message_label.text.contains(game._catalog_series_notice_name(game._series_entry(series_id))))
 	assert(str(game.catalog_cover_species.get(series_id,""))==species_id)
 	assert(game.catalog_series_unlock_overlay.cover_image.texture!=null and game.catalog_series_unlock_overlay.cover_image.texture.resource_path==str(game._catalog_entry(species_id).get("image_path","")))
 	game.catalog_series_unlock_overlay.busy=false;await game.catalog_series_unlock_overlay.close_overlay();await get_tree().process_frame
+	assert(await _wait_until(func()->bool:return fake_interstitial.present_count==1,900),"fifth-draw interstitial was not requested after the completed GET flow decision=%s block=%s policy=%s story=%s"%[game.forced_ad_last_decision,game.forced_ad_last_block_reason,game.forced_interstitial_policy.diagnostic_snapshot(),game.StoryProgressionClass.peek_story_event(game.story_progression_state)])
+	assert(fake_interstitial.last_context=="forest_gacha" and game.forest_gacha_ui.visible and game.forest_gacha_ui.is_ready_for_forced_interstitial_transition(),"gacha did not remain ready for draw six after the interstitial request")
+	var count_while_ad_showing:int=game.forest_gacha_draw_count;game.forest_gacha_ui._request_spin()
+	assert(await _wait_until(func()->bool:return not game.forest_gacha_ui._spin_feedback_active,900))
+	assert(game.forest_gacha_draw_count==count_while_ad_showing and game.forest_gacha_pending_commit.is_empty(),"a new gacha started behind the interstitial")
+	fake_interstitial.showing=false
 	assert(not game.catalog_series_unlock_overlay.visible and not game.forest_gacha_ui.busy and game.puku_balance_units==first_balance_after_spin_units)
 	# Measure all three consecutive openings at production animation speed. Each
 	# second call verifies that duplicate spin/reveal input still cannot charge or
@@ -422,6 +440,7 @@ func _test_spin_capsule_and_reveal(game)->void:
 	print("GACHA_CAPSULE_SMOKE normal_speed run1_ms=",profile_totals[0]," run2_ms=",profile_totals[1]," run3_ms=",profile_totals[2])
 	game._close_forest_gacha()
 	game.puku_balance_units=2000;var previous_count:int=game.forest_gacha_draw_count;game._open_forest_gacha();assert(game.forest_gacha_ui.spin_button.disabled);game._spin_forest_gacha();assert(game.forest_gacha_draw_count==previous_count and game.puku_balance_units==2000 and game.forest_gacha_pending_commit.is_empty());game._close_forest_gacha()
+	game.interstitial_ad_service=original_interstitial_service
 
 func _test_repeated_price_debit(game)->void:
 	game.forest_gacha_pending_commit.clear();game.puku_points=115;game.forest_gacha_draw_count=0
