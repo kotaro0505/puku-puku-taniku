@@ -13,6 +13,7 @@ from configure_att_localizations import ATT_USAGE_DESCRIPTION_EN
 
 SAMPLE_IOS_APP_ID = "ca-app-pub-3940256099942544~1458002511"
 SAMPLE_IOS_REWARDED_ID = "ca-app-pub-3940256099942544/1712485313"
+SAMPLE_IOS_INTERSTITIAL_ID = "ca-app-pub-3940256099942544/4411468910"
 APP_ID_PATTERN = re.compile(r"^ca-app-pub-[0-9]{16}~[0-9]{10}$")
 AD_UNIT_PATTERN = re.compile(r"^ca-app-pub-[0-9]{16}/[0-9]{10}$")
 # The plugin writes this value into the base Info.plist. Keep an English-only
@@ -38,16 +39,24 @@ def main() -> None:
     if mode == "production":
         app_id = os.environ.get("ADMOB_IOS_APP_ID", "").strip()
         rewarded_id = os.environ.get("ADMOB_IOS_REWARDED_AD_UNIT_ID", "").strip()
+        interstitial_id = os.environ.get("ADMOB_IOS_INTERSTITIAL_AD_UNIT_ID", "").strip()
         if not APP_ID_PATTERN.fullmatch(app_id):
             fail("ADMOB_IOS_APP_ID is missing or malformed")
         if not AD_UNIT_PATTERN.fullmatch(rewarded_id):
             fail("ADMOB_IOS_REWARDED_AD_UNIT_ID is missing or malformed")
-        if app_id == SAMPLE_IOS_APP_ID or rewarded_id == SAMPLE_IOS_REWARDED_ID:
+        if not AD_UNIT_PATTERN.fullmatch(interstitial_id):
+            fail("ADMOB_IOS_INTERSTITIAL_AD_UNIT_ID is missing or malformed")
+        if (
+            app_id == SAMPLE_IOS_APP_ID
+            or rewarded_id == SAMPLE_IOS_REWARDED_ID
+            or interstitial_id == SAMPLE_IOS_INTERSTITIAL_ID
+        ):
             fail("Production builds must not use Google's sample AdMob IDs")
         is_real = "true"
     else:
         app_id = SAMPLE_IOS_APP_ID
         rewarded_id = SAMPLE_IOS_REWARDED_ID
+        interstitial_id = SAMPLE_IOS_INTERSTITIAL_ID
         is_real = "false"
 
     export_config = Path("addons/AdmobPlugin/ios_export.cfg")
@@ -81,6 +90,7 @@ def main() -> None:
                 "[ios]",
                 f'mode="{mode}"',
                 f'rewarded_ad_unit_id="{rewarded_id}"',
+                f'interstitial_ad_unit_id="{interstitial_id}"',
                 "",
             ]
         ),

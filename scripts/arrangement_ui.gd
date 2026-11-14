@@ -67,6 +67,8 @@ var pot_design_unlocks:Dictionary={}
 var pot_iap_products:Dictionary={}
 var pot_restore_available:=false
 var pot_restore_in_progress:=false
+var forced_ads_removal_product_id:=""
+var forced_ads_removed:=false
 var share_background_catalog:Array=[]
 var share_background_unlocks:Dictionary={}
 var texture_resolver:Callable
@@ -235,7 +237,7 @@ void fragment() {
 func _exit_tree()->void:
 	_remove_web_multitouch_fallback()
 
-func configure(species_data:Array,series_data:Array,pots_data:Array,discovery:Dictionary,purchased_pots:Dictionary,arrangements:Array,capacity:int,puku_points:int,resolver:Callable,requester:Callable=Callable(),best_records:Dictionary={},locale:String="ja",sales_stage:int=0,design_unlocks:Dictionary={},iap_products:Dictionary={},restore_available:bool=false,restore_in_progress:bool=false,share_backgrounds:Array=[],background_unlocks:Dictionary={},picker_series_data:Array=[])->void:
+func configure(species_data:Array,series_data:Array,pots_data:Array,discovery:Dictionary,purchased_pots:Dictionary,arrangements:Array,capacity:int,puku_points:int,resolver:Callable,requester:Callable=Callable(),best_records:Dictionary={},locale:String="ja",sales_stage:int=0,design_unlocks:Dictionary={},iap_products:Dictionary={},restore_available:bool=false,restore_in_progress:bool=false,share_backgrounds:Array=[],background_unlocks:Dictionary={},picker_series_data:Array=[],ads_removed:bool=false,ads_removal_product_id:String="")->void:
 	var next_picker_signature:=_species_picker_signature(species_data,discovery)
 	if next_picker_signature!=picker_card_signature:
 		_clear_species_picker_cache()
@@ -258,6 +260,8 @@ func configure(species_data:Array,series_data:Array,pots_data:Array,discovery:Di
 	pot_iap_products=iap_products
 	pot_restore_available=restore_available
 	pot_restore_in_progress=restore_in_progress
+	forced_ads_removed=ads_removed
+	forced_ads_removal_product_id=ads_removal_product_id
 	share_background_catalog=share_backgrounds.duplicate(true)
 	share_background_unlocks=background_unlocks.duplicate(true)
 	if visible and is_share_editor_active() and _share_background_panel_is_open():_refresh_share_background_panel()
@@ -301,8 +305,8 @@ func sync_catalog_state(purchased_catalogs:Dictionary,puku_points:int)->void:
 	if visible and shop_page.visible:_refresh_pot_shop()
 	if visible and catalog_shop_page.visible:_refresh_catalog_shop()
 
-func sync_pot_iap_state(design_unlocks:Dictionary,iap_products:Dictionary,restore_available:bool,restore_in_progress:bool)->void:
-	pot_design_unlocks=design_unlocks;pot_iap_products=iap_products;pot_restore_available=restore_available;pot_restore_in_progress=restore_in_progress
+func sync_pot_iap_state(design_unlocks:Dictionary,iap_products:Dictionary,restore_available:bool,restore_in_progress:bool,ads_removed:bool=false,ads_removal_product_id:String="")->void:
+	pot_design_unlocks=design_unlocks;pot_iap_products=iap_products;pot_restore_available=restore_available;pot_restore_in_progress=restore_in_progress;forced_ads_removed=ads_removed;forced_ads_removal_product_id=ads_removal_product_id
 	if visible and shop_page.visible:_refresh_pot_shop()
 	if visible and home_page.visible:_refresh_home()
 
@@ -1626,7 +1630,7 @@ func _build_shop_page()->void:
 
 func _refresh_pot_shop()->void:
 	shop_wallet.text=GameLocalizer.text(language_code,"wallet",[wallet_puku_points])
-	shop_restore_button.visible=_has_visible_iap_pots()
+	shop_restore_button.visible=_has_visible_iap_products()
 	shop_restore_button.text=GameLocalizer.text(language_code,"iap_restore_processing" if pot_restore_in_progress else "iap_restore_purchases")
 	shop_restore_button.disabled=not pot_restore_available or pot_restore_in_progress
 	_refresh_pot_shop_cards()
@@ -1634,6 +1638,7 @@ func _refresh_pot_shop()->void:
 func _refresh_pot_shop_cards()->void:
 	_prune_pot_purchase_feedback()
 	_clear_children(shop_grid)
+	if not forced_ads_removal_product_id.is_empty():_build_forced_ads_removal_card()
 	for pot_value in pot_catalog:
 		if not pot_value is Dictionary:continue
 		var pot:Dictionary=pot_value
@@ -1668,6 +1673,25 @@ func _refresh_pot_shop_cards()->void:
 		if design_unlocked:
 			_build_pot_purchase_feedback(content)
 			if pot_purchase_feedback.has(pot_id):_show_pot_purchase_feedback(content,pot,pot_purchase_feedback[pot_id])
+
+func _build_forced_ads_removal_card()->void:
+	var card:=PanelContainer.new();card.name="ForcedAdsRemovalCard";card.custom_minimum_size=Vector2(504,210);card.mouse_filter=Control.MOUSE_FILTER_PASS;card.clip_contents=true;card.add_theme_stylebox_override("panel",_box(Color("#f4e1bc"),Color("#9b6a48"),20,3));shop_grid.add_child(card)
+	var content:=Control.new();content.custom_minimum_size=Vector2(484,190);content.mouse_filter=Control.MOUSE_FILTER_PASS;content.clip_contents=true;card.add_child(content)
+	var title:=Label.new();title.name="ForcedAdsRemovalTitle";title.text=GameLocalizer.text(language_code,"forced_ads_removal_name");title.position=Vector2(16,8);title.size=Vector2(452,38);title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;title.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;title.add_theme_font_size_override("font_size",22);title.add_theme_color_override("font_color",UI_BROWN);content.add_child(title)
+	var description:=Label.new();description.name="ForcedAdsRemovalDescription";description.text=GameLocalizer.text(language_code,"forced_ads_removal_description");description.position=Vector2(22,47);description.size=Vector2(440,78);description.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;description.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;description.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;description.add_theme_font_size_override("font_size",14);description.add_theme_color_override("font_color",Color("#79543a"));content.add_child(description)
+	var product_state:Dictionary=pot_iap_products.get(forced_ads_removal_product_id,{"status":"loading","localized_price":""})
+	var status:=str(product_state.get("status","loading"));var localized_price:=str(product_state.get("localized_price","")).strip_edges();var button_text:="";var button_enabled:=false
+	if forced_ads_removed:
+		button_text=GameLocalizer.text(language_code,"forced_ads_removal_owned")
+	else:
+		match status:
+			"available":button_text=GameLocalizer.text(language_code,"forced_ads_removal_buy",[localized_price]);button_enabled=not localized_price.is_empty()
+			"purchasing":button_text=GameLocalizer.text(language_code,"iap_purchase_processing")
+			"loading":button_text=GameLocalizer.text(language_code,"iap_price_loading")
+			_:button_text=GameLocalizer.text(language_code,"iap_purchase_unavailable")
+	var buy:=_button(button_text,Vector2(76,130),Vector2(332,54),Color("#d7aa64") if button_enabled else Color("#b9a17d"),17);buy.name="ForcedAdsRemovalBuyButton";_prepare_scroll_button(buy);buy.disabled=not button_enabled
+	if button_enabled:buy.pressed.connect(_request_pot_unlock.bind(forced_ads_removal_product_id))
+	content.add_child(buy)
 
 func _prune_pot_purchase_feedback()->void:
 	var now:=Time.get_ticks_msec()
@@ -1723,7 +1747,8 @@ func _request_pot_unlock(product_id:String)->void:
 func _request_pot_restore()->void:
 	pot_restore_requested.emit()
 
-func _has_visible_iap_pots()->bool:
+func _has_visible_iap_products()->bool:
+	if not forced_ads_removal_product_id.is_empty():return true
 	for pot_value in pot_catalog:
 		if pot_value is Dictionary and _pot_sales_stage_unlocked(pot_value) and str(pot_value.get("unlock_type","free"))=="iap_unlock":return true
 	return false

@@ -3,9 +3,12 @@ extends Control
 
 signal preset_requested(preset_id: String)
 signal spawn_101_requested
+signal reset_requested
 signal close_requested
 
 const StoryDevPresetsClass = preload("res://scripts/story_dev_presets.gd")
+
+var allow_species_spawn := false
 
 
 func _ready() -> void:
@@ -62,7 +65,7 @@ func _build_ui() -> void:
 
 	var preset_scroll := ScrollContainer.new()
 	preset_scroll.name = "StoryPresetScroll"
-	preset_scroll.custom_minimum_size = Vector2(430, 560)
+	preset_scroll.custom_minimum_size = Vector2(430, 490)
 	preset_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	preset_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	preset_scroll.scroll_deadzone = 12
@@ -86,9 +89,13 @@ func _build_ui() -> void:
 	var divider := HSeparator.new()
 	divider.custom_minimum_size = Vector2(410, 12)
 	content.add_child(divider)
-	var spawn_button := _button("101cmコロラータ生成", "StoryDevSpawn101", Color("#d9c27d"))
-	spawn_button.pressed.connect(func(): spawn_101_requested.emit())
-	content.add_child(spawn_button)
+	if allow_species_spawn:
+		var spawn_button := _button("101cmコロラータ生成", "StoryDevSpawn101", Color("#d9c27d"))
+		spawn_button.pressed.connect(func(): spawn_101_requested.emit())
+		content.add_child(spawn_button)
+	var reset_button := _button("進行を初期状態へ戻す", "StoryDevReset", Color("#d9c49d"))
+	reset_button.pressed.connect(func(): reset_requested.emit())
+	content.add_child(reset_button)
 
 	var close_button := _button("閉じる", "StoryDevClose", Color("#ead8b1"))
 	close_button.pressed.connect(close)

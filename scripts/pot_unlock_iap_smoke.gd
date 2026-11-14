@@ -78,6 +78,23 @@ func _ready()->void:
 	assert(str(service.product_states_snapshot()[first_product].status)==service.STATUS_AVAILABLE)
 	assert(service.purchase(first_product));assert(service.is_unlocked(first_product) and mock.purchase_calls.size()==1)
 	assert(not service.purchase(first_product) and mock.purchase_calls.size()==1)
+	# The forced-ad removal is the 37th independent non-consumable. It shares the
+	# StoreKit purchase/entitlement/restore bridge without changing any pot ID.
+	var forced_ads_product_id:="forced_ads_removal"
+	var all_product_prices:=prices.duplicate(true);all_product_prices[forced_ads_product_id]="€0,99"
+	var extra_mock:=MockClass.new();extra_mock.localized_prices=all_product_prices.duplicate(true)
+	var extra_service:=ServiceClass.new();add_child(extra_service);extra_service.configure(all_pots,{},extra_mock,null,[forced_ads_product_id])
+	await get_tree().process_frame
+	assert(extra_mock.requested_products.size()==37)
+	assert(str(extra_service.product_states_snapshot()[forced_ads_product_id].localized_price)=="€0,99")
+	assert(extra_service.purchase(forced_ads_product_id))
+	assert(extra_service.is_unlocked(forced_ads_product_id))
+	assert(extra_mock.purchase_calls==[forced_ads_product_id])
+	var extra_restore_mock:=MockClass.new();extra_restore_mock.localized_prices=all_product_prices.duplicate(true);extra_restore_mock.restore_entitlements={forced_ads_product_id:true}
+	var extra_restore_service:=ServiceClass.new();add_child(extra_restore_service);extra_restore_service.configure(all_pots,{},extra_restore_mock,null,[forced_ads_product_id])
+	await get_tree().process_frame
+	assert(extra_restore_service.restore_purchases())
+	assert(extra_restore_service.is_unlocked(forced_ads_product_id))
 	var failure_mock:=MockClass.new();failure_mock.localized_prices=prices.duplicate(true);failure_mock.next_purchase_error="declined"
 	var failure_service:=ServiceClass.new();add_child(failure_service);failure_service.configure(all_pots,{},failure_mock)
 	await get_tree().process_frame
@@ -208,6 +225,12 @@ func _ready()->void:
 	var capture_card:=_pot_shop_card(ui,"g1_crystal_goblet")
 	var capture_buy_button:=capture_card.find_child("PotBuyButton",true,false) as Button
 	assert(capture_buy_button.text==Localizer.text("ja","iap_unlock_for_price",["$0.49"]))
+	ui.configure([],[],all_pots,{},owned,[],20,5,Callable(),Callable(),{},"ja",2,{},extra_service.product_states_snapshot(),true,false,[],{},[],true,forced_ads_product_id)
+	ui.open_pot_shop();await get_tree().process_frame
+	var forced_ads_card:=ui.find_child("ForcedAdsRemovalCard",true,false)
+	var forced_ads_buy:=ui.find_child("ForcedAdsRemovalBuyButton",true,false) as Button
+	assert(forced_ads_card!=null and forced_ads_buy!=null)
+	assert(forced_ads_buy.text==Localizer.text("ja","forced_ads_removal_owned") and forced_ads_buy.disabled)
 	ui.configure([],[],all_pots,{},owned,[],20,5,Callable(),Callable(),{},"ja",0,{},service.product_states_snapshot(),false,false)
 	ui.open_pot_shop();assert(ui.shop_grid.get_child_count()==8 and not ui.shop_restore_button.visible)
 	ui.configure([],[],all_pots,{},owned,[],20,5,Callable(),Callable(),{},"ja",1,{},service.product_states_snapshot(),false,false)
@@ -230,7 +253,7 @@ func _ready()->void:
 	var all_paid_unlocks:Dictionary={}
 	for pot_value in paid:all_paid_unlocks[str((pot_value as Dictionary).iap_product_id)]=true
 	for locale in ["ja","hiragana","en"]:
-		for key in ["pot_not_owned","pot_iap_locked_short","pot_unlock_required","pot_permanent_unlock","pot_locked_puku_price","pot_unlock_success","iap_unlock_for_price","iap_price_loading","iap_purchase_unavailable","iap_restore_purchases","iap_restore_complete","iap_restore_failed","iap_restore_cancelled","iap_restore_network_failed","iap_restore_timeout"]:assert(Localizer.text(locale,key)!=key)
+		for key in ["pot_not_owned","pot_iap_locked_short","pot_unlock_required","pot_permanent_unlock","pot_locked_puku_price","pot_unlock_success","iap_unlock_for_price","iap_price_loading","iap_purchase_unavailable","iap_restore_purchases","iap_restore_complete","iap_restore_failed","iap_restore_cancelled","iap_restore_network_failed","iap_restore_timeout","forced_ads_removal_name","forced_ads_removal_description","forced_ads_removal_owned","forced_ads_removal_success"]:assert(Localizer.text(locale,key)!=key)
 		ui.configure([],[],all_pots,{},owned,[],200,1000,Callable(),Callable(),{},locale,2,{},service.product_states_snapshot(),false,false);ui.open_pot_shop();await get_tree().process_frame
 		for pot_value in paid:
 			var pot:Dictionary=pot_value;var pot_id:=str(pot.pot_id);var expected_price:=int(expected_prices[pot_id]);var locked_card:=_pot_shop_card(ui,pot_id);var locked_price:=locked_card.find_child("PotLockedPukuPrice",true,false) as Label
@@ -243,7 +266,7 @@ func _ready()->void:
 	for source_path in ["res://data/pot-iap-catalog.json","res://scripts/pot_unlock_iap_service.gd","res://scripts/arrangement_ui.gd","res://scripts/main.gd"]:
 		var source:=FileAccess.get_file_as_string(source_path);assert(not "100円" in source and not "¥100" in source)
 	assert(not FileAccess.file_exists("res://scripts/secret_gacha_system.gd"))
-	print("POT_UNLOCK_IAP_SMOKE_OK initial=",initial.size()," group_1=",group_1_count," group_2=",group_2_count," official_prices=36 localized_display=ja-hiragana-en localized_price=€0,99 restore=true safe_preview=true")
+	print("POT_UNLOCK_IAP_SMOKE_OK initial=",initial.size()," group_1=",group_1_count," group_2=",group_2_count," official_pot_prices=36 non_consumables=37 localized_display=ja-hiragana-en localized_price=€0,99 restore=true safe_preview=true")
 	get_tree().quit()
 
 func _read_array(path:String)->Array:

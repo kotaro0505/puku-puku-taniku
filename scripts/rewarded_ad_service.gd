@@ -7,6 +7,8 @@ signal presentation_started
 signal presentation_finished
 signal privacy_options_requirement_changed(required: bool)
 signal privacy_options_form_finished(succeeded: bool)
+signal mobile_ads_initialized(admob)
+signal ad_request_permission_changed(can_request_ads: bool)
 
 const BuildProfileClass = preload("res://scripts/build_profile.gd")
 const AdmobClass = preload("res://addons/AdmobPlugin/Admob.gd")
@@ -19,6 +21,7 @@ const UNKNOWN_SDK_ERROR_CODE := -1
 const AD_MODE_PRODUCTION := "production"
 const AD_MODE_TEST := "test"
 const TEST_REWARDED_ID := "ca-app-pub-3940256099942544/1712485313"
+const TEST_INTERSTITIAL_ID := "ca-app-pub-3940256099942544/4411468910"
 const AD_UNIT_PATTERN := "^ca-app-pub-[0-9]{16}/[0-9]{10}$"
 
 enum State {
@@ -91,6 +94,18 @@ func is_privacy_options_required() -> bool:
 
 func is_privacy_options_form_open() -> bool:
 	return _privacy_options_form_open
+
+
+func mobile_ads_is_initialized() -> bool:
+	return _initialized and _admob != null
+
+
+func shared_admob():
+	return _admob if _initialized else null
+
+
+func is_full_screen_presentation_active() -> bool:
+	return state == State.SHOWING or _presentation_active
 
 
 func diagnostic_snapshot() -> Dictionary:
@@ -217,6 +232,10 @@ func _start_if_supported() -> void:
 	if rewarded_id.is_empty():
 		_mark_unavailable("rewarded_id_missing")
 		return
+	var interstitial_id := str(mobile_ads_config.get("interstitial_ad_unit_id", ""))
+	if interstitial_id.is_empty():
+		_mark_unavailable("interstitial_id_missing")
+		return
 
 	_admob = AdmobClass.new()
 	_admob.is_real = _ads_mode == AD_MODE_PRODUCTION
@@ -228,6 +247,7 @@ func _start_if_supported() -> void:
 	_admob.under_age_of_consent = AdmobConfigClass.TagForUnderAgeOfConsent.UNSPECIFIED
 	_admob.first_party_id_enabled = false
 	_admob.personalization_state = AdmobConfigClass.PersonalizationState.DISABLED
+	_admob.remove_interstitial_ads_after_displayed = true
 	_att_required = (
 		BuildProfileClass.is_app_store_release()
 		and not BuildProfileClass.iap_review_capture_enabled()
@@ -235,8 +255,10 @@ func _start_if_supported() -> void:
 	_admob.att_enabled = _att_required
 	if _admob.is_real:
 		_admob.ios_real_rewarded_id = rewarded_id
+		_admob.ios_real_interstitial_id = interstitial_id
 	else:
 		_admob.ios_debug_rewarded_id = rewarded_id
+		_admob.ios_debug_interstitial_id = interstitial_id
 
 	_admob.initialization_completed.connect(_on_initialization_completed)
 	_admob.rewarded_ad_loaded.connect(_on_rewarded_ad_loaded)
@@ -274,6 +296,7 @@ func _load_mobile_ads_config() -> Dictionary:
 		return {}
 	var mode := str(config.get_value("ios", "mode", "")).strip_edges().to_lower()
 	var rewarded_id := str(config.get_value("ios", "rewarded_ad_unit_id", "")).strip_edges()
+	var interstitial_id := str(config.get_value("ios", "interstitial_ad_unit_id", "")).strip_edges()
 	if mode not in [AD_MODE_PRODUCTION, AD_MODE_TEST]:
 		_mobile_ads_config_failure_reason = "mobile_ads_mode_invalid"
 		return {}
@@ -283,7 +306,17 @@ func _load_mobile_ads_config() -> Dictionary:
 	if not _valid_rewarded_id(rewarded_id, mode):
 		_mobile_ads_config_failure_reason = "rewarded_id_invalid"
 		return {}
-	return {"mode": mode, "rewarded_ad_unit_id": rewarded_id}
+	if interstitial_id.is_empty():
+		_mobile_ads_config_failure_reason = "interstitial_id_missing"
+		return {}
+	if not _valid_interstitial_id(interstitial_id, mode):
+		_mobile_ads_config_failure_reason = "interstitial_id_invalid"
+		return {}
+	return {
+		"mode": mode,
+		"rewarded_ad_unit_id": rewarded_id,
+		"interstitial_ad_unit_id": interstitial_id,
+	}
 
 
 func _valid_rewarded_id(rewarded_id: String, mode: String) -> bool:
@@ -295,6 +328,17 @@ func _valid_rewarded_id(rewarded_id: String, mode: String) -> bool:
 	if regex.compile(AD_UNIT_PATTERN) != OK:
 		return false
 	return regex.search(rewarded_id) != null
+
+
+func _valid_interstitial_id(interstitial_id: String, mode: String) -> bool:
+	if mode == AD_MODE_TEST:
+		return interstitial_id == TEST_INTERSTITIAL_ID
+	if interstitial_id == TEST_INTERSTITIAL_ID:
+		return false
+	var regex := RegEx.new()
+	if regex.compile(AD_UNIT_PATTERN) != OK:
+		return false
+	return regex.search(interstitial_id) != null
 
 
 func _request_consent_update() -> void:
@@ -424,6 +468,7 @@ func _on_privacy_options_form_dismissed(error_data = null) -> void:
 	_refresh_privacy_options_requirement()
 	var succeeded:bool=error_data == null or (error_data is Dictionary and error_data.is_empty())
 	if succeeded and _admob != null and _admob.can_request_ads():
+		ad_request_permission_changed.emit(true)
 		# A consent change must affect the next request. Discard an ad loaded
 		# under the previous choice and request a fresh one.
 		if _initialized:
@@ -433,6 +478,7 @@ func _on_privacy_options_form_dismissed(error_data = null) -> void:
 		else:
 			_initialize_ads_after_att()
 	elif succeeded:
+		ad_request_permission_changed.emit(false)
 		if _admob != null and _initialized and _admob.is_rewarded_ad_loaded():
 			_admob.remove_rewarded_ad()
 		_mark_unavailable("consent_disallows_ads")
@@ -545,6 +591,7 @@ func _on_initialization_completed(_status_data = null) -> void:
 	last_failure_stage = ""
 	last_failure_code = UNKNOWN_SDK_ERROR_CODE
 	_log_diagnostic("initialization_completed")
+	mobile_ads_initialized.emit(_admob)
 	_load_rewarded_ad()
 
 
@@ -793,7 +840,7 @@ func _diagnostic_stage_code(reason: String, stage: String) -> String:
 		return "CONFIG-PARSE"
 	if reason == "mobile_ads_mode_invalid":
 		return "CONFIG-MODE"
-	if reason in ["rewarded_id_missing", "rewarded_id_invalid"]:
+	if reason in ["rewarded_id_missing", "rewarded_id_invalid", "interstitial_id_missing", "interstitial_id_invalid"]:
 		return "CONFIG-ID"
 	if reason == "production_ads_in_development":
 		return "CONFIG-PROFILE"

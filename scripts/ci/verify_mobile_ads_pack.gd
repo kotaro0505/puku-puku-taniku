@@ -2,6 +2,7 @@ extends SceneTree
 
 const CONFIG_PATH := "res://data/mobile-ads.cfg"
 const TEST_REWARDED_ID := "ca-app-pub-3940256099942544/1712485313"
+const TEST_INTERSTITIAL_ID := "ca-app-pub-3940256099942544/4411468910"
 const AD_UNIT_PATTERN := "^ca-app-pub-[0-9]{16}/[0-9]{10}$"
 
 
@@ -32,11 +33,15 @@ func _init() -> void:
 		return
 	var mode := str(config.get_value("ios", "mode", "")).strip_edges().to_lower()
 	var rewarded_id := str(config.get_value("ios", "rewarded_ad_unit_id", "")).strip_edges()
+	var interstitial_id := str(config.get_value("ios", "interstitial_ad_unit_id", "")).strip_edges()
 	if mode != expected_mode:
 		_fail("config.mode", "exported mode does not match the workflow mode")
 		return
 	if not _valid_rewarded_id(rewarded_id, expected_mode):
 		_fail("config.rewarded_id", "exported rewarded ID is missing, malformed, or for the wrong mode")
+		return
+	if not _valid_interstitial_id(interstitial_id, expected_mode):
+		_fail("config.interstitial_id", "exported interstitial ID is missing, malformed, or for the wrong mode")
 		return
 
 	print("MOBILE_ADS_PACK_OK mode=%s path=%s" % [expected_mode, CONFIG_PATH])
@@ -52,6 +57,17 @@ func _valid_rewarded_id(rewarded_id: String, mode: String) -> bool:
 	if regex.compile(AD_UNIT_PATTERN) != OK:
 		return false
 	return regex.search(rewarded_id) != null
+
+
+func _valid_interstitial_id(interstitial_id: String, mode: String) -> bool:
+	if mode == "test":
+		return interstitial_id == TEST_INTERSTITIAL_ID
+	if interstitial_id == TEST_INTERSTITIAL_ID:
+		return false
+	var regex := RegEx.new()
+	if regex.compile(AD_UNIT_PATTERN) != OK:
+		return false
+	return regex.search(interstitial_id) != null
 
 
 func _fail(check: String, detail: String) -> void:

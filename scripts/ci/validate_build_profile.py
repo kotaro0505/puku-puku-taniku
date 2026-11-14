@@ -54,6 +54,20 @@ def main() -> None:
             "display_name": PRODUCTION_DISPLAY_NAME,
             "forbidden": [
                 "puku_iap_review_capture",
+                "puku_internal_test_story_jump",
+                "puku_development",
+                "puku_rewarded_ad_stub",
+                "puku_ios_test_ads",
+            ],
+        },
+        "internal_test": {
+            "preset": "iOS Internal Test",
+            "features": "puku_app_store_release,puku_internal_test_story_jump",
+            "bundle": PRODUCTION_BUNDLE,
+            "display_name_setting": "config/name",
+            "display_name": PRODUCTION_DISPLAY_NAME,
+            "forbidden": [
+                "puku_iap_review_capture",
                 "puku_development",
                 "puku_rewarded_ad_stub",
                 "puku_ios_test_ads",
@@ -66,6 +80,7 @@ def main() -> None:
             "display_name_setting": "config/name.puku_iap_review_capture",
             "display_name": IAP_REVIEW_CAPTURE_DISPLAY_NAME,
             "forbidden": [
+                "puku_internal_test_story_jump",
                 "puku_development",
                 "puku_rewarded_ad_stub",
                 "puku_ios_test_ads",
@@ -78,12 +93,13 @@ def main() -> None:
             "forbidden": [
                 "puku_app_store_release",
                 "puku_iap_review_capture",
+                "puku_internal_test_story_jump",
                 "puku_rewarded_ad_stub",
             ],
         },
     }
     if len(sys.argv) != 2 or sys.argv[1] not in profiles:
-        fail("usage: validate_build_profile.py app_store|iap_review_capture|development")
+        fail("usage: validate_build_profile.py app_store|internal_test|iap_review_capture|development")
     profile = sys.argv[1]
     presets = parse_presets(Path("export_presets.cfg").read_text(encoding="utf-8"))
     profile_config = profiles[profile]
@@ -177,6 +193,8 @@ def main() -> None:
         "scripts/build_profile.gd",
         "scripts/iap_review_capture.gd",
         "scripts/rewarded_ad_service.gd",
+        "scripts/interstitial_ad_service.gd",
+        "scripts/forced_interstitial_policy.gd",
         "scripts/story_dev_presets.gd",
         "tools/.gdignore",
     ]:
@@ -250,6 +268,9 @@ def main() -> None:
         "first_party_id_enabled = false",
         "personalization_state = AdmobConfigClass.PersonalizationState.DISABLED",
         "att_enabled = _att_required",
+        "remove_interstitial_ads_after_displayed = true",
+        "ios_real_interstitial_id = interstitial_id",
+        "ios_debug_interstitial_id = interstitial_id",
     ]:
         if required_setting not in ad_service_source:
             fail(f"Rewarded-ad privacy setting is missing: {required_setting}")
@@ -290,6 +311,8 @@ def main() -> None:
         'att_setting not in {"true", "false"}',
         "ATT_USAGE_DESCRIPTION",
         "ATT_USAGE_DESCRIPTION_EN",
+        "ADMOB_IOS_INTERSTITIAL_AD_UNIT_ID",
+        "SAMPLE_IOS_INTERSTITIAL_ID",
     ]:
         if required_att_configuration not in config_source:
             fail(f"Generated mobile-ads ATT configuration is missing: {required_att_configuration}")
@@ -335,6 +358,7 @@ def main() -> None:
         "ProjectSettings.load_resource_pack(pack_path, true)",
         'expected_mode not in ["test", "production"]',
         "MOBILE_ADS_PACK_OK",
+        "interstitial_ad_unit_id",
     ]:
         if required_pack_check not in pack_validator_source:
             fail(f"Exported mobile-ads pack validation is missing: {required_pack_check}")
@@ -419,6 +443,12 @@ def main() -> None:
         fail("Test-ad TestFlight workflow must remain internal-testing-only")
     if 'IOS_ATT_ENABLED: "true"' not in testflight_block:
         fail("Internal TestFlight must enable ATT")
+    for required_internal_setting in [
+        'BUILD_PROFILE: "internal_test"',
+        'GODOT_IOS_PRESET: "iOS Internal Test"',
+    ]:
+        if required_internal_setting not in testflight_block:
+            fail(f"Internal TestFlight story-jump separation is missing: {required_internal_setting}")
     if 'MOBILE_ADS_MODE: "production"' not in release_block or "admob_production" not in release_block:
         fail("App Store release must load production AdMob secrets")
     if 'APP_STORE_SUBMISSION: "true"' not in release_block:

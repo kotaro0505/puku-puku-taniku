@@ -50,7 +50,7 @@ var _restore_result_code:=RESTORE_RESULT_IDLE
 var _restore_pending_product_ids:Dictionary={}
 var _restore_timeout_token:=0
 
-func configure(pots:Array,cached_entitlements:Dictionary={},test_bridge:Variant=null,price_only_products:Variant=null)->void:
+func configure(pots:Array,cached_entitlements:Dictionary={},test_bridge:Variant=null,price_only_products:Variant=null,extra_product_ids:Variant=null)->void:
 	_product_ids.clear()
 	_product_states.clear()
 	_entitlements.clear()
@@ -76,6 +76,11 @@ func configure(pots:Array,cached_entitlements:Dictionary={},test_bridge:Variant=
 		_product_ids.append(product_id)
 		_product_states[product_id]={"status":STATUS_LOADING,"localized_price":"","error":""}
 		if bool(cached_entitlements.get(product_id,false)):_entitlements[product_id]=true
+	for extra_product_id in _normalize_product_ids(extra_product_ids):
+		if _product_ids.has(extra_product_id):continue
+		_product_ids.append(extra_product_id)
+		_product_states[extra_product_id]={"status":STATUS_LOADING,"localized_price":"","error":""}
+		if bool(cached_entitlements.get(extra_product_id,false)):_entitlements[extra_product_id]=true
 	for requested_product_id in _price_only_product_ids:
 		if not _product_ids.has(requested_product_id):
 			_mark_all_unavailable("capture_product_unknown")
@@ -250,6 +255,10 @@ func _on_product_price_received(price:Dictionary)->void:
 
 
 func _normalize_price_only_product_ids(value:Variant)->Array[String]:
+	return _normalize_product_ids(value)
+
+
+func _normalize_product_ids(value:Variant)->Array[String]:
 	var normalized:Array[String]=[]
 	var candidates:Array=[]
 	if typeof(value)==TYPE_STRING:

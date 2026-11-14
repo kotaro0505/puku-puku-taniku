@@ -152,15 +152,18 @@ func _ready() -> void:
 	var fake_rewarded := FakeRewardedAdmob.new()
 	var cycle_results: Array[Dictionary] = []
 	var presentation_events: Array[String] = []
+	var initialized_admob_instances:Array=[]
 	cycle_service._admob = fake_rewarded
 	cycle_service.reward_finished.connect(func(context: String, earned: bool) -> void:
 		cycle_results.append({"context": context, "earned": earned})
 	)
 	cycle_service.presentation_started.connect(func() -> void:presentation_events.append("started"))
 	cycle_service.presentation_finished.connect(func() -> void:presentation_events.append("finished"))
+	cycle_service.mobile_ads_initialized.connect(func(admob) -> void:initialized_admob_instances.append(admob))
 	add_child(cycle_service)
 	cycle_service.state = ServiceClass.State.INITIALIZING
 	cycle_service._on_initialization_completed()
+	assert(initialized_admob_instances==[fake_rewarded])
 	assert(cycle_service.state == ServiceClass.State.LOADING)
 	assert(cycle_service.is_preparing())
 	assert(cycle_service.user_diagnostic_code() == "ADS-WAIT-LOAD")
@@ -342,14 +345,18 @@ func _ready() -> void:
 		["mobile_ads_config_load_failed", "ADS-CONFIG-PARSE"],
 		["mobile_ads_mode_invalid", "ADS-CONFIG-MODE"],
 		["rewarded_id_invalid", "ADS-CONFIG-ID"],
+		["interstitial_id_invalid", "ADS-CONFIG-ID"],
 		["production_ads_in_development", "ADS-CONFIG-PROFILE"],
 	]:
 		service._mark_unavailable(str(config_case[0]))
 		assert(service.user_diagnostic_code() == str(config_case[1]))
 	assert(service._valid_rewarded_id(ServiceClass.TEST_REWARDED_ID, ServiceClass.AD_MODE_TEST))
 	assert(not service._valid_rewarded_id(ServiceClass.TEST_REWARDED_ID, ServiceClass.AD_MODE_PRODUCTION))
+	assert(service._valid_interstitial_id(ServiceClass.TEST_INTERSTITIAL_ID, ServiceClass.AD_MODE_TEST))
+	assert(not service._valid_interstitial_id(ServiceClass.TEST_INTERSTITIAL_ID, ServiceClass.AD_MODE_PRODUCTION))
 	var fake_production_id := "ca-app-pub-" + "1".repeat(16) + "/" + "2".repeat(10)
 	assert(service._valid_rewarded_id(fake_production_id, ServiceClass.AD_MODE_PRODUCTION))
+	assert(service._valid_interstitial_id(fake_production_id, ServiceClass.AD_MODE_PRODUCTION))
 	assert(not JSON.stringify(service.diagnostic_snapshot()).contains("ca-app-pub"))
 
 	# Unsupported editor/Web or untouched upstream binaries must fail closed

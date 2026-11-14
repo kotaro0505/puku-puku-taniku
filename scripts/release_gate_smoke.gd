@@ -17,10 +17,12 @@ func _ready() -> void:
 
 	assert(not game._trial_dev_controls_enabled())
 	assert(game.story_dev_panel == null)
+	assert(game.internal_story_jump_button == null)
 	assert(game.habitat_dev_panel == null)
 	assert(game.jelly_dev_overlay == null)
 	assert(game.catalog_preview_ui == null)
 	assert(game.find_child("StoryDevOpen", true, false) == null)
+	assert(game.find_child("InternalStoryJumpButton", true, false) == null)
 	assert(game.find_child("ProgressionDevReset", true, false) == null)
 	assert(game.find_child("TrialDevGachaOpen", true, false) == null)
 	assert(not game._opening_story_preview_requested())

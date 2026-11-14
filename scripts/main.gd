@@ -6,6 +6,8 @@ const SucculentClass = preload("res://scripts/succulent.gd")
 const AudioManagerClass = preload("res://scripts/audio_manager.gd")
 const BuildProfileClass = preload("res://scripts/build_profile.gd")
 const RewardedAdServiceClass = preload("res://scripts/rewarded_ad_service.gd")
+const InterstitialAdServiceClass = preload("res://scripts/interstitial_ad_service.gd")
+const ForcedInterstitialPolicyClass = preload("res://scripts/forced_interstitial_policy.gd")
 const JellyBalanceClass = preload("res://scripts/jelly_balance.gd")
 const ArrangementUIClass = preload("res://scripts/arrangement_ui.gd")
 const ArrangementShareBackgroundsClass = preload("res://scripts/arrangement_share_backgrounds.gd")
@@ -114,6 +116,7 @@ const HABITAT_TIME_MULTIPLIERS := [1, 60, 3600, 21600, 86400]
 const DEFAULT_POT_ID := "shallow_terracotta"
 const ARRANGEMENT_SAVE_CAPACITY := ArrangementUIClass.DEFAULT_SAVE_CAPACITY
 const POT_PRICE_PUKU := 1
+const FORCED_ADS_REMOVAL_PRODUCT_ID := "forced_ads_removal"
 const NORMAL_GERMINATION_COUNT := 12
 const VOLUME_GERMINATION_COUNT := 36
 const PREMIUM_GERMINATION_COUNT := 24
@@ -511,6 +514,11 @@ var last_armadillo_shop_chatter_index := -1
 var rescue_reward_in_progress := false
 var rescue_reward_context := ""
 var rewarded_ad_service
+var interstitial_ad_service
+var forced_interstitial_policy
+var forced_ads_removed:=false
+var forest_gacha_interstitial_count:=0
+var fusion_interstitial_count:=0
 var intro_overlay: Control
 var intro_dialog_panel: PanelContainer
 var intro_dialogue_label: Label
@@ -602,6 +610,7 @@ var forest_gacha_preview_draw_count:=0
 var forest_gacha_preview_discovered:Dictionary={FIRST_STORY_SPECIES_ID:true}
 var forest_gacha_preview_encountered:Dictionary={}
 var trial_dev_gacha_button:Button
+var internal_story_jump_button:Button
 var series_seed_inventory:Dictionary={}
 var active_series_seed_id:=""
 var species_get_overlay
@@ -1159,9 +1168,14 @@ func _setup_pot_unlock_iap()->void:
 	pot_unlock_iap_service.purchase_failed.connect(_on_pot_iap_purchase_failed)
 	pot_unlock_iap_service.restore_finished.connect(_on_pot_iap_restore_finished)
 	var price_only_product_ids:Variant=null
+	var extra_product_ids:Variant=[FORCED_ADS_REMOVAL_PRODUCT_ID]
 	if BuildProfileClass.iap_review_capture_enabled():
 		price_only_product_ids=BuildProfileClass.iap_review_capture_product_ids()
-	pot_unlock_iap_service.configure(pot_catalog,pot_design_unlocks,null,price_only_product_ids)
+		# The dedicated capture build remains the already-approved 36-pot batch.
+		extra_product_ids=null
+	var cached_entitlements:=pot_design_unlocks.duplicate(true)
+	if forced_ads_removed:cached_entitlements[FORCED_ADS_REMOVAL_PRODUCT_ID]=true
+	pot_unlock_iap_service.configure(pot_catalog,cached_entitlements,null,price_only_product_ids,extra_product_ids)
 
 func _setup_rewarded_ads()->void:
 	rewarded_ad_service=RewardedAdServiceClass.new()
@@ -1172,11 +1186,24 @@ func _setup_rewarded_ads()->void:
 	rewarded_ad_service.privacy_options_form_finished.connect(_on_privacy_options_form_finished)
 	rescue_reward_ad_requested.connect(rewarded_ad_service.request_reward)
 	add_child(rewarded_ad_service)
+	interstitial_ad_service=InterstitialAdServiceClass.new()
+	interstitial_ad_service.presentation_started.connect(_on_interstitial_ad_presentation_started)
+	interstitial_ad_service.presentation_finished.connect(_on_interstitial_ad_presentation_finished)
+	add_child(interstitial_ad_service)
+	interstitial_ad_service.bind_rewarded_service(rewarded_ad_service)
+	forced_interstitial_policy=ForcedInterstitialPolicyClass.new()
+	forced_interstitial_policy.restore_counts(forest_gacha_interstitial_count,fusion_interstitial_count)
 
 func _on_rewarded_ad_presentation_started()->void:
 	if audio_manager:audio_manager.pause_for_rewarded_ad()
 
 func _on_rewarded_ad_presentation_finished()->void:
+	if audio_manager:audio_manager.resume_from_rewarded_ad()
+
+func _on_interstitial_ad_presentation_started()->void:
+	if audio_manager:audio_manager.pause_for_rewarded_ad()
+
+func _on_interstitial_ad_presentation_finished(_presentation_context:String,_displayed:bool)->void:
 	if audio_manager:audio_manager.resume_from_rewarded_ad()
 
 func _on_rewarded_ad_service_finished(reward_context:String,reward_earned:bool)->void:
@@ -1253,6 +1280,9 @@ func _load_save() -> void:
 	save_file_present_on_boot=false
 	language_selected=false
 	pot_design_unlocks={}
+	forced_ads_removed=false
+	forest_gacha_interstitial_count=0
+	fusion_interstitial_count=0
 	var save_path:=_active_save_path()
 	if FileAccess.file_exists(save_path):
 		var value = JSON.parse_string(FileAccess.get_file_as_string(save_path))
@@ -1288,7 +1318,7 @@ func _load_save() -> void:
 				puku_gauge_cm=fposmod(puku_gauge_cm,SEED_POD_GAUGE_TARGET_CM)
 			species_get_counts=value.get("species_get_counts",{});unlocked_series=value.get("unlocked_series",{INITIAL_SERIES_ID:true});catalog_cover_species=value.get("catalog_cover_species",{})
 			collection_complete_versions=_normalize_collection_complete_versions(value.get("collection_complete_versions",{}))
-			owned_pots=value.get("owned_pots",{DEFAULT_POT_ID:1});pot_design_unlocks=_normalize_pot_design_unlocks(value.get("pot_design_unlocks",{}));saved_arrangements=value.get("saved_arrangements",[])
+			owned_pots=value.get("owned_pots",{DEFAULT_POT_ID:1});pot_design_unlocks=_normalize_pot_design_unlocks(value.get("pot_design_unlocks",{}));forced_ads_removed=bool(value.get("forced_ads_removed",false));saved_arrangements=value.get("saved_arrangements",[])
 			var saved_arrangement_capacity:=int(value.get("arrangement_save_capacity",ARRANGEMENT_SAVE_CAPACITY))
 			arrangement_save_capacity=ARRANGEMENT_SAVE_CAPACITY
 			arrangement_capacity_migration_dirty=not value.has("arrangement_save_capacity") or saved_arrangement_capacity!=ARRANGEMENT_SAVE_CAPACITY
@@ -1360,7 +1390,7 @@ func _load_save() -> void:
 			habitat_old_catalog_page_pending=bool(value.get("habitat_old_catalog_page_pending",false));habitat_old_catalog_page_series_id=str(value.get("habitat_old_catalog_page_series_id",""));habitat_old_catalog_page_point=Vector2(float(value.get("habitat_old_catalog_page_point_x",905.0)),float(value.get("habitat_old_catalog_page_point_y",452.0)))
 			old_catalog_page_roll_play_count=int(value.get("old_catalog_page_roll_play_count",-1))
 			series_seed_inventory=value.get("series_seed_inventory",{})
-			forest_gacha_draw_count=maxi(0,int(value.get("forest_gacha_draw_count",0)));forest_gacha_encountered=value.get("forest_gacha_encountered",{})
+			forest_gacha_draw_count=maxi(0,int(value.get("forest_gacha_draw_count",0)));forest_gacha_encountered=value.get("forest_gacha_encountered",{});forest_gacha_interstitial_count=clampi(int(value.get("forest_gacha_interstitial_count",0)),0,ForcedInterstitialPolicyClass.DISPLAY_INTERVAL-1);fusion_interstitial_count=clampi(int(value.get("fusion_interstitial_count",0)),0,ForcedInterstitialPolicyClass.DISPLAY_INTERVAL-1)
 			if not series_seed_inventory is Dictionary:series_seed_inventory={}
 			if not forest_gacha_encountered is Dictionary:forest_gacha_encountered={}
 			habitat_tutorial_started=bool(value.get("habitat_tutorial_started",false));habitat_tutorial_complete=bool(value.get("habitat_tutorial_complete",false));habitat_tutorial_species_id=str(value.get("habitat_tutorial_species_id",""));original_catalog_gifted=bool(value.get("original_catalog_gifted",false))
@@ -1500,7 +1530,7 @@ func _save() -> void:
 		normal_round_ad_rescue_clock_floor_unix=maxi(normal_round_ad_rescue_clock_floor_unix,floori(Time.get_unix_time_from_system()))
 	var payload:={
 		"progression_version":PROGRESSION_VERSION,"retired_content_version":RETIRED_CONTENT_VERSION,"bests":bests,"discovered":discovered,"species_get_counts":species_get_counts,"catalog_cover_species":catalog_cover_species,"collection_complete_versions":collection_complete_versions,
-		"unlocked_series":unlocked_series,"owned_pots":owned_pots,"pot_design_unlocks":pot_design_unlocks,"saved_arrangements":saved_arrangements,"arrangement_save_capacity":arrangement_save_capacity,
+		"unlocked_series":unlocked_series,"owned_pots":owned_pots,"pot_design_unlocks":pot_design_unlocks,"forced_ads_removed":forced_ads_removed,"saved_arrangements":saved_arrangements,"arrangement_save_capacity":arrangement_save_capacity,
 		"unlocked_species":unlocked_species,"greenhouse_available":greenhouse_available,"completed_unlock_conditions":completed_unlock_conditions,"pending_habitat_species":pending_habitat_species,
 		"total_play_count":total_play_count,"normal_play_count":normal_play_count,"formal_play_count":formal_play_count,"shop_visit_count":shop_visit_count,
 		"hidden_species_acquired":hidden_species_acquired,"tovar_next_play":tovar_next_play,"tovar_attempt_count":tovar_attempt_count,
@@ -1524,7 +1554,7 @@ func _save() -> void:
 		"normal_seed_bags":normal_seed_bags,"volume_seed_bags":volume_seed_bags,"premium_seed_bags":premium_seed_bags,
 		"volume_seed_unlocked":volume_seed_unlocked,"volume_seed_intro_seen":volume_seed_intro_seen,"premium_seed_unlocked":premium_seed_unlocked,
 		"best_100_achieved":best_100_achieved,"login_bonus_date":login_bonus_date,"audio_settings":audio_settings,"show_growing_puku_preview":show_growing_puku_preview,"pending_round_new_species_ids":pending_round_new_species_ids,
-		"series_seed_inventory":series_seed_inventory,"forest_gacha_draw_count":forest_gacha_draw_count,"forest_gacha_encountered":forest_gacha_encountered,
+		"series_seed_inventory":series_seed_inventory,"forest_gacha_draw_count":forest_gacha_draw_count,"forest_gacha_encountered":forest_gacha_encountered,"forest_gacha_interstitial_count":forest_gacha_interstitial_count,"fusion_interstitial_count":fusion_interstitial_count,
 		"puku_gauge_cm":puku_gauge_cm,"puku_balance_units":puku_balance_units,"normal_round_free_plays":normal_round_free_plays,"normal_round_ad_rescue_ticket_active":normal_round_ad_rescue_ticket_active,"normal_round_ad_rescue_next_available_unix":normal_round_ad_rescue_next_available_unix,"normal_round_ad_rescue_clock_floor_unix":normal_round_ad_rescue_clock_floor_unix,"puku_coin_gauge_cm":_legacy_puku_coin_gauge_cm_for_save(),"puku_points":puku_points,"old_catalog_pages":old_catalog_pages,"old_catalog_page_inventory":old_catalog_page_inventory,
 		"old_catalog_intro_seen":old_catalog_intro_seen,"old_catalog_intro_pending":old_catalog_intro_pending,
 		"habitat_old_catalog_page_pending":habitat_old_catalog_page_pending,"habitat_old_catalog_page_series_id":habitat_old_catalog_page_series_id,
@@ -1554,6 +1584,9 @@ func _is_endless_greenhouse_enabled()->bool:
 
 func _trial_dev_controls_enabled()->bool:
 	return TRIAL_DEV_CONTROLS_ENABLED
+
+func _story_jump_controls_enabled()->bool:
+	return _trial_dev_controls_enabled() or BuildProfileClass.internal_test_story_jump_enabled()
 
 func _trial_dev_controls_enabled_for_context(_is_web_build:bool)->bool:
 	# Compatibility seam for existing smoke tests and callers. Platform and URL
@@ -2087,6 +2120,8 @@ func _build_ui() -> void:
 	var mission_content:=VBoxContainer.new();mission_content.alignment=BoxContainer.ALIGNMENT_CENTER;mission_content.mouse_filter=Control.MOUSE_FILTER_IGNORE;mission_content.add_theme_constant_override("separation",1);mission_panel.add_child(mission_content)
 	mission_title_label=Label.new();mission_title_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;mission_title_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;mission_title_label.add_theme_font_size_override("font_size",15);mission_title_label.add_theme_color_override("font_color",Color("#f6cf69"));mission_content.add_child(mission_title_label)
 	mission_text_label=Label.new();mission_text_label.custom_minimum_size=Vector2(320,60);mission_text_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;mission_text_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;mission_text_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;mission_text_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;mission_text_label.add_theme_font_size_override("font_size",16);mission_text_label.add_theme_color_override("font_color",Color("#fff7dc"));mission_content.add_child(mission_text_label)
+	if BuildProfileClass.internal_test_story_jump_enabled():
+		internal_story_jump_button=Button.new();internal_story_jump_button.name="InternalStoryJumpButton";internal_story_jump_button.text="開発用：ジャンプ";internal_story_jump_button.position=Vector2(18,400);internal_story_jump_button.size=Vector2(150,44);internal_story_jump_button.focus_mode=Control.FOCUS_NONE;internal_story_jump_button.mouse_filter=Control.MOUSE_FILTER_STOP;_skin_button(internal_story_jump_button,Color("#c7d6ad"),13);internal_story_jump_button.pressed.connect(_open_story_dev);main_status_hud.add_child(internal_story_jump_button)
 	plant_label_visibility_button=Button.new();plant_label_visibility_button.name="PlantLabelVisibilityButton";plant_label_visibility_button.position=Vector2(18,952);plant_label_visibility_button.size=Vector2(124,48);plant_label_visibility_button.focus_mode=Control.FOCUS_NONE;plant_label_visibility_button.mouse_filter=Control.MOUSE_FILTER_STOP;_skin_plant_label_visibility_button(plant_label_visibility_button);plant_label_visibility_button.pressed.connect(_toggle_growing_plant_labels);main_status_hud.add_child(plant_label_visibility_button)
 	for entry in [{"x":398,"t":"図鑑"},{"x":478,"t":"設定"}]:
 		var b:=Button.new();b.text=entry.t;b.position=Vector2(entry.x,134);b.custom_minimum_size=TOP_NAVIGATION_BUTTON_SIZE;b.size=TOP_NAVIGATION_BUTTON_SIZE;b.clip_text=true;b.text_overrun_behavior=TextServer.OVERRUN_NO_TRIMMING;_skin_button(b,Color("#fff0cf"),16);hud.add_child(b)
@@ -2139,7 +2174,7 @@ func _build_ui() -> void:
 	_build_collection_complete_overlay(hud)
 	if _trial_dev_controls_enabled():
 		_build_habitat_dev_panel(hud)
-	if _trial_dev_controls_enabled():
+	if _story_jump_controls_enabled():
 		_build_story_dev_panel(hud)
 	_update_best_ui()
 	_update_puku_ui()
@@ -2495,7 +2530,7 @@ func _sync_arrangement_ui()->void:
 	var iap_states:Dictionary=pot_unlock_iap_service.product_states_snapshot() if pot_unlock_iap_service!=null else {}
 	var restore_available:bool=pot_unlock_iap_service.restore_available() if pot_unlock_iap_service!=null else false
 	var restore_in_progress:bool=pot_unlock_iap_service.restore_in_progress() if pot_unlock_iap_service!=null else false
-	arrangement_ui.configure(catalog_species,[],pot_catalog,discovered,owned_pots,saved_arrangements,arrangement_save_capacity,puku_points,_species_texture,_request_species_texture,bests,language_code,_current_pot_sales_stage(),pot_design_unlocks,iap_states,restore_available,restore_in_progress,ArrangementShareBackgroundsClass.catalog(),_share_background_unlock_states(),species_picker_series_catalog)
+	arrangement_ui.configure(catalog_species,[],pot_catalog,discovered,owned_pots,saved_arrangements,arrangement_save_capacity,puku_points,_species_texture,_request_species_texture,bests,language_code,_current_pot_sales_stage(),pot_design_unlocks,iap_states,restore_available,restore_in_progress,ArrangementShareBackgroundsClass.catalog(),_share_background_unlock_states(),species_picker_series_catalog,forced_ads_removed,FORCED_ADS_REMOVAL_PRODUCT_ID)
 	arrangement_ui.sync_catalog_state(unlocked_series,puku_points)
 	arrangement_ui.sync_seed_shop_state(_seed_shop_products(),puku_points)
 
@@ -2690,6 +2725,15 @@ func _persist_pot_purchase_after_first_frame(pot_id:String,profile_purchase:bool
 	if profile_purchase and OS.is_debug_build():print("POT_PURCHASE_PROFILE pot_id=",pot_id," save_after_first_frame_ms=",snappedf(float(Time.get_ticks_usec()-save_started_usec)/1000.0,.001))
 
 func _on_pot_unlock_requested(product_id:String)->void:
+	if product_id==FORCED_ADS_REMOVAL_PRODUCT_ID:
+		if forced_ads_removed:
+			arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"forced_ads_removal_owned"))
+			return
+		if pot_unlock_iap_service==null or not pot_unlock_iap_service.purchase(product_id):
+			arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"iap_purchase_unavailable"))
+			return
+		arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"iap_purchase_processing"))
+		return
 	var pot:=_pot_entry_for_product(product_id)
 	if pot.is_empty() or not _pot_progression_unlocked(pot):
 		arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"pot_locked"))
@@ -2713,6 +2757,14 @@ func _on_pot_iap_state_changed()->void:
 	if arrangement_ui!=null:_sync_arrangement_ui()
 
 func _on_pot_iap_entitlement_changed(product_id:String,unlocked:bool)->void:
+	if product_id==FORCED_ADS_REMOVAL_PRODUCT_ID:
+		forced_ads_removed=unlocked
+		if forced_ads_removed and forced_interstitial_policy!=null:forced_interstitial_policy.clear_session_pending()
+		if save_file_present_on_boot or language_selected:_save()
+		if arrangement_ui!=null:
+			_sync_arrangement_ui()
+			if unlocked:arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"forced_ads_removal_success"))
+		return
 	if unlocked:pot_design_unlocks[product_id]=true
 	else:pot_design_unlocks.erase(product_id)
 	if save_file_present_on_boot or language_selected:_save()
@@ -4216,18 +4268,20 @@ func _build_habitat_dev_panel(hud:Control)->void:
 	habitat_dev_panel.close_requested.connect(_update_play_ui)
 
 func _build_story_dev_panel(hud:Control)->void:
-	if not _trial_dev_controls_enabled():return
-	story_dev_panel=StoryDevPanelClass.new();hud.add_child(story_dev_panel)
+	if not _story_jump_controls_enabled():return
+	story_dev_panel=StoryDevPanelClass.new();story_dev_panel.allow_species_spawn=_trial_dev_controls_enabled();hud.add_child(story_dev_panel)
 	story_dev_panel.preset_requested.connect(_apply_story_dev_preset)
 	story_dev_panel.spawn_101_requested.connect(_spawn_story_dev_101_colorata)
+	story_dev_panel.reset_requested.connect(_reset_progression_from_story_panel)
 	story_dev_panel.close_requested.connect(_update_play_ui)
 
 func _open_story_dev()->void:
-	if not StoryDevPresetsClass.available(_trial_dev_controls_enabled()) or story_dev_panel==null:return
-	settings_overlay.visible=false;story_dev_panel.open();_update_play_ui()
+	if not StoryDevPresetsClass.available(_story_jump_controls_enabled()) or story_dev_panel==null:return
+	if settings_overlay:settings_overlay.visible=false
+	story_dev_panel.open();_update_play_ui()
 
 func _apply_story_dev_preset(preset_id:String)->Dictionary:
-	if not StoryDevPresetsClass.available(_trial_dev_controls_enabled()):return {"ok":false,"error":"development_only"}
+	if not StoryDevPresetsClass.available(_story_jump_controls_enabled()):return {"ok":false,"error":"development_only"}
 	var result:Dictionary=StoryDevPresetsClass.apply(self,preset_id)
 	if not bool(result.get("ok",false)):return result
 	if story_dev_panel and story_dev_panel.visible:story_dev_panel.close()
@@ -4237,10 +4291,15 @@ func _apply_story_dev_preset(preset_id:String)->Dictionary:
 	return result
 
 func _spawn_story_dev_101_colorata()->void:
-	if not StoryDevPresetsClass.available(_trial_dev_controls_enabled()):return
+	if not StoryDevPresetsClass.available(_story_jump_controls_enabled()):return
 	if story_dev_panel and story_dev_panel.visible:story_dev_panel.close()
 	if settings_overlay:settings_overlay.visible=false
 	if StoryDevPresetsClass.spawn_101cm_colorata(self):_apply_mode();_update_play_ui()
+
+func _reset_progression_from_story_panel()->void:
+	if not _story_jump_controls_enabled():return
+	if story_dev_panel and story_dev_panel.visible:story_dev_panel.close()
+	_reset_progression_state()
 
 func _open_habitat_dev()->void:
 	if not _trial_dev_controls_enabled() or habitat_dev_panel==null:return
@@ -4563,6 +4622,7 @@ func _close_fusion_lab()->void:
 	if fusion_lab_ui:fusion_lab_ui.close_lab()
 	fusion_parent_a_id="";fusion_parent_b_id=""
 	_update_play_ui()
+	_try_present_forced_interstitial(ForcedInterstitialPolicyClass.SOURCE_FUSION_LAB)
 
 func _on_fusion_parent_selected(slot:int,species_id:String)->void:
 	if fusion_in_progress or _species_get_count(species_id)<=0 or not fusion_system.is_eligible_parent_species(species_id):return
@@ -4606,6 +4666,7 @@ func _perform_fusion(parent_a_id:String,parent_b_id:String)->void:
 	_register_species_discovery(result_species_id,true)
 	_apply_saved_unlocks();_sync_arrangement_ui();_refresh_series_selection()
 	if encyclopedia_overlay and encyclopedia_overlay.visible:_refresh_encyclopedia_header();_refresh_encyclopedia_cards()
+	_record_forced_interstitial_success(ForcedInterstitialPolicyClass.SOURCE_FUSION_LAB)
 	_save();_update_currency_ui();_update_play_ui()
 	await fusion_lab_ui.play_fusion_reveal(_species_texture(result_entry),is_new)
 	fusion_in_progress=false
@@ -4729,7 +4790,7 @@ func _open_puku_puku_battle_preview()->void:
 func _close_forest_gacha()->void:
 	if forest_gacha_ui:forest_gacha_ui.close_gacha()
 	forest_gacha_preview_mode=false;forest_gacha_trial_dev_mode=false
-	_play_current_area_bgm();_update_play_ui();call_deferred("_try_start_pending_story_event")
+	_play_current_area_bgm();_update_play_ui();_try_present_forced_interstitial(ForcedInterstitialPolicyClass.SOURCE_FOREST_GACHA);call_deferred("_try_start_pending_story_event")
 
 func _spin_forest_gacha()->void:
 	if forest_gacha_ui==null or not forest_gacha_ui.visible or forest_gacha_ui.is_busy():return
@@ -4790,9 +4851,36 @@ func _on_forest_gacha_spin_animation_completed()->void:
 	if not unlocked_series_id.is_empty():unlocked_series[unlocked_series_id]=true
 	var registration_started_msec:=Time.get_ticks_msec();_register_species_discovery(species_id,true);last_forest_gacha_registration_duration_msec=maxi(0,Time.get_ticks_msec()-registration_started_msec)
 	if not unlocked_series_id.is_empty():_queue_catalog_series_unlock_notice(unlocked_series_id)
+	if mode=="live":_record_forced_interstitial_success(ForcedInterstitialPolicyClass.SOURCE_FOREST_GACHA)
 	var save_started_msec:=Time.get_ticks_msec();_save();last_forest_gacha_save_duration_msec=maxi(0,Time.get_ticks_msec()-save_started_msec)
 	var ui_started_msec:=Time.get_ticks_msec();_update_currency_ui();_sync_arrangement_ui();forest_gacha_ui.set_wallet(TRIAL_DEV_GACHA_WALLET if mode=="trial" else puku_points,forest_gacha_draw_count);last_forest_gacha_ui_update_duration_msec=maxi(0,Time.get_ticks_msec()-ui_started_msec)
 	last_forest_gacha_persist_ended_msec=Time.get_ticks_msec();last_forest_gacha_persist_duration_msec=maxi(0,last_forest_gacha_persist_ended_msec-last_forest_gacha_persist_started_msec)
+
+func _record_forced_interstitial_success(source:String)->bool:
+	if forced_interstitial_policy==null:
+		forced_interstitial_policy=ForcedInterstitialPolicyClass.new()
+		forced_interstitial_policy.restore_counts(forest_gacha_interstitial_count,fusion_interstitial_count)
+	var reached_interval:bool=forced_interstitial_policy.record_success(source,forced_ads_removed)
+	forest_gacha_interstitial_count=forced_interstitial_policy.success_count(ForcedInterstitialPolicyClass.SOURCE_FOREST_GACHA)
+	fusion_interstitial_count=forced_interstitial_policy.success_count(ForcedInterstitialPolicyClass.SOURCE_FUSION_LAB)
+	return reached_interval
+
+func _try_present_forced_interstitial(source:String)->bool:
+	if forced_interstitial_policy==null or not forced_interstitial_policy.has_pending_transition(source):return false
+	var candidate:bool=forced_interstitial_policy.consume_transition_candidate(source,forced_ads_removed)
+	if not candidate or not _forced_interstitial_transition_safe():return false
+	if interstitial_ad_service==null or not interstitial_ad_service.try_present(source):return false
+	forced_interstitial_policy.mark_presented()
+	return true
+
+func _forced_interstitial_transition_safe()->bool:
+	if current_mode!="greenhouse" or play_active or arrangement_scene_active or arrangement_transitioning:return false
+	if not scripted_dialog_kind.is_empty() or not tutorial_dialog_kind.is_empty() or _immediate_get_story_transition_pending():return false
+	if not str(StoryProgressionClass.peek_story_event(story_progression_state)).is_empty():return false
+	if (opening_overlay and opening_overlay.visible) or (opening_story_overlay and opening_story_overlay.visible) or (intro_overlay and intro_overlay.visible):return false
+	if (species_get_overlay and species_get_overlay.visible) or (catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible):return false
+	if (forest_gacha_ui and forest_gacha_ui.visible) or (fusion_lab_ui and fusion_lab_ui.visible):return false
+	return true
 
 func _unlock_forest_gacha_series(series_id:String,_species_id:String)->void:
 	if forest_gacha_ui==null or not forest_gacha_ui.visible:return
@@ -5186,7 +5274,10 @@ func _toggle_growing_plant_labels()->void:
 	_update_labels()
 
 func _reset_progression_state()->void:
-	if not _trial_dev_controls_enabled():return
+	if not _story_jump_controls_enabled():return
+	forest_gacha_interstitial_count=0
+	fusion_interstitial_count=0
+	if forced_interstitial_policy:forced_interstitial_policy.restore_counts(0,0)
 	_end_first_play_tutorial_context()
 	_reset_collection_complete_presentation(true)
 	collection_complete_versions.clear();collection_complete_pending_species_id="";collection_complete_resume_context="";collection_complete_resume_shop_visible=false
@@ -5588,6 +5679,7 @@ func _update_play_ui()->void:
 	if puku_gauge_area:puku_gauge_area.visible=mystery_items_acquired
 	if seed_pod_gauge_area:seed_pod_gauge_area.visible=mystery_items_acquired and not _is_endless_greenhouse_enabled()
 	if trial_dev_gacha_button:trial_dev_gacha_button.visible=_is_endless_greenhouse_enabled() and _trial_dev_controls_enabled()
+	if internal_story_jump_button:internal_story_jump_button.visible=_internal_story_jump_button_should_show(arrangement_navigation_suspended)
 	play_overlay.visible=current_mode=="greenhouse" and not play_active and play_modal_open and not endless_owns_normal_flow
 	play_open_button.visible=current_mode=="greenhouse" and intro_story_complete and not play_active and not play_modal_open and normal_round_start_visible and not arrangement_navigation_suspended and (not result_overlay or not result_overlay.visible) and (not shop_overlay or not shop_overlay.visible) and (not encyclopedia_overlay or not encyclopedia_overlay.visible) and (not settings_overlay or not settings_overlay.visible) and (not arrangement_ui or not arrangement_ui.visible)
 	if endless_owns_normal_flow:
@@ -5630,6 +5722,17 @@ func _update_play_ui()->void:
 	var normal_seed_available:=_normal_seed_play_available();normal_play_button.visible=normal_seed_available and not _is_endless_greenhouse_enabled();normal_play_button.text=Localizer.text(language_code,"play_normal_seed",[normal_seed_bags]);normal_play_button.disabled=not normal_seed_available
 	volume_play_button.visible=volume_seed_bags>0 and _volume_seed_unlocked();volume_play_button.text=Localizer.text(language_code,"play_volume_seed",[volume_seed_bags]);volume_play_button.disabled=not _volume_seed_unlocked() or volume_seed_bags<1
 	premium_play_button.visible=premium_seed_bags>0 and _premium_seed_unlocked();premium_play_button.text=Localizer.text(language_code,"play_premium_seed",[premium_seed_bags]);premium_play_button.disabled=not _premium_seed_unlocked() or premium_seed_bags<1
+
+func _internal_story_jump_button_should_show(navigation_suspended:bool)->bool:
+	return (
+		BuildProfileClass.internal_test_story_jump_enabled()
+		and current_mode=="greenhouse"
+		and not play_active
+		and not navigation_suspended
+		and (opening_overlay==null or not opening_overlay.visible)
+		and (opening_story_overlay==null or not opening_story_overlay.visible)
+		and (tutorial_guide_overlay==null or not tutorial_guide_overlay.visible)
+	)
 
 func _open_shop()->void:
 	if catalog_preview_mode_active or play_active:return
