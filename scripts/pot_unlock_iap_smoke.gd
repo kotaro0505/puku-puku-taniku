@@ -252,8 +252,30 @@ func _ready()->void:
 
 	var all_paid_unlocks:Dictionary={}
 	for pot_value in paid:all_paid_unlocks[str((pot_value as Dictionary).iap_product_id)]=true
+	var expected_ads_copy:Dictionary={
+		"ja":{"name":"広告を削除","description":"森のガチャとラボで自動表示される広告を削除します。パンダのお手伝い広告は残ります。","banned":"強制広告"},
+		"hiragana":{"name":"こうこくを けす","description":"もりの がちゃと らぼで じどうで でる こうこくを けします。ぱんだの おてつだいこうこくは のこります。","banned":"きょうせいこうこく"},
+		"en":{"name":"Remove Ads","description":"Removes ads that appear automatically in Forest Gacha and Hybrid Lab. Panda Help ads will remain available.","banned":"forced ads"},
+	}
 	for locale in ["ja","hiragana","en"]:
 		for key in ["pot_not_owned","pot_iap_locked_short","pot_unlock_required","pot_permanent_unlock","pot_locked_puku_price","pot_unlock_success","iap_unlock_for_price","iap_price_loading","iap_purchase_unavailable","iap_restore_purchases","iap_restore_complete","iap_restore_failed","iap_restore_cancelled","iap_restore_network_failed","iap_restore_timeout","forced_ads_removal_name","forced_ads_removal_description","forced_ads_removal_owned","forced_ads_removal_success"]:assert(Localizer.text(locale,key)!=key)
+		var expected_copy:Dictionary=expected_ads_copy[locale]
+		assert(Localizer.text(locale,"forced_ads_removal_name")==str(expected_copy.name))
+		assert(Localizer.text(locale,"forced_ads_removal_description")==str(expected_copy.description))
+		var player_purchase_copy:=("%s %s %s %s %s"%[Localizer.text(locale,"forced_ads_removal_name"),Localizer.text(locale,"forced_ads_removal_description"),Localizer.text(locale,"forced_ads_removal_buy",["€0,99"]),Localizer.text(locale,"forced_ads_removal_owned"),Localizer.text(locale,"forced_ads_removal_success")]).to_lower()
+		assert(not str(expected_copy.banned).to_lower() in player_purchase_copy)
+		ui.configure([],[],all_pots,{},owned,[],200,1000,Callable(),Callable(),{},locale,2,{},extra_service.product_states_snapshot(),true,false,[],{},[],false,forced_ads_product_id);ui.open_pot_shop();await get_tree().process_frame;await get_tree().process_frame
+		var forced_card:=ui.find_child("ForcedAdsRemovalCard",true,false) as PanelContainer
+		var forced_title:=ui.find_child("ForcedAdsRemovalTitle",true,false) as Label
+		var forced_description:=ui.find_child("ForcedAdsRemovalDescription",true,false) as Label
+		var forced_buy:=ui.find_child("ForcedAdsRemovalBuyButton",true,false) as Button
+		assert(forced_card!=null and forced_title!=null and forced_description!=null and forced_buy!=null)
+		assert(forced_title.text==str(expected_copy.name) and forced_description.text==str(expected_copy.description))
+		assert(forced_description.autowrap_mode==TextServer.AUTOWRAP_WORD_SMART and forced_description.custom_minimum_size.y==96.0)
+		assert(forced_description.get_visible_line_count()==forced_description.get_line_count())
+		assert(forced_description.get_combined_minimum_size().y<=forced_description.size.y+.5)
+		assert(forced_description.position.y+forced_description.size.y<=forced_buy.position.y+.5)
+		assert(forced_card.get_combined_minimum_size().y<=forced_card.size.y+.5)
 		ui.configure([],[],all_pots,{},owned,[],200,1000,Callable(),Callable(),{},locale,2,{},service.product_states_snapshot(),false,false);ui.open_pot_shop();await get_tree().process_frame
 		for pot_value in paid:
 			var pot:Dictionary=pot_value;var pot_id:=str(pot.pot_id);var expected_price:=int(expected_prices[pot_id]);var locked_card:=_pot_shop_card(ui,pot_id);var locked_price:=locked_card.find_child("PotLockedPukuPrice",true,false) as Label

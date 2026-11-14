@@ -1675,10 +1675,10 @@ func _refresh_pot_shop_cards()->void:
 			if pot_purchase_feedback.has(pot_id):_show_pot_purchase_feedback(content,pot,pot_purchase_feedback[pot_id])
 
 func _build_forced_ads_removal_card()->void:
-	var card:=PanelContainer.new();card.name="ForcedAdsRemovalCard";card.custom_minimum_size=Vector2(504,210);card.mouse_filter=Control.MOUSE_FILTER_PASS;card.clip_contents=true;card.add_theme_stylebox_override("panel",_box(Color("#f4e1bc"),Color("#9b6a48"),20,3));shop_grid.add_child(card)
-	var content:=Control.new();content.custom_minimum_size=Vector2(484,190);content.mouse_filter=Control.MOUSE_FILTER_PASS;content.clip_contents=true;card.add_child(content)
-	var title:=Label.new();title.name="ForcedAdsRemovalTitle";title.text=GameLocalizer.text(language_code,"forced_ads_removal_name");title.position=Vector2(16,8);title.size=Vector2(452,38);title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;title.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;title.add_theme_font_size_override("font_size",22);title.add_theme_color_override("font_color",UI_BROWN);content.add_child(title)
-	var description:=Label.new();description.name="ForcedAdsRemovalDescription";description.text=GameLocalizer.text(language_code,"forced_ads_removal_description");description.position=Vector2(22,47);description.size=Vector2(440,78);description.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;description.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;description.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;description.add_theme_font_size_override("font_size",14);description.add_theme_color_override("font_color",Color("#79543a"));content.add_child(description)
+	var card:=PanelContainer.new();card.name="ForcedAdsRemovalCard";card.custom_minimum_size=Vector2(504,220);card.mouse_filter=Control.MOUSE_FILTER_PASS;card.clip_contents=true;card.add_theme_stylebox_override("panel",_box(Color("#f4e1bc"),Color("#9b6a48"),20,3));shop_grid.add_child(card)
+	var content:=VBoxContainer.new();content.name="ForcedAdsRemovalContent";content.custom_minimum_size=Vector2(484,200);content.mouse_filter=Control.MOUSE_FILTER_PASS;content.add_theme_constant_override("separation",8);card.add_child(content)
+	var title:=Label.new();title.name="ForcedAdsRemovalTitle";title.text=GameLocalizer.text(language_code,"forced_ads_removal_name");title.custom_minimum_size=Vector2(452,38);title.size_flags_horizontal=Control.SIZE_SHRINK_CENTER;title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;title.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;title.add_theme_font_size_override("font_size",22);title.add_theme_color_override("font_color",UI_BROWN);content.add_child(title)
+	var description:=Label.new();description.name="ForcedAdsRemovalDescription";description.text=GameLocalizer.text(language_code,"forced_ads_removal_description");description.custom_minimum_size=Vector2(440,96);description.size_flags_horizontal=Control.SIZE_SHRINK_CENTER;description.size_flags_vertical=Control.SIZE_EXPAND_FILL;description.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;description.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;description.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;description.add_theme_font_size_override("font_size",14);description.add_theme_color_override("font_color",Color("#79543a"));content.add_child(description)
 	var product_state:Dictionary=pot_iap_products.get(forced_ads_removal_product_id,{"status":"loading","localized_price":""})
 	var status:=str(product_state.get("status","loading"));var localized_price:=str(product_state.get("localized_price","")).strip_edges();var button_text:="";var button_enabled:=false
 	if forced_ads_removed:
@@ -1689,9 +1689,10 @@ func _build_forced_ads_removal_card()->void:
 			"purchasing":button_text=GameLocalizer.text(language_code,"iap_purchase_processing")
 			"loading":button_text=GameLocalizer.text(language_code,"iap_price_loading")
 			_:button_text=GameLocalizer.text(language_code,"iap_purchase_unavailable")
-	var buy:=_button(button_text,Vector2(76,130),Vector2(332,54),Color("#d7aa64") if button_enabled else Color("#b9a17d"),17);buy.name="ForcedAdsRemovalBuyButton";_prepare_scroll_button(buy);buy.disabled=not button_enabled
+	var buy:=_button(button_text,Vector2.ZERO,Vector2(332,54),Color("#d7aa64") if button_enabled else Color("#b9a17d"),17);buy.name="ForcedAdsRemovalBuyButton";buy.size_flags_horizontal=Control.SIZE_SHRINK_CENTER;_prepare_scroll_button(buy);buy.disabled=not button_enabled
 	if button_enabled:buy.pressed.connect(_request_pot_unlock.bind(forced_ads_removal_product_id))
 	content.add_child(buy)
+	var bottom_padding:=Control.new();bottom_padding.name="ForcedAdsRemovalBottomPadding";bottom_padding.custom_minimum_size=Vector2(1,6);bottom_padding.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.add_child(bottom_padding)
 
 func _prune_pot_purchase_feedback()->void:
 	var now:=Time.get_ticks_msec()
