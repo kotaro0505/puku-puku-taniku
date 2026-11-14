@@ -17,6 +17,9 @@ const ENERGY_PARTICLES_PER_WAVE := 8
 const ENERGY_PARTICLE_TRAVEL_SECONDS := 0.42
 const ENERGY_PARTICLE_FADE_SECONDS := 0.18
 const ENERGY_PARTICLE_STAGGER_SECONDS := 0.035
+# Imported catalog textures are decoded synchronously on iOS. Keep only the
+# visible rows and one neighboring row warm instead of touching every species.
+const PICKER_TEXTURE_PREFETCH_MARGIN := 240.0
 const HIDDEN_WHILE_UNOBTAINED_TIER1_PREVIEW_IDS := {
 	"fus1_jelly_bomb": true,
 	"fus1_pukupuku_planet": true,
@@ -86,6 +89,11 @@ var candidate_cards_by_id: Dictionary = {}
 var candidate_images_by_id: Dictionary = {}
 var candidate_name_labels_by_id: Dictionary = {}
 var candidate_selected_badges_by_id: Dictionary = {}
+var picker_texture_update_serial := 0
+var last_picker_open_duration_msec := 0.0
+var last_picker_card_build_duration_msec := 0.0
+var last_picker_texture_update_duration_msec := 0.0
+var last_picker_texture_request_count := 0
 var current_cost := 1
 var fusion_processing := false
 var result_revealed := false
@@ -345,6 +353,7 @@ func _build_picker_page() -> void:
 	picker_scroll.scroll_deadzone = 12
 	picker_scroll.mouse_filter = Control.MOUSE_FILTER_STOP
 	picker_page.add_child(picker_scroll)
+	picker_scroll.get_v_scroll_bar().value_changed.connect(_on_picker_scroll_changed)
 	picker_grid = GridContainer.new()
 	picker_grid.columns = 2
 	picker_grid.custom_minimum_size = Vector2(452, 0)
@@ -393,6 +402,7 @@ func open_lab(parent_candidates: Array[Dictionary], counts: Dictionary, parent_a
 	refresh_selection(selected_a_id, selected_b_id, {}, false)
 
 func close_lab() -> void:
+	_release_picker_textures()
 	visible = false
 	main_page.visible = true
 	picker_page.visible = false
@@ -613,6 +623,7 @@ func _picker_max_scroll_vertical() -> int:
 
 func _queue_picker_scroll_restore(slot: int, scroll_vertical: int) -> void:
 	picker_scroll_restore_serial += 1
+	picker_texture_update_serial += 1
 	var restore_serial := picker_scroll_restore_serial
 	call_deferred("_restore_picker_scroll", slot, scroll_vertical, restore_serial)
 
@@ -623,8 +634,10 @@ func _restore_picker_scroll(slot: int, scroll_vertical: int, restore_serial: int
 	var restored_scroll := clampi(scroll_vertical, 0, _picker_max_scroll_vertical())
 	picker_scroll.scroll_vertical = restored_scroll
 	picker_scroll_verticals_by_slot[slot] = restored_scroll
+	_queue_picker_texture_update()
 
 func _open_picker(slot: int) -> void:
+	var open_started_usec := Time.get_ticks_usec()
 	if picker_page.visible:
 		_remember_picker_state()
 	picker_slot = clampi(slot, 0, 1)
@@ -641,6 +654,7 @@ func _open_picker(slot: int) -> void:
 		picker_scroll_verticals_by_slot[picker_slot] = 0
 	_rebuild_picker()
 	_queue_picker_scroll_restore(picker_slot, requested_scroll_vertical)
+	last_picker_open_duration_msec = float(Time.get_ticks_usec() - open_started_usec) / 1000.0
 
 func _rebuild_picker() -> void:
 	if picker_grid == null:
@@ -658,6 +672,7 @@ func _candidate_signature(entries: Array) -> String:
 	return "|".join(ids)
 
 func _clear_picker_card_cache() -> void:
+	_release_picker_textures()
 	if picker_grid != null:
 		for child in picker_grid.get_children():
 			child.free()
@@ -750,9 +765,12 @@ func _ensure_picker_empty_label() -> void:
 
 func _ensure_picker_cards() -> void:
 	if not candidate_cards_by_id.is_empty():
+		last_picker_card_build_duration_msec = 0.0
 		return
+	var build_started_usec := Time.get_ticks_usec()
 	if candidates.is_empty():
 		_ensure_picker_empty_label()
+		last_picker_card_build_duration_msec = float(Time.get_ticks_usec() - build_started_usec) / 1000.0
 		return
 	var selected_id := selected_a_id if picker_slot == 0 else selected_b_id
 	for entry in candidates:
@@ -820,6 +838,7 @@ func _ensure_picker_cards() -> void:
 		candidate_name_labels_by_id[species_id] = name_label
 		candidate_selected_badges_by_id[species_id] = selected_badge
 	_ensure_picker_empty_label()
+	last_picker_card_build_duration_msec = float(Time.get_ticks_usec() - build_started_usec) / 1000.0
 
 func _apply_picker_filter() -> void:
 	var visible_index := 0
@@ -831,13 +850,72 @@ func _apply_picker_filter() -> void:
 		var matches := picker_filter_series_id == "all" or _candidate_display_series_id(entry) == picker_filter_series_id
 		card.visible = matches
 		if matches:
-			if not bool(card.get_meta("image_requested", false)):
-				card.set_meta("image_requested", true)
-				candidate_image_requested.emit(entry, candidate_images_by_id[species_id], visible_index < 6)
 			visible_index += 1
+		else:
+			_release_picker_texture(species_id)
 	if picker_empty_label != null:
 		picker_empty_label.text = Localizer.text(language, "fusion_no_parents")
 		picker_empty_label.visible = visible_index == 0
+
+func _on_picker_scroll_changed(_value: float) -> void:
+	_queue_picker_texture_update()
+
+func _queue_picker_texture_update() -> void:
+	picker_texture_update_serial += 1
+	var update_serial := picker_texture_update_serial
+	call_deferred("_update_picker_textures_after_layout", update_serial)
+
+func _update_picker_textures_after_layout(update_serial: int) -> void:
+	await get_tree().process_frame
+	if update_serial != picker_texture_update_serial:
+		return
+	_update_picker_visible_textures()
+
+func _update_picker_visible_textures() -> void:
+	if picker_scroll == null or picker_grid == null or not picker_page.visible:
+		return
+	var update_started_usec := Time.get_ticks_usec()
+	var visible_top := float(picker_scroll.scroll_vertical)
+	var visible_bottom := visible_top + picker_scroll.size.y
+	var prefetch_top := visible_top - PICKER_TEXTURE_PREFETCH_MARGIN
+	var prefetch_bottom := visible_bottom + PICKER_TEXTURE_PREFETCH_MARGIN
+	var requested_count := 0
+	for entry in candidates:
+		var species_id := str(entry.get("species_id", ""))
+		if not candidate_cards_by_id.has(species_id):
+			continue
+		var card := candidate_cards_by_id[species_id] as Button
+		if not card.visible:
+			continue
+		var card_top := card.global_position.y - picker_scroll.global_position.y + visible_top
+		var visible_now := card_top + card.size.y >= visible_top and card_top <= visible_bottom
+		var should_prefetch := card_top + card.size.y >= prefetch_top and card_top <= prefetch_bottom
+		if should_prefetch:
+			if not bool(card.get_meta("image_requested", false)):
+				card.set_meta("image_requested", true)
+				candidate_image_requested.emit(entry, candidate_images_by_id[species_id], visible_now)
+				requested_count += 1
+		else:
+			_release_picker_texture(species_id)
+	last_picker_texture_request_count = requested_count
+	last_picker_texture_update_duration_msec = float(Time.get_ticks_usec() - update_started_usec) / 1000.0
+
+func _release_picker_texture(species_id: String) -> void:
+	if not candidate_cards_by_id.has(species_id) or not candidate_images_by_id.has(species_id):
+		return
+	var card := candidate_cards_by_id[species_id] as Button
+	var image := candidate_images_by_id[species_id] as TextureRect
+	card.set_meta("image_requested", false)
+	image.texture = null
+	image.set_meta("catalog_loaded_path", "")
+	image.set_meta("catalog_request_path", "")
+	image.set_meta("catalog_request_callback", Callable())
+
+func _release_picker_textures() -> void:
+	picker_texture_update_serial += 1
+	for species_id_value in candidate_images_by_id:
+		_release_picker_texture(str(species_id_value))
+	last_picker_texture_request_count = 0
 
 func _refresh_picker_selection() -> void:
 	var selected_id := selected_a_id if picker_slot == 0 else selected_b_id
@@ -867,6 +945,7 @@ func _choose_candidate(species_id: String) -> void:
 func _show_main_page(remember_picker_state := true) -> void:
 	if remember_picker_state and picker_page.visible:
 		_remember_picker_state()
+	_release_picker_textures()
 	picker_scroll_restore_serial += 1
 	main_page.visible = true
 	picker_page.visible = false

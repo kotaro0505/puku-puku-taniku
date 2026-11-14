@@ -874,6 +874,11 @@ func _test_parent_picker_touch_scrolling(game) -> void:
 	ui.open_lab(scroll_candidates, game.species_get_counts)
 	ui._open_picker(0)
 	await _wait_for_picker_layout()
+	var initially_requested_candidate_images := 0
+	for candidate_card_value in ui.candidate_cards_by_id.values():
+		if bool((candidate_card_value as Button).get_meta("image_requested", false)):
+			initially_requested_candidate_images += 1
+	assert(initially_requested_candidate_images > 0 and initially_requested_candidate_images <= 8)
 	var picker_scroll: ScrollContainer = ui.picker_scroll
 	assert(picker_scroll.scroll_deadzone == 12)
 	assert(picker_scroll.mouse_filter == Control.MOUSE_FILTER_STOP)
@@ -889,8 +894,10 @@ func _test_parent_picker_touch_scrolling(game) -> void:
 	# Selecting a parent remembers the position that was visible when the picker closed.
 	picker_scroll.scroll_vertical = 100000
 	await get_tree().process_frame
+	await get_tree().process_frame
 	var selected_scroll_vertical := picker_scroll.scroll_vertical
 	assert(selected_scroll_vertical > 0)
+	assert(not bool(first_card.get_meta("image_requested", false)))
 	assert(ui.picker_page.visible)
 	assert(game.fusion_parent_a_id.is_empty())
 	first_card.pressed.emit()
@@ -1038,6 +1045,7 @@ func _test_parent_picker_touch_scrolling(game) -> void:
 		await get_tree().process_frame
 
 func _wait_for_picker_layout() -> void:
+	await get_tree().process_frame
 	await get_tree().process_frame
 	await get_tree().process_frame
 

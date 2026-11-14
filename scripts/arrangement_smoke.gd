@@ -55,9 +55,12 @@ func _ready()->void:
 	assert(ui.picker_filter.item_count==3 and gummy_filter_index>0)
 	ui.picker_filter.select(gummy_filter_index);ui._on_picker_filter_changed(gummy_filter_index)
 	var gummy_entries:Array=ui._available_species_entries("gummy");assert(gummy_entries.size()==2 and gummy_entries.all(func(entry:Dictionary)->bool:return str(entry.get("species_id","")) in ["gummy_peach_milk","hyb_gummy_metal"]))
-	assert(ui.picker_grid.get_child_count()==2)
+	var visible_gummy_cards:Array[Button]=[]
 	for card_value in ui.picker_grid.get_children():
-		var card:=card_value as Button;assert(card!=null and card.find_child("SpeciesImage",true,false)!=null and card.find_child("SpeciesName",true,false)!=null and card.find_child("SpeciesName",true,false).text.count("\n")==0 and not _has_label_text_containing(card,"記録"))
+		var card:=card_value as Button
+		if card!=null and card.visible:visible_gummy_cards.append(card)
+	assert(visible_gummy_cards.size()==2)
+	for card in visible_gummy_cards:assert(card.find_child("SpeciesImage",true,false)!=null and card.find_child("SpeciesName",true,false)!=null and card.find_child("SpeciesName",true,false).text.count("\n")==0 and not _has_label_text_containing(card,"記録"))
 	game.discovered.erase("gummy_peach_milk");game.discovered.erase("hyb_gummy_metal");game._sync_arrangement_ui()
 	ui.open_home();assert(ui.home_page.visible and ui.pot_select_grid.get_child_count()==1 and not (ui.pot_select_grid.get_child(0) as Button).disabled and _has_label_text_containing(ui.pot_select_grid.get_child(0),"使用可能 ×1"))
 	assert(_has_label_text_containing(ui.pot_select_grid,"浅型素焼き鉢") and not _has_label_text_containing(ui.pot_select_grid,"未所持") and not _has_label_text_containing(ui.pot_select_grid,"デザイン未アンロック"))
@@ -278,12 +281,22 @@ func _ready()->void:
 	var free_scale:Dictionary=game._normalize_arrangement({"arrangement_id":"free_scale","name":"自由拡大","pot_id":"shallow_terracotta","plants":[{"species_id":"colorata","x":211.0,"y":287.0,"scale":2.75,"rotation":73.0,"z_index":4}]})
 	assert(is_equal_approx(float(free_scale.plants[0].scale),2.75) and is_equal_approx(float(free_scale.plants[0].rotation),73.0) and int(free_scale.plants[0].z_index)==4)
 	for species_entry in game.catalog_species:game.discovered[str(species_entry.get("species_id",""))]=true
-	game._sync_arrangement_ui();ui._open_species_picker();await get_tree().process_frame;await get_tree().process_frame
+	game._sync_arrangement_ui();ui._open_species_picker();await get_tree().process_frame;await get_tree().process_frame;await get_tree().process_frame
 	assert(ui.picker_page.visible and ui.picker_scroll.vertical_scroll_mode==ScrollContainer.SCROLL_MODE_AUTO and ui.picker_scroll.get_v_scroll_bar().max_value>ui.picker_scroll.size.y)
+	assert(ui.picker_cards_by_id.size()==game.catalog_species.size())
+	var initially_requested_picker_images:=0
+	for picker_card_value in ui.picker_cards_by_id.values():
+		if bool((picker_card_value as Button).get_meta("image_requested",false)):initially_requested_picker_images+=1
+	assert(initially_requested_picker_images>0 and initially_requested_picker_images<=16)
+	var cached_first_picker_card_id:=-1
 	for picker_card in ui.picker_grid.get_children():
-		if picker_card is Button:assert(picker_card.action_mode==BaseButton.ACTION_MODE_BUTTON_RELEASE and picker_card.mouse_filter==Control.MOUSE_FILTER_PASS and picker_card.mouse_force_pass_scroll_events)
-	ui.picker_scroll.scroll_vertical=100000;await get_tree().process_frame;assert(ui.picker_scroll.scroll_vertical>0)
+		if picker_card is Button:
+			assert(picker_card.action_mode==BaseButton.ACTION_MODE_BUTTON_RELEASE and picker_card.mouse_filter==Control.MOUSE_FILTER_PASS and picker_card.mouse_force_pass_scroll_events)
+			if cached_first_picker_card_id<0:cached_first_picker_card_id=picker_card.get_instance_id()
+	ui.picker_scroll.scroll_vertical=100000;await get_tree().process_frame;await get_tree().process_frame;assert(ui.picker_scroll.scroll_vertical>0)
+	assert(not bool((ui.picker_cards_by_id.values()[0] as Button).get_meta("image_requested",false)))
 	ui._return_to_editor()
+	ui._open_species_picker();assert((ui.picker_cards_by_id.values()[0] as Button).get_instance_id()==cached_first_picker_card_id);ui._return_to_editor()
 	ui.current_arrangement={"arrangement_id":"limit_test","name":"上限テスト","pot_id":"shallow_terracotta","created_at":"test","plants":[]};ui._load_editor_from_current()
 	for plant_index in range(ui.MAX_PLANTS_PER_ARRANGEMENT+3):ui._add_species_to_editor("colorata")
 	assert(ui.editor_plants.size()==ui.MAX_PLANTS_PER_ARRANGEMENT and ui.add_plant_button.disabled)
