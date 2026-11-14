@@ -1,7 +1,7 @@
 # 『ぷくぷく！たにくらいふ』プライバシーポリシー公開原稿
 
 > **正式公開済み**<br>
-> 最終更新・施行日: 2026-11-13<br>
+> 最終更新・施行日: 2026-11-14<br>
 > 正式URL: `https://kotaro0505.github.io/puku-puku-taniku/privacy-policy/`<br>
 > 公開本文は日本語・英語の各「プライバシーポリシー」節です。末尾の検証記録は公開HTMLに含めません。
 
@@ -17,13 +17,15 @@
 - 運営者：オハナ屋農園
 - 所在国・地域：日本
 - 問い合わせ先：kotaro.hana.0505@gmail.com
-- 施行日：2026年11月13日
+- 施行日：2026年11月14日
 
 ## 2. 取り扱う情報
 
-### 2.1 リワード広告
+### 2.1 広告
 
-iOS版は、任意視聴のリワード広告を提供するため、Google Mobile Ads SDK（Google AdMob）およびGoogle User Messaging Platform SDK（UMP）を使用します。広告の配信、同意管理、広告効果の測定（ad measurement）、広告分析、表示回数の制御、不正利用防止、障害解析およびSDKの品質改善のため、Googleは端末や同意状態等に応じて次の情報を処理する可能性があります。
+iOS版は、任意視聴のリワード広告と、森のガチャおよびハイブリッドラボで自動表示されるインタースティシャル広告を提供するため、Google Mobile Ads SDK（Google AdMob）およびGoogle User Messaging Platform SDK（UMP）を使用します。広告の配信、同意管理、広告効果の測定（ad measurement）、広告分析、表示回数の制御、不正利用防止、障害解析およびSDKの品質改善のため、Googleは端末や同意状態等に応じて次の情報を処理する可能性があります。
+
+インタースティシャル広告は、森のガチャの正常な抽選またはハイブリッドラボの正常な交配が、それぞれ5回に達するごとに、結果、GETカードおよび関連演出の終了後の安全な画面切り替え時に自動表示される場合があります。広告が準備できていない場合、その回は表示せず、後から突然表示しません。
 
 - IPアドレス、およびIPアドレス等から推定されるおおまかな位置情報
 - 広告識別子その他の端末識別子
@@ -38,7 +40,7 @@ iOS版は、必要なGoogle UMPの処理が完了した後、ATTの状態が未�
 
 ### 2.2 アプリ内課金
 
-iOS版は、36種類の鉢デザインを永続的に解放する非消耗型アプリ内課金にApple StoreKit 2を使用します。支払い、購入履歴、返金およびApple Accountに関する情報はAppleが処理します。運営者がクレジットカード番号や銀行口座番号等の完全な支払手段情報を直接受け取ることはありません。
+iOS版は、36種類の鉢デザインと、日本のApp Storeで100円として設定している「広告を削除」を提供するため、計37商品の非消耗型アプリ内課金にApple StoreKit 2を使用します。鉢デザインは永続的に解放されます。「広告を削除」は、森のガチャとハイブリッドラボで自動表示されるインタースティシャル広告だけを永久に削除し、任意視聴のパンダのお手伝いリワード広告は残ります。支払い、購入履歴、返金およびApple Accountに関する情報はAppleが処理します。運営者がクレジットカード番号や銀行口座番号等の完全な支払手段情報を直接受け取ることはありません。
 
 本アプリは、商品ID、StoreKitが提供する価格表示、購入・復元・保留・取消・失敗・返金等の取引状態、および購入利用権が有効かどうかを受け取ります。購入済み機能を提供するため、利用権の端末内キャッシュをセーブデータへ保存します。
 
@@ -78,7 +80,7 @@ Web版ゲーム、サポートページ、プライバシーポリシーおよ�
 取り扱う情報は、該当する場合に限り、次の目的で利用します。
 
 - ゲーム進行、設定、購入済み機能その他の本アプリ機能の提供
-- リワード広告の読込み、表示、視聴完了の確認および報酬の付与
+- リワード広告の読込み、表示、視聴完了の確認および報酬の付与、ならびにインタースティシャル広告の読込みおよび表示
 - 広告配信、集計測定、表示回数の制御、不正利用防止および障害解析
 - 地域等に応じた同意メッセージの表示とプライバシー選択の反映
 - 商品情報と価格の表示、購入処理、購入の復元、返金・利用権変更の反映
@@ -113,7 +115,9 @@ Web版ゲーム、サポートページ、プライバシーポリシーおよ�
 
 ## 5. 広告の同意と選択
 
-本アプリはGoogle UMPを使って同意情報を更新し、利用者の地域等により必要な場合はGoogleが提供する同意フォームを表示します。必要な同意または広告要求の許可を確認できない場合、リワード広告は利用できません。広告を視聴していないのに視聴成功として扱うことはありません。
+本アプリはGoogle UMPを使って同意情報を更新し、利用者の地域等により必要な場合はGoogleが提供する同意フォームを表示します。必要な同意または広告要求の許可を確認できない場合、リワード広告とインタースティシャル広告は読み込まず、表示しません。リワード広告を視聴していないのに視聴成功として扱うことはありません。
+
+「広告を削除」を購入した場合、森のガチャとハイブリッドラボのインタースティシャル広告は表示しません。任意視聴のパンダのお手伝いリワード広告は、購入後も利用できます。
 
 Google UMPによる同意とApple ATTによる追跡許可は別の仕組みです。本アプリは必要なUMP処理を先に行い、その後、ATTの状態が未決定の場合に限り、Google Mobile Ads SDKを初期化する前にiOSの追跡許可ダイアログを表示します。ATTが許可、拒否または制限のいずれであっても、ゲーム機能は利用できます。ATTの選択は、iOSの設定画面から後で変更できる場合があります。
 
@@ -161,13 +165,15 @@ Kids Categoryを使用しないことだけを理由に、子どもに関する�
 - Operator: オハナ屋農園
 - Country or region: Japan
 - Contact: kotaro.hana.0505@gmail.com
-- Effective date: November 13, 2026
+- Effective date: November 14, 2026
 
 ## 2. Information Processed
 
-### 2.1 Rewarded advertising
+### 2.1 Advertising
 
-The iOS version uses Google Mobile Ads SDK (Google AdMob) and Google User Messaging Platform SDK (UMP) to provide optional rewarded ads. Depending on the device, consent status, region, Google settings, and ad availability, Google may process the following information for ad delivery, consent management, ad measurement, advertising analytics, frequency controls, fraud prevention, diagnostics, and SDK quality:
+The iOS version uses Google Mobile Ads SDK (Google AdMob) and Google User Messaging Platform SDK (UMP) to provide optional rewarded ads and automatically displayed interstitial ads in Forest Gacha and Hybrid Lab. Depending on the device, consent status, region, Google settings, and ad availability, Google may process the following information for ad delivery, consent management, ad measurement, advertising analytics, frequency controls, fraud prevention, diagnostics, and SDK quality:
+
+An interstitial ad may be displayed automatically after every five successfully completed Forest Gacha draws or every five successfully completed Hybrid Lab fusions, at a safe screen transition after the result, GET card, and related presentation have ended. If an ad is not ready, the App skips it for that occasion and does not display it unexpectedly later.
 
 - IP address and coarse location inferred from an IP address or similar data;
 - an advertising identifier or another device identifier;
@@ -182,7 +188,7 @@ After completing any required Google UMP processing and only when the ATT status
 
 ### 2.2 In-app purchases
 
-The iOS version uses Apple StoreKit 2 for non-consumable purchases that permanently unlock 36 pot designs. Apple processes payment, purchase history, refunds, and Apple Account information. The Operator does not directly receive complete payment credentials such as credit card or bank account numbers.
+The iOS version uses Apple StoreKit 2 for 37 non-consumable in-app purchases: 36 pot-design products and one “Remove Ads” product configured at ¥100 in the Japanese storefront. Pot designs are permanently unlocked. “Remove Ads” permanently removes only the automatically displayed interstitial ads in Forest Gacha and Hybrid Lab; the optional Panda Help rewarded ad remains available. Apple processes payment, purchase history, refunds, and Apple Account information. The Operator does not directly receive complete payment credentials such as credit card or bank account numbers.
 
 The App receives product identifiers, StoreKit-provided price displays, transaction states such as purchase, restoration, pending, cancellation, failure, and refund, and whether an entitlement is active. An on-device entitlement cache is stored with game save data to provide purchased functionality.
 
@@ -213,7 +219,7 @@ If a user contacts the Operator by email, the Operator may receive the sender's 
 Information is processed, as applicable, for the following purposes:
 
 - providing game progress, settings, purchased functionality, and other App features;
-- loading and displaying rewarded ads, verifying completion, and granting rewards;
+- loading and displaying rewarded ads, verifying completion, and granting rewards, and loading and displaying interstitial ads;
 - ad delivery, aggregate ad measurement, advertising analytics, frequency controls, fraud prevention, and diagnostics;
 - displaying consent messages based on region or other applicable factors and applying privacy choices;
 - displaying product information and prices, processing and restoring purchases, and reflecting refunds or entitlement changes;
@@ -248,7 +254,9 @@ These providers may process information outside Japan.
 
 ## 5. Advertising Consent and Choices
 
-The App uses Google UMP to update consent information and to display a Google-provided consent form when required based on the user's region or other applicable factors. Rewarded ads remain unavailable when the App cannot confirm the required consent or permission to request ads. The App does not treat an unviewed ad as completed.
+The App uses Google UMP to update consent information and to display a Google-provided consent form when required based on the user's region or other applicable factors. The App does not load or display rewarded or interstitial ads when it cannot confirm the required consent or permission to request ads. The App does not treat an unviewed rewarded ad as completed.
+
+After “Remove Ads” is purchased, the App does not display interstitial ads in Forest Gacha or Hybrid Lab. The optional Panda Help rewarded ad remains available after the purchase.
 
 Google UMP consent and Apple ATT tracking authorization are separate controls. The App completes any required UMP processing first and then, only when the ATT status is not determined, displays the iOS tracking authorization prompt before initializing Google Mobile Ads SDK. The game remains available whether ATT is authorized, denied, or restricted. The ATT choice may be changeable later in iOS Settings.
 
@@ -291,16 +299,18 @@ This Policy may be updated when the App, SDKs, laws, or services change. Materia
 ### 完了している確認
 
 1. TestFlight Build 83のiPhone実機で、UMP処理、GoogleのIDFA事前説明、ATT許可、Google Mobile Ads初期化、Google公式テスト広告の再生、視聴完了報酬の付与まで成功したことを確認した。
-2. 現行コードはGodot AdMob Plugin v7.0、Google Mobile Ads SDK 12.14.0、UMP 3.1.0を固定し、`UMP -> ATT -> Google Mobile Ads初期化` の順序、非パーソナライズ広告、パブリッシャーのファーストパーティID無効、最大広告レーティング `G` を設定している。
+2. 現行コードはGodot AdMob Plugin v7.0、Google Mobile Ads SDK 12.14.0、UMP 3.1.0を固定し、リワード広告とインタースティシャル広告で共通の `UMP -> ATT -> Google Mobile Ads初期化` の順序、非パーソナライズ広告、パブリッシャーのファーストパーティID無効、最大広告レーティング `G` を設定している。
 3. ATTの拒否・制限済み状態でもGoogle Mobile Ads初期化へ進むこと、および拒否時も広告再生、報酬の一度だけの付与、次広告の再読込を維持することを自動回帰テストで確認した。
 4. コミット `8fe7083` で、AppleのATT用途説明を日本語・英語の `InfoPlist.strings` に分離し、生成Xcodeプロジェクトと署名済みIPAで両言語を検証するCIを追加した。
 5. UMPの `privacyOptionsRequirementStatus`、`presentPrivacyOptionsForm`、`canRequestAds` を利用するネイティブブリッジと、required時だけ設定画面に入口を表示するコード・自動テストが存在する。
-6. 最新ソースで、36商品のStoreKit 2利用権処理と購入復元、端末内セーブ、利用者操作時だけ開く共有シート、および通常プレイでは新規通知を予約せず旧通知を取り消すだけの構成を確認した。
+6. 最新ソースで、鉢36商品と「広告を削除」1商品の計37商品のStoreKit 2利用権処理と購入復元、端末内セーブ、利用者操作時だけ開く共有シート、および通常プレイでは新規通知を予約せず旧通知を取り消すだけの構成を確認した。
+7. 森のガチャとハイブリッドラボの独立した5回カウンター、安全な画面切り替え時だけのインタースティシャル広告表示、広告未準備時の単発スキップ、および「広告を削除」購入・復元後の表示抑止をコードと回帰テストで確認した。
+8. インタースティシャル広告は既存のGoogle Mobile Ads SDK、UMP、ATTゲートを共用し、別の広告SDKや運営者管理サーバーを追加していない。AppleのApp PrivacyとGoogleのデータ開示資料を再照合し、Device ID、広告データ、利用状況、診断情報等の既存申告候補を広告形式の追加だけを理由に削除しない方針を確認した。最終申告は引き続き提出用archiveのPrivacy Reportと実際のAdMob構成に合わせて確定する。
 
 ### 正式公開時に完了した確認
 
 1. 運営者が日本語・英語本文、運営者名、問い合わせ先、保管・削除方針、および公開URLを最終承認した。
-2. 施行日を日本時間の公開日である2026年11月13日に確定した。
+2. 最終更新・施行日を日本時間の更新日である2026年11月14日に確定した。
 3. Apple App Review Guidelines 5.1.1(i)に関する候補文を含む日英本文を承認した。公開資料だけで確認できない第三者の保護措置を確認済みとは記載していない。
 4. 最新Markdownから、下書き表示、`noindex`、作業用注記を含まない公開HTMLを再生成した。
 5. 公開先を `https://kotaro0505.github.io/puku-puku-taniku/privacy-policy/` とし、サポートページと相互リンクした。
