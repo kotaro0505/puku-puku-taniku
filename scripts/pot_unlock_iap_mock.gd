@@ -5,9 +5,10 @@ signal transaction_state_changed(transaction:Dictionary)
 signal product_info_received(product_info:Dictionary)
 signal product_price_received(product_price:Dictionary)
 signal synchronized(error:String)
+signal current_entitlements_received(info:Dictionary)
 
-const TRANSACTION_PURCHASED := 3
-const TRANSACTION_RESTORED := 4
+const TRANSACTION_PURCHASED := 4
+const TRANSACTION_RESTORED := 5
 
 var localized_prices:Dictionary={}
 var currency_values:Dictionary={}
@@ -23,8 +24,11 @@ var requested_prices:Array[String]=[]
 var suppress_price_response:=false
 var suppress_product_info_response:=false
 var suppress_sync_response:=false
+var suppress_entitlement_snapshot_response:=false
 var sync_error:=""
+var entitlement_snapshot_error:=""
 var sync_calls:=0
+var entitlement_snapshot_calls:=0
 
 func request_product_info(product_id:String)->Signal:
 	requested_products.append(product_id)
@@ -88,3 +92,16 @@ func sync()->Signal:
 
 func emit_sync_result(error:String="")->void:
 	synchronized.emit(error)
+
+func request_current_entitlements()->Signal:
+	entitlement_snapshot_calls+=1
+	if suppress_entitlement_snapshot_response:return current_entitlements_received
+	var product_ids:Array[String]=[]
+	for product_id_value in purchased:
+		if bool(purchased[product_id_value]):product_ids.append(str(product_id_value))
+	product_ids.sort()
+	current_entitlements_received.emit({
+		"error":entitlement_snapshot_error,
+		"product_ids":product_ids,
+	})
+	return current_entitlements_received

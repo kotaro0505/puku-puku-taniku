@@ -1245,6 +1245,7 @@ func _refresh_internal_forced_ad_diagnostics()->void:
 	var policy_diag:Dictionary=forced_interstitial_policy.diagnostic_snapshot() if forced_interstitial_policy!=null else {}
 	var service_diag:Dictionary=interstitial_ad_service.diagnostic_snapshot() if interstitial_ad_service!=null else {}
 	var reward_diag:Dictionary=rewarded_ad_service.diagnostic_snapshot() if rewarded_ad_service!=null else {}
+	var iap_diag:Dictionary=pot_unlock_iap_service.diagnostic_snapshot() if pot_unlock_iap_service!=null else {}
 	internal_forced_ad_diagnostic_label.text="\n".join([
 		"profile=internal_test",
 		"forced_ads_removed=%s"%str(forced_ads_removed),
@@ -1266,6 +1267,8 @@ func _refresh_internal_forced_ad_diagnostics()->void:
 		"att_status=%s  consent=%s"%[str(reward_diag.get("att_status","unknown")),str(reward_diag.get("privacy_requirement","unknown"))],
 		"att_pending=%s  consent_pending=%s"%[str(reward_diag.get("att_request_pending",false)),str(reward_diag.get("consent_operation_pending",false))],
 		"rewarded_diagnostic=%s"%str(reward_diag.get("diagnostic_code","unknown")),
+		"iap_restore=%s  sync=%s  rights=%s  count=%d"%[str(iap_diag.get("restore_result_code","unknown")),str(iap_diag.get("restore_sync_result_code","unknown")),str(iap_diag.get("restore_entitlements_result_code","unknown")),int(iap_diag.get("restore_entitlement_count",0))],
+		"iap_product_errors=%d  last=%s"%[int(iap_diag.get("product_info_error_count",0)),str(iap_diag.get("last_product_info_error_product_id","none"))],
 	])
 
 func _on_rewarded_ad_service_finished(reward_context:String,reward_earned:bool)->void:
@@ -2853,6 +2856,7 @@ func _on_pot_iap_restore_finished(success:bool)->void:
 			_:message_key="iap_restore_failed"
 	arrangement_ui.show_pot_shop_message(Localizer.text(language_code,message_key))
 	_sync_arrangement_ui()
+	_refresh_internal_forced_ad_diagnostics()
 
 func _on_catalog_purchase_requested(series_id:String)->void:
 	# Catalog pages are recorded automatically on first GET; they are never sold.

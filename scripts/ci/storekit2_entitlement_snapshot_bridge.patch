@@ -1,0 +1,69 @@
+diff --git a/godot-storekit2/GodotStoreKit2Swift.swift b/godot-storekit2/GodotStoreKit2Swift.swift
+index 82ae928..d7a3a9e 100644
+--- a/godot-storekit2/GodotStoreKit2Swift.swift
++++ b/godot-storekit2/GodotStoreKit2Swift.swift
+@@ -208,0 +209,15 @@ public final class GodotStoreKit2Proxy: NSObject,
++	public func getCurrentEntitlements() async -> EntitlementSnapshot {
++		let snapshot = EntitlementSnapshot()
++		for await verificationResult in Transaction.currentEntitlements {
++			switch verificationResult {
++			case .verified(let transaction):
++				snapshot.productIds.append(transaction.productID)
++			case .unverified(_, _):
++				// Never apply a partial entitlement snapshot. GDScript retains its
++				// last verified cache and reports the restore as failed instead.
++				snapshot.errorCode = "unverified_entitlement"
++				return snapshot
++			}
++		}
++		return snapshot
++	}
+@@ -254,0 +270,6 @@ public class ProductInfo: NSObject {
++
++@objcMembers
++public class EntitlementSnapshot: NSObject {
++	public var productIds: [String] = []
++	public var errorCode = ""
++}
+diff --git a/godot-storekit2/godot-storekit2.h b/godot-storekit2/godot-storekit2.h
+index e74089d..b2da1e1 100644
+--- a/godot-storekit2/godot-storekit2.h
++++ b/godot-storekit2/godot-storekit2.h
+@@ -37,0 +38 @@ public:
++	Signal request_current_entitlements();
+diff --git a/godot-storekit2/godot-storekit2.mm b/godot-storekit2/godot-storekit2.mm
+index 4086f42..d53cce6 100644
+--- a/godot-storekit2/godot-storekit2.mm
++++ b/godot-storekit2/godot-storekit2.mm
+@@ -3,0 +4 @@
++#include "core/variant/array.h"
+@@ -19,0 +21 @@ void GodotStoreKit2::_bind_methods() {
++	ClassDB::bind_method(D_METHOD("request_current_entitlements"), &GodotStoreKit2::request_current_entitlements);
+@@ -25,0 +28 @@ void GodotStoreKit2::_bind_methods() {
++	ADD_SIGNAL(MethodInfo("current_entitlements_received", PropertyInfo(Variant::DICTIONARY, "info")));
+@@ -39 +42,2 @@ Signal GodotStoreKit2::request_product_info(String p_product_id) {
+-	[proxy getProductInfoWithProductId:fromGodotString(p_product_id) completionHandler:^(ProductInfo *info, NSError *error) {
++	NSString *productId = fromGodotString(p_product_id);
++	[proxy getProductInfoWithProductId:productId completionHandler:^(ProductInfo *info, NSError *error) {
+@@ -40,0 +45 @@ Signal GodotStoreKit2::request_product_info(String p_product_id) {
++		result["product_id"] = toGodotString(productId);
+@@ -45 +49,0 @@ Signal GodotStoreKit2::request_product_info(String p_product_id) {
+-			result["product_id"] = toGodotString(info.productId);
+@@ -84,0 +89,17 @@ Signal GodotStoreKit2::request_product_price(String p_product_id) {
++
++Signal GodotStoreKit2::request_current_entitlements() {
++	[proxy getCurrentEntitlementsWithCompletionHandler:^(EntitlementSnapshot *snapshot) {
++		Dictionary result;
++		result["error"] = toGodotString(snapshot.errorCode);
++		Array productIds;
++		for (NSString *productId in snapshot.productIds) {
++			productIds.append(toGodotString(productId));
++		}
++		result["product_ids"] = productIds;
++
++		call_deferred("emit_signal", "current_entitlements_received", result);
++	}];
++
++	return Signal(this, "current_entitlements_received");
++}
++

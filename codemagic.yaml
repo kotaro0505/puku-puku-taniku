@@ -14,7 +14,7 @@ workflows:
         GODOT_TEMPLATE_VERSION: "4.7.2.stable"
         STOREKIT2_VERSION: "v0.2"
         IOS_MIN_VERSION: "15.6"
-        STOREKIT2_COMPAT_REVISION: "compat5"
+        STOREKIT2_COMPAT_REVISION: "compat6"
         ADMOB_PLUGIN_VERSION: "v7.0"
         ADMOB_PLUGIN_UPSTREAM_COMMIT: "4b4ddceab0be81f0dcb12a6313038dba6cf9eacf"
         ADMOB_NATIVE_COMPAT_REVISION: "ump2-att2"
@@ -38,7 +38,7 @@ workflows:
     cache:
       cache_paths:
         - $HOME/.cache/puku-puku-taniku/godot-4.7.2
-        - $HOME/.cache/puku-puku-taniku/storekit2-v0.2-godot-4.7.2-ios15.6-compat5
+        - $HOME/.cache/puku-puku-taniku/storekit2-v0.2-godot-4.7.2-ios15.6-compat6
         - $HOME/.cache/puku-puku-taniku/admob-v7.0-ump2-att2-godot-4.7.2-gma-12.14.0-ios15.6
         - $HOME/Library/Application Support/Godot/export_templates/4.7.2.stable
     scripts:
@@ -83,7 +83,7 @@ workflows:
           test "$APPLE_TEAM_ID" = "UK8FRB9XKH"
           test "$APP_VERSION" = "1.0.0"
           test "$IOS_MIN_VERSION" = "15.6"
-          test "$STOREKIT2_COMPAT_REVISION" = "compat5"
+          test "$STOREKIT2_COMPAT_REVISION" = "compat6"
           test "$ADMOB_PLUGIN_VERSION" = "v7.0"
           test "$ADMOB_PLUGIN_UPSTREAM_COMMIT" = "4b4ddceab0be81f0dcb12a6313038dba6cf9eacf"
           test "$ADMOB_NATIVE_COMPAT_REVISION" = "ump2-att2"
@@ -625,7 +625,7 @@ workflows:
         GODOT_TEMPLATE_VERSION: "4.7.2.stable"
         STOREKIT2_VERSION: "v0.2"
         IOS_MIN_VERSION: "15.6"
-        STOREKIT2_COMPAT_REVISION: "compat5"
+        STOREKIT2_COMPAT_REVISION: "compat6"
         ADMOB_PLUGIN_VERSION: "v7.0"
         ADMOB_PLUGIN_UPSTREAM_COMMIT: "4b4ddceab0be81f0dcb12a6313038dba6cf9eacf"
         ADMOB_NATIVE_COMPAT_REVISION: "ump2-att2"
@@ -666,7 +666,7 @@ workflows:
         GODOT_TEMPLATE_VERSION: "4.7.2.stable"
         STOREKIT2_VERSION: "v0.2"
         IOS_MIN_VERSION: "15.6"
-        STOREKIT2_COMPAT_REVISION: "compat5"
+        STOREKIT2_COMPAT_REVISION: "compat6"
         ADMOB_PLUGIN_VERSION: "v7.0"
         ADMOB_PLUGIN_UPSTREAM_COMMIT: "4b4ddceab0be81f0dcb12a6313038dba6cf9eacf"
         ADMOB_NATIVE_COMPAT_REVISION: "ump2-att2"
@@ -711,7 +711,7 @@ workflows:
         GODOT_TEMPLATE_VERSION: "4.7.2.stable"
         STOREKIT2_VERSION: "v0.2"
         IOS_MIN_VERSION: "15.6"
-        STOREKIT2_COMPAT_REVISION: "compat5"
+        STOREKIT2_COMPAT_REVISION: "compat6"
         ADMOB_PLUGIN_VERSION: "v7.0"
         ADMOB_PLUGIN_UPSTREAM_COMMIT: "4b4ddceab0be81f0dcb12a6313038dba6cf9eacf"
         ADMOB_NATIVE_COMPAT_REVISION: "ump2-att2"

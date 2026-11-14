@@ -16,7 +16,8 @@ const EXPECTED_PRICE_GROUPS := {
 }
 
 func _ready()->void:
-	assert(ServiceClass.TRANSACTION_PURCHASED==3 and ServiceClass.TRANSACTION_RESTORED==4 and ServiceClass.TRANSACTION_CANCELED==6)
+	assert(ServiceClass.TRANSACTION_DEFERRED==3 and ServiceClass.TRANSACTION_PURCHASED==4 and ServiceClass.TRANSACTION_RESTORED==5)
+	assert(ServiceClass.TRANSACTION_EXPIRED==6 and ServiceClass.TRANSACTION_CANCELED==7)
 	var initial:=_read_array("res://data/pots.json")
 	var paid:=_read_array("res://data/pot-iap-catalog.json")
 	assert(initial.size()==8)
@@ -90,16 +91,25 @@ func _ready()->void:
 	assert(extra_service.purchase(forced_ads_product_id))
 	assert(extra_service.is_unlocked(forced_ads_product_id))
 	assert(extra_mock.purchase_calls==[forced_ads_product_id])
-	var extra_restore_mock:=MockClass.new();extra_restore_mock.localized_prices=all_product_prices.duplicate(true);extra_restore_mock.restore_entitlements={forced_ads_product_id:true}
+	# Simulate purchase -> process restart/new save -> explicit restore from Apple's
+	# transaction history, without carrying the local entitlement cache forward.
+	var extra_restore_mock:=MockClass.new();extra_restore_mock.localized_prices=all_product_prices.duplicate(true);extra_restore_mock.restore_entitlements=extra_mock.purchased.duplicate(true)
 	var extra_restore_service:=ServiceClass.new();add_child(extra_restore_service);extra_restore_service.configure(all_pots,{},extra_restore_mock,null,[forced_ads_product_id])
 	await get_tree().process_frame
 	assert(extra_restore_service.restore_purchases())
-	assert(extra_restore_service.is_unlocked(forced_ads_product_id))
+	assert(extra_restore_service.is_unlocked(forced_ads_product_id) and extra_restore_mock.entitlement_snapshot_calls==1)
+	assert(extra_restore_service.restore_result_code()==extra_restore_service.RESTORE_RESULT_SUCCESS)
+	extra_restore_mock.transaction_state_changed.emit({"error":"","product_id":forced_ads_product_id,"transaction_state":ServiceClass.TRANSACTION_REFUNDED})
+	assert(not extra_restore_service.is_unlocked(forced_ads_product_id))
 	var failure_mock:=MockClass.new();failure_mock.localized_prices=prices.duplicate(true);failure_mock.next_purchase_error="declined"
 	var failure_service:=ServiceClass.new();add_child(failure_service);failure_service.configure(all_pots,{},failure_mock)
 	await get_tree().process_frame
 	assert(failure_service.purchase(first_product));assert(not failure_service.is_unlocked(first_product))
 	assert(str(failure_service.product_states_snapshot()[first_product].status)==failure_service.STATUS_AVAILABLE)
+	var cancel_reasons:Array[String]=[]
+	failure_service.purchase_failed.connect(func(_product_id:String,reason:String)->void:cancel_reasons.append(reason))
+	failure_mock.transaction_state_changed.emit({"error":"","product_id":first_product,"transaction_state":ServiceClass.TRANSACTION_CANCELED})
+	assert(cancel_reasons==["canceled"] and not failure_service.is_unlocked(first_product))
 
 	# The review-capture profile needs only visible StoreKit prices. It requests
 	# all 36 products through the price-only bridge without entitlement lookups.
@@ -147,6 +157,10 @@ func _ready()->void:
 	assert(not restore_service.is_unlocked(first_product));assert(restore_service.restore_purchases())
 	assert(restore_mock.sync_calls==1 and restore_service.is_unlocked(first_product) and restore_service.is_unlocked(last_product) and not restore_service.restore_in_progress())
 	assert(restore_results==[true] and restore_service.restore_result_code()==restore_service.RESTORE_RESULT_SUCCESS)
+	assert(restore_mock.entitlement_snapshot_calls==1 and restore_mock.requested_products.size()==36)
+	var restore_diagnostic:Dictionary=restore_service.diagnostic_snapshot()
+	assert(str(restore_diagnostic.restore_sync_result_code)==restore_service.RESTORE_RESULT_SUCCESS)
+	assert(str(restore_diagnostic.restore_entitlements_result_code)==restore_service.RESTORE_RESULT_SUCCESS and int(restore_diagnostic.restore_entitlement_count)==2)
 	# Duplicate native completion callbacks must not complete or refresh twice.
 	restore_mock.emit_sync_result("");assert(restore_results==[true])
 
@@ -192,24 +206,53 @@ func _ready()->void:
 	var refresh_timeout_mock:=MockClass.new();refresh_timeout_mock.localized_prices=prices.duplicate(true)
 	var refresh_timeout_service:=ServiceClass.new();add_child(refresh_timeout_service);refresh_timeout_service.configure(all_pots,{},refresh_timeout_mock)
 	await get_tree().process_frame
-	refresh_timeout_mock.suppress_product_info_response=true
+	refresh_timeout_mock.suppress_entitlement_snapshot_response=true
 	var refresh_timeout_results:Array[bool]=[]
 	refresh_timeout_service.restore_finished.connect(func(success:bool)->void:refresh_timeout_results.append(success))
 	assert(refresh_timeout_service.restore_purchases() and refresh_timeout_service.restore_in_progress())
 	refresh_timeout_service._on_restore_timeout(refresh_timeout_service._restore_timeout_token)
 	assert(refresh_timeout_results==[false] and refresh_timeout_service.restore_result_code()==refresh_timeout_service.RESTORE_RESULT_TIMEOUT)
 
-	# A product lookup error after AppStore.sync() is not reported as a fully
-	# verified restore. Existing cached entitlements are not erased on the error.
-	var refresh_failure_mock:=MockClass.new();refresh_failure_mock.localized_prices=prices.duplicate(true);refresh_failure_mock.purchased[first_product]=true
-	var refresh_failure_service:=ServiceClass.new();add_child(refresh_failure_service);refresh_failure_service.configure(all_pots,{first_product:true},refresh_failure_mock)
+	# Product merchandising data and purchase entitlements are independent.
+	# One unavailable, unpurchased product must not turn a verified 37-product
+	# entitlement snapshot into a restore failure.
+	var partial_catalog_prices:=all_product_prices.duplicate(true);partial_catalog_prices.erase(last_product)
+	var partial_catalog_mock:=MockClass.new();partial_catalog_mock.localized_prices=partial_catalog_prices;partial_catalog_mock.restore_entitlements={forced_ads_product_id:true}
+	var partial_catalog_service:=ServiceClass.new();add_child(partial_catalog_service);partial_catalog_service.configure(all_pots,{},partial_catalog_mock,null,[forced_ads_product_id])
 	await get_tree().process_frame
-	refresh_failure_mock.localized_prices.erase(last_product)
-	var refresh_failure_results:Array[bool]=[]
-	refresh_failure_service.restore_finished.connect(func(success:bool)->void:refresh_failure_results.append(success))
-	assert(refresh_failure_service.restore_purchases())
-	assert(refresh_failure_results==[false] and refresh_failure_service.is_unlocked(first_product))
-	assert(refresh_failure_service.restore_result_code()==refresh_failure_service.RESTORE_RESULT_FAILED)
+	assert(str(partial_catalog_service.product_states_snapshot()[last_product].status)==partial_catalog_service.STATUS_UNAVAILABLE)
+	var partial_catalog_results:Array[bool]=[]
+	partial_catalog_service.restore_finished.connect(func(success:bool)->void:partial_catalog_results.append(success))
+	assert(partial_catalog_service.restore_purchases())
+	assert(partial_catalog_results==[true] and partial_catalog_service.is_unlocked(forced_ads_product_id))
+	assert(partial_catalog_service.restore_result_code()==partial_catalog_service.RESTORE_RESULT_SUCCESS)
+	assert(partial_catalog_mock.entitlement_snapshot_calls==1 and partial_catalog_mock.requested_products.size()==37)
+	var partial_catalog_diagnostic:Dictionary=partial_catalog_service.diagnostic_snapshot()
+	assert(int(partial_catalog_diagnostic.product_info_error_count)==1 and str(partial_catalog_diagnostic.last_product_info_error_product_id)==last_product)
+
+	# A failed or unverified entitlement snapshot never becomes a success and
+	# never erases the last verified cache.
+	var snapshot_failure_mock:=MockClass.new();snapshot_failure_mock.localized_prices=all_product_prices.duplicate(true);snapshot_failure_mock.purchased[forced_ads_product_id]=true;snapshot_failure_mock.entitlement_snapshot_error="unverified_entitlement"
+	var snapshot_failure_service:=ServiceClass.new();add_child(snapshot_failure_service);snapshot_failure_service.configure(all_pots,{forced_ads_product_id:true},snapshot_failure_mock,null,[forced_ads_product_id])
+	await get_tree().process_frame
+	var snapshot_failure_results:Array[bool]=[]
+	snapshot_failure_service.restore_finished.connect(func(success:bool)->void:snapshot_failure_results.append(success))
+	assert(snapshot_failure_service.restore_purchases())
+	assert(snapshot_failure_results==[false] and snapshot_failure_service.is_unlocked(forced_ads_product_id))
+	assert(snapshot_failure_service.restore_result_code()==snapshot_failure_service.RESTORE_RESULT_FAILED)
+	assert(str(snapshot_failure_service.diagnostic_snapshot().restore_entitlements_result_code)=="unverified_entitlement")
+
+	# An authoritative empty snapshot removes a cached non-consumable after a
+	# refund/revocation without marking any unpurchased product as owned.
+	var revoked_mock:=MockClass.new();revoked_mock.localized_prices=all_product_prices.duplicate(true);revoked_mock.purchased[forced_ads_product_id]=true
+	var revoked_service:=ServiceClass.new();add_child(revoked_service);revoked_service.configure(all_pots,{forced_ads_product_id:true},revoked_mock,null,[forced_ads_product_id])
+	await get_tree().process_frame
+	assert(revoked_service.is_unlocked(forced_ads_product_id));revoked_mock.purchased.clear()
+	var revoked_results:Array[bool]=[]
+	revoked_service.restore_finished.connect(func(success:bool)->void:revoked_results.append(success))
+	assert(revoked_service.restore_purchases())
+	assert(revoked_results==[true] and not revoked_service.is_unlocked(forced_ads_product_id))
+	assert(revoked_service.entitlements_snapshot().is_empty())
 
 	# Production desktop/Web has no StoreKit bridge. It must never simulate a
 	# charge or invent a price; only the isolated test bridge above can do that.

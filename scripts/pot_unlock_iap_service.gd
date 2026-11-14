@@ -23,15 +23,16 @@ const RESTORE_STAGE_REFRESHING := "refreshing"
 const RESTORE_SYNC_TIMEOUT_SECONDS := 120.0
 const RESTORE_REFRESH_TIMEOUT_SECONDS := 60.0
 
-# Values exported by GodotStoreKit2.TransactionState.  Keeping the numeric
+# Values exported by GodotStoreKit2.TransactionState. Keeping the numeric
 # bridge constants here avoids loading an iOS-only class on Web or desktop.
 const TRANSACTION_FAILED := 0
 const TRANSACTION_REFUNDED := 1
 const TRANSACTION_PENDING := 2
-const TRANSACTION_PURCHASED := 3
-const TRANSACTION_RESTORED := 4
-const TRANSACTION_EXPIRED := 5
-const TRANSACTION_CANCELED := 6
+const TRANSACTION_DEFERRED := 3
+const TRANSACTION_PURCHASED := 4
+const TRANSACTION_RESTORED := 5
+const TRANSACTION_EXPIRED := 6
+const TRANSACTION_CANCELED := 7
 
 var _store_kit
 var _product_ids:Array[String]=[]
@@ -45,9 +46,13 @@ var _request_method_available:=false
 var _response_signal_available:=false
 var _requests_dispatched:=0
 var _responses_received:=0
+var _product_info_error_count:=0
+var _last_product_info_error_product_id:=""
 var _restore_stage:=RESTORE_STAGE_IDLE
 var _restore_result_code:=RESTORE_RESULT_IDLE
-var _restore_pending_product_ids:Dictionary={}
+var _restore_sync_result_code:=RESTORE_RESULT_IDLE
+var _restore_entitlements_result_code:=RESTORE_RESULT_IDLE
+var _restore_entitlement_count:=0
 var _restore_timeout_token:=0
 
 func configure(pots:Array,cached_entitlements:Dictionary={},test_bridge:Variant=null,price_only_products:Variant=null,extra_product_ids:Variant=null)->void:
@@ -63,9 +68,13 @@ func configure(pots:Array,cached_entitlements:Dictionary={},test_bridge:Variant=
 	_response_signal_available=false
 	_requests_dispatched=0
 	_responses_received=0
+	_product_info_error_count=0
+	_last_product_info_error_product_id=""
 	_restore_stage=RESTORE_STAGE_IDLE
 	_restore_result_code=RESTORE_RESULT_IDLE
-	_restore_pending_product_ids.clear()
+	_restore_sync_result_code=RESTORE_RESULT_IDLE
+	_restore_entitlements_result_code=RESTORE_RESULT_IDLE
+	_restore_entitlement_count=0
 	_restore_timeout_token+=1
 	for pot_value in pots:
 		if not pot_value is Dictionary:continue
@@ -114,7 +123,14 @@ func is_unlocked(product_id:String)->bool:
 	return bool(_entitlements.get(product_id,false))
 
 func restore_available()->bool:
-	return _price_only_product_ids.is_empty() and _store_kit!=null and _store_kit.has_method("sync") and _store_kit.has_signal("synchronized")
+	return (
+		_price_only_product_ids.is_empty()
+		and _store_kit!=null
+		and _store_kit.has_method("sync")
+		and _store_kit.has_signal("synchronized")
+		and _store_kit.has_method("request_current_entitlements")
+		and _store_kit.has_signal("current_entitlements_received")
+	)
 
 func restore_in_progress()->bool:
 	return _restore_in_progress
@@ -135,6 +151,15 @@ func diagnostic_snapshot()->Dictionary:
 		"requested_product_count":_price_only_product_ids.size() if not _price_only_product_ids.is_empty() else _product_ids.size(),
 		"requests_dispatched":_requests_dispatched,
 		"responses_received":_responses_received,
+		"product_info_error_count":_product_info_error_count,
+		"last_product_info_error_product_id":_last_product_info_error_product_id,
+		"restore_available":restore_available(),
+		"restore_in_progress":_restore_in_progress,
+		"restore_stage":_restore_stage,
+		"restore_result_code":_restore_result_code,
+		"restore_sync_result_code":_restore_sync_result_code,
+		"restore_entitlements_result_code":_restore_entitlements_result_code,
+		"restore_entitlement_count":_restore_entitlement_count,
 	}
 
 func purchase(product_id:String)->bool:
@@ -160,7 +185,9 @@ func restore_purchases()->bool:
 	_restore_in_progress=true
 	_restore_stage=RESTORE_STAGE_SYNCING
 	_restore_result_code=RESTORE_RESULT_IDLE
-	_restore_pending_product_ids.clear()
+	_restore_sync_result_code=RESTORE_RESULT_IDLE
+	_restore_entitlements_result_code=RESTORE_RESULT_IDLE
+	_restore_entitlement_count=0
 	_arm_restore_timeout(RESTORE_SYNC_TIMEOUT_SECONDS)
 	state_changed.emit()
 	_store_kit.call("sync")
@@ -175,6 +202,8 @@ func _connect_bridge_signals()->void:
 		_store_kit.connect("transaction_state_changed",_on_transaction_state_changed)
 	if _store_kit.has_signal("synchronized"):
 		_store_kit.connect("synchronized",_on_synchronized)
+	if _store_kit.has_signal("current_entitlements_received"):
+		_store_kit.connect("current_entitlements_received",_on_current_entitlements_received)
 
 func _validate_product_request_api()->bool:
 	var method_name:="request_product_price" if not _price_only_product_ids.is_empty() else "request_product_info"
@@ -208,25 +237,26 @@ func _on_product_info_received(info:Dictionary)->void:
 	if product_id.is_empty():
 		# StoreKit may omit the product id on an error. Keep every unresolved item
 		# safely unavailable rather than guessing which price belongs to it.
-		if not str(info.get("error","")).is_empty():_mark_loading_unavailable(str(info.get("error","product_info_failed")))
-		_record_restore_product_response(product_id,false)
+		if not str(info.get("error","")).is_empty():
+			_product_info_error_count+=1
+			_last_product_info_error_product_id="unknown"
+			_mark_loading_unavailable(str(info.get("error","product_info_failed")))
 		return
 	if not _product_ids.has(product_id):
-		_record_restore_product_response(product_id,false)
 		return
 	var error:=str(info.get("error",""))
 	var localized_price:=str(info.get("localized_price","")).strip_edges()
 	if not error.is_empty() or localized_price.is_empty():
+		_product_info_error_count+=1
+		_last_product_info_error_product_id=product_id
 		_product_states[product_id]={"status":STATUS_UNAVAILABLE,"localized_price":"","error":error if not error.is_empty() else "localized_price_missing"}
 		state_changed.emit()
-		_record_restore_product_response(product_id,false)
 		return
 	_product_states[product_id]={"status":STATUS_AVAILABLE,"localized_price":localized_price,"error":""}
 	# A successful StoreKit lookup is authoritative. It restores purchases on a
 	# new save/device and also removes a refunded entitlement from the local cache.
 	_set_entitlement(product_id,bool(info.get("is_purchased",false)))
 	state_changed.emit()
-	_record_restore_product_response(product_id,true)
 
 func _on_product_price_received(price:Dictionary)->void:
 	_responses_received+=1
@@ -289,7 +319,7 @@ func _on_transaction_state_changed(transaction:Dictionary)->void:
 		TRANSACTION_REFUNDED,TRANSACTION_EXPIRED:
 			_set_entitlement(product_id,false)
 			_reset_product_after_purchase(product_id,"")
-		TRANSACTION_PENDING:
+		TRANSACTION_PENDING,TRANSACTION_DEFERRED:
 			var state:Dictionary=_product_states.get(product_id,{})
 			state["status"]=STATUS_PURCHASING
 			_product_states[product_id]=state
@@ -307,36 +337,48 @@ func _on_synchronized(error:String="")->void:
 	# when AppStore.sync() completed successfully.
 	if not _restore_in_progress or _restore_stage!=RESTORE_STAGE_SYNCING:return
 	var result_code:=_classify_restore_error(error)
+	_restore_sync_result_code=result_code
 	if result_code!=RESTORE_RESULT_SUCCESS:
 		_finish_restore(false,result_code)
 		return
-	_begin_restore_product_refresh()
+	_begin_restore_entitlement_refresh()
 
-func _begin_restore_product_refresh()->void:
+func _begin_restore_entitlement_refresh()->void:
 	_restore_stage=RESTORE_STAGE_REFRESHING
-	_restore_pending_product_ids.clear()
-	for product_id in _product_ids:_restore_pending_product_ids[product_id]=true
-	if _restore_pending_product_ids.is_empty():
+	if _product_ids.is_empty():
+		_restore_entitlements_result_code=RESTORE_RESULT_SUCCESS
 		_finish_restore(true,RESTORE_RESULT_SUCCESS)
 		return
 	_arm_restore_timeout(RESTORE_REFRESH_TIMEOUT_SECONDS)
-	_request_configured_product_data()
+	_store_kit.call("request_current_entitlements")
 
-func _record_restore_product_response(product_id:String,success:bool)->void:
+func _on_current_entitlements_received(info:Dictionary)->void:
 	if not _restore_in_progress or _restore_stage!=RESTORE_STAGE_REFRESHING:return
-	if product_id.is_empty() or not _restore_pending_product_ids.has(product_id):
+	var error:=str(info.get("error","")).strip_edges().to_lower()
+	_restore_entitlements_result_code=error if not error.is_empty() else RESTORE_RESULT_SUCCESS
+	if not error.is_empty():
 		_finish_restore(false,RESTORE_RESULT_FAILED)
 		return
-	_restore_pending_product_ids.erase(product_id)
-	if not success:
+	var product_ids_value:Variant=info.get("product_ids",null)
+	if not (product_ids_value is Array) and typeof(product_ids_value)!=TYPE_PACKED_STRING_ARRAY:
+		_restore_entitlements_result_code="invalid_entitlement_snapshot"
 		_finish_restore(false,RESTORE_RESULT_FAILED)
 		return
-	if _restore_pending_product_ids.is_empty():_finish_restore(true,RESTORE_RESULT_SUCCESS)
+	var active_entitlements:Dictionary={}
+	for product_id in _normalize_product_ids(product_ids_value):
+		if _product_ids.has(product_id):active_entitlements[product_id]=true
+	# Apply the verified snapshot only after it has been validated in full. This
+	# restores purchases on a new device and removes refunded/revoked rights,
+	# while a failed snapshot leaves the last known cache untouched.
+	for product_id in _product_ids:
+		_set_entitlement(product_id,active_entitlements.has(product_id))
+	_restore_entitlement_count=active_entitlements.size()
+	_finish_restore(true,RESTORE_RESULT_SUCCESS)
 
 func _classify_restore_error(error:String)->String:
 	var normalized:=error.strip_edges().to_lower()
 	if normalized.is_empty():return RESTORE_RESULT_SUCCESS
-	# compat5 emits these stable, locale-independent codes.  The fallback
+	# compat6 emits these stable, locale-independent codes. The fallback
 	# aliases keep a build made with an older bridge from reporting success.
 	if normalized in ["cancelled","canceled","user_cancelled","user_canceled"]:return RESTORE_RESULT_CANCELLED
 	if normalized in ["network_error","network","offline"]:return RESTORE_RESULT_NETWORK_ERROR
@@ -361,7 +403,6 @@ func _finish_restore(success:bool,result_code:String)->void:
 	_restore_in_progress=false
 	_restore_stage=RESTORE_STAGE_IDLE
 	_restore_result_code=result_code
-	_restore_pending_product_ids.clear()
 	_restore_timeout_token+=1
 	state_changed.emit()
 	restore_finished.emit(success)

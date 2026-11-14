@@ -297,6 +297,8 @@ func _test_integration_contracts() -> void:
 	assert(main_source.contains('_forced_interstitial_transition_block_reason(source)'))
 	assert(main_source.contains('_try_present_forced_interstitial(source)'))
 	assert(main_source.contains('internal_forced_ad_diagnostic_button.name="InternalForcedAdDiagnosticButton"'))
+	assert(main_source.contains('"iap_restore=%s  sync=%s  rights=%s  count=%d"'))
+	assert(main_source.contains('"iap_product_errors=%d  last=%s"'))
 	assert(not main_source.contains('if not str(StoryProgressionClass.peek_story_event(story_progression_state)).is_empty():return false'))
 	assert(main_source.contains('BuildProfileClass.internal_test_story_jump_enabled()'))
 	assert(main_source.contains('internal_story_jump_button.name="InternalStoryJumpButton"'))
