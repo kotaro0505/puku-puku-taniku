@@ -519,6 +519,10 @@ var forced_interstitial_policy
 var forced_ads_removed:=false
 var forest_gacha_interstitial_count:=0
 var fusion_interstitial_count:=0
+var forced_ad_transition_generation:=0
+var forced_ad_last_source:=""
+var forced_ad_last_decision:="not_attempted"
+var forced_ad_last_block_reason:=""
 var intro_overlay: Control
 var intro_dialog_panel: PanelContainer
 var intro_dialogue_label: Label
@@ -611,6 +615,9 @@ var forest_gacha_preview_discovered:Dictionary={FIRST_STORY_SPECIES_ID:true}
 var forest_gacha_preview_encountered:Dictionary={}
 var trial_dev_gacha_button:Button
 var internal_story_jump_button:Button
+var internal_forced_ad_diagnostic_button:Button
+var internal_forced_ad_diagnostic_overlay:Control
+var internal_forced_ad_diagnostic_label:Label
 var series_seed_inventory:Dictionary={}
 var active_series_seed_id:=""
 var species_get_overlay
@@ -1202,9 +1209,63 @@ func _on_rewarded_ad_presentation_finished()->void:
 
 func _on_interstitial_ad_presentation_started()->void:
 	if audio_manager:audio_manager.pause_for_rewarded_ad()
+	forced_ad_last_decision="presenting"
+	_refresh_internal_forced_ad_diagnostics()
 
 func _on_interstitial_ad_presentation_finished(_presentation_context:String,_displayed:bool)->void:
 	if audio_manager:audio_manager.resume_from_rewarded_ad()
+	forced_ad_last_decision="dismissed" if _displayed else "show_failed"
+	_refresh_internal_forced_ad_diagnostics()
+
+func _build_internal_forced_ad_diagnostics(hud:Control)->void:
+	if not BuildProfileClass.internal_test_story_jump_enabled():return
+	internal_forced_ad_diagnostic_overlay=Control.new();internal_forced_ad_diagnostic_overlay.name="InternalForcedAdDiagnosticOverlay";internal_forced_ad_diagnostic_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);internal_forced_ad_diagnostic_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;internal_forced_ad_diagnostic_overlay.visible=false;hud.add_child(internal_forced_ad_diagnostic_overlay)
+	var shade:=ColorRect.new();shade.color=Color(0.035,.03,.025,.88);shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);shade.mouse_filter=Control.MOUSE_FILTER_STOP;internal_forced_ad_diagnostic_overlay.add_child(shade)
+	var panel:=PanelContainer.new();panel.position=Vector2(32,100);panel.size=Vector2(512,824);panel.add_theme_stylebox_override("panel",_box(Color("#f7e8c7"),Color("#8f633b"),24,4));internal_forced_ad_diagnostic_overlay.add_child(panel)
+	var margin:=MarginContainer.new();margin.add_theme_constant_override("margin_left",20);margin.add_theme_constant_override("margin_right",20);margin.add_theme_constant_override("margin_top",18);margin.add_theme_constant_override("margin_bottom",18);panel.add_child(margin)
+	var content:=VBoxContainer.new();content.add_theme_constant_override("separation",10);margin.add_child(content)
+	var title:=Label.new();title.text="内部テスト用：強制広告診断";title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;title.add_theme_font_size_override("font_size",23);title.add_theme_color_override("font_color",UI_BROWN);content.add_child(title)
+	var note:=Label.new();note.text="広告IDや個人情報は表示しません。5回目の操作後に更新してください。";note.custom_minimum_size=Vector2(452,48);note.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;note.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;note.add_theme_font_size_override("font_size",14);note.add_theme_color_override("font_color",Color("#76513b"));content.add_child(note)
+	internal_forced_ad_diagnostic_label=Label.new();internal_forced_ad_diagnostic_label.name="InternalForcedAdDiagnosticLabel";internal_forced_ad_diagnostic_label.custom_minimum_size=Vector2(452,590);internal_forced_ad_diagnostic_label.size_flags_vertical=Control.SIZE_EXPAND_FILL;internal_forced_ad_diagnostic_label.vertical_alignment=VERTICAL_ALIGNMENT_TOP;internal_forced_ad_diagnostic_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;internal_forced_ad_diagnostic_label.add_theme_font_size_override("font_size",14);internal_forced_ad_diagnostic_label.add_theme_color_override("font_color",Color("#54351f"));content.add_child(internal_forced_ad_diagnostic_label)
+	var buttons:=HBoxContainer.new();buttons.alignment=BoxContainer.ALIGNMENT_CENTER;buttons.add_theme_constant_override("separation",14);content.add_child(buttons)
+	var refresh:=Button.new();refresh.text="更新";refresh.custom_minimum_size=Vector2(150,48);_skin_button(refresh,Color("#d9c27d"),16);refresh.pressed.connect(_refresh_internal_forced_ad_diagnostics);buttons.add_child(refresh)
+	var close:=Button.new();close.text="閉じる";close.custom_minimum_size=Vector2(150,48);_skin_button(close,Color("#ead8b1"),16);close.pressed.connect(_close_internal_forced_ad_diagnostics);buttons.add_child(close)
+
+func _open_internal_forced_ad_diagnostics()->void:
+	if not BuildProfileClass.internal_test_story_jump_enabled() or internal_forced_ad_diagnostic_overlay==null:return
+	_refresh_internal_forced_ad_diagnostics();internal_forced_ad_diagnostic_overlay.visible=true;internal_forced_ad_diagnostic_overlay.move_to_front();_update_play_ui()
+
+func _close_internal_forced_ad_diagnostics()->void:
+	if internal_forced_ad_diagnostic_overlay==null:return
+	internal_forced_ad_diagnostic_overlay.visible=false;_update_play_ui()
+
+func _refresh_internal_forced_ad_diagnostics()->void:
+	if internal_forced_ad_diagnostic_label==null:return
+	var policy_diag:Dictionary=forced_interstitial_policy.diagnostic_snapshot() if forced_interstitial_policy!=null else {}
+	var service_diag:Dictionary=interstitial_ad_service.diagnostic_snapshot() if interstitial_ad_service!=null else {}
+	var reward_diag:Dictionary=rewarded_ad_service.diagnostic_snapshot() if rewarded_ad_service!=null else {}
+	internal_forced_ad_diagnostic_label.text="\n".join([
+		"profile=internal_test",
+		"forced_ads_removed=%s"%str(forced_ads_removed),
+		"gacha_count=%d  pending=%s"%[int(policy_diag.get("forest_gacha_count",forest_gacha_interstitial_count)),str(policy_diag.get("forest_gacha_pending",false))],
+		"fusion_count=%d  pending=%s"%[int(policy_diag.get("fusion_lab_count",fusion_interstitial_count)),str(policy_diag.get("fusion_lab_pending",false))],
+		"separation_required=%s"%str(policy_diag.get("separation_required",false)),
+		"last_source=%s"%(forced_ad_last_source if not forced_ad_last_source.is_empty() else "none"),
+		"last_decision=%s"%forced_ad_last_decision,
+		"block_reason=%s"%(forced_ad_last_block_reason if not forced_ad_last_block_reason.is_empty() else "none"),
+		"interstitial_state=%s  available=%s"%[str(service_diag.get("state","MISSING")),str(service_diag.get("available",false))],
+		"admob_attached=%s  signals_connected=%s"%[str(service_diag.get("admob_attached",false)),str(service_diag.get("signals_connected",false))],
+		"load_requests=%d  show_requests=%d"%[int(service_diag.get("load_requests",0)),int(service_diag.get("show_requests",0))],
+		"presentation_active=%s"%str(service_diag.get("presentation_active",false)),
+		"last_ad_event=%s"%str(service_diag.get("last_event","none")),
+		"ad_error_stage=%s  code=%d"%[str(service_diag.get("last_error_stage","none")),int(service_diag.get("last_error_code",-1))],
+		"ad_error_domain=%s"%str(service_diag.get("last_error_domain","none")),
+		"gma_state=%s  mode=%s"%[str(reward_diag.get("state","MISSING")),str(reward_diag.get("ads_mode","unknown"))],
+		"gma_initialized=%s  can_request_ads=%s"%[str(reward_diag.get("initialized",false)),str(reward_diag.get("can_request_ads",false))],
+		"att_status=%s  consent=%s"%[str(reward_diag.get("att_status","unknown")),str(reward_diag.get("privacy_requirement","unknown"))],
+		"att_pending=%s  consent_pending=%s"%[str(reward_diag.get("att_request_pending",false)),str(reward_diag.get("consent_operation_pending",false))],
+		"rewarded_diagnostic=%s"%str(reward_diag.get("diagnostic_code","unknown")),
+	])
 
 func _on_rewarded_ad_service_finished(reward_context:String,reward_earned:bool)->void:
 	if not rescue_reward_in_progress or reward_context!=rescue_reward_context:return
@@ -2122,6 +2183,8 @@ func _build_ui() -> void:
 	mission_text_label=Label.new();mission_text_label.custom_minimum_size=Vector2(320,60);mission_text_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;mission_text_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;mission_text_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;mission_text_label.mouse_filter=Control.MOUSE_FILTER_IGNORE;mission_text_label.add_theme_font_size_override("font_size",16);mission_text_label.add_theme_color_override("font_color",Color("#fff7dc"));mission_content.add_child(mission_text_label)
 	if BuildProfileClass.internal_test_story_jump_enabled():
 		internal_story_jump_button=Button.new();internal_story_jump_button.name="InternalStoryJumpButton";internal_story_jump_button.text="開発用：ジャンプ";internal_story_jump_button.position=Vector2(18,400);internal_story_jump_button.size=Vector2(150,44);internal_story_jump_button.focus_mode=Control.FOCUS_NONE;internal_story_jump_button.mouse_filter=Control.MOUSE_FILTER_STOP;_skin_button(internal_story_jump_button,Color("#c7d6ad"),13);internal_story_jump_button.pressed.connect(_open_story_dev);main_status_hud.add_child(internal_story_jump_button)
+		internal_forced_ad_diagnostic_button=Button.new();internal_forced_ad_diagnostic_button.name="InternalForcedAdDiagnosticButton";internal_forced_ad_diagnostic_button.text="広告診断";internal_forced_ad_diagnostic_button.position=Vector2(18,452);internal_forced_ad_diagnostic_button.size=Vector2(150,40);internal_forced_ad_diagnostic_button.focus_mode=Control.FOCUS_NONE;internal_forced_ad_diagnostic_button.mouse_filter=Control.MOUSE_FILTER_STOP;_skin_button(internal_forced_ad_diagnostic_button,Color("#d9c27d"),13);internal_forced_ad_diagnostic_button.pressed.connect(_open_internal_forced_ad_diagnostics);main_status_hud.add_child(internal_forced_ad_diagnostic_button)
+		_build_internal_forced_ad_diagnostics(hud)
 	plant_label_visibility_button=Button.new();plant_label_visibility_button.name="PlantLabelVisibilityButton";plant_label_visibility_button.position=Vector2(18,952);plant_label_visibility_button.size=Vector2(124,48);plant_label_visibility_button.focus_mode=Control.FOCUS_NONE;plant_label_visibility_button.mouse_filter=Control.MOUSE_FILTER_STOP;_skin_plant_label_visibility_button(plant_label_visibility_button);plant_label_visibility_button.pressed.connect(_toggle_growing_plant_labels);main_status_hud.add_child(plant_label_visibility_button)
 	for entry in [{"x":398,"t":"図鑑"},{"x":478,"t":"設定"}]:
 		var b:=Button.new();b.text=entry.t;b.position=Vector2(entry.x,134);b.custom_minimum_size=TOP_NAVIGATION_BUTTON_SIZE;b.size=TOP_NAVIGATION_BUTTON_SIZE;b.clip_text=true;b.text_overrun_behavior=TextServer.OVERRUN_NO_TRIMMING;_skin_button(b,Color("#fff0cf"),16);hud.add_child(b)
@@ -4622,7 +4685,8 @@ func _close_fusion_lab()->void:
 	if fusion_lab_ui:fusion_lab_ui.close_lab()
 	fusion_parent_a_id="";fusion_parent_b_id=""
 	_update_play_ui()
-	_try_present_forced_interstitial(ForcedInterstitialPolicyClass.SOURCE_FUSION_LAB)
+	_schedule_forced_interstitial_transition(ForcedInterstitialPolicyClass.SOURCE_FUSION_LAB)
+	call_deferred("_try_start_pending_story_event")
 
 func _on_fusion_parent_selected(slot:int,species_id:String)->void:
 	if fusion_in_progress or _species_get_count(species_id)<=0 or not fusion_system.is_eligible_parent_species(species_id):return
@@ -4790,7 +4854,7 @@ func _open_puku_puku_battle_preview()->void:
 func _close_forest_gacha()->void:
 	if forest_gacha_ui:forest_gacha_ui.close_gacha()
 	forest_gacha_preview_mode=false;forest_gacha_trial_dev_mode=false
-	_play_current_area_bgm();_update_play_ui();_try_present_forced_interstitial(ForcedInterstitialPolicyClass.SOURCE_FOREST_GACHA);call_deferred("_try_start_pending_story_event")
+	_play_current_area_bgm();_update_play_ui();_schedule_forced_interstitial_transition(ForcedInterstitialPolicyClass.SOURCE_FOREST_GACHA);call_deferred("_try_start_pending_story_event")
 
 func _spin_forest_gacha()->void:
 	if forest_gacha_ui==null or not forest_gacha_ui.visible or forest_gacha_ui.is_busy():return
@@ -4863,24 +4927,91 @@ func _record_forced_interstitial_success(source:String)->bool:
 	var reached_interval:bool=forced_interstitial_policy.record_success(source,forced_ads_removed)
 	forest_gacha_interstitial_count=forced_interstitial_policy.success_count(ForcedInterstitialPolicyClass.SOURCE_FOREST_GACHA)
 	fusion_interstitial_count=forced_interstitial_policy.success_count(ForcedInterstitialPolicyClass.SOURCE_FUSION_LAB)
+	forced_ad_last_source=source;forced_ad_last_decision="interval_due" if reached_interval and not forced_ads_removed else ("removed" if forced_ads_removed else "count_recorded");forced_ad_last_block_reason="";_refresh_internal_forced_ad_diagnostics()
 	return reached_interval
 
+func _schedule_forced_interstitial_transition(source:String)->void:
+	forced_ad_last_source=source
+	forced_ad_transition_generation+=1
+	if forced_interstitial_policy==null or not forced_interstitial_policy.has_pending_transition(source):
+		forced_ad_last_decision="not_due";forced_ad_last_block_reason="";_refresh_internal_forced_ad_diagnostics();return
+	_resolve_forced_interstitial_transition(source,forced_ad_transition_generation)
+
+func _resolve_forced_interstitial_transition(source:String,generation:int)->void:
+	# Give story handlers scheduled by the result/GET close two frames to claim
+	# the foreground. This is a bounded part of the same navigation transition,
+	# never a queued ad that may appear later in the session.
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if generation!=forced_ad_transition_generation:
+		if forced_interstitial_policy!=null:forced_interstitial_policy.discard_transition_candidate(source)
+		forced_ad_last_source=source;forced_ad_last_decision="skipped_superseded";forced_ad_last_block_reason="transition_replaced";_refresh_internal_forced_ad_diagnostics();return
+	_try_present_forced_interstitial(source)
+
 func _try_present_forced_interstitial(source:String)->bool:
-	if forced_interstitial_policy==null or not forced_interstitial_policy.has_pending_transition(source):return false
+	forced_ad_last_source=source
+	if forced_interstitial_policy==null or not forced_interstitial_policy.has_pending_transition(source):
+		forced_ad_last_decision="not_due";forced_ad_last_block_reason="";_refresh_internal_forced_ad_diagnostics();return false
+	# Determine whether this exact screen transition is safe before consuming the
+	# fifth-use candidate. The previous ordering silently erased the opportunity
+	# before we could identify a queued-but-not-active story event.
+	var block_reason:=_forced_interstitial_transition_block_reason()
+	if not block_reason.is_empty():
+		forced_interstitial_policy.discard_transition_candidate(source)
+		forced_ad_last_decision="skipped_unsafe";forced_ad_last_block_reason=block_reason;_refresh_internal_forced_ad_diagnostics();return false
+	var candidate_status:String=forced_interstitial_policy.transition_candidate_status(source,forced_ads_removed)
 	var candidate:bool=forced_interstitial_policy.consume_transition_candidate(source,forced_ads_removed)
-	if not candidate or not _forced_interstitial_transition_safe():return false
-	if interstitial_ad_service==null or not interstitial_ad_service.try_present(source):return false
+	if not candidate:
+		forced_ad_last_decision="skipped_%s"%candidate_status;forced_ad_last_block_reason="";_refresh_internal_forced_ad_diagnostics();return false
+	if interstitial_ad_service==null:
+		forced_ad_last_decision="skipped_service_missing";forced_ad_last_block_reason="service_missing";_refresh_internal_forced_ad_diagnostics();return false
+	if not interstitial_ad_service.try_present(source):
+		var service_diag:Dictionary=interstitial_ad_service.diagnostic_snapshot()
+		forced_ad_last_decision="skipped_ad_not_ready";forced_ad_last_block_reason="ad_%s"%str(service_diag.get("state","unknown")).to_lower();_refresh_internal_forced_ad_diagnostics();return false
 	forced_interstitial_policy.mark_presented()
+	forced_ad_last_decision="show_requested";forced_ad_last_block_reason="";_refresh_internal_forced_ad_diagnostics()
 	return true
 
 func _forced_interstitial_transition_safe()->bool:
-	if current_mode!="greenhouse" or play_active or arrangement_scene_active or arrangement_transitioning:return false
-	if not scripted_dialog_kind.is_empty() or not tutorial_dialog_kind.is_empty() or _immediate_get_story_transition_pending():return false
-	if not str(StoryProgressionClass.peek_story_event(story_progression_state)).is_empty():return false
-	if (opening_overlay and opening_overlay.visible) or (opening_story_overlay and opening_story_overlay.visible) or (intro_overlay and intro_overlay.visible):return false
-	if (species_get_overlay and species_get_overlay.visible) or (catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible):return false
-	if (forest_gacha_ui and forest_gacha_ui.visible) or (fusion_lab_ui and fusion_lab_ui.visible):return false
-	return true
+	return _forced_interstitial_transition_block_reason().is_empty()
+
+func _forced_interstitial_transition_block_reason()->String:
+	if current_mode!="greenhouse":return "wrong_mode"
+	if play_active:return "gameplay_active"
+	if arrangement_scene_active or arrangement_transitioning:return "arrangement_active"
+	if not scripted_dialog_kind.is_empty():return "scripted_dialog"
+	if not tutorial_dialog_kind.is_empty():return "tutorial_dialog"
+	if _immediate_get_story_transition_pending():return "immediate_story"
+	if collection_complete_presentation_active:return "collection_complete"
+	if not species_get_queue.is_empty() or not species_get_active_context.is_empty():return "get_queue"
+	if round_result_species_finalize_active or not round_result_species_finalize_queue.is_empty():return "result_queue"
+	if scene_transition_fade and scene_transition_fade.visible:return "scene_transition"
+	if jurejure_intro_camera_active or jurejure_first_encounter_active:return "story_camera"
+	if (opening_overlay and opening_overlay.visible):return "opening"
+	if (opening_story_overlay and opening_story_overlay.visible):return "opening_story"
+	if (intro_overlay and intro_overlay.visible):return "dialog_overlay"
+	if (tutorial_guide_overlay and tutorial_guide_overlay.visible):return "tutorial_overlay"
+	if (habitat_awakening_overlay and habitat_awakening_overlay.visible):return "habitat_story"
+	if (seed_pod_story_overlay and seed_pod_story_overlay.visible):return "seed_pod_story"
+	if (habitat_second_awakening_overlay and habitat_second_awakening_overlay.visible):return "habitat_story_2"
+	if (jurejure_first_encounter_overlay and jurejure_first_encounter_overlay.visible):return "jurejure_story"
+	if (puku_puku_battle and puku_puku_battle.visible):return "battle"
+	if (species_get_overlay and species_get_overlay.visible):return "get_card"
+	if (catalog_series_unlock_overlay and catalog_series_unlock_overlay.visible):return "catalog_unlock"
+	if (forest_gacha_ui and forest_gacha_ui.visible):return "gacha_open"
+	if (fusion_lab_ui and fusion_lab_ui.visible):return "fusion_open"
+	if (result_overlay and result_overlay.visible):return "result_overlay"
+	if (play_overlay and play_overlay.visible):return "play_overlay"
+	if (shop_overlay and shop_overlay.visible):return "shop_open"
+	if (encyclopedia_overlay and encyclopedia_overlay.visible):return "catalog_open"
+	if (settings_overlay and settings_overlay.visible):return "settings_open"
+	if (arrangement_ui and arrangement_ui.visible):return "arrangement_open"
+	if (catalog_preview_ui and catalog_preview_ui.is_overlay_open()):return "catalog_preview"
+	if (habitat_plant_panel and habitat_plant_panel.visible):return "habitat_panel"
+	if (habitat_dev_panel and habitat_dev_panel.visible):return "habitat_dev"
+	if (story_dev_panel and story_dev_panel.visible):return "story_dev"
+	if (internal_forced_ad_diagnostic_overlay and internal_forced_ad_diagnostic_overlay.visible):return "diagnostics_open"
+	return ""
 
 func _unlock_forest_gacha_series(series_id:String,_species_id:String)->void:
 	if forest_gacha_ui==null or not forest_gacha_ui.visible:return
@@ -5618,6 +5749,7 @@ func _mission_foreground_safe()->bool:
 		or (habitat_plant_panel and habitat_plant_panel.visible) \
 		or (habitat_dev_panel and habitat_dev_panel.visible) \
 		or (story_dev_panel and story_dev_panel.visible) \
+		or (internal_forced_ad_diagnostic_overlay and internal_forced_ad_diagnostic_overlay.visible) \
 		or (catalog_preview_ui and catalog_preview_ui.is_overlay_open()) \
 		or (arrangement_ui and arrangement_ui.visible) \
 		or (puku_puku_battle and puku_puku_battle.visible) \
@@ -5641,7 +5773,8 @@ func _restoration_progress_hud_safe()->bool:
 	var best_record_showcase_open:bool=best_record_showcase!=null and best_record_showcase.visible
 	var habitat_modal_open:bool=battle_open or (habitat_plant_panel!=null and habitat_plant_panel.visible) or (habitat_dev_panel!=null and habitat_dev_panel.visible) or (story_dev_panel!=null and story_dev_panel.visible) or (habitat_awakening_overlay!=null and habitat_awakening_overlay.visible) or (seed_pod_story_overlay!=null and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay!=null and habitat_second_awakening_overlay.visible)
 	var conversation_navigation_suspended:bool=(intro_overlay!=null and intro_overlay.visible) or not scripted_dialog_kind.is_empty() or not tutorial_dialog_kind.is_empty()
-	var arrangement_navigation_suspended:bool=arrangement_scene_active or arrangement_transitioning or catalog_preview_mode_active or preview_overlay_open or gacha_open or habitat_modal_open or conversation_navigation_suspended or best_record_showcase_open or jurejure_intro_camera_active or habitat_lookaround_active
+	var internal_diagnostics_open:bool=internal_forced_ad_diagnostic_overlay!=null and internal_forced_ad_diagnostic_overlay.visible
+	var arrangement_navigation_suspended:bool=arrangement_scene_active or arrangement_transitioning or catalog_preview_mode_active or preview_overlay_open or gacha_open or habitat_modal_open or conversation_navigation_suspended or best_record_showcase_open or jurejure_intro_camera_active or habitat_lookaround_active or internal_diagnostics_open
 	return current_mode=="greenhouse" and not arrangement_navigation_suspended and not arrangement_scene_active \
 		and (opening_overlay==null or not opening_overlay.visible) \
 		and (opening_story_overlay==null or not opening_story_overlay.visible) \
@@ -5668,7 +5801,8 @@ func _update_play_ui()->void:
 	var best_record_showcase_open:bool=best_record_showcase!=null and best_record_showcase.visible
 	var habitat_modal_open:bool=battle_open or (habitat_plant_panel!=null and habitat_plant_panel.visible) or (habitat_dev_panel!=null and habitat_dev_panel.visible) or (story_dev_panel!=null and story_dev_panel.visible) or (habitat_awakening_overlay!=null and habitat_awakening_overlay.visible) or (seed_pod_story_overlay!=null and seed_pod_story_overlay.visible) or (habitat_second_awakening_overlay!=null and habitat_second_awakening_overlay.visible)
 	var conversation_navigation_suspended:bool=(intro_overlay!=null and intro_overlay.visible) or not scripted_dialog_kind.is_empty() or not tutorial_dialog_kind.is_empty()
-	var arrangement_navigation_suspended:bool=arrangement_scene_active or arrangement_transitioning or catalog_preview_mode_active or preview_overlay_open or gacha_open or habitat_modal_open or conversation_navigation_suspended or best_record_showcase_open or jurejure_intro_camera_active or habitat_lookaround_active
+	var internal_diagnostics_open:bool=internal_forced_ad_diagnostic_overlay!=null and internal_forced_ad_diagnostic_overlay.visible
+	var arrangement_navigation_suspended:bool=arrangement_scene_active or arrangement_transitioning or catalog_preview_mode_active or preview_overlay_open or gacha_open or habitat_modal_open or conversation_navigation_suspended or best_record_showcase_open or jurejure_intro_camera_active or habitat_lookaround_active or internal_diagnostics_open
 	var arrangement_hud_hidden:bool=arrangement_scene_active or arrangement_transitioning
 	var endless_owns_normal_flow:=_endless_normal_flow_owns_play_controls()
 	var normal_round_start_visible:=not endless_owns_normal_flow or _endless_greenhouse_auto_start_unlocked()
@@ -5680,6 +5814,7 @@ func _update_play_ui()->void:
 	if seed_pod_gauge_area:seed_pod_gauge_area.visible=mystery_items_acquired and not _is_endless_greenhouse_enabled()
 	if trial_dev_gacha_button:trial_dev_gacha_button.visible=_is_endless_greenhouse_enabled() and _trial_dev_controls_enabled()
 	if internal_story_jump_button:internal_story_jump_button.visible=_internal_story_jump_button_should_show(arrangement_navigation_suspended)
+	if internal_forced_ad_diagnostic_button:internal_forced_ad_diagnostic_button.visible=_internal_story_jump_button_should_show(arrangement_navigation_suspended)
 	play_overlay.visible=current_mode=="greenhouse" and not play_active and play_modal_open and not endless_owns_normal_flow
 	play_open_button.visible=current_mode=="greenhouse" and intro_story_complete and not play_active and not play_modal_open and normal_round_start_visible and not arrangement_navigation_suspended and (not result_overlay or not result_overlay.visible) and (not shop_overlay or not shop_overlay.visible) and (not encyclopedia_overlay or not encyclopedia_overlay.visible) and (not settings_overlay or not settings_overlay.visible) and (not arrangement_ui or not arrangement_ui.visible)
 	if endless_owns_normal_flow:

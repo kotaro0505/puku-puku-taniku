@@ -169,6 +169,29 @@ def main() -> None:
     ]:
         if required_capture_gate not in main_source:
             fail(f"main.gd is missing IAP review capture gate: {required_capture_gate}")
+    for required_internal_ad_diagnostic_gate in [
+        "BuildProfileClass.internal_test_story_jump_enabled()",
+        'internal_forced_ad_diagnostic_button.name="InternalForcedAdDiagnosticButton"',
+        'internal_forced_ad_diagnostic_overlay.name="InternalForcedAdDiagnosticOverlay"',
+        "if not BuildProfileClass.internal_test_story_jump_enabled():return",
+    ]:
+        if required_internal_ad_diagnostic_gate not in main_source:
+            fail(
+                "main.gd is missing the internal-TestFlight forced-ad diagnostic gate: "
+                f"{required_internal_ad_diagnostic_gate}"
+            )
+    release_gate_source = Path("scripts/release_gate_smoke.gd").read_text(encoding="utf-8")
+    for required_release_absence_check in [
+        "game.internal_forced_ad_diagnostic_button == null",
+        "game.internal_forced_ad_diagnostic_overlay == null",
+        'game.find_child("InternalForcedAdDiagnosticButton", true, false) == null',
+        'game.find_child("InternalForcedAdDiagnosticOverlay", true, false) == null',
+    ]:
+        if required_release_absence_check not in release_gate_source:
+            fail(
+                "Release gate does not prove forced-ad diagnostics are absent: "
+                f"{required_release_absence_check}"
+            )
     for forbidden_literal in [
         "const TRIAL_DEV_CONTROLS_ENABLED := true",
         "const REWARDED_AD_DEVELOPMENT_STUB_ENABLED := true",

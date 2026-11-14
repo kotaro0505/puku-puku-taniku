@@ -21,10 +21,15 @@ var _presentation_active := false
 var _signals_connected := false
 var _load_request_count := 0
 var _show_request_count := 0
+var _last_event := "created"
+var _last_error_stage := ""
+var _last_error_code := -1
+var _last_error_domain := ""
 
 
 func bind_rewarded_service(rewarded_service) -> void:
 	_rewarded_service = rewarded_service
+	_last_event = "waiting_for_gma"
 	if rewarded_service == null:
 		return
 	if rewarded_service.has_signal("mobile_ads_initialized"):
@@ -54,18 +59,22 @@ func is_showing() -> bool:
 
 func try_present(presentation_context: String) -> bool:
 	if presentation_context.is_empty() or not _active_context.is_empty():
+		_last_event = "show_rejected_context"
 		return false
 	if _rewarded_service != null \
 			and _rewarded_service.has_method("is_full_screen_presentation_active") \
 			and _rewarded_service.is_full_screen_presentation_active():
+		_last_event = "show_rejected_other_fullscreen"
 		return false
 	if not is_available():
 		# Preload for a future eligible transition, but never queue this one.
+		_last_event = "show_skipped_not_ready"
 		_request_load()
 		return false
 	_active_context = presentation_context
 	_set_state(State.SHOWING)
 	_show_request_count += 1
+	_last_event = "show_requested"
 	_admob.show_interstitial_ad()
 	return true
 
@@ -77,6 +86,13 @@ func diagnostic_snapshot() -> Dictionary:
 		"show_requests": _show_request_count,
 		"presentation_active": _presentation_active,
 		"has_context": not _active_context.is_empty(),
+		"available": is_available(),
+		"admob_attached": _admob != null,
+		"signals_connected": _signals_connected,
+		"last_event": _last_event,
+		"last_error_stage": _last_error_stage,
+		"last_error_code": _last_error_code,
+		"last_error_domain": _last_error_domain,
 	}
 
 
@@ -91,11 +107,13 @@ func _on_mobile_ads_initialized(admob) -> void:
 
 func _attach_admob(admob) -> void:
 	if admob == null:
+		_last_event = "attach_failed_null"
 		return
 	if _admob != null and _admob != admob:
 		_disconnect_admob_signals()
 	_admob = admob
 	_connect_admob_signals()
+	_last_event = "gma_attached"
 	_request_load()
 
 
@@ -131,8 +149,10 @@ func _on_ad_request_permission_changed(can_request_ads: bool) -> void:
 		return
 	_discard_loaded_ad()
 	if can_request_ads:
+		_last_event = "consent_allows_ads"
 		_request_load()
 	else:
+		_last_event = "consent_blocks_ads"
 		_set_state(State.UNAVAILABLE)
 
 
@@ -140,10 +160,12 @@ func _request_load() -> void:
 	if _admob == null or state in [State.LOADING, State.SHOWING]:
 		return
 	if _admob.is_interstitial_ad_loaded():
+		_last_event = "native_ad_already_loaded"
 		_set_state(State.READY)
 		return
 	_set_state(State.LOADING)
 	_load_request_count += 1
+	_last_event = "load_requested"
 	_admob.load_interstitial_ad()
 
 
@@ -153,12 +175,16 @@ func _on_interstitial_ad_loaded(_ad_info = null, _response_info = null) -> void:
 		# retain that late result for a later presentation.
 		_discard_loaded_ad()
 		return
+	_clear_error()
+	_last_event = "loaded"
 	_set_state(State.READY)
 
 
-func _on_interstitial_ad_failed_to_load(_ad_info = null, _error_data = null) -> void:
+func _on_interstitial_ad_failed_to_load(_ad_info = null, error_data = null) -> void:
 	if state != State.LOADING:
 		return
+	_capture_error("load", error_data)
+	_last_event = "load_failed"
 	_set_state(State.UNAVAILABLE)
 
 
@@ -166,13 +192,16 @@ func _on_interstitial_ad_showed(_ad_info = null) -> void:
 	if state != State.SHOWING or _active_context.is_empty() or _presentation_active:
 		return
 	_presentation_active = true
+	_last_event = "showed"
 	presentation_started.emit()
 
 
-func _on_interstitial_ad_failed_to_show(_ad_info = null, _error_data = null) -> void:
+func _on_interstitial_ad_failed_to_show(_ad_info = null, error_data = null) -> void:
 	if state != State.SHOWING or _active_context.is_empty():
 		return
 	var finished_context := _active_context
+	_capture_error("show", error_data)
+	_last_event = "show_failed"
 	_end_presentation()
 	_active_context = ""
 	_discard_loaded_ad()
@@ -187,6 +216,8 @@ func _on_interstitial_ad_dismissed(_ad_info = null) -> void:
 	var finished_context := _active_context
 	_end_presentation()
 	_active_context = ""
+	_clear_error()
+	_last_event = "dismissed"
 	# Interstitial objects are single-use. The wrapper is configured to evict the
 	# displayed object, and this load prepares only a future transition.
 	_set_state(State.UNAVAILABLE)
@@ -203,6 +234,28 @@ func _end_presentation() -> void:
 	if not _presentation_active:
 		return
 	_presentation_active = false
+
+
+func _capture_error(stage: String, error_data) -> void:
+	_last_error_stage = stage
+	_last_error_code = -1
+	_last_error_domain = ""
+	if error_data == null:
+		return
+	if error_data is Dictionary:
+		_last_error_code = int(error_data.get("code", -1))
+		_last_error_domain = str(error_data.get("domain", ""))
+		return
+	if typeof(error_data) == TYPE_OBJECT and error_data.has_method("get_code"):
+		_last_error_code = int(error_data.get_code())
+	if typeof(error_data) == TYPE_OBJECT and error_data.has_method("get_domain"):
+		_last_error_domain = str(error_data.get_domain())
+
+
+func _clear_error() -> void:
+	_last_error_stage = ""
+	_last_error_code = -1
+	_last_error_domain = ""
 
 
 func _set_state(next_state: State) -> void:

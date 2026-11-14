@@ -4,6 +4,8 @@ const PolicyClass = preload("res://scripts/forced_interstitial_policy.gd")
 const InterstitialServiceClass = preload("res://scripts/interstitial_ad_service.gd")
 const Localizer = preload("res://scripts/game_localizer.gd")
 const StoryDevPanelClass = preload("res://scripts/story_dev_panel.gd")
+const MainClass = preload("res://scripts/main.gd")
+const StoryProgressionClass = preload("res://scripts/story_progression.gd")
 
 
 class FakeAdmob:
@@ -25,9 +27,26 @@ class FakeAdmob:
 	func remove_interstitial_ad() -> void:remove_count+=1;loaded=false
 
 
+class FakeInterstitialRuntime:
+	extends RefCounted
+
+	var available := true
+	var present_count := 0
+	var last_context := ""
+
+	func try_present(context:String) -> bool:
+		present_count+=1
+		last_context=context
+		return available
+
+	func diagnostic_snapshot() -> Dictionary:
+		return {"state":"READY" if available else "UNAVAILABLE","available":available}
+
+
 func _ready() -> void:
 	_test_counter_policy()
 	await _test_interstitial_lifecycle()
+	_test_main_transition_regression()
 	await _test_story_panel_scope()
 	_test_integration_contracts()
 	print("FORCED_ADS_SMOKE_OK independent_counters=true persisted_modulo=true fifth_transition=true unavailable_skips=true separation=true lifecycle=true removal_iap=true internal_story_gate=true")
@@ -43,6 +62,7 @@ func _test_counter_policy() -> void:
 		assert(not policy.has_pending_transition(PolicyClass.SOURCE_FOREST_GACHA))
 	assert(policy.success_count(PolicyClass.SOURCE_FUSION_LAB) == 0)
 	assert(policy.record_success(PolicyClass.SOURCE_FOREST_GACHA))
+	assert(policy.transition_candidate_status(PolicyClass.SOURCE_FOREST_GACHA)=="ready")
 	assert(policy.success_count(PolicyClass.SOURCE_FOREST_GACHA) == 0)
 	assert(policy.consume_transition_candidate(PolicyClass.SOURCE_FOREST_GACHA))
 	assert(not policy.consume_transition_candidate(PolicyClass.SOURCE_FOREST_GACHA))
@@ -79,6 +99,10 @@ func _test_counter_policy() -> void:
 	assert(not policy.has_pending_transition(PolicyClass.SOURCE_FOREST_GACHA))
 	assert(not policy.consume_transition_candidate(PolicyClass.SOURCE_FOREST_GACHA, true))
 	assert(not policy.record_success("unknown_source"))
+	policy.restore_counts(4,0)
+	assert(policy.record_success(PolicyClass.SOURCE_FOREST_GACHA))
+	assert(policy.discard_transition_candidate(PolicyClass.SOURCE_FOREST_GACHA))
+	assert(not policy.has_pending_transition(PolicyClass.SOURCE_FOREST_GACHA))
 
 
 func _test_interstitial_lifecycle() -> void:
@@ -116,8 +140,11 @@ func _test_interstitial_lifecycle() -> void:
 
 	# A failed load remains playable. The next eligible transition starts one
 	# fresh preload but is itself skipped instead of being shown later.
-	fake.interstitial_ad_failed_to_load.emit(null,{"code":1})
+	fake.interstitial_ad_failed_to_load.emit(null,{"code":1,"domain":"load.test"})
 	assert(service.state == InterstitialServiceClass.State.UNAVAILABLE)
+	var failed_load_diag:Dictionary=service.diagnostic_snapshot()
+	assert(failed_load_diag.last_event=="load_failed" and failed_load_diag.last_error_stage=="load")
+	assert(int(failed_load_diag.last_error_code)==1 and failed_load_diag.last_error_domain=="load.test")
 	assert(not service.try_present("fusion_lab"))
 	assert(service.state == InterstitialServiceClass.State.LOADING and fake.load_count == 3)
 	fake.loaded=true
@@ -125,16 +152,60 @@ func _test_interstitial_lifecycle() -> void:
 	assert(fake.show_count == 1)
 	assert(service.try_present("fusion_lab"))
 	fake.interstitial_ad_showed_full_screen_content.emit(null)
-	fake.interstitial_ad_failed_to_show_full_screen_content.emit(null,{"code":2})
+	fake.interstitial_ad_failed_to_show_full_screen_content.emit(null,{"code":2,"domain":"show.test"})
 	await get_tree().process_frame
 	assert(finishes.size() == 2 and finishes[-1].context == "fusion_lab" and not finishes[-1].displayed)
 	assert(service.state == InterstitialServiceClass.State.LOADING and fake.load_count == 4)
-	fake.interstitial_ad_failed_to_show_full_screen_content.emit(null,{"code":2})
+	var failed_show_diag:Dictionary=service.diagnostic_snapshot()
+	assert(failed_show_diag.last_error_stage=="show" and int(failed_show_diag.last_error_code)==2)
+	assert(failed_show_diag.last_error_domain=="show.test")
+	fake.interstitial_ad_failed_to_show_full_screen_content.emit(null,{"code":2,"domain":"show.test"})
 	assert(finishes.size() == 2 and fake.load_count == 4)
 
 	service.queue_free()
 	fake.queue_free()
 	await get_tree().process_frame
+
+
+func _test_main_transition_regression() -> void:
+	var game:=MainClass.new()
+	game.current_mode="greenhouse"
+	game.story_progression_state=StoryProgressionClass.default_runtime_state()
+	# This event is intentionally waiting for a habitat visit. It is not an
+	# active greenhouse story and must not suppress a natural gacha transition.
+	StoryProgressionClass.queue_story_event(game.story_progression_state,StoryProgressionClass.EVENT_ACT3_BATTLE_INTRO)
+	assert(StoryProgressionClass.peek_story_event(game.story_progression_state)==StoryProgressionClass.EVENT_ACT3_BATTLE_INTRO)
+	assert(game._forced_interstitial_transition_block_reason().is_empty())
+	var runtime:=FakeInterstitialRuntime.new()
+	game.interstitial_ad_service=runtime
+	game.forced_interstitial_policy=PolicyClass.new()
+	game.forced_interstitial_policy.restore_counts(4,0)
+	assert(game._record_forced_interstitial_success(PolicyClass.SOURCE_FOREST_GACHA))
+	assert(game._try_present_forced_interstitial(PolicyClass.SOURCE_FOREST_GACHA))
+	assert(runtime.present_count==1 and runtime.last_context==PolicyClass.SOURCE_FOREST_GACHA)
+
+	# A story that actually owns the foreground skips exactly this due event and
+	# never reappears after the story is closed.
+	game.forced_interstitial_policy.restore_counts(4,0)
+	assert(game._record_forced_interstitial_success(PolicyClass.SOURCE_FOREST_GACHA))
+	game.scripted_dialog_kind="active_story"
+	assert(not game._try_present_forced_interstitial(PolicyClass.SOURCE_FOREST_GACHA))
+	assert(game.forced_ad_last_decision=="skipped_unsafe")
+	assert(game.forced_ad_last_block_reason=="scripted_dialog")
+	assert(not game.forced_interstitial_policy.has_pending_transition(PolicyClass.SOURCE_FOREST_GACHA))
+	game.scripted_dialog_kind=""
+	assert(not game._try_present_forced_interstitial(PolicyClass.SOURCE_FOREST_GACHA))
+	assert(runtime.present_count==1)
+
+	# An unavailable ad is consumed once and triggers no delayed presentation.
+	runtime.available=false
+	game.forced_interstitial_policy.restore_counts(4,0)
+	assert(game._record_forced_interstitial_success(PolicyClass.SOURCE_FOREST_GACHA))
+	assert(not game._try_present_forced_interstitial(PolicyClass.SOURCE_FOREST_GACHA))
+	assert(game.forced_ad_last_decision=="skipped_ad_not_ready")
+	assert(game.forced_ad_last_block_reason=="ad_unavailable")
+	assert(not game.forced_interstitial_policy.has_pending_transition(PolicyClass.SOURCE_FOREST_GACHA))
+	game.free()
 
 
 func _test_story_panel_scope() -> void:
@@ -172,8 +243,11 @@ func _test_integration_contracts() -> void:
 	assert(main_source.contains('"fusion_interstitial_count":fusion_interstitial_count'))
 	assert(main_source.contains('if mode=="live":_record_forced_interstitial_success'))
 	assert(main_source.contains('_record_forced_interstitial_success(ForcedInterstitialPolicyClass.SOURCE_FUSION_LAB)'))
-	assert(main_source.contains('_try_present_forced_interstitial(ForcedInterstitialPolicyClass.SOURCE_FOREST_GACHA)'))
-	assert(main_source.contains('_try_present_forced_interstitial(ForcedInterstitialPolicyClass.SOURCE_FUSION_LAB)'))
+	assert(main_source.contains('_schedule_forced_interstitial_transition(ForcedInterstitialPolicyClass.SOURCE_FOREST_GACHA)'))
+	assert(main_source.contains('_schedule_forced_interstitial_transition(ForcedInterstitialPolicyClass.SOURCE_FUSION_LAB)'))
+	assert(main_source.contains('_try_present_forced_interstitial(source)'))
+	assert(main_source.contains('internal_forced_ad_diagnostic_button.name="InternalForcedAdDiagnosticButton"'))
+	assert(not main_source.contains('if not str(StoryProgressionClass.peek_story_event(story_progression_state)).is_empty():return false'))
 	assert(main_source.contains('BuildProfileClass.internal_test_story_jump_enabled()'))
 	assert(main_source.contains('internal_story_jump_button.name="InternalStoryJumpButton"'))
 	assert(main_source.contains('story_dev_panel.allow_species_spawn=_trial_dev_controls_enabled()'))

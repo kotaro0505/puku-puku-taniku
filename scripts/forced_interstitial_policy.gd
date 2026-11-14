@@ -47,6 +47,16 @@ func has_pending_transition(source: String) -> bool:
 	return bool(_transition_pending.get(source, false))
 
 
+func transition_candidate_status(source: String, forced_ads_removed: bool = false) -> String:
+	if not has_pending_transition(source):
+		return "not_pending"
+	if forced_ads_removed:
+		return "removed"
+	if _separation_required:
+		return "separation"
+	return "ready"
+
+
 func consume_transition_candidate(source: String, forced_ads_removed: bool = false) -> bool:
 	if not has_pending_transition(source):
 		return false
@@ -61,6 +71,13 @@ func consume_transition_candidate(source: String, forced_ads_removed: bool = fal
 	return true
 
 
+func discard_transition_candidate(source: String) -> bool:
+	if not has_pending_transition(source):
+		return false
+	_transition_pending.erase(source)
+	return true
+
+
 func mark_presented() -> void:
 	_separation_required = true
 
@@ -68,6 +85,16 @@ func mark_presented() -> void:
 func clear_session_pending() -> void:
 	_transition_pending.clear()
 	_separation_required = false
+
+
+func diagnostic_snapshot() -> Dictionary:
+	return {
+		"forest_gacha_count": success_count(SOURCE_FOREST_GACHA),
+		"fusion_lab_count": success_count(SOURCE_FUSION_LAB),
+		"forest_gacha_pending": has_pending_transition(SOURCE_FOREST_GACHA),
+		"fusion_lab_pending": has_pending_transition(SOURCE_FUSION_LAB),
+		"separation_required": _separation_required,
+	}
 
 
 func _normalize_count(value: int) -> int:
