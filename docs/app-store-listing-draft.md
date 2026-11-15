@@ -1,8 +1,8 @@
 # App Store 掲載情報・審査資料 草案
 
-作成日: 2026-10-26 / 最終更新: 2026-11-11
+作成日: 2026-10-26 / 最終更新: 2026-11-16
 対象: 『ぷくぷく！たにくらいふ』ストーリー版 iOS 1.0
-状態: **App Store Connect転記前の承認用草案**。36件の非消耗型IAPは商品情報・価格・販売地域・審査画像が登録済みで、全件 `READY_TO_SUBMIT`。アプリ本体の掲載文、ストア用スクリーンショット、URL、審査情報は未登録または未確定であり、審査提出・公開は行っていない。
+状態: **App Store Connect転記前の承認用草案**。鉢36商品と「広告を削除」1商品の計37件は、既存のApp Review用ドラフトSubmissionへ追加済み。鉢36件の商品情報・価格・販売地域・審査画像は登録済みで、全件 `READY_TO_SUBMIT`。購入、購入復元、広告削除権利、リワード広告の主要動作はTestFlight実機で確認済み。アプリ本体の審査提出・公開は行っていない。
 
 この文書は、現行のゲーム実装、2026-11-11の読み取り専用App Store Connect監査、およびApple公式資料を照合し、App Store Connectへ転記できる形に整理したものです。「候補」「未確認」とした内容は、最終ビルドまたはApp Store Connect上で確認してから登録してください。
 
@@ -37,8 +37,8 @@
 - `scripts/fusion_lab_ui.gd`、`data/fusion-recipes.json`、`data/hybrid-species.json`: ハイブリッドラボ
 - `scripts/puku_puku_battle.gd`: ジュレジュレ団との育成・収穫スコア対戦
 - `scripts/arrangement_ui.gd`、`data/pots.json`: 寄せ植えと鉢ショップ
-- `scripts/pot_unlock_iap_service.gd`、`data/pot-iap-catalog.json`: StoreKit 2による36種の鉢デザイン解放
-- `scripts/rewarded_ad_service.gd`: AdMobリワード広告、UMP同意、報酬完了判定
+- `scripts/pot_unlock_iap_service.gd`、`data/pot-iap-catalog.json`: StoreKit 2による36種の鉢デザイン解放と「広告を削除」の利用権管理
+- `scripts/rewarded_ad_service.gd`、`scripts/interstitial_ad_service.gd`、`scripts/forced_interstitial_policy.gd`: AdMobリワード広告、ガチャ・ラボのインタースティシャル広告、UMP同意、ATT、報酬完了判定
 - `scripts/build_profile.gd`、`export_presets.cfg`: 開発版とApp Store本番版の分離
 - `data/species-v2.json`、`data/series.json`、`data/catalog-progression.json`: 品種、図鑑、シリーズ構成
 
@@ -54,13 +54,15 @@
 - 発見した多肉と鉢を使う寄せ植え
 - 最高記録画像と寄せ植え画像のOS共有シートによる共有
 - 任意視聴のリワード広告による、ぷくコインまたはたねの救済
+- 森のガチャとハイブリッドラボで、それぞれ正常完了5回ごとの結果確認後に表示されるインタースティシャル広告
 - 36種の鉢デザインを永続解放する非消耗型アプリ内課金
+- ガチャとラボの自動表示広告だけを永久に削除し、任意視聴のリワード広告を残す非消耗型アプリ内課金
 
 ### 正式版の特徴として掲載しないもの
 
 - ストーリージャンプ、開発用ガチャ、進行リセット、品種プレビュー、原生地テスト等の開発専用機能
 - 開発用スロット画面。`SlotMachineScene` は開発機能で保護されたプレビュー経路からだけ生成され、本番のゲーム進行には接続されていない
-- 現行ソースに存在しないジュレジュレ団リベンジ広告、広告削除購入、オンライン対戦、ランキング、ユーザー間チャット
+- 現行ソースに存在しないジュレジュレ団リベンジ広告、オンライン対戦、ランキング、ユーザー間チャット
 - データ上で将来用または未解禁となっているシリーズ
 
 ## 3. Appleの現行文字数制限
@@ -72,11 +74,11 @@
 | Promotional Text | 170文字 | 日英とも上限内 |
 | Description | 4,000文字、プレーンテキスト | 日英とも上限内 |
 | Keywords | UTF-8で100バイト、カンマ区切り | 日本語92バイト、英語83バイト |
-| IAP Reference Name | 64文字 | 36件すべて上限内 |
-| IAP Product ID | 100文字 | 36件すべて上限内 |
-| IAP Display Name | 2〜30文字 | 36件・日英とも上限内 |
-| IAP Description | 45文字 | 日本語26文字、英語43文字 |
-| App Review Notes | 4,000バイト | 日本語候補2,314バイト、英語候補1,846バイト。いずれか1つを転記する |
+| IAP Reference Name | 64文字 | 37件（鉢36件＋広告削除1件）を登録済み |
+| IAP Product ID | 100文字 | 37件すべて上限内 |
+| IAP Display Name | 2〜30文字 | 37件・日英とも上限内 |
+| IAP Description | 45文字 | 登録済み37件の日英表示を提出直前に再確認する |
+| App Review Notes | 4,000バイト | 日本語候補3,936バイト、英語候補3,324バイト。いずれか1つを転記する |
 
 根拠: [App information](https://developer.apple.com/help/app-store-connect/reference/app-information/app-information)、[Platform version information](https://developer.apple.com/help/app-store-connect/reference/app-information/platform-version-information)、[In-App Purchase information](https://developer.apple.com/help/app-store-connect/reference/in-app-purchases-and-subscriptions/in-app-purchase-information/)。Appleの一般向け紹介ページには過去のIAP文字数が残る場合があるため、本草案ではApp Store Connect Helpの30文字／45文字を採用しています。
 
@@ -134,7 +136,7 @@
 日本語・ひらがな・英語に対応。
 ログインせずに遊べます。
 
-本アプリには、任意で視聴できるリワード広告と、鉢デザインを永続的にアンロックする非消耗型のアプリ内課金が含まれます。
+本アプリには、任意で視聴できるリワード広告、森のガチャとハイブリッドラボで一定回数ごとに自動表示される広告、36種類の鉢デザインを永続解放する非消耗型アプリ内課金、および自動表示広告だけを削除する非消耗型アプリ内課金が含まれます。
 ```
 
 ## 5. English listing text
@@ -190,7 +192,7 @@ ENJOY YOUR COLLECTION IN NEW WAYS
 Available in Japanese, hiragana, and English.
 No login is required.
 
-This app includes optional rewarded ads and non-consumable in-app purchases that permanently unlock pot designs.
+This app includes optional rewarded ads, ads that appear automatically after a set number of completed Forest Gacha draws or Hybrid Lab fusions, 36 non-consumable pot-design purchases, and one non-consumable purchase that removes only the automatically displayed ads.
 ```
 
 ## 6. App Storeカテゴリ候補
@@ -218,9 +220,9 @@ Appleが質問票の回答から世界共通および地域別のレーティン
 
 - 「ぷくぷくバトル」は両陣営が多肉を育て、収穫サイズの合計点を競う一人用対戦です。攻撃、負傷、血、武器、死亡表現は確認できません。
 - 本番のガチャは3ぷくコインを消費し、カプセルからランダムな品種が必ず出ます。ぷくコインを現金で購入するIAPや、現金への換金は現行実装にありません。
-- 有料IAPは特定の鉢デザインを選んで買う固定商品で、ランダム商品ではありません。
+- 有料IAPは、特定の鉢デザインを選んで買う固定商品36件と、自動表示広告だけを削除する固定商品1件です。いずれもランダム商品ではありません。
 - スロット風の専用シーンは開発プレビューだけです。App Store本番では開発機能が無効になり、通常プレイから利用できません。
-- リワード動画広告があります。広告コンテンツ最大レーティングをGにする設定でも、質問票の `Advertising` は `Yes` です。
+- 任意視聴のリワード動画広告と、森のガチャ・ハイブリッドラボで各5回ごとに自動表示されるインタースティシャル広告があります。広告コンテンツ最大レーティングをGにする設定でも、質問票の `Advertising` は `Yes` です。
 - 共有はOSの共有シートを開くだけで、アプリ内投稿、フィード、チャット、ユーザー間共有サービスはありません。
 - 物語には「乱獲」「密猟」「絶滅」と、原生地を利用するジュレジュレ団との倫理的対立が短く登場します。
 
@@ -260,11 +262,17 @@ Appleが質問票の回答から世界共通および地域別のレーティン
 - `Mature or Suggestive Themes = Infrequent` も通常地域で9+の要素です。
 - `Advertising = Yes` 自体は通常地域の4+に含まれ得ますが、広告クリエイティブがアプリの年齢レーティングに適合することは別途必要です。
 - Appleが最終レーティングを自動計算するため、本書では「9+」等を確定値として登録しません。
-- App Review Guideline 2.5.18は、不適切または年齢不相応な広告を利用者が報告できる手段も求めています。Google広告画面内の報告導線を含め、実機で未確認です。提出前の確認事項として残します。
+- App Review Guideline 2.5.18に対応するため、設定画面の「不適切な広告を報告」から公開サポートページの専用案内へ常時アクセスできます。広告内容、表示日時、表示場所、アプリのバージョンとビルド番号を、不要な個人情報を含めず報告できる導線です。最終IPAでブラウザ起動を実機確認してください。
 
-## 8. 有料鉢36商品の日英メタデータ
+## 8. 非消耗型IAP 37商品の日英メタデータ
 
-### 共通仕様と登録状態
+### 構成
+
+- 有料鉢デザイン：36商品
+- 自動表示広告だけを削除する商品：1商品（`forced_ads_removal`）
+- 合計：37商品。すべてApp Review用の既存ドラフトSubmissionへ追加済み
+
+### 有料鉢36商品の共通仕様と登録状態
 
 - 実装上は全36件が `iap_unlock` で、StoreKit entitlementを永続利用権として扱うため、登録タイプは **Non-Consumable** です。
 - App Store Connect APIの読み取り専用監査で、36件すべてが `NON_CONSUMABLE` であることを確認済みです。
@@ -328,6 +336,14 @@ This non-consumable permanently unlocks the pot design named above. After unlock
 
 各商品には、対象カード、StoreKitのローカライズ価格、購入ボタンが同時に見える実機Review Screenshotが登録済みです。36/36件について商品ID対応、1125×2436 PNG、欠番・重複、manifestを検証し、App Store Connect APIで画像状態 `COMPLETE` を再確認しています。
 
+### 広告を削除
+
+| Product ID | Reference Name | 日本語Display Name | English Display Name | 日本語Description | English Description | Type |
+| --- | --- | --- | --- | --- | --- | --- |
+| `forced_ads_removal` | Forced Ads Removal | 広告を削除 | Remove Ads | 森のガチャとラボの自動広告を削除。パンダ広告は残ります。 | Removes auto Gacha/Lab ads. Panda ads remain. | Non-Consumable |
+
+この商品は森のガチャとハイブリッドラボで自動表示されるインタースティシャル広告だけを永久に削除します。任意視聴のパンダのお手伝いリワード広告、その報酬、広告利用不可時の無料プレイ救済は変更しません。購入、再起動後の権利維持、購入復元、広告の表示抑止はTestFlight実機で確認済みです。
+
 ## 9. App Review Information 草案
 
 ### 連絡先
@@ -356,13 +372,17 @@ AppleはApp Review連絡先として担当者名、メール、電話番号を�
 4. ストーリー進行により、原生地、寄せ植え、ガチャ、ハイブリッドラボ、ジュレジュレ団との育成・収穫スコア対戦が順次解放されます。
 
 広告:
-任意視聴のリワード動画広告だけを使用します。通常ゲーム用のぷくコインまたはたねが不足した際に「パンダのお店」でパンダをタップすると、救済の案内が表示されます。「お手伝いする」または「広告を見てたねをもらう」を選ぶと広告を要求します。SDKから視聴完了が通知された場合だけ、1ぷくコインまたはたね1セットを1回付与します。途中終了や読み込み失敗では広告報酬を付与しません。ぷくコイン不足時に広告が自動再試行後も利用不可と確定した場合に限り、ぷくコインを付与せず通常ゲーム1回分の無料プレイ券を付与することがあります。券は最大1枚で、消費後の再取得には10分の待ち時間があります。地域等により必要な場合、初回起動時にGoogle UMPの同意画面が表示されます。
+任意視聴のリワード動画広告とインタースティシャル広告を使用します。通常ゲーム用のぷくコインまたはたねが不足した際に「パンダのお店」でパンダをタップし、「お手伝いする」または「広告を見てたねをもらう」を選ぶとリワード広告を要求します。SDKから視聴完了が通知された場合だけ、1ぷくコインまたはたね1セットを1回付与します。途中終了や読み込み失敗では広告報酬を付与しません。ぷくコイン不足時に広告が自動再試行後も利用不可と確定した場合に限り、ぷくコインを付与せず通常ゲーム1回分の無料プレイ券を付与することがあります。券は最大1枚で、消費後の再取得には10分の待ち時間があります。
+
+インタースティシャル広告は、森のガチャの正常抽選5回ごと、およびハイブリッドラボの正常交配5回ごとに、それぞれ結果・NEWカード・シリーズ解放等の確認が完了した安全な画面切り替え時だけ表示します。広告が未準備の場合はその回をスキップし、後から突然表示しません。「広告を削除」の購入者には表示しません。地域等により必要な場合はGoogle UMPを処理し、その後ATTが未決定の場合だけ追跡許可を求めます。許可・拒否のどちらでもゲームを利用でき、リワード広告の報酬条件は変わりません。
 
 アプリ内課金:
-pot_unlock_001〜pot_unlock_036は非消耗型です。購入すると特定の鉢デザインを永続解放し、その後は同じデザインの鉢をゲーム内カタログに設定されたぷくコイン価格で何度でも購入できます。現金でぷくコインを販売する機能や、ランダムな有料IAPはありません。
+37商品はすべて非消耗型です。pot_unlock_001〜pot_unlock_036は、購入すると特定の鉢デザインを永続解放し、その後は同じデザインの鉢をゲーム内カタログに設定されたぷくコイン価格で何度でも購入できます。forced_ads_removal「広告を削除」は、森のガチャとハイブリッドラボの自動表示広告だけを永久に削除し、任意視聴のパンダのお手伝い広告は残します。現金でぷくコインを販売する機能や、ランダムな有料IAPはありません。
 
 購入画面への通常導線:
-オープニングと初回チュートリアルを完了し、不思議な多肉を3品種取得すると寄せ植えとショップ内の鉢カテゴリが解放されます。6品種取得後はpot_unlock_001〜pot_unlock_014が「パンダのお店」＞「鉢」に表示されます。第三幕の解放後はpot_unlock_015〜pot_unlock_036も表示されます。「購入を復元」は鉢画面上部にあります。
+オープニングと初回チュートリアルを完了し、不思議な多肉を3品種取得すると寄せ植えとショップ内の鉢カテゴリが解放され、「広告を削除」と「購入を復元」が鉢画面上部に表示されます。6品種取得後はpot_unlock_001〜pot_unlock_014が「パンダのお店」＞「鉢」に表示されます。pot_unlock_015〜pot_unlock_036の後半22商品は、物語とショップの商品展開を一致させるため、全利用者共通の通常進行条件として第三幕解放後に表示されます。審査だけを対象とする制限ではありません。
+
+37商品はApp Review用の同じドラフトSubmissionへ追加済みです。TestFlight実機で購入、購入復元、再起動後の権利維持、「広告を削除」の表示抑止、リワード広告の視聴完了報酬を確認しています。
 
 本番ビルドでは、開発用ストーリージャンプ、進行リセット、開発用ガチャ等は無効です。これらを審査操作には使用できません。
 ```
@@ -379,13 +399,17 @@ Basic flow:
 4. The native habitat, arrangements, gacha, Hybrid Lab, and the grow-and-harvest score matches against the Jurejure Gang unlock through normal story progress.
 
 Ads:
-The app uses optional rewarded video ads only. When the player lacks Puku Coins or playable seeds, open Panda's Shop and tap the panda. Choose "Help at the shop" or "Watch an ad to get seeds" to request an ad. One Puku Coin or one seed set is granted once only after the SDK reports that the reward was earned. Closing early or failing to load grants no ad reward. Only when an ad remains unavailable after automatic retries while the player lacks the Puku Coin needed for a normal round, the app may grant one free normal-round ticket instead of coins or an ad reward. At most one ticket is held, and another cannot be granted until 10 minutes after use. A Google UMP consent form may appear when required for the user's region or consent state.
+The app uses optional rewarded video ads and interstitial ads. When the player lacks Puku Coins or playable seeds, open Panda's Shop, tap the panda, and choose "Help at the shop" or "Watch an ad to get seeds" to request a rewarded ad. One Puku Coin or one seed set is granted once only after the SDK reports that the reward was earned. Closing early or failing to load grants no ad reward. Only when an ad remains unavailable after automatic retries while the player lacks the Puku Coin needed for a normal round, the app may grant one free normal-round ticket instead of coins or an ad reward. At most one ticket is held, and another cannot be granted until 10 minutes after use.
+
+An interstitial may appear after every five successful Forest Gacha draws and, independently, every five successful Hybrid Lab fusions. It is requested only at a safe transition after the result, NEW card, and any series-unlock flow have been completed. If the ad is not ready, that opportunity is skipped and is not shown unexpectedly later. Interstitials are disabled for owners of Remove Ads. The app completes any required Google UMP flow and requests ATT only when its status remains not determined. The game remains available whether ATT is allowed or denied, and rewarded-ad rewards do not change.
 
 In-App Purchases:
-pot_unlock_001 through pot_unlock_036 are non-consumables. Each purchase permanently unlocks one specific pot design. The player can then buy individual pots of that design repeatedly at its in-game Puku Coin catalog price. The app does not sell Puku Coins for money and has no randomized paid IAP.
+All 37 products are non-consumables. pot_unlock_001 through pot_unlock_036 each permanently unlock one specific pot design. The player can then buy individual pots of that design repeatedly at its in-game Puku Coin catalog price. forced_ads_removal (Remove Ads) permanently removes only the automatically displayed interstitial ads in Forest Gacha and Hybrid Lab; the optional Panda Help rewarded ad remains available. The app does not sell Puku Coins for money and has no randomized paid IAP.
 
 Normal route to the purchase screen:
-Complete the opening and first tutorial. After discovering 3 fantasy varieties, arrangements and the Pots category unlock. After 6 such discoveries, pot_unlock_001 through pot_unlock_014 appear in Panda's Shop > Pots. pot_unlock_015 through pot_unlock_036 appear after Act III unlocks. Restore Purchases is at the top of the Pots screen.
+Complete the opening and first tutorial. After discovering 3 fantasy varieties, arrangements and the Pots category unlock; Remove Ads and Restore Purchases appear at the top of the Pots screen. After 6 such discoveries, pot_unlock_001 through pot_unlock_014 appear in Panda's Shop > Pots. The later 22 products, pot_unlock_015 through pot_unlock_036, appear after Act III unlocks so that the shop inventory follows the game's story progression. This is the same normal progression rule for every player and is not a review-only restriction.
+
+All 37 products have been added to the same draft App Review submission. TestFlight device testing has confirmed purchase, Restore Purchases, entitlement persistence after relaunch, Remove Ads behavior, and completed rewarded-ad rewards.
 
 The production build disables all developer-only story jumps, progress resets, and developer gacha controls. They are not available as review shortcuts.
 ```
@@ -394,7 +418,7 @@ The production build disables all developer-only story jumps, progress resets, a
 
 1. 新規データでオープニングから通常12粒ゲームまで進める。
 2. 収穫とNEWカード、図鑑登録を確認する。
-3. 地域またはデバッグ用同意状態に応じたUMP画面と設定内のプライバシー設定導線を確認する。
+3. 地域または保存済みの同意状態に応じたUMP画面と設定内のプライバシー設定導線を確認する。
 4. 本番AdMob広告が審査環境で利用可能な場合、完了時だけ報酬が1回付与され、途中終了では付与されないことを確認する。広告在庫、通信、同意状態により広告が利用できない場合もゲームが異常終了しないことを確認する。
 5. Sandboxで鉢の購入、キャンセル、購入失敗、再起動後の権利維持、購入の復元を確認する。
 6. 購入後、該当鉢がゲーム内カタログに表示された正式なぷくコイン価格で購入でき、寄せ植えに使用できることを確認する。
@@ -403,12 +427,12 @@ The production build disables all developer-only story jumps, progress resets, a
 
 IAP後半22件は第三幕まで進めないと表示されないため、審査担当者が短時間で直接確認しにくい状態です。開発用ストーリージャンプは本番で使えず、審査メモに使用可能と書いてはいけません。提出前に次を行ってください。
 
-1. 36件それぞれのReview Screenshotは登録済みです。提出直前に全件が `READY_TO_SUBMIT` のままであることを再確認する。
+1. 鉢36件それぞれのReview Screenshotは登録済みで、`forced_ads_removal` を含む37商品は同じApp Review用ドラフトSubmissionへ追加済みです。提出直前にドラフト内の37件と商品状態を再確認する。
 2. App Review Informationへ、上記の正確な通常解放条件と、購入・復元を示す短い画面収録を添付する。
-3. TestFlight本番Bundle IDでApp Reviewと同じ商品レコードをSandbox確認する。
+3. TestFlight本番Bundle IDでApp Reviewと同じ商品レコードを使った購入、購入復元、権利維持、広告削除を確認済みです。審査メモにもこの結果を記載する。
 4. Appleが直接操作できる短縮経路を要求した場合は、隠し開発機能を有効にせず、一般利用者にも説明可能な本番安全設計を別途決定する。今回の資料作成ではゲーム仕様を変更しない。
 
-この「審査到達性」は提出前の未解決事項です。動画だけでIAPの実機審査が代替できるとは断定しません。
+後半22商品はストーリーとショップの商品展開を一致させる通常仕様として第三幕後に表示されます。全商品の初期解放や隠しジャンプは追加せず、審査メモ、登録済みReview Screenshot、必要な画面収録で解放理由と通常導線を明示します。動画だけでIAPの実機審査が代替できるとは断定しません。
 
 ## 10. スクリーンショット構成案
 
@@ -450,15 +474,16 @@ Appleはデバイスサイズごとに1〜10枚を受け付け、最初の1〜3�
 - Primary/Secondaryカテゴリの最終決定
 - 年齢質問票の `Mature or Suggestive Themes` と `Loot Boxes` の最終判断
 - App Privacy申告と、AdMob/UMP/ATTの実機Privacy Reportとの整合
-- 広告内またはアプリ内の「不適切な広告を報告」導線
 - 配布国・地域。中国本土、ベトナム、韓国、オーストラリア等のゲーム／年齢関連要件も配布地域に応じて確認する
 
-### 36件のIAP
+### 37件のIAP
 
-- **完了**: 36商品をNon-Consumableとして登録し、日英ローカライズ、現金価格、販売地域、36件分のReview Screenshotを設定。全件 `READY_TO_SUBMIT`
+- **完了**: 鉢36商品と `forced_ads_removal` の計37商品をNon-Consumableとして登録し、同じApp Review用ドラフトSubmissionへ追加
+- **完了**: 鉢36件の日英ローカライズ、現金価格、販売地域、36件分のReview Screenshotを設定し、全件 `READY_TO_SUBMIT`
+- **完了**: TestFlight実機で購入、購入復元、再起動後の権利維持、広告削除、リワード広告の主要動作を確認
 - **提出前確認**: 税区分、Family Sharing方針、商品情報の最終表示
-- 初回アプリバージョンと同じSubmissionへ36件を追加すること
-- Sandbox/TestFlight実機での購入、キャンセル、失敗、復元、再インストール、返金／権利変更
+- 初回アプリバージョンと同じドラフトSubmission内に37件すべてが残っていること
+- Sandbox/TestFlight実機で未確認の購入キャンセル、通信失敗、再インストール、返金／権利変更
 - 後半商品まで審査担当者が確認できる方法
 
 ### 掲載素材とストア運用
@@ -474,7 +499,7 @@ Appleはデバイスサイズごとに1〜10枚を受け付け、最初の1〜3�
 
 1. Privacy Policy URL、Support URL、App Review担当者名・電話番号を確定する。
 2. App Informationで日英名称、カテゴリ、年齢質問票を入力する。Loot Boxesの判断を先送りしない。
-3. 登録済み36件のIAPがすべて `READY_TO_SUBMIT` であることを再確認し、初回アプリバージョンと同じSubmissionへ追加する。
+3. 初回アプリバージョンと同じドラフトSubmissionに追加済みの37件を確認し、鉢36件が `READY_TO_SUBMIT` のままであることと `forced_ads_removal` の最終商品表示を再確認する。
 4. iOSバージョン画面に日英のSubtitle、Description、Keywords、Promotional Text、スクリーンショットを登録する。
 5. App Privacy、広告報告導線、UMP/ATT、Sandbox IAPを最終IPAと実機で照合する。
 6. App Review Informationへ英語審査メモ、担当者情報、必要な画面収録を登録する。

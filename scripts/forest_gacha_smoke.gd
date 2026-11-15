@@ -18,6 +18,7 @@ func _ready()->void:
 	game._reset_progression_state();game.opening_story_complete=true;game.intro_story_complete=true;game.first_colorata_confirmed=true;game.trio_originals_confirmed=true;game.encyclopedia_unlocked=true;game.habitat_unlocked=true;game.habitat_arrival_started=true;game.habitat_awakened=true;game.habitat_awakening_event_complete=true;game.habitat_tutorial_started=true;game.habitat_tutorial_complete=true;game.seed_shop_open=true;game.panda_beacon_unlocked=true;game.panda_beacon_count=1;game.puku_gauge_intro_complete=true;game.total_play_count=3;game.puku_points=20;game.current_mode="greenhouse";game.story_progression_state["arrangement_unlocked"]=true;game.story_progression_state["arrangement_intro_seen"]=true;game._update_play_ui()
 	_test_assets_and_routes(game)
 	_test_price_and_localization(game)
+	_test_draw_rate_disclosure(game)
 	await _test_get_card_decoration(game)
 	_test_removed_status_text(game)
 	_test_draw_rules(game)
@@ -28,7 +29,7 @@ func _ready()->void:
 	_test_repeated_price_debit(game)
 	_test_encounter_save_and_unlock(game)
 	game._reset_progression_state();game.queue_free()
-	print("FOREST_GACHA_SMOKE_OK price=3 ranks=95+4+0.8+0.2+0 five_star=never normal_species=uniform rank_new=60 duplicate=40 jure_mission=25+35+40 empty_rank=no_upper_transfer wallet=2_blocked+3_allowed+115_to_1 card=new_gold+duplicate_ivory_no_glow+stars")
+	print("FOREST_GACHA_SMOKE_OK price=3 ranks=95+4+0.8+0.2+0 rates=pre-spin+localized+code-derived five_star=never normal_species=uniform rank_new=60 duplicate=40 jure_mission=25+35+40 empty_rank=no_upper_transfer wallet=2_blocked+3_allowed+115_to_1 card=new_gold+duplicate_ivory_no_glow+stars")
 	get_tree().quit()
 
 func _test_assets_and_routes(game)->void:
@@ -84,6 +85,36 @@ func _test_price_and_localization(game)->void:
 	ui.set_wallet(3,0);assert(not ui.spin_button.disabled and not ui.dial_hit_area.disabled)
 	ui.set_wallet(115,0);assert(not ui.spin_button.disabled and not ui.dial_hit_area.disabled)
 	ui.set_wallet(20,0)
+
+func _test_draw_rate_disclosure(game)->void:
+	var ui=game.forest_gacha_ui
+	var expected_rates:=[
+		ui._rate_percent(ForestGachaSystemClass.NORMAL_RANK_RATE),
+		ui._rate_percent(ForestGachaSystemClass.TWO_STAR_RATE),
+		ui._rate_percent(ForestGachaSystemClass.THREE_STAR_RATE),
+		ui._rate_percent(ForestGachaSystemClass.FOUR_STAR_RATE),
+		ui._rate_percent(ForestGachaSystemClass.NEW_DRAW_RATE),
+	]
+	assert(expected_rates==["95","4","0.8","0.2","60"])
+	ui.open_gacha(20,0)
+	for test_language in Localizer.SUPPORTED_LANGUAGES:
+		ui.set_language(test_language)
+		assert(ui.rates_button.text==Localizer.text(test_language,"gacha_rates"))
+		assert(ui.rates_title.text==Localizer.text(test_language,"gacha_rates_title"))
+		assert(ui.rates_body.text==Localizer.text(test_language,"gacha_rates_body",expected_rates))
+		for expected_rate in expected_rates:assert((expected_rate+"%") in ui.rates_body.text)
+		assert(ui.rates_body.text.contains("NEW"))
+	ui.set_language("ja")
+	ui.rates_button.pressed.emit()
+	assert(ui.rates_overlay.visible and ui.rates_button.disabled and ui.spin_button.disabled and ui.dial_hit_area.disabled and ui.close_button.disabled)
+	assert(ui.rates_overlay.get_global_rect().encloses(ui.rates_body.get_global_rect()))
+	assert(ui.is_busy() and not ui.is_ready_for_forced_interstitial_transition())
+	var draw_count_before:int=int(ui.current_draw_count)
+	ui._request_spin()
+	assert(ui.current_draw_count==draw_count_before and not ui._spin_feedback_active)
+	ui.rates_close_button.pressed.emit()
+	assert(not ui.rates_overlay.visible and not ui.rates_button.disabled and not ui.close_button.disabled)
+	ui.close_gacha()
 
 func _test_get_card_decoration(game)->void:
 	var overlay=game.species_get_overlay

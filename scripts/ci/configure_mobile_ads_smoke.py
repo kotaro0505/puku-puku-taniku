@@ -48,6 +48,9 @@ def main() -> None:
     assert "あなたに合った" not in usage
     assert "personalized" not in usage.lower()
     assert " / " not in usage
+    assert "for ad frequency control and measurement" in usage
+    assert "for rewarded-ad frequency control" not in usage
+    assert "use the game if you decline tracking" in usage
     assert "rewards will not change" in usage
     assert "att=true" in enabled_output
     assert enabled_runtime.get("ios", "mode") == '"test"'

@@ -1,7 +1,7 @@
 # 『ぷくぷく！たにくらいふ』サポートページ公開原稿
 
 > **正式公開済み**<br>
-> 最終更新: 2026-11-13<br>
+> 最終更新: 2026-11-16<br>
 > 正式URL: `https://kotaro0505.github.io/puku-puku-taniku/support/`<br>
 > 公開本文は日本語・英語の各サポート節です。末尾の検証記録は公開HTMLに含めません。
 
@@ -27,13 +27,19 @@
 
 購入済みの鉢デザインが表示されない場合は、購入時と同じApple Accountを使用していることを確認し、「パンダのお店」＞「鉢」画面上部の「購入を復元」をお試しください。請求、返金またはApple Accountに関する事項はAppleのサポートもご確認ください。
 
-### リワード広告
+### 広告
 
-広告は任意視聴です。通信、広告在庫、地域、同意状態、端末設定等により利用できない場合があります。広告を途中で閉じた場合や、SDKから視聴完了が通知されなかった場合は報酬を付与しません。
+パンダのお手伝い広告は任意視聴です。通信、広告在庫、地域、同意状態、端末設定等により利用できない場合があります。広告を途中で閉じた場合や、SDKから視聴完了が通知されなかった場合は報酬を付与しません。森のガチャとハイブリッドラボでは、それぞれ正常完了5回ごとの結果確認後にインタースティシャル広告が自動表示される場合があります。
 
 Googleがプライバシー設定の再表示を必要と判定した場合は、ゲーム内の設定画面にプライバシー設定ボタンが表示されます。
 
 iOSの追跡許可（ATT）はGoogle UMPの同意とは別の設定です。追跡を許可しない場合でもゲームは利用でき、広告が利用可能で最後まで視聴した場合の報酬は変わりません。
+
+### 不適切な広告の報告
+
+不適切または年齢に合わない広告が表示された場合は、可能であれば広告内の報告機能を利用してください。あわせて、問題の確認に必要な範囲で、広告の内容または広告主名、表示日時、表示された場所（パンダのお店、森のガチャ、ハイブリッドラボ等）、アプリのバージョンとビルド番号をサポート窓口までお知らせください。
+
+スクリーンショットを送る場合は、個人情報が含まれていないことを確認してください。調査のために広告をタップしたり、広告先で個人情報を入力したりする必要はありません。メールアプリを利用できない場合も、このページ上部の問い合わせ先を確認・コピーし、利用可能なメールサービスからご連絡いただけます。
 
 ### 共有画像
 
@@ -80,13 +86,19 @@ Pot designs are non-consumable in-app purchases. A purchase permanently unlocks 
 
 If a purchased design is missing, confirm that the device uses the Apple Account used for the purchase, then open Panda's Shop > Pots and choose Restore Purchases at the top of the screen. For billing, refunds, or Apple Account issues, please also consult Apple Support.
 
-### Rewarded ads
+### Ads
 
-Rewarded ads are optional. Availability may depend on the network, ad inventory, region, consent status, and device settings. No reward is granted when an ad is closed early or the SDK does not report completion.
+Panda Help rewarded ads are optional. Availability may depend on the network, ad inventory, region, consent status, and device settings. No reward is granted when an ad is closed early or the SDK does not report completion. In Forest Gacha and Hybrid Lab, an interstitial ad may appear after the result has been reviewed following every five successful completions in each feature.
 
 When Google reports that privacy options must be available, the App displays a corresponding Privacy Settings button in its settings screen.
 
 Apple's App Tracking Transparency (ATT) authorization is separate from Google UMP consent. The game remains available if tracking is declined, and the reward is unchanged when a rewarded ad is available and completed.
+
+### Reporting an Inappropriate Ad
+
+If an inappropriate or age-inappropriate ad appears, use the reporting option within the ad when available. You can also contact support and, only to the extent needed to investigate the issue, include the ad content or advertiser name, the date and time, where it appeared (such as Panda's Shop, Forest Gacha, or Hybrid Lab), and the App version and build number.
+
+Before sending a screenshot, check that it contains no personal information. You do not need to tap the ad or enter personal information on the advertiser's page for us to investigate. If no email app is available, you can still view and copy the contact address at the top of this page and use another available email service.
 
 ### Shared images
 

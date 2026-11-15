@@ -24,7 +24,7 @@ func _ready() -> void:
 	_test_progression_thresholds()
 	_test_phase_bgm_policy(game)
 	game._reset_progression_state()
-	print("PROGRESSION_UI_REVISION_SMOKE_OK copy=updated language_ui=fixed settings=content-sized+stable-toggles privacy_policy=localized+always-available privacy_options=localized+state-gated panda_chatter=5 armadillo_chatter=5 habitat_button=always_plain arrangement=3+swipe forest=8 fusion=12 bgm=phase-aware migration=preserved")
+	print("PROGRESSION_UI_REVISION_SMOKE_OK copy=updated language_ui=fixed settings=content-sized+stable-toggles privacy_policy=localized+always-available ad_report=localized+always-available privacy_options=localized+state-gated panda_chatter=5 armadillo_chatter=5 habitat_button=always_plain arrangement=3+swipe forest=8 fusion=12 bgm=phase-aware migration=preserved")
 	get_tree().quit()
 
 
@@ -250,6 +250,7 @@ func _test_product_settings_layout() -> void:
 	assert(product_game.settings_content.alignment == BoxContainer.ALIGNMENT_BEGIN)
 	assert(product_game.settings_content.find_child("AudioSettingsNote", true, false) == null)
 	assert(product_game.privacy_policy_button != null and product_game.privacy_policy_button.visible and not product_game.privacy_policy_button.disabled)
+	assert(product_game.ad_report_button != null and product_game.ad_report_button.visible and not product_game.ad_report_button.disabled)
 	for development_control_name in ["HabitatDevOpen", "OpeningStoryReplay", "StoryDevOpen", "ProgressionDevReset", "JellyDevOpen", "TrialDevGachaOpen", "CatalogPreviewDevOpen"]:
 		assert(product_game.settings_content.find_child(development_control_name, true, false) == null)
 	product_game.settings_overlay.visible = true
@@ -285,6 +286,7 @@ func _test_product_settings_layout() -> void:
 		_assert_settings_label_toggle_gap(growing_label, growing_toggle)
 		_assert_button_decoration_inside_scroll(growing_toggle, product_game.settings_scroll, ["normal", "hover", "pressed", "hover_pressed", "focus", "disabled"])
 		_assert_button_decoration_inside_scroll(product_game.privacy_policy_button, product_game.settings_scroll, ["normal", "hover", "pressed"])
+		_assert_button_decoration_inside_scroll(product_game.ad_report_button, product_game.settings_scroll, ["normal", "hover", "pressed"])
 		_assert_button_decoration_inside_scroll(product_game.settings_close_button, product_game.settings_scroll, ["normal", "hover", "pressed"])
 	product_game._set_language("ja")
 	await get_tree().process_frame
@@ -358,36 +360,48 @@ func _assert_settings_panel_centered(overlay: Control, panel: Control) -> void:
 
 func _test_privacy_ui(game: Node) -> void:
 	var policy_button := game.find_child("PrivacyPolicyButton", true, false) as Button
+	var report_button := game.find_child("AdReportButton", true, false) as Button
 	var options_button := game.find_child("PrivacyOptionsButton", true, false) as Button
-	assert(policy_button != null and options_button != null)
-	assert(policy_button.visible and not policy_button.disabled)
-	assert(policy_button.get_index() < options_button.get_index())
+	assert(policy_button != null and report_button != null and options_button != null)
+	assert(policy_button.visible and not policy_button.disabled and report_button.visible and not report_button.disabled)
+	assert(policy_button.get_index() < report_button.get_index() and report_button.get_index() < options_button.get_index())
 	assert(game.PRIVACY_POLICY_URL == "https://kotaro0505.github.io/puku-puku-taniku/privacy-policy/")
+	assert(game.SUPPORT_AD_REPORT_URL == "https://kotaro0505.github.io/puku-puku-taniku/support/")
 	assert(policy_button.pressed.is_connected(Callable(game, "_on_privacy_policy_pressed")))
+	assert(report_button.pressed.is_connected(Callable(game, "_on_ad_report_pressed")))
 	var main_source:=FileAccess.get_file_as_string("res://scripts/main.gd")
 	assert(main_source.contains("OS.shell_open(PRIVACY_POLICY_URL)"))
+	assert(main_source.contains("OS.shell_open(SUPPORT_AD_REPORT_URL+section)"))
+	assert(main_source.contains('"#ad-report-en" if language_code=="en" else "#ad-report-ja"'))
+	var support_html:=FileAccess.get_file_as_string("res://support/index.html")
+	assert(support_html.contains('id="ad-report-ja"') and support_html.contains('id="ad-report-en"'))
+	assert(support_html.contains('href="mailto:kotaro.hana.0505@gmail.com"'))
+	assert(support_html.contains("広告の内容または広告主名") and support_html.contains("ad content or advertiser name"))
+	assert(support_html.contains("個人情報が含まれていないこと") and support_html.contains("contains no personal information"))
 	assert(not options_button.visible and options_button.disabled)
 	for locale in Localizer.SUPPORTED_LANGUAGES:
 		game.language_code = locale
 		game._apply_language_to_ui()
 		assert(policy_button.text == Localizer.text(locale, "privacy_policy"))
 		assert(policy_button.visible and not policy_button.disabled)
+		assert(report_button.text == Localizer.text(locale, "ad_report"))
+		assert(report_button.visible and not report_button.disabled)
 		assert(options_button.text == Localizer.text(locale, "privacy_settings"))
 	game.rewarded_ad_service._privacy_options_required = true
 	game.rewarded_ad_service._privacy_options_form_open = false
 	game._refresh_privacy_options_button()
 	await get_tree().process_frame
-	assert(policy_button.visible and not policy_button.disabled)
+	assert(policy_button.visible and not policy_button.disabled and report_button.visible and not report_button.disabled)
 	assert(options_button.visible and not options_button.disabled)
 	game.rewarded_ad_service._privacy_options_form_open = true
 	game._refresh_privacy_options_button()
-	assert(policy_button.visible and not policy_button.disabled)
+	assert(policy_button.visible and not policy_button.disabled and report_button.visible and not report_button.disabled)
 	assert(options_button.visible and options_button.disabled)
 	game.rewarded_ad_service._privacy_options_form_open = false
 	game.rewarded_ad_service._privacy_options_required = false
 	game._refresh_privacy_options_button()
 	await get_tree().process_frame
-	assert(policy_button.visible and not policy_button.disabled)
+	assert(policy_button.visible and not policy_button.disabled and report_button.visible and not report_button.disabled)
 	assert(not options_button.visible and options_button.disabled)
 	game.language_code = "ja"
 	game._apply_language_to_ui()

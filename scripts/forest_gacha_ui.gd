@@ -10,6 +10,7 @@ signal capsule_reveal_started
 signal species_reveal_requested(result:Dictionary)
 
 const CapsuleClass=preload("res://scripts/forest_gacha_capsule.gd")
+const ForestGachaSystemClass=preload("res://scripts/forest_gacha_system.gd")
 const BACKGROUND_TEXTURE=preload("res://assets/forest_gacha/forest-gacha-background.jpg")
 const DIAL_TEXTURE=preload("res://assets/forest_gacha/temporary-dial.png")
 const BACKGROUND_SHADER=preload("res://shaders/forest_gacha_background.gdshader")
@@ -23,6 +24,7 @@ const SPIN_COST_PUKU:=3
 var wallet_label:Label
 var title_label:Label
 var close_button:Button
+var rates_button:Button
 var spin_button:Button
 var hint_label:Label
 var background_stage:Control
@@ -43,6 +45,10 @@ var offer_panel:PanelContainer
 var unlock_button:Button
 var later_button:Button
 var result_close_button:Button
+var rates_overlay:Control
+var rates_title:Label
+var rates_body:Label
+var rates_close_button:Button
 var pending_result:Dictionary={}
 var busy:=false
 var capsule_ready:=false
@@ -66,7 +72,7 @@ var language:="ja"
 
 func _ready()->void:
 	name="ForestGachaUI";set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);mouse_filter=Control.MOUSE_FILTER_STOP;visible=false
-	_build_background();_build_header();_build_dial();_build_capsule();_build_result_overlay()
+	_build_background();_build_header();_build_dial();_build_capsule();_build_result_overlay();_build_rates_overlay()
 
 func _build_background()->void:
 	background_stage=Control.new();background_stage.name="MachineStage";background_stage.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);background_stage.mouse_filter=Control.MOUSE_FILTER_IGNORE;add_child(background_stage)
@@ -77,6 +83,7 @@ func _build_background()->void:
 func _build_header()->void:
 	title_label=Label.new();title_label.text="ガチャ";title_label.position=Vector2(138,24);title_label.size=Vector2(300,66);title_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;title_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;title_label.add_theme_font_size_override("font_size",31);title_label.add_theme_color_override("font_color",Color("#fff5d6"));title_label.add_theme_color_override("font_outline_color",Color("#45220f"));title_label.add_theme_constant_override("outline_size",8);add_child(title_label)
 	wallet_label=Label.new();wallet_label.name="WalletLabel";wallet_label.position=Vector2(22,92);wallet_label.size=Vector2(238,48);wallet_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;wallet_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;wallet_label.add_theme_font_size_override("font_size",18);wallet_label.add_theme_color_override("font_color",Color("#fff4ba"));wallet_label.add_theme_stylebox_override("normal",_box(Color(0.18,.09,.035,.82),Color("#d7ad63"),18,2));add_child(wallet_label)
+	rates_button=Button.new();rates_button.name="DrawRatesButton";rates_button.position=Vector2(332,92);rates_button.size=Vector2(210,48);_skin_button(rates_button,Color("#ead8b1"),16);rates_button.pressed.connect(_open_rates);add_child(rates_button)
 	close_button=Button.new();close_button.name="CloseButton";close_button.text="もどる";close_button.position=Vector2(448,28);close_button.size=Vector2(106,54);_skin_button(close_button,Color("#fff0cf"),17);close_button.pressed.connect(_request_close);add_child(close_button)
 
 func _build_dial()->void:
@@ -110,22 +117,53 @@ func _build_result_overlay()->void:
 	later_button=Button.new();later_button.name="LaterButton";later_button.text="あとで";later_button.custom_minimum_size=Vector2(154,76);_skin_button(later_button,Color("#d8c59a"),18);later_button.pressed.connect(_request_later);choice_row.add_child(later_button)
 	result_close_button=Button.new();result_close_button.name="ResultCloseButton";result_close_button.text="ガチャへ戻る";result_close_button.custom_minimum_size=Vector2(260,62);_skin_button(result_close_button,Color("#d5aa58"),18);result_close_button.pressed.connect(_close_result);content.add_child(result_close_button)
 
+func _build_rates_overlay()->void:
+	rates_overlay=Control.new();rates_overlay.name="DrawRatesOverlay";rates_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);rates_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;rates_overlay.visible=false;add_child(rates_overlay)
+	var dim:=ColorRect.new();dim.color=Color(0.025,.018,.012,.82);dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);dim.mouse_filter=Control.MOUSE_FILTER_STOP;rates_overlay.add_child(dim)
+	var panel:=PanelContainer.new();panel.name="DrawRatesPanel";panel.position=Vector2(38,132);panel.size=Vector2(500,744);panel.add_theme_stylebox_override("panel",_box(Color(.12,.075,.035,.98),Color("#e8bd67"),30,4));rates_overlay.add_child(panel)
+	var content:=VBoxContainer.new();content.alignment=BoxContainer.ALIGNMENT_CENTER;content.add_theme_constant_override("separation",14);content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);content.offset_left=30;content.offset_top=28;content.offset_right=-30;content.offset_bottom=-28;panel.add_child(content)
+	rates_title=Label.new();rates_title.name="DrawRatesTitle";rates_title.custom_minimum_size=Vector2(420,56);rates_title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;rates_title.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;rates_title.add_theme_font_size_override("font_size",26);rates_title.add_theme_color_override("font_color",Color("#fff4d2"));rates_title.add_theme_color_override("font_outline_color",Color("#3c1b0d"));rates_title.add_theme_constant_override("outline_size",6);content.add_child(rates_title)
+	rates_body=Label.new();rates_body.name="DrawRatesBody";rates_body.custom_minimum_size=Vector2(420,540);rates_body.size_flags_vertical=Control.SIZE_EXPAND_FILL;rates_body.horizontal_alignment=HORIZONTAL_ALIGNMENT_LEFT;rates_body.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;rates_body.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;rates_body.add_theme_font_size_override("font_size",17);rates_body.add_theme_color_override("font_color",UI_CREAM);content.add_child(rates_body)
+	rates_close_button=Button.new();rates_close_button.name="DrawRatesCloseButton";rates_close_button.custom_minimum_size=Vector2(250,58);_skin_button(rates_close_button,Color("#d5aa58"),18);rates_close_button.pressed.connect(_close_rates);content.add_child(rates_close_button)
+
 func open_gacha(puku_points:int,draw_count:int)->void:
-	cancel_spin_feedback();cancel_capsule_opening();visible=true;pending_result.clear();busy=false;capsule_ready=false;capsule.visible=false;capsule_hit_area.visible=false;result_overlay.visible=false;spin_request_started_msec=-1;spin_started_msec=-1;last_spin_start_latency_msec=-1;spin_first_visual_msec=-1;last_spin_visual_latency_msec=-1;last_capsule_tap_msec=-1;last_capsule_first_visual_msec=-1;last_capsule_first_visual_latency_msec=-1;set_wallet(puku_points,draw_count);hint_label.text="ダイヤルをタップして回そう";close_button.disabled=false
+	cancel_spin_feedback();cancel_capsule_opening();visible=true;pending_result.clear();busy=false;capsule_ready=false;capsule.visible=false;capsule_hit_area.visible=false;result_overlay.visible=false;rates_overlay.visible=false;spin_request_started_msec=-1;spin_started_msec=-1;last_spin_start_latency_msec=-1;spin_first_visual_msec=-1;last_spin_visual_latency_msec=-1;last_capsule_tap_msec=-1;last_capsule_first_visual_msec=-1;last_capsule_first_visual_latency_msec=-1;set_wallet(puku_points,draw_count);hint_label.text="ダイヤルをタップして回そう";close_button.disabled=false
 	set_language(language)
 
 func set_language(value:String)->void:
 	language=Localizer.normalize_language(value)
 	if not is_node_ready():return
-	title_label.text=Localizer.text(language,"forest_gacha");close_button.text=Localizer.text(language,"back");spin_button.text=Localizer.text(language,"gacha_spin");hint_label.text=Localizer.text(language,"gacha_dial_hint")
+	title_label.text=Localizer.text(language,"forest_gacha");close_button.text=Localizer.text(language,"back");rates_button.text=Localizer.text(language,"gacha_rates");spin_button.text=Localizer.text(language,"gacha_spin");hint_label.text=Localizer.text(language,"gacha_dial_hint")
 	wallet_label.text=Localizer.text(language,"wallet",[current_puku_points]);result_close_button.text=Localizer.text(language,"gacha_return");unlock_button.text=Localizer.text(language,"unlock_action");later_button.text=Localizer.text(language,"later")
+	rates_title.text=Localizer.text(language,"gacha_rates_title");rates_body.text=Localizer.text(language,"gacha_rates_body",_draw_rate_text_args());rates_close_button.text=Localizer.text(language,"close")
 
 func close_gacha()->void:
-	cancel_spin_feedback();cancel_capsule_opening();visible=false;pending_result.clear();busy=false;capsule_ready=false
+	cancel_spin_feedback();cancel_capsule_opening();visible=false;pending_result.clear();busy=false;capsule_ready=false;rates_overlay.visible=false
 
 func set_wallet(puku_points:int,draw_count:int)->void:
 	current_puku_points=puku_points;current_draw_count=draw_count
-	wallet_label.text=Localizer.text(language,"wallet",[puku_points]);spin_button.disabled=busy or _spin_feedback_active or capsule_ready or result_overlay.visible or puku_points<SPIN_COST_PUKU;dial_hit_area.disabled=spin_button.disabled
+	wallet_label.text=Localizer.text(language,"wallet",[puku_points]);spin_button.disabled=busy or _spin_feedback_active or capsule_ready or result_overlay.visible or rates_overlay.visible or puku_points<SPIN_COST_PUKU;dial_hit_area.disabled=spin_button.disabled
+	rates_button.disabled=busy or _spin_feedback_active or capsule_ready or result_overlay.visible or rates_overlay.visible
+
+func _draw_rate_text_args()->Array:
+	return [
+		_rate_percent(ForestGachaSystemClass.NORMAL_RANK_RATE),
+		_rate_percent(ForestGachaSystemClass.TWO_STAR_RATE),
+		_rate_percent(ForestGachaSystemClass.THREE_STAR_RATE),
+		_rate_percent(ForestGachaSystemClass.FOUR_STAR_RATE),
+		_rate_percent(ForestGachaSystemClass.NEW_DRAW_RATE),
+	]
+
+func _rate_percent(rate:float)->String:
+	var percentage:=rate*100.0
+	return "%d"%roundi(percentage) if is_equal_approx(percentage,roundf(percentage)) else "%.1f"%percentage
+
+func _open_rates()->void:
+	if busy or _spin_feedback_active or capsule_ready or result_overlay.visible:return
+	rates_overlay.visible=true;rates_button.disabled=true;spin_button.disabled=true;dial_hit_area.disabled=true;close_button.disabled=true
+
+func _close_rates()->void:
+	rates_overlay.visible=false;close_button.disabled=false;set_wallet(current_puku_points,current_draw_count)
 
 func play_spin(result:Dictionary,texture:Texture2D)->void:
 	if busy:return
@@ -166,7 +204,7 @@ func _on_dial_input(event:InputEvent)->void:
 		dial_texture.rotation+=event.relative.x*.025
 
 func _request_spin()->void:
-	if busy or _spin_feedback_active or capsule_ready or result_overlay.visible or spin_button.disabled:return
+	if busy or _spin_feedback_active or capsule_ready or result_overlay.visible or rates_overlay.visible or spin_button.disabled:return
 	spin_request_started_msec=Time.get_ticks_msec();_spin_feedback_active=true;close_button.disabled=true;spin_button.disabled=true;dial_hit_area.disabled=true;hint_label.text=""
 	dial_texture.rotation=fmod(dial_texture.rotation,TAU)
 	# Start the real 3.4-turn animation at input time. Result selection follows
@@ -259,14 +297,14 @@ func _close_result()->void:
 	cancel_capsule_opening();result_overlay.visible=false;pending_result.clear();result_image.texture=null;result_image.get_parent().visible=true;close_button.disabled=false;hint_label.text=Localizer.text(language,"gacha_dial_hint");capsule_ready=false;busy=false;set_wallet(current_puku_points,current_draw_count)
 
 func _request_close()->void:
-	if busy or _spin_feedback_active or capsule_ready or result_overlay.visible:return
+	if busy or _spin_feedback_active or capsule_ready or result_overlay.visible or rates_overlay.visible:return
 	close_requested.emit()
 
 func is_open()->bool:return visible
-func is_busy()->bool:return busy or capsule_ready or result_overlay.visible
+func is_busy()->bool:return busy or capsule_ready or result_overlay.visible or rates_overlay.visible
 
 func is_ready_for_forced_interstitial_transition()->bool:
-	return visible and not busy and not _spin_feedback_active and not capsule_ready and not result_overlay.visible and pending_result.is_empty()
+	return visible and not busy and not _spin_feedback_active and not capsule_ready and not result_overlay.visible and not rates_overlay.visible and pending_result.is_empty()
 
 func _skin_button(button:Button,background:Color,font_size:int)->void:
 	button.add_theme_font_size_override("font_size",font_size);button.add_theme_color_override("font_color",UI_BROWN if background.get_luminance()>.55 else Color.WHITE);button.add_theme_color_override("font_hover_color",UI_BROWN);button.add_theme_stylebox_override("normal",_box(background,background.lightened(.22),20,3));button.add_theme_stylebox_override("hover",_box(background.lightened(.08),Color.WHITE,20,3));button.add_theme_stylebox_override("pressed",_box(background.darkened(.08),background.lightened(.2),20,3));button.add_theme_stylebox_override("disabled",_box(background.darkened(.28),Color(.55,.48,.36,.65),20,2))

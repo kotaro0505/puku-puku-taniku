@@ -68,6 +68,12 @@ def main() -> None:
         assert read_info_plist_string(app_dir / "ja.lproj/InfoPlist.strings") == ATT_USAGE_DESCRIPTION_JA
         assert "personalized" not in ATT_USAGE_DESCRIPTION_EN.lower()
         assert "あなたに合った" not in ATT_USAGE_DESCRIPTION_JA
+        assert "for ad frequency control and measurement" in ATT_USAGE_DESCRIPTION_EN
+        assert "for rewarded-ad frequency control" not in ATT_USAGE_DESCRIPTION_EN
+        assert ATT_USAGE_DESCRIPTION_JA.startswith("広告の表示回数調整と効果測定")
+        assert not ATT_USAGE_DESCRIPTION_JA.startswith("リワード広告")
+        assert "追跡を許可しなくてもゲームを利用でき" in ATT_USAGE_DESCRIPTION_JA
+        assert "use the game if you decline tracking" in ATT_USAGE_DESCRIPTION_EN
 
     with tempfile.TemporaryDirectory() as temporary_directory:
         project, app_dir = write_fixture(Path(temporary_directory))
@@ -89,7 +95,7 @@ def main() -> None:
 
     print(
         "ATT_LOCALIZATION_SMOKE_OK locales=en,ja exact_text=true "
-        "idempotent=true disabled_absent=true personalized_claim=false"
+        "idempotent=true disabled_absent=true all_ad_formats=true personalized_claim=false"
     )
 
 

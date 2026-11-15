@@ -11,13 +11,14 @@ from pathlib import Path
 
 ATT_KEY = "NSUserTrackingUsageDescription"
 ATT_USAGE_DESCRIPTION_JA = (
-    "リワード広告の表示回数調整と効果測定のため、端末の広告識別子の利用許可を求めます。"
-    "許可しなくても広告を利用でき、報酬は変わりません。"
+    "広告の表示回数調整と効果測定のため、端末の広告識別子を利用した追跡の許可を求めます。"
+    "追跡を許可しなくてもゲームを利用でき、リワード広告の報酬は変わりません。"
 )
 ATT_USAGE_DESCRIPTION_EN = (
-    "We request permission to use the device advertising identifier for rewarded-ad "
-    "frequency control and measurement. You can still use rewarded ads without allowing tracking, "
-    "and rewards will not change."
+    "We request permission to track using the device advertising identifier "
+    "for ad frequency control and measurement. You can still use the game if you decline tracking, "
+    "and rewarded-ad "
+    "rewards will not change."
 )
 JA_FILE_REFERENCE_ID = "A77A77000000000000000001"
 

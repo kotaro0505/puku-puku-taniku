@@ -348,8 +348,11 @@ def main() -> None:
     for required_att_localization in [
         "ATT_USAGE_DESCRIPTION_JA",
         "ATT_USAGE_DESCRIPTION_EN",
-        "許可しなくても広告を利用でき、報酬は変わりません",
-        "You can still use rewarded ads without allowing tracking",
+        "広告の表示回数調整と効果測定",
+        "追跡を許可しなくてもゲームを利用でき",
+        "for ad frequency control",
+        "and measurement",
+        "use the game if you decline tracking",
         "rewards will not change",
         "ja.lproj/InfoPlist.strings",
         "verify_bundle_localizations",

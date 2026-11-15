@@ -169,7 +169,8 @@ workflows:
           case "$IOS_ATT_ENABLED" in
             true)
               grep -Fxq 'att_enabled=true' addons/AdmobPlugin/ios_export.cfg
-              grep -Fq 'You can still use rewarded ads without allowing tracking' addons/AdmobPlugin/ios_export.cfg
+              grep -Fq 'for ad frequency control and measurement' addons/AdmobPlugin/ios_export.cfg
+              grep -Fq 'use the game if you decline tracking' addons/AdmobPlugin/ios_export.cfg
               grep -Fq 'rewards will not change.' addons/AdmobPlugin/ios_export.cfg
               ! grep -Fq ' / ' addons/AdmobPlugin/ios_export.cfg
               ! grep -Fqi 'personalized' addons/AdmobPlugin/ios_export.cfg
@@ -554,9 +555,9 @@ workflows:
           usage_description = str(info.get("NSUserTrackingUsageDescription", ""))
           if att_setting == "true":
               expected_att_fallback = (
-                  "We request permission to use the device advertising identifier for rewarded-ad "
-                  "frequency control and measurement. You can still use rewarded ads without allowing "
-                  "tracking, and rewards will not change."
+                  "We request permission to track using the device advertising identifier for ad frequency "
+                  "control and measurement. You can still use the game if you decline tracking, "
+                  "and rewarded-ad rewards will not change."
               )
               if usage_description != expected_att_fallback:
                   raise SystemExit("ATT-enabled IPA has an unexpected base purpose text")
