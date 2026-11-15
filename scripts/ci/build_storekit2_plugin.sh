@@ -4,7 +4,7 @@ set -euo pipefail
 : "${GODOT_VERSION:?GODOT_VERSION is required}"
 STOREKIT2_VERSION="${STOREKIT2_VERSION:-v0.2}"
 IOS_MIN_VERSION="${IOS_MIN_VERSION:-15.6}"
-STOREKIT2_COMPAT_REVISION="${STOREKIT2_COMPAT_REVISION:-compat6}"
+STOREKIT2_COMPAT_REVISION="${STOREKIT2_COMPAT_REVISION:-compat7}"
 PROJECT_DIR="${CM_BUILD_DIR:-$(pwd)}"
 SOURCE_HEAD="$(git -C "$PROJECT_DIR" rev-parse HEAD 2>/dev/null || true)"
 [ -n "$SOURCE_HEAD" ] || SOURCE_HEAD="unavailable"
@@ -16,6 +16,7 @@ OUTPUT_DIR="$PROJECT_DIR/ios/plugins/godot-storekit2"
 PRICE_BRIDGE_PATCH="$PROJECT_DIR/scripts/ci/storekit2_price_bridge.patch"
 RESTORE_BRIDGE_PATCH="$PROJECT_DIR/scripts/ci/storekit2_restore_result_bridge.patch"
 ENTITLEMENT_BRIDGE_PATCH="$PROJECT_DIR/scripts/ci/storekit2_entitlement_snapshot_bridge.patch"
+SYNC_DIAGNOSTIC_BRIDGE_PATCH="$PROJECT_DIR/scripts/ci/storekit2_sync_diagnostic_bridge.patch"
 
 if [ "$IOS_MIN_VERSION" != "15.6" ]; then
   echo "godot-storekit2 $STOREKIT2_VERSION requires IOS_MIN_VERSION=15.6, got $IOS_MIN_VERSION" >&2
@@ -32,8 +33,8 @@ if [ "$STOREKIT2_VERSION" != "v0.2" ]; then
   exit 1
 fi
 
-if [ "$STOREKIT2_COMPAT_REVISION" != "compat6" ]; then
-  echo "Unexpected StoreKit2 compatibility revision: expected compat6, got $STOREKIT2_COMPAT_REVISION" >&2
+if [ "$STOREKIT2_COMPAT_REVISION" != "compat7" ]; then
+  echo "Unexpected StoreKit2 compatibility revision: expected compat7, got $STOREKIT2_COMPAT_REVISION" >&2
   exit 1
 fi
 
@@ -49,6 +50,11 @@ fi
 
 if [ ! -f "$ENTITLEMENT_BRIDGE_PATCH" ]; then
   echo "Missing StoreKit2 entitlement snapshot bridge patch: $ENTITLEMENT_BRIDGE_PATCH" >&2
+  exit 1
+fi
+
+if [ ! -f "$SYNC_DIAGNOSTIC_BRIDGE_PATCH" ]; then
+  echo "Missing StoreKit2 sync diagnostic bridge patch: $SYNC_DIAGNOSTIC_BRIDGE_PATCH" >&2
   exit 1
 fi
 
@@ -96,6 +102,9 @@ for framework_arg in sys.argv[1:]:
             b"request_current_entitlements",
             b"current_entitlements_received",
             b"unverified_entitlement",
+            b"restore_sync_diagnostic_received",
+            b"storekit_system_error",
+            b"underlying_domain",
         ):
             if marker not in library_data:
                 raise SystemExit(
@@ -170,6 +179,8 @@ git -C "$PLUGIN_SOURCE" apply --unidiff-zero --check "$RESTORE_BRIDGE_PATCH"
 git -C "$PLUGIN_SOURCE" apply --unidiff-zero "$RESTORE_BRIDGE_PATCH"
 git -C "$PLUGIN_SOURCE" apply --unidiff-zero --check "$ENTITLEMENT_BRIDGE_PATCH"
 git -C "$PLUGIN_SOURCE" apply --unidiff-zero "$ENTITLEMENT_BRIDGE_PATCH"
+git -C "$PLUGIN_SOURCE" apply --unidiff-zero --check "$SYNC_DIAGNOSTIC_BRIDGE_PATCH"
+git -C "$PLUGIN_SOURCE" apply --unidiff-zero "$SYNC_DIAGNOSTIC_BRIDGE_PATCH"
 grep -Fq 'D_METHOD("request_product_price", "product_id")' "$PLUGIN_IMPLEMENTATION"
 grep -Fq 'getProductPriceWithProductId:productId' "$PLUGIN_IMPLEMENTATION"
 grep -Fq '"product_price_received"' "$PLUGIN_IMPLEMENTATION"
@@ -185,14 +196,24 @@ fi
 grep -Fq 'private func priceInfoFromProduct(product: Product) async -> PriceInfo' "$PLUGIN_SWIFT"
 grep -Fq 'if let storefront = await Storefront.current {' "$PLUGIN_SWIFT"
 grep -Fq 'public var storefrontCountryCode = ""' "$PLUGIN_SWIFT"
-grep -Fq 'private func restoreErrorCode(error: Error) -> NSString' "$PLUGIN_SWIFT"
+grep -Fq 'private func restoreErrorCode(error: Error) -> String' "$PLUGIN_SWIFT"
 grep -Fq 'case .userCancelled:' "$PLUGIN_SWIFT"
 grep -Fq 'case .networkError(_):' "$PLUGIN_SWIFT"
-grep -Fq 'public func restorePurchases() async -> NSString' "$PLUGIN_SWIFT"
+grep -Fq 'public func restorePurchases() async -> RestoreSyncResult' "$PLUGIN_SWIFT"
 grep -Fq 'return "network_error"' "$PLUGIN_SWIFT"
 grep -Fq 'return "cancelled"' "$PLUGIN_SWIFT"
-grep -Fq 'restorePurchasesWithCompletionHandler:^(NSString *resultCode)' "$PLUGIN_IMPLEMENTATION"
-grep -Fq 'toGodotString(resultCode)' "$PLUGIN_IMPLEMENTATION"
+grep -Fq 'restorePurchasesWithCompletionHandler:^(RestoreSyncResult *syncResult)' "$PLUGIN_IMPLEMENTATION"
+grep -Fq 'restore_sync_diagnostic_received' "$PLUGIN_IMPLEMENTATION"
+grep -Fq 'diagnostic["error_domain"] = toGodotString(syncResult.errorDomain);' "$PLUGIN_IMPLEMENTATION"
+grep -Fq 'diagnostic["underlying_code"] = syncResult.underlyingCode;' "$PLUGIN_IMPLEMENTATION"
+grep -Fq 'private func restoreErrorKind(error: Error) -> String' "$PLUGIN_SWIFT"
+grep -Fq 'case .notEntitled:' "$PLUGIN_SWIFT"
+grep -Fq 'return "storekit_not_entitled"' "$PLUGIN_SWIFT"
+grep -Fq 'return "storekit_not_available_in_storefront"' "$PLUGIN_SWIFT"
+grep -Fq 'private func restoreUnderlyingError(error: Error) -> NSError?' "$PLUGIN_SWIFT"
+grep -Fq 'NSUnderlyingErrorKey' "$PLUGIN_SWIFT"
+grep -Fq 'result.errorDomain = nsError.domain' "$PLUGIN_SWIFT"
+grep -Fq 'result.errorCode = nsError.code' "$PLUGIN_SWIFT"
 grep -Fq 'D_METHOD("request_current_entitlements")' "$PLUGIN_IMPLEMENTATION"
 grep -Fq '"current_entitlements_received"' "$PLUGIN_IMPLEMENTATION"
 grep -Fq 'getCurrentEntitlementsWithCompletionHandler:^(EntitlementSnapshot *snapshot)' "$PLUGIN_IMPLEMENTATION"
@@ -264,6 +285,7 @@ echo "STOREKIT2_NUMERIC_PRICE_BRIDGE_OK conversion=NSDecimalNumber.doubleValue p
 echo "STOREKIT2_RESTORE_RESULT_BRIDGE_OK results=success,cancelled,network_error,failed localized_error_matching=false"
 echo "STOREKIT2_ENTITLEMENT_SNAPSHOT_BRIDGE_OK source=Transaction.currentEntitlements atomic=true product_metadata_independent=true"
 echo "STOREKIT2_PRODUCT_ERROR_ID_BRIDGE_OK callbacks=product_info,product_price"
+echo "STOREKIT2_SYNC_DIAGNOSTIC_BRIDGE_OK fields=kind,domain,code,underlying_domain,underlying_code localized_description=false"
 
 PLUGIN_PROJECT="$PLUGIN_SOURCE/godot-storekit2.xcodeproj/project.pbxproj"
 python3 - "$PLUGIN_PROJECT" "$IOS_MIN_VERSION" <<'PY'

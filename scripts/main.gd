@@ -1268,6 +1268,8 @@ func _refresh_internal_forced_ad_diagnostics()->void:
 		"att_pending=%s  consent_pending=%s"%[str(reward_diag.get("att_request_pending",false)),str(reward_diag.get("consent_operation_pending",false))],
 		"rewarded_diagnostic=%s"%str(reward_diag.get("diagnostic_code","unknown")),
 		"iap_restore=%s  sync=%s  rights=%s  count=%d"%[str(iap_diag.get("restore_result_code","unknown")),str(iap_diag.get("restore_sync_result_code","unknown")),str(iap_diag.get("restore_entitlements_result_code","unknown")),int(iap_diag.get("restore_entitlement_count",0))],
+		"iap_source=%s  sync_kind=%s"%[str(iap_diag.get("restore_source","none")),str(iap_diag.get("restore_sync_error_kind","none"))],
+		"iap_sync_error=%s:%d  underlying=%s:%d"%[str(iap_diag.get("restore_sync_error_domain","none")),int(iap_diag.get("restore_sync_error_code",0)),str(iap_diag.get("restore_sync_underlying_domain","none")),int(iap_diag.get("restore_sync_underlying_code",0))],
 		"iap_product_errors=%d  last=%s"%[int(iap_diag.get("product_info_error_count",0)),str(iap_diag.get("last_product_info_error_product_id","none"))],
 	])
 

@@ -93,12 +93,16 @@ func _ready()->void:
 	assert(extra_mock.purchase_calls==[forced_ads_product_id])
 	# Simulate purchase -> process restart/new save -> explicit restore from Apple's
 	# transaction history, without carrying the local entitlement cache forward.
-	var extra_restore_mock:=MockClass.new();extra_restore_mock.localized_prices=all_product_prices.duplicate(true);extra_restore_mock.restore_entitlements=extra_mock.purchased.duplicate(true)
+	var extra_restore_mock:=MockClass.new();extra_restore_mock.localized_prices=all_product_prices.duplicate(true);extra_restore_mock.purchased=extra_mock.purchased.duplicate(true);extra_restore_mock.suppress_product_info_response=true;extra_restore_mock.sync_error="must_not_run"
 	var extra_restore_service:=ServiceClass.new();add_child(extra_restore_service);extra_restore_service.configure(all_pots,{},extra_restore_mock,null,[forced_ads_product_id])
 	await get_tree().process_frame
+	assert(not extra_restore_service.is_unlocked(forced_ads_product_id))
 	assert(extra_restore_service.restore_purchases())
-	assert(extra_restore_service.is_unlocked(forced_ads_product_id) and extra_restore_mock.entitlement_snapshot_calls==1)
+	assert(extra_restore_service.is_unlocked(forced_ads_product_id) and extra_restore_mock.entitlement_snapshot_calls==1 and extra_restore_mock.sync_calls==0)
 	assert(extra_restore_service.restore_result_code()==extra_restore_service.RESTORE_RESULT_SUCCESS)
+	var current_rights_diagnostic:Dictionary=extra_restore_service.diagnostic_snapshot()
+	assert(str(current_rights_diagnostic.restore_sync_result_code)==extra_restore_service.RESTORE_RESULT_NOT_NEEDED)
+	assert(str(current_rights_diagnostic.restore_source)==extra_restore_service.RESTORE_SOURCE_CURRENT_ENTITLEMENTS)
 	extra_restore_mock.transaction_state_changed.emit({"error":"","product_id":forced_ads_product_id,"transaction_state":ServiceClass.TRANSACTION_REFUNDED})
 	assert(not extra_restore_service.is_unlocked(forced_ads_product_id))
 	var failure_mock:=MockClass.new();failure_mock.localized_prices=prices.duplicate(true);failure_mock.next_purchase_error="declined"
@@ -157,10 +161,11 @@ func _ready()->void:
 	assert(not restore_service.is_unlocked(first_product));assert(restore_service.restore_purchases())
 	assert(restore_mock.sync_calls==1 and restore_service.is_unlocked(first_product) and restore_service.is_unlocked(last_product) and not restore_service.restore_in_progress())
 	assert(restore_results==[true] and restore_service.restore_result_code()==restore_service.RESTORE_RESULT_SUCCESS)
-	assert(restore_mock.entitlement_snapshot_calls==1 and restore_mock.requested_products.size()==36)
+	assert(restore_mock.entitlement_snapshot_calls==2 and restore_mock.requested_products.size()==36)
 	var restore_diagnostic:Dictionary=restore_service.diagnostic_snapshot()
 	assert(str(restore_diagnostic.restore_sync_result_code)==restore_service.RESTORE_RESULT_SUCCESS)
 	assert(str(restore_diagnostic.restore_entitlements_result_code)==restore_service.RESTORE_RESULT_SUCCESS and int(restore_diagnostic.restore_entitlement_count)==2)
+	assert(str(restore_diagnostic.restore_source)==restore_service.RESTORE_SOURCE_SYNCED_ENTITLEMENTS)
 	# Duplicate native completion callbacks must not complete or refresh twice.
 	restore_mock.emit_sync_result("");assert(restore_results==[true])
 
@@ -172,15 +177,16 @@ func _ready()->void:
 	empty_restore_service.restore_finished.connect(func(success:bool)->void:empty_restore_results.append(success))
 	assert(empty_restore_service.restore_purchases())
 	assert(empty_restore_results==[true] and empty_restore_service.entitlements_snapshot().is_empty())
+	assert(empty_restore_mock.sync_calls==1 and empty_restore_mock.entitlement_snapshot_calls==2)
 
 	# StoreKit sync failures never become a success message. Stable native result
 	# codes keep cancellation and network errors independent of the device locale.
 	for failure_case in [
-		{"native_code":"cancelled","expected":ServiceClass.RESTORE_RESULT_CANCELLED},
-		{"native_code":"network_error","expected":ServiceClass.RESTORE_RESULT_NETWORK_ERROR},
-		{"native_code":"unexpected_storekit_error","expected":ServiceClass.RESTORE_RESULT_FAILED},
+		{"native_code":"cancelled","expected":ServiceClass.RESTORE_RESULT_CANCELLED,"kind":"storekit_user_cancelled","domain":"StoreKit.StoreKitError","code":2,"underlying_domain":"","underlying_code":0},
+		{"native_code":"network_error","expected":ServiceClass.RESTORE_RESULT_NETWORK_ERROR,"kind":"storekit_network_error","domain":"StoreKit.StoreKitError","code":1,"underlying_domain":"NSURLErrorDomain","underlying_code":-1009},
+		{"native_code":"unexpected_storekit_error","expected":ServiceClass.RESTORE_RESULT_FAILED,"kind":"storekit_other","domain":"StoreKit.StoreKitError","code":0,"underlying_domain":"","underlying_code":0},
 	]:
-		var restore_failure_mock:=MockClass.new();restore_failure_mock.localized_prices=prices.duplicate(true);restore_failure_mock.sync_error=str(failure_case.native_code)
+		var restore_failure_mock:=MockClass.new();restore_failure_mock.localized_prices=prices.duplicate(true);restore_failure_mock.sync_error=str(failure_case.native_code);restore_failure_mock.sync_error_kind=str(failure_case.kind);restore_failure_mock.sync_error_domain=str(failure_case.domain);restore_failure_mock.sync_error_code=int(failure_case.code);restore_failure_mock.sync_underlying_domain=str(failure_case.underlying_domain);restore_failure_mock.sync_underlying_code=int(failure_case.underlying_code)
 		var restore_failure_service:=ServiceClass.new();add_child(restore_failure_service);restore_failure_service.configure(all_pots,{},restore_failure_mock)
 		await get_tree().process_frame
 		var failure_results:Array[bool]=[]
@@ -188,6 +194,21 @@ func _ready()->void:
 		assert(restore_failure_service.restore_purchases())
 		assert(failure_results==[false] and not restore_failure_service.restore_in_progress())
 		assert(restore_failure_service.restore_result_code()==str(failure_case.expected))
+		var failure_diagnostic:Dictionary=restore_failure_service.diagnostic_snapshot()
+		assert(str(failure_diagnostic.restore_sync_error_kind)==str(failure_case.kind))
+		assert(str(failure_diagnostic.restore_sync_error_domain)==str(failure_case.domain) and int(failure_diagnostic.restore_sync_error_code)==int(failure_case.code))
+		assert(str(failure_diagnostic.restore_sync_underlying_domain)==str(failure_case.underlying_domain) and int(failure_diagnostic.restore_sync_underlying_code)==int(failure_case.underlying_code))
+
+	# A failed forced refresh never turns a local cache into a success and never
+	# destroys it. Only a verified StoreKit snapshot may change entitlements.
+	var preserved_cache_mock:=MockClass.new();preserved_cache_mock.localized_prices=all_product_prices.duplicate(true);preserved_cache_mock.suppress_product_info_response=true;preserved_cache_mock.sync_error="network_error";preserved_cache_mock.sync_error_kind="storekit_network_error";preserved_cache_mock.sync_error_domain="StoreKit.StoreKitError";preserved_cache_mock.sync_error_code=1;preserved_cache_mock.sync_underlying_domain="NSURLErrorDomain";preserved_cache_mock.sync_underlying_code=-1009
+	var preserved_cache_service:=ServiceClass.new();add_child(preserved_cache_service);preserved_cache_service.configure(all_pots,{forced_ads_product_id:true},preserved_cache_mock,null,[forced_ads_product_id])
+	await get_tree().process_frame
+	var preserved_cache_results:Array[bool]=[]
+	preserved_cache_service.restore_finished.connect(func(success:bool)->void:preserved_cache_results.append(success))
+	assert(preserved_cache_service.restore_purchases())
+	assert(preserved_cache_results==[false] and preserved_cache_service.is_unlocked(forced_ads_product_id))
+	assert(preserved_cache_service.restore_result_code()==ServiceClass.RESTORE_RESULT_NETWORK_ERROR)
 
 	# A missing native callback and an incomplete entitlement refresh both time
 	# out, re-enable the restore action, and ignore a later stale callback.
@@ -226,7 +247,7 @@ func _ready()->void:
 	assert(partial_catalog_service.restore_purchases())
 	assert(partial_catalog_results==[true] and partial_catalog_service.is_unlocked(forced_ads_product_id))
 	assert(partial_catalog_service.restore_result_code()==partial_catalog_service.RESTORE_RESULT_SUCCESS)
-	assert(partial_catalog_mock.entitlement_snapshot_calls==1 and partial_catalog_mock.requested_products.size()==37)
+	assert(partial_catalog_mock.entitlement_snapshot_calls==2 and partial_catalog_mock.requested_products.size()==37)
 	var partial_catalog_diagnostic:Dictionary=partial_catalog_service.diagnostic_snapshot()
 	assert(int(partial_catalog_diagnostic.product_info_error_count)==1 and str(partial_catalog_diagnostic.last_product_info_error_product_id)==last_product)
 

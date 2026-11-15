@@ -17,9 +17,14 @@ const RESTORE_RESULT_CANCELLED := "cancelled"
 const RESTORE_RESULT_NETWORK_ERROR := "network_error"
 const RESTORE_RESULT_TIMEOUT := "timeout"
 const RESTORE_RESULT_FAILED := "failed"
+const RESTORE_RESULT_NOT_NEEDED := "not_needed"
 const RESTORE_STAGE_IDLE := "idle"
+const RESTORE_STAGE_CHECKING := "checking_entitlements"
 const RESTORE_STAGE_SYNCING := "syncing"
 const RESTORE_STAGE_REFRESHING := "refreshing"
+const RESTORE_SOURCE_NONE := "none"
+const RESTORE_SOURCE_CURRENT_ENTITLEMENTS := "current_entitlements"
+const RESTORE_SOURCE_SYNCED_ENTITLEMENTS := "synced_entitlements"
 const RESTORE_SYNC_TIMEOUT_SECONDS := 120.0
 const RESTORE_REFRESH_TIMEOUT_SECONDS := 60.0
 
@@ -53,6 +58,12 @@ var _restore_result_code:=RESTORE_RESULT_IDLE
 var _restore_sync_result_code:=RESTORE_RESULT_IDLE
 var _restore_entitlements_result_code:=RESTORE_RESULT_IDLE
 var _restore_entitlement_count:=0
+var _restore_source:=RESTORE_SOURCE_NONE
+var _restore_sync_error_kind:="none"
+var _restore_sync_error_domain:=""
+var _restore_sync_error_code:=0
+var _restore_sync_underlying_domain:=""
+var _restore_sync_underlying_code:=0
 var _restore_timeout_token:=0
 
 func configure(pots:Array,cached_entitlements:Dictionary={},test_bridge:Variant=null,price_only_products:Variant=null,extra_product_ids:Variant=null)->void:
@@ -75,6 +86,8 @@ func configure(pots:Array,cached_entitlements:Dictionary={},test_bridge:Variant=
 	_restore_sync_result_code=RESTORE_RESULT_IDLE
 	_restore_entitlements_result_code=RESTORE_RESULT_IDLE
 	_restore_entitlement_count=0
+	_restore_source=RESTORE_SOURCE_NONE
+	_clear_restore_sync_diagnostic()
 	_restore_timeout_token+=1
 	for pot_value in pots:
 		if not pot_value is Dictionary:continue
@@ -128,6 +141,7 @@ func restore_available()->bool:
 		and _store_kit!=null
 		and _store_kit.has_method("sync")
 		and _store_kit.has_signal("synchronized")
+		and _store_kit.has_signal("restore_sync_diagnostic_received")
 		and _store_kit.has_method("request_current_entitlements")
 		and _store_kit.has_signal("current_entitlements_received")
 	)
@@ -160,6 +174,12 @@ func diagnostic_snapshot()->Dictionary:
 		"restore_sync_result_code":_restore_sync_result_code,
 		"restore_entitlements_result_code":_restore_entitlements_result_code,
 		"restore_entitlement_count":_restore_entitlement_count,
+		"restore_source":_restore_source,
+		"restore_sync_error_kind":_restore_sync_error_kind,
+		"restore_sync_error_domain":_restore_sync_error_domain,
+		"restore_sync_error_code":_restore_sync_error_code,
+		"restore_sync_underlying_domain":_restore_sync_underlying_domain,
+		"restore_sync_underlying_code":_restore_sync_underlying_code,
 	}
 
 func purchase(product_id:String)->bool:
@@ -183,14 +203,14 @@ func restore_purchases()->bool:
 		purchase_failed.emit("","restore_unavailable")
 		return false
 	_restore_in_progress=true
-	_restore_stage=RESTORE_STAGE_SYNCING
 	_restore_result_code=RESTORE_RESULT_IDLE
 	_restore_sync_result_code=RESTORE_RESULT_IDLE
 	_restore_entitlements_result_code=RESTORE_RESULT_IDLE
 	_restore_entitlement_count=0
-	_arm_restore_timeout(RESTORE_SYNC_TIMEOUT_SECONDS)
+	_restore_source=RESTORE_SOURCE_NONE
+	_clear_restore_sync_diagnostic()
 	state_changed.emit()
-	_store_kit.call("sync")
+	_begin_restore_entitlement_refresh(false)
 	return true
 
 func _connect_bridge_signals()->void:
@@ -202,6 +222,8 @@ func _connect_bridge_signals()->void:
 		_store_kit.connect("transaction_state_changed",_on_transaction_state_changed)
 	if _store_kit.has_signal("synchronized"):
 		_store_kit.connect("synchronized",_on_synchronized)
+	if _store_kit.has_signal("restore_sync_diagnostic_received"):
+		_store_kit.connect("restore_sync_diagnostic_received",_on_restore_sync_diagnostic_received)
 	if _store_kit.has_signal("current_entitlements_received"):
 		_store_kit.connect("current_entitlements_received",_on_current_entitlements_received)
 
@@ -341,22 +363,33 @@ func _on_synchronized(error:String="")->void:
 	if result_code!=RESTORE_RESULT_SUCCESS:
 		_finish_restore(false,result_code)
 		return
-	_begin_restore_entitlement_refresh()
+	_begin_restore_entitlement_refresh(true)
 
-func _begin_restore_entitlement_refresh()->void:
-	_restore_stage=RESTORE_STAGE_REFRESHING
+func _begin_restore_sync()->void:
+	_restore_stage=RESTORE_STAGE_SYNCING
+	_arm_restore_timeout(RESTORE_SYNC_TIMEOUT_SECONDS)
+	_store_kit.call("sync")
+
+func _begin_restore_entitlement_refresh(after_sync:bool)->void:
+	_restore_stage=RESTORE_STAGE_REFRESHING if after_sync else RESTORE_STAGE_CHECKING
 	if _product_ids.is_empty():
 		_restore_entitlements_result_code=RESTORE_RESULT_SUCCESS
+		_restore_sync_result_code=RESTORE_RESULT_NOT_NEEDED if not after_sync else _restore_sync_result_code
+		_restore_source=RESTORE_SOURCE_CURRENT_ENTITLEMENTS if not after_sync else RESTORE_SOURCE_SYNCED_ENTITLEMENTS
 		_finish_restore(true,RESTORE_RESULT_SUCCESS)
 		return
 	_arm_restore_timeout(RESTORE_REFRESH_TIMEOUT_SECONDS)
 	_store_kit.call("request_current_entitlements")
 
 func _on_current_entitlements_received(info:Dictionary)->void:
-	if not _restore_in_progress or _restore_stage!=RESTORE_STAGE_REFRESHING:return
+	if not _restore_in_progress or _restore_stage not in [RESTORE_STAGE_CHECKING,RESTORE_STAGE_REFRESHING]:return
+	var before_sync:=_restore_stage==RESTORE_STAGE_CHECKING
 	var error:=str(info.get("error","")).strip_edges().to_lower()
 	_restore_entitlements_result_code=error if not error.is_empty() else RESTORE_RESULT_SUCCESS
 	if not error.is_empty():
+		if before_sync:
+			_begin_restore_sync()
+			return
 		_finish_restore(false,RESTORE_RESULT_FAILED)
 		return
 	var product_ids_value:Variant=info.get("product_ids",null)
@@ -367,18 +400,42 @@ func _on_current_entitlements_received(info:Dictionary)->void:
 	var active_entitlements:Dictionary={}
 	for product_id in _normalize_product_ids(product_ids_value):
 		if _product_ids.has(product_id):active_entitlements[product_id]=true
+	_restore_entitlement_count=active_entitlements.size()
+	# StoreKit normally keeps this verified sequence current. If it already
+	# contains an app entitlement, no authentication prompt or AppStore.sync()
+	# is needed. An empty/invalid initial result is the rare missing-history case
+	# for which Apple recommends a user-initiated sync, followed by a fresh read.
+	if before_sync and active_entitlements.is_empty():
+		_begin_restore_sync()
+		return
 	# Apply the verified snapshot only after it has been validated in full. This
 	# restores purchases on a new device and removes refunded/revoked rights,
 	# while a failed snapshot leaves the last known cache untouched.
 	for product_id in _product_ids:
 		_set_entitlement(product_id,active_entitlements.has(product_id))
-	_restore_entitlement_count=active_entitlements.size()
+	_restore_sync_result_code=RESTORE_RESULT_NOT_NEEDED if before_sync else _restore_sync_result_code
+	_restore_source=RESTORE_SOURCE_CURRENT_ENTITLEMENTS if before_sync else RESTORE_SOURCE_SYNCED_ENTITLEMENTS
 	_finish_restore(true,RESTORE_RESULT_SUCCESS)
+
+func _on_restore_sync_diagnostic_received(info:Dictionary)->void:
+	if not _restore_in_progress or _restore_stage!=RESTORE_STAGE_SYNCING:return
+	_restore_sync_error_kind=str(info.get("error_kind","unknown")).strip_edges()
+	_restore_sync_error_domain=str(info.get("error_domain","")).strip_edges()
+	_restore_sync_error_code=int(info.get("error_code",0))
+	_restore_sync_underlying_domain=str(info.get("underlying_domain","")).strip_edges()
+	_restore_sync_underlying_code=int(info.get("underlying_code",0))
+
+func _clear_restore_sync_diagnostic()->void:
+	_restore_sync_error_kind="none"
+	_restore_sync_error_domain=""
+	_restore_sync_error_code=0
+	_restore_sync_underlying_domain=""
+	_restore_sync_underlying_code=0
 
 func _classify_restore_error(error:String)->String:
 	var normalized:=error.strip_edges().to_lower()
 	if normalized.is_empty():return RESTORE_RESULT_SUCCESS
-	# compat6 emits these stable, locale-independent codes. The fallback
+	# compat7 emits these stable, locale-independent codes. The fallback
 	# aliases keep a build made with an older bridge from reporting success.
 	if normalized in ["cancelled","canceled","user_cancelled","user_canceled"]:return RESTORE_RESULT_CANCELLED
 	if normalized in ["network_error","network","offline"]:return RESTORE_RESULT_NETWORK_ERROR

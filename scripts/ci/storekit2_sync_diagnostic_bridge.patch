@@ -1,0 +1,103 @@
+diff --git a/godot-storekit2/GodotStoreKit2Swift.swift b/godot-storekit2/GodotStoreKit2Swift.swift
+index d7a3a9e..28ceea2 100644
+--- a/godot-storekit2/GodotStoreKit2Swift.swift
++++ b/godot-storekit2/GodotStoreKit2Swift.swift
+@@ -179 +179 @@ public final class GodotStoreKit2Proxy: NSObject,
+-	private func restoreErrorCode(error: Error) -> NSString {
++	private func restoreErrorCode(error: Error) -> String {
+@@ -201 +201,58 @@ public final class GodotStoreKit2Proxy: NSObject,
+-	public func restorePurchases() async -> NSString {
++	private func restoreErrorKind(error: Error) -> String {
++		if let storeKitError = error as? StoreKitError {
++			switch storeKitError {
++			case .userCancelled:
++				return "storekit_user_cancelled"
++			case .networkError(_):
++				return "storekit_network_error"
++			case .systemError(_):
++				return "storekit_system_error"
++			case .notEntitled:
++				return "storekit_not_entitled"
++			case .notAvailableInStorefront:
++				return "storekit_not_available_in_storefront"
++			case .unknown:
++				return "storekit_unknown"
++			default:
++				return "storekit_other"
++			}
++		}
++		if error is URLError {
++			return "url_error"
++		}
++		return "other"
++	}
++
++	private func restoreUnderlyingError(error: Error) -> NSError? {
++		if let storeKitError = error as? StoreKitError {
++			switch storeKitError {
++			case .networkError(let underlyingError):
++				return underlyingError as NSError
++			case .systemError(let underlyingError):
++				return underlyingError as NSError
++			default:
++				break
++			}
++		}
++		let nsError = error as NSError
++		return nsError.userInfo[NSUnderlyingErrorKey] as? NSError
++	}
++
++	private func makeRestoreSyncResult(error: Error?) -> RestoreSyncResult {
++		let result = RestoreSyncResult()
++		guard let error else {
++			return result
++		}
++		result.resultCode = restoreErrorCode(error: error)
++		result.errorKind = restoreErrorKind(error: error)
++		let nsError = error as NSError
++		result.errorDomain = nsError.domain
++		result.errorCode = nsError.code
++		if let underlyingError = restoreUnderlyingError(error: error) {
++			result.underlyingDomain = underlyingError.domain
++			result.underlyingCode = underlyingError.code
++		}
++		return result
++	}
++
++	public func restorePurchases() async -> RestoreSyncResult {
+@@ -204 +261 @@ public final class GodotStoreKit2Proxy: NSObject,
+-			return ""
++			return makeRestoreSyncResult(error: nil)
+@@ -206 +263 @@ public final class GodotStoreKit2Proxy: NSObject,
+-			return restoreErrorCode(error: error)
++			return makeRestoreSyncResult(error: error)
+@@ -275,0 +333,10 @@ public class EntitlementSnapshot: NSObject {
++
++@objcMembers
++public class RestoreSyncResult: NSObject {
++	public var resultCode = ""
++	public var errorKind = "none"
++	public var errorDomain = ""
++	public var errorCode = 0
++	public var underlyingDomain = ""
++	public var underlyingCode = 0
++}
+diff --git a/godot-storekit2/godot-storekit2.mm b/godot-storekit2/godot-storekit2.mm
+index d53cce6..5701cb9 100644
+--- a/godot-storekit2/godot-storekit2.mm
++++ b/godot-storekit2/godot-storekit2.mm
+@@ -28,0 +29 @@ void GodotStoreKit2::_bind_methods() {
++	ADD_SIGNAL(MethodInfo("restore_sync_diagnostic_received", PropertyInfo(Variant::DICTIONARY, "info")));
+@@ -126,2 +127,10 @@ Signal GodotStoreKit2::sync() {
+-	[proxy restorePurchasesWithCompletionHandler:^(NSString *resultCode) {
+-		call_deferred("emit_signal", "synchronized", toGodotString(resultCode));
++	[proxy restorePurchasesWithCompletionHandler:^(RestoreSyncResult *syncResult) {
++		Dictionary diagnostic;
++		diagnostic["result_code"] = toGodotString(syncResult.resultCode);
++		diagnostic["error_kind"] = toGodotString(syncResult.errorKind);
++		diagnostic["error_domain"] = toGodotString(syncResult.errorDomain);
++		diagnostic["error_code"] = syncResult.errorCode;
++		diagnostic["underlying_domain"] = toGodotString(syncResult.underlyingDomain);
++		diagnostic["underlying_code"] = syncResult.underlyingCode;
++		call_deferred("emit_signal", "restore_sync_diagnostic_received", diagnostic);
++		call_deferred("emit_signal", "synchronized", toGodotString(syncResult.resultCode));

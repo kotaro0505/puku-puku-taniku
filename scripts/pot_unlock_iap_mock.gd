@@ -5,6 +5,7 @@ signal transaction_state_changed(transaction:Dictionary)
 signal product_info_received(product_info:Dictionary)
 signal product_price_received(product_price:Dictionary)
 signal synchronized(error:String)
+signal restore_sync_diagnostic_received(info:Dictionary)
 signal current_entitlements_received(info:Dictionary)
 
 const TRANSACTION_PURCHASED := 4
@@ -26,6 +27,11 @@ var suppress_product_info_response:=false
 var suppress_sync_response:=false
 var suppress_entitlement_snapshot_response:=false
 var sync_error:=""
+var sync_error_kind:="none"
+var sync_error_domain:=""
+var sync_error_code:=0
+var sync_underlying_domain:=""
+var sync_underlying_code:=0
 var entitlement_snapshot_error:=""
 var sync_calls:=0
 var entitlement_snapshot_calls:=0
@@ -87,11 +93,24 @@ func sync()->Signal:
 		if not bool(restore_entitlements[product_id_value]):continue
 		purchased[product_id]=true
 		transaction_state_changed.emit({"error":"","product_id":product_id,"transaction_state":TRANSACTION_RESTORED})
-	if not suppress_sync_response:synchronized.emit(sync_error)
+	if not suppress_sync_response:
+		_emit_sync_diagnostic()
+		synchronized.emit(sync_error)
 	return synchronized
 
 func emit_sync_result(error:String="")->void:
+	_emit_sync_diagnostic()
 	synchronized.emit(error)
+
+func _emit_sync_diagnostic()->void:
+	restore_sync_diagnostic_received.emit({
+		"result_code":sync_error,
+		"error_kind":sync_error_kind,
+		"error_domain":sync_error_domain,
+		"error_code":sync_error_code,
+		"underlying_domain":sync_underlying_domain,
+		"underlying_code":sync_underlying_code,
+	})
 
 func request_current_entitlements()->Signal:
 	entitlement_snapshot_calls+=1
