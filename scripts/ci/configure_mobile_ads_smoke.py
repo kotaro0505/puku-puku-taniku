@@ -80,6 +80,7 @@ def main() -> None:
             "ADMOB_IOS_APP_ID": "ca-app-pub-1111111111111111~1111111111",
             "ADMOB_IOS_REWARDED_AD_UNIT_ID": "ca-app-pub-1111111111111111/2222222222",
         })
+        env.pop("ADMOB_IOS_INTERSTITIAL_AD_UNIT_ID", None)
         missing_interstitial = subprocess.run(
             [sys.executable, str(SCRIPT), "production"],
             cwd=temporary_directory,
