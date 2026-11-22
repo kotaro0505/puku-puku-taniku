@@ -31,9 +31,13 @@ func _ready() -> void:
 	assert(game.find_child("TrialDevGachaOpen", true, false) == null)
 	assert(not game._opening_story_preview_requested())
 	assert(not game._habitat_test_preview_requested())
-	assert(game.opening_settings_button != null and game.settings_version_button != null)
-	game._open_settings()
-	game._open_app_review_code_entry()
+	assert(game.find_child("OpeningSettingsButton", true, false) == null and game.settings_version_button != null)
+	game.language_selected = true
+	game._show_opening()
+	assert(game.opening_review_logo_tap_area != null and game.opening_review_logo_tap_area.is_visible_in_tree())
+	for _tap in range(5):
+		game.opening_review_logo_tap_area.pressed.emit()
+	assert(game.app_review_code_overlay.visible and game.opening_overlay.visible and not game.opening_finished)
 	game.app_review_code_input.text = "PUKU-REVIEW-37"
 	assert(game._submit_app_review_code())
 	await get_tree().process_frame
@@ -44,7 +48,7 @@ func _ready() -> void:
 			if not product_id.is_empty(): review_products[product_id] = true
 	assert(review_products.size() == 37 and review_products.has("forced_ads_removal"))
 	game.arrangement_ui.close()
-	assert(not game.app_review_iap_access_active)
+	assert(not game.app_review_iap_access_active and game.opening_overlay.visible and not game.settings_overlay.visible)
 
 	game.normal_seed_bags = 7
 	game.puku_balance_units = 3210
@@ -57,6 +61,6 @@ func _ready() -> void:
 	assert(not bool(preset_result.get("ok", false)))
 	assert(str(preset_result.get("error", "")) == "development_only")
 
-	print("RELEASE_GATE_SMOKE_OK dev_ui_absent=true internal_ad_diagnostics_absent=true story_jump_blocked=true reset_blocked=true currency_grant_blocked=true preview_blocked=true app_review_iap=37-products+temporary")
+	print("RELEASE_GATE_SMOKE_OK dev_ui_absent=true internal_ad_diagnostics_absent=true story_jump_blocked=true reset_blocked=true currency_grant_blocked=true preview_blocked=true app_review_iap=opening-logo+37-products+temporary")
 	game.queue_free()
 	get_tree().quit()

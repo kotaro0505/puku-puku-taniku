@@ -25,7 +25,7 @@ func _ready() -> void:
 	_test_progression_thresholds()
 	_test_phase_bgm_policy(game)
 	game._reset_progression_state()
-	print("PROGRESSION_UI_REVISION_SMOKE_OK copy=updated language_ui=fixed settings=content-sized+stable-toggles app_review_iap=title-entry+5-taps+37-products+temporary privacy_policy=localized+always-available ad_report=localized+always-available privacy_options=localized+state-gated panda_chatter=5 armadillo_chatter=5 habitat_button=always_plain arrangement=3+swipe forest=8 fusion=12 bgm=phase-aware migration=preserved")
+	print("PROGRESSION_UI_REVISION_SMOKE_OK copy=updated language_ui=fixed settings=content-sized+stable-toggles app_review_iap=opening-logo+5-taps+37-products+temporary privacy_policy=localized+always-available ad_report=localized+always-available privacy_options=localized+state-gated panda_chatter=5 armadillo_chatter=5 habitat_button=always_plain arrangement=3+swipe forest=8 fusion=12 bgm=phase-aware migration=preserved")
 	get_tree().quit()
 
 
@@ -225,14 +225,21 @@ func _test_settings_controls(game: Node) -> void:
 func _test_app_review_iap_access(game:Node)->void:
 	game.language_selected=false
 	game._show_opening()
-	assert(game.opening_overlay.visible and game.opening_language_panel.visible)
-	assert(not game.opening_settings_button.visible)
-	game._select_initial_language("ja")
-	assert(game.opening_settings_button.visible and not game.opening_language_panel.visible)
-	game.opening_settings_button.pressed.emit()
 	await get_tree().process_frame
-	assert(game.settings_overlay.visible and game.settings_overlay.get_index()>game.opening_overlay.get_index())
+	assert(game.opening_overlay.visible and game.opening_language_panel.visible)
+	assert(game.find_child("OpeningSettingsButton",true,false)==null)
+	assert(game.opening_review_logo_tap_area!=null and not game.opening_review_logo_tap_area.visible and game.opening_review_logo_tap_area.disabled)
+	game._select_initial_language("ja")
+	await get_tree().process_frame
+	assert(not game.opening_language_panel.visible and game.opening_review_logo_tap_area.is_visible_in_tree() and not game.opening_review_logo_tap_area.disabled)
+	assert(not game.settings_overlay.visible and game.opening_overlay.visible and not game.opening_finished)
 	assert(game.settings_version_button.text=="Version 1.0.0")
+	assert(game.opening_review_logo_tap_area.position==game.APP_REVIEW_OPENING_LOGO_TAP_RECT.position)
+	assert(game.opening_review_logo_tap_area.size==game.APP_REVIEW_OPENING_LOGO_TAP_RECT.size)
+	assert(game.opening_review_logo_tap_area.action_mode==BaseButton.ACTION_MODE_BUTTON_RELEASE)
+	assert(game.opening_review_logo_tap_area.focus_mode==Control.FOCUS_NONE and game.opening_review_logo_tap_area.mouse_filter==Control.MOUSE_FILTER_STOP)
+	assert(game.opening_review_logo_tap_area.get_index()>game.opening_tap_area.get_index())
+	assert(game.opening_review_logo_tap_area.get_global_rect().end.y<game.opening_prompt.get_global_rect().position.y)
 	var progression_before:Dictionary=game.story_progression_state.duplicate(true)
 	var puku_before:int=game.puku_balance_units
 	var owned_before:Dictionary=game.owned_pots.duplicate(true)
@@ -245,47 +252,45 @@ func _test_app_review_iap_access(game:Node)->void:
 
 	assert(game.app_review_code_input.virtual_keyboard_type==LineEdit.KEYBOARD_TYPE_URL)
 	for _tap in range(4):
-		game.settings_version_button.pressed.emit()
-		assert(not game.app_review_code_overlay.visible)
-	assert(game.app_review_version_tap_count==4)
-	game.app_review_version_last_tap_msec=Time.get_ticks_msec()-game.APP_REVIEW_VERSION_TAP_TIMEOUT_MSEC-1
-	game.settings_version_button.pressed.emit()
-	assert(not game.app_review_code_overlay.visible and game.app_review_version_tap_count==1)
-	game.settings_version_button.pressed.emit()
-	assert(game.app_review_version_tap_count==2)
-	game._on_settings_scroll_gui_input(InputEventScreenDrag.new())
-	assert(game.app_review_version_tap_count==0 and not game.app_review_code_overlay.visible)
-	game.settings_version_button.pressed.emit()
-	game.settings_version_button.pressed.emit()
-	game.settings_scroll.scroll_started.emit()
-	assert(game.app_review_version_tap_count==0 and not game.app_review_code_overlay.visible)
-	game.settings_version_button.pressed.emit()
+		await _touch_control(game.opening_review_logo_tap_area)
+		assert(not game.app_review_code_overlay.visible and game.opening_overlay.visible and not game.opening_finished)
+	assert(game.app_review_opening_logo_tap_count==4)
+	game.app_review_opening_logo_last_tap_msec=Time.get_ticks_msec()-game.APP_REVIEW_ACCESS_TAP_TIMEOUT_MSEC-1
+	await _touch_control(game.opening_review_logo_tap_area)
+	assert(not game.app_review_code_overlay.visible and game.app_review_opening_logo_tap_count==1)
+	await _touch_control(game.opening_review_logo_tap_area)
+	assert(game.app_review_opening_logo_tap_count==2)
 	game._notification(NOTIFICATION_APPLICATION_PAUSED)
-	assert(game.app_review_version_tap_count==0 and not game.app_review_code_overlay.visible)
-	game.settings_version_button.pressed.emit()
-	game._close_settings()
-	assert(game.app_review_version_tap_count==0 and not game.app_review_code_overlay.visible)
-	game._open_settings()
+	assert(game.app_review_opening_logo_tap_count==0 and not game.app_review_code_overlay.visible)
 
-	game.settings_version_button.pressed.emit()
+	await _touch_control(game.opening_review_logo_tap_area)
 	await get_tree().create_timer(2.05).timeout
-	assert(game.app_review_version_tap_count==0 and not game.app_review_code_overlay.visible)
+	assert(game.app_review_opening_logo_tap_count==0 and not game.app_review_code_overlay.visible)
 	for tap_index in range(5):
-		game.settings_version_button.pressed.emit()
+		await _touch_control(game.opening_review_logo_tap_area)
 		if tap_index<4:assert(not game.app_review_code_overlay.visible)
-	assert(game.app_review_code_overlay.visible and game.app_review_code_input.has_focus())
+	assert(game.app_review_code_overlay.visible and game.app_review_code_input.has_focus() and game.opening_overlay.visible and not game.opening_finished)
+	assert(not game.settings_overlay.visible and game.app_review_code_title_label.text==Localizer.text("ja","app_review_code_title"))
 	game.app_review_code_input.text="WRONG"
 	assert(not game._submit_app_review_code())
 	assert(game.app_review_code_overlay.visible and not game.app_review_iap_access_active)
 	game._cancel_app_review_code_entry()
-	assert(not game.app_review_code_overlay.visible and not game.app_review_iap_access_active)
+	assert(not game.app_review_code_overlay.visible and not game.app_review_iap_access_active and game.opening_overlay.visible)
 
-	game._open_app_review_code_entry()
+	for language_entry in [{"code":"hiragana","title":"かくにん こーど"},{"code":"en","title":"Verification Code"}]:
+		game.language_code=str(language_entry.code);game._apply_language_to_ui()
+		for _tap in range(5):
+			await _touch_control(game.opening_review_logo_tap_area)
+		assert(game.app_review_code_overlay.visible and game.app_review_code_title_label.text==str(language_entry.title))
+		game._cancel_app_review_code_entry()
+	game.language_code="ja";game._apply_language_to_ui()
+	for _tap in range(5):
+		await _touch_control(game.opening_review_logo_tap_area)
 	game.app_review_code_input.text="PUKU-REVIEW-37"
 	assert(game._submit_app_review_code())
 	await get_tree().process_frame
 	assert(game.app_review_iap_access_active and game.arrangement_ui.visible)
-	assert(game.arrangement_ui.return_context=="app_review_settings")
+	assert(game.arrangement_ui.return_context=="app_review_opening")
 	assert(game.arrangement_ui.app_review_all_iap_products_visible)
 	var visible_product_ids:Dictionary={}
 	for card_value in game.arrangement_ui.shop_grid.get_children():
@@ -309,14 +314,25 @@ func _test_app_review_iap_access(game:Node)->void:
 	game.arrangement_ui.close()
 	await get_tree().process_frame
 	assert(not game.app_review_iap_access_active and not game.arrangement_ui.app_review_all_iap_products_visible)
-	assert(game.settings_overlay.visible and game.opening_overlay.visible)
-	game._close_settings()
-	assert(not game.settings_overlay.visible and game.opening_overlay.visible)
+	assert(not game.settings_overlay.visible and game.opening_overlay.visible and not game.opening_finished)
 	assert(game.story_progression_state==progression_before)
 	assert(game.puku_balance_units==puku_before and game.owned_pots==owned_before and game.pot_design_unlocks==unlocks_before)
 	assert(game.discovered==discovered_before and game.species_get_counts==get_counts_before and game.tutorial_steps==tutorial_before)
 	assert(game.act3_unlocked==act3_before and game.forced_ads_removed==ads_removed_before)
+	game.opening_tap_area.pressed.emit()
+	await get_tree().process_frame
+	assert(game.opening_finished and not game.opening_overlay.visible)
 	_prepare_safe_greenhouse(game)
+
+
+func _touch_control(control:Control)->void:
+	var center:=control.get_global_rect().get_center()
+	var press:=InputEventScreenTouch.new();press.index=0;press.position=center;press.pressed=true
+	get_viewport().push_input(press,true)
+	await get_tree().process_frame
+	var release:=InputEventScreenTouch.new();release.index=0;release.position=center;release.pressed=false
+	get_viewport().push_input(release,true)
+	await get_tree().process_frame
 
 
 func _assert_stable_settings_toggle(button: Button, enabled: bool) -> void:
