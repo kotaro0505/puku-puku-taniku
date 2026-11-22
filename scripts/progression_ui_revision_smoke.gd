@@ -25,7 +25,7 @@ func _ready() -> void:
 	_test_progression_thresholds()
 	_test_phase_bgm_policy(game)
 	game._reset_progression_state()
-	print("PROGRESSION_UI_REVISION_SMOKE_OK copy=updated language_ui=fixed settings=content-sized+stable-toggles app_review_iap=title-entry+2s-hold+37-products+temporary privacy_policy=localized+always-available ad_report=localized+always-available privacy_options=localized+state-gated panda_chatter=5 armadillo_chatter=5 habitat_button=always_plain arrangement=3+swipe forest=8 fusion=12 bgm=phase-aware migration=preserved")
+	print("PROGRESSION_UI_REVISION_SMOKE_OK copy=updated language_ui=fixed settings=content-sized+stable-toggles app_review_iap=title-entry+5-taps+37-products+temporary privacy_policy=localized+always-available ad_report=localized+always-available privacy_options=localized+state-gated panda_chatter=5 armadillo_chatter=5 habitat_button=always_plain arrangement=3+swipe forest=8 fusion=12 bgm=phase-aware migration=preserved")
 	get_tree().quit()
 
 
@@ -243,29 +243,36 @@ func _test_app_review_iap_access(game:Node)->void:
 	var act3_before:bool=game.act3_unlocked
 	var ads_removed_before:bool=game.forced_ads_removed
 
-	game.settings_version_button.button_down.emit()
-	var short_generation:int=game.app_review_version_hold_generation
-	game.settings_version_button.button_up.emit()
-	assert(not game._complete_app_review_version_hold(short_generation))
-	assert(not game.app_review_code_overlay.visible)
-	game._begin_app_review_version_hold()
-	var drag_generation:int=game.app_review_version_hold_generation
+	assert(game.app_review_code_input.virtual_keyboard_type==LineEdit.KEYBOARD_TYPE_URL)
+	for _tap in range(4):
+		game.settings_version_button.pressed.emit()
+		assert(not game.app_review_code_overlay.visible)
+	assert(game.app_review_version_tap_count==4)
+	game.app_review_version_last_tap_msec=Time.get_ticks_msec()-game.APP_REVIEW_VERSION_TAP_TIMEOUT_MSEC-1
+	game.settings_version_button.pressed.emit()
+	assert(not game.app_review_code_overlay.visible and game.app_review_version_tap_count==1)
+	game.settings_version_button.pressed.emit()
+	assert(game.app_review_version_tap_count==2)
 	game._on_settings_scroll_gui_input(InputEventScreenDrag.new())
-	assert(not game._complete_app_review_version_hold(drag_generation))
-	game._begin_app_review_version_hold()
-	var inactive_generation:int=game.app_review_version_hold_generation
+	assert(game.app_review_version_tap_count==0 and not game.app_review_code_overlay.visible)
+	game.settings_version_button.pressed.emit()
+	game.settings_version_button.pressed.emit()
+	game.settings_scroll.scroll_started.emit()
+	assert(game.app_review_version_tap_count==0 and not game.app_review_code_overlay.visible)
+	game.settings_version_button.pressed.emit()
 	game._notification(NOTIFICATION_APPLICATION_PAUSED)
-	assert(not game._complete_app_review_version_hold(inactive_generation))
-	game._begin_app_review_version_hold()
-	var close_generation:int=game.app_review_version_hold_generation
+	assert(game.app_review_version_tap_count==0 and not game.app_review_code_overlay.visible)
+	game.settings_version_button.pressed.emit()
 	game._close_settings()
-	assert(not game._complete_app_review_version_hold(close_generation))
+	assert(game.app_review_version_tap_count==0 and not game.app_review_code_overlay.visible)
 	game._open_settings()
 
-	game._begin_app_review_version_hold()
-	await get_tree().create_timer(0.15).timeout
-	assert(not game.app_review_code_overlay.visible)
-	await get_tree().create_timer(1.95).timeout
+	game.settings_version_button.pressed.emit()
+	await get_tree().create_timer(2.05).timeout
+	assert(game.app_review_version_tap_count==0 and not game.app_review_code_overlay.visible)
+	for tap_index in range(5):
+		game.settings_version_button.pressed.emit()
+		if tap_index<4:assert(not game.app_review_code_overlay.visible)
 	assert(game.app_review_code_overlay.visible and game.app_review_code_input.has_focus())
 	game.app_review_code_input.text="WRONG"
 	assert(not game._submit_app_review_code())

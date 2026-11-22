@@ -1,6 +1,6 @@
 # App Store 掲載情報・審査資料 草案
 
-作成日: 2026-10-26 / 最終更新: 2026-11-16
+作成日: 2026-10-26 / 最終更新: 2026-11-22
 対象: 『ぷくぷく！たにくらいふ』ストーリー版 iOS 1.0
 状態: **App Store Connect転記前の承認用草案**。鉢36商品と「広告を削除」1商品の計37件は、既存のApp Review用ドラフトSubmissionへ追加済み。鉢36件の商品情報・価格・販売地域・審査画像は登録済みで、全件 `READY_TO_SUBMIT`。購入、購入復元、広告削除権利、リワード広告の主要動作はTestFlight実機で確認済み。アプリ本体の審査提出・公開は行っていない。
 
@@ -78,7 +78,7 @@
 | IAP Product ID | 100文字 | 37件すべて上限内 |
 | IAP Display Name | 2〜30文字 | 37件・日英とも上限内 |
 | IAP Description | 45文字 | 登録済み37件の日英表示を提出直前に再確認する |
-| App Review Notes | 4,000文字 | 日本語候補1,143文字、英語候補2,731文字。英語候補を転記する |
+| App Review Notes | 4,000文字 | 日本語候補1,146文字、英語候補2,731文字。英語候補を転記する |
 
 根拠: [App information](https://developer.apple.com/help/app-store-connect/reference/app-information/app-information)、[Platform version information](https://developer.apple.com/help/app-store-connect/reference/app-information/platform-version-information)、[In-App Purchase information](https://developer.apple.com/help/app-store-connect/reference/in-app-purchases-and-subscriptions/in-app-purchase-information/)。Appleの一般向け紹介ページには過去のIAP文字数が残る場合があるため、本草案ではApp Store Connect Helpの30文字／45文字を採用しています。
 
@@ -367,7 +367,7 @@ AppleはApp Review連絡先として担当者名、メール、電話番号を�
 
 App Review向け全37商品確認経路:
 1. 初回言語選択後のタイトル画面右上で「設定」を開きます。ストーリー開始は不要です。
-2. 設定画面最下部の「Version 1.0.0」を2秒長押しします。
+2. 設定画面最下部の「Version 1.0.0」を5回続けてタップします。
 3. 確認コード画面に「PUKU-REVIEW-37」と入力し、「確認」を押します。
 4. 「寄せ植え用の鉢」に「広告を削除」、pot_unlock_001〜pot_unlock_036、および「購入を復元」が表示されます。各商品の実際のStoreKit価格と購入ボタンを確認できます。
 
@@ -391,7 +391,7 @@ Puku Puku! Taniku Life is a single-player succulent-growing and collection story
 
 Direct App Review route to all 37 products:
 1. After choosing a language on first launch, tap "Settings" at the upper-right of the title screen. You do not need to start the story.
-2. At the bottom of Settings, press and hold "Version 1.0.0" for 2 seconds.
+2. At the bottom of Settings, tap "Version 1.0.0" five times in succession.
 3. On the "Verification Code" screen, enter "PUKU-REVIEW-37" and tap "Continue."
 4. The "Arrangement Pots" screen displays Remove Ads, pot_unlock_001 through pot_unlock_036, and "Restore Purchases." Each product uses its live StoreKit price and purchase flow.
 
@@ -473,7 +473,7 @@ Appleはデバイスサイズごとに1〜10枚を受け付け、最初の1〜3�
 - **提出前確認**: 税区分、Family Sharing方針、商品情報の最終表示
 - 初回アプリバージョンと同じドラフトSubmission内に37件すべてが残っていること
 - Sandbox/TestFlight実機で未確認の購入キャンセル、通信失敗、再インストール、返金／権利変更
-- **実装済み／実機確認待ち**: タイトルの設定→Version長押し→確認コードで、進行を変えず後半商品を含む37件へ到達するApp Review経路
+- **実装済み／実機確認待ち**: タイトルの設定→Versionを5回連続タップ→確認コードで、進行を変えず後半商品を含む37件へ到達するApp Review経路
 
 ### 掲載素材とストア運用
 

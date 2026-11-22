@@ -95,7 +95,8 @@ const SETTINGS_CONTENT_DECORATION_MARGIN_BOTTOM := 10.0
 const PRIVACY_POLICY_URL := "https://kotaro0505.github.io/puku-puku-taniku/privacy-policy/"
 const SUPPORT_AD_REPORT_URL := "https://kotaro0505.github.io/puku-puku-taniku/support/"
 const APP_REVIEW_IAP_ACCESS_CODE := "PUKU-REVIEW-37"
-const APP_REVIEW_VERSION_HOLD_SECONDS := 2.0
+const APP_REVIEW_VERSION_TAP_TARGET := 5
+const APP_REVIEW_VERSION_TAP_TIMEOUT_MSEC := 2000
 const PUKU_GAUGE_FINISH_SPEED_SCALE := 0.5
 const FIRST_GET_MIN_REWARD_UNITS := 200
 const DOUBLE_PUKU_REWARD_SPECIES_ID := "sweets_strawberry_shortcake"
@@ -607,8 +608,9 @@ var app_review_code_input:LineEdit
 var app_review_code_status_label:Label
 var app_review_code_confirm_button:Button
 var app_review_code_cancel_button:Button
-var app_review_version_hold_active:=false
-var app_review_version_hold_generation:=0
+var app_review_version_tap_count:=0
+var app_review_version_tap_generation:=0
+var app_review_version_last_tap_msec:=-1
 var app_review_iap_access_active:=false
 var language_buttons:Dictionary={}
 var progression_dev_labels:Dictionary={}
@@ -908,7 +910,7 @@ var habitat_crisis_eligible_visit_id := 0
 
 func _notification(what:int)->void:
 	if what==NOTIFICATION_APPLICATION_FOCUS_OUT or what==NOTIFICATION_APPLICATION_PAUSED or what==NOTIFICATION_WM_WINDOW_FOCUS_OUT:
-		_cancel_app_review_version_hold()
+		_reset_app_review_version_taps()
 
 func _ready() -> void:
 	for profile_error in BuildProfileClass.runtime_profile_errors():
@@ -4353,10 +4355,10 @@ func _build_settings(hud:Control)->void:
 	settings_close_button=Button.new();settings_close_button.text="閉じる";settings_close_button.custom_minimum_size=Vector2(280,55);_skin_button(settings_close_button,Color("#ead8b1"),18);settings_close_button.pressed.connect(_close_settings);content.add_child(settings_close_button)
 	settings_version_button=Button.new();settings_version_button.name="SettingsVersionButton";settings_version_button.text="Version %s"%_game_version_key();settings_version_button.flat=true;settings_version_button.focus_mode=Control.FOCUS_NONE;settings_version_button.action_mode=BaseButton.ACTION_MODE_BUTTON_RELEASE;settings_version_button.custom_minimum_size=Vector2(280,36);settings_version_button.size_flags_horizontal=Control.SIZE_SHRINK_CENTER;settings_version_button.mouse_default_cursor_shape=Control.CURSOR_POINTING_HAND;settings_version_button.add_theme_font_size_override("font_size",14)
 	for color_name in ["font_color","font_hover_color","font_pressed_color","font_focus_color","font_hover_pressed_color"]:settings_version_button.add_theme_color_override(color_name,Color("#79543a"))
-	settings_version_button.button_down.connect(_begin_app_review_version_hold);settings_version_button.button_up.connect(_cancel_app_review_version_hold);settings_version_button.gui_input.connect(_on_settings_version_gui_input);content.add_child(settings_version_button)
+	settings_version_button.pressed.connect(_register_app_review_version_tap);content.add_child(settings_version_button)
 	_build_app_review_code_overlay(settings_overlay)
 	settings_scroll.gui_input.connect(_on_settings_scroll_gui_input)
-	settings_scroll.scroll_started.connect(_cancel_app_review_version_hold)
+	settings_scroll.scroll_started.connect(_reset_app_review_version_taps)
 	settings_overlay.visibility_changed.connect(_on_settings_overlay_visibility_changed)
 	settings_content_frame.minimum_size_changed.connect(_queue_settings_panel_layout)
 	_refresh_progression_dev_counters()
@@ -4370,48 +4372,49 @@ func _build_app_review_code_overlay(parent:Control)->void:
 	var content:=VBoxContainer.new();content.alignment=BoxContainer.ALIGNMENT_CENTER;content.add_theme_constant_override("separation",14);panel.add_child(content)
 	app_review_code_title_label=Label.new();app_review_code_title_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;app_review_code_title_label.add_theme_font_size_override("font_size",24);app_review_code_title_label.add_theme_color_override("font_color",UI_BROWN);content.add_child(app_review_code_title_label)
 	app_review_code_hint_label=Label.new();app_review_code_hint_label.custom_minimum_size=Vector2(400,76);app_review_code_hint_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;app_review_code_hint_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;app_review_code_hint_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;app_review_code_hint_label.add_theme_font_size_override("font_size",16);app_review_code_hint_label.add_theme_color_override("font_color",Color("#76513b"));content.add_child(app_review_code_hint_label)
-	app_review_code_input=LineEdit.new();app_review_code_input.name="AppReviewCodeInput";app_review_code_input.custom_minimum_size=Vector2(400,58);app_review_code_input.max_length=32;app_review_code_input.alignment=HORIZONTAL_ALIGNMENT_CENTER;app_review_code_input.add_theme_font_size_override("font_size",19);app_review_code_input.add_theme_color_override("font_color",UI_BROWN);app_review_code_input.add_theme_stylebox_override("normal",_box(Color("#fff8e6"),Color("#b77c48"),14,2));app_review_code_input.text_submitted.connect(_on_app_review_code_text_submitted);content.add_child(app_review_code_input)
+	app_review_code_input=LineEdit.new();app_review_code_input.name="AppReviewCodeInput";app_review_code_input.custom_minimum_size=Vector2(400,58);app_review_code_input.max_length=32;app_review_code_input.alignment=HORIZONTAL_ALIGNMENT_CENTER;app_review_code_input.virtual_keyboard_type=LineEdit.KEYBOARD_TYPE_URL;app_review_code_input.virtual_keyboard_show_on_focus=true;app_review_code_input.add_theme_font_size_override("font_size",19);app_review_code_input.add_theme_color_override("font_color",UI_BROWN);app_review_code_input.add_theme_stylebox_override("normal",_box(Color("#fff8e6"),Color("#b77c48"),14,2));app_review_code_input.text_submitted.connect(_on_app_review_code_text_submitted);content.add_child(app_review_code_input)
 	app_review_code_status_label=Label.new();app_review_code_status_label.custom_minimum_size=Vector2(400,54);app_review_code_status_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;app_review_code_status_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;app_review_code_status_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;app_review_code_status_label.add_theme_font_size_override("font_size",15);app_review_code_status_label.add_theme_color_override("font_color",Color("#a13f2e"));content.add_child(app_review_code_status_label)
 	var actions:=HBoxContainer.new();actions.alignment=BoxContainer.ALIGNMENT_CENTER;actions.add_theme_constant_override("separation",12);content.add_child(actions)
 	app_review_code_cancel_button=Button.new();app_review_code_cancel_button.custom_minimum_size=Vector2(176,54);_skin_button(app_review_code_cancel_button,Color("#ead8b1"),17);app_review_code_cancel_button.pressed.connect(_cancel_app_review_code_entry);actions.add_child(app_review_code_cancel_button)
 	app_review_code_confirm_button=Button.new();app_review_code_confirm_button.custom_minimum_size=Vector2(176,54);_skin_button(app_review_code_confirm_button,Color("#d7aa64"),17);app_review_code_confirm_button.pressed.connect(_submit_app_review_code);actions.add_child(app_review_code_confirm_button)
 
-func _begin_app_review_version_hold()->void:
-	if settings_overlay==null or not settings_overlay.visible or app_review_code_overlay==null or app_review_code_overlay.visible:return
-	app_review_version_hold_generation+=1
-	app_review_version_hold_active=true
-	_wait_for_app_review_version_hold(app_review_version_hold_generation)
+func _register_app_review_version_tap()->void:
+	if settings_overlay==null or not settings_overlay.visible or app_review_code_overlay==null or app_review_code_overlay.visible:
+		_reset_app_review_version_taps()
+		return
+	var now_msec:=Time.get_ticks_msec()
+	if app_review_version_tap_count>0 and app_review_version_last_tap_msec>=0 and now_msec-app_review_version_last_tap_msec>APP_REVIEW_VERSION_TAP_TIMEOUT_MSEC:
+		_reset_app_review_version_taps()
+	app_review_version_tap_count+=1
+	app_review_version_last_tap_msec=now_msec
+	app_review_version_tap_generation+=1
+	var generation:=app_review_version_tap_generation
+	if app_review_version_tap_count>=APP_REVIEW_VERSION_TAP_TARGET:
+		_reset_app_review_version_taps()
+		_open_app_review_code_entry()
+		return
+	_wait_for_app_review_version_tap_timeout(generation)
 
-func _wait_for_app_review_version_hold(generation:int)->void:
-	await get_tree().create_timer(APP_REVIEW_VERSION_HOLD_SECONDS).timeout
-	_complete_app_review_version_hold(generation)
+func _wait_for_app_review_version_tap_timeout(generation:int)->void:
+	await get_tree().create_timer(float(APP_REVIEW_VERSION_TAP_TIMEOUT_MSEC)/1000.0).timeout
+	if generation==app_review_version_tap_generation:_reset_app_review_version_taps()
 
-func _complete_app_review_version_hold(generation:int)->bool:
-	if generation!=app_review_version_hold_generation or not app_review_version_hold_active:return false
-	if settings_overlay==null or not settings_overlay.visible or app_review_code_overlay==null or app_review_code_overlay.visible:return false
-	app_review_version_hold_active=false
-	_open_app_review_code_entry()
-	return true
-
-func _cancel_app_review_version_hold()->void:
-	if app_review_version_hold_active:app_review_version_hold_generation+=1
-	app_review_version_hold_active=false
-
-func _on_settings_version_gui_input(event:InputEvent)->void:
-	if event is InputEventScreenDrag or (event is InputEventScreenTouch and not event.pressed):_cancel_app_review_version_hold()
-	elif event is InputEventMouseMotion and app_review_version_hold_active and (event as InputEventMouseMotion).relative.length()>1.0:_cancel_app_review_version_hold()
+func _reset_app_review_version_taps()->void:
+	app_review_version_tap_generation+=1
+	app_review_version_tap_count=0
+	app_review_version_last_tap_msec=-1
 
 func _on_settings_scroll_gui_input(event:InputEvent)->void:
-	if event is InputEventScreenDrag or event is InputEventMouseButton or event is InputEventPanGesture:_cancel_app_review_version_hold()
+	if event is InputEventScreenDrag or event is InputEventPanGesture:_reset_app_review_version_taps()
 
 func _on_settings_overlay_visibility_changed()->void:
 	if settings_overlay!=null and settings_overlay.visible:return
-	_cancel_app_review_version_hold()
+	_reset_app_review_version_taps()
 	if app_review_code_overlay!=null:app_review_code_overlay.visible=false
 	if app_review_code_input!=null:app_review_code_input.release_focus()
 
 func _open_app_review_code_entry()->void:
-	_cancel_app_review_version_hold()
+	_reset_app_review_version_taps()
 	app_review_code_input.text=""
 	app_review_code_status_label.text=""
 	app_review_code_overlay.visible=true
@@ -4419,7 +4422,7 @@ func _open_app_review_code_entry()->void:
 	app_review_code_input.grab_focus()
 
 func _cancel_app_review_code_entry()->void:
-	_cancel_app_review_version_hold()
+	_reset_app_review_version_taps()
 	if app_review_code_input!=null:
 		app_review_code_input.text=""
 		app_review_code_input.release_focus()
