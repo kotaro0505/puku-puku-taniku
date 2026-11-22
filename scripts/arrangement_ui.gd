@@ -69,6 +69,7 @@ var pot_restore_available:=false
 var pot_restore_in_progress:=false
 var forced_ads_removal_product_id:=""
 var forced_ads_removed:=false
+var app_review_all_iap_products_visible:=false
 var share_background_catalog:Array=[]
 var share_background_unlocks:Dictionary={}
 var texture_resolver:Callable
@@ -237,7 +238,7 @@ void fragment() {
 func _exit_tree()->void:
 	_remove_web_multitouch_fallback()
 
-func configure(species_data:Array,series_data:Array,pots_data:Array,discovery:Dictionary,purchased_pots:Dictionary,arrangements:Array,capacity:int,puku_points:int,resolver:Callable,requester:Callable=Callable(),best_records:Dictionary={},locale:String="ja",sales_stage:int=0,design_unlocks:Dictionary={},iap_products:Dictionary={},restore_available:bool=false,restore_in_progress:bool=false,share_backgrounds:Array=[],background_unlocks:Dictionary={},picker_series_data:Array=[],ads_removed:bool=false,ads_removal_product_id:String="")->void:
+func configure(species_data:Array,series_data:Array,pots_data:Array,discovery:Dictionary,purchased_pots:Dictionary,arrangements:Array,capacity:int,puku_points:int,resolver:Callable,requester:Callable=Callable(),best_records:Dictionary={},locale:String="ja",sales_stage:int=0,design_unlocks:Dictionary={},iap_products:Dictionary={},restore_available:bool=false,restore_in_progress:bool=false,share_backgrounds:Array=[],background_unlocks:Dictionary={},picker_series_data:Array=[],ads_removed:bool=false,ads_removal_product_id:String="",review_all_iap_products:bool=false)->void:
 	var next_picker_signature:=_species_picker_signature(species_data,discovery)
 	if next_picker_signature!=picker_card_signature:
 		_clear_species_picker_cache()
@@ -262,6 +263,7 @@ func configure(species_data:Array,series_data:Array,pots_data:Array,discovery:Di
 	pot_restore_in_progress=restore_in_progress
 	forced_ads_removed=ads_removed
 	forced_ads_removal_product_id=ads_removal_product_id
+	app_review_all_iap_products_visible=review_all_iap_products
 	share_background_catalog=share_backgrounds.duplicate(true)
 	share_background_unlocks=background_unlocks.duplicate(true)
 	if visible and is_share_editor_active() and _share_background_panel_is_open():_refresh_share_background_panel()
@@ -321,8 +323,8 @@ func sync_seed_shop_state(products:Array,puku_points:int)->void:
 func open_home()->void:
 	return_context="greenhouse";visible=true;_show_page(home_page);_refresh_home()
 
-func open_pot_shop()->void:
-	set_world_backdrop_mode(false,world_pot_anchor_screen);return_context="shop";visible=true;_show_page(shop_page);_refresh_pot_shop()
+func open_pot_shop(context:String="shop")->void:
+	set_world_backdrop_mode(false,world_pot_anchor_screen);return_context=context;visible=true;_show_page(shop_page);_refresh_pot_shop()
 
 func open_catalog_shop()->void:
 	set_world_backdrop_mode(false,world_pot_anchor_screen);return_context="shop";visible=true;_show_page(catalog_shop_page);_refresh_catalog_shop()
@@ -1648,9 +1650,10 @@ func _refresh_pot_shop_cards()->void:
 		var content:=Control.new();content.name="PotCardContent";content.custom_minimum_size=Vector2(484,184);content.mouse_filter=Control.MOUSE_FILTER_PASS;content.clip_contents=true;card.add_child(content)
 		var preview:=Control.new();preview.position=Vector2(2,2);preview.size=Vector2(214,176);preview.mouse_filter=Control.MOUSE_FILTER_IGNORE;content.add_child(preview);_render_pot(preview,pot,true)
 		var name:=Label.new();name.text=GameLocalizer.pot_name(language_code,pot);name.position=Vector2(220,12);name.size=Vector2(258,45);name.mouse_filter=Control.MOUSE_FILTER_IGNORE;name.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;name.add_theme_font_size_override("font_size",19);name.add_theme_color_override("font_color",UI_BROWN);content.add_child(name)
-		var condition:=Label.new();condition.name="PotOwnedTotal";condition.text=GameLocalizer.text(language_code,"pot_owned_total",[total]) if design_unlocked else GameLocalizer.text(language_code,"pot_permanent_unlock");condition.position=Vector2(220,52);condition.size=Vector2(258,32);condition.mouse_filter=Control.MOUSE_FILTER_IGNORE;condition.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;condition.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;condition.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;condition.add_theme_font_size_override("font_size",17 if design_unlocked else 14);condition.add_theme_color_override("font_color",Color("#79543a"));content.add_child(condition)
+		var paid_design:=str(pot.get("unlock_type","free"))=="iap_unlock"
+		var condition:=Label.new();condition.name="PotOwnedTotal";condition.text=GameLocalizer.text(language_code,"app_review_pot_design_unlocked",[total]) if app_review_all_iap_products_visible and design_unlocked and paid_design else (GameLocalizer.text(language_code,"pot_owned_total",[total]) if design_unlocked else GameLocalizer.text(language_code,"pot_permanent_unlock"));condition.position=Vector2(220,52);condition.size=Vector2(258,32);condition.mouse_filter=Control.MOUSE_FILTER_IGNORE;condition.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;condition.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;condition.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;condition.add_theme_font_size_override("font_size",15 if app_review_all_iap_products_visible and design_unlocked and paid_design else (17 if design_unlocked else 14));condition.add_theme_color_override("font_color",Color("#79543a"));content.add_child(condition)
 		var locked_price:=Label.new();locked_price.name="PotLockedPukuPrice";locked_price.text=GameLocalizer.text(language_code,"pot_locked_puku_price",[price]) if priced else GameLocalizer.text(language_code,"price_tbd");locked_price.position=Vector2(220,84);locked_price.size=Vector2(258,30);locked_price.mouse_filter=Control.MOUSE_FILTER_IGNORE;locked_price.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;locked_price.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;locked_price.add_theme_font_size_override("font_size",18);locked_price.add_theme_color_override("font_color",Color("#9b5f27"));locked_price.visible=not design_unlocked;content.add_child(locked_price)
-		var buy_text:="";var buy_enabled:=false;var product_id:=str(pot.get("iap_product_id",""));var buy_action:=Callable()
+		var buy_text:="";var buy_enabled:=false;var product_id:=str(pot.get("iap_product_id",""));var buy_action:=Callable();card.set_meta("iap_product_id",product_id)
 		if design_unlocked:
 			buy_text=GameLocalizer.text(language_code,"buy_puku",[price]) if priced else GameLocalizer.text(language_code,"price_tbd")
 			buy_enabled=priced and wallet_puku_points>=price
@@ -1675,7 +1678,7 @@ func _refresh_pot_shop_cards()->void:
 			if pot_purchase_feedback.has(pot_id):_show_pot_purchase_feedback(content,pot,pot_purchase_feedback[pot_id])
 
 func _build_forced_ads_removal_card()->void:
-	var card:=PanelContainer.new();card.name="ForcedAdsRemovalCard";card.custom_minimum_size=Vector2(504,220);card.mouse_filter=Control.MOUSE_FILTER_PASS;card.clip_contents=true;card.add_theme_stylebox_override("panel",_box(Color("#f4e1bc"),Color("#9b6a48"),20,3));shop_grid.add_child(card)
+	var card:=PanelContainer.new();card.name="ForcedAdsRemovalCard";card.set_meta("iap_product_id",forced_ads_removal_product_id);card.custom_minimum_size=Vector2(504,220);card.mouse_filter=Control.MOUSE_FILTER_PASS;card.clip_contents=true;card.add_theme_stylebox_override("panel",_box(Color("#f4e1bc"),Color("#9b6a48"),20,3));shop_grid.add_child(card)
 	var content:=VBoxContainer.new();content.name="ForcedAdsRemovalContent";content.custom_minimum_size=Vector2(484,200);content.mouse_filter=Control.MOUSE_FILTER_PASS;content.add_theme_constant_override("separation",8);card.add_child(content)
 	var title:=Label.new();title.name="ForcedAdsRemovalTitle";title.text=GameLocalizer.text(language_code,"forced_ads_removal_name");title.custom_minimum_size=Vector2(452,38);title.size_flags_horizontal=Control.SIZE_SHRINK_CENTER;title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;title.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;title.add_theme_font_size_override("font_size",22);title.add_theme_color_override("font_color",UI_BROWN);content.add_child(title)
 	var description:=Label.new();description.name="ForcedAdsRemovalDescription";description.text=GameLocalizer.text(language_code,"forced_ads_removal_description");description.custom_minimum_size=Vector2(440,96);description.size_flags_horizontal=Control.SIZE_SHRINK_CENTER;description.size_flags_vertical=Control.SIZE_EXPAND_FILL;description.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;description.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;description.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;description.add_theme_font_size_override("font_size",14);description.add_theme_color_override("font_color",Color("#79543a"));content.add_child(description)
@@ -1743,10 +1746,16 @@ func _request_pot_purchase(pot_id:String)->void:
 	pot_purchase_request_started_usec.erase(pot_id)
 
 func _request_pot_unlock(product_id:String)->void:
-	pot_unlock_requested.emit(product_id)
+	call_deferred("_emit_pot_unlock_request",product_id)
+
+func _emit_pot_unlock_request(product_id:String)->void:
+	if visible and shop_page.visible:pot_unlock_requested.emit(product_id)
 
 func _request_pot_restore()->void:
-	pot_restore_requested.emit()
+	call_deferred("_emit_pot_restore_request")
+
+func _emit_pot_restore_request()->void:
+	if visible and shop_page.visible:pot_restore_requested.emit()
 
 func _has_visible_iap_products()->bool:
 	if not forced_ads_removal_product_id.is_empty():return true
@@ -1877,7 +1886,7 @@ func _at_save_capacity()->bool:
 	return saved_arrangements.size()>=save_capacity
 
 func _pot_sales_stage_unlocked(pot:Dictionary)->bool:
-	return int(pot.get("sales_stage",0))<=pot_sales_stage
+	return app_review_all_iap_products_visible or int(pot.get("sales_stage",0))<=pot_sales_stage
 
 func _pot_design_unlocked(pot:Dictionary)->bool:
 	if str(pot.get("unlock_type","free"))!="iap_unlock":return true

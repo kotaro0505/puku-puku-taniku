@@ -16,6 +16,7 @@ func _ready() -> void:
 	await _test_language_ui_geometry(game)
 	await _test_settings_controls(game)
 	await _test_privacy_ui(game)
+	await _test_app_review_iap_access(game)
 	await _test_product_settings_layout()
 	_test_top_hud_and_speaker_geometry(game)
 	_test_shop_chatter_contract(game)
@@ -24,7 +25,7 @@ func _ready() -> void:
 	_test_progression_thresholds()
 	_test_phase_bgm_policy(game)
 	game._reset_progression_state()
-	print("PROGRESSION_UI_REVISION_SMOKE_OK copy=updated language_ui=fixed settings=content-sized+stable-toggles privacy_policy=localized+always-available ad_report=localized+always-available privacy_options=localized+state-gated panda_chatter=5 armadillo_chatter=5 habitat_button=always_plain arrangement=3+swipe forest=8 fusion=12 bgm=phase-aware migration=preserved")
+	print("PROGRESSION_UI_REVISION_SMOKE_OK copy=updated language_ui=fixed settings=content-sized+stable-toggles app_review_iap=title-entry+2s-hold+37-products+temporary privacy_policy=localized+always-available ad_report=localized+always-available privacy_options=localized+state-gated panda_chatter=5 armadillo_chatter=5 habitat_button=always_plain arrangement=3+swipe forest=8 fusion=12 bgm=phase-aware migration=preserved")
 	get_tree().quit()
 
 
@@ -83,6 +84,10 @@ func _test_localized_copy() -> void:
 	assert(Localizer.text("ja", "privacy_policy") == "プライバシーポリシー")
 	assert(Localizer.text("hiragana", "privacy_policy") == "ぷらいばしー ぽりしー")
 	assert(Localizer.text("en", "privacy_policy") == "Privacy Policy")
+	assert(Localizer.text("ja", "app_review_code_title") == "確認コード")
+	assert(Localizer.text("hiragana", "app_review_code_title") == "かくにん こーど")
+	assert(Localizer.text("en", "app_review_code_title") == "Verification Code")
+	assert(Localizer.text("en", "app_review_pot_design_unlocked", [0]) == "Design unlocked · Owned ×0")
 	assert(Localizer.text("ja", "fusion_lab_intro_armadillo_3") == "多肉植物同士をかけあわせて\n新たな品種を作れるよ！")
 	assert(Localizer.text("ja", "self_best", [12.3]) == "最大サイズ 12.3cm")
 	assert(Localizer.text("ja", "self_best_none") == "最大サイズ ー")
@@ -217,6 +222,96 @@ func _test_settings_controls(game: Node) -> void:
 	await get_tree().process_frame
 
 
+func _test_app_review_iap_access(game:Node)->void:
+	game.language_selected=false
+	game._show_opening()
+	assert(game.opening_overlay.visible and game.opening_language_panel.visible)
+	assert(not game.opening_settings_button.visible)
+	game._select_initial_language("ja")
+	assert(game.opening_settings_button.visible and not game.opening_language_panel.visible)
+	game.opening_settings_button.pressed.emit()
+	await get_tree().process_frame
+	assert(game.settings_overlay.visible and game.settings_overlay.get_index()>game.opening_overlay.get_index())
+	assert(game.settings_version_button.text=="Version 1.0.0")
+	var progression_before:Dictionary=game.story_progression_state.duplicate(true)
+	var puku_before:int=game.puku_balance_units
+	var owned_before:Dictionary=game.owned_pots.duplicate(true)
+	var unlocks_before:Dictionary=game.pot_design_unlocks.duplicate(true)
+	var discovered_before:Dictionary=game.discovered.duplicate(true)
+	var get_counts_before:Dictionary=game.species_get_counts.duplicate(true)
+	var tutorial_before:Dictionary=game.tutorial_steps.duplicate(true)
+	var act3_before:bool=game.act3_unlocked
+	var ads_removed_before:bool=game.forced_ads_removed
+
+	game.settings_version_button.button_down.emit()
+	var short_generation:int=game.app_review_version_hold_generation
+	game.settings_version_button.button_up.emit()
+	assert(not game._complete_app_review_version_hold(short_generation))
+	assert(not game.app_review_code_overlay.visible)
+	game._begin_app_review_version_hold()
+	var drag_generation:int=game.app_review_version_hold_generation
+	game._on_settings_scroll_gui_input(InputEventScreenDrag.new())
+	assert(not game._complete_app_review_version_hold(drag_generation))
+	game._begin_app_review_version_hold()
+	var inactive_generation:int=game.app_review_version_hold_generation
+	game._notification(NOTIFICATION_APPLICATION_PAUSED)
+	assert(not game._complete_app_review_version_hold(inactive_generation))
+	game._begin_app_review_version_hold()
+	var close_generation:int=game.app_review_version_hold_generation
+	game._close_settings()
+	assert(not game._complete_app_review_version_hold(close_generation))
+	game._open_settings()
+
+	game._begin_app_review_version_hold()
+	await get_tree().create_timer(0.15).timeout
+	assert(not game.app_review_code_overlay.visible)
+	await get_tree().create_timer(1.95).timeout
+	assert(game.app_review_code_overlay.visible and game.app_review_code_input.has_focus())
+	game.app_review_code_input.text="WRONG"
+	assert(not game._submit_app_review_code())
+	assert(game.app_review_code_overlay.visible and not game.app_review_iap_access_active)
+	game._cancel_app_review_code_entry()
+	assert(not game.app_review_code_overlay.visible and not game.app_review_iap_access_active)
+
+	game._open_app_review_code_entry()
+	game.app_review_code_input.text="PUKU-REVIEW-37"
+	assert(game._submit_app_review_code())
+	await get_tree().process_frame
+	assert(game.app_review_iap_access_active and game.arrangement_ui.visible)
+	assert(game.arrangement_ui.return_context=="app_review_settings")
+	assert(game.arrangement_ui.app_review_all_iap_products_visible)
+	var visible_product_ids:Dictionary={}
+	for card_value in game.arrangement_ui.shop_grid.get_children():
+		if not card_value is Control:continue
+		var product_id:=str((card_value as Control).get_meta("iap_product_id",""))
+		if not product_id.is_empty():
+			assert(not visible_product_ids.has(product_id))
+			visible_product_ids[product_id]=true
+	assert(visible_product_ids.size()==37)
+	assert(visible_product_ids.has("forced_ads_removal"))
+	for index in range(1,37):assert(visible_product_ids.has("pot_unlock_%03d"%index))
+	assert(game.arrangement_ui.shop_restore_button.visible)
+	var late_product:="pot_unlock_036"
+	game._on_pot_unlock_requested(late_product)
+	assert(game.arrangement_ui.shop_message.text==Localizer.text("ja","iap_purchase_unavailable"))
+	assert(game.story_progression_state==progression_before)
+	assert(game.puku_balance_units==puku_before and game.owned_pots==owned_before and game.pot_design_unlocks==unlocks_before)
+	assert(game.discovered==discovered_before and game.species_get_counts==get_counts_before and game.tutorial_steps==tutorial_before)
+	assert(game.act3_unlocked==act3_before and game.forced_ads_removed==ads_removed_before)
+
+	game.arrangement_ui.close()
+	await get_tree().process_frame
+	assert(not game.app_review_iap_access_active and not game.arrangement_ui.app_review_all_iap_products_visible)
+	assert(game.settings_overlay.visible and game.opening_overlay.visible)
+	game._close_settings()
+	assert(not game.settings_overlay.visible and game.opening_overlay.visible)
+	assert(game.story_progression_state==progression_before)
+	assert(game.puku_balance_units==puku_before and game.owned_pots==owned_before and game.pot_design_unlocks==unlocks_before)
+	assert(game.discovered==discovered_before and game.species_get_counts==get_counts_before and game.tutorial_steps==tutorial_before)
+	assert(game.act3_unlocked==act3_before and game.forced_ads_removed==ads_removed_before)
+	_prepare_safe_greenhouse(game)
+
+
 func _assert_stable_settings_toggle(button: Button, enabled: bool) -> void:
 	assert(button.toggle_mode)
 	assert(button.action_mode == BaseButton.ACTION_MODE_BUTTON_RELEASE)
@@ -243,6 +338,7 @@ func _test_product_settings_layout() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	product_game.audio_manager.apply_settings({"bgm_enabled": false, "se_enabled": false})
+	assert(not product_game.app_review_iap_access_active and not product_game.arrangement_ui.app_review_all_iap_products_visible)
 	var panel := product_game.settings_panel as PanelContainer
 	assert(panel != null and panel.size.x == 488.0)
 	assert(panel.size.y < 896.0, "product settings retained development height: %s" % panel.size.y)

@@ -94,6 +94,8 @@ const SETTINGS_CONTENT_DECORATION_MARGIN_TOP := 4.0
 const SETTINGS_CONTENT_DECORATION_MARGIN_BOTTOM := 10.0
 const PRIVACY_POLICY_URL := "https://kotaro0505.github.io/puku-puku-taniku/privacy-policy/"
 const SUPPORT_AD_REPORT_URL := "https://kotaro0505.github.io/puku-puku-taniku/support/"
+const APP_REVIEW_IAP_ACCESS_CODE := "PUKU-REVIEW-37"
+const APP_REVIEW_VERSION_HOLD_SECONDS := 2.0
 const PUKU_GAUGE_FINISH_SPEED_SCALE := 0.5
 const FIRST_GET_MIN_REWARD_UNITS := 200
 const DOUBLE_PUKU_REWARD_SPECIES_ID := "sweets_strawberry_shortcake"
@@ -362,6 +364,7 @@ var forest_gacha_button: Button
 var shop_forest_gacha_button: Button
 var fusion_lab_button: Button
 var settings_button:Button
+var opening_settings_button:Button
 var current_mode := "greenhouse"
 var labels_layer: Control
 var main_status_hud: Control
@@ -596,6 +599,17 @@ var settings_title_label:Label
 var settings_language_heading:Label
 var settings_close_button:Button
 var settings_language_status:Label
+var settings_version_button:Button
+var app_review_code_overlay:Control
+var app_review_code_title_label:Label
+var app_review_code_hint_label:Label
+var app_review_code_input:LineEdit
+var app_review_code_status_label:Label
+var app_review_code_confirm_button:Button
+var app_review_code_cancel_button:Button
+var app_review_version_hold_active:=false
+var app_review_version_hold_generation:=0
+var app_review_iap_access_active:=false
 var language_buttons:Dictionary={}
 var progression_dev_labels:Dictionary={}
 var endless_economy_debug_label:Label
@@ -891,6 +905,10 @@ var habitat_visit_id := 0
 var jurejure_focused_habitat_visit_id := -1
 var act3_intro_eligible_visit_id := 0
 var habitat_crisis_eligible_visit_id := 0
+
+func _notification(what:int)->void:
+	if what==NOTIFICATION_APPLICATION_FOCUS_OUT or what==NOTIFICATION_APPLICATION_PAUSED or what==NOTIFICATION_WM_WINDOW_FOCUS_OUT:
+		_cancel_app_review_version_hold()
 
 func _ready() -> void:
 	for profile_error in BuildProfileClass.runtime_profile_errors():
@@ -2269,11 +2287,13 @@ func _build_opening_screen(hud:Control)->void:
 	var language_title:=Label.new();language_title.text="ことばを えらんでください\nChoose your language";language_title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;language_title.add_theme_font_size_override("font_size",22);language_title.add_theme_color_override("font_color",Color("#fff4d8"));language_content.add_child(language_title)
 	for language_entry in [{"code":"ja","label":"日本語"},{"code":"en","label":"英語"},{"code":"hiragana","label":"ひらがな"}]:
 		var language_button:=Button.new();language_button.text=str(language_entry.label);language_button.custom_minimum_size=Vector2(330,64);_skin_button(language_button,Color("#f0d29b"),20);language_button.pressed.connect(_select_initial_language.bind(str(language_entry.code)));language_content.add_child(language_button)
+	opening_settings_button=Button.new();opening_settings_button.name="OpeningSettingsButton";opening_settings_button.text=Localizer.text(language_code,"settings");opening_settings_button.position=Vector2(438,34);opening_settings_button.size=Vector2(120,54);opening_settings_button.focus_mode=Control.FOCUS_NONE;opening_settings_button.mouse_filter=Control.MOUSE_FILTER_STOP;_skin_button(opening_settings_button,Color("#fff0cf"),16);opening_settings_button.pressed.connect(_open_settings);opening_overlay.add_child(opening_settings_button)
 	_show_opening()
 
 func _show_opening()->void:
 	opening_finished=false;opening_overlay.visible=true;_refresh_opening_prompt();opening_prompt.scale=Vector2.ONE;opening_prompt_localized.scale=Vector2.ONE
 	opening_language_panel.visible=not language_selected
+	opening_settings_button.visible=language_selected
 	opening_tap_area.disabled=not language_selected
 	opening_tap_area.mouse_filter=Control.MOUSE_FILTER_IGNORE if not language_selected else Control.MOUSE_FILTER_STOP
 	if opening_prompt_tween and opening_prompt_tween.is_valid():opening_prompt_tween.kill()
@@ -2291,7 +2311,7 @@ func _start_opening_prompt_pulse()->void:
 func _select_initial_language(value:String)->void:
 	language_code=Localizer.normalize_language(value);language_selected=true
 	_save();_apply_language_to_ui()
-	opening_language_panel.visible=false;opening_tap_area.disabled=false;opening_tap_area.mouse_filter=Control.MOUSE_FILTER_STOP
+	opening_language_panel.visible=false;opening_settings_button.visible=true;opening_tap_area.disabled=false;opening_tap_area.mouse_filter=Control.MOUSE_FILTER_STOP
 	_refresh_opening_prompt();_start_opening_prompt_pulse()
 
 func _refresh_opening_prompt()->void:
@@ -2606,7 +2626,7 @@ func _sync_arrangement_ui()->void:
 	var iap_states:Dictionary=pot_unlock_iap_service.product_states_snapshot() if pot_unlock_iap_service!=null else {}
 	var restore_available:bool=pot_unlock_iap_service.restore_available() if pot_unlock_iap_service!=null else false
 	var restore_in_progress:bool=pot_unlock_iap_service.restore_in_progress() if pot_unlock_iap_service!=null else false
-	arrangement_ui.configure(catalog_species,[],pot_catalog,discovered,owned_pots,saved_arrangements,arrangement_save_capacity,puku_points,_species_texture,_request_species_texture,bests,language_code,_current_pot_sales_stage(),pot_design_unlocks,iap_states,restore_available,restore_in_progress,ArrangementShareBackgroundsClass.catalog(),_share_background_unlock_states(),species_picker_series_catalog,forced_ads_removed,FORCED_ADS_REMOVAL_PRODUCT_ID)
+	arrangement_ui.configure(catalog_species,[],pot_catalog,discovered,owned_pots,saved_arrangements,arrangement_save_capacity,puku_points,_species_texture,_request_species_texture,bests,language_code,_current_pot_sales_stage(),pot_design_unlocks,iap_states,restore_available,restore_in_progress,ArrangementShareBackgroundsClass.catalog(),_share_background_unlock_states(),species_picker_series_catalog,forced_ads_removed,FORCED_ADS_REMOVAL_PRODUCT_ID,app_review_iap_access_active)
 	arrangement_ui.sync_catalog_state(unlocked_series,puku_points)
 	arrangement_ui.sync_seed_shop_state(_seed_shop_products(),puku_points)
 
@@ -2635,9 +2655,12 @@ func _on_arrangement_swipe_intro_finished()->void:
 
 func _open_pot_shop()->void:
 	if not _tutorial_fully_complete():return
-	audio_manager.prepare_se("purchase");_hide_shop_chatter(true);_sync_arrangement_ui();arrangement_ui.open_pot_shop()
+	_deactivate_app_review_iap_access();audio_manager.prepare_se("purchase");_hide_shop_chatter(true);_sync_arrangement_ui();arrangement_ui.open_pot_shop()
 
 func _on_arrangement_close_requested(context:String)->void:
+	if context=="app_review_settings":
+		_deactivate_app_review_iap_access();_sync_arrangement_ui();settings_overlay.visible=true;settings_overlay.move_to_front();_queue_settings_panel_layout();_update_play_ui()
+		return
 	if context=="greenhouse" and arrangement_scene_active:
 		if arrangement_transitioning:return
 		_snap_greenhouse_area(false)
@@ -2779,7 +2802,7 @@ func _on_arrangement_share_texture_ready(texture:Texture2D,path:String,pending:D
 func _on_pot_purchase_requested(pot_id:String)->void:
 	var pot:=_pot_entry(pot_id)
 	if pot.is_empty():arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"pot_missing"));return
-	if not _pot_progression_unlocked(pot):arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"pot_locked"));return
+	if not app_review_iap_access_active and not _pot_progression_unlocked(pot):arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"pot_locked"));return
 	if not _pot_design_unlocked(pot):arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"pot_unlock_required"));return
 	var price:=maxi(0,int(pot.get("price_puku",POT_PRICE_PUKU)))
 	var price_units:=_puku_cost_units(price)
@@ -2811,7 +2834,7 @@ func _on_pot_unlock_requested(product_id:String)->void:
 		arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"iap_purchase_processing"))
 		return
 	var pot:=_pot_entry_for_product(product_id)
-	if pot.is_empty() or not _pot_progression_unlocked(pot):
+	if pot.is_empty() or (not app_review_iap_access_active and not _pot_progression_unlocked(pot)):
 		arrangement_ui.show_pot_shop_message(Localizer.text(language_code,"pot_locked"))
 		return
 	if _pot_design_unlocked(pot):
@@ -4328,10 +4351,103 @@ func _build_settings(hud:Control)->void:
 		if DEVELOPMENT_CATALOG_PREVIEW_ENABLED:
 			catalog_preview_settings_button=Button.new();catalog_preview_settings_button.name="CatalogPreviewDevOpen";catalog_preview_settings_button.text="開発用：品種プレビュー";catalog_preview_settings_button.custom_minimum_size=Vector2(370,58);_skin_button(catalog_preview_settings_button,Color("#c7d6ad"),17);catalog_preview_settings_button.pressed.connect(_open_catalog_preview_dev);content.add_child(catalog_preview_settings_button)
 	settings_close_button=Button.new();settings_close_button.text="閉じる";settings_close_button.custom_minimum_size=Vector2(280,55);_skin_button(settings_close_button,Color("#ead8b1"),18);settings_close_button.pressed.connect(_close_settings);content.add_child(settings_close_button)
+	settings_version_button=Button.new();settings_version_button.name="SettingsVersionButton";settings_version_button.text="Version %s"%_game_version_key();settings_version_button.flat=true;settings_version_button.focus_mode=Control.FOCUS_NONE;settings_version_button.action_mode=BaseButton.ACTION_MODE_BUTTON_RELEASE;settings_version_button.custom_minimum_size=Vector2(280,36);settings_version_button.size_flags_horizontal=Control.SIZE_SHRINK_CENTER;settings_version_button.mouse_default_cursor_shape=Control.CURSOR_POINTING_HAND;settings_version_button.add_theme_font_size_override("font_size",14)
+	for color_name in ["font_color","font_hover_color","font_pressed_color","font_focus_color","font_hover_pressed_color"]:settings_version_button.add_theme_color_override(color_name,Color("#79543a"))
+	settings_version_button.button_down.connect(_begin_app_review_version_hold);settings_version_button.button_up.connect(_cancel_app_review_version_hold);settings_version_button.gui_input.connect(_on_settings_version_gui_input);content.add_child(settings_version_button)
+	_build_app_review_code_overlay(settings_overlay)
+	settings_scroll.gui_input.connect(_on_settings_scroll_gui_input)
+	settings_scroll.scroll_started.connect(_cancel_app_review_version_hold)
+	settings_overlay.visibility_changed.connect(_on_settings_overlay_visibility_changed)
 	settings_content_frame.minimum_size_changed.connect(_queue_settings_panel_layout)
 	_refresh_progression_dev_counters()
 	_refresh_privacy_options_button()
 	_queue_settings_panel_layout()
+
+func _build_app_review_code_overlay(parent:Control)->void:
+	app_review_code_overlay=Control.new();app_review_code_overlay.name="AppReviewCodeOverlay";app_review_code_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);app_review_code_overlay.mouse_filter=Control.MOUSE_FILTER_STOP;app_review_code_overlay.visible=false;parent.add_child(app_review_code_overlay)
+	var shade:=ColorRect.new();shade.color=Color(0.08,0.04,0.03,.78);shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);shade.mouse_filter=Control.MOUSE_FILTER_STOP;app_review_code_overlay.add_child(shade)
+	var panel:=PanelContainer.new();panel.name="AppReviewCodePanel";panel.position=Vector2(48,152);panel.size=Vector2(480,452);var panel_style:=_box(Color("#f7e8c7"),Color("#9b642f"),26,4);panel_style.content_margin_left=28;panel_style.content_margin_right=28;panel_style.content_margin_top=24;panel_style.content_margin_bottom=24;panel.add_theme_stylebox_override("panel",panel_style);app_review_code_overlay.add_child(panel)
+	var content:=VBoxContainer.new();content.alignment=BoxContainer.ALIGNMENT_CENTER;content.add_theme_constant_override("separation",14);panel.add_child(content)
+	app_review_code_title_label=Label.new();app_review_code_title_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;app_review_code_title_label.add_theme_font_size_override("font_size",24);app_review_code_title_label.add_theme_color_override("font_color",UI_BROWN);content.add_child(app_review_code_title_label)
+	app_review_code_hint_label=Label.new();app_review_code_hint_label.custom_minimum_size=Vector2(400,76);app_review_code_hint_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;app_review_code_hint_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;app_review_code_hint_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;app_review_code_hint_label.add_theme_font_size_override("font_size",16);app_review_code_hint_label.add_theme_color_override("font_color",Color("#76513b"));content.add_child(app_review_code_hint_label)
+	app_review_code_input=LineEdit.new();app_review_code_input.name="AppReviewCodeInput";app_review_code_input.custom_minimum_size=Vector2(400,58);app_review_code_input.max_length=32;app_review_code_input.alignment=HORIZONTAL_ALIGNMENT_CENTER;app_review_code_input.add_theme_font_size_override("font_size",19);app_review_code_input.add_theme_color_override("font_color",UI_BROWN);app_review_code_input.add_theme_stylebox_override("normal",_box(Color("#fff8e6"),Color("#b77c48"),14,2));app_review_code_input.text_submitted.connect(_on_app_review_code_text_submitted);content.add_child(app_review_code_input)
+	app_review_code_status_label=Label.new();app_review_code_status_label.custom_minimum_size=Vector2(400,54);app_review_code_status_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;app_review_code_status_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;app_review_code_status_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;app_review_code_status_label.add_theme_font_size_override("font_size",15);app_review_code_status_label.add_theme_color_override("font_color",Color("#a13f2e"));content.add_child(app_review_code_status_label)
+	var actions:=HBoxContainer.new();actions.alignment=BoxContainer.ALIGNMENT_CENTER;actions.add_theme_constant_override("separation",12);content.add_child(actions)
+	app_review_code_cancel_button=Button.new();app_review_code_cancel_button.custom_minimum_size=Vector2(176,54);_skin_button(app_review_code_cancel_button,Color("#ead8b1"),17);app_review_code_cancel_button.pressed.connect(_cancel_app_review_code_entry);actions.add_child(app_review_code_cancel_button)
+	app_review_code_confirm_button=Button.new();app_review_code_confirm_button.custom_minimum_size=Vector2(176,54);_skin_button(app_review_code_confirm_button,Color("#d7aa64"),17);app_review_code_confirm_button.pressed.connect(_submit_app_review_code);actions.add_child(app_review_code_confirm_button)
+
+func _begin_app_review_version_hold()->void:
+	if settings_overlay==null or not settings_overlay.visible or app_review_code_overlay==null or app_review_code_overlay.visible:return
+	app_review_version_hold_generation+=1
+	app_review_version_hold_active=true
+	_wait_for_app_review_version_hold(app_review_version_hold_generation)
+
+func _wait_for_app_review_version_hold(generation:int)->void:
+	await get_tree().create_timer(APP_REVIEW_VERSION_HOLD_SECONDS).timeout
+	_complete_app_review_version_hold(generation)
+
+func _complete_app_review_version_hold(generation:int)->bool:
+	if generation!=app_review_version_hold_generation or not app_review_version_hold_active:return false
+	if settings_overlay==null or not settings_overlay.visible or app_review_code_overlay==null or app_review_code_overlay.visible:return false
+	app_review_version_hold_active=false
+	_open_app_review_code_entry()
+	return true
+
+func _cancel_app_review_version_hold()->void:
+	if app_review_version_hold_active:app_review_version_hold_generation+=1
+	app_review_version_hold_active=false
+
+func _on_settings_version_gui_input(event:InputEvent)->void:
+	if event is InputEventScreenDrag or (event is InputEventScreenTouch and not event.pressed):_cancel_app_review_version_hold()
+	elif event is InputEventMouseMotion and app_review_version_hold_active and (event as InputEventMouseMotion).relative.length()>1.0:_cancel_app_review_version_hold()
+
+func _on_settings_scroll_gui_input(event:InputEvent)->void:
+	if event is InputEventScreenDrag or event is InputEventMouseButton or event is InputEventPanGesture:_cancel_app_review_version_hold()
+
+func _on_settings_overlay_visibility_changed()->void:
+	if settings_overlay!=null and settings_overlay.visible:return
+	_cancel_app_review_version_hold()
+	if app_review_code_overlay!=null:app_review_code_overlay.visible=false
+	if app_review_code_input!=null:app_review_code_input.release_focus()
+
+func _open_app_review_code_entry()->void:
+	_cancel_app_review_version_hold()
+	app_review_code_input.text=""
+	app_review_code_status_label.text=""
+	app_review_code_overlay.visible=true
+	app_review_code_overlay.move_to_front()
+	app_review_code_input.grab_focus()
+
+func _cancel_app_review_code_entry()->void:
+	_cancel_app_review_version_hold()
+	if app_review_code_input!=null:
+		app_review_code_input.text=""
+		app_review_code_input.release_focus()
+	if app_review_code_status_label!=null:app_review_code_status_label.text=""
+	if app_review_code_overlay!=null:app_review_code_overlay.visible=false
+
+func _on_app_review_code_text_submitted(_value:String)->void:
+	_submit_app_review_code()
+
+func _submit_app_review_code()->bool:
+	if app_review_code_input==null or app_review_code_input.text.strip_edges()!=APP_REVIEW_IAP_ACCESS_CODE:
+		if app_review_code_status_label!=null:app_review_code_status_label.text=Localizer.text(language_code,"app_review_code_invalid")
+		if app_review_code_input!=null:app_review_code_input.select_all()
+		return false
+	_cancel_app_review_code_entry()
+	_open_app_review_pot_shop()
+	return true
+
+func _open_app_review_pot_shop()->void:
+	app_review_iap_access_active=true
+	settings_overlay.visible=false
+	_sync_arrangement_ui()
+	arrangement_ui.open_pot_shop("app_review_settings")
+	arrangement_ui.move_to_front()
+	_update_play_ui()
+
+func _deactivate_app_review_iap_access()->void:
+	app_review_iap_access_active=false
 
 func _build_habitat_plant_panel(hud:Control)->void:
 	habitat_plant_panel=HabitatPlantPanelClass.new();hud.add_child(habitat_plant_panel)
@@ -4562,10 +4678,10 @@ func _refresh_settings_panel_layout()->void:
 
 func _open_settings()->void:
 	if play_active:return
-	_refresh_progression_dev_counters();_refresh_privacy_options_button();settings_overlay.visible=true;_queue_settings_panel_layout();_update_play_ui()
+	_cancel_app_review_code_entry();_refresh_progression_dev_counters();_refresh_privacy_options_button();settings_overlay.visible=true;settings_overlay.move_to_front();_queue_settings_panel_layout();_update_play_ui()
 
 func _close_settings()->void:
-	settings_overlay.visible=false;_save();_update_play_ui()
+	_cancel_app_review_code_entry();_deactivate_app_review_iap_access();settings_overlay.visible=false;_save();_update_play_ui()
 
 func _set_language(value:String)->void:
 	language_code=Localizer.normalize_language(value);language_selected=true;_save();_apply_language_to_ui()
@@ -4581,11 +4697,17 @@ func _apply_language_to_ui()->void:
 	if fusion_lab_button:fusion_lab_button.text=Localizer.text(language_code,"main_fusion")
 	if mode_button:mode_button.text=Localizer.text(language_code,"main_greenhouse" if current_mode=="habitat" else "main_habitat")
 	if settings_button:settings_button.text=Localizer.text(language_code,"settings")
+	if opening_settings_button:opening_settings_button.text=Localizer.text(language_code,"settings")
 	if encyclopedia_icon_button:encyclopedia_icon_button.text=Localizer.text(language_code,"catalog")
 	_apply_top_navigation_button_layout()
 	if settings_title_label:settings_title_label.text=Localizer.text(language_code,"settings")
 	if settings_language_heading:settings_language_heading.text=Localizer.text(language_code,"language_heading")
 	if settings_close_button:settings_close_button.text=Localizer.text(language_code,"close")
+	if app_review_code_title_label:app_review_code_title_label.text=Localizer.text(language_code,"app_review_code_title")
+	if app_review_code_hint_label:app_review_code_hint_label.text=Localizer.text(language_code,"app_review_code_hint")
+	if app_review_code_input:app_review_code_input.placeholder_text=Localizer.text(language_code,"app_review_code_placeholder")
+	if app_review_code_confirm_button:app_review_code_confirm_button.text=Localizer.text(language_code,"app_review_code_confirm")
+	if app_review_code_cancel_button:app_review_code_cancel_button.text=Localizer.text(language_code,"app_review_code_cancel")
 	var bgm_label:=find_child("BgmSettingLabel",true,false) as Label
 	var se_label:=find_child("SeSettingLabel",true,false) as Label
 	if bgm_label:bgm_label.text=Localizer.text(language_code,"audio_bgm")

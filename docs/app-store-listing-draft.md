@@ -78,7 +78,7 @@
 | IAP Product ID | 100文字 | 37件すべて上限内 |
 | IAP Display Name | 2〜30文字 | 37件・日英とも上限内 |
 | IAP Description | 45文字 | 登録済み37件の日英表示を提出直前に再確認する |
-| App Review Notes | 4,000バイト | 日本語候補3,936バイト、英語候補3,324バイト。いずれか1つを転記する |
+| App Review Notes | 4,000文字 | 日本語候補1,143文字、英語候補2,731文字。英語候補を転記する |
 
 根拠: [App information](https://developer.apple.com/help/app-store-connect/reference/app-information/app-information)、[Platform version information](https://developer.apple.com/help/app-store-connect/reference/app-information/platform-version-information)、[In-App Purchase information](https://developer.apple.com/help/app-store-connect/reference/in-app-purchases-and-subscriptions/in-app-purchase-information/)。Appleの一般向け紹介ページには過去のIAP文字数が残る場合があるため、本草案ではApp Store Connect Helpの30文字／45文字を採用しています。
 
@@ -363,24 +363,21 @@ AppleはApp Review連絡先として担当者名、メール、電話番号を�
 ### 日本語版 審査メモ候補
 
 ```text
-『ぷくぷく！たにくらいふ』は、縦画面で遊ぶ一人用の多肉植物育成・収集ストーリーゲームです。ログインやアカウント登録は不要です。
+『ぷくぷく！たにくらいふ』は、ログイン不要の一人用多肉植物育成・収集ストーリーゲームです。通常ゲームでは12粒のたねを育てて収穫し、初取得品種をNEWカードと図鑑へ登録します。
 
-基本操作:
-1. 初回起動後、オープニングと古いたねのチュートリアルを進めます。
-2. 通常ゲームでは一度に12粒のたねをまき、成長中の株をタップして収穫します。
-3. 初めて取得した品種はNEWカードの後、図鑑へ登録されます。
-4. ストーリー進行により、原生地、寄せ植え、ガチャ、ハイブリッドラボ、ジュレジュレ団との育成・収穫スコア対戦が順次解放されます。
+App Review向け全37商品確認経路:
+1. 初回言語選択後のタイトル画面右上で「設定」を開きます。ストーリー開始は不要です。
+2. 設定画面最下部の「Version 1.0.0」を2秒長押しします。
+3. 確認コード画面に「PUKU-REVIEW-37」と入力し、「確認」を押します。
+4. 「寄せ植え用の鉢」に「広告を削除」、pot_unlock_001〜pot_unlock_036、および「購入を復元」が表示されます。各商品の実際のStoreKit価格と購入ボタンを確認できます。
 
-広告:
-任意視聴のリワード動画広告とインタースティシャル広告を使用します。通常ゲーム用のぷくコインまたはたねが不足した際に「パンダのお店」でパンダをタップし、「お手伝いする」または「広告を見てたねをもらう」を選ぶとリワード広告を要求します。SDKから視聴完了が通知された場合だけ、1ぷくコインまたはたね1セットを1回付与します。途中終了や読み込み失敗では広告報酬を付与しません。ぷくコイン不足時に広告が自動再試行後も利用不可と確定した場合に限り、ぷくコインを付与せず通常ゲーム1回分の無料プレイ券を付与することがあります。券は最大1枚で、消費後の再取得には10分の待ち時間があります。
+この経路はショップを閉じるまで商品の表示・購入に必要な進行度チェックだけを一時的に上書きします。商品や購入権利を無料付与せず、ストーリー、チュートリアル、収集状況、ぷくコイン、所持鉢を変更しません。正規のStoreKit購入・復元で取得した非消耗型権利だけが通常どおり保存されます。鉢デザインの購入後は「デザイン解放済み」と所持鉢数を別々に表示します。ショップを閉じると設定へ戻り、アプリ再起動後も通常の段階解放へ戻ります。
 
-インタースティシャル広告は、森のガチャの正常抽選5回ごと、およびハイブリッドラボの正常交配5回ごとに、それぞれ結果・NEWカード・シリーズ解放等の確認が完了した安全な画面切り替え時だけ表示します。広告が未準備の場合はその回をスキップし、後から突然表示しません。「広告を削除」の購入者には表示しません。地域等により必要な場合はGoogle UMPを処理し、その後ATTが未決定の場合だけ追跡許可を求めます。許可・拒否のどちらでもゲームを利用でき、リワード広告の報酬条件は変わりません。
+37商品はすべて非消耗型です。pot_unlock_001〜pot_unlock_036は特定の鉢デザインを永久解放し、その後はゲーム内ぷくコインで同じデザインの個々の鉢を購入できます。forced_ads_removal「広告を削除」は、ガチャとラボの自動広告だけを永久に削除し、任意視聴のパンダ広告は残します。
 
-アプリ内課金:
-37商品はすべて非消耗型です。pot_unlock_001〜pot_unlock_036は、購入すると特定の鉢デザインを永続解放し、その後は同じデザインの鉢をゲーム内カタログに設定されたぷくコイン価格で何度でも購入できます。forced_ads_removal「広告を削除」は、森のガチャとハイブリッドラボの自動表示広告だけを永久に削除し、任意視聴のパンダのお手伝い広告は残します。現金でぷくコインを販売する機能や、ランダムな有料IAPはありません。
+通常プレイでは、初回チュートリアル後に異なるファンタジー品種3種と寄せ植え導入イベントを完了すると鉢カテゴリ、「広告を削除」、「購入を復元」が解放されます。合計6種でpot_unlock_001〜014、第三幕解放でpot_unlock_015〜036が表示されます。
 
-購入画面への通常導線:
-オープニングと初回チュートリアルを完了し、不思議な多肉を3品種取得すると寄せ植えとショップ内の鉢カテゴリが解放され、「広告を削除」と「購入を復元」が鉢画面上部に表示されます。6品種取得後はpot_unlock_001〜pot_unlock_014が「パンダのお店」＞「鉢」に表示されます。pot_unlock_015〜pot_unlock_036の後半22商品は、物語とショップの商品展開を一致させるため、全利用者共通の通常進行条件として第三幕解放後に表示されます。審査だけを対象とする制限ではありません。
+任意視聴のリワード広告はSDKが視聴完了を通知した場合だけ報酬を1回付与します。インタースティシャル広告はガチャの正常抽選5回ごと、ラボの正常交配5回ごとに、安全な結果確認後だけ表示します。ATTの許可・拒否でゲーム利用やリワード条件は変わりません。
 
 37商品はApp Review用の同じドラフトSubmissionへ追加済みです。TestFlight実機で購入、購入復元、再起動後の権利維持、「広告を削除」の表示抑止、リワード広告の視聴完了報酬を確認しています。
 
@@ -390,24 +387,21 @@ AppleはApp Review連絡先として担当者名、メール、電話番号を�
 ### English App Review Notes candidate
 
 ```text
-Puku Puku! Taniku Life is a portrait, single-player succulent growing and collection story game. No login or account registration is required.
+Puku Puku! Taniku Life is a single-player succulent-growing and collection story game. No login is required. Normal rounds grow 12 seeds; first discoveries appear on a NEW card and enter the catalog.
 
-Basic flow:
-1. On first launch, follow the opening story and the old-seed tutorial.
-2. In a normal round, sow 12 seeds and tap growing plants to harvest them.
-3. A newly obtained variety is shown on a NEW card and then recorded in the catalog.
-4. The native habitat, arrangements, gacha, Hybrid Lab, and the grow-and-harvest score matches against the Jurejure Gang unlock through normal story progress.
+Direct App Review route to all 37 products:
+1. After choosing a language on first launch, tap "Settings" at the upper-right of the title screen. You do not need to start the story.
+2. At the bottom of Settings, press and hold "Version 1.0.0" for 2 seconds.
+3. On the "Verification Code" screen, enter "PUKU-REVIEW-37" and tap "Continue."
+4. The "Arrangement Pots" screen displays Remove Ads, pot_unlock_001 through pot_unlock_036, and "Restore Purchases." Each product uses its live StoreKit price and purchase flow.
 
-Ads:
-The app uses optional rewarded video ads and interstitial ads. When the player lacks Puku Coins or playable seeds, open Panda's Shop, tap the panda, and choose "Help at the shop" or "Watch an ad to get seeds" to request a rewarded ad. One Puku Coin or one seed set is granted once only after the SDK reports that the reward was earned. Closing early or failing to load grants no ad reward. Only when an ad remains unavailable after automatic retries while the player lacks the Puku Coin needed for a normal round, the app may grant one free normal-round ticket instead of coins or an ad reward. At most one ticket is held, and another cannot be granted until 10 minutes after use.
+This route temporarily bypasses only the product-visibility and progression checks while this Pots screen remains open. It does not grant a product or entitlement for free and does not change story/tutorial progress, collection progress, Puku Coins, or owned pots. Only entitlements obtained through the normal StoreKit purchase or restore flow are saved. After a pot-design entitlement is obtained, the screen separately identifies the design as unlocked and shows the number of individual pots owned, including zero. Closing the Pots screen returns to Settings; relaunching the app restores the normal staged unlock rules.
 
-An interstitial may appear after every five successful Forest Gacha draws and, independently, every five successful Hybrid Lab fusions. It is requested only at a safe transition after the result, NEW card, and any series-unlock flow have been completed. If the ad is not ready, that opportunity is skipped and is not shown unexpectedly later. Interstitials are disabled for owners of Remove Ads. The app completes any required Google UMP flow and requests ATT only when its status remains not determined. The game remains available whether ATT is allowed or denied, and rewarded-ad rewards do not change.
+All 37 IAPs are non-consumables. pot_unlock_001 through pot_unlock_036 permanently unlock individual pot designs; individual pots of an unlocked design are then bought with in-game Puku Coins. forced_ads_removal (Remove Ads) permanently removes only automatic Gacha/Hybrid Lab interstitials; optional Panda Help rewarded ads remain.
 
-In-App Purchases:
-All 37 products are non-consumables. pot_unlock_001 through pot_unlock_036 each permanently unlock one specific pot design. The player can then buy individual pots of that design repeatedly at its in-game Puku Coin catalog price. forced_ads_removal (Remove Ads) permanently removes only the automatically displayed interstitial ads in Forest Gacha and Hybrid Lab; the optional Panda Help rewarded ad remains available. The app does not sell Puku Coins for money and has no randomized paid IAP.
+In normal play, after the first tutorial, collect 3 distinct fantasy varieties and complete the arrangement introduction to unlock the Pots category, Remove Ads, and Restore Purchases. At 6 total fantasy varieties, pot_unlock_001–014 appear. pot_unlock_015–036 appear after Act III unlocks. These are the normal rules for every player.
 
-Normal route to the purchase screen:
-Complete the opening and first tutorial. After discovering 3 fantasy varieties, arrangements and the Pots category unlock; Remove Ads and Restore Purchases appear at the top of the Pots screen. After 6 such discoveries, pot_unlock_001 through pot_unlock_014 appear in Panda's Shop > Pots. The later 22 products, pot_unlock_015 through pot_unlock_036, appear after Act III unlocks so that the shop inventory follows the game's story progression. This is the same normal progression rule for every player and is not a review-only restriction.
+Rewarded ads grant a reward once only after the SDK reports completion. Interstitials may appear after every five successful Gacha draws and, independently, every five successful Hybrid Lab fusions, only after all result/NEW/unlock presentation is complete. ATT allow/deny does not change game access or reward conditions.
 
 All 37 products have been added to the same draft App Review submission. TestFlight device testing has confirmed purchase, Restore Purchases, entitlement persistence after relaunch, Remove Ads behavior, and completed rewarded-ad rewards.
 
@@ -423,16 +417,11 @@ The production build disables all developer-only story jumps, progress resets, a
 5. Sandboxで鉢の購入、キャンセル、購入失敗、再起動後の権利維持、購入の復元を確認する。
 6. 購入後、該当鉢がゲーム内カタログに表示された正式なぷくコイン価格で購入でき、寄せ植えに使用できることを確認する。
 
-### 通常プレイでは到達に時間がかかる項目への対応案
+### 通常プレイでは到達に時間がかかる項目への対応
 
-IAP後半22件は第三幕まで進めないと表示されないため、審査担当者が短時間で直接確認しにくい状態です。開発用ストーリージャンプは本番で使えず、審査メモに使用可能と書いてはいけません。提出前に次を行ってください。
+IAP後半22件は通常プレイでは第三幕後に表示されますが、上記のApp Review向け確認経路により、審査担当者はストーリー進行を変更せず同じリリースビルド内で37商品と購入復元を直接確認できます。この経路は開発用ストーリージャンプ、進行リセット、撮影モード、課金モックを使用せず、ショップを閉じた時点で通常条件へ戻ります。
 
-1. 鉢36件それぞれのReview Screenshotは登録済みで、`forced_ads_removal` を含む37商品は同じApp Review用ドラフトSubmissionへ追加済みです。提出直前にドラフト内の37件と商品状態を再確認する。
-2. App Review Informationへ、上記の正確な通常解放条件と、購入・復元を示す短い画面収録を添付する。
-3. TestFlight本番Bundle IDでApp Reviewと同じ商品レコードを使った購入、購入復元、権利維持、広告削除を確認済みです。審査メモにもこの結果を記載する。
-4. Appleが直接操作できる短縮経路を要求した場合は、隠し開発機能を有効にせず、一般利用者にも説明可能な本番安全設計を別途決定する。今回の資料作成ではゲーム仕様を変更しない。
-
-後半22商品はストーリーとショップの商品展開を一致させる通常仕様として第三幕後に表示されます。全商品の初期解放や隠しジャンプは追加せず、審査メモ、登録済みReview Screenshot、必要な画面収録で解放理由と通常導線を明示します。動画だけでIAPの実機審査が代替できるとは断定しません。
+鉢36件それぞれのReview Screenshotは登録済みで、`forced_ads_removal` を含む37商品は同じApp Review用ドラフトSubmissionへ追加済みです。提出直前に、ドラフト内の37件、商品状態、審査メモのコードとビルド内表示が一致していることを再確認してください。TestFlight本番Bundle IDでは購入、購入復元、権利維持、広告削除を確認済みです。
 
 ## 10. スクリーンショット構成案
 
@@ -484,7 +473,7 @@ Appleはデバイスサイズごとに1〜10枚を受け付け、最初の1〜3�
 - **提出前確認**: 税区分、Family Sharing方針、商品情報の最終表示
 - 初回アプリバージョンと同じドラフトSubmission内に37件すべてが残っていること
 - Sandbox/TestFlight実機で未確認の購入キャンセル、通信失敗、再インストール、返金／権利変更
-- 後半商品まで審査担当者が確認できる方法
+- **実装済み／実機確認待ち**: タイトルの設定→Version長押し→確認コードで、進行を変えず後半商品を含む37件へ到達するApp Review経路
 
 ### 掲載素材とストア運用
 

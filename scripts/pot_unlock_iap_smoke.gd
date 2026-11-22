@@ -295,6 +295,28 @@ func _ready()->void:
 	var forced_ads_buy:=ui.find_child("ForcedAdsRemovalBuyButton",true,false) as Button
 	assert(forced_ads_card!=null and forced_ads_buy!=null)
 	assert(forced_ads_buy.text==Localizer.text("ja","forced_ads_removal_owned") and forced_ads_buy.disabled)
+	ui.configure([],[],all_pots,{},owned,[],20,5,Callable(),Callable(),{},"ja",0,{},service.product_states_snapshot(),true,false,[],{},[],false,forced_ads_product_id,true)
+	ui.open_pot_shop("app_review_settings");await get_tree().process_frame
+	var review_product_ids:Dictionary={}
+	for review_card_value in ui.shop_grid.get_children():
+		if not review_card_value is Control:continue
+		var review_product_id:=str((review_card_value as Control).get_meta("iap_product_id",""))
+		if not review_product_id.is_empty():
+			assert(not review_product_ids.has(review_product_id));review_product_ids[review_product_id]=true
+	assert(review_product_ids.size()==37 and review_product_ids.has(forced_ads_product_id) and review_product_ids.has(first_product) and review_product_ids.has(last_product))
+	assert(ui.return_context=="app_review_settings" and ui.shop_restore_button.visible)
+	var deferred_unlock_requests:Array[String]=[]
+	ui.pot_unlock_requested.connect(func(product_id:String)->void:deferred_unlock_requests.append(product_id))
+	ui._request_pot_unlock(last_product)
+	assert(deferred_unlock_requests.is_empty())
+	await get_tree().process_frame
+	assert(deferred_unlock_requests==[last_product])
+	var review_unlocks:Dictionary={first_product:true}
+	ui.configure([],[],all_pots,{},owned,[],20,5,Callable(),Callable(),{},"ja",0,review_unlocks,service.product_states_snapshot(),true,false,[],{},[],false,forced_ads_product_id,true)
+	ui.open_pot_shop("app_review_settings");await get_tree().process_frame
+	var review_unlocked_card:=_pot_shop_card(ui,"g1_crystal_goblet")
+	var review_unlocked_label:=review_unlocked_card.find_child("PotOwnedTotal",true,false) as Label
+	assert(review_unlocked_label.text==Localizer.text("ja","app_review_pot_design_unlocked",[0]))
 	ui.configure([],[],all_pots,{},owned,[],20,5,Callable(),Callable(),{},"ja",0,{},service.product_states_snapshot(),false,false)
 	ui.open_pot_shop();assert(ui.shop_grid.get_child_count()==8 and not ui.shop_restore_button.visible)
 	ui.configure([],[],all_pots,{},owned,[],20,5,Callable(),Callable(),{},"ja",1,{},service.product_states_snapshot(),false,false)
@@ -349,6 +371,10 @@ func _ready()->void:
 			var pot:Dictionary=pot_value;var pot_id:=str(pot.pot_id);var expected_price:=int(expected_prices[pot_id]);var card:=_pot_shop_card(ui,pot_id);var buy:=card.find_child("PotBuyButton",true,false) as Button;var owned_total:=card.find_child("PotOwnedTotal",true,false) as Label
 			assert(buy.text==Localizer.text(locale,"buy_puku",[expected_price]) and not buy.disabled and buy.get_theme_font_size("font_size")==19 and buy.get_minimum_size().x<=buy.size.x and bool(buy.get_meta("puku_purchase",false)))
 			assert(owned_total.get_theme_font_size("font_size")==17 and owned_total.get_minimum_size().x<=owned_total.size.x)
+		ui.configure([],[],all_pots,{},owned,[],200,1000,Callable(),Callable(),{},locale,0,all_paid_unlocks,service.product_states_snapshot(),true,false,[],{},[],false,forced_ads_product_id,true);ui.open_pot_shop("app_review_settings");await get_tree().process_frame
+		var localized_review_card:=_pot_shop_card(ui,"g1_crystal_goblet")
+		var localized_review_status:=localized_review_card.find_child("PotOwnedTotal",true,false) as Label
+		assert(localized_review_status.text==Localizer.text(locale,"app_review_pot_design_unlocked",[int(owned.get("g1_crystal_goblet",0))]))
 	for source_path in ["res://data/pot-iap-catalog.json","res://scripts/pot_unlock_iap_service.gd","res://scripts/arrangement_ui.gd","res://scripts/main.gd"]:
 		var source:=FileAccess.get_file_as_string(source_path);assert(not "100円" in source and not "¥100" in source)
 	assert(not FileAccess.file_exists("res://scripts/secret_gacha_system.gd"))
