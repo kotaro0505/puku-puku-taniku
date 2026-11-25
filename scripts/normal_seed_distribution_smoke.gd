@@ -2,6 +2,7 @@ extends Node
 
 const SpeciesStarRarityClass=preload("res://scripts/species_star_rarity.gd")
 const NORMAL_SAMPLE_COUNT:=1000000
+const KING_OF_DESIRE_ID:="hyb_jure_jure"
 
 func _ready()->void:
 	var game=load("res://main.tscn").instantiate();add_child(game)
@@ -217,14 +218,17 @@ func _test_jurejure_story_phase_acquisition_gate(game:Node)->void:
 	var act2_ids:Array[String]=[]
 	var jurejure_page_ids:Array[String]=[]
 	var direct_jurejure_ids:Array[String]=[]
+	var jurejure_fusion_ids:Array[String]=[]
 	for entry_value in game.catalog_species:
 		if not entry_value is Dictionary:continue
 		var entry:Dictionary=entry_value;var species_id:=str(entry.get("species_id",""))
 		if game._is_jurejure_collection_species(entry):jurejure_page_ids.append(species_id)
 		if game._is_jurejure_species(entry):direct_jurejure_ids.append(species_id)
+		if str(entry.get("series_id",""))!="jurejure" and (str(entry.get("fusion_series",""))=="jure" or str(entry.get("fusion_display_series",""))=="jure"):jurejure_fusion_ids.append(species_id)
 		if not game._is_jurejure_collection_species(entry) and (bool(entry.get("main_story_original",false)) or game._is_fantasy_species(entry)):
 			act2_ids.append(species_id)
-	assert(jurejure_page_ids.size()==20 and direct_jurejure_ids.size()==10 and act2_ids.size()>=24)
+	assert(jurejure_page_ids.size()==20 and direct_jurejure_ids.size()==10 and jurejure_fusion_ids.size()==10 and act2_ids.size()>=24)
+	for species_id in jurejure_fusion_ids:assert(species_id in jurejure_page_ids)
 
 	# Reproduce a fresh Act II 5/24 save while also injecting the stale unlock
 	# flags seen in older formats. The flags must not become acquisition proof.
@@ -233,10 +237,33 @@ func _test_jurejure_story_phase_acquisition_gate(game:Node)->void:
 		game.discovered[species_id]=true;game.species_get_counts[species_id]=1
 		game.greenhouse_available[species_id]=true;game.unlocked_species[species_id]=true
 	assert(game._unique_act2_species_get_count()==5)
+	# Build 97 regression: King of Desire has no story_group marker. Its hybrid
+	# series assigns two stars at runtime, so the former stars>=2 early branch
+	# admitted it before any era/Jure gate was evaluated.
+	var king_of_desire:Dictionary=game._catalog_entry(KING_OF_DESIRE_ID)
+	assert(str(king_of_desire.get("name_ja",""))=="欲望王")
+	assert(str(king_of_desire.get("series_id",""))=="hybrid")
+	assert(str(king_of_desire.get("story_group",""))=="")
+	assert(str(king_of_desire.get("fusion_series",""))=="jure")
+	assert(str(king_of_desire.get("fusion_display_series",""))=="")
+	assert(str(king_of_desire.get("rarity",""))=="配合種")
+	assert(SpeciesStarRarityClass.stars_for(king_of_desire)==2)
+	var build_97_unlocks:Dictionary=game._random_fusion_source_unlocks()
+	assert(SpeciesStarRarityClass.random_source_unlocked(2,build_97_unlocks))
+	var build_97_rank_two:Array[Dictionary]=[]
+	for candidate_value in game.catalog_species:
+		if not candidate_value is Dictionary:continue
+		var candidate:Dictionary=candidate_value;var stars:=SpeciesStarRarityClass.stars_for(candidate)
+		# This is the former early branch from Build 97, before any era/Jure gate.
+		if stars==2 and SpeciesStarRarityClass.random_source_unlocked(stars,build_97_unlocks):build_97_rank_two.append(candidate)
+	assert(build_97_rank_two.any(func(candidate:Dictionary)->bool:return str(candidate.get("species_id",""))==KING_OF_DESIRE_ID))
 	game.jurejure_pool_unlocked=true
 	for species_id in direct_jurejure_ids:game.jurejure_species_unlocked[species_id]=true
 	assert(not game._jurejure_acquisition_is_allowed())
 	assert(not game._is_jurejure_species_unlocked(direct_jurejure_ids[0]))
+	assert(game._is_jurejure_collection_species(king_of_desire) and game._jurejure_acquisition_is_blocked(king_of_desire))
+	var fixed_rank_two:Array=game._normal_seed_selection_pools().get("fusion_by_stars",{}).get(2,[])
+	assert(fixed_rank_two.all(func(candidate:Dictionary)->bool:return str(candidate.get("species_id",""))!=KING_OF_DESIRE_ID))
 	_assert_pre_exploitation_random_pools_exclude_jurejure(game,jurejure_page_ids)
 	# The early one-time Armadillo series gift is another random grant route.
 	# If every ordinary series is already open, it must not fall through to the
@@ -294,6 +321,8 @@ func _test_jurejure_story_phase_acquisition_gate(game:Node)->void:
 	# legitimate Lab result then contributes to the shared eight-species count.
 	game.story_progression_state["exploitation_started"]=true;game.act3_intro_seen=true;game.act3_intro_pending=false
 	assert(game._unlock_jurejure_pool() and game._is_jurejure_species_unlocked(direct_jurejure_ids[1]))
+	var allowed_rank_two:Array=game._normal_seed_selection_pools().get("fusion_by_stars",{}).get(2,[])
+	assert(allowed_rank_two.any(func(candidate:Dictionary)->bool:return str(candidate.get("species_id",""))==KING_OF_DESIRE_ID))
 	var no_featured:Array[String]=[]
 	var gacha_post:Dictionary=game.forest_gacha_system._eligible_candidates_by_rank(true,game.jurejure_species_unlocked,{2:true,3:true,4:true},no_featured,true)
 	for species_id in jurejure_page_ids:
