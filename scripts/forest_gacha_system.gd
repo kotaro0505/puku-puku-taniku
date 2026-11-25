@@ -34,10 +34,11 @@ func configure(series_catalog:Array,species_catalog:Array,catalog_progression:Di
 			var series_id:=str(raw_rule.get("series_id",""))
 			if not series_id.is_empty():normal_series_ids[series_id]=true
 
-func draw(unlocked_series:Dictionary,discovered:Dictionary,encountered:Dictionary,draw_rng:RandomNumberGenerator,creative_allowed:=true,jurejure_species_unlocked:Dictionary={},random_source_unlocks:Dictionary={},forced_rank_roll:float=-1.0,featured_jurejure_new_ids:Array[String]=[],jurejure_collection_active:=false,forced_selection_roll:float=-1.0)->Dictionary:
+func draw(unlocked_series:Dictionary,discovered:Dictionary,encountered:Dictionary,draw_rng:RandomNumberGenerator,creative_allowed:=true,jurejure_species_unlocked:Dictionary={},random_source_unlocks:Dictionary={},forced_rank_roll:float=-1.0,featured_jurejure_new_ids:Array[String]=[],jurejure_collection_active:=false,forced_selection_roll:float=-1.0,jurejure_acquisition_allowed:=false)->Dictionary:
 	var effective_featured_ids:Array[String]=[]
-	if jurejure_collection_active:effective_featured_ids=featured_jurejure_new_ids
-	var candidates_by_rank:=_eligible_candidates_by_rank(creative_allowed,jurejure_species_unlocked,random_source_unlocks,effective_featured_ids)
+	var effective_collection_active:=jurejure_collection_active and jurejure_acquisition_allowed
+	if effective_collection_active:effective_featured_ids=featured_jurejure_new_ids
+	var candidates_by_rank:=_eligible_candidates_by_rank(creative_allowed,jurejure_species_unlocked,random_source_unlocks,effective_featured_ids,jurejure_acquisition_allowed)
 	var selected_rank:=_roll_star_rank(draw_rng.randf() if forced_rank_roll<0.0 else forced_rank_roll)
 	var rank_candidates:Array=candidates_by_rank.get(selected_rank,[])
 	# A locked or empty fusion rank falls back only to the ordinary 95% pool.
@@ -58,7 +59,7 @@ func draw(unlocked_series:Dictionary,discovered:Dictionary,encountered:Dictionar
 		var undiscovered_jurejure:=str(candidate_species.get("story_group","")).to_lower()=="jurejure" and not bool(discovered.get(candidate_species_id,false))
 		# A live/pending NEW is deliberately absent from the featured IDs.  While
 		# the mission is active it must not leak back through the ordinary NEW pool.
-		if jurejure_collection_active and undiscovered_jurejure and not featured_ids.has(candidate_species_id):continue
+		if effective_collection_active and undiscovered_jurejure and not featured_ids.has(candidate_species_id):continue
 		if bool(discovered.get(candidate_species_id,false)):duplicate_species.append(candidate_species)
 		elif selected_rank==0 and featured_ids.has(candidate_species_id):featured_jurejure_new.append(candidate_species)
 		else:new_species.append(candidate_species)
@@ -105,7 +106,7 @@ func _roll_star_rank(roll:float)->int:
 	if normalized<.998:return 3
 	return 4
 
-func _eligible_candidates_by_rank(creative_allowed:bool,jurejure_species_unlocked:Dictionary,random_source_unlocks:Dictionary,featured_jurejure_new_ids:Array[String]=[])->Dictionary:
+func _eligible_candidates_by_rank(creative_allowed:bool,jurejure_species_unlocked:Dictionary,random_source_unlocks:Dictionary,featured_jurejure_new_ids:Array[String]=[],jurejure_acquisition_allowed:=false)->Dictionary:
 	var result:Dictionary={0:[],2:[],3:[],4:[]}
 	var normal_ids:Dictionary={}
 	# Preserve the established normal-series and route gates, but flatten the
@@ -113,6 +114,7 @@ func _eligible_candidates_by_rank(creative_allowed:bool,jurejure_species_unlocke
 	for series_entry in eligible_series(creative_allowed,jurejure_species_unlocked):
 		var series_id:=str(series_entry.get("series_id",""))
 		for entry in eligible_species(series_id,creative_allowed,jurejure_species_unlocked):
+			if not jurejure_acquisition_allowed and _is_jurejure_collection_species(entry):continue
 			if SpeciesStarRarityClass.stars_for(entry)<=1:
 				(result[0] as Array).append(entry)
 				normal_ids[str(entry.get("species_id",""))]=true
@@ -120,6 +122,7 @@ func _eligible_candidates_by_rank(creative_allowed:bool,jurejure_species_unlocke
 	# Mission-featured JureJure species intentionally bypass only their old
 	# battle-pool gate.  They remain in rank 0 and cannot alter ranks 2-4.
 	for featured_id in featured_jurejure_new_ids:
+		if not jurejure_acquisition_allowed:break
 		if featured_id.is_empty() or normal_ids.has(featured_id):continue
 		var featured_entry:Dictionary=species_by_id.get(featured_id,{})
 		if featured_entry.is_empty() or str(featured_entry.get("story_group","")).to_lower()!="jurejure":continue
@@ -131,10 +134,18 @@ func _eligible_candidates_by_rank(creative_allowed:bool,jurejure_species_unlocke
 	for species_value in species_by_id.values():
 		if not species_value is Dictionary:continue
 		var entry:Dictionary=species_value
+		if not jurejure_acquisition_allowed and _is_jurejure_collection_species(entry):continue
 		var stars:=SpeciesStarRarityClass.stars_for(entry)
 		if stars<2 or stars>4 or not SpeciesStarRarityClass.random_source_unlocked(stars,effective_unlocks):continue
 		(result[stars] as Array).append(entry)
 	return result
+
+func _is_jurejure_collection_species(entry:Dictionary)->bool:
+	if entry.is_empty():return false
+	if str(entry.get("story_group","")).to_lower()=="jurejure":return true
+	var display_series:=str(entry.get("fusion_display_series",""))
+	if display_series.is_empty() and str(entry.get("series_id",""))=="hybrid":display_series=str(entry.get("fusion_series",""))
+	return str(entry.get("series_id",""))=="jurejure" or display_series in ["jure","jurejure"]
 
 func eligible_series(creative_allowed:=true,jurejure_species_unlocked:Dictionary={})->Array[Dictionary]:
 	var result:Array[Dictionary]=[]

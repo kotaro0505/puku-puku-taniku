@@ -47,6 +47,7 @@ func _test_fusion_display_series(game:Node)->void:
 	assert(str(game.catalog_cover_species.get("sea",""))==SEA_FUSION_FIRST)
 	assert(game._register_species_discovery(SEA_SECOND,true))
 	assert(str(game.catalog_cover_species.get("sea",""))==SEA_FUSION_FIRST)
+	game.story_progression_state["exploitation_started"]=true
 	assert(game._register_species_discovery(JURE_FUSION_FIRST,true))
 	assert(str(game._catalog_display_series_id_for_entry(game._catalog_entry(JURE_FUSION_FIRST)))=="jurejure")
 	assert(str(game.catalog_cover_species.get("jurejure",""))==JURE_FUSION_FIRST)

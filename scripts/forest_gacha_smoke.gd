@@ -332,7 +332,7 @@ func _test_jurejure_collection_distribution()->void:
 	var sample_count:=200000;var jure_new_count:=0;var other_new_count:=0;var duplicate_count:=0
 	var ranks:Dictionary={0:0,2:0,3:0,4:0};var jure_counts:Dictionary={}
 	for sample_index in range(sample_count):
-		var result:Dictionary=system.draw({"normal":true},discovered,{},test_rng,true,{},unlocks,-1.0,featured,true)
+		var result:Dictionary=system.draw({"normal":true},discovered,{},test_rng,true,{},unlocks,-1.0,featured,true,-1.0,true)
 		var species_id:=str(result.get("species_id",""));var stars:=int(result.get("star_rating",-1))
 		var rank_key:=0 if stars<=1 else stars;ranks[rank_key]=int(ranks.get(rank_key,0))+1
 		if species_id in featured:
@@ -356,19 +356,19 @@ func _test_jurejure_collection_distribution()->void:
 	# extra NEW chance, and can never consume a fusion-rank roll.
 	var boundary_rng:=RandomNumberGenerator.new();boundary_rng.seed=42
 	assert(str(system.draw({"normal":true},discovered,{},boundary_rng,true,{},unlocks,.5,featured,false,.0).get("species_id","")) not in featured)
-	assert(str(system.draw({"normal":true},discovered,{},boundary_rng,true,{},unlocks,.5,featured,true,.0).get("species_id","")) in featured)
-	assert(str(system.draw({"normal":true},discovered,{},boundary_rng,true,{},unlocks,.5,featured,true,.3).get("species_id","")).begins_with("other_new"))
-	assert(bool(system.draw({"normal":true},discovered,{},boundary_rng,true,{},unlocks,.5,featured,true,.9).get("was_discovered",false)))
-	assert(int(system.draw({"normal":true},discovered,{},boundary_rng,true,{},unlocks,.96,featured,true,.0).get("star_rating",-1))==2)
+	assert(str(system.draw({"normal":true},discovered,{},boundary_rng,true,{},unlocks,.5,featured,true,.0,true).get("species_id","")) in featured)
+	assert(str(system.draw({"normal":true},discovered,{},boundary_rng,true,{},unlocks,.5,featured,true,.3,true).get("species_id","")).begins_with("other_new"))
+	assert(bool(system.draw({"normal":true},discovered,{},boundary_rng,true,{},unlocks,.5,featured,true,.9,true).get("was_discovered",false)))
+	assert(int(system.draw({"normal":true},discovered,{},boundary_rng,true,{},unlocks,.96,featured,true,.0,true).get("star_rating",-1))==2)
 	var unlocked_jurejure:Dictionary={};for species_id in featured:unlocked_jurejure[species_id]=true
-	assert(str(system.draw({"normal":true,"jurejure":true},discovered,{},boundary_rng,true,unlocked_jurejure,unlocks,.5,[],true,.0).get("species_id","")) not in featured)
+	assert(str(system.draw({"normal":true,"jurejure":true},discovered,{},boundary_rng,true,unlocked_jurejure,unlocks,.5,[],true,.0,true).get("species_id","")) not in featured)
 	var inactive_a:=RandomNumberGenerator.new();var inactive_b:=RandomNumberGenerator.new();inactive_a.seed=301;inactive_b.seed=301
 	var inactive_with_ids:Dictionary=system.draw({"normal":true,"jurejure":true},discovered,{},inactive_a,true,unlocked_jurejure,unlocks,.5,featured,false,.0)
 	var inactive_without_ids:Dictionary=system.draw({"normal":true,"jurejure":true},discovered,{},inactive_b,true,unlocked_jurejure,unlocks,.5,[],false,.0)
 	assert(str(inactive_with_ids.get("species_id",""))==str(inactive_without_ids.get("species_id","")))
 	var remaining_featured:Array[String]=["jure_b","jure_c","jure_d"]
 	for sample_index in range(100):
-		var pending_safe:Dictionary=system.draw({"normal":true,"jurejure":true},discovered,{},boundary_rng,true,unlocked_jurejure,unlocks,.5,remaining_featured,true,.3)
+		var pending_safe:Dictionary=system.draw({"normal":true,"jurejure":true},discovered,{},boundary_rng,true,unlocked_jurejure,unlocks,.5,remaining_featured,true,.3,true)
 		assert(str(pending_safe.get("species_id",""))!="jure_a")
 	# With no mission candidates, the established rank-local 60/40 draw is used.
 	var no_feature_new:=0;test_rng.seed=2026101802
@@ -393,6 +393,11 @@ func _test_jurejure_species_gate(game)->void:
 		var result:Dictionary=game.forest_gacha_system.draw({"base":true,"jurejure":true},known,{},test_rng,true,pool_unlocks)
 		if str(result.get("series_id",""))=="jurejure":
 			seen_jurejure[str(result.get("species_id",""))]=true
+	assert(seen_jurejure.is_empty())
+	var no_featured:Array[String]=[]
+	for sample_index in range(200):
+		var result:Dictionary=game.forest_gacha_system.draw({"base":true,"jurejure":true},known,{},test_rng,true,pool_unlocks,{},-1.0,no_featured,false,-1.0,true)
+		if str(result.get("series_id",""))=="jurejure":seen_jurejure[str(result.get("species_id",""))]=true
 	assert(seen_jurejure.size()>1)
 
 func _test_spin_capsule_and_reveal(game)->void:

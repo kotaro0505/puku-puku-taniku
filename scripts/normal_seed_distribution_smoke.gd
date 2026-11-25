@@ -15,6 +15,7 @@ func _ready()->void:
 	_test_fusion_acquisition_does_not_leak(game)
 	_test_route_exclusions_and_spawn_weight(game)
 	_test_jurejure_collection_new_selection(game)
+	_test_jurejure_story_phase_acquisition_gate(game)
 	game.free();await get_tree().process_frame
 	print("NORMAL_SEED_DISTRIBUTION_SMOKE_OK normal=uniform_0+1 fusion=0.5+0.1+0.03 five_star=0 guarantees=3+1 jure_new_share=50 unlocks=2+3+4")
 	get_tree().quit()
@@ -201,3 +202,134 @@ func _test_jurejure_collection_new_selection(game:Node)->void:
 	# the route immediately without a separate UI refresh.
 	for index in range(8):game.species_get_counts[str(jure_entries[index].get("species_id",""))]=1
 	assert(not game._jurejure_collection_draw_active() and game._jurejure_collection_new_candidates().is_empty())
+
+func _test_jurejure_story_phase_acquisition_gate(game:Node)->void:
+	game.discovered.clear();game.species_get_counts.clear();game.greenhouse_available.clear();game.unlocked_species.clear()
+	game.unlocked_series={"base":true,"jurejure":true}
+	game.pending_round_new_species_ids.clear();game.forest_gacha_encountered.clear()
+	game.act2_unlocked=true;game.act3_unlocked=false;game.act3_intro_seen=false;game.act3_intro_pending=false
+	game.story_progression_state=game.StoryProgressionClass.default_runtime_state()
+	game.story_progression_state["fantasy_unlocked"]=true
+	game.story_progression_state["fusion_lab_unlocked"]=true
+	game.story_progression_state["exploitation_started"]=false
+	game.habitat_crisis_pending=false;game.habitat_crisis_started=false
+
+	var act2_ids:Array[String]=[]
+	var jurejure_page_ids:Array[String]=[]
+	var direct_jurejure_ids:Array[String]=[]
+	for entry_value in game.catalog_species:
+		if not entry_value is Dictionary:continue
+		var entry:Dictionary=entry_value;var species_id:=str(entry.get("species_id",""))
+		if game._is_jurejure_collection_species(entry):jurejure_page_ids.append(species_id)
+		if game._is_jurejure_species(entry):direct_jurejure_ids.append(species_id)
+		if not game._is_jurejure_collection_species(entry) and (bool(entry.get("main_story_original",false)) or game._is_fantasy_species(entry)):
+			act2_ids.append(species_id)
+	assert(jurejure_page_ids.size()==20 and direct_jurejure_ids.size()==10 and act2_ids.size()>=24)
+
+	# Reproduce a fresh Act II 5/24 save while also injecting the stale unlock
+	# flags seen in older formats. The flags must not become acquisition proof.
+	for index in range(5):
+		var species_id:=act2_ids[index]
+		game.discovered[species_id]=true;game.species_get_counts[species_id]=1
+		game.greenhouse_available[species_id]=true;game.unlocked_species[species_id]=true
+	assert(game._unique_act2_species_get_count()==5)
+	game.jurejure_pool_unlocked=true
+	for species_id in direct_jurejure_ids:game.jurejure_species_unlocked[species_id]=true
+	assert(not game._jurejure_acquisition_is_allowed())
+	assert(not game._is_jurejure_species_unlocked(direct_jurejure_ids[0]))
+	_assert_pre_exploitation_random_pools_exclude_jurejure(game,jurejure_page_ids)
+	# The early one-time Armadillo series gift is another random grant route.
+	# If every ordinary series is already open, it must not fall through to the
+	# still-locked JureJure catalog page.
+	for rule_value in game.catalog_progression.get("normal_series",[]):
+		if rule_value is Dictionary and str(rule_value.get("series_id",""))!="jurejure":game.unlocked_series[str(rule_value.get("series_id",""))]=true
+	game.unlocked_series.erase("jurejure")
+	game.armadillo_gift_series_id="jurejure";game.armadillo_gift_species_id=direct_jurejure_ids[0]
+	game._prepare_armadillo_series_gift()
+	assert(game.armadillo_gift_series_id.is_empty() and game.armadillo_gift_species_id.is_empty())
+	game.unlocked_series["jurejure"]=true
+	var direct_id:=direct_jurejure_ids[0];var fusion_id:="hyb_sweets_jure"
+	assert(not game._register_species_discovery(direct_id,true) and game._species_get_count(direct_id)==0)
+	assert(not game._register_species_discovery(fusion_id,true) and game._species_get_count(fusion_id)==0)
+
+	# A corrupt/old save can own a Jure parent, but the Lab must reject its Jure
+	# result before charging currency or changing ownership.
+	var sweets_parent:="sweets_strawberry_shortcake"
+	game.species_get_counts[sweets_parent]=1;game.species_get_counts[direct_id]=1
+	game.discovered[sweets_parent]=true;game.discovered[direct_id]=true
+	game.greenhouse_available[sweets_parent]=true;game.greenhouse_available[direct_id]=true
+	game.puku_points=20;var balance_before:int=game.puku_balance_units
+	var blocked_resolution:Dictionary=game.fusion_system.resolve(sweets_parent,direct_id)
+	assert(str(blocked_resolution.get("result_species_id",""))==fusion_id)
+	game._perform_fusion(sweets_parent,direct_id)
+	assert(game.puku_balance_units==balance_before and game._species_get_count(fusion_id)==0 and not game.fusion_in_progress)
+	game.species_get_counts.erase(sweets_parent);game.discovered.erase(sweets_parent)
+	game.greenhouse_available.erase(sweets_parent);game.unlocked_species.erase(sweets_parent)
+
+	# Even 24/24 only queues Act III. Until the intro actually begins
+	# exploitation, every acquisition path remains closed and crisis cannot start.
+	for index in range(5,24):
+		var species_id:=act2_ids[index]
+		game.discovered[species_id]=true;game.species_get_counts[species_id]=1
+		game.greenhouse_available[species_id]=true;game.unlocked_species[species_id]=true
+	assert(game._unique_act2_species_get_count()==24)
+	game._refresh_narrative_species_progress()
+	assert(game.act3_unlocked and game.act3_intro_pending and not game._jurejure_acquisition_is_allowed())
+	assert(not game.habitat_crisis_pending and not game.habitat_crisis_started)
+	_assert_pre_exploitation_random_pools_exclude_jurejure(game,jurejure_page_ids)
+
+	# Reload migration clears stale pool flags but preserves the already-owned
+	# leaked card instead of corrupting or deleting player data.
+	game.habitat_crisis_pending=true
+	game.armadillo_gift_series_id="jurejure";game.armadillo_gift_species_id=direct_id
+	game.StoryProgressionClass.queue_habitat_crisis_transition(game.story_progression_state,false)
+	game._migrate_three_act_progress(game.PROGRESSION_VERSION)
+	assert(not game.jurejure_pool_unlocked and game.jurejure_species_unlocked.is_empty())
+	assert(game.armadillo_gift_series_id.is_empty() and game.armadillo_gift_species_id.is_empty())
+	assert(game._species_get_count(direct_id)==1 and bool(game.discovered.get(direct_id,false)))
+	assert(not game.habitat_crisis_pending and not game.jurejure_species_first_seen)
+	_assert_pre_exploitation_random_pools_exclude_jurejure(game,jurejure_page_ids)
+
+	# The same entries become eligible at the durable exploitation phase. A
+	# legitimate Lab result then contributes to the shared eight-species count.
+	game.story_progression_state["exploitation_started"]=true;game.act3_intro_seen=true;game.act3_intro_pending=false
+	assert(game._unlock_jurejure_pool() and game._is_jurejure_species_unlocked(direct_jurejure_ids[1]))
+	var no_featured:Array[String]=[]
+	var gacha_post:Dictionary=game.forest_gacha_system._eligible_candidates_by_rank(true,game.jurejure_species_unlocked,{2:true,3:true,4:true},no_featured,true)
+	for species_id in jurejure_page_ids:
+		var entry:Dictionary=game._catalog_entry(species_id);var stars:int=SpeciesStarRarityClass.stars_for(entry)
+		if stars>=2 and stars<=4:assert((gacha_post.get(stars,[]) as Array).any(func(candidate:Dictionary)->bool:return str(candidate.get("species_id",""))==species_id))
+	var before_fusion_count:int=game._unique_jurejure_species_get_count()
+	assert(game._register_species_discovery(fusion_id,true))
+	assert(game._unique_jurejure_species_get_count()==before_fusion_count+1)
+	game.habitat_crisis_pending=false;game.habitat_crisis_started=false
+	for index in range(8):
+		var species_id:=jurejure_page_ids[index]
+		game.discovered[species_id]=true;game.species_get_counts[species_id]=maxi(1,game._species_get_count(species_id))
+	game._refresh_narrative_species_progress()
+	assert(game._unique_jurejure_species_get_count()>=8 and game.habitat_crisis_pending)
+	var restoration:Dictionary=game._restoration_state();restoration["ending_seen"]=true;restoration["ending_phase"]="complete";game.story_progression_state["restoration"]=restoration
+	assert(game._jurejure_acquisition_is_allowed() and not game._post_ending_normal_reward_candidates().is_empty())
+
+func _assert_pre_exploitation_random_pools_exclude_jurejure(game:Node,jurejure_page_ids:Array[String])->void:
+	var blocked_ids:Dictionary={}
+	for species_id in jurejure_page_ids:blocked_ids[species_id]=true
+	var normal_pools:Dictionary=game._normal_seed_selection_pools()
+	for group_name in ["unlocked_new","locked_new","normal_known","all_known"]:
+		for entry_value in normal_pools.get(group_name,[]):
+			assert(entry_value is Dictionary and not blocked_ids.has(str(entry_value.get("species_id",""))),"normal seed leaked %s through %s"%[entry_value.get("species_id",""),group_name])
+	for stars in [2,3,4]:
+		for entry_value in (normal_pools.get("fusion_by_stars",{}).get(stars,[]) as Array):
+			assert(entry_value is Dictionary and not blocked_ids.has(str(entry_value.get("species_id",""))),"normal seed rank %d leaked %s"%[stars,entry_value.get("species_id","")])
+	var no_featured:Array[String]=[]
+	var gacha_pools:Dictionary=game.forest_gacha_system._eligible_candidates_by_rank(true,game.jurejure_species_unlocked,{2:true,3:true,4:true},no_featured,false)
+	for stars in [0,2,3,4]:
+		for entry_value in (gacha_pools.get(stars,[]) as Array):
+			assert(entry_value is Dictionary and not blocked_ids.has(str(entry_value.get("species_id",""))),"gacha rank %d leaked %s"%[stars,entry_value.get("species_id","")])
+	for stars in [2,3,4]:
+		for entry_value in game._battle_fusion_reward_candidates(stars):
+			assert(not blocked_ids.has(str(entry_value.get("species_id",""))),"battle rank %d leaked %s"%[stars,entry_value.get("species_id","")])
+	for entry_value in game._series_seed_draw_candidates("jurejure"):
+		assert(not blocked_ids.has(str(entry_value.get("species_id",""))),"series seed leaked %s"%entry_value.get("species_id",""))
+	for entry_value in game._jurejure_reward_candidates():
+		assert(not blocked_ids.has(str(entry_value.get("species_id",""))),"battle reward leaked %s"%entry_value.get("species_id",""))

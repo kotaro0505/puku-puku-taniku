@@ -604,7 +604,7 @@ func _test_three_act_sequence(game: Node) -> void:
 	assert(game.current_mode == "greenhouse" and game.scripted_dialog_kind == "post_crisis_greenhouse")
 	assert(game.scripted_dialog_pages.size() == 4)
 	assert(str(game.scripted_dialog_pages[0].get("text", "")) == "原生地を元に戻すには、どうしたらいいんだろう……。")
-	assert(str(game.scripted_dialog_pages[1].get("text", "")) == "弱ってるなら、まずは多肉を戻してあげた方がいいかもしれない。")
+	assert(str(game.scripted_dialog_pages[1].get("text", "")) == Localizer.text("ja", "post_crisis_greenhouse_armadillo"))
 	assert(str(game.scripted_dialog_pages[2].get("text", "")) == "じゃあ、とにかく大きな株を作って持っていってみない？")
 	assert(str(game.scripted_dialog_pages[3].get("text", "")) == "うん。やってみよう！")
 	_finish_dialog(game)
@@ -728,11 +728,13 @@ func _test_legacy_three_act_migration(game: Node) -> void:
 	assert(bool(game.discovered.get("pinwheel", false)) and game._species_get_count("pinwheel") == 1)
 	assert(bool(game.discovered.get("transparent_succulent", false)) and game._species_get_count("transparent_succulent") == 1)
 	assert(bool(game.habitat_returned_species.get("laui", false)) and bool(game.habitat_returned_species.get("transparent_succulent", false)))
-	assert(game._is_jurejure_species_unlocked(migrated_jurejure_id))
-	assert(game.jurejure_pool_unlocked and game.jurejure_species_unlocked.size() == 10)
+	# Preserve the leaked legacy ownership, but a pre-exploitation reload must
+	# discard its stale random-acquisition pool flags.
+	assert(not game._is_jurejure_species_unlocked(migrated_jurejure_id))
+	assert(not game.jurejure_pool_unlocked and game.jurejure_species_unlocked.is_empty())
 	for jure_entry in game._series_species_entries("jurejure"):
 		var jure_id := str(jure_entry.get("species_id", ""))
-		assert(game._is_jurejure_species_unlocked(jure_id))
+		assert(not game._is_jurejure_species_unlocked(jure_id))
 		if jure_id != migrated_jurejure_id:
 			assert(game._species_get_count(jure_id) == 0 and not bool(game.discovered.get(jure_id, false)))
 	assert(bool(game.greenhouse_available.get(migrated_jurejure_id, false)) and game._species_get_count(migrated_jurejure_id) == 2)

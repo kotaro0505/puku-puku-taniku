@@ -2007,9 +2007,8 @@ func _migrate_three_act_progress(saved_progression_version:int,retired_secret_ga
 		if bool(jurejure_species_unlocked.get(species_id_value,false)) and _is_jurejure_species(saved_entry):
 			sanitized_jurejure_unlocks[saved_species_id]=true;legacy_jurejure_unlock_found=true
 	jurejure_species_unlocked=sanitized_jurejure_unlocks
-	# Any real legacy JureJure GET/unlock is authoritative evidence that the
-	# player already crossed the new one-time pool gate. Keep ownership exact,
-	# while opening all ten only as future acquisition candidates.
+	# Preserve exact legacy ownership and pool evidence. The story-phase gate
+	# below decides whether that evidence may currently reopen future candidates.
 	for raw_entry in catalog_species:
 		if raw_entry is Dictionary and _is_jurejure_species(raw_entry):
 			var owned_jurejure_id:=str(raw_entry.get("species_id",""))
@@ -2040,6 +2039,21 @@ func _migrate_three_act_progress(saved_progression_version:int,retired_secret_ga
 		"habitat_crisis_pending":habitat_crisis_pending,
 		"secret_gacha_evidence":retired_secret_gacha_evidence,
 	})
+	# Affected pre-exploitation saves can contain stale pool flags or even an
+	# already-owned leaked card. Keep ownership intact, but never let those flags
+	# reopen random acquisition before the real story phase begins.
+	if not _jurejure_acquisition_is_allowed():
+		jurejure_pool_unlocked=false
+		jurejure_species_unlocked.clear()
+		var saved_armadillo_gift:=_catalog_entry(armadillo_gift_species_id)
+		if not saved_armadillo_gift.is_empty() and _jurejure_acquisition_is_blocked(saved_armadillo_gift):
+			armadillo_gift_series_id=""
+			armadillo_gift_species_id=""
+		if not habitat_crisis_started:
+			habitat_crisis_pending=false
+			StoryProgressionClass.clear_habitat_crisis_transition(story_progression_state)
+	elif jurejure_pool_unlocked:
+		_sync_jurejure_pool_unlock_state()
 	if fantasy_first_discovery_seen:StoryProgressionClass.consume_story_event(story_progression_state,StoryProgressionClass.EVENT_FANTASY_FIRST)
 	if fantasy_realization_seen:StoryProgressionClass.consume_story_event(story_progression_state,StoryProgressionClass.EVENT_FANTASY_SIX)
 	# In older save formats the completed six-species milestone itself was the
@@ -2072,8 +2086,8 @@ func _migrate_three_act_progress(saved_progression_version:int,retired_secret_ga
 		if not act3_intro_seen:act3_intro_pending=true
 	if act3_intro_seen:
 		act3_intro_pending=false
-	if jurejure_count>=1 and saved_progression_version<PROGRESSION_VERSION:jurejure_species_first_seen=true
-	if jurejure_count>=8 and not habitat_crisis_started:
+	if _jurejure_acquisition_is_allowed() and jurejure_count>=1 and saved_progression_version<PROGRESSION_VERSION:jurejure_species_first_seen=true
+	if _jurejure_acquisition_is_allowed() and jurejure_count>=8 and not habitat_crisis_started:
 		habitat_crisis_pending=true
 		if StoryProgressionClass.habitat_crisis_route(story_progression_state).is_empty():
 			StoryProgressionClass.queue_habitat_crisis_transition(story_progression_state,false)
@@ -3438,10 +3452,12 @@ func _finish_scripted_dialog()->void:
 			armadillo_intro_event_3_completed=true;pending_armadillo_story_event="";show_pinwheel_get=true
 			_queue_armadillo_progress_event()
 		"armadillo_7":
-			if not armadillo_gift_series_id.is_empty():
+			var armadillo_gift_entry:=_catalog_entry(armadillo_gift_species_id)
+			if not armadillo_gift_series_id.is_empty() and not armadillo_gift_entry.is_empty() and not _jurejure_acquisition_is_blocked(armadillo_gift_entry):
 				_unlock_series_and_register_encounters(armadillo_gift_series_id)
 				if _register_species_discovery(armadillo_gift_species_id,true):acquired.append(armadillo_gift_species_id)
-			armadillo_series_event_7_completed=true;pending_armadillo_story_event="";show_armadillo_gift=true
+				show_armadillo_gift=true
+			armadillo_series_event_7_completed=true;pending_armadillo_story_event=""
 		"puku_gauge_first_gift":
 			puku_gauge_intro_complete=true;tutorial_steps["puku_gauge_intro_complete"]=true;_ensure_initial_puku_capital(true);shop_current_page="categories";_set_shop_purchase_visible(true)
 		"collection_complete":
@@ -4831,6 +4847,9 @@ func _refresh_fusion_lab_result()->void:
 	if fusion_lab_ui==null:return
 	var resolution:Dictionary=fusion_system.resolve(fusion_parent_a_id,fusion_parent_b_id)
 	var result_species_id:=str(resolution.get("result_species_id",""))
+	var resolved_entry:Dictionary=resolution.get("result_entry",{})
+	if _jurejure_acquisition_is_blocked(resolved_entry):
+		resolution={};result_species_id=""
 	var is_new:=not result_species_id.is_empty() and _species_get_count(result_species_id)<=0
 	fusion_lab_ui.refresh_selection(fusion_parent_a_id,fusion_parent_b_id,resolution,is_new)
 	var result_entry:Dictionary=resolution.get("result_entry",{})
@@ -4846,6 +4865,8 @@ func _perform_fusion(parent_a_id:String,parent_b_id:String)->void:
 	var result_entry:Dictionary=resolution.get("result_entry",{})
 	var result_species_id:=str(resolution.get("result_species_id",""))
 	if result_entry.is_empty() or result_species_id.is_empty():
+		fusion_lab_ui.show_error(Localizer.text(language_code,"fusion_recipe_missing"));return
+	if _jurejure_acquisition_is_blocked(result_entry):
 		fusion_lab_ui.show_error(Localizer.text(language_code,"fusion_recipe_missing"));return
 	if _species_get_count(result_species_id)>0:
 		fusion_lab_ui.set_processing_state(false)
@@ -5008,7 +5029,7 @@ func _spin_forest_gacha()->void:
 		if not _trial_dev_controls_enabled():forest_gacha_ui.cancel_spin_feedback();return
 		var trial_next:=forest_gacha_draw_count+1
 		var trial_collection_draw_active:=_jurejure_collection_draw_active()
-		var trial_result:Dictionary=forest_gacha_system.draw(unlocked_series,discovered,forest_gacha_encountered,forest_gacha_rng,StoryProgressionClass.fantasy_is_unlocked(story_progression_state),jurejure_species_unlocked,_random_fusion_source_unlocks(),-1.0,_jurejure_collection_new_candidate_ids(),trial_collection_draw_active)
+		var trial_result:Dictionary=forest_gacha_system.draw(unlocked_series,discovered,forest_gacha_encountered,forest_gacha_rng,StoryProgressionClass.fantasy_is_unlocked(story_progression_state),jurejure_species_unlocked,_random_fusion_source_unlocks(),-1.0,_jurejure_collection_new_candidate_ids(),trial_collection_draw_active,-1.0,_jurejure_acquisition_is_allowed())
 		if trial_result.is_empty():forest_gacha_ui.cancel_spin_feedback();return
 		var trial_unlocked_series_id:=""
 		if str(trial_result.get("source",""))=="locked":
@@ -5020,7 +5041,7 @@ func _spin_forest_gacha()->void:
 		forest_gacha_ui.cancel_spin_feedback();forest_gacha_ui.set_wallet(puku_points,forest_gacha_draw_count);return
 	var next_draw:=forest_gacha_draw_count+1
 	var collection_draw_active:=_jurejure_collection_draw_active()
-	var result:Dictionary=forest_gacha_system.draw(unlocked_series,discovered,forest_gacha_encountered,forest_gacha_rng,StoryProgressionClass.fantasy_is_unlocked(story_progression_state),jurejure_species_unlocked,_random_fusion_source_unlocks(),-1.0,_jurejure_collection_new_candidate_ids(),collection_draw_active)
+	var result:Dictionary=forest_gacha_system.draw(unlocked_series,discovered,forest_gacha_encountered,forest_gacha_rng,StoryProgressionClass.fantasy_is_unlocked(story_progression_state),jurejure_species_unlocked,_random_fusion_source_unlocks(),-1.0,_jurejure_collection_new_candidate_ids(),collection_draw_active,-1.0,_jurejure_acquisition_is_allowed())
 	if result.is_empty():forest_gacha_ui.cancel_spin_feedback();return
 	var unlocked_series_id:=""
 	if str(result.get("source",""))=="locked":
@@ -5510,7 +5531,7 @@ func _immediate_get_story_transition_pending()->bool:
 	if habitat_crisis_pending or act3_intro_pending and not act3_intro_seen:return true
 	var event_id:=StoryProgressionClass.peek_story_event(story_progression_state)
 	if event_id in [StoryProgressionClass.EVENT_FANTASY_FIRST,StoryProgressionClass.EVENT_FANTASY_SIX,StoryProgressionClass.EVENT_FUSION_LAB_INTRO]:return true
-	return _unique_jurejure_species_get_count()>=1 and not jurejure_species_first_seen
+	return _jurejure_acquisition_is_allowed() and _unique_jurejure_species_get_count()>=1 and not jurejure_species_first_seen
 
 func _change_audio_enabled(enabled:bool,is_bgm:bool)->void:
 	audio_settings["bgm_enabled" if is_bgm else "se_enabled"]=enabled
@@ -5809,17 +5830,25 @@ func _start_pending_armadillo_story()->bool:
 	return false
 
 func _prepare_armadillo_series_gift()->void:
-	if not armadillo_gift_series_id.is_empty() and not armadillo_gift_species_id.is_empty():return
+	if not armadillo_gift_series_id.is_empty() and not armadillo_gift_species_id.is_empty():
+		var saved_gift_entry:=_catalog_entry(armadillo_gift_species_id)
+		if not saved_gift_entry.is_empty() and not _jurejure_acquisition_is_blocked(saved_gift_entry):return
+		armadillo_gift_series_id="";armadillo_gift_species_id=""
 	var candidates:Array[Dictionary]=[]
 	for rule_value in catalog_progression.get("normal_series",[]):
 		if not rule_value is Dictionary:continue
 		var series_id:=str(rule_value.get("series_id",""));var entry:=_series_entry(series_id)
 		if series_id in [INITIAL_SERIES_ID,ORIGINAL_SERIES_ID] or entry.is_empty() or _is_series_unlocked(entry):continue
-		if _series_species_entries(series_id).is_empty():continue
+		var available_entries:Array[Dictionary]=[]
+		for species_entry in _series_species_entries(series_id):
+			if not _jurejure_acquisition_is_blocked(species_entry):available_entries.append(species_entry)
+		if available_entries.is_empty():continue
 		candidates.append(entry)
 	if candidates.is_empty():return
 	var chosen_series:Dictionary=candidates[rng.randi_range(0,candidates.size()-1)];armadillo_gift_series_id=str(chosen_series.get("series_id",""))
-	var gift_species:=_series_species_entries(armadillo_gift_series_id);var preferred:Array[Dictionary]=[]
+	var gift_species:Array[Dictionary]=[];var preferred:Array[Dictionary]=[]
+	for entry in _series_species_entries(armadillo_gift_series_id):
+		if not _jurejure_acquisition_is_blocked(entry):gift_species.append(entry)
 	for entry in gift_species:
 		if not bool(discovered.get(str(entry.get("species_id","")),false)):preferred.append(entry)
 	var source:=preferred if not preferred.is_empty() else gift_species
@@ -7336,17 +7365,27 @@ func _is_jurejure_collection_species(entry:Dictionary)->bool:
 	# members of that acquisition pool.
 	return not entry.is_empty() and _catalog_display_series_id_for_entry(entry)==JUREJURE_SERIES_ID
 
+func _jurejure_acquisition_is_allowed()->bool:
+	# Acquisition opens at the durable exploitation phase, not from legacy pool
+	# flags, Act III unlock/UI state, or an already-owned leaked card. This keeps
+	# old saves from bypassing the story gate while preserving their ownership.
+	return StoryProgressionClass.exploitation_is_started(story_progression_state)
+
+func _jurejure_acquisition_is_blocked(entry:Dictionary)->bool:
+	return _is_jurejure_collection_species(entry) and not _jurejure_acquisition_is_allowed()
+
 func _is_jurejure_species_unlocked(species_id:String)->bool:
-	return jurejure_pool_unlocked and _is_jurejure_species(_catalog_entry(species_id))
+	return _jurejure_acquisition_is_allowed() and jurejure_pool_unlocked and _is_jurejure_species(_catalog_entry(species_id))
 
 func _sync_jurejure_pool_unlock_state()->void:
-	if not jurejure_pool_unlocked:return
+	if not jurejure_pool_unlocked or not _jurejure_acquisition_is_allowed():return
 	unlocked_series[JUREJURE_SERIES_ID]=true
 	for entry in catalog_species:
 		if entry is Dictionary and _is_jurejure_species(entry):
 			jurejure_species_unlocked[str(entry.get("species_id",""))]=true
 
 func _unlock_jurejure_pool()->bool:
+	if not _jurejure_acquisition_is_allowed():return false
 	var newly_unlocked:=not jurejure_pool_unlocked
 	jurejure_pool_unlocked=true
 	_sync_jurejure_pool_unlock_state()
@@ -7489,7 +7528,7 @@ func _refresh_narrative_species_progress()->void:
 		act3_unlocked=true;act3_intro_pending=not act3_intro_seen;act3_intro_eligible_visit_id=habitat_visit_id
 	var jurejure_count:=_unique_jurejure_species_get_count()
 	StoryProgressionClass.update_jurejure_progress(story_progression_state,jurejure_count)
-	if jurejure_count>=8 and not habitat_crisis_started and not habitat_crisis_pending:
+	if _jurejure_acquisition_is_allowed() and jurejure_count>=8 and not habitat_crisis_started and not habitat_crisis_pending:
 		habitat_crisis_pending=true
 		StoryProgressionClass.queue_habitat_crisis_transition(story_progression_state,current_mode=="habitat")
 	_update_main_story_progress(false)
@@ -7534,6 +7573,7 @@ func _record_species_get(species_id:String,amount:int=1)->void:
 
 func _species_available_in_current_era(entry:Dictionary)->bool:
 	if entry.is_empty():return false
+	if _jurejure_acquisition_is_blocked(entry):return false
 	if _is_jurejure_species(entry):return _is_jurejure_species_unlocked(str(entry.get("species_id","")))
 	if bool(entry.get("main_story_original",false)):return true
 	if StoryProgressionClass.fantasy_is_unlocked(story_progression_state):return true
@@ -7554,6 +7594,7 @@ func _register_species_discovery(species_id:String,count_get:=true,check_collect
 	if profile_first_colorata:_old_colorata_profile_mark("registration_lookup_start")
 	var entry:=_catalog_entry(species_id)
 	if entry.is_empty():return false
+	if _jurejure_acquisition_is_blocked(entry):return false
 	if _is_jurejure_species(entry) and not _is_jurejure_species_unlocked(species_id):
 		# The collection mission is the only non-battle route allowed to open the
 		# existing gang pool.  Outside it the historical acquisition gate remains.
@@ -7765,7 +7806,7 @@ func _try_start_pending_story_event()->void:
 		_start_fusion_lab_intro_event()
 	elif current_mode=="greenhouse" and forest_gacha_unlocked and not forest_gacha_intro_seen:
 		_start_forest_gacha_intro_event()
-	elif _unique_jurejure_species_get_count()>=1 and not jurejure_species_first_seen:
+	elif _jurejure_acquisition_is_allowed() and _unique_jurejure_species_get_count()>=1 and not jurejure_species_first_seen:
 		_start_jurejure_species_first_event()
 	elif current_mode=="habitat" and StoryProgressionClass.exploitation_is_started(story_progression_state) and not habitat_crisis_started:
 		_maybe_start_habitat_exploitation_concern()
@@ -7775,7 +7816,7 @@ func _try_start_pending_story_event()->void:
 		_start_post_tutorial_habitat_guidance()
 
 func _try_start_pending_habitat_crisis_transition()->bool:
-	if not habitat_crisis_pending or habitat_crisis_started:return false
+	if not _jurejure_acquisition_is_allowed() or not habitat_crisis_pending or habitat_crisis_started:return false
 	var route:=StoryProgressionClass.habitat_crisis_route(story_progression_state)
 	if route.is_empty():
 		StoryProgressionClass.queue_habitat_crisis_transition(story_progression_state,current_mode=="habitat")
@@ -9226,6 +9267,7 @@ func _normal_seed_selection_pools()->Dictionary:
 	for entry in catalog_species:
 		var species_id:=str(entry.get("species_id",""))
 		if species_id.is_empty() or species_id in pending_round_new_species_ids:continue
+		if _jurejure_acquisition_is_blocked(entry):continue
 		var stars:=SpeciesStarRarityClass.stars_for(entry)
 		if stars>=2:
 			if stars<=4 and SpeciesStarRarityClass.random_source_unlocked(stars,fusion_unlocks):
@@ -9633,18 +9675,18 @@ func _jurejure_reward_candidates()->Array[Dictionary]:
 	for entry in catalog_species:
 		var species_id:=str(entry.get("species_id",""))
 		if species_id.is_empty():continue
-		if act3_intro_seen:
+		if _jurejure_acquisition_is_allowed():
 			if not _is_jurejure_species(entry):continue
 			all_jurejure.append(entry)
 			if _species_get_count(species_id)<=0:candidates.append(entry)
 			continue
 		if _species_get_count(species_id)>0:continue
-		if _is_jurejure_species(entry) or not _species_available_in_current_era(entry):continue
+		if _is_jurejure_collection_species(entry) or not _species_available_in_current_era(entry):continue
 		if _seed_new_species_blocked(species_id) or str(entry.get("rarity","")) in ["隠し原種","謎品種"]:continue
 		if not _species_is_in_unlocked_series(species_id):continue
 		candidates.append(entry)
 	# After all ten have actually been obtained, repeat wins may award any one.
-	if act3_intro_seen and candidates.is_empty():candidates=all_jurejure
+	if _jurejure_acquisition_is_allowed() and candidates.is_empty():candidates=all_jurejure
 	return candidates
 
 func _is_post_ending_jurejure_battle()->bool:
@@ -9673,7 +9715,7 @@ func _grant_jurejure_battle_reward()->String:
 	if candidates.is_empty():return ""
 	var chosen:Dictionary=candidates[rng.randi_range(0,candidates.size()-1)];var species_id:=str(chosen.get("species_id",""))
 	jurejure_pending_reward_is_new=_species_get_count(species_id)<=0
-	if act3_intro_seen:_unlock_jurejure_pool()
+	if _jurejure_acquisition_is_allowed():_unlock_jurejure_pool()
 	_register_species_discovery(species_id,true);_apply_saved_unlocks();_sync_arrangement_ui()
 	return species_id
 
@@ -9681,15 +9723,22 @@ func _grant_random_fusion_battle_reward(forced_roll:float=-1.0,difficulty:int=Pu
 	var roll:=rng.randf() if forced_roll<0.0 else clampf(forced_roll,0.0,.999999)
 	var stars:=_battle_fusion_reward_rank_for_roll(roll,difficulty)
 	if stars==0 or not SpeciesStarRarityClass.random_source_unlocked(stars,_random_fusion_source_unlocks()):return ""
-	var candidates:Array[Dictionary]=[]
-	for entry_value in catalog_species:
-		if entry_value is Dictionary and SpeciesStarRarityClass.stars_for(entry_value)==stars:candidates.append(entry_value)
+	var candidates:=_battle_fusion_reward_candidates(stars)
 	if candidates.is_empty():return ""
 	var chosen:Dictionary=candidates[rng.randi_range(0,candidates.size()-1)]
 	var species_id:=str(chosen.get("species_id",""))
 	jurejure_pending_fusion_reward_is_new=_species_get_count(species_id)<=0
 	_register_species_discovery(species_id,true);_apply_saved_unlocks();_sync_arrangement_ui()
 	return species_id
+
+func _battle_fusion_reward_candidates(stars:int)->Array[Dictionary]:
+	var candidates:Array[Dictionary]=[]
+	for entry_value in catalog_species:
+		if not entry_value is Dictionary:continue
+		var entry:Dictionary=entry_value
+		if SpeciesStarRarityClass.stars_for(entry)!=stars or _jurejure_acquisition_is_blocked(entry):continue
+		candidates.append(entry)
+	return candidates
 
 func _battle_fusion_reward_rank_for_roll(roll:float,difficulty:int=PukuPukuBattleClass.DIFFICULTY_NORMAL)->int:
 	return PukuPukuBattleClass.fusion_reward_rank_for_roll(roll,difficulty)
