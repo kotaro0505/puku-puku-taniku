@@ -6860,8 +6860,8 @@ func _catalog_entry_is_listed_for_series(entry:Dictionary,series_id:String)->boo
 	return false
 
 func _game_version_key()->String:
-	var version:=str(ProjectSettings.get_setting("application/config/version","1.0.0")).strip_edges()
-	return "1.0.0" if version.is_empty() else version.trim_prefix("v").trim_prefix("V")
+	var version:=str(ProjectSettings.get_setting("application/config/version","1.0.1")).strip_edges()
+	return "1.0.1" if version.is_empty() else version.trim_prefix("v").trim_prefix("V")
 
 func _collection_complete_entry_is_eligible(entry:Dictionary)->bool:
 	if entry.is_empty():return false

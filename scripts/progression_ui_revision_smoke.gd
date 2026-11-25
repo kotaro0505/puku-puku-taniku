@@ -233,7 +233,7 @@ func _test_app_review_iap_access(game:Node)->void:
 	await get_tree().process_frame
 	assert(not game.opening_language_panel.visible and game.opening_review_logo_tap_area.is_visible_in_tree() and not game.opening_review_logo_tap_area.disabled)
 	assert(not game.settings_overlay.visible and game.opening_overlay.visible and not game.opening_finished)
-	assert(game.settings_version_button.text=="Version 1.0.0")
+	assert(game.settings_version_button.text=="Version 1.0.1")
 	assert(game.opening_review_logo_tap_area.position==game.APP_REVIEW_OPENING_LOGO_TAP_RECT.position)
 	assert(game.opening_review_logo_tap_area.size==game.APP_REVIEW_OPENING_LOGO_TAP_RECT.size)
 	assert(game.opening_review_logo_tap_area.action_mode==BaseButton.ACTION_MODE_BUTTON_RELEASE)

@@ -17,7 +17,7 @@ func _ready() -> void:
 	var project_settings_source:=FileAccess.get_file_as_string("res://project.godot")
 	assert(project_settings_source.contains('config/name.puku_iap_review_capture="ぷくぷく 撮影"'))
 	assert(ProjectSettings.get_setting("application/config/icon") == "res://assets/ios/app-icon-1024.png")
-	assert(ProjectSettings.get_setting("application/config/version") == "1.0.0")
+	assert(ProjectSettings.get_setting("application/config/version") == "1.0.1")
 	assert(ProjectSettings.get_setting("rendering/renderer/rendering_method") == "gl_compatibility")
 	assert(ProjectSettings.get_setting("rendering/renderer/rendering_method.mobile") == "gl_compatibility")
 	assert(ProjectSettings.get_setting("rendering/textures/vram_compression/import_etc2_astc"))
